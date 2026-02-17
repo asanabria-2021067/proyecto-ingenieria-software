@@ -1,64 +1,101 @@
-# Proyecto de Ingeniería de Software  
-## Entrega 1 – Design Thinking
+# Plataforma Digital para la Colaboración Interdisciplinaria entre Asociaciones Estudiantiles Universitarias
+## CC3058 – Ingeniería de Software 1 | Sección 30
 
-### 📌 Descripción general
-Este repositorio contiene la **Entrega 1** del Proyecto de Ingeniería de Software, la cual se centra en la **fase de entendimiento del problema** utilizando la metodología de **Design Thinking**.  
+**Universidad del Valle de Guatemala**  
+**Docente:** Lynette García  
 
-El objetivo principal de esta entrega es analizar una problemática real desde la perspectiva de los usuarios, identificar insights relevantes y establecer una base sólida para el desarrollo de una solución en fases posteriores del proyecto.
-
----
-
-### 🎯 Objetivo de la Entrega
-- Comprender el problema desde un enfoque centrado en el usuario.
-- Identificar y definir perfiles de usuarios relevantes.
-- Analizar comportamientos, necesidades y motivaciones.
-- Generar insights que permitan formular oportunidades de mejora.
-- Proponer preguntas tipo **“¿Cómo podríamos…?”** como punto de partida para la solución.
+### 👥 Equipo de Desarrollo
+| Nombre | Carné |
+|---|---|
+| Angel Gabriel Sanabria Morales | 24725 |
+| Saul Esteban Castillo Arenas | 24915 |
+| Vernel Josué Hernández Cáceres | 24584 |
+| Derek Friedhelm Coronado Chilin | 24732 |
+| Samuel Antonio Robledo López | 241282 |
 
 ---
 
-### 🧠 Metodología Utilizada
-Se utilizó la metodología **Design Thinking**, enfocándose principalmente en las siguientes etapas:
+## 📋 Descripción del Proyecto
 
-- **Empatizar**
-- **Definir**
-
-Para ello se aplicaron distintas técnicas de análisis y documentación de usuarios.
+Plataforma digital que centraliza la gestión de proyectos extracurriculares y de investigación dentro de la Universidad del Valle de Guatemala. Permite a asociaciones estudiantiles e institutos académicos publicar oportunidades de colaboración, gestionar equipos y dar seguimiento institucional al trabajo estudiantil de forma estructurada.
 
 ---
 
-### 👥 Perfiles y Usuarios
-- **Perfiles:** Representan grupos de usuarios con características y comportamientos similares.
-- **Usuarios:** Representan usuarios específicos dentro de cada perfil, incluyendo casos extremos (usuarios con participación muy alta y muy baja), los cuales permiten comprender mejor la problemática desde diferentes perspectivas.
+## 🗂️ Estado de Entregas
+
+### ✅ Corte 1 – Empatía y Definición *(Completado)*
+Fase de entendimiento del problema mediante Design Thinking.
+
+- [x] Selección de perfiles y usuarios
+- [x] Entrevistas con usuarios (12 entrevistas realizadas)
+- [x] Técnica Qué, Cómo y Por Qué
+- [x] Framework AEIOU
+- [x] Identificación de insights
+- [x] Formulación de preguntas *¿Cómo podríamos...?*
 
 ---
 
-### 🛠️ Técnicas Aplicadas
-- **Selección de usuarios:** Identificación de grupos relevantes para el estudio.
-- **Usuarios externos:** Análisis de usuarios con comportamientos extremos.
-- **Técnica Qué, Cómo y Por Qué:**  
-  - Qué hacen los usuarios  
-  - Cómo lo hacen  
-  - Por qué lo hacen de esa manera
-- **Framework AEIOU:**  
-  - **Activities (Actividades)**  
-  - **Environments (Entornos)**  
-  - **Interactions (Interacciones)**  
-  - **Objects (Objetos)**  
-  - **Users (Usuarios)**
+### 🚧 Corte 2 – Ideación y Modelación del Sistema *(En progreso)*
+Aplicación de la etapa de Ideación del enfoque Design Thinking para generar, evaluar y estructurar propuestas de solución.
+
+#### IV. Etapa de Ideación
+- [x] **Design Studio** — Aplicado para cada pregunta *¿Cómo podríamos?* formulada en el Corte 1 (17 preguntas trabajadas con sketches y evidencia fotográfica)
+- [x] **Prototipos en bruto** — Pantalla de inicio, ficha de proyecto, sistema de postulación y panel de seguimiento
+- [x] **Refinamiento de prototipos** — Iteraciones basadas en insights: centralización, reconocimiento académico, comunicación, seguimiento, equidad y claridad de roles
+- [x] **Testeo** — Sesión con estudiantes interesados, colaboradores activos y líder de asociación (10/02/2026)
+
+#### V. Modelación del Sistema
+- [x] **Lista de historias de usuario** — 12 historias identificadas (4 perfiles: estudiantes, colaboradores, líderes, coordinadores)
+- [x] **Identificación y descripción de actores** — 4 actores definidos
+- [ ] **Diagrama de casos de uso UML** *(Pendiente)*
+- [ ] **Descripción formal de casos de uso** *(Pendiente)*
+- [x] **Mapa de Historias de Usuario** — Flujo: Awareness → Consideration → Decision → Retention
+- [x] **Priorización de historias de usuario** — Alta, Media y Baja prioridad definidas
+- [x] **Requisitos no funcionales** — 20 RNF clasificados: interfaz, usabilidad, rendimiento, seguridad, confiabilidad, soporte, portabilidad, legales y diseño
+
+#### VI. Trabajo con el Cliente y/o Usuarios
+- [x] **Bitácora de interacción** — 13 sesiones registradas (12 del Corte 1 + 1 de testeo en Corte 2)
+
+#### VII. Informe de Gestión
+- [ ] Desglose de tareas por miembro *(Pendiente)*
+- [ ] Formularios LOGT individuales *(Pendiente)*
+- [ ] Informe de gestión del tiempo del equipo *(Pendiente)*
 
 ---
 
-### 🚀 Estado del Proyecto
-📍 **Entrega 1 completada**  
-Las siguientes entregas se enfocarán en la ideación, prototipado y validación de la solución propuesta.
+## 🧠 Metodología
+
+Se utilizó la metodología **Design Thinking** a lo largo del proyecto:
+
+| Etapa | Corte | Estado |
+|---|---|---|
+| Empatizar | Corte 1 | ✅ Completado |
+| Definir | Corte 1 | ✅ Completado |
+| Idear | Corte 2 | 🚧 En progreso |
+| Prototipar | Corte 2 | 🚧 En progreso |
+| Probar | Corte 2 | ✅ Testeo realizado |
 
 ---
 
-### 📚 Curso
-**Ingeniería de Software**
+## 🛠️ Técnicas Aplicadas — Corte 2
+
+- **Design Studio** — Generación de ideas mediante sketching individual + discusión grupal + votación
+- **Prototipos en bruto** — Storyboards por flujo de interacción
+- **Refinamiento iterativo** — 3+ iteraciones por prototipo basadas en testeo y feedback
+- **User Story Mapping** — Mapeo del recorrido del usuario (Awareness → Consideration → Decision → Retention)
+- **Historias de usuario** — Formato: *Como [actor], deseo [funcionalidad], para [beneficio]*
+- **Priorización MoSCoW** — Clasificación de historias en Alta, Media y Baja prioridad
+- **Formulario LOGT (PSP0)** — Registro de tiempo individual por fase
 
 ---
 
-### 📝 Notas
-Este repositorio corresponde únicamente a la **fase inicial de análisis y definición**, por lo que no incluye aún implementación técnica o desarrollo de software.
+## 👤 Actores del Sistema
+
+| Actor | Rol |
+|---|---|
+| Estudiante sin información | Busca y se postula a proyectos extracurriculares |
+| Estudiante colaborador activo | Participa en proyectos, gestiona tareas y comunicación |
+| Líder de asociación estudiantil | Publica proyectos, coordina equipos y supervisa avances |
+| Coordinador académico / Investigador | Valida participación y certifica horas institucionales |
+
+---
