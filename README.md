@@ -104,9 +104,9 @@ Empatizar → Definir → Idear → Prototipar → Probar
 - [x] **Bitácora** — 13 sesiones registradas (12 Corte 1 + 1 Corte 2)
 
 #### VII. Informe de Gestión
-- [ ] Desglose de tareas por miembro
-- [ ] Formularios LOGT individuales
-- [ ] Informe de gestión del tiempo del equipo
+- [X] Desglose de tareas por miembro
+- [X] Formularios LOGT individuales
+- [X] Informe de gestión del tiempo del equipo
 
 ---
 
