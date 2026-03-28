@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: uvg-collab-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-uvg_collab}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-uvg_collab}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - uvg-network
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  uvg-network:
+    driver: bridge
