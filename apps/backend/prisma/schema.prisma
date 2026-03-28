@@ -1,0 +1,691 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────────
+
+enum EstadoUsuario {
+  ACTIVO
+  INACTIVO
+  BLOQUEADO
+}
+
+enum TipoTelefono {
+  PERSONAL
+  TRABAJO
+  EMERGENCIA
+  OTRO
+}
+
+enum EstadoCarrera {
+  ACTIVA
+  INACTIVA
+}
+
+enum NivelHabilidad {
+  BASICO
+  INTERMEDIO
+  AVANZADO
+}
+
+enum TipoExperiencia {
+  PROYECTO_UNIVERSITARIO
+  PASANTIA
+  VOLUNTARIADO
+  INVESTIGACION
+  OTRO
+}
+
+enum TipoOrganizacion {
+  ASOCIACION
+  INSTITUTO
+  GRUPO_ESTUDIANTIL
+  CENTRO_INVESTIGACION
+  OTRO
+}
+
+enum EstadoOrganizacion {
+  ACTIVA
+  INACTIVA
+}
+
+enum RolOrganizacion {
+  PROPIETARIO
+  ADMINISTRADOR
+  MIEMBRO
+}
+
+enum EstadoMembresia {
+  ACTIVA
+  INACTIVA
+}
+
+enum TipoProyecto {
+  ACADEMICO_HORAS_BECA
+  ACADEMICO_EXPERIENCIA
+  EXTRACURRICULAR_EXTENSION
+}
+
+enum EstadoProyecto {
+  BORRADOR
+  PUBLICADO
+  EN_PROGRESO
+  CERRADO
+}
+
+enum ModalidadProyecto {
+  PRESENCIAL
+  VIRTUAL
+  MIXTA
+}
+
+enum RolOrganizacionProyecto {
+  PRINCIPAL
+  COLABORADORA
+}
+
+enum EstadoPostulacion {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+}
+
+enum EstadoParticipacion {
+  ACTIVO
+  RETIRADO
+  COMPLETADO
+}
+
+enum EstadoHito {
+  PENDIENTE
+  EN_PROGRESO
+  COMPLETADO
+}
+
+enum EstadoTarea {
+  POR_HACER
+  EN_PROGRESO
+  EN_REVISION
+  HECHO
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+}
+
+enum TipoEvidencia {
+  ENLACE
+  ARCHIVO
+  REPORTE
+}
+
+enum ResultadoRevision {
+  APROBADA
+  RECHAZADA
+}
+
+enum EstadoHoras {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
+enum TipoCertificado {
+  HORAS_BECA
+  EXTENSION
+  EXPERIENCIA
+}
+
+enum TipoNotificacion {
+  POSTULACION_RESUELTA
+  TAREA_ASIGNADA
+  EVIDENCIA_REVISADA
+  PROYECTO_PUBLICADO
+  HORAS_VALIDADAS
+  CERTIFICADO_EMITIDO
+  PARTICIPACION_ACTUALIZADA
+}
+
+// ─── MODELS ─────────────────────────────────────────────────────
+
+model Usuario {
+  idUsuario         Int            @id @default(autoincrement()) @map("id_usuario")
+  correo            String         @unique @db.VarChar(255)
+  contrasena        String         @db.VarChar(255)
+  nombre            String         @db.VarChar(255)
+  apellido          String         @db.VarChar(255)
+  fotoUrl           String?        @map("foto_url") @db.VarChar(255)
+  estado            EstadoUsuario  @default(ACTIVO)
+  fechaCreacion     DateTime       @default(now()) @map("fecha_creacion")
+  fechaUltimaSesion DateTime?      @map("fecha_ultima_sesion")
+
+  telefonos                   UsuarioTelefono[]
+  perfil                      PerfilEstudiante?
+  habilidades                 UsuarioHabilidad[]
+  intereses                   UsuarioInteres[]
+  cualidades                  UsuarioCualidad[]
+  experiencias                ExperienciaPrevia[]
+  organizacionesCreadas       Organizacion[]
+  membresiasOrganizacion      UsuarioOrganizacion[]
+  proyectosCreados            Proyecto[]
+  postulaciones               Postulacion[]           @relation("Postulante")
+  postulacionesResueltas      Postulacion[]           @relation("PostulacionResolutor")
+  participaciones             ParticipacionProyecto[]
+  tareasCreadas               Tarea[]
+  tareasAsignadas             AsignacionTarea[]       @relation("TareaAsignada")
+  tareasQueAsigno             AsignacionTarea[]       @relation("TareaAsignador")
+  evidenciasCargadas          Evidencia[]
+  revisionesRealizadas        RevisionEvidencia[]
+  horasAprobadas              HorasParticipacion[]
+  certificadosEmitidos        Certificado[]
+  notificaciones              Notificacion[]
+  rolesAcceso                 UsuarioRolAcceso[]
+  auditorias                  BitacoraAuditoria[]
+  configuracionesActualizadas ConfiguracionSistema[]
+
+  @@map("usuario")
+}
+
+model UsuarioTelefono {
+  idUsuarioTelefono Int          @id @default(autoincrement()) @map("id_usuario_telefono")
+  idUsuario         Int          @map("id_usuario")
+  numero            String       @db.VarChar(30)
+  tipoTelefono      TipoTelefono @default(PERSONAL) @map("tipo_telefono")
+  esPrincipal       Boolean      @default(false) @map("es_principal")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("usuario_telefono")
+}
+
+model PerfilEstudiante {
+  idUsuario                  Int       @id @map("id_usuario")
+  carne                      String    @unique @db.VarChar(255)
+  idCarrera                  Int?      @map("id_carrera")
+  semestre                   Int?
+  biografia                  String?   @db.Text
+  enlacePortafolio           String?   @map("enlace_portafolio") @db.VarChar(255)
+  githubUrl                  String?   @map("github_url") @db.VarChar(255)
+  linkedinUrl                String?   @map("linkedin_url") @db.VarChar(255)
+  disponibilidadHorasSemana  Int?      @map("disponibilidad_horas_semana")
+  urlCv                      String?   @map("url_cv") @db.VarChar(255)
+  preferenciasNotificaciones Json?     @map("preferencias_notificaciones")
+  fechaActualizacion         DateTime? @map("fecha_actualizacion")
+
+  usuario Usuario  @relation(fields: [idUsuario], references: [idUsuario])
+  carrera Carrera? @relation(fields: [idCarrera], references: [idCarrera])
+
+  @@map("perfil_estudiante")
+}
+
+model Carrera {
+  idCarrera          Int           @id @default(autoincrement()) @map("id_carrera")
+  nombreCarrera      String        @map("nombre_carrera") @db.VarChar(255)
+  facultad           String?       @db.VarChar(255)
+  descripcionCarrera String?       @map("descripcion_carrera") @db.Text
+  estado             EstadoCarrera @default(ACTIVA)
+
+  perfiles      PerfilEstudiante[]
+  rolesProyecto RolProyecto[]
+
+  @@map("carrera")
+}
+
+model Habilidad {
+  idHabilidad          Int     @id @default(autoincrement()) @map("id_habilidad")
+  nombreHabilidad      String  @map("nombre_habilidad") @db.VarChar(255)
+  categoriaHabilidad   String? @map("categoria_habilidad") @db.VarChar(255)
+  descripcionHabilidad String? @map("descripcion_habilidad") @db.Text
+
+  usuarioHabilidades UsuarioHabilidad[]
+  experiencias       ExperienciaPrevia[]
+  requisitosRol      RequisitoHabilidadRol[]
+
+  @@map("habilidad")
+}
+
+model UsuarioHabilidad {
+  idUsuarioHabilidad Int            @id @default(autoincrement()) @map("id_usuario_habilidad")
+  idUsuario          Int            @map("id_usuario")
+  idHabilidad        Int            @map("id_habilidad")
+  nivelHabilidad     NivelHabilidad @default(BASICO) @map("nivel_habilidad")
+  aniosExperiencia   Int?           @map("anios_experiencia")
+
+  usuario   Usuario   @relation(fields: [idUsuario], references: [idUsuario])
+  habilidad Habilidad @relation(fields: [idHabilidad], references: [idHabilidad])
+
+  @@unique([idUsuario, idHabilidad])
+  @@map("usuario_habilidad")
+}
+
+model Interes {
+  idInteres          Int     @id @default(autoincrement()) @map("id_interes")
+  nombreInteres      String  @unique @map("nombre_interes") @db.VarChar(255)
+  descripcionInteres String? @map("descripcion_interes") @db.Text
+
+  usuarioIntereses  UsuarioInteres[]
+  proyectoIntereses ProyectoInteres[]
+
+  @@map("interes")
+}
+
+model UsuarioInteres {
+  idUsuarioInteres Int @id @default(autoincrement()) @map("id_usuario_interes")
+  idUsuario        Int @map("id_usuario")
+  idInteres        Int @map("id_interes")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+  interes Interes @relation(fields: [idInteres], references: [idInteres])
+
+  @@unique([idUsuario, idInteres])
+  @@map("usuario_interes")
+}
+
+model Cualidad {
+  idCualidad          Int     @id @default(autoincrement()) @map("id_cualidad")
+  nombreCualidad      String  @unique @map("nombre_cualidad") @db.VarChar(100)
+  descripcionCualidad String? @map("descripcion_cualidad") @db.Text
+
+  usuarioCualidades UsuarioCualidad[]
+
+  @@map("cualidad")
+}
+
+model UsuarioCualidad {
+  idUsuarioCualidad Int @id @default(autoincrement()) @map("id_usuario_cualidad")
+  idUsuario         Int @map("id_usuario")
+  idCualidad        Int @map("id_cualidad")
+
+  usuario  Usuario  @relation(fields: [idUsuario], references: [idUsuario])
+  cualidad Cualidad @relation(fields: [idCualidad], references: [idCualidad])
+
+  @@unique([idUsuario, idCualidad])
+  @@map("usuario_cualidad")
+}
+
+model ExperienciaPrevia {
+  idExperiencia             Int             @id @default(autoincrement()) @map("id_experiencia")
+  idUsuario                 Int             @map("id_usuario")
+  tituloProyectoExperiencia String          @map("titulo_proyecto_experiencia") @db.VarChar(255)
+  rolDesempenado            String?         @map("rol_desempenado") @db.VarChar(255)
+  idHabilidadPrincipal      Int?            @map("id_habilidad_principal")
+  verificable               Boolean         @default(false)
+  fechaInicio               DateTime?       @map("fecha_inicio") @db.Date
+  fechaFin                  DateTime?       @map("fecha_fin") @db.Date
+  tipoExperiencia           TipoExperiencia @default(OTRO) @map("tipo_experiencia")
+
+  usuario            Usuario    @relation(fields: [idUsuario], references: [idUsuario])
+  habilidadPrincipal Habilidad? @relation(fields: [idHabilidadPrincipal], references: [idHabilidad])
+
+  @@map("experiencia_previa")
+}
+
+model Organizacion {
+  idOrganizacion          Int                @id @default(autoincrement()) @map("id_organizacion")
+  nombreOrganizacion      String             @map("nombre_organizacion") @db.VarChar(255)
+  tipoOrganizacion        TipoOrganizacion   @default(OTRO) @map("tipo_organizacion")
+  descripcionOrganizacion String?            @map("descripcion_organizacion") @db.Text
+  correoContacto          String?            @map("correo_contacto") @db.VarChar(255)
+  telefonoContacto        String?            @map("telefono_contacto") @db.VarChar(255)
+  sitioWeb                String?            @map("sitio_web") @db.VarChar(255)
+  logoUrl                 String?            @map("logo_url") @db.VarChar(255)
+  estadoOrganizacion      EstadoOrganizacion @default(ACTIVA) @map("estado_organizacion")
+  creadaPor               Int                @map("creada_por")
+  fechaCreacion           DateTime           @default(now()) @map("fecha_creacion")
+
+  creador    Usuario                @relation(fields: [creadaPor], references: [idUsuario])
+  miembros   UsuarioOrganizacion[]
+  proyectos  ProyectoOrganizacion[]
+
+  @@map("organizacion")
+}
+
+model UsuarioOrganizacion {
+  idUsuarioOrganizacion Int             @id @default(autoincrement()) @map("id_usuario_organizacion")
+  idUsuario             Int             @map("id_usuario")
+  idOrganizacion        Int             @map("id_organizacion")
+  rolOrganizacion       RolOrganizacion @default(MIEMBRO) @map("rol_organizacion")
+  fechaIngreso          DateTime        @default(now()) @map("fecha_ingreso")
+  estadoMembresia       EstadoMembresia @default(ACTIVA) @map("estado_membresia")
+
+  usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario])
+  organizacion Organizacion @relation(fields: [idOrganizacion], references: [idOrganizacion])
+
+  @@unique([idUsuario, idOrganizacion])
+  @@map("usuario_organizacion")
+}
+
+model Proyecto {
+  idProyecto         Int               @id @default(autoincrement()) @map("id_proyecto")
+  tituloProyecto     String            @map("titulo_proyecto") @db.VarChar(200)
+  descripcionProyecto String           @map("descripcion_proyecto") @db.Text
+  objetivosProyecto  String?           @map("objetivos_proyecto") @db.Text
+  tipoProyecto       TipoProyecto      @map("tipo_proyecto")
+  estadoProyecto     EstadoProyecto    @default(BORRADOR) @map("estado_proyecto")
+  modalidadProyecto  ModalidadProyecto @default(MIXTA) @map("modalidad_proyecto")
+  ubicacionProyecto  String?           @map("ubicacion_proyecto") @db.VarChar(255)
+  contextoAcademico  String?           @map("contexto_academico") @db.VarChar(255)
+  urlRecursoExterno  String?           @map("url_recurso_externo") @db.VarChar(255)
+  fechaPublicacion   DateTime?         @map("fecha_publicacion") @db.Date
+  fechaInicio        DateTime?         @map("fecha_inicio") @db.Date
+  fechaFinEstimada   DateTime?         @map("fecha_fin_estimada") @db.Date
+  creadoPor          Int               @map("creado_por")
+  fechaCreacion      DateTime          @default(now()) @map("fecha_creacion")
+  fechaActualizacion DateTime?         @map("fecha_actualizacion")
+  eliminadoEn        DateTime?         @map("eliminado_en")
+
+  creador        Usuario                @relation(fields: [creadoPor], references: [idUsuario])
+  organizaciones ProyectoOrganizacion[]
+  intereses      ProyectoInteres[]
+  roles          RolProyecto[]
+  hitos          Hito[]
+  tareas         Tarea[]
+
+  @@map("proyecto")
+}
+
+model ProyectoOrganizacion {
+  idProyectoOrganizacion Int                     @id @default(autoincrement()) @map("id_proyecto_organizacion")
+  idProyecto             Int                     @map("id_proyecto")
+  idOrganizacion         Int                     @map("id_organizacion")
+  rolOrganizacion        RolOrganizacionProyecto @default(PRINCIPAL) @map("rol_organizacion")
+  fechaVinculacion       DateTime                @default(now()) @map("fecha_vinculacion")
+
+  proyecto     Proyecto     @relation(fields: [idProyecto], references: [idProyecto])
+  organizacion Organizacion @relation(fields: [idOrganizacion], references: [idOrganizacion])
+
+  @@unique([idProyecto, idOrganizacion])
+  @@map("proyecto_organizacion")
+}
+
+model ProyectoInteres {
+  idProyectoInteres Int @id @default(autoincrement()) @map("id_proyecto_interes")
+  idProyecto        Int @map("id_proyecto")
+  idInteres         Int @map("id_interes")
+
+  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
+  interes  Interes  @relation(fields: [idInteres], references: [idInteres])
+
+  @@unique([idProyecto, idInteres])
+  @@map("proyecto_interes")
+}
+
+model RolProyecto {
+  idRolProyecto          Int     @id @default(autoincrement()) @map("id_rol_proyecto")
+  idProyecto             Int     @map("id_proyecto")
+  nombreRol              String  @map("nombre_rol") @db.VarChar(255)
+  descripcionRolProyecto String? @map("descripcion_rol_proyecto") @db.Text
+  idCarreraRequerida     Int?    @map("id_carrera_requerida")
+  cupos                  Int     @default(1)
+  horasSemanalesEstimadas Int?   @map("horas_semanales_estimadas")
+
+  proyecto         Proyecto                @relation(fields: [idProyecto], references: [idProyecto])
+  carreraRequerida Carrera?                @relation(fields: [idCarreraRequerida], references: [idCarrera])
+  requisitos       RequisitoHabilidadRol[]
+  postulaciones    Postulacion[]
+  participaciones  ParticipacionProyecto[]
+
+  @@map("rol_proyecto")
+}
+
+model RequisitoHabilidadRol {
+  idRequisitoHabilidad Int            @id @default(autoincrement()) @map("id_requisito_habilidad")
+  idRolProyecto        Int            @map("id_rol_proyecto")
+  idHabilidad          Int            @map("id_habilidad")
+  nivelMinimo          NivelHabilidad @default(BASICO) @map("nivel_minimo")
+  obligatorio          Boolean        @default(true)
+
+  rolProyecto RolProyecto @relation(fields: [idRolProyecto], references: [idRolProyecto])
+  habilidad   Habilidad   @relation(fields: [idHabilidad], references: [idHabilidad])
+
+  @@unique([idRolProyecto, idHabilidad])
+  @@map("requisito_habilidad_rol")
+}
+
+model Postulacion {
+  idPostulacion        Int               @id @default(autoincrement()) @map("id_postulacion")
+  idUsuarioPostulante  Int               @map("id_usuario_postulante")
+  idRolProyecto        Int               @map("id_rol_proyecto")
+  justificacion        String            @db.Text
+  estadoPostulacion    EstadoPostulacion @default(PENDIENTE) @map("estado_postulacion")
+  fechaPostulacion     DateTime          @default(now()) @map("fecha_postulacion")
+  fechaResolucion      DateTime?         @map("fecha_resolucion")
+  resueltaPor          Int?              @map("resuelta_por")
+  comentarioResolucion String?           @map("comentario_resolucion") @db.Text
+
+  postulante      Usuario                 @relation("Postulante", fields: [idUsuarioPostulante], references: [idUsuario])
+  resolutor       Usuario?                @relation("PostulacionResolutor", fields: [resueltaPor], references: [idUsuario])
+  rolProyecto     RolProyecto             @relation(fields: [idRolProyecto], references: [idRolProyecto])
+  participaciones ParticipacionProyecto[]
+
+  @@map("postulacion")
+}
+
+model ParticipacionProyecto {
+  idParticipacion     Int                 @id @default(autoincrement()) @map("id_participacion")
+  idUsuario           Int                 @map("id_usuario")
+  idRolProyecto       Int                 @map("id_rol_proyecto")
+  idPostulacion       Int?                @map("id_postulacion")
+  estadoParticipacion EstadoParticipacion @default(ACTIVO) @map("estado_participacion")
+  fechaIngreso        DateTime            @default(now()) @map("fecha_ingreso") @db.Date
+  fechaSalida         DateTime?           @map("fecha_salida") @db.Date
+
+  usuario        Usuario            @relation(fields: [idUsuario], references: [idUsuario])
+  rolProyecto    RolProyecto        @relation(fields: [idRolProyecto], references: [idRolProyecto])
+  postulacion    Postulacion?       @relation(fields: [idPostulacion], references: [idPostulacion])
+  registrosHoras HorasParticipacion[]
+  certificados   Certificado[]
+
+  @@map("participacion_proyecto")
+}
+
+model Hito {
+  idHito          Int        @id @default(autoincrement()) @map("id_hito")
+  idProyecto      Int        @map("id_proyecto")
+  tituloHito      String     @map("titulo_hito") @db.VarChar(255)
+  descripcionHito String?    @map("descripcion_hito") @db.Text
+  fechaLimite     DateTime?  @map("fecha_limite") @db.Date
+  estadoHito      EstadoHito @default(PENDIENTE) @map("estado_hito")
+  orden           Int
+
+  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
+  tareas   Tarea[]
+
+  @@map("hito")
+}
+
+model Tarea {
+  idTarea          Int         @id @default(autoincrement()) @map("id_tarea")
+  idProyecto       Int         @map("id_proyecto")
+  idHito           Int?        @map("id_hito")
+  tituloTarea      String      @map("titulo_tarea") @db.VarChar(255)
+  descripcionTarea String?     @map("descripcion_tarea") @db.Text
+  estadoTarea      EstadoTarea @default(POR_HACER) @map("estado_tarea")
+  prioridad        Prioridad   @default(MEDIA)
+  creadaPor        Int         @map("creada_por")
+  fechaCreacion    DateTime    @default(now()) @map("fecha_creacion")
+  fechaLimite      DateTime?   @map("fecha_limite") @db.Date
+  actualizadaEn    DateTime?   @map("actualizada_en")
+
+  proyecto     Proyecto          @relation(fields: [idProyecto], references: [idProyecto])
+  hito         Hito?             @relation(fields: [idHito], references: [idHito])
+  creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario])
+  asignaciones AsignacionTarea[]
+  evidencias   Evidencia[]
+
+  @@map("tarea")
+}
+
+model AsignacionTarea {
+  idAsignacion    Int      @id @default(autoincrement()) @map("id_asignacion")
+  idTarea         Int      @map("id_tarea")
+  idUsuario       Int      @map("id_usuario")
+  fechaAsignacion DateTime @default(now()) @map("fecha_asignacion")
+  asignadoPor     Int      @map("asignado_por")
+
+  tarea     Tarea   @relation(fields: [idTarea], references: [idTarea])
+  usuario   Usuario @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
+  asignador Usuario @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
+
+  @@unique([idTarea, idUsuario])
+  @@map("asignacion_tarea")
+}
+
+model Evidencia {
+  idEvidencia       Int           @id @default(autoincrement()) @map("id_evidencia")
+  idTarea           Int           @map("id_tarea")
+  idUsuarioCargador Int           @map("id_usuario_cargador")
+  tipoEvidencia     TipoEvidencia @map("tipo_evidencia")
+  urlRecurso        String        @map("url_recurso") @db.VarChar(255)
+  descripcion       String?       @db.Text
+  tamanoBytes       BigInt?       @map("tamano_bytes")
+  fechaEnvio        DateTime      @default(now()) @map("fecha_envio")
+
+  tarea      Tarea               @relation(fields: [idTarea], references: [idTarea])
+  cargador   Usuario             @relation(fields: [idUsuarioCargador], references: [idUsuario])
+  revisiones RevisionEvidencia[]
+
+  @@map("evidencia")
+}
+
+model RevisionEvidencia {
+  idRevision        Int               @id @default(autoincrement()) @map("id_revision")
+  idEvidencia       Int               @map("id_evidencia")
+  idRevisor         Int               @map("id_revisor")
+  resultadoRevision ResultadoRevision @map("resultado_revision")
+  comentario        String?           @db.Text
+  fechaRevision     DateTime          @default(now()) @map("fecha_revision")
+
+  evidencia Evidencia @relation(fields: [idEvidencia], references: [idEvidencia])
+  revisor   Usuario   @relation(fields: [idRevisor], references: [idUsuario])
+
+  @@map("revision_evidencia")
+}
+
+model HorasParticipacion {
+  idRegistroHoras Int         @id @default(autoincrement()) @map("id_registro_horas")
+  idParticipacion Int         @map("id_participacion")
+  periodoInicio   DateTime    @map("periodo_inicio") @db.Date
+  periodoFin      DateTime    @map("periodo_fin") @db.Date
+  horasReportadas Decimal     @map("horas_reportadas") @db.Decimal(6, 2)
+  horasAprobadas  Decimal?    @map("horas_aprobadas") @db.Decimal(6, 2)
+  estadoHoras     EstadoHoras @default(PENDIENTE) @map("estado_horas")
+  aprobadoPor     Int?        @map("aprobado_por")
+  fechaAprobacion DateTime?   @map("fecha_aprobacion")
+
+  participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion])
+  aprobador     Usuario?              @relation(fields: [aprobadoPor], references: [idUsuario])
+
+  @@map("horas_participacion")
+}
+
+model Certificado {
+  idCertificado      Int             @id @default(autoincrement()) @map("id_certificado")
+  idParticipacion    Int             @map("id_participacion")
+  tipoCertificado    TipoCertificado @map("tipo_certificado")
+  horasCertificadas  Decimal         @map("horas_certificadas") @db.Decimal(6, 2)
+  urlCertificado     String?         @map("url_certificado") @db.VarChar(255)
+  emitidoPor         Int             @map("emitido_por")
+  fechaEmision       DateTime        @default(now()) @map("fecha_emision")
+  codigoVerificacion String          @unique @map("codigo_verificacion") @db.VarChar(255)
+
+  participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion])
+  emisor        Usuario               @relation(fields: [emitidoPor], references: [idUsuario])
+
+  @@map("certificado")
+}
+
+model Notificacion {
+  idNotificacion      Int              @id @default(autoincrement()) @map("id_notificacion")
+  idUsuario           Int              @map("id_usuario")
+  tipoNotificacion    TipoNotificacion @map("tipo_notificacion")
+  tituloNotificacion  String           @map("titulo_notificacion") @db.VarChar(255)
+  mensajeNotificacion String?          @map("mensaje_notificacion") @db.Text
+  datosJson           Json?            @map("datos_json")
+  creadaEn            DateTime         @default(now()) @map("creada_en")
+  leidaEn             DateTime?        @map("leida_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("notificacion")
+}
+
+model RolAcceso {
+  idRolAcceso  Int     @id @default(autoincrement()) @map("id_rol_acceso")
+  nombrePerfil String  @unique @map("nombre_perfil") @db.VarChar(255)
+  descripcion  String? @db.Text
+
+  usuarios UsuarioRolAcceso[]
+  permisos RolPermiso[]
+
+  @@map("rol_acceso")
+}
+
+model Permiso {
+  idPermiso          Int     @id @default(autoincrement()) @map("id_permiso")
+  nombrePermiso      String  @unique @map("nombre_permiso") @db.VarChar(255)
+  descripcionPermiso String? @map("descripcion_permiso") @db.Text
+
+  roles RolPermiso[]
+
+  @@map("permiso")
+}
+
+model UsuarioRolAcceso {
+  idUsuarioRolAcceso Int      @id @default(autoincrement()) @map("id_usuario_rol_acceso")
+  idUsuario          Int      @map("id_usuario")
+  idRolAcceso        Int      @map("id_rol_acceso")
+  fechaAsignacion    DateTime @default(now()) @map("fecha_asignacion")
+
+  usuario   Usuario   @relation(fields: [idUsuario], references: [idUsuario])
+  rolAcceso RolAcceso @relation(fields: [idRolAcceso], references: [idRolAcceso])
+
+  @@unique([idUsuario, idRolAcceso])
+  @@map("usuario_rol_acceso")
+}
+
+model RolPermiso {
+  idRolPermiso Int @id @default(autoincrement()) @map("id_rol_permiso")
+  idRolAcceso  Int @map("id_rol_acceso")
+  idPermiso    Int @map("id_permiso")
+
+  rolAcceso RolAcceso @relation(fields: [idRolAcceso], references: [idRolAcceso])
+  permiso   Permiso   @relation(fields: [idPermiso], references: [idPermiso])
+
+  @@unique([idRolAcceso, idPermiso])
+  @@map("rol_permiso")
+}
+
+model BitacoraAuditoria {
+  idAuditoria Int      @id @default(autoincrement()) @map("id_auditoria")
+  idUsuario   Int?     @map("id_usuario")
+  accion      String   @db.VarChar(255)
+  tipoObjeto  String   @map("tipo_objeto") @db.VarChar(255)
+  idObjeto    String?  @map("id_objeto") @db.VarChar(255)
+  detalleJson Json?    @map("detalle_json")
+  ipOrigen    String?  @map("ip_origen") @db.VarChar(255)
+  fechaEvento DateTime @default(now()) @map("fecha_evento")
+
+  usuario Usuario? @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("bitacora_auditoria")
+}
+
+model ConfiguracionSistema {
+  clave                String    @id @db.VarChar(255)
+  valor                String?   @db.Text
+  descripcionParametro String?   @map("descripcion_parametro") @db.Text
+  actualizadoPor       Int?      @map("actualizado_por")
+  actualizadoEn        DateTime? @map("actualizado_en")
+
+  actualizador Usuario? @relation(fields: [actualizadoPor], references: [idUsuario])
+
+  @@map("configuracion_sistema")
+}
