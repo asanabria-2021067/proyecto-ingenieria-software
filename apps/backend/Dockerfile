@@ -17,6 +17,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+RUN npx prisma generate
+
 RUN if [ -f pnpm-lock.yaml ]; then \
       corepack enable && corepack prepare pnpm@latest --activate && \
       pnpm build; \
