@@ -161,18 +161,22 @@ cd proyecto-ingenieria-software
 cp .env.example .env
 ```
 
-### 2. Levantar la base de datos (Docker)
+### 2. Levantar el entorno con Docker
 
 ```bash
 # Desde la raiz del proyecto
-cd apps/backend
+
+# Opcion 1: Levantar TODO el entorno (DB + Backend + Frontend)
+docker compose --profile app up -d --build
+
+# Opcion 2: Levantar solo la base de datos (para desarrollo local)
 docker compose up -d
 
-# Verificar que el contenedor este corriendo
+# Verificar que los contenedores esten corriendo
 docker ps
 ```
 
-> **Nota:** Si tienes PostgreSQL instalado localmente en el puerto 5432, el proyecto usa el puerto **5433** para evitar conflictos. Esto ya esta configurado en el `.env`.
+> **Nota:** El comando `docker compose --profile app up -d --build` levanta PostgreSQL, el backend (puerto 3001) y el frontend (puerto 3000) de forma automatica. Si solo necesitas la base de datos para desarrollar localmente, usa `docker compose up -d` sin el profile.
 
 ### 3. Instalar dependencias
 
@@ -206,6 +210,21 @@ npx prisma generate
 ## 🖥️ Comandos por Rol
 
 ### Desarrollador Backend
+
+**Con Docker (recomendado):**
+
+```bash
+# Desde la raiz del proyecto, levanta todo el entorno
+docker compose --profile app up -d --build
+
+# Ver logs del backend
+docker compose logs -f backend
+
+# Reconstruir solo el backend despues de cambios
+docker compose --profile app up -d --build backend
+```
+
+**Sin Docker (desarrollo local):**
 
 ```bash
 cd apps/backend
@@ -243,6 +262,21 @@ npm run prisma:seed
 
 ### Desarrollador Frontend
 
+**Con Docker (recomendado):**
+
+```bash
+# Desde la raiz del proyecto, levanta todo el entorno
+docker compose --profile app up -d --build
+
+# Ver logs del frontend
+docker compose logs -f frontend
+
+# Reconstruir solo el frontend despues de cambios
+docker compose --profile app up -d --build frontend
+```
+
+**Sin Docker (desarrollo local):**
+
 ```bash
 cd apps/frontend
 
@@ -266,28 +300,31 @@ npm run start
 
 ### Admin del Proyecto
 
-**Docker:**
+**Docker (desde la raiz del proyecto):**
 
 ```bash
-cd apps/backend
+# Levantar todo el entorno (DB + Backend + Frontend)
+docker compose --profile app up -d --build
 
-# Levantar base de datos
+# Levantar solo la base de datos
 docker compose up -d
 
-# Detener base de datos
-docker compose down
+# Detener todos los servicios
+docker compose --profile app down
 
-# Ver logs del contenedor
-docker compose logs -f
+# Ver logs de un servicio especifico
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose logs -f postgres
 
-# Ver estado del contenedor
+# Ver estado de los contenedores
 docker ps
 
-# Reiniciar contenedor
-docker compose restart
+# Reiniciar todos los servicios
+docker compose --profile app restart
 
 # Eliminar volumen de datos (CUIDADO: borra toda la BD)
-docker compose down -v
+docker compose --profile app down -v
 ```
 
 **Git (flujo):**
