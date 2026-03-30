@@ -128,6 +128,212 @@ Empatizar → Definir → Idear → Prototipar → Probar
 
 ---
 
+## 🚀 Stack Tecnologico
+
+| Capa | Tecnologia | Version |
+|---|---|---|
+| **Backend** | NestJS | 11.0.0 |
+| **ORM** | Prisma | 6.19.2 |
+| **Base de Datos** | PostgreSQL | 17 (Docker) |
+| **Frontend** | Next.js | 15.1.0 |
+| **UI** | React | 19.0.0 |
+| **Lenguaje** | TypeScript | 5.7.0 |
+| **Contenedores** | Docker | Alpine Linux |
+| **Runtime** | Node.js | 22+ |
+
+---
+
+## ⚙️ Configuracion del Entorno
+
+### Prerrequisitos
+
+- [Node.js](https://nodejs.org/) v22+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- npm (incluido con Node.js)
+
+### 1. Clonar y configurar variables de entorno
+
+```bash
+git clone <url-del-repositorio>
+cd proyecto-ingenieria-software
+
+# Copiar archivo de variables de entorno
+cp .env.example .env
+```
+
+### 2. Levantar la base de datos (Docker)
+
+```bash
+# Desde la raiz del proyecto
+cd apps/backend
+docker compose up -d
+
+# Verificar que el contenedor este corriendo
+docker ps
+```
+
+> **Nota:** Si tienes PostgreSQL instalado localmente en el puerto 5432, el proyecto usa el puerto **5433** para evitar conflictos. Esto ya esta configurado en el `.env`.
+
+### 3. Instalar dependencias
+
+```bash
+# Backend
+cd apps/backend
+npm install
+
+# Frontend
+cd apps/frontend
+npm install
+```
+
+### 4. Configurar la base de datos
+
+```bash
+cd apps/backend
+
+# Crear las tablas (migraciones)
+npx prisma migrate dev --name init
+
+# Poblar con datos de prueba
+npx prisma db seed
+
+# Generar el cliente de Prisma
+npx prisma generate
+```
+
+---
+
+## 🖥️ Comandos por Rol
+
+### Desarrollador Backend
+
+```bash
+cd apps/backend
+
+# Iniciar servidor en modo desarrollo (hot-reload, puerto 3001)
+npm run start:dev
+
+# Compilar el proyecto
+npm run build
+
+# Iniciar en modo produccion
+npm run start:prod
+```
+
+**Prisma (Base de datos):**
+
+```bash
+cd apps/backend
+
+# Crear una nueva migracion despues de cambiar schema.prisma
+npx prisma migrate dev --name descripcion_del_cambio
+
+# Aplicar schema directamente sin crear migracion (solo desarrollo)
+npm run prisma:push
+
+# Regenerar el cliente de Prisma (despues de cambios al schema)
+npm run prisma:generate
+
+# Abrir Prisma Studio (explorador visual de la BD en http://localhost:5555)
+npm run prisma:studio
+
+# Ejecutar el seed (datos de prueba)
+npm run prisma:seed
+```
+
+### Desarrollador Frontend
+
+```bash
+cd apps/frontend
+
+# Iniciar servidor de desarrollo (puerto 3000)
+npm run dev
+
+# Compilar para produccion
+npm run build
+
+# Iniciar servidor de produccion
+npm run start
+```
+
+**URLs de desarrollo:**
+
+| Servicio | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:3001 |
+| Prisma Studio | http://localhost:5555 |
+
+### Admin del Proyecto
+
+**Docker:**
+
+```bash
+cd apps/backend
+
+# Levantar base de datos
+docker compose up -d
+
+# Detener base de datos
+docker compose down
+
+# Ver logs del contenedor
+docker compose logs -f
+
+# Ver estado del contenedor
+docker ps
+
+# Reiniciar contenedor
+docker compose restart
+
+# Eliminar volumen de datos (CUIDADO: borra toda la BD)
+docker compose down -v
+```
+
+**Git (flujo):**
+
+```bash
+# Ver estado de cambios
+git status
+
+# Crear rama para nueva feature
+git checkout -b feature/nombre-de-la-feature
+
+# Agregar y commitear cambios
+git add .
+git commit -m "feat: descripcion del cambio"
+
+# Subir rama
+git push -u origin feature/nombre-de-la-feature
+
+# Volver a main y actualizar
+git checkout main
+git pull origin main
+```
+
+**Migraciones en equipo:**
+
+```bash
+cd apps/backend
+
+# Cuando alguien agrego una migracion nueva, ejecutar:
+npx prisma migrate dev
+
+# Si hay conflictos de migracion, resetear la BD local:
+npx prisma migrate reset
+```
+
+---
+
+## 🗄️ Usuarios de Prueba (Seed)
+
+| Correo | Contrasena | Rol |
+|---|---|---|
+| test1@uvg.edu.gt | Test1234! | Estudiante |
+| test2@uvg.edu.gt | Test1234! | Estudiante |
+
+---
+
 ## 🛠️ Técnicas Aplicadas
 
 | Técnica | Descripción |
@@ -160,22 +366,23 @@ Empatizar → Definir → Idear → Prototipar → Probar
 
 ```
 📦 proyecto-ingenieria-software
- ┣ 📂 Corte 1/                # Entregables del Corte 1 (Empatía y Definición)
- ┃  ┣ 📂 documento_colaborativo/
- ┃  ┣ 📂 gestion_tiempo/
- ┃  ┗ 📂 informe/
- ┣ 📂 Corte 2/                # Entregables del Corte 2 (Ideación y Modelación)
- ┃  ┣ 📂 documento_colaborativo/
- ┃  ┣ 📂 gestion_tiempo/
- ┃  ┗ 📂 informe/
- ┣ 📂 Corte 3/                # Entregables del Corte 3 (Prototipado y BD)
- ┃  ┣ 📂 assets/              # DER del sistema (PNG, SVG)
- ┃  ┣ 📂 documento_colaborativo/
- ┃  ┣ 📂 gestion_tiempo/
- ┃  ┗ 📂 informe/
- ┣ 📂 Avances 1/              # Primera entrega de avance
- ┣ 📂 Avances 2/              # Segunda entrega de avance
- ┣ 📂 Scrum/                  # Artefactos de Scrum
+ ┣ 📂 apps/
+ ┃  ┣ 📂 backend/              # API NestJS + Prisma
+ ┃  ┃  ┣ 📂 src/               # Codigo fuente del backend
+ ┃  ┃  ┣ 📂 prisma/            # Schema, migraciones y seed
+ ┃  ┃  ┣ 📄 Dockerfile
+ ┃  ┃  ┗ 📄 docker-compose.yml # PostgreSQL (Docker)
+ ┃  ┗ 📂 frontend/             # Next.js + React
+ ┃     ┣ 📂 src/               # Codigo fuente del frontend
+ ┃     ┗ 📄 Dockerfile
+ ┣ 📂 Corte 1/                 # Entregables Corte 1 (Empatia y Definicion)
+ ┣ 📂 Corte 2/                 # Entregables Corte 2 (Ideacion y Modelacion)
+ ┣ 📂 Corte 3/                 # Entregables Corte 3 (Prototipado y BD)
+ ┣ 📂 Avances 1/               # Primera entrega de avance
+ ┣ 📂 Avances 2/               # Segunda entrega de avance
+ ┣ 📂 Scrum/                   # Artefactos de Scrum
+ ┣ 📄 docker-compose.yml       # Orquestacion completa (DB + Backend + Frontend)
+ ┣ 📄 .env.example              # Plantilla de variables de entorno
  ┗ 📄 README.md
 ```
 
