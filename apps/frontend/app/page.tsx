@@ -1,241 +1,556 @@
-import Link from "next/link";
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import {
+  Users,
+  Lightbulb,
+  Building2,
+  Search,
+  UserPlus,
+  Rocket,
+  ArrowRight,
+  Menu,
+  X,
+} from "lucide-react"
 
-const features = [
-  {
-    title: "Proyectos centralizados",
-    description:
-      "Encuentra en un solo lugar iniciativas, asociaciones y oportunidades de colaboración dentro de la universidad.",
-  },
-  {
-    title: "Colaboración interdisciplinaria",
-    description:
-      "Conecta estudiantes de distintas áreas para participar en proyectos con impacto académico y estudiantil.",
-  },
-  {
-    title: "Acceso más claro",
-    description:
-      "Consulta información relevante de forma ordenada y accede rápidamente al sistema para explorar nuevas oportunidades.",
-  },
-];
-
-const steps = [
-  "Explora proyectos y asociaciones disponibles.",
-  "Conoce los objetivos, requisitos y áreas involucradas.",
-  "Inicia sesión para acceder al sistema y dar seguimiento a las oportunidades.",
-];
-
-export default function HomePage() {
+function Navbar() {
   return (
-    <main className="min-h-screen bg-white text-gray-900">
-      <section className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div>
-            <p className="text-2xl font-bold text-blue-700">UVG Collab</p>
-            <p className="text-sm text-gray-500">
-              Plataforma de colaboración universitaria
-            </p>
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <span className="text-sm font-bold text-primary-foreground">UC</span>
           </div>
+          <span className="text-xl font-bold text-foreground">UVG Collab</span>
+        </Link>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/login"
-              className="rounded-lg border border-blue-600 px-4 py-2 text-blue-600 transition hover:bg-blue-50"
-            >
-              Iniciar sesión
-            </Link>
-            <Link
-              href="/dashboard"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
-            >
-              Ir al sistema
-            </Link>
-          </div>
+        <nav className="hidden items-center gap-8 md:flex">
+          <a
+            href="#caracteristicas"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Características
+          </a>
+          <a
+            href="#como-funciona"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Cómo Funciona
+          </a>
+          <a
+            href="#para-quien"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Para Quién
+          </a>
+        </nav>
+
+        <div className="hidden items-center gap-3 md:flex">
+          <Button variant="ghost" asChild>
+            <Link href="/login">Iniciar Sesión</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard">Comenzar</Link>
+          </Button>
         </div>
-      </section>
 
-      <section className="bg-gradient-to-b from-blue-50 to-white">
-        <div className="mx-auto grid min-h-[78vh] max-w-7xl items-center gap-12 px-6 py-16 md:grid-cols-2">
-          <div>
-            <span className="inline-block rounded-full bg-blue-100 px-4 py-1 text-sm font-medium text-blue-700">
-              Colaboración interdisciplinaria
+        <MobileNav />
+      </div>
+    </header>
+  )
+}
+
+function MobileNav() {
+  return (
+    <div className="md:hidden">
+      <input type="checkbox" id="mobile-menu" className="peer hidden" />
+      <label
+        htmlFor="mobile-menu"
+        className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-md hover:bg-accent peer-checked:[&>.menu-icon]:hidden peer-checked:[&>.close-icon]:block"
+      >
+        <Menu className="menu-icon h-5 w-5" />
+        <X className="close-icon hidden h-5 w-5" />
+      </label>
+      <div className="invisible absolute left-0 top-16 w-full border-b border-border bg-background p-4 opacity-0 transition-all peer-checked:visible peer-checked:opacity-100">
+        <nav className="flex flex-col gap-4">
+          <a
+            href="#caracteristicas"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Características
+          </a>
+          <a
+            href="#como-funciona"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Cómo Funciona
+          </a>
+          <a
+            href="#para-quien"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Para Quién
+          </a>
+          <div className="flex flex-col gap-2 pt-4">
+            <Button variant="outline" asChild className="w-full">
+              <Link href="/login">Iniciar Sesión</Link>
+            </Button>
+            <Button asChild className="w-full">
+              <Link href="/dashboard">Comenzar</Link>
+            </Button>
+          </div>
+        </nav>
+      </div>
+    </div>
+  )
+}
+
+function HeroSection() {
+  return (
+    <section className="relative overflow-hidden bg-background py-20 sm:py-32">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.12),transparent)]" />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl text-center">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/50 px-4 py-1.5 text-sm text-muted-foreground">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
-
-            <h1 className="mt-6 text-4xl font-bold leading-tight md:text-6xl">
-              Conecta estudiantes, asociaciones e institutos en una sola
-              plataforma
-            </h1>
-
-            <p className="mt-6 max-w-xl text-lg text-gray-600">
-              UVG Collab centraliza proyectos universitarios para facilitar la
-              participación estudiantil, mejorar la comunicación y dar mayor
-              visibilidad a las oportunidades de colaboración.
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/login"
-                className="rounded-xl bg-blue-600 px-6 py-3 font-medium text-white transition hover:bg-blue-700"
-              >
-                Comenzar ahora
-              </Link>
-
-              <Link
-                href="/dashboard"
-                className="rounded-xl border border-gray-300 px-6 py-3 font-medium text-gray-700 transition hover:bg-gray-100"
-              >
-                Ver panel principal
-              </Link>
-            </div>
-
-            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-2xl font-bold text-blue-700">+3</p>
-                <p className="text-sm text-gray-600">Rutas principales base</p>
-              </div>
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-2xl font-bold text-blue-700">1</p>
-                <p className="text-sm text-gray-600">Punto de acceso central</p>
-              </div>
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-2xl font-bold text-blue-700">100%</p>
-                <p className="text-sm text-gray-600">Enfoque en colaboración</p>
-              </div>
-            </div>
+            Plataforma Universitaria
           </div>
-
-          <div className="rounded-3xl border border-blue-100 bg-white p-6 shadow-xl">
-            <div className="rounded-2xl bg-blue-600 p-6 text-white">
-              <p className="text-sm uppercase tracking-wide text-blue-100">
-                Vista general
-              </p>
-              <h2 className="mt-2 text-2xl font-bold">
-                Plataforma lista para descubrir oportunidades
-              </h2>
-              <p className="mt-3 text-sm text-blue-100">
-                Accede a un entorno donde estudiantes y asociaciones pueden
-                encontrarse, compartir proyectos y colaborar de forma más
-                organizada.
-              </p>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <div className="rounded-2xl border border-gray-200 p-4">
-                <p className="font-semibold text-gray-800">
-                  Explora proyectos universitarios
-                </p>
-                <p className="mt-1 text-sm text-gray-600">
-                  Consulta iniciativas activas y conoce cómo integrarte a ellas.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-gray-200 p-4">
-                <p className="font-semibold text-gray-800">
-                  Accede al sistema fácilmente
-                </p>
-                <p className="mt-1 text-sm text-gray-600">
-                  Ingresa desde la landing al login o navega al dashboard base.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-gray-200 p-4">
-                <p className="font-semibold text-gray-800">
-                  Impulsa la participación estudiantil
-                </p>
-                <p className="mt-1 text-sm text-gray-600">
-                  Facilita el vínculo entre estudiantes, asociaciones e
-                  institutos de forma más clara.
-                </p>
-              </div>
-            </div>
+          <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+            Conecta, Colabora y Crea en
+            <span className="text-primary"> UVG Collab</span>
+          </h1>
+          <p className="mt-6 text-pretty text-lg leading-relaxed text-muted-foreground sm:text-xl">
+            La plataforma que centraliza la colaboración interdisciplinaria entre
+            estudiantes, asociaciones estudiantiles e institutos académicos.
+            Descubre proyectos, únete a iniciativas y transforma ideas en
+            realidad.
+          </p>
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Button size="lg" asChild className="w-full sm:w-auto">
+              <Link href="/dashboard">
+                Explorar Proyectos
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild className="w-full sm:w-auto">
+              <Link href="/login">Iniciar Sesión</Link>
+            </Button>
           </div>
         </div>
-      </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-            Beneficios
-          </p>
-          <h2 className="mt-3 text-3xl font-bold md:text-4xl">
-            Una experiencia más clara para descubrir y participar
+        <div className="mt-16 grid gap-6 sm:grid-cols-3">
+          <StatCard number="500+" label="Proyectos Activos" />
+          <StatCard number="2,000+" label="Estudiantes Conectados" />
+          <StatCard number="50+" label="Asociaciones e Institutos" />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function StatCard({ number, label }: { number: string; label: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 text-center shadow-sm">
+      <div className="text-3xl font-bold text-primary">{number}</div>
+      <div className="mt-1 text-sm text-muted-foreground">{label}</div>
+    </div>
+  )
+}
+
+function FeaturesSection() {
+  const features = [
+    {
+      icon: Search,
+      title: "Descubre Proyectos",
+      description:
+        "Explora una amplia variedad de proyectos interdisciplinarios. Filtra por área de interés, facultad o tipo de colaboración.",
+    },
+    {
+      icon: Users,
+      title: "Colaboración Real",
+      description:
+        "Conecta con estudiantes de diferentes carreras y forma equipos diversos para abordar desafíos complejos.",
+    },
+    {
+      icon: Lightbulb,
+      title: "Impulsa tus Ideas",
+      description:
+        "Publica tus propias iniciativas y encuentra colaboradores, mentores y recursos para hacerlas realidad.",
+    },
+    {
+      icon: Building2,
+      title: "Apoyo Institucional",
+      description:
+        "Accede a recursos de asociaciones estudiantiles e institutos académicos que respaldan la innovación.",
+    },
+  ]
+
+  return (
+    <section id="caracteristicas" className="bg-secondary/30 py-20 sm:py-28">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Todo lo que necesitas para colaborar
           </h2>
-          <p className="mt-4 text-gray-600">
-            La plataforma busca resolver la dispersión de información y mejorar
-            el acceso a proyectos universitarios mediante una experiencia más
-            organizada y centralizada.
+          <p className="mt-4 text-lg text-muted-foreground">
+            Herramientas diseñadas para facilitar la colaboración universitaria y
+            maximizar el impacto de tus proyectos.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
+        <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((feature) => (
-            <article
+            <div
               key={feature.title}
-              className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              className="group rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:border-primary/50 hover:shadow-md"
             >
-              <h3 className="text-xl font-semibold text-gray-900">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                <feature.icon className="h-6 w-6" />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-foreground">
                 {feature.title}
               </h3>
-              <p className="mt-3 text-gray-600">{feature.description}</p>
-            </article>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {feature.description}
+              </p>
+            </div>
           ))}
         </div>
-      </section>
+      </div>
+    </section>
+  )
+}
 
-      <section className="bg-gray-50">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-              Cómo funciona
-            </p>
-            <h2 className="mt-3 text-3xl font-bold md:text-4xl">
-              Un flujo simple para empezar
-            </h2>
-          </div>
+function HowItWorksSection() {
+  const steps = [
+    {
+      icon: UserPlus,
+      step: "01",
+      title: "Crea tu Perfil",
+      description:
+        "Regístrate con tu correo institucional y completa tu perfil con tus habilidades, intereses y experiencia.",
+    },
+    {
+      icon: Search,
+      step: "02",
+      title: "Explora Oportunidades",
+      description:
+        "Navega por proyectos activos, convocatorias de asociaciones e iniciativas de institutos académicos.",
+    },
+    {
+      icon: Rocket,
+      step: "03",
+      title: "Únete y Colabora",
+      description:
+        "Postúlate a proyectos que te interesen o crea el tuyo propio para encontrar colaboradores.",
+    },
+  ]
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {steps.map((step, index) => (
-              <div
-                key={step}
-                className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
-                  {index + 1}
-                </div>
-                <p className="mt-4 text-gray-700">{step}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="rounded-3xl bg-blue-600 px-8 py-12 text-center text-white shadow-lg">
-          <h2 className="text-3xl font-bold md:text-4xl">
-            Empieza a colaborar de forma más organizada
+  return (
+    <section id="como-funciona" className="bg-background py-20 sm:py-28">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Cómo Funciona
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-blue-100">
-            Accede a la plataforma y explora una nueva forma de conectar
-            proyectos, asociaciones y estudiantes dentro del entorno
-            universitario.
+          <p className="mt-4 text-lg text-muted-foreground">
+            En tres simples pasos estarás listo para comenzar tu próxima
+            colaboración.
           </p>
+        </div>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link
-              href="/login"
-              className="rounded-xl bg-white px-6 py-3 font-medium text-blue-700 transition hover:bg-blue-50"
+        <div className="mt-16 grid gap-8 lg:grid-cols-3">
+          {steps.map((item, index) => (
+            <div key={item.step} className="relative">
+              {index < steps.length - 1 && (
+                <div className="absolute left-1/2 top-12 hidden h-0.5 w-full bg-border lg:block" />
+              )}
+              <div className="relative flex flex-col items-center text-center">
+                <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full border-2 border-primary bg-background">
+                  <item.icon className="h-10 w-10 text-primary" />
+                  <span className="absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    {item.step}
+                  </span>
+                </div>
+                <h3 className="mt-6 text-xl font-semibold text-foreground">
+                  {item.title}
+                </h3>
+                <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">
+                  {item.description}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ForWhoSection() {
+  const audiences = [
+    {
+      title: "Estudiantes",
+      description:
+        "Encuentra proyectos que complementen tu formación, desarrolla habilidades prácticas y construye tu red profesional desde la universidad.",
+      features: [
+        "Explora proyectos por área",
+        "Conecta con mentores",
+        "Desarrolla tu portafolio",
+      ],
+    },
+    {
+      title: "Asociaciones Estudiantiles",
+      description:
+        "Publica convocatorias, gestiona proyectos y encuentra voluntarios comprometidos para tus iniciativas.",
+      features: [
+        "Gestiona convocatorias",
+        "Recluta miembros",
+        "Visibiliza tus proyectos",
+      ],
+    },
+    {
+      title: "Institutos Académicos",
+      description:
+        "Conecta con estudiantes talentosos, promueve oportunidades de investigación y fortalece la vinculación académica.",
+      features: [
+        "Publica oportunidades",
+        "Encuentra asistentes",
+        "Impulsa la investigación",
+      ],
+    },
+  ]
+
+  return (
+    <section id="para-quien" className="bg-secondary/30 py-20 sm:py-28">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Una plataforma para toda la comunidad
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground">
+            UVG Collab está diseñada para conectar a todos los actores de la vida
+            universitaria.
+          </p>
+        </div>
+
+        <div className="mt-16 grid gap-8 lg:grid-cols-3">
+          {audiences.map((audience) => (
+            <div
+              key={audience.title}
+              className="flex flex-col rounded-2xl border border-border bg-card p-8 shadow-sm"
             >
-              Iniciar sesión
-            </Link>
-            <Link
-              href="/dashboard"
-              className="rounded-xl border border-white px-6 py-3 font-medium text-white transition hover:bg-blue-700"
+              <h3 className="text-xl font-semibold text-foreground">
+                {audience.title}
+              </h3>
+              <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
+                {audience.description}
+              </p>
+              <ul className="mt-6 space-y-3">
+                {audience.features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-sm">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10">
+                      <svg
+                        className="h-3 w-3 text-primary"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                    <span className="text-foreground">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function CTASection() {
+  return (
+    <section className="bg-primary py-20 sm:py-28">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl">
+            Comienza a colaborar hoy
+          </h2>
+          <p className="mt-4 text-lg text-primary-foreground/80">
+            Únete a la comunidad de estudiantes, asociaciones e institutos que ya
+            están transformando la experiencia universitaria.
+          </p>
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Button
+              size="lg"
+              variant="secondary"
+              asChild
+              className="w-full sm:w-auto"
             >
-              Ir al dashboard
-            </Link>
+              <Link href="/dashboard">
+                Explorar Plataforma
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              asChild
+              className="w-full border-primary-foreground/20 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:w-auto"
+            >
+              <Link href="/login">Ya tengo cuenta</Link>
+            </Button>
           </div>
         </div>
-      </section>
-    </main>
-  );
+      </div>
+    </section>
+  )
+}
+
+function Footer() {
+  return (
+    <footer className="border-t border-border bg-background py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="sm:col-span-2 lg:col-span-1">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                <span className="text-sm font-bold text-primary-foreground">
+                  UC
+                </span>
+              </div>
+              <span className="text-xl font-bold text-foreground">UVG Collab</span>
+            </Link>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Centralizando la colaboración interdisciplinaria en la universidad.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">Plataforma</h4>
+            <ul className="mt-4 space-y-3">
+              <li>
+                <a
+                  href="#caracteristicas"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Características
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#como-funciona"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Cómo Funciona
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#para-quien"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Para Quién
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">Recursos</h4>
+            <ul className="mt-4 space-y-3">
+              <li>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Documentación
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Tutoriales
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Preguntas Frecuentes
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">Legal</h4>
+            <ul className="mt-4 space-y-3">
+              <li>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Términos de Uso
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Privacidad
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Contacto
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-12 border-t border-border pt-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            © {new Date().getFullYear()} UVG Collab. Todos los derechos
+            reservados.
+          </p>
+        </div>
+      </div>
+    </footer>
+  )
+}
+
+export default function LandingPage() {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Navbar />
+      <main className="flex-1">
+        <HeroSection />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <ForWhoSection />
+        <CTASection />
+      </main>
+      <Footer />
+    </div>
+  )
 }
 
