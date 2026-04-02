@@ -1,29 +1,23 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 
-COPY package.json ./
-COPY package-lock.json* pnpm-lock.yaml* ./
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
-RUN if [ -f pnpm-lock.yaml ]; then \
-      corepack enable && corepack prepare pnpm@latest --activate && \
-      pnpm install --frozen-lockfile; \
-    else \
-      npm ci; \
-    fi
+COPY package.json pnpm-lock.yaml .npmrc* ./
+
+ENV CI=true
+RUN pnpm install
 
 FROM node:22-alpine AS build
 WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN if [ -f pnpm-lock.yaml ]; then \
-      corepack enable && corepack prepare pnpm@latest --activate && \
-      pnpm build; \
-    else \
-      npm run build; \
-    fi
+RUN pnpm build
 
 FROM node:22-alpine AS production
 WORKDIR /app
