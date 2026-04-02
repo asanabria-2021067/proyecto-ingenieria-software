@@ -1,8 +1,12 @@
 import './global.css';
+import { Inter, Manrope } from 'next/font/google';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 
 export const metadata = {
-  title: 'UVG Collab',
-  description: 'UVG Collaboration Platform',
+  title: 'UVG Scholar | Excelencia Académica',
+  description: 'Plataforma de colaboración y gestión académica de la Universidad del Valle de Guatemala.',
 };
 
 export default function RootLayout({
@@ -12,7 +16,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body className={`${inter.variable} ${manrope.variable} font-body`}>
+        {children}
+      </body>
     </html>
   );
 }
