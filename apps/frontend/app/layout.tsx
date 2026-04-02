@@ -1,3 +1,5 @@
+import './global.css';
+
 export const metadata = {
   title: 'UVG Collab',
   description: 'UVG Collaboration Platform',
