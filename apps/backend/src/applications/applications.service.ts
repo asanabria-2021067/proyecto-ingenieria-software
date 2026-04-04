@@ -2,9 +2,11 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
+import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
 @Injectable()
 export class ApplicationsService {
@@ -69,7 +71,116 @@ export class ApplicationsService {
     });
   }
 
-  findAll() {
-    return { message: 'Not implemented yet' };
+  async findAll() {
+    return this.prisma.postulacion.findMany({
+      include: {
+        postulante: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+          },
+        },
+        rolProyecto: {
+          include: { proyecto: true },
+        },
+      },
+      orderBy: { fechaPostulacion: 'desc' },
+    });
+  }
+
+  async findMine(userId: number) {
+    return this.prisma.postulacion.findMany({
+      where: { idUsuarioPostulante: userId },
+      include: {
+        rolProyecto: {
+          include: {
+            proyecto: {
+              select: {
+                idProyecto: true,
+                tituloProyecto: true,
+                estadoProyecto: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { fechaPostulacion: 'desc' },
+    });
+  }
+
+  async findOne(id: number) {
+    const postulacion = await this.prisma.postulacion.findUnique({
+      where: { idPostulacion: id },
+      include: {
+        postulante: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+          },
+        },
+        rolProyecto: {
+          include: {
+            proyecto: true,
+            requisitos: {
+              include: { habilidad: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!postulacion) {
+      throw new NotFoundException(`Postulación con id ${id} no encontrada`);
+    }
+
+    return postulacion;
+  }
+
+  async updateEstado(
+    id: number,
+    dto: UpdateEstadoPostulacionDto,
+    resolutorId: number,
+  ) {
+    const postulacion = await this.prisma.postulacion.findUnique({
+      where: { idPostulacion: id },
+      include: {
+        rolProyecto: {
+          include: { proyecto: true },
+        },
+      },
+    });
+
+    if (!postulacion) {
+      throw new NotFoundException(`Postulación con id ${id} no encontrada`);
+    }
+
+    if (postulacion.estadoPostulacion !== 'PENDIENTE') {
+      throw new BadRequestException('Esta postulación ya fue resuelta');
+    }
+
+    if (postulacion.rolProyecto.proyecto.creadoPor !== resolutorId) {
+      throw new ForbiddenException(
+        'Solo el creador del proyecto puede resolver postulaciones',
+      );
+    }
+
+    return this.prisma.postulacion.update({
+      where: { idPostulacion: id },
+      data: {
+        estadoPostulacion: dto.estadoPostulacion,
+        comentarioResolucion: dto.comentarioResolucion,
+        resueltaPor: resolutorId,
+        fechaResolucion: new Date(),
+      },
+      include: {
+        rolProyecto: {
+          include: { proyecto: true },
+        },
+      },
+    });
   }
 }
