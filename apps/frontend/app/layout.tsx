@@ -1,4 +1,5 @@
 import './global.css';
+import { Providers } from './providers';
 
 export const metadata = {
   title: 'UVG Collab',
@@ -12,7 +13,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
