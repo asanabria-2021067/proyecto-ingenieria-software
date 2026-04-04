@@ -1,11 +1,17 @@
-import { IsInt, IsString, IsNotEmpty, MinLength } from 'class-validator';
+import { IsInt, IsString, IsNotEmpty, MinLength, MaxLength } from 'class-validator';
 
 export class CreatePostulacionDto {
   @IsInt()
+  @IsNotEmpty()
+  idUsuarioPostulante!: number;
+
+  @IsInt()
+  @IsNotEmpty()
   idRolProyecto!: number;
 
   @IsString()
   @IsNotEmpty()
-  @MinLength(20)
+  @MinLength(40)
+  @MaxLength(1000)
   justificacion!: string;
 }
