@@ -1,66 +1,76 @@
-export default function ProjectsPage() {
-  const projects = [
-    {
-      name: "Sistema de Riego Inteligente",
-      area: "Ingeniería Mecatrónica",
-      status: "Activo",
-      members: 5,
-    },
-    {
-      name: "App de Tutorías entre Pares",
-      area: "Ciencias de la Computación",
-      status: "Activo",
-      members: 3,
-    },
-    {
-      name: "Campaña de Reforestación UVG",
-      area: "Ciencias Ambientales",
-      status: "En pausa",
-      members: 8,
-    },
-    {
-      name: "Plataforma de Donaciones Estudiantiles",
-      area: "Ingeniería de Software",
-      status: "Activo",
-      members: 4,
-    },
-  ];
+import Link from 'next/link';
+import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
+
+async function getProjects(q?: string): Promise<ProyectoListItemDTO[]> {
+  const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/proyectos`);
+  if (q) url.searchParams.set('q', q);
+  const res = await fetch(url.toString(), { cache: 'no-store' });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+const ESTADO_STYLES: Record<string, string> = {
+  PUBLICADO:   'bg-[#006735] text-white',
+  EN_PROGRESO: 'bg-[#416900] text-white',
+  BORRADOR:    'bg-gray-100 text-gray-600',
+};
+
+interface Props {
+  searchParams: Promise<{ q?: string }>;
+}
+
+export default async function ProjectsPage({ searchParams }: Props) {
+  const { q } = await searchParams;
+  const projects = await getProjects(q);
 
   return (
     <main className="min-h-screen bg-gray-50 px-8 py-10">
-      <h1 className="mb-2 text-3xl font-bold text-blue-700">Proyectos</h1>
-      <p className="mb-8 text-gray-600">
-        Explora los proyectos universitarios disponibles y encuentra
-        oportunidades de colaboración.
+      <h1 className="mb-2 text-2xl font-bold text-gray-900">Proyectos</h1>
+      <p className="mb-8 text-sm text-gray-500">
+        Explora los proyectos universitarios disponibles y encuentra oportunidades de colaboración.
       </p>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {projects.map((project) => (
-          <div
-            key={project.name}
-            className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {project.name}
-              </h2>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  project.status === "Activo"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-yellow-100 text-yellow-700"
-                }`}
-              >
-                {project.status}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600">Área: {project.area}</p>
-            <p className="text-sm text-gray-600">
-              Miembros: {project.members}
-            </p>
-          </div>
-        ))}
-      </div>
+      {projects.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-16">
+          {q ? `No se encontraron proyectos para "${q}".` : 'No hay proyectos disponibles.'}
+        </p>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {projects.map((project) => (
+            <Link
+              key={project.idProyecto}
+              href={`/dashboard/projects/${project.idProyecto}`}
+              className="group block bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h2 className="text-sm font-semibold text-gray-900 group-hover:text-[#006735] transition-colors line-clamp-2">
+                  {project.tituloProyecto}
+                </h2>
+                <span
+                  className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                    ESTADO_STYLES[project.estadoProyecto] ?? 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {project.estadoProyecto}
+                </span>
+              </div>
+              {project.descripcionProyecto && (
+                <p className="text-xs text-gray-500 line-clamp-2 mb-3">
+                  {project.descripcionProyecto}
+                </p>
+              )}
+              <div className="flex gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600">
+                  {project.tipoProyecto}
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600">
+                  {project.modalidadProyecto}
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

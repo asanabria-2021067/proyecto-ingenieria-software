@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, ParseIntPipe, Query } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 
 @Controller('proyectos')
@@ -6,8 +6,8 @@ export class ProjectsController {
   constructor(private projectsService: ProjectsService) {}
 
   @Get()
-  findAll() {
-    return this.projectsService.findAll();
+  findAll(@Query('q') q?: string) {
+    return this.projectsService.findAll(q);
   }
 
   @Get(':id')
