@@ -1,7 +1,7 @@
 const steps = [
   {
     number: '01',
-    title: 'Descubri o Crea',
+    title: 'Descubre o Crea',
     description:
       'Explora los proyectos disponibles o crea el tuyo. Podes crear proyectos individuales o una organizacion con miembros fijos (como GitHub).',
     style: 'bg-surface-container-low text-primary',
@@ -27,7 +27,7 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <section id="la-solucion" className="scroll-mt-20 overflow-hidden px-8 py-24">
+    <section className="scroll-mt-20 overflow-hidden px-8 py-24">
       <div className="mx-auto max-w-7xl">
         <div className="mb-20 text-center">
           <h2 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
@@ -40,7 +40,6 @@ export default function HowItWorks() {
         </div>
         <div className="relative grid grid-cols-1 gap-12 md:grid-cols-3">
           {/* Connector line */}
-          <div className="absolute left-1/2 top-10 hidden h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-primary/20 via-primary/40 to-secondary/20 md:block" />
           {steps.map((step) => (
             <div
               key={step.number}

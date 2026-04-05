@@ -15,7 +15,7 @@ export default function OrganizationsSection() {
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-16 lg:flex-row">
         <div className="space-y-8 lg:w-1/2">
           <span className="text-xs font-bold uppercase tracking-widest text-secondary-fixed">
-            Modelo tipo GitHub
+            Para Equipos de Trabajo
           </span>
           <h2 className="font-headline text-4xl font-extrabold leading-tight md:text-5xl">
             Organizaciones: tu equipo, tus proyectos
