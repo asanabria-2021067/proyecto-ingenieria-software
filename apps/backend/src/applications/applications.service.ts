@@ -172,7 +172,7 @@ export class ApplicationsService {
       where: { idPostulacion: id },
       data: {
         estadoPostulacion: dto.estadoPostulacion,
-        comentarioResolucion: dto.comentarioResolucion,
+        comentarioResolucion: dto.comentarioResolucion ?? null,
         resueltaPor: resolutorId,
         fechaResolucion: new Date(),
       },
