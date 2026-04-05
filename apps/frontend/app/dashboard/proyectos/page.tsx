@@ -1,68 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Search, MapPin, Clock, Users } from 'lucide-react';
+import { Search, MapPin, Users } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import apiClient from '@/lib/api/client';
-
-type Proyecto = {
-  idProyecto: number;
-  tituloProyecto: string;
-  descripcionProyecto: string;
-  tipoProyecto: string;
-  modalidadProyecto: string;
-  organizaciones: { organizacion: { nombreOrganizacion: string } }[];
-  intereses: { interes: { nombreInteres: string } }[];
-  roles: { idRolProyecto: number }[];
-};
-
-const TIPO_LABEL: Record<string, string> = {
-  ACADEMICO_HORAS_BECA: 'Horas Beca',
-  ACADEMICO_EXPERIENCIA: 'Experiencia',
-  EXTRACURRICULAR_EXTENSION: 'Extensión',
-};
-
-const MODALIDAD_LABEL: Record<string, string> = {
-  PRESENCIAL: 'Presencial',
-  VIRTUAL: 'Virtual',
-  MIXTA: 'Mixta',
-};
+import { apiFetch } from '@/lib/api/client';
+import { ProyectoResumen, TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
 
 export default function ProyectosPage() {
-  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
-  const [filtrados, setFiltrados] = useState<Proyecto[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  useEffect(() => {
-    apiClient
-      .get('/proyectos')
-      .then((res) => {
-        setProyectos(res.data);
-        setFiltrados(res.data);
-      })
-      .catch(() => setError('No se pudieron cargar los proyectos.'))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: proyectos = [], isLoading, isError } = useQuery<ProyectoResumen[]>({
+    queryKey: ['proyectos'],
+    queryFn: () => apiFetch('/proyectos'),
+  });
 
-  useEffect(() => {
-    let resultado = proyectos;
-    if (busqueda) {
-      const q = busqueda.toLowerCase();
-      resultado = resultado.filter(
-        (p) =>
-          p.tituloProyecto.toLowerCase().includes(q) ||
-          p.descripcionProyecto.toLowerCase().includes(q),
-      );
-    }
-    if (tipoFiltro) {
-      resultado = resultado.filter((p) => p.tipoProyecto === tipoFiltro);
-    }
-    setFiltrados(resultado);
-  }, [busqueda, tipoFiltro, proyectos]);
+  const filtrados = proyectos.filter((p) => {
+    const coincideBusqueda =
+      !busqueda ||
+      p.tituloProyecto.toLowerCase().includes(busqueda.toLowerCase()) ||
+      p.descripcionProyecto.toLowerCase().includes(busqueda.toLowerCase());
+    const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
+    return coincideBusqueda && coincideTipo;
+  });
 
   return (
     <DashboardLayout>
@@ -99,14 +61,16 @@ export default function ProyectosPage() {
           </select>
         </div>
 
-        {loading && (
+        {isLoading && (
           <div className="text-center py-16 text-tertiary text-sm">Cargando proyectos...</div>
         )}
-        {error && (
-          <div className="text-center py-16 text-error text-sm">{error}</div>
+        {isError && (
+          <div className="text-center py-16 text-error text-sm">
+            No se pudieron cargar los proyectos.
+          </div>
         )}
 
-        {!loading && !error && filtrados.length === 0 && (
+        {!isLoading && !isError && filtrados.length === 0 && (
           <div className="text-center py-16 text-tertiary text-sm">
             No se encontraron proyectos con los filtros aplicados.
           </div>
@@ -125,13 +89,11 @@ export default function ProyectosPage() {
                     {proyecto.tituloProyecto}
                   </h2>
                   <span className="shrink-0 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-bold">
-                    {TIPO_LABEL[proyecto.tipoProyecto] ?? proyecto.tipoProyecto}
+                    {TIPO_LABEL[proyecto.tipoProyecto]}
                   </span>
                 </div>
 
-                {org && (
-                  <p className="text-tertiary text-sm font-medium">{org}</p>
-                )}
+                {org && <p className="text-tertiary text-sm font-medium">{org}</p>}
 
                 <p className="text-on-surface text-sm leading-relaxed line-clamp-2">
                   {proyecto.descripcionProyecto}
