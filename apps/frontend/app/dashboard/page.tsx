@@ -1,573 +1,500 @@
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
+'use client';
+
+import Link from 'next/link';
 import {
   LayoutDashboard,
-  FolderKanban,
-  FileText,
+  FolderOpen,
+  ClipboardCheck,
   Settings,
   Search,
   Bell,
-  Calendar,
+  Grid3X3,
+  Plus,
+  GraduationCap,
+  HeartHandshake,
+  Zap,
   Clock,
-  Users,
-  Star,
-  TrendingUp,
-  ChevronRight,
   MapPin,
-  ArrowUpRight,
-  Megaphone,
-} from "lucide-react"
+  Eye,
+  Calendar,
+} from 'lucide-react';
 
 export default function DashboardPage() {
   return (
-    <div className="flex min-h-screen bg-muted/30">
-      <Sidebar />
+    <div className="min-h-screen bg-surface text-on-surface">
+      <TopNavBar />
+      <SideNavBar />
 
-      <div className="flex flex-1 flex-col">
-        <Header />
+      <main className="min-h-screen px-8 pb-12 pt-24 md:ml-64">
+        {/* Welcome */}
+        <section className="mb-12">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary">
+            Bienvenido de vuelta
+          </span>
+          <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
+            Hola, Alejandro
+          </h1>
+          <p className="mt-2 max-w-2xl text-lg text-on-surface-variant">
+            Tu progreso academico este semestre es excepcional. Tienes 3 nuevas oportunidades
+            de beca que coinciden con tu perfil.
+          </p>
+        </section>
 
-        <main className="flex-1 overflow-auto p-6">
-          <div className="mx-auto max-w-7xl space-y-6">
-            <WelcomeSection />
-            <SummaryCards />
-
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="space-y-6 lg:col-span-2">
-                <RecommendedProjects />
-                <ApplicationsStatus />
+        {/* Stats */}
+        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <StatCard
+            label="Horas Beca Acumuladas"
+            value="124"
+            suffix="/ 150"
+            progress={82}
+            icon={<GraduationCap className="h-16 w-16" />}
+            iconColor="text-primary/5"
+          />
+          <StatCardBadge
+            label="Horas de Extension"
+            value="45"
+            suffix="HRS"
+            badge="+12 este mes"
+            icon={<HeartHandshake className="h-16 w-16" />}
+            iconColor="text-secondary/5"
+            valueColor="text-secondary"
+            badgeBg="bg-secondary-container"
+            badgeColor="text-on-secondary-container"
+          />
+          <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-primary p-8 text-on-primary">
+            <div className="relative z-10">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-on-primary-container">
+                Proyectos Activos
+              </span>
+              <span className="text-5xl font-black leading-none tracking-tighter">02</span>
+            </div>
+            <div className="relative z-10 flex gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+                <Zap className="h-5 w-5 text-white" />
               </div>
-
-              <div className="space-y-6">
-                <UpcomingDates />
-                <AnnouncementCard />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+                <Calendar className="h-5 w-5 text-white" />
               </div>
             </div>
+            <Zap className="absolute -bottom-4 -right-4 h-20 w-20 text-white/10" />
           </div>
-        </main>
-      </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+          {/* Left Column */}
+          <div className="space-y-12 lg:col-span-8">
+            <RecommendedProjects />
+            <ApplicationsStatus />
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-8 lg:col-span-4">
+            <UpcomingDates />
+            <NewsCard />
+          </div>
+        </div>
+      </main>
     </div>
-  )
+  );
 }
 
-function Sidebar() {
+/* ---------- Top Nav ---------- */
+function TopNavBar() {
+  return (
+    <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between bg-white/80 px-8 shadow-[0_20px_40px_rgba(24,28,32,0.06)] backdrop-blur-xl">
+      <div className="flex items-center gap-8">
+        <span className="font-headline text-2xl font-black tracking-tighter text-green-800">
+          UVG Scholar
+        </span>
+        <nav className="hidden gap-6 md:flex">
+          <a href="#" className="border-b-2 border-green-800 py-5 font-bold text-green-800">
+            Dashboard
+          </a>
+          <Link
+            href="/dashboard/proyectos"
+            className="px-2 py-5 text-slate-500 transition-colors hover:bg-slate-100"
+          >
+            Projects
+          </Link>
+          <Link
+            href="/dashboard/mis-postulaciones"
+            className="px-2 py-5 text-slate-500 transition-colors hover:bg-slate-100"
+          >
+            My Applications
+          </Link>
+          <a href="#" className="px-2 py-5 text-slate-500 transition-colors hover:bg-slate-100">
+            Settings
+          </a>
+        </nav>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="relative hidden sm:block">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+          <input
+            type="text"
+            placeholder="Search projects..."
+            className="w-64 rounded-xl border-none bg-surface-container-low py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <button className="rounded-full p-2 transition-colors hover:bg-slate-100">
+          <Bell className="h-5 w-5 text-on-surface-variant" />
+        </button>
+        <button className="rounded-full p-2 transition-colors hover:bg-slate-100">
+          <Grid3X3 className="h-5 w-5 text-on-surface-variant" />
+        </button>
+        <div className="h-8 w-8 rounded-full border border-outline-variant/30 bg-primary-container" />
+      </div>
+    </header>
+  );
+}
+
+/* ---------- Side Nav ---------- */
+function SideNavBar() {
   const navItems = [
-    { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", active: true },
-    { icon: FolderKanban, label: "Proyectos", href: "/dashboard/proyectos", active: false },
-    { icon: FileText, label: "Mis aplicaciones", href: "/dashboard/aplicaciones", active: false },
-    { icon: Settings, label: "Configuración", href: "/dashboard/configuracion", active: false },
-  ]
+    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', active: true },
+    { icon: FolderOpen, label: 'Projects', href: '/dashboard/proyectos', active: false },
+    { icon: ClipboardCheck, label: 'My Applications', href: '/dashboard/mis-postulaciones', active: false },
+    { icon: Settings, label: 'Settings', href: '#', active: false },
+  ];
 
   return (
-    <aside className="hidden w-64 flex-col border-r border-border bg-card lg:flex">
-      <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <span className="text-lg font-bold text-primary-foreground">U</span>
-        </div>
-        <span className="text-xl font-bold text-foreground">
-          UVG <span className="text-primary">Collab</span>
-        </span>
+    <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col gap-y-2 bg-slate-50 pt-20 md:flex">
+      <div className="mb-8 px-6">
+        <h2 className="font-headline text-lg font-bold text-green-900">Academic Ledger</h2>
+        <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
+          Student Portal
+        </p>
       </div>
-
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex flex-col gap-y-1">
         {navItems.map((item) => (
           <Link
             key={item.label}
             href={item.href}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            className={`mx-2 flex items-center gap-3 rounded-lg px-4 py-3 transition-all duration-200 ${
               item.active
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? 'bg-white text-green-800 shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200/50 hover:text-green-700'
             }`}
           >
             <item.icon className="h-5 w-5" />
-            {item.label}
+            <span className="text-sm font-medium">{item.label}</span>
           </Link>
         ))}
       </nav>
-
-      <div className="border-t border-border p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 border-2 border-primary/20">
-            <AvatarFallback className="bg-primary/10 font-semibold text-primary">
-              AR
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
-              Alejandro Robledo
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              Ingeniería en Sistemas
-            </p>
-          </div>
-        </div>
+      <div className="mt-auto px-4 pb-8">
+        <Link
+          href="/dashboard/proyectos"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-on-primary shadow-sm transition-opacity hover:opacity-90"
+        >
+          <Plus className="h-5 w-5" />
+          New Project
+        </Link>
       </div>
     </aside>
-  )
+  );
 }
 
-function Header() {
+/* ---------- Stat Cards ---------- */
+function StatCard({
+  label,
+  value,
+  suffix,
+  progress,
+  icon,
+  iconColor,
+}: {
+  label: string;
+  value: string;
+  suffix: string;
+  progress: number;
+  icon: React.ReactNode;
+  iconColor: string;
+}) {
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
-      <div className="flex items-center gap-2 lg:hidden">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <span className="text-sm font-bold text-primary-foreground">U</span>
-        </div>
-        <span className="text-lg font-bold text-foreground">UVG Collab</span>
-      </div>
-
-      <div className="hidden max-w-md flex-1 md:block">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Buscar proyectos, asociaciones..."
-            className="w-full border-border bg-muted/50 pl-10"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-            3
+    <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
+      <div className="relative z-10">
+        <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-tertiary">
+          {label}
+        </span>
+        <div className="flex items-baseline gap-2">
+          <span className="text-5xl font-black leading-none tracking-tighter text-primary">
+            {value}
           </span>
-        </Button>
-        <Avatar className="h-9 w-9 border-2 border-primary/20 lg:hidden">
-          <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
-            AR
-          </AvatarFallback>
-        </Avatar>
-      </div>
-    </header>
-  )
-}
-
-function WelcomeSection() {
-  return (
-    <div className="rounded-xl bg-gradient-to-r from-primary to-primary/80 p-6 text-primary-foreground">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Hola, Alejandro</h1>
-          <p className="mt-1 text-primary-foreground/90">
-            Descubre nuevos proyectos y oportunidades de colaboración que se
-            alinean con tus intereses.
-          </p>
+          <span className="text-lg font-bold text-primary-container">{suffix}</span>
         </div>
-        <Button variant="secondary" className="shrink-0 bg-card text-foreground hover:bg-card/90">
-          <FolderKanban className="mr-2 h-4 w-4" />
-          Explorar proyectos
-        </Button>
       </div>
+      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
+      </div>
+      <div className={`absolute -bottom-4 -right-4 ${iconColor}`}>{icon}</div>
     </div>
-  )
+  );
 }
 
-function SummaryCards() {
-  const stats = [
-    {
-      title: "Proyectos activos",
-      value: "3",
-      change: "+1 este mes",
-      icon: FolderKanban,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-    },
-    {
-      title: "Aplicaciones enviadas",
-      value: "7",
-      change: "2 pendientes",
-      icon: FileText,
-      color: "text-secondary",
-      bgColor: "bg-secondary/20",
-    },
-    {
-      title: "Oportunidades recomendadas",
-      value: "12",
-      change: "Basado en tu perfil",
-      icon: Star,
-      color: "text-amber-600",
-      bgColor: "bg-amber-100",
-    },
-    {
-      title: "Horas de colaboración",
-      value: "48",
-      change: "+12 esta semana",
-      icon: TrendingUp,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-100",
-    },
-  ]
-
+function StatCardBadge({
+  label,
+  value,
+  suffix,
+  badge,
+  icon,
+  iconColor,
+  valueColor,
+  badgeBg,
+  badgeColor,
+}: {
+  label: string;
+  value: string;
+  suffix: string;
+  badge: string;
+  icon: React.ReactNode;
+  iconColor: string;
+  valueColor: string;
+  badgeBg: string;
+  badgeColor: string;
+}) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat) => (
-        <Card key={stat.title} className="border-border/50">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </p>
-                <p className="mt-1 text-3xl font-bold text-foreground">
-                  {stat.value}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {stat.change}
-                </p>
-              </div>
-              <div className={`rounded-lg p-2.5 ${stat.bgColor}`}>
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
+      <div className="relative z-10">
+        <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-tertiary">
+          {label}
+        </span>
+        <div className="flex items-baseline gap-2">
+          <span className={`text-5xl font-black leading-none tracking-tighter ${valueColor}`}>
+            {value}
+          </span>
+          <span className={`text-lg font-bold ${badgeBg.replace('bg-', 'text-')}`}>{suffix}</span>
+        </div>
+      </div>
+      <div className="mt-4 flex items-center gap-2">
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${badgeBg} ${badgeColor}`}
+        >
+          {badge}
+        </span>
+      </div>
+      <div className={`absolute -bottom-4 -right-4 ${iconColor}`}>{icon}</div>
     </div>
-  )
+  );
 }
 
+/* ---------- Recommended Projects ---------- */
 function RecommendedProjects() {
   const projects = [
     {
       id: 1,
-      title: "Plataforma de tutorías peer-to-peer",
+      tag: 'Hora Beca',
+      tagBg: 'bg-secondary-container text-on-secondary-container',
+      code: 'PRJ-2024',
+      title: 'Asistente de Investigacion',
       description:
-        "Desarrollo de una aplicación web para conectar estudiantes que necesitan ayuda con tutores voluntarios.",
-      category: "Tecnología",
-      status: "Buscando miembros",
-      statusColor: "bg-amber-100 text-amber-700",
-      team: ["Ing. Sistemas", "Diseño UX", "Educación"],
-      members: 4,
-      maxMembers: 8,
-      deadline: "20 Abr 2026",
-      location: "Híbrido",
+        'Colaboracion en el Laboratorio de Innovacion para el desarrollo de sensores inteligentes aplicados a agricultura.',
+      meta: '10 hrs/semana',
+      metaIcon: <Clock className="h-4 w-4" />,
     },
     {
       id: 2,
-      title: "Campaña de reciclaje campus verde",
+      tag: 'Extension',
+      tagBg: 'bg-surface-container-highest text-tertiary',
+      code: 'PRJ-2983',
+      title: 'Apoyo en Evento de Asociacion',
       description:
-        "Iniciativa ambiental para implementar estaciones de reciclaje inteligentes en todo el campus.",
-      category: "Sostenibilidad",
-      status: "En progreso",
-      statusColor: "bg-primary/10 text-primary",
-      team: ["Ing. Ambiental", "Comunicación", "Diseño"],
-      members: 6,
-      maxMembers: 10,
-      deadline: "15 May 2026",
-      location: "Presencial",
+        'Logistica y soporte tecnico durante el Congreso Nacional de Estudiantes de Ciencias 2024.',
+      meta: 'Campus Central',
+      metaIcon: <MapPin className="h-4 w-4" />,
     },
-    {
-      id: 3,
-      title: "Hackathon de innovación social",
-      description:
-        "Organización de evento de 48 horas enfocado en soluciones tecnológicas para problemas sociales locales.",
-      category: "Eventos",
-      status: "Buscando miembros",
-      statusColor: "bg-amber-100 text-amber-700",
-      team: ["Cualquier carrera", "Liderazgo", "Logística"],
-      members: 3,
-      maxMembers: 12,
-      deadline: "30 Jun 2026",
-      location: "Presencial",
-    },
-    {
-      id: 4,
-      title: "Investigación de UX en apps educativas",
-      description:
-        "Estudio de usabilidad sobre herramientas digitales utilizadas por estudiantes universitarios.",
-      category: "Investigación",
-      status: "Próximamente",
-      statusColor: "bg-muted text-muted-foreground",
-      team: ["Psicología", "Diseño UX", "Estadística"],
-      members: 2,
-      maxMembers: 6,
-      deadline: "10 Jul 2026",
-      location: "Remoto",
-    },
-  ]
+  ];
 
   return (
-    <Card className="border-border/50">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
+    <section>
+      <div className="mb-6 flex items-end justify-between">
         <div>
-          <CardTitle className="text-lg font-semibold">
-            Proyectos disponibles
-          </CardTitle>
-          <CardDescription>
-            Oportunidades recomendadas según tu perfil e intereses
-          </CardDescription>
+          <h2 className="font-headline text-2xl font-black tracking-tight">
+            Proyectos Recomendados
+          </h2>
+          <p className="text-sm text-on-surface-variant">
+            Basado en tus habilidades de Ingenieria
+          </p>
         </div>
-        <Button variant="ghost" size="sm" className="text-primary hover:text-primary">
+        <Link
+          href="/dashboard/proyectos"
+          className="text-sm font-bold text-primary hover:underline"
+        >
           Ver todos
-          <ChevronRight className="ml-1 h-4 w-4" />
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {projects.map((project) => (
+        </Link>
+      </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {projects.map((p) => (
           <div
-            key={project.id}
-            className="group rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/30 hover:shadow-md"
+            key={p.id}
+            className="group rounded-xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
           >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="text-xs font-medium">
-                    {project.category}
-                  </Badge>
-                  <Badge className={`text-xs ${project.statusColor}`}>
-                    {project.status}
-                  </Badge>
-                </div>
-                <h3 className="font-semibold text-foreground transition-colors group-hover:text-primary">
-                  {project.title}
-                </h3>
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                  {project.description}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" />
-                    {project.members}/{project.maxMembers} miembros
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {project.deadline}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {project.location}
-                  </span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {project.team.map((role) => (
-                    <span
-                      key={role}
-                      className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                    >
-                      {role}
-                    </span>
-                  ))}
-                </div>
+            <div className="mb-4 flex items-start justify-between">
+              <span
+                className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ${p.tagBg}`}
+              >
+                {p.tag}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                ID: {p.code}
+              </span>
+            </div>
+            <h3 className="mb-2 text-lg font-bold text-on-surface transition-colors group-hover:text-primary">
+              {p.title}
+            </h3>
+            <p className="mb-6 line-clamp-2 text-sm text-on-surface-variant">{p.description}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-medium text-on-surface-variant">
+                {p.metaIcon}
+                {p.meta}
               </div>
-              <div className="flex gap-2 sm:flex-col">
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
-                  Aplicar
-                  <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
-                <Button size="sm" variant="outline">
-                  Ver detalles
-                </Button>
-              </div>
+              <button className="rounded-xl bg-surface-container-high px-6 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary">
+                Aplicar
+              </button>
             </div>
           </div>
         ))}
-      </CardContent>
-    </Card>
-  )
+      </div>
+    </section>
+  );
 }
 
-function UpcomingDates() {
-  const events = [
-    {
-      title: "Reunión equipo Tutorías",
-      date: "Hoy",
-      time: "14:00",
-      type: "Reunión",
-      typeColor: "bg-blue-100 text-blue-700",
-    },
-    {
-      title: "Deadline: Propuesta Campus Verde",
-      date: "Mañana",
-      time: "23:59",
-      type: "Entrega",
-      typeColor: "bg-red-100 text-red-700",
-    },
-    {
-      title: "Workshop de Design Thinking",
-      date: "15 Abr",
-      time: "10:00",
-      type: "Evento",
-      typeColor: "bg-primary/10 text-primary",
-    },
-    {
-      title: "Presentación de avances",
-      date: "18 Abr",
-      time: "16:00",
-      type: "Reunión",
-      typeColor: "bg-blue-100 text-blue-700",
-    },
-  ]
-
-  return (
-    <Card className="border-border/50">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <Calendar className="h-5 w-5 text-primary" />
-          Próximas fechas
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {events.map((event, index) => (
-          <div
-            key={index}
-            className="flex items-start gap-3 rounded-lg border border-border/50 p-3"
-          >
-            <div className="min-w-[50px] rounded-lg bg-muted px-2 py-1 text-center">
-              <span className="text-xs font-medium text-muted-foreground">
-                {event.date}
-              </span>
-              <span className="block text-sm font-bold text-foreground">
-                {event.time}
-              </span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground">
-                {event.title}
-              </p>
-              <Badge className={`mt-1 text-xs ${event.typeColor}`}>
-                {event.type}
-              </Badge>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  )
-}
-
+/* ---------- Applications Status ---------- */
 function ApplicationsStatus() {
-  const applications = [
+  const apps = [
     {
-      project: "Plataforma de mentorías",
-      appliedDate: "28 Mar 2026",
-      status: "Aceptada",
-      statusColor: "bg-emerald-100 text-emerald-700",
+      name: 'Tutor de Matematicas I',
+      dept: 'Departamento de Educacion',
+      date: '12 Oct, 2023',
+      status: 'En Revision',
+      statusBg: 'bg-blue-100 text-blue-800',
     },
     {
-      project: "App de bienestar estudiantil",
-      appliedDate: "25 Mar 2026",
-      status: "En revisión",
-      statusColor: "bg-amber-100 text-amber-700",
+      name: 'Digitalizacion de Archivos',
+      dept: 'Biblioteca Central',
+      date: '05 Oct, 2023',
+      status: 'Aceptado',
+      statusBg: 'bg-green-100 text-green-800',
     },
     {
-      project: "Revista digital UVG",
-      appliedDate: "20 Mar 2026",
-      status: "En revisión",
-      statusColor: "bg-amber-100 text-amber-700",
+      name: 'Soporte TI Nocturno',
+      dept: 'Laboratorios de Computo',
+      date: '28 Sep, 2023',
+      status: 'Entrevista',
+      statusBg: 'bg-amber-100 text-amber-800',
     },
-    {
-      project: "Programa de radio campus",
-      appliedDate: "15 Mar 2026",
-      status: "Rechazada",
-      statusColor: "bg-red-100 text-red-700",
-    },
-  ]
+  ];
 
   return (
-    <Card className="border-border/50">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <div>
-          <CardTitle className="text-lg font-semibold">
-            Estado de aplicaciones
-          </CardTitle>
-          <CardDescription>
-            Seguimiento de tus postulaciones a proyectos
-          </CardDescription>
-        </div>
-        <Button variant="ghost" size="sm" className="text-primary hover:text-primary">
-          Ver historial
-          <ChevronRight className="ml-1 h-4 w-4" />
-        </Button>
-      </CardHeader>
-      <CardContent>
+    <section>
+      <h2 className="mb-6 font-headline text-2xl font-black tracking-tight">
+        Estado de Aplicaciones
+      </h2>
+      <div className="overflow-hidden rounded-xl bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">
+          <table className="w-full text-left">
+            <thead className="bg-surface-container-low">
+              <tr>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
                   Proyecto
                 </th>
-                <th className="hidden pb-3 text-left text-sm font-medium text-muted-foreground sm:table-cell">
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
                   Fecha
                 </th>
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
                   Estado
                 </th>
-                <th className="pb-3 text-right text-sm font-medium text-muted-foreground">
-                  Acción
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                  Accion
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {applications.map((app, index) => (
-                <tr key={index} className="group">
-                  <td className="py-3">
-                    <span className="text-sm font-medium text-foreground transition-colors group-hover:text-primary">
-                      {app.project}
+            <tbody className="divide-y divide-surface-container">
+              {apps.map((a, i) => (
+                <tr key={i}>
+                  <td className="px-6 py-5">
+                    <div className="text-sm font-bold text-on-surface">{a.name}</div>
+                    <div className="text-xs text-on-surface-variant">{a.dept}</div>
+                  </td>
+                  <td className="px-6 py-5 text-sm text-on-surface-variant">{a.date}</td>
+                  <td className="px-6 py-5">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${a.statusBg}`}
+                    >
+                      {a.status}
                     </span>
                   </td>
-                  <td className="hidden py-3 sm:table-cell">
-                    <span className="text-sm text-muted-foreground">
-                      {app.appliedDate}
-                    </span>
-                  </td>
-                  <td className="py-3">
-                    <Badge className={`text-xs ${app.statusColor}`}>
-                      {app.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3 text-right">
-                    <Button variant="ghost" size="sm" className="text-primary hover:text-primary">
-                      Ver
-                    </Button>
+                  <td className="px-6 py-5">
+                    <button className="text-primary">
+                      <Eye className="h-5 w-5" />
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </CardContent>
-    </Card>
-  )
+      </div>
+    </section>
+  );
 }
 
-function AnnouncementCard() {
+/* ---------- Upcoming Dates ---------- */
+function UpcomingDates() {
+  const events = [
+    { month: 'OCT', day: '24', title: 'Entrega Reporte Horas', sub: 'Investigacion Sensores', color: 'bg-error/10 text-error' },
+    { month: 'OCT', day: '28', title: 'Reunion de Avance', sub: 'Depto. Innovacion', color: 'bg-primary/10 text-primary' },
+    { month: 'NOV', day: '02', title: 'Cierre de Convocatoria', sub: 'Becas de Verano', color: 'bg-secondary/10 text-secondary' },
+  ];
+
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <div className="rounded-full bg-primary/10 p-1.5">
-            <Megaphone className="h-4 w-4 text-primary" />
+    <div className="rounded-xl bg-surface-container-low p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <h3 className="font-headline text-lg font-black tracking-tight">Proximas Fechas</h3>
+        <Calendar className="h-5 w-5 text-primary" />
+      </div>
+      <div className="space-y-4">
+        {events.map((e, i) => (
+          <div key={i} className="group flex items-center gap-4 rounded-lg bg-white p-4">
+            <div
+              className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded ${e.color}`}
+            >
+              <span className="text-xs font-bold">{e.month}</span>
+              <span className="text-lg font-black leading-none">{e.day}</span>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-bold text-on-surface group-hover:text-primary">
+                {e.title}
+              </h4>
+              <p className="text-xs text-on-surface-variant">{e.sub}</p>
+            </div>
           </div>
-          <CardTitle className="text-base font-semibold">
-            Convocatoria abierta
-          </CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div>
-          <h4 className="font-semibold text-foreground">
-            Feria de Innovación 2026
-          </h4>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Inscribe tu proyecto para participar en la feria anual de innovación
-            y emprendimiento de UVG.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="h-3.5 w-3.5" />
-          <span>Cierre: 30 Abr 2026</span>
-        </div>
-        <Button size="sm" className="w-full bg-primary hover:bg-primary/90">
-          Inscribir proyecto
-        </Button>
-      </CardContent>
-    </Card>
-  )
+        ))}
+      </div>
+      <button className="mt-6 w-full py-2 text-xs font-bold uppercase tracking-widest text-primary hover:underline">
+        Ver calendario completo
+      </button>
+    </div>
+  );
+}
+
+/* ---------- News Card ---------- */
+function NewsCard() {
+  return (
+    <div className="group relative h-64 overflow-hidden rounded-xl bg-slate-900">
+      <img
+        alt="UVG Campus"
+        className="absolute inset-0 h-full w-full object-cover opacity-40 transition-transform duration-700 group-hover:scale-105"
+        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBifKYl2ZPwNxUUrxL1zg895S9VG8AYf5WAQ2wVk_TcR3BgmShDFM4jDR_98CGHPF8DoPjfrQntosl2LdZIMYKe03ecZWYZsiq-hlfDygtpjhV201YXBU7h3tHlwJV2eg5UyCJS5XC3yn-7mktHRzhAUetPu-D_OxH6PVA1paFhEU0miKy9WhXiIWzQaxhNi0DuBxPJMKlzVaYQPtSNFJqUAU_Eov67uDapmxcsrSaPdnrXf5bZv0gazXR6Ztjxw1d8O4AX3_2xTw"
+      />
+      <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-6">
+        <h3 className="mb-1 text-lg font-bold text-white">UVG Institutional News</h3>
+        <p className="text-xs text-white/70">
+          Nueva convocatoria para proyectos de sostenibilidad ambiental abierta hasta Diciembre.
+        </p>
+        <button className="mt-4 text-xs font-black uppercase tracking-tighter text-white underline underline-offset-4">
+          Leer mas
+        </button>
+      </div>
+    </div>
+  );
 }
