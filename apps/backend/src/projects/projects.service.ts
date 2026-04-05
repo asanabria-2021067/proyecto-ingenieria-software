@@ -3,7 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { EstadoProyecto } from '@prisma/client';
 
-// Selección base reutilizada en findAll y findOne
 const proyectoSelect = {
   idProyecto: true,
   tituloProyecto: true,
@@ -35,22 +34,67 @@ const proyectoSelect = {
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
+  async findAll() {
     return this.prisma.proyecto.findMany({
-      where: { eliminadoEn: null },
-      orderBy: { fechaCreacion: 'desc' },
-      select: proyectoSelect,
+      where: { estadoProyecto: 'PUBLICADO', eliminadoEn: null },
+      select: {
+        idProyecto: true,
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        tipoProyecto: true,
+        estadoProyecto: true,
+        modalidadProyecto: true,
+        fechaPublicacion: true,
+        organizaciones: {
+          select: {
+            organizacion: { select: { nombreOrganizacion: true } },
+          },
+        },
+        intereses: {
+          select: { interes: { select: { nombreInteres: true } } },
+        },
+        roles: { select: { idRolProyecto: true } },
+      },
+      orderBy: { fechaPublicacion: 'desc' },
     });
   }
 
   async findOne(id: number) {
-    const proyecto = await this.prisma.proyecto.findFirst({
-      where: { idProyecto: id, eliminadoEn: null },
-      select: {
-        ...proyectoSelect,
+    const proyecto = await this.prisma.proyecto.findUnique({
+      where: { idProyecto: id },
+      include: {
+        creador: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+          },
+        },
+        organizaciones: {
+          include: {
+            organizacion: true,
+          },
+        },
+        intereses: {
+          include: {
+            interes: true,
+          },
+        },
+        roles: {
+          include: {
+            requisitos: {
+              include: {
+                habilidad: true,
+              },
+            },
+            carreraRequerida: true,
+          },
+        },
         hitos: {
-          select: { idHito: true, tituloHito: true, estadoHito: true, fechaLimite: true, orden: true },
-          orderBy: { orden: 'asc' },
+          orderBy: {
+            orden: 'asc',
+          },
         },
       },
     });
@@ -58,7 +102,6 @@ export class ProjectsService {
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
     }
-
     return proyecto;
   }
 
