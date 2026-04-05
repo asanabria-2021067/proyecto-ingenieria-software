@@ -40,7 +40,6 @@
     "@tanstack/react-query": "^5.62.0",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
-    "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
