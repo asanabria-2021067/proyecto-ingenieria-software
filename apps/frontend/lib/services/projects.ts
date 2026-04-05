@@ -1,14 +1,11 @@
-import apiClient from '@/lib/api/client';
+import { apiFetch } from '@/lib/api/client';
 import type { ProyectoDetalleDTO, ProyectoListItemDTO } from '@/lib/dto/project.dto';
 
 export async function getProjectById(id: number): Promise<ProyectoDetalleDTO> {
-  const { data } = await apiClient.get<ProyectoDetalleDTO>(`/proyectos/${id}`);
-  return data;
+  return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}`);
 }
 
 export async function searchProjects(q: string): Promise<ProyectoListItemDTO[]> {
-  const { data } = await apiClient.get<ProyectoListItemDTO[]>('/proyectos', {
-    params: { q },
-  });
-  return data;
+  const params = q ? `?q=${encodeURIComponent(q)}` : '';
+  return apiFetch<ProyectoListItemDTO[]>(`/proyectos${params}`);
 }
