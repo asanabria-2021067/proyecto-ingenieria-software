@@ -1,21 +1,10 @@
+'use client';
+
 import ProyectoCard from '@/components/ProyectoCard';
-import { getProyectos } from '@/lib/api';
-import { Proyecto } from '@/types/proyecto';
+import { useProyectos } from '@/hooks/useProyectos';
 
-export const metadata = {
-  title: 'Proyectos · UVG Collab',
-  description: 'Explora los proyectos académicos y extracurriculares disponibles.',
-};
-
-export default async function ProyectosPage() {
-  let proyectos: Proyecto[] = [];
-  let error: string | null = null;
-
-  try {
-    proyectos = await getProyectos();
-  } catch (e) {
-    error = e instanceof Error ? e.message : 'Error desconocido al cargar proyectos';
-  }
+export default function ProyectosPage() {
+  const { data: proyectos, isLoading, isError, error } = useProyectos();
 
   return (
     <main style={{ maxWidth: 860, margin: '0 auto', padding: '40px 16px' }}>
@@ -29,8 +18,13 @@ export default async function ProyectosPage() {
         </p>
       </header>
 
-      {/* Estado de error */}
-      {error && (
+      {/* Estado: cargando */}
+      {isLoading && (
+        <p style={{ color: '#9ca3af', fontSize: 15 }}>Cargando proyectos…</p>
+      )}
+
+      {/* Estado: error */}
+      {isError && (
         <div
           role="alert"
           style={{
@@ -42,12 +36,12 @@ export default async function ProyectosPage() {
             fontSize: 14,
           }}
         >
-          {error}
+          {error instanceof Error ? error.message : 'Error al cargar proyectos'}
         </div>
       )}
 
-      {/* Estado vacío */}
-      {!error && proyectos.length === 0 && (
+      {/* Estado: vacío */}
+      {!isLoading && !isError && proyectos?.length === 0 && (
         <div
           style={{
             textAlign: 'center',
@@ -61,10 +55,11 @@ export default async function ProyectosPage() {
       )}
 
       {/* Lista de proyectos */}
-      {!error && proyectos.length > 0 && (
+      {!isLoading && !isError && proyectos && proyectos.length > 0 && (
         <>
           <p style={{ margin: '0 0 16px', fontSize: 13, color: '#9ca3af' }}>
-            {proyectos.length} {proyectos.length === 1 ? 'proyecto encontrado' : 'proyectos encontrados'}
+            {proyectos.length}{' '}
+            {proyectos.length === 1 ? 'proyecto encontrado' : 'proyectos encontrados'}
           </p>
           <div style={{ display: 'grid', gap: 14 }}>
             {proyectos.map((proyecto) => (
