@@ -5,6 +5,7 @@ import {
   Param,
   Body,
   ParseIntPipe,
+  Query,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -19,8 +20,8 @@ export class ProjectsController {
   constructor(private projectsService: ProjectsService) {}
 
   @Get()
-  findAll() {
-    return this.projectsService.findAll();
+  findAll(@Query('q') q?: string) {
+    return this.projectsService.findAll(q);
   }
 
   @Get(':id')

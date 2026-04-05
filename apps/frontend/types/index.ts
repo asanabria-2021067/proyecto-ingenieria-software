@@ -1,5 +1,3 @@
-// ─── Enums ───────────────────────────────────────────────────────────────────
-
 export type EstadoProyecto = 'BORRADOR' | 'PUBLICADO' | 'EN_PROGRESO' | 'CERRADO';
 export type TipoProyecto =
   | 'ACADEMICO_HORAS_BECA'
@@ -9,16 +7,12 @@ export type ModalidadProyecto = 'PRESENCIAL' | 'VIRTUAL' | 'MIXTA';
 export type EstadoPostulacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
 export type NivelHabilidad = 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
 
-// ─── Entidades ────────────────────────────────────────────────────────────────
-
 export type Habilidad = { nombreHabilidad: string };
-
 export type Requisito = {
   nivelMinimo: NivelHabilidad;
   obligatorio: boolean;
   habilidad: Habilidad;
 };
-
 export type Rol = {
   idRolProyecto: number;
   nombreRol: string;
@@ -28,7 +22,6 @@ export type Rol = {
   carreraRequerida?: { nombreCarrera: string };
   requisitos: Requisito[];
 };
-
 export type Proyecto = {
   idProyecto: number;
   tituloProyecto: string;
@@ -46,7 +39,6 @@ export type Proyecto = {
   intereses: { interes: { nombreInteres: string } }[];
   roles: Rol[];
 };
-
 export type ProyectoResumen = {
   idProyecto: number;
   tituloProyecto: string;
@@ -59,7 +51,6 @@ export type ProyectoResumen = {
   intereses: { interes: { nombreInteres: string } }[];
   roles: { idRolProyecto: number }[];
 };
-
 export type Postulacion = {
   idPostulacion: number;
   justificacion: string;
@@ -75,21 +66,16 @@ export type Postulacion = {
     };
   };
 };
-
-// ─── Labels ───────────────────────────────────────────────────────────────────
-
 export const TIPO_LABEL: Record<TipoProyecto, string> = {
   ACADEMICO_HORAS_BECA: 'Horas Beca',
   ACADEMICO_EXPERIENCIA: 'Experiencia',
   EXTRACURRICULAR_EXTENSION: 'Extensión',
 };
-
 export const MODALIDAD_LABEL: Record<ModalidadProyecto, string> = {
   PRESENCIAL: 'Presencial',
   VIRTUAL: 'Virtual',
   MIXTA: 'Mixta',
 };
-
 export const NIVEL_LABEL: Record<NivelHabilidad, string> = {
   BASICO: 'Básico',
   INTERMEDIO: 'Intermedio',
