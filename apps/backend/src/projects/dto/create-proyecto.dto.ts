@@ -26,7 +26,7 @@ export class CreateProyectoDto {
   @IsNotEmpty()
   @MinLength(5)
   @MaxLength(200)
-  tituloProyecto: string;
+  tituloProyecto!: string;
 
   @IsOptional()
   @IsString()
@@ -39,10 +39,10 @@ export class CreateProyectoDto {
   objetivosProyecto?: string;
 
   @IsEnum(TipoProyecto)
-  tipoProyecto: TipoProyecto;
+  tipoProyecto!: TipoProyecto;
 
   @IsEnum(ModalidadProyecto)
-  modalidadProyecto: ModalidadProyecto;
+  modalidadProyecto!: ModalidadProyecto;
 
   @IsOptional()
   @IsString()
@@ -65,5 +65,5 @@ export class CreateProyectoDto {
   fechaFinEstimada?: string;
 
   @IsNumber()
-  idCreador: number;
+  idCreador!: number;
 }
