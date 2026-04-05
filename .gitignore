@@ -45,3 +45,5 @@ coverage/
 *.pid
 *.seed
 *.pid.lock
+
+pnpm-lock.yaml
