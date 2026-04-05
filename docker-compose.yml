@@ -7,7 +7,6 @@ services:
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
-      network: host
     container_name: uvg-collab-backend
     profiles:
       - app
@@ -30,7 +29,6 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
-      network: host
     container_name: uvg-collab-frontend
     profiles:
       - app
