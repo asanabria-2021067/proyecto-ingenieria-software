@@ -5,8 +5,29 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
-    return { message: 'Not implemented yet' };
+  async findAll() {
+    return this.prisma.proyecto.findMany({
+      where: { estadoProyecto: 'PUBLICADO', eliminadoEn: null },
+      select: {
+        idProyecto: true,
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        tipoProyecto: true,
+        estadoProyecto: true,
+        modalidadProyecto: true,
+        fechaPublicacion: true,
+        organizaciones: {
+          select: {
+            organizacion: { select: { nombreOrganizacion: true } },
+          },
+        },
+        intereses: {
+          select: { interes: { select: { nombreInteres: true } } },
+        },
+        roles: { select: { idRolProyecto: true } },
+      },
+      orderBy: { fechaPublicacion: 'desc' },
+    });
   }
 
   async findOne(id: number){
