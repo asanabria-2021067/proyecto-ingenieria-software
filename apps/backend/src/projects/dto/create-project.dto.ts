@@ -20,17 +20,17 @@ export class CreateProjectDto {
   @IsNotEmpty({ message: 'El título del proyecto es requerido' })
   @MinLength(5, { message: 'El título debe tener al menos 5 caracteres' })
   @MaxLength(200, { message: 'El título no puede superar 200 caracteres' })
-  tituloProyecto: string;
+  tituloProyecto!: string;
 
   @IsString()
   @IsNotEmpty({ message: 'La descripción del proyecto es requerida' })
   @MinLength(20, { message: 'La descripción debe tener al menos 20 caracteres' })
-  descripcionProyecto: string;
+  descripcionProyecto!: string;
 
   @IsEnum(TipoProyecto, {
     message: `tipoProyecto debe ser uno de: ${Object.values(TipoProyecto).join(', ')}`,
   })
-  tipoProyecto: TipoProyecto;
+  tipoProyecto!: TipoProyecto;
 
   // Opcionales
   @IsOptional()
