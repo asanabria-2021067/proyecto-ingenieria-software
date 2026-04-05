@@ -1,62 +1,61 @@
 const steps = [
   {
-    number: "01",
-    title: "Descubrí o Creá",
+    number: '01',
+    title: 'Descubri o Crea',
     description:
-      "Explorá los proyectos disponibles o creá el tuyo. Podés crear proyectos individuales o una organización con miembros fijos (como GitHub).",
-    style: "bg-surface-container-low text-primary",
-    offset: "",
+      'Explora los proyectos disponibles o crea el tuyo. Podes crear proyectos individuales o una organizacion con miembros fijos (como GitHub).',
+    style: 'bg-surface-container-low text-primary',
+    offset: '',
   },
   {
-    number: "02",
-    title: "Postulate",
+    number: '02',
+    title: 'Postulate',
     description:
-      "Aplicá a los proyectos que te interesen. Los dueños del proyecto revisan postulaciones y aceptan colaboradores.",
-    style: "bg-primary text-on-primary shadow-lg",
-    offset: "md:mt-16",
+      'Aplica a los proyectos que te interesen. Los duenos del proyecto revisan postulaciones y aceptan colaboradores.',
+    style: 'bg-primary text-on-primary shadow-lg',
+    offset: 'md:mt-16',
   },
   {
-    number: "03",
-    title: "Gestioná y Da Seguimiento",
+    number: '03',
+    title: 'Gestiona y Da Seguimiento',
     description:
-      "Creá hitos, asigná tareas y llevá el control del progreso del proyecto de forma organizada.",
-    style: "bg-secondary-container text-on-secondary-container",
-    offset: "md:mt-32",
+      'Crea hitos, asigna tareas y lleva el control del progreso del proyecto de forma organizada.',
+    style: 'bg-secondary-container text-on-secondary-container',
+    offset: 'md:mt-32',
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <section id="la-solucion" className="py-24 px-8 overflow-hidden">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-20">
-          <h2 className="font-headline font-extrabold text-4xl text-on-surface tracking-tight">
+    <section id="la-solucion" className="scroll-mt-20 overflow-hidden px-8 py-24">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-20 text-center">
+          <h2 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
             Una plataforma que lo formaliza todo
           </h2>
-          <p className="text-tertiary mt-4 max-w-2xl mx-auto">
-            Pasá de la improvisación al orden: descubrí proyectos, postulá y gestioná el progreso con hitos y tareas.
+          <p className="mx-auto mt-4 max-w-2xl text-tertiary">
+            Pasa de la improvisacion al orden: descubri proyectos, postula y gestiona el
+            progreso con hitos y tareas.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+        <div className="relative grid grid-cols-1 gap-12 md:grid-cols-3">
+          {/* Connector line */}
+          <div className="absolute left-1/2 top-10 hidden h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-primary/20 via-primary/40 to-secondary/20 md:block" />
           {steps.map((step) => (
             <div
               key={step.number}
-              className={`relative flex flex-col items-center text-center space-y-6 ${step.offset}`}
+              className={`group relative flex flex-col items-center space-y-6 text-center ${step.offset}`}
             >
               <div
-                className={`w-20 h-20 rounded-full flex items-center justify-center relative z-10 ${step.style}`}
+                className={`relative z-10 flex h-20 w-20 items-center justify-center rounded-full transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-xl ${step.style}`}
               >
-                <span className="font-headline font-black text-2xl">
-                  {step.number}
-                </span>
+                <span className="font-headline text-2xl font-black">{step.number}</span>
               </div>
               <div className="space-y-2">
-                <h4 className="font-headline font-bold text-xl uppercase tracking-tighter">
+                <h4 className="font-headline text-xl font-bold uppercase tracking-tighter">
                   {step.title}
                 </h4>
-                <p className="text-sm text-tertiary px-4">
-                  {step.description}
-                </p>
+                <p className="px-4 text-sm text-tertiary">{step.description}</p>
               </div>
             </div>
           ))}

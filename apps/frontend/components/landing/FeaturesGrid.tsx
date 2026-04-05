@@ -1,69 +1,73 @@
-import { GraduationCap, HeartHandshake, Network } from "lucide-react";
+import { GraduationCap, HeartHandshake, Network } from 'lucide-react';
 
 const features = [
   {
     icon: GraduationCap,
-    title: "Oportunidades de boca en boca",
+    title: 'Oportunidades de boca en boca',
     description:
-      "Actualmente, las oportunidades (horas beca, extensión y proyectos) se comparten principalmente por amistades y contactos. No todos se enteran a tiempo.",
-    variant: "light" as const,
+      'Actualmente, las oportunidades (horas beca, extension y proyectos) se comparten principalmente por amistades y contactos. No todos se enteran a tiempo.',
+    variant: 'light' as const,
   },
   {
     icon: HeartHandshake,
-    title: "Acceso desigual",
+    title: 'Acceso desigual',
     description:
-      "El acceso a oportunidades depende de a quién conocés, no de tu experiencia. La plataforma busca que la decisión se base en tu perfil y en el interés de cada proyecto.",
-    variant: "primary" as const,
+      'El acceso a oportunidades depende de a quien conoces, no de tu experiencia. La plataforma busca que la decision se base en tu perfil y en el interes de cada proyecto.',
+    variant: 'primary' as const,
   },
   {
     icon: Network,
-    title: "Sin seguimiento formal",
+    title: 'Sin seguimiento formal',
     description:
-      "No hay una forma consistente de dar seguimiento a tareas, hitos y el progreso de los proyectos. Se pierde claridad y se dificulta la continuidad.",
-    variant: "light" as const,
+      'No hay una forma consistente de dar seguimiento a tareas, hitos y el progreso de los proyectos. Se pierde claridad y se dificulta la continuidad.',
+    variant: 'light' as const,
   },
 ];
 
 export default function FeaturesGrid() {
   return (
-    <section id="el-problema" className="py-24 bg-surface-container-low px-8">
-      <div className="max-w-7xl mx-auto">
+    <section id="el-problema" className="scroll-mt-20 bg-surface-container-low px-8 py-24">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-16">
-          <span className="text-primary font-bold tracking-widest text-xs uppercase">
+          <span className="text-xs font-bold uppercase tracking-widest text-primary">
             El problema hoy
           </span>
-          <h2 className="font-headline font-bold text-4xl mt-2 text-on-surface">
-            ¿Qué problema resolvemos?
+          <h2 className="mt-2 font-headline text-4xl font-bold text-on-surface">
+            Que problema resolvemos?
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {features.map((feature) => {
             const Icon = feature.icon;
-            const isPrimary = feature.variant === "primary";
+            const isPrimary = feature.variant === 'primary';
 
             return (
               <div
                 key={feature.title}
-                className={`p-8 rounded-[2rem] space-y-6 flex flex-col justify-between h-full ${
+                className={`flex h-full flex-col justify-between space-y-6 rounded-[2rem] p-8 transition-all duration-300 ${
                   isPrimary
-                    ? "bg-primary text-on-primary shadow-xl"
-                    : "bg-surface-container-lowest group hover:shadow-lg transition-all duration-300"
+                    ? 'bg-primary text-on-primary shadow-xl hover:-translate-y-1 hover:shadow-2xl'
+                    : 'bg-surface-container-lowest hover:-translate-y-1 hover:shadow-xl'
                 }`}
               >
                 <div className="space-y-4">
                   <div
-                    className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                    className={`flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 hover:scale-110 ${
                       isPrimary
-                        ? "bg-on-primary-container text-primary"
-                        : "bg-surface-container-high text-on-surface"
+                        ? 'bg-on-primary-container text-primary'
+                        : 'bg-surface-container-high text-on-surface'
                     }`}
                   >
-                    <Icon className="w-7 h-7" />
+                    <Icon className="h-7 w-7" />
                   </div>
-                  <h3 className={`font-headline font-bold text-2xl ${!isPrimary ? "text-on-surface" : ""}`}>
+                  <h3
+                    className={`font-headline text-2xl font-bold ${!isPrimary ? 'text-on-surface' : ''}`}
+                  >
                     {feature.title}
                   </h3>
-                  <p className={`leading-relaxed ${isPrimary ? "text-on-primary-container opacity-90" : "text-tertiary"}`}>
+                  <p
+                    className={`leading-relaxed ${isPrimary ? 'text-on-primary-container opacity-90' : 'text-tertiary'}`}
+                  >
                     {feature.description}
                   </p>
                 </div>

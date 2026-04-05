@@ -50,6 +50,10 @@
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: var(--font-family-body);
 }

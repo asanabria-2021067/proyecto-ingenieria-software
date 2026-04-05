@@ -1,49 +1,48 @@
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
 export default function HeroSection() {
   return (
-    <section className="relative overflow-hidden pt-20 pb-32 px-8">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-        <div className="lg:col-span-7 space-y-8">
-          <div className="inline-block px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-xs font-bold tracking-widest uppercase">
+    <section className="relative overflow-hidden px-8 pb-32 pt-20">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 lg:grid-cols-12">
+        <div className="space-y-8 lg:col-span-7">
+          <div className="inline-block rounded-full bg-secondary-container px-3 py-1 text-xs font-bold uppercase tracking-widest text-on-secondary-container">
             Plataforma Universitaria UVG
           </div>
-          <h1 className="font-headline font-extrabold text-5xl md:text-7xl text-on-surface leading-[1.1] tracking-tight">
+          <h1 className="font-headline text-5xl font-extrabold leading-[1.1] tracking-tight text-on-surface md:text-7xl">
             Todas las oportunidades universitarias en un solo lugar
           </h1>
-          <p className="text-lg text-tertiary max-w-xl leading-relaxed">
-            Actualmente, muchas oportunidades (horas beca, extensión y proyectos)
-            se comparten principalmente boca en boca, por amistades y
-            contactos. UVG Scholar formaliza el acceso para que puedas
-            descubrir, crear y postular proyectos desde una plataforma.
+          <p className="max-w-xl text-lg leading-relaxed text-tertiary">
+            Actualmente, muchas oportunidades (horas beca, extension y proyectos) se comparten
+            principalmente boca en boca, por amistades y contactos. UVG Scholar formaliza el
+            acceso para que puedas descubrir, crear y postular proyectos desde una plataforma.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          <div className="flex flex-col gap-4 pt-4 sm:flex-row">
             <Link
               href="/login"
-              className="bg-primary text-on-primary px-8 py-4 rounded-xl font-headline font-bold text-lg hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
+              className="group flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-4 font-headline text-lg font-bold text-on-primary shadow-lg shadow-primary/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 active:scale-95"
             >
               Explorar Proyectos
-              <ArrowRight className="w-5 h-5" />
+              <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
             <Link
               href="/login"
-              className="bg-surface-container-high text-on-surface px-8 py-4 rounded-xl font-headline font-bold text-lg hover:bg-surface-container-highest hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center"
+              className="flex items-center justify-center rounded-xl bg-surface-container-high px-8 py-4 font-headline text-lg font-bold text-on-surface transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface-container-highest hover:shadow-lg active:scale-95"
             >
               Crear mi Proyecto
             </Link>
           </div>
         </div>
-        <div className="lg:col-span-5 relative">
-          <div className="aspect-square rounded-[3rem] bg-surface-container-low overflow-hidden shadow-2xl relative z-10">
+        <div className="relative lg:col-span-5">
+          <div className="relative z-10 aspect-square overflow-hidden rounded-[3rem] bg-surface-container-low shadow-2xl transition-transform duration-700 hover:scale-[1.02]">
             <img
               alt="Estudiantes colaborando en la universidad"
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
               src="https://res.cloudinary.com/uvggt/image/upload/q_auto:best,f_auto,w_1200/v1768599742/2026/01%20Enero/Induccion%20estudiantes/Induccion-2026-Portada.jpg"
             />
           </div>
-          <div className="absolute -top-6 -right-6 w-32 h-32 bg-secondary-container rounded-full mix-blend-multiply filter blur-2xl opacity-70" />
-          <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-primary-container rounded-full mix-blend-multiply filter blur-3xl opacity-30" />
+          <div className="absolute -right-6 -top-6 h-32 w-32 animate-pulse rounded-full bg-secondary-container opacity-70 mix-blend-multiply blur-2xl" />
+          <div className="absolute -bottom-10 -left-10 h-48 w-48 animate-pulse rounded-full bg-primary-container opacity-30 mix-blend-multiply blur-3xl [animation-delay:1s]" />
         </div>
       </div>
     </section>

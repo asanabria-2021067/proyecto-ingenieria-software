@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { GraduationCap, Globe } from 'lucide-react';
+import { GraduationCap, Globe, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { useLogin } from '@/hooks/use-login';
+
+import img from '@/public/login-foto.jpg'
 
 export default function LoginPage() {
   const [correo, setCorreo] = useState('');
@@ -21,7 +24,7 @@ export default function LoginPage() {
         <img
           alt="Estudiantes UVG"
           className="absolute inset-0 h-full w-full object-cover"
-          src="https://lh3.googleusercontent.com/aida/ADBb0uhrP-Bv8w-f34VZ7Lz2kZcth5c33xQXhod16cWPSI59r3PMKa9Oba3xh0Ey5TU7BnRMT-lj_qbKJJakO4KmPE2wa0PR_Cx5bxtKfIbJ55lEyLRuN4Xc9Mc0YMNlYU3kK7WNIumHf1dpPLB3_FfAW9FbRK2D_0fC3Uopnvf2kSTlkPaxwwffDCZGIbpOrix4EXnW1xZMiBEF2nadW-aYnQk8PGU1yV3iy9D9BsP_AWU35hqRc2_mzt48tJtpIIRlgyFP9M4Etoo0"
+          src={img.src}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent" />
         <div className="absolute bottom-12 left-12 max-w-md">
@@ -38,12 +41,16 @@ export default function LoginPage() {
       <div className="relative flex w-full flex-col bg-surface lg:w-1/2">
         {/* Top Bar */}
         <header className="z-10 flex items-center justify-between px-8 py-6">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-outline transition-colors hover:text-primary"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-xs font-bold uppercase tracking-wider">Volver</span>
+          </Link>
           <span className="font-headline text-xl font-bold uppercase tracking-wider text-primary">
             UVG Scholar
           </span>
-          <button className="text-outline transition-colors hover:text-on-surface">
-            <Globe className="h-5 w-5" />
-          </button>
         </header>
 
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
