@@ -1,71 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Clock, BookOpen, ChevronRight } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import apiClient from '@/lib/api/client';
-
-type Habilidad = { nombreHabilidad: string };
-type Requisito = { nivelMinimo: string; obligatorio: boolean; habilidad: Habilidad };
-type Rol = {
-  idRolProyecto: number;
-  nombreRol: string;
-  descripcionRolProyecto?: string;
-  cupos: number;
-  horasSemanalesEstimadas?: number;
-  carreraRequerida?: { nombreCarrera: string };
-  requisitos: Requisito[];
-};
-type Proyecto = {
-  idProyecto: number;
-  tituloProyecto: string;
-  descripcionProyecto: string;
-  objetivosProyecto?: string;
-  tipoProyecto: string;
-  estadoProyecto: string;
-  modalidadProyecto: string;
-  ubicacionProyecto?: string;
-  fechaInicio?: string;
-  fechaFinEstimada?: string;
-  creador: { nombre: string; apellido: string };
-  organizaciones: { organizacion: { nombreOrganizacion: string } }[];
-  intereses: { interes: { nombreInteres: string } }[];
-  roles: Rol[];
-};
-
-const TIPO_LABEL: Record<string, string> = {
-  ACADEMICO_HORAS_BECA: 'Horas Beca',
-  ACADEMICO_EXPERIENCIA: 'Experiencia',
-  EXTRACURRICULAR_EXTENSION: 'Extensión',
-};
-
-const MODALIDAD_LABEL: Record<string, string> = {
-  PRESENCIAL: 'Presencial',
-  VIRTUAL: 'Virtual',
-  MIXTA: 'Mixta',
-};
-
-const NIVEL_LABEL: Record<string, string> = {
-  BASICO: 'Básico',
-  INTERMEDIO: 'Intermedio',
-  AVANZADO: 'Avanzado',
-};
+import { apiFetch } from '@/lib/api/client';
+import { Proyecto, TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 
 export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
-  const [proyecto, setProyecto] = useState<Proyecto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  useEffect(() => {
-    apiClient
-      .get(`/proyectos/${id}`)
-      .then((res) => setProyecto(res.data))
-      .catch(() => setError('No se pudo cargar el proyecto.'))
-      .finally(() => setLoading(false));
-  }, [id]);
+  const { data: proyecto, isLoading, isError } = useQuery<Proyecto>({
+    queryKey: ['proyecto', id],
+    queryFn: () => apiFetch(`/proyectos/${id}`),
+  });
 
   return (
     <DashboardLayout>
@@ -78,11 +27,13 @@ export default function ProyectoDetallePage() {
           Volver a proyectos
         </Link>
 
-        {loading && (
+        {isLoading && (
           <div className="text-center py-16 text-tertiary text-sm">Cargando...</div>
         )}
-        {error && (
-          <div className="text-center py-16 text-error text-sm">{error}</div>
+        {isError && (
+          <div className="text-center py-16 text-error text-sm">
+            No se pudo cargar el proyecto.
+          </div>
         )}
 
         {proyecto && (
@@ -93,7 +44,7 @@ export default function ProyectoDetallePage() {
                   {proyecto.tituloProyecto}
                 </h1>
                 <span className="shrink-0 px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-bold">
-                  {TIPO_LABEL[proyecto.tipoProyecto] ?? proyecto.tipoProyecto}
+                  {TIPO_LABEL[proyecto.tipoProyecto]}
                 </span>
               </div>
 
@@ -129,8 +80,12 @@ export default function ProyectoDetallePage() {
 
               {proyecto.objetivosProyecto && (
                 <div>
-                  <h3 className="font-headline font-bold text-on-surface text-sm mb-1">Objetivos</h3>
-                  <p className="text-on-surface text-sm leading-relaxed">{proyecto.objetivosProyecto}</p>
+                  <h3 className="font-headline font-bold text-on-surface text-sm mb-1">
+                    Objetivos
+                  </h3>
+                  <p className="text-on-surface text-sm leading-relaxed">
+                    {proyecto.objetivosProyecto}
+                  </p>
                 </div>
               )}
 
