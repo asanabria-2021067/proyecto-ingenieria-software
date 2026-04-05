@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
+import img1 from '@/public/Foto-expereinincia-Portada.jpg'
+
 export default function HeroSection() {
   return (
     <section className="relative overflow-hidden px-8 pb-32 pt-20">
@@ -38,7 +40,7 @@ export default function HeroSection() {
             <img
               alt="Estudiantes colaborando en la universidad"
               className="h-full w-full object-cover"
-              src="https://res.cloudinary.com/uvggt/image/upload/q_auto:best,f_auto,w_1200/v1768599742/2026/01%20Enero/Induccion%20estudiantes/Induccion-2026-Portada.jpg"
+              src={img1.src}
             />
           </div>
           <div className="absolute -right-6 -top-6 h-32 w-32 animate-pulse rounded-full bg-secondary-container opacity-70 mix-blend-multiply blur-2xl" />
