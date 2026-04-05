@@ -1,28 +1,28 @@
-import Link from "next/link";
+import Link from 'next/link';
 
 export default function CTABanner() {
   return (
-    <section className="py-20 px-8">
-      <div className="max-w-5xl mx-auto bg-surface-container-low rounded-[3rem] p-12 text-center space-y-8 relative overflow-hidden">
+    <section className="px-8 py-20">
+      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-[3rem] bg-surface-container-low p-12 text-center">
         <div className="relative z-10 space-y-6">
-          <h2 className="font-headline font-bold text-3xl md:text-4xl text-on-surface">
-            ¿Tenés un proyecto o buscás uno?
+          <h2 className="font-headline text-3xl font-bold text-on-surface md:text-4xl">
+            Tenes un proyecto o buscas uno?
           </h2>
-          <p className="text-tertiary max-w-xl mx-auto">
-            Creá tu cuenta, explorá oportunidades o publicá tu propio proyecto.
-            Todo en un solo lugar.
+          <p className="mx-auto max-w-xl text-tertiary">
+            Crea tu cuenta, explora oportunidades o publica tu propio proyecto. Todo en un solo
+            lugar.
           </p>
           <div className="pt-4">
             <Link
               href="/login"
-              className="inline-block bg-primary text-on-primary px-12 py-4 rounded-xl font-headline font-bold text-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200"
+              className="inline-block rounded-xl bg-primary px-12 py-4 font-headline text-lg font-bold text-on-primary shadow-lg shadow-primary/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 active:scale-95"
             >
               Crear mi Cuenta
             </Link>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-secondary/10 rounded-full -ml-16 -mb-16 blur-3xl" />
+        <div className="absolute -mr-16 -mt-16 right-0 top-0 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -mb-16 -ml-16 bottom-0 left-0 h-40 w-40 rounded-full bg-secondary/10 blur-3xl" />
       </div>
     </section>
   );

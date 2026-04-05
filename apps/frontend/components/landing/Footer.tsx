@@ -1,40 +1,34 @@
-import logo from "@/public/Logo UVG-08.png";
+import logo from '@/public/Logo UVG-08.png';
 
 const platformLinks = [
-  { label: "Proyectos", href: "#la-solucion" },
-  { label: "Organizaciones", href: "#como-funciona" },
-  { label: "Soporte", href: "#" },
+  { label: 'Proyectos', href: '#la-solucion' },
+  { label: 'Organizaciones', href: '#como-funciona' },
+  { label: 'Soporte', href: '#' },
 ];
 
 const legalLinks = [
-  { label: "Política de Privacidad", href: "#" },
-  { label: "Términos de Servicio", href: "#" },
+  { label: 'Politica de Privacidad', href: '#' },
+  { label: 'Terminos de Servicio', href: '#' },
 ];
 
 export default function Footer() {
   return (
-    <footer className="bg-slate-100 w-full py-12 px-8 border-t border-slate-200">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-7xl mx-auto">
+    <footer className="w-full border-t border-slate-200 bg-slate-100 px-8 py-12">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 md:grid-cols-4">
         <div className="col-span-1 space-y-4">
-          <img
-            src={logo.src}
-            alt="UVG Scholar"
-            className="h-15 w-auto brightness-0"
-          />
+          <img src={logo.src} alt="UVG Scholar" className="h-15 w-auto brightness-0" />
           <p className="text-sm text-slate-500">
-            Impulsando la excelencia académica y el compromiso social de la
-            Universidad del Valle de Guatemala.
+            Impulsando la excelencia academica y el compromiso social de la Universidad del
+            Valle de Guatemala.
           </p>
         </div>
         <div className="col-span-1 space-y-4">
-          <h4 className="font-headline font-semibold text-emerald-800">
-            Plataforma
-          </h4>
+          <h4 className="font-headline font-semibold text-primary">Plataforma</h4>
           <ul className="space-y-2 text-sm">
             {platformLinks.map((link) => (
               <li key={link.label}>
                 <a
-                  className="text-slate-500 hover:text-emerald-600 underline transition-all duration-300"
+                  className="text-slate-500 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline"
                   href={link.href}
                 >
                   {link.label}
@@ -44,14 +38,12 @@ export default function Footer() {
           </ul>
         </div>
         <div className="col-span-1 space-y-4">
-          <h4 className="font-headline font-semibold text-emerald-800">
-            Legal
-          </h4>
+          <h4 className="font-headline font-semibold text-primary">Legal</h4>
           <ul className="space-y-2 text-sm">
             {legalLinks.map((link) => (
               <li key={link.label}>
                 <a
-                  className="text-slate-500 hover:text-emerald-600 underline transition-all duration-300"
+                  className="text-slate-500 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline"
                   href={link.href}
                 >
                   {link.label}
@@ -61,9 +53,7 @@ export default function Footer() {
           </ul>
         </div>
         <div className="col-span-1 space-y-4">
-          <h4 className="font-headline font-semibold text-emerald-800">
-            Universidad
-          </h4>
+          <h4 className="font-headline font-semibold text-primary">Universidad</h4>
           <p className="text-sm text-slate-500">
             Avenida La Reforma, Zona 10
             <br />
@@ -71,10 +61,9 @@ export default function Footer() {
           </p>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-slate-200">
-        <p className="text-sm text-slate-500 text-center">
-          © {new Date().getFullYear()} Universidad del Valle de Guatemala.
-          Academic Excellence.
+      <div className="mx-auto mt-12 max-w-7xl border-t border-slate-200 pt-8">
+        <p className="text-center text-sm text-slate-500">
+          2025 Universidad del Valle de Guatemala. Academic Excellence.
         </p>
       </div>
     </footer>
