@@ -1,6 +1,6 @@
 import './global.css';
 import { Inter, Manrope } from 'next/font/google';
-import { Providers } from './providers';
+import Providers from './providers';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
