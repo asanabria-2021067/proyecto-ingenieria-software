@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useLogin } from '@/hooks/use-login';
 
 import img from '@/public/login-foto.jpg'
+import logo from '@/public/logo.png';
 
 export default function LoginPage() {
   const [correo, setCorreo] = useState('');
@@ -48,34 +49,30 @@ export default function LoginPage() {
             <ArrowLeft className="h-4 w-4" />
             <span className="text-xs font-bold uppercase tracking-wider">Volver</span>
           </Link>
-          <span className="font-headline text-xl font-bold uppercase tracking-wider text-primary">
-            UVG Scholar
-          </span>
+
         </header>
 
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
           <div className="w-full max-w-md">
             {/* Branding */}
             <div className="mb-10 text-left">
-              <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-primary-container shadow-lg shadow-green-900/10">
-                <GraduationCap className="h-8 w-8 text-white" />
-              </div>
+              <img src={logo.src} alt="UVG Scholar" className='h-40 w-auto mx-auto mb-4' />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
                 Bienvenido de nuevo
               </h1>
               <p className="mt-2 text-base text-tertiary">
-                Portal academico de la Universidad del Valle
+                Inicia sesion con tu correo institucional
               </p>
             </div>
 
             {/* Error message */}
             {isError && (
-              <div className="mb-6 rounded-xl border border-error/30 bg-error-container px-4 py-3 text-sm text-error">
+              <div className="mb-3 rounded-xl border border-error/30 bg-error-container px-4 py-3 text-sm text-error">
                 {(error as { message?: string })?.message ?? 'Credenciales invalidas'}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email */}
               <div className="space-y-2">
                 <label className="font-label text-xs font-bold uppercase tracking-widest text-tertiary">
@@ -101,7 +98,7 @@ export default function LoginPage() {
                     href="#"
                     className="font-label text-xs font-bold uppercase tracking-widest text-primary transition-all hover:underline"
                   >
-                    Olvide mi contrasena
+                    Olvide mi contraseña
                   </a>
                 </div>
                 <input
