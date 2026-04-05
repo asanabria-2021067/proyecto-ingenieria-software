@@ -166,7 +166,7 @@ export class ProjectsService {
     return proyecto;
   }
 
-  create(data: any) {
+  create(_createProyectoDto: import('./dto/create-proyecto.dto').CreateProyectoDto) {
     return { message: 'Not implemented yet' };
   }
 }
