@@ -1,0 +1,62 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { FolderOpen, FileText, User, LogOut } from 'lucide-react';
+
+const navItems = [
+  { href: '/dashboard/proyectos', label: 'Proyectos', icon: FolderOpen },
+  { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
+  { href: '/dashboard/perfil', label: 'Perfil', icon: User },
+];
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  return (
+    <div className="min-h-screen bg-surface flex">
+      <aside className="w-64 bg-surface-container-low border-r border-outline-variant flex flex-col shrink-0">
+        <div className="px-6 py-5 border-b border-outline-variant">
+          <span className="font-headline font-extrabold text-xl text-primary">UVG Scholar</span>
+        </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  active
+                    ? 'bg-primary text-on-primary'
+                    : 'text-on-surface hover:bg-surface-container-high'
+                }`}
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="px-3 py-4 border-t border-outline-variant">
+          <button
+            onClick={() => {
+              localStorage.removeItem('token');
+              window.location.href = '/login';
+            }}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-surface-container-high w-full transition-colors"
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            Cerrar sesión
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-auto bg-surface">
+        {children}
+      </main>
+    </div>
+  );
+}
