@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { EstadoProyecto } from '@prisma/client';
 
+const ESTADOS_VISIBLES = [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO];
+
 const proyectoSelect = {
   idProyecto: true,
   tituloProyecto: true,
@@ -34,9 +36,15 @@ const proyectoSelect = {
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(q?: string) {
     return this.prisma.proyecto.findMany({
-      where: { estadoProyecto: 'PUBLICADO', eliminadoEn: null },
+      where: {
+        estadoProyecto: { in: ESTADOS_VISIBLES },
+        eliminadoEn: null,
+        ...(q && q.trim().length > 0
+          ? { tituloProyecto: { contains: q.trim(), mode: 'insensitive' } }
+          : {}),
+      },
       select: {
         idProyecto: true,
         tituloProyecto: true,
@@ -55,14 +63,33 @@ export class ProjectsService {
         },
         roles: { select: { idRolProyecto: true } },
       },
-      orderBy: { fechaPublicacion: 'desc' },
+      orderBy: { fechaCreacion: 'desc' },
+      take: 20,
     });
   }
 
   async findOne(id: number) {
-    const proyecto = await this.prisma.proyecto.findUnique({
-      where: { idProyecto: id },
-      include: {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: {
+        idProyecto: id,
+        estadoProyecto: { in: ESTADOS_VISIBLES },
+        eliminadoEn: null,
+      },
+      select: {
+        idProyecto: true,
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        objetivosProyecto: true,
+        tipoProyecto: true,
+        estadoProyecto: true,
+        modalidadProyecto: true,
+        ubicacionProyecto: true,
+        contextoAcademico: true,
+        urlRecursoExterno: true,
+        fechaPublicacion: true,
+        fechaInicio: true,
+        fechaFinEstimada: true,
+        fechaCreacion: true,
         creador: {
           select: {
             idUsuario: true,
@@ -72,28 +99,93 @@ export class ProjectsService {
           },
         },
         organizaciones: {
-          include: {
-            organizacion: true,
+          select: {
+            idProyectoOrganizacion: true,
+            rolOrganizacion: true,
+            fechaVinculacion: true,
+            organizacion: {
+              select: {
+                idOrganizacion: true,
+                nombreOrganizacion: true,
+                tipoOrganizacion: true,
+                descripcionOrganizacion: true,
+                correoContacto: true,
+                telefonoContacto: true,
+                sitioWeb: true,
+                logoUrl: true,
+                estadoOrganizacion: true,
+              },
+            },
           },
         },
         intereses: {
-          include: {
-            interes: true,
+          select: {
+            idProyectoInteres: true,
+            interes: {
+              select: {
+                idInteres: true,
+                nombreInteres: true,
+                descripcionInteres: true,
+              },
+            },
           },
         },
         roles: {
-          include: {
-            requisitos: {
-              include: {
-                habilidad: true,
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
+            cupos: true,
+            horasSemanalesEstimadas: true,
+            carreraRequerida: {
+              select: {
+                idCarrera: true,
+                nombreCarrera: true,
+                facultad: true,
               },
             },
-            carreraRequerida: true,
+            requisitos: {
+              select: {
+                idRequisitoHabilidad: true,
+                nivelMinimo: true,
+                obligatorio: true,
+                habilidad: {
+                  select: {
+                    idHabilidad: true,
+                    nombreHabilidad: true,
+                    categoriaHabilidad: true,
+                    descripcionHabilidad: true,
+                  },
+                },
+              },
+            },
           },
         },
         hitos: {
+          select: {
+            idHito: true,
+            tituloHito: true,
+            descripcionHito: true,
+            fechaLimite: true,
+            estadoHito: true,
+            orden: true,
+          },
           orderBy: {
             orden: 'asc',
+          },
+        },
+        tareas: {
+          select: {
+            idTarea: true,
+            idHito: true,
+            tituloTarea: true,
+            descripcionTarea: true,
+            estadoTarea: true,
+            prioridad: true,
+            fechaLimite: true,
+          },
+          orderBy: {
+            idTarea: 'asc',
           },
         },
       },
