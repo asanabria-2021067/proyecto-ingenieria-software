@@ -14,12 +14,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       ...(options.headers as Record<string, string>),
     },
   });
-
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw error;
   }
-
   return res.json();
 }
 
