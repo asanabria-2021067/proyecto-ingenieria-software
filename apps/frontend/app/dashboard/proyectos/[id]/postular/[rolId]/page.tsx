@@ -1,28 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import apiClient, { getUserIdFromToken } from '@/lib/api/client';
-
-type Rol = {
-  idRolProyecto: number;
-  nombreRol: string;
-  descripcionRolProyecto?: string;
-  cupos: number;
-  carreraRequerida?: { nombreCarrera: string };
-};
-
-type Proyecto = {
-  idProyecto: number;
-  tituloProyecto: string;
-  roles: Rol[];
-};
+import { apiFetch, getUserIdFromToken } from '@/lib/api/client';
+import { Proyecto } from '@/types';
 
 const schema = z.object({
   justificacion: z
@@ -36,60 +24,46 @@ type FormData = z.infer<typeof schema>;
 export default function PostularPage() {
   const { id, rolId } = useParams<{ id: string; rolId: string }>();
   const router = useRouter();
-
-  const [proyecto, setProyecto] = useState<Proyecto | null>(null);
-  const [rol, setRol] = useState<Rol | null>(null);
-  const [loadingData, setLoadingData] = useState(true);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+
+  const { data: proyecto, isLoading } = useQuery<Proyecto>({
+    queryKey: ['proyecto', id],
+    queryFn: () => apiFetch(`/proyectos/${id}`),
+  });
+
+  const rol = proyecto?.roles.find((r) => r.idRolProyecto === Number(rolId));
 
   const {
     register,
     handleSubmit,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const justificacion = watch('justificacion', '');
 
-  useEffect(() => {
-    apiClient
-      .get(`/proyectos/${id}`)
-      .then((res) => {
-        const p: Proyecto = res.data;
-        setProyecto(p);
-        const r = p.roles.find((r) => r.idRolProyecto === Number(rolId));
-        setRol(r ?? null);
-      })
-      .catch(() => setErrorMsg('No se pudo cargar la información del proyecto.'))
-      .finally(() => setLoadingData(false));
-  }, [id, rolId]);
-
-  const onSubmit = async (data: FormData) => {
-    const userId = getUserIdFromToken();
-    if (!userId) {
-      setErrorMsg('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-      setSubmitStatus('error');
-      return;
-    }
-
-    try {
-      await apiClient.post('/postulaciones', {
-        idUsuarioPostulante: userId,
-        idRolProyecto: Number(rolId),
-        justificacion: data.justificacion,
+  const mutation = useMutation({
+    mutationFn: (data: FormData) => {
+      const userId = getUserIdFromToken();
+      if (!userId) throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+      return apiFetch('/postulaciones', {
+        method: 'POST',
+        body: JSON.stringify({
+          idUsuarioPostulante: userId,
+          idRolProyecto: Number(rolId),
+          justificacion: data.justificacion,
+        }),
       });
-      setSubmitStatus('success');
-    } catch (err: unknown) {
+    },
+    onError: (err: unknown) => {
       const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        (err as { message?: string })?.message ??
         'Ocurrió un error al enviar tu postulación.';
       setErrorMsg(msg);
-      setSubmitStatus('error');
-    }
-  };
+    },
+  });
 
-  if (submitStatus === 'success') {
+  if (mutation.isSuccess) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-[80vh] px-8">
@@ -99,7 +73,8 @@ export default function PostularPage() {
               ¡Postulación enviada!
             </h2>
             <p className="text-tertiary text-sm mb-6">
-              Tu postulación fue recibida. El equipo del proyecto revisará tu solicitud y te notificará el resultado.
+              Tu postulación fue recibida. El equipo del proyecto revisará tu solicitud y te
+              notificará el resultado.
             </p>
             <Link
               href="/dashboard/mis-postulaciones"
@@ -124,15 +99,11 @@ export default function PostularPage() {
           Volver al proyecto
         </Link>
 
-        {loadingData && (
+        {isLoading && (
           <div className="text-center py-16 text-tertiary text-sm">Cargando...</div>
         )}
 
-        {!loadingData && errorMsg && submitStatus !== 'error' && (
-          <div className="text-center py-16 text-error text-sm">{errorMsg}</div>
-        )}
-
-        {!loadingData && proyecto && rol && (
+        {proyecto && rol && (
           <>
             <div className="mb-8">
               <h1 className="font-headline font-extrabold text-2xl text-on-surface mb-1">
@@ -146,8 +117,12 @@ export default function PostularPage() {
 
             {rol.descripcionRolProyecto && (
               <div className="bg-surface-container-low rounded-xl border border-outline-variant p-4 mb-6">
-                <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1">Descripción del rol</p>
-                <p className="text-on-surface text-sm leading-relaxed">{rol.descripcionRolProyecto}</p>
+                <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1">
+                  Descripción del rol
+                </p>
+                <p className="text-on-surface text-sm leading-relaxed">
+                  {rol.descripcionRolProyecto}
+                </p>
                 {rol.carreraRequerida && (
                   <p className="text-xs text-tertiary mt-2">
                     Carrera requerida:{' '}
@@ -157,13 +132,14 @@ export default function PostularPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-on-surface mb-1.5">
                   Justificación <span className="text-error">*</span>
                 </label>
                 <p className="text-xs text-tertiary mb-2">
-                  Explica por qué eres un buen candidato para este rol, tus experiencias relevantes y motivación.
+                  Explica por qué eres un buen candidato para este rol, tus experiencias relevantes
+                  y motivación.
                 </p>
                 <textarea
                   {...register('justificacion')}
@@ -181,21 +157,13 @@ export default function PostularPage() {
                   ) : (
                     <span />
                   )}
-                  <span
-                    className={`text-xs ml-auto ${
-                      (justificacion?.length ?? 0) < 40
-                        ? 'text-error'
-                        : (justificacion?.length ?? 0) > 900
-                          ? 'text-tertiary'
-                          : 'text-tertiary'
-                    }`}
-                  >
+                  <span className="text-xs text-tertiary ml-auto">
                     {justificacion?.length ?? 0} / 1000
                   </span>
                 </div>
               </div>
 
-              {submitStatus === 'error' && (
+              {mutation.isError && (
                 <div className="flex items-start gap-2 bg-error-container text-error rounded-xl px-4 py-3 text-sm">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   {errorMsg}
@@ -211,10 +179,10 @@ export default function PostularPage() {
                 </Link>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={mutation.isPending}
                   className="flex-1 bg-primary text-on-primary px-5 py-3 rounded-xl text-sm font-bold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-60 disabled:scale-100 disabled:shadow-none"
                 >
-                  {isSubmitting ? 'Enviando...' : 'Enviar Postulación'}
+                  {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
                 </button>
               </div>
             </form>

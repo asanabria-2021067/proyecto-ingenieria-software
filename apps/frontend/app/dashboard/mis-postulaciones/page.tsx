@@ -1,28 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Clock, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import apiClient from '@/lib/api/client';
+import { apiFetch } from '@/lib/api/client';
+import { Postulacion, EstadoPostulacion } from '@/types';
 
-type Postulacion = {
-  idPostulacion: number;
-  justificacion: string;
-  estadoPostulacion: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
-  fechaPostulacion: string;
-  comentarioResolucion?: string;
-  rolProyecto: {
-    nombreRol: string;
-    proyecto: {
-      idProyecto: number;
-      tituloProyecto: string;
-      estadoProyecto: string;
-    };
-  };
-};
-
-const ESTADO_CONFIG = {
+const ESTADO_CONFIG: Record<
+  EstadoPostulacion,
+  { label: string; icon: React.ElementType; className: string }
+> = {
   PENDIENTE: {
     label: 'Pendiente',
     icon: Clock,
@@ -41,17 +29,10 @@ const ESTADO_CONFIG = {
 };
 
 export default function MisPostulacionesPage() {
-  const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    apiClient
-      .get('/postulaciones/mis-postulaciones')
-      .then((res) => setPostulaciones(res.data))
-      .catch(() => setError('No se pudieron cargar tus postulaciones. Verifica que hayas iniciado sesión.'))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: postulaciones = [], isLoading, isError } = useQuery<Postulacion[]>({
+    queryKey: ['mis-postulaciones'],
+    queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
+  });
 
   return (
     <DashboardLayout>
@@ -65,14 +46,18 @@ export default function MisPostulacionesPage() {
           </p>
         </div>
 
-        {loading && (
-          <div className="text-center py-16 text-tertiary text-sm">Cargando tus postulaciones...</div>
+        {isLoading && (
+          <div className="text-center py-16 text-tertiary text-sm">
+            Cargando tus postulaciones...
+          </div>
         )}
-        {error && (
-          <div className="text-center py-16 text-error text-sm">{error}</div>
+        {isError && (
+          <div className="text-center py-16 text-error text-sm">
+            No se pudieron cargar tus postulaciones. Verifica que hayas iniciado sesión.
+          </div>
         )}
 
-        {!loading && !error && postulaciones.length === 0 && (
+        {!isLoading && !isError && postulaciones.length === 0 && (
           <div className="text-center py-16">
             <p className="text-tertiary text-sm mb-4">Aún no tienes postulaciones enviadas.</p>
             <Link
