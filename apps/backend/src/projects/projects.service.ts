@@ -1,8 +1,36 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateProjectDto } from './dto/create-project.dto';
 import { EstadoProyecto } from '@prisma/client';
 
 const ESTADOS_VISIBLES = [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO];
+
+const proyectoSelect = {
+  idProyecto: true,
+  tituloProyecto: true,
+  descripcionProyecto: true,
+  objetivosProyecto: true,
+  tipoProyecto: true,
+  estadoProyecto: true,
+  modalidadProyecto: true,
+  ubicacionProyecto: true,
+  contextoAcademico: true,
+  fechaInicio: true,
+  fechaFinEstimada: true,
+  fechaCreacion: true,
+  creador: {
+    select: { nombre: true, apellido: true, correo: true },
+  },
+  organizaciones: {
+    select: {
+      rolOrganizacion: true,
+      organizacion: { select: { idOrganizacion: true, nombreOrganizacion: true } },
+    },
+  },
+  roles: {
+    select: { idRolProyecto: true, nombreRol: true, cupos: true },
+  },
+} as const;
 
 @Injectable()
 export class ProjectsService {
@@ -20,10 +48,20 @@ export class ProjectsService {
       select: {
         idProyecto: true,
         tituloProyecto: true,
+        descripcionProyecto: true,
         tipoProyecto: true,
         estadoProyecto: true,
         modalidadProyecto: true,
-        descripcionProyecto: true,
+        fechaPublicacion: true,
+        organizaciones: {
+          select: {
+            organizacion: { select: { nombreOrganizacion: true } },
+          },
+        },
+        intereses: {
+          select: { interes: { select: { nombreInteres: true } } },
+        },
+        roles: { select: { idRolProyecto: true } },
       },
       orderBy: { fechaCreacion: 'desc' },
       take: 20,
@@ -52,7 +90,6 @@ export class ProjectsService {
         fechaInicio: true,
         fechaFinEstimada: true,
         fechaCreacion: true,
-
         creador: {
           select: {
             idUsuario: true,
@@ -61,7 +98,6 @@ export class ProjectsService {
             correo: true,
           },
         },
-
         organizaciones: {
           select: {
             idProyectoOrganizacion: true,
@@ -82,7 +118,6 @@ export class ProjectsService {
             },
           },
         },
-
         intereses: {
           select: {
             idProyectoInteres: true,
@@ -95,7 +130,6 @@ export class ProjectsService {
             },
           },
         },
-
         roles: {
           select: {
             idRolProyecto: true,
@@ -127,7 +161,6 @@ export class ProjectsService {
             },
           },
         },
-
         hitos: {
           select: {
             idHito: true,
@@ -141,7 +174,6 @@ export class ProjectsService {
             orden: 'asc',
           },
         },
-
         tareas: {
           select: {
             idTarea: true,
@@ -162,11 +194,31 @@ export class ProjectsService {
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
     }
-
     return proyecto;
   }
 
-  create(_createProyectoDto: import('./dto/create-proyecto.dto').CreateProyectoDto) {
-    return { message: 'Not implemented yet' };
+  async create(data: CreateProjectDto, creadoPor: number) {
+    const {
+      fechaInicio,
+      fechaFinEstimada,
+      organizacionesIds,
+      ...rest
+    } = data;
+
+    return this.prisma.proyecto.create({
+      data: {
+        ...rest,
+        estadoProyecto: EstadoProyecto.BORRADOR,
+        creadoPor,
+        fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
+        fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
+        ...(organizacionesIds?.length && {
+          organizaciones: {
+            create: organizacionesIds.map((idOrganizacion) => ({ idOrganizacion })),
+          },
+        }),
+      },
+      select: proyectoSelect,
+    });
   }
 }
