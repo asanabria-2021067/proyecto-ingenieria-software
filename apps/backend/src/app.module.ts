@@ -9,6 +9,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { ValidationModule } from './validation/validation.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { CatalogsModule } from './catalogs/catalogs.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     EvidenceModule,
     ValidationModule,
     NotificationsModule,
+    CatalogsModule,
   ],
   controllers: [AppController],
 })

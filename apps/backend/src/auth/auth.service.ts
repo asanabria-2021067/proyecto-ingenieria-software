@@ -48,16 +48,32 @@ export class AuthService {
 
     const contrasenaHash = await bcrypt.hash(registerDto.contrasena, 10);
 
-    const usuario = await this.prisma.usuario.create({
-      data: {
-        correo: registerDto.correo,
-        contrasena: contrasenaHash,
-        nombre: registerDto.nombre,
-        apellido: registerDto.apellido,
-      },
+    const usuario = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.usuario.create({
+        data: {
+          correo: registerDto.correo,
+          contrasena: contrasenaHash,
+          nombre: registerDto.nombre,
+          apellido: registerDto.apellido,
+        },
+      });
+
+      await tx.perfilEstudiante.create({
+        data: {
+          idUsuario: user.idUsuario,
+          carne: registerDto.carne,
+          idCarrera: registerDto.idCarrera,
+          semestre: registerDto.semestre,
+        },
+      });
+
+      return user;
     });
 
-    const { contrasena, ...resultado } = usuario;
-    return resultado;
+    const payload = { sub: usuario.idUsuario, correo: usuario.correo };
+
+    return {
+      accessToken: this.jwtService.sign(payload),
+    };
   }
 }
