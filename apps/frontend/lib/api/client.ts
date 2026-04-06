@@ -15,7 +15,12 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     },
   });
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
+    const body = await res.json().catch(() => ({}));
+    const error = new Error(
+      Array.isArray(body.message) ? body.message.join(', ') : body.message || 'Error del servidor',
+    );
+    (error as any).statusCode = body.statusCode;
+    (error as any).details = body.message;
     throw error;
   }
   return res.json();
