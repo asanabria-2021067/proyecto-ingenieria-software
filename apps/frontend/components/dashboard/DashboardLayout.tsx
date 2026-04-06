@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FolderOpen, FileText, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, FileText, User, LogOut } from 'lucide-react';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import logo from '@/public/logo.png';
 
 const navItems = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/proyectos', label: 'Proyectos', icon: FolderOpen },
   { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
   { href: '/dashboard/perfil', label: 'Perfil', icon: User },
@@ -12,17 +15,19 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { data: user } = useCurrentUser();
 
   return (
     <div className="min-h-screen bg-surface flex">
       <aside className="w-64 bg-surface-container-low border-r border-outline-variant flex flex-col shrink-0">
-        <div className="px-6 py-5 border-b border-outline-variant">
+        <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
+          <img src={logo.src} alt="UVG Scholar" className="h-10 w-auto" />
           <span className="font-headline font-extrabold text-xl text-primary">UVG Scholar</span>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href);
+          {navItems.map(({ href, label, icon: Icon, exact }) => {
+            const active = exact ? pathname === href : pathname.startsWith(href);
             return (
               <Link
                 key={href}
@@ -40,7 +45,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        <div className="px-3 py-4 border-t border-outline-variant">
+        <div className="px-3 py-4 border-t border-outline-variant space-y-3">
+          {user && (
+            <div className="flex items-center gap-3 px-3 py-2">
+              {user.fotoUrl ? (
+                <img
+                  src={user.fotoUrl}
+                  alt=""
+                  className="h-8 w-8 rounded-full object-cover border border-outline-variant/30"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-primary-container flex items-center justify-center text-xs font-bold text-on-primary-container">
+                  {user.nombre[0]}{user.apellido[0]}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-on-surface truncate">
+                  {user.nombre} {user.apellido}
+                </p>
+                <p className="text-xs text-tertiary truncate">{user.correo}</p>
+              </div>
+            </div>
+          )}
           <button
             onClick={() => {
               localStorage.removeItem('token');
@@ -49,7 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-surface-container-high w-full transition-colors"
           >
             <LogOut className="w-5 h-5 shrink-0" />
-            Cerrar sesión
+            Cerrar sesion
           </button>
         </div>
       </aside>
