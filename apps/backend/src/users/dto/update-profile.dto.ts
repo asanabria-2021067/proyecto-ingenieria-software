@@ -30,6 +30,12 @@ export class UpdateProfileDto {
   @Min(1)
   @Max(80)
   disponibilidadHorasSemana?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  horasBecaRequeridas?: number;
 }
 
 export class ReplaceHabilidadesDto {
