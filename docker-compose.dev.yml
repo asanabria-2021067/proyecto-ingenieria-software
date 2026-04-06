@@ -1,0 +1,33 @@
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile app up
+# This overrides the production build with dev servers + volume mounts for hot-reload.
+
+services:
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./apps/backend/src:/app/src
+      - ./apps/backend/prisma:/app/prisma
+    environment:
+      - NODE_ENV=development
+    command: npm run start:dev
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./apps/frontend/app:/app/app
+      - ./apps/frontend/components:/app/components
+      - ./apps/frontend/hooks:/app/hooks
+      - ./apps/frontend/lib:/app/lib
+      - ./apps/frontend/public:/app/public
+      - ./apps/frontend/types:/app/types
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-dez2bbiiw}
+      - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET:-dez2bbiiw}
+      - WATCHPACK_POLLING=true
+    command: npm run dev
