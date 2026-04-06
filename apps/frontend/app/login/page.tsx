@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { GraduationCap, Globe, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useLogin } from '@/hooks/use-login';
 
@@ -11,7 +11,7 @@ import logo from '@/public/logo.png';
 export default function LoginPage() {
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
-  const { mutate, isPending, isError, error } = useLogin();
+  const { mutate, isPending } = useLogin();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -64,13 +64,6 @@ export default function LoginPage() {
                 Inicia sesion con tu correo institucional
               </p>
             </div>
-
-            {/* Error message */}
-            {isError && (
-              <div className="mb-3 rounded-xl border border-error/30 bg-error-container px-4 py-3 text-sm text-error">
-                {(error as { message?: string })?.message ?? 'Credenciales invalidas'}
-              </div>
-            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email */}
