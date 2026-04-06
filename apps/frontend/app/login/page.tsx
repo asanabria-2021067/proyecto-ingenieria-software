@@ -94,12 +94,12 @@ export default function LoginPage() {
                   <label className="font-label text-xs font-bold uppercase tracking-widest text-tertiary">
                     Contrasena
                   </label>
-                  <a
-                    href="#"
+                  <Link
+                    href="/recuperar-contrasena"
                     className="font-label text-xs font-bold uppercase tracking-widest text-primary transition-all hover:underline"
                   >
-                    Olvide mi contraseña
-                  </a>
+                    Olvide mi contrasena
+                  </Link>
                 </div>
                 <input
                   type="password"
@@ -142,10 +142,10 @@ export default function LoginPage() {
             </button>
 
             <p className="mt-10 text-center text-xs text-tertiary">
-              Necesitas acceso? Contacta a{' '}
-              <a href="#" className="font-bold text-primary hover:underline">
-                Soporte Tecnico IT
-              </a>
+              No tienes cuenta?{' '}
+              <Link href="/registro" className="font-bold text-primary hover:underline">
+                Registrate aqui
+              </Link>
             </p>
           </div>
         </main>
