@@ -85,13 +85,13 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-end justify-between">
                   <label className="font-label text-xs font-bold uppercase tracking-widest text-tertiary">
-                    Contrasena
+                    Contraseña
                   </label>
                   <Link
                     href="/recuperar-contrasena"
                     className="font-label text-xs font-bold uppercase tracking-widest text-primary transition-all hover:underline"
                   >
-                    Olvide mi contrasena
+                    Olvide mi contraseña
                   </Link>
                 </div>
                 <input
