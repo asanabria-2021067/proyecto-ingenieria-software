@@ -32,9 +32,9 @@ export default function IndividualProjectsSection() {
         <div className="grid items-center gap-16 lg:grid-cols-2">
           {/* Left: Content */}
           <div className="space-y-8">
-            <span className="inline-block rounded-full bg-secondary-container px-3 py-1 text-xs font-bold uppercase tracking-widest text-on-secondary-container">
-              Para cada estudiante
-            </span>
+          <span className="text-xs font-bold uppercase tracking-widest text-primary">
+            Para cada estudiante
+          </span>
             <h2 className="font-headline text-4xl font-extrabold leading-tight md:text-5xl">
               Tu proyecto, tu ritmo
             </h2>
