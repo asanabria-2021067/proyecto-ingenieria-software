@@ -14,7 +14,7 @@ export default function CTABanner() {
           </p>
           <div className="pt-4">
             <Link
-              href="/login"
+              href="/registro"
               className="inline-block rounded-xl bg-primary px-12 py-4 font-headline text-lg font-bold text-on-primary shadow-lg shadow-primary/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 active:scale-95"
             >
               Crear mi Cuenta

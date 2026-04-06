@@ -50,7 +50,7 @@ export default function Navbar() {
             Iniciar Sesion
           </Link>
           <Link
-            href="/login"
+            href="/registro"
             className="rounded-xl bg-primary px-6 py-2 text-sm font-bold uppercase tracking-wider text-on-primary shadow-md transition-all duration-200 hover:shadow-lg hover:brightness-110 active:scale-95"
           >
             Registrarse
