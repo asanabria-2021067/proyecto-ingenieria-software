@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRegister } from '@/hooks/use-register';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
+import uvgSwal from '@/lib/swal';
 
 import img from '@/public/login-foto.jpg';
 import logo from '@/public/logo.png';
@@ -19,9 +20,7 @@ export default function RegistroPage() {
   const [idCarrera, setIdCarrera] = useState<number>(0);
   const [semestre, setSemestre] = useState<number>(1);
   const [carreras, setCarreras] = useState<Carrera[]>([]);
-  const [localError, setLocalError] = useState('');
-
-  const { mutate, isPending, isError, error } = useRegister();
+  const { mutate, isPending } = useRegister();
 
   useEffect(() => {
     getCarreras().then(setCarreras).catch(() => {});
@@ -29,27 +28,22 @@ export default function RegistroPage() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setLocalError('');
 
     if (contrasena !== confirmar) {
-      setLocalError('Las contrasenas no coinciden');
+      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'Las contrasenas no coinciden' });
       return;
     }
     if (!correo.endsWith('@uvg.edu.gt')) {
-      setLocalError('El correo debe ser @uvg.edu.gt');
+      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'El correo debe ser @uvg.edu.gt' });
       return;
     }
     if (idCarrera === 0) {
-      setLocalError('Selecciona una carrera');
+      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'Selecciona una carrera' });
       return;
     }
 
     mutate({ correo, contrasena, nombre, apellido, carne, idCarrera, semestre });
   }
-
-  const errorMsg =
-    localError ||
-    (isError ? (error as { message?: string })?.message ?? 'Error al registrar' : '');
 
   const inputClass =
     'w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
@@ -99,12 +93,6 @@ export default function RegistroPage() {
                 Usa tu correo institucional para registrarte
               </p>
             </div>
-
-            {errorMsg && (
-              <div className="mb-3 rounded-xl border border-error/30 bg-error-container px-4 py-3 text-sm text-error">
-                {errorMsg}
-              </div>
-            )}
 
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
