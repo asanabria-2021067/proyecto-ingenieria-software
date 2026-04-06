@@ -57,9 +57,12 @@ export default function DashboardPage() {
   }
 
   const horasBeca = stats?.horasBeca ?? 0;
+  const horasBecaRequeridas = stats?.horasBecaRequeridas ?? 150;
   const horasExtension = stats?.horasExtension ?? 0;
   const proyectosActivos = stats?.proyectosActivos ?? 0;
-  const progressBeca = Math.min(100, Math.round((horasBeca / 150) * 100));
+  const progressBeca = horasBecaRequeridas > 0
+    ? Math.min(100, Math.round((horasBeca / horasBecaRequeridas) * 100))
+    : 0;
 
   return (
     <DashboardLayout>
@@ -94,7 +97,7 @@ export default function DashboardPage() {
                 <span className="text-5xl font-black leading-none tracking-tighter text-primary">
                   {horasBeca}
                 </span>
-                <span className="text-lg font-bold text-primary-container">/ 150</span>
+                <span className="text-lg font-bold text-primary-container">/ {horasBecaRequeridas}</span>
               </div>
             </div>
             <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">

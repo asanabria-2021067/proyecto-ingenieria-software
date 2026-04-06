@@ -12,7 +12,15 @@ export function useLogin() {
     mutationFn: (data: LoginPayload) => login(data),
     onSuccess: (res) => {
       localStorage.setItem('token', res.accessToken);
-      router.push('/dashboard');
+      uvgSwal.fire({
+        icon: 'success',
+        title: 'Bienvenido',
+        text: 'Inicio de sesion exitoso',
+        timer: 1500,
+        showConfirmButton: false,
+      }).then(() => {
+        router.push('/dashboard');
+      });
     },
     onError: (error: Error & { details?: string | string[] }) => {
       const msg = error.message || 'Credenciales invalidas';
