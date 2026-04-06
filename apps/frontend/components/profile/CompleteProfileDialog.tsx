@@ -55,6 +55,7 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [biografia, setBiografia] = useState('');
   const [disponibilidad, setDisponibilidad] = useState<number>(10);
+  const [horasBecaRequeridas, setHorasBecaRequeridas] = useState<number>(150);
 
   // Step 2
   const [catalogHabilidades, setCatalogHabilidades] = useState<Habilidad[]>([]);
@@ -145,6 +146,7 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
         await updateProfile({
           biografia: biografia || undefined,
           disponibilidadHorasSemana: disponibilidad,
+          horasBecaRequeridas,
           ...(fotoUrl && { fotoUrl }),
         });
       } else if (step === 1) {
@@ -268,6 +270,23 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
                 onChange={(e) => setDisponibilidad(Number(e.target.value))}
                 className={inputClass}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
+                Horas beca requeridas (total)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={horasBecaRequeridas}
+                onChange={(e) => setHorasBecaRequeridas(Number(e.target.value))}
+                className={inputClass}
+              />
+              <p className="text-[11px] text-tertiary">
+                Cantidad total de horas beca que necesitas completar
+              </p>
             </div>
           </div>
         )}
