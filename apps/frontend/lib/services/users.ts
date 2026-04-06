@@ -16,6 +16,7 @@ export interface UserProfile {
     githubUrl: string | null;
     linkedinUrl: string | null;
     disponibilidadHorasSemana: number | null;
+    horasBecaRequeridas: number;
     urlCv: string | null;
     carrera: { idCarrera: number; nombreCarrera: string } | null;
   } | null;
@@ -45,6 +46,7 @@ export interface UserProfile {
 
 export interface DashboardStats {
   horasBeca: number;
+  horasBecaRequeridas: number;
   horasExtension: number;
   horasTotal: number;
   proyectosActivos: number;
