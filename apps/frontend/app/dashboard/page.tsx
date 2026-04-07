@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   GraduationCap,
@@ -33,18 +33,16 @@ export default function DashboardPage() {
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [projects, setProjects] = useState<ProyectoListItemDTO[]>([]);
-  const [showWizard, setShowWizard] = useState(false);
+  const [wizardDismissed, setWizardDismissed] = useState(false);
+  const showWizard = useMemo(
+    () => !wizardDismissed && !!user && isProfileIncomplete(user),
+    [wizardDismissed, user],
+  );
 
   useEffect(() => {
     getDashboardStats().then(setStats).catch(() => {});
     searchProjects('').then((p) => setProjects(p.slice(0, 4))).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (user && isProfileIncomplete(user)) {
-      setShowWizard(true);
-    }
-  }, [user]);
 
   if (userLoading) {
     return (
@@ -68,7 +66,7 @@ export default function DashboardPage() {
     <DashboardLayout>
       <CompleteProfileDialog
         open={showWizard}
-        onComplete={() => setShowWizard(false)}
+        onComplete={() => setWizardDismissed(true)}
       />
 
       <div className="px-8 pb-12 pt-8">
