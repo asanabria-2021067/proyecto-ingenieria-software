@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload, Plus, X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -222,6 +223,8 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
             <div className="flex items-center gap-4">
               <div className="relative">
                 {fotoPreview ? (
+                  // blob: URL from createObjectURL - cannot be optimized by next/image
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={fotoPreview}
                     alt=""

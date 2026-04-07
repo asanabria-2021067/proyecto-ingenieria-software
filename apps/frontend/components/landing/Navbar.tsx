@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import logo from '@/public/Logo UVG-08.png';
 
@@ -29,7 +30,7 @@ export default function Navbar() {
     >
       <nav className="mx-auto flex w-full max-w-7xl items-center justify-between px-8 py-4">
         <div className="flex items-center gap-8">
-          <img src={logo.src} alt="UVG Scholar" className="h-10 w-auto brightness-0" />
+          <Image src={logo} alt="UVG Scholar" className="h-10 w-auto brightness-0" />
           <div className="hidden gap-6 md:flex">
             {navLinks.map((link) => (
               <a
