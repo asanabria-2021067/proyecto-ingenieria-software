@@ -43,9 +43,15 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Max(500)
-  horasBecaRequeridas?: number;
+  horasBecaRequeridas?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(500)
+  horasExtensionRequeridas?: number | null;
 }
 
 export class HabilidadItemDto {
