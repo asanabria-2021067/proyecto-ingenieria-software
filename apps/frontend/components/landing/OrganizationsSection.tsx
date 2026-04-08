@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { CheckCircle2 } from 'lucide-react';
 
 const benefits = [
@@ -42,11 +43,12 @@ export default function OrganizationsSection() {
         <div className="lg:w-1/2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-4 pt-8">
-              <div className="group overflow-hidden rounded-3xl h-48">
-                <img
+              <div className="group relative overflow-hidden rounded-3xl h-48">
+                <Image
                   alt="Impacto social"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   src="https://res.cloudinary.com/uvggt/image/upload/q_auto:best,f_auto,w_800/v1734455717/2025/01%20Enero/Innovacion%20e%20ingenio/Innovaci%C3%B3n-e-ingenio-Portada.jpg"
+                  fill
                 />
               </div>
               <div className="rounded-3xl bg-secondary-container p-6 text-on-secondary-container transition-transform duration-300 hover:scale-[1.02]">
@@ -65,11 +67,12 @@ export default function OrganizationsSection() {
                   por hitos y tareas
                 </span>
               </div>
-              <div className="group h-64 overflow-hidden rounded-3xl">
-                <img
+              <div className="group relative h-64 overflow-hidden rounded-3xl">
+                <Image
                   alt="Colaboracion"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   src="https://res.cloudinary.com/uvggt/image/upload/q_auto:best,f_auto,w_800/v1701711361/2023/12%20Diciembre/Proyectos%20Ingenieria%20Mecanica/Proyectos-Ingenieria-Mecanica.jpg"
+                  fill
                 />
               </div>
             </div>

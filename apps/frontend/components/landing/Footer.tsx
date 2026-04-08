@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import logo from '@/public/Logo UVG-08.png';
 
 const platformLinks = [
@@ -16,7 +17,7 @@ export default function Footer() {
     <footer className="w-full border-t border-slate-200 bg-slate-100 px-8 py-12">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 md:grid-cols-4">
         <div className="col-span-1 space-y-4">
-          <img src={logo.src} alt="UVG Scholar" className="h-15 w-auto brightness-0" />
+          <Image src={logo} alt="UVG Scholar" className="h-15 w-auto brightness-0" />
           <p className="text-sm text-slate-500">
             Impulsando la excelencia academica y el compromiso social de la Universidad del
             Valle de Guatemala.

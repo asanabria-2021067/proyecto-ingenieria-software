@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 
 import img1 from '@/public/Foto-expereinincia-Portada.jpg'
@@ -37,10 +38,11 @@ export default function HeroSection() {
         </div>
         <div className="relative lg:col-span-5">
           <div className="relative z-10 aspect-square overflow-hidden rounded-[3rem] bg-surface-container-low shadow-2xl transition-transform duration-700 hover:scale-[1.02]">
-            <img
+            <Image
               alt="Estudiantes colaborando en la universidad"
               className="h-full w-full object-cover"
-              src={img1.src}
+              src={img1}
+              fill
             />
           </div>
           <div className="absolute -right-6 -top-6 h-32 w-32 animate-pulse rounded-full bg-secondary-container opacity-70 mix-blend-multiply blur-2xl" />
