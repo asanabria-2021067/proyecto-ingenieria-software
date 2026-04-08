@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, FolderOpen, FileText, User, LogOut } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -21,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="h-screen bg-surface flex overflow-hidden">
       <aside className="w-64 h-screen bg-surface-container-low border-r border-outline-variant flex flex-col shrink-0 overflow-y-auto">
         <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
-          <img src={logo.src} alt="UVG Scholar" className="h-10 w-auto" />
+          <Image src={logo} alt="UVG Scholar" className="h-10 w-auto" />
           <span className="font-headline font-extrabold text-xl text-primary">UVG Scholar</span>
         </div>
 
@@ -49,9 +50,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {user && (
             <div className="flex items-center gap-3 px-3 py-2">
               {user.fotoUrl ? (
-                <img
+                <Image
                   src={user.fotoUrl}
                   alt=""
+                  width={32}
+                  height={32}
                   className="h-8 w-8 rounded-full object-cover border border-outline-variant/30"
                 />
               ) : (
