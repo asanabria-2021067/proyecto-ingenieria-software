@@ -3,6 +3,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRegister } from '@/hooks/use-register';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
@@ -54,10 +55,12 @@ export default function RegistroPage() {
     <div className="flex min-h-screen flex-col overflow-hidden bg-surface font-body text-on-surface antialiased lg:flex-row">
       {/* Left Column: Image */}
       <div className="relative hidden overflow-hidden lg:block lg:w-1/2">
-        <img
+        <Image
           alt="Estudiantes UVG"
           className="absolute inset-0 h-full w-full object-cover"
-          src={img.src}
+          src={img}
+          fill
+          priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent" />
         <div className="absolute bottom-12 left-12 max-w-md">
@@ -85,7 +88,7 @@ export default function RegistroPage() {
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
           <div className="w-full max-w-md">
             <div className="mb-8 text-left">
-              <img src={logo.src} alt="UVG Scholar" className="h-28 w-auto mx-auto mb-4" />
+              <Image src={logo} alt="UVG Scholar" className="h-28 w-auto mx-auto mb-4" />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
                 Crear cuenta
               </h1>

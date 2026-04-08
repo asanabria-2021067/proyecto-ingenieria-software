@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 import logo from '@/public/logo.png';
 import img from '@/public/login-foto.jpg';
@@ -21,10 +22,12 @@ export default function RecuperarContrasenaPage() {
     <div className="flex h-screen flex-col overflow-hidden bg-surface font-body text-on-surface antialiased lg:flex-row">
       {/* Left Column: Image */}
       <div className="relative hidden overflow-hidden lg:block lg:w-1/2">
-        <img
+        <Image
           alt="Estudiantes UVG"
           className="absolute inset-0 h-full w-full object-cover"
-          src={img.src}
+          src={img}
+          fill
+          priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent" />
         <div className="absolute bottom-12 left-12 max-w-md">
@@ -52,7 +55,7 @@ export default function RecuperarContrasenaPage() {
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
           <div className="w-full max-w-md">
             <div className="mb-10 text-left">
-              <img src={logo.src} alt="UVG Scholar" className="h-40 w-auto mx-auto mb-4" />
+              <Image src={logo} alt="UVG Scholar" className="h-40 w-auto mx-auto mb-4" />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
                 Recuperar contrasena
               </h1>
