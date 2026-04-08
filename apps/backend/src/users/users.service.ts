@@ -54,6 +54,9 @@ export class UsersService {
         ...(dto.horasBecaRequeridas !== undefined && {
           horasBecaRequeridas: dto.horasBecaRequeridas,
         }),
+        ...(dto.horasExtensionRequeridas !== undefined && {
+          horasExtensionRequeridas: dto.horasExtensionRequeridas,
+        }),
         fechaActualizacion: new Date(),
       },
     });
@@ -129,7 +132,10 @@ export class UsersService {
   async getDashboard(userId: number) {
     const perfil = await this.prisma.perfilEstudiante.findUnique({
       where: { idUsuario: userId },
-      select: { horasBecaRequeridas: true },
+      select: {
+        horasBecaRequeridas: true,
+        horasExtensionRequeridas: true,
+      },
     });
 
     const [horasData, proyectosActivos, postulacionesRecientes] =
@@ -184,8 +190,9 @@ export class UsersService {
 
     return {
       horasBeca: Number(horasBecaResult._sum.horasAprobadas ?? 0),
-      horasBecaRequeridas: perfil?.horasBecaRequeridas ?? 150,
+      horasBecaRequeridas: perfil?.horasBecaRequeridas ?? null,
       horasExtension: Number(horasExtensionResult._sum.horasAprobadas ?? 0),
+      horasExtensionRequeridas: perfil?.horasExtensionRequeridas ?? null,
       horasTotal: Number(horasData._sum.horasAprobadas ?? 0),
       proyectosActivos,
       postulacionesRecientes,
