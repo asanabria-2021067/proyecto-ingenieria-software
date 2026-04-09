@@ -1,0 +1,48 @@
+include:
+  - path: apps/backend/docker-compose.yml
+    env_file: .env
+
+services:
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: uvg-collab-backend
+    profiles:
+      - app
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file: .env
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-me}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - uvg-network
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-}
+        - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET:-}
+    container_name: uvg-collab-frontend
+    profiles:
+      - app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+    depends_on:
+      - backend
+    networks:
+      - uvg-network
