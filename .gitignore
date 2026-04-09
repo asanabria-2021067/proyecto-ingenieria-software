@@ -1,0 +1,49 @@
+# ── Dependencias ──────────────────────────────────────────
+node_modules/
+.pnpm-store/
+
+# ── Build outputs ─────────────────────────────────────────
+dist/
+.next/
+out/
+build/
+
+# ── Env (solo se commitea el .example) ────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Docker ────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── IDE / Editor ──────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Testing ───────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ── TypeScript ────────────────────────────────────────────
+*.tsbuildinfo
+
+# ── Misc ──────────────────────────────────────────────────
+*.pid
+*.seed
+*.pid.lock
+
+pnpm-lock.yaml
