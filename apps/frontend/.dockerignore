@@ -1,0 +1,17 @@
+node_modules
+pnpm-lock.yaml
+.next
+out
+dist
+.git
+.gitignore
+.env
+.env.*
+*.md
+Dockerfile
+.dockerignore
+.vscode
+.idea
+coverage
+*.log
+.DS_Store
