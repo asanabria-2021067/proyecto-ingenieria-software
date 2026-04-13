@@ -28,7 +28,25 @@ const proyectoSelect = {
     },
   },
   roles: {
-    select: { idRolProyecto: true, nombreRol: true, cupos: true },
+    select: {
+      idRolProyecto: true,
+      nombreRol: true,
+      descripcionRolProyecto: true,
+      cupos: true,
+      horasSemanalesEstimadas: true,
+      idCarreraRequerida: true,
+      requisitos: {
+        select: {
+          idRequisitoHabilidad: true,
+          idHabilidad: true,
+          nivelMinimo: true,
+          obligatorio: true,
+          habilidad: {
+            select: { idHabilidad: true, nombreHabilidad: true },
+          },
+        },
+      },
+    },
   },
 } as const;
 
@@ -202,23 +220,63 @@ export class ProjectsService {
       fechaInicio,
       fechaFinEstimada,
       organizacionesIds,
+      roles,
       ...rest
     } = data;
 
-    return this.prisma.proyecto.create({
-      data: {
-        ...rest,
-        estadoProyecto: EstadoProyecto.BORRADOR,
-        creadoPor,
-        fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
-        fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
-        ...(organizacionesIds?.length && {
-          organizaciones: {
-            create: organizacionesIds.map((idOrganizacion) => ({ idOrganizacion })),
-          },
-        }),
-      },
-      select: proyectoSelect,
+    return this.prisma.$transaction(async (tx) => {
+      const proyecto = await tx.proyecto.create({
+        data: {
+          ...rest,
+          estadoProyecto: EstadoProyecto.BORRADOR,
+          creadoPor,
+          fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
+          fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
+          ...(organizacionesIds?.length && {
+            organizaciones: {
+              create: organizacionesIds.map((idOrganizacion) => ({ idOrganizacion })),
+            },
+          }),
+        },
+      });
+
+      if (roles?.length) {
+        for (const rol of roles) {
+          const { requisitos, ...rolData } = rol;
+          const createdRol = await tx.rolProyecto.create({
+            data: {
+              idProyecto: proyecto.idProyecto,
+              nombreRol: rolData.nombreRol,
+              ...(rolData.descripcionRolProyecto !== undefined && {
+                descripcionRolProyecto: rolData.descripcionRolProyecto,
+              }),
+              ...(rolData.cupos !== undefined && { cupos: rolData.cupos }),
+              ...(rolData.idCarreraRequerida !== undefined && {
+                idCarreraRequerida: rolData.idCarreraRequerida,
+              }),
+              ...(rolData.horasSemanalesEstimadas !== undefined && {
+                horasSemanalesEstimadas: rolData.horasSemanalesEstimadas,
+              }),
+            },
+          });
+
+          if (requisitos?.length) {
+            await tx.requisitoHabilidadRol.createMany({
+              data: requisitos.map((req) => ({
+                idRolProyecto: createdRol.idRolProyecto,
+                idHabilidad: req.idHabilidad,
+                ...(req.nivelMinimo !== undefined && { nivelMinimo: req.nivelMinimo }),
+                ...(req.obligatorio !== undefined && { obligatorio: req.obligatorio }),
+              })),
+            });
+          }
+        }
+      }
+
+      return tx.proyecto.findUnique({
+        where: { idProyecto: proyecto.idProyecto },
+        select: proyectoSelect,
+      });
     });
   }
 }
