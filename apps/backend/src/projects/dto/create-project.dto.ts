@@ -7,13 +7,64 @@ import {
   IsArray,
   ArrayUnique,
   IsInt,
+  IsBoolean,
+  Min,
   MinLength,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   TipoProyecto,
   ModalidadProyecto,
+  NivelHabilidad,
 } from '@prisma/client';
+
+export class RequisitoHabilidadDto {
+  @IsInt({ message: 'idHabilidad debe ser un número entero' })
+  idHabilidad!: number;
+
+  @IsOptional()
+  @IsEnum(NivelHabilidad, {
+    message: `nivelMinimo debe ser uno de: ${Object.values(NivelHabilidad).join(', ')}`,
+  })
+  nivelMinimo?: NivelHabilidad;
+
+  @IsOptional()
+  @IsBoolean({ message: 'obligatorio debe ser un booleano' })
+  obligatorio?: boolean;
+}
+
+export class RolProyectoDto {
+  @IsString()
+  @IsNotEmpty({ message: 'El nombre del rol es requerido' })
+  @MaxLength(255)
+  nombreRol!: string;
+
+  @IsOptional()
+  @IsString()
+  descripcionRolProyecto?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1, { message: 'cupos debe ser al menos 1' })
+  cupos?: number;
+
+  @IsOptional()
+  @IsInt()
+  idCarreraRequerida?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  horasSemanalesEstimadas?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RequisitoHabilidadDto)
+  requisitos?: RequisitoHabilidadDto[];
+}
 
 export class CreateProjectDto {
   @IsString()
@@ -32,7 +83,6 @@ export class CreateProjectDto {
   })
   tipoProyecto!: TipoProyecto;
 
-  // Opcionales
   @IsOptional()
   @IsString()
   objetivosProyecto?: string;
@@ -71,4 +121,10 @@ export class CreateProjectDto {
   @ArrayUnique({ message: 'organizacionesIds no debe tener valores duplicados' })
   @IsInt({ each: true, message: 'Cada id de organización debe ser un número entero' })
   organizacionesIds?: number[];
+
+  @IsOptional()
+  @IsArray({ message: 'roles debe ser un arreglo' })
+  @ValidateNested({ each: true })
+  @Type(() => RolProyectoDto)
+  roles?: RolProyectoDto[];
 }
