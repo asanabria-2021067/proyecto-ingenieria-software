@@ -5,6 +5,11 @@ import { CatalogsService } from './catalogs.service';
 export class CatalogsController {
   constructor(private catalogsService: CatalogsService) {}
 
+  @Get('catalogs')
+  findAll() {
+    return this.catalogsService.findAll();
+  }
+
   @Get('carreras')
   findCarreras() {
     return this.catalogsService.findCarreras();
