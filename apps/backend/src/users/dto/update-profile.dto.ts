@@ -13,6 +13,14 @@ import { Type } from 'class-transformer';
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  apellido?: string;
+
+  @IsOptional()
+  @IsString()
   biografia?: string;
 
   @IsOptional()
@@ -34,6 +42,16 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   urlCv?: string;
+
+  @IsOptional()
+  @IsInt()
+  idCarrera?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  semestre?: number | null;
 
   @IsOptional()
   @IsInt()
@@ -61,6 +79,11 @@ export class HabilidadItemDto {
   @IsString()
   @IsEnum(['BASICO', 'INTERMEDIO', 'AVANZADO'])
   nivelHabilidad!: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  aniosExperiencia?: number;
 }
 
 export class ReplaceHabilidadesDto {
