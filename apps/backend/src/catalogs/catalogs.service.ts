@@ -29,4 +29,14 @@ export class CatalogsService {
       orderBy: { nombreCualidad: 'asc' },
     });
   }
+
+  async findAll() {
+    const [carreras, habilidades, intereses, cualidades] = await Promise.all([
+      this.findCarreras(),
+      this.findHabilidades(),
+      this.findIntereses(),
+      this.findCualidades(),
+    ]);
+    return { carreras, habilidades, intereses, cualidades };
+  }
 }
