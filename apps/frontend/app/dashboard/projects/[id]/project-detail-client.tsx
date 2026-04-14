@@ -39,6 +39,12 @@ function estadoBadgeStyle(estado: string): string {
   switch (estado.toUpperCase()) {
     case 'PUBLICADO':   return 'bg-[#006735] text-white';
     case 'EN_PROGRESO': return 'bg-[#416900] text-white';
+    case 'EN_REVISION': return 'bg-blue-100 text-blue-700';
+    case 'OBSERVADO':   return 'bg-amber-100 text-amber-700';
+    case 'EN_SOLICITUD_CIERRE': return 'bg-purple-100 text-purple-700';
+    case 'BORRADOR':    return 'bg-gray-100 text-gray-600';
+    case 'CERRADO':     return 'bg-gray-200 text-gray-500';
+    case 'CANCELADO':   return 'bg-red-100 text-red-700';
     default:            return 'bg-gray-100 text-gray-700';
   }
 }
