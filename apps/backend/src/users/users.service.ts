@@ -39,23 +39,86 @@ export class UsersService {
     return user;
   }
 
-  async updateProfile(userId: number, dto: UpdateProfileDto) {
-    return this.prisma.perfilEstudiante.update({
+  async getProfile(userId: number) {
+    const user = await this.prisma.usuario.findUnique({
       where: { idUsuario: userId },
-      data: {
-        ...(dto.biografia !== undefined && { biografia: dto.biografia }),
-        ...(dto.enlacePortafolio !== undefined && { enlacePortafolio: dto.enlacePortafolio }),
-        ...(dto.githubUrl !== undefined && { githubUrl: dto.githubUrl }),
-        ...(dto.linkedinUrl !== undefined && { linkedinUrl: dto.linkedinUrl }),
-        ...(dto.urlCv !== undefined && { urlCv: dto.urlCv }),
-        ...(dto.disponibilidadHorasSemana !== undefined && {
-          disponibilidadHorasSemana: dto.disponibilidadHorasSemana,
-        }),
-        ...(dto.horasBecaRequeridas !== undefined && {
-          horasBecaRequeridas: dto.horasBecaRequeridas,
-        }),
-        fechaActualizacion: new Date(),
+      select: {
+        idUsuario: true,
+        correo: true,
+        nombre: true,
+        apellido: true,
+        fotoUrl: true,
+        perfil: {
+          include: { carrera: true },
+        },
+        habilidades: {
+          include: { habilidad: true },
+        },
+        intereses: {
+          include: { interes: true },
+        },
+        cualidades: {
+          include: { cualidad: true },
+        },
+        experiencias: true,
       },
+    });
+
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    return user;
+  }
+
+  async updateProfile(userId: number, dto: UpdateProfileDto) {
+    const hasUsuarioFields = dto.nombre !== undefined || dto.apellido !== undefined;
+    const hasPerfilFields =
+      dto.biografia !== undefined ||
+      dto.enlacePortafolio !== undefined ||
+      dto.githubUrl !== undefined ||
+      dto.linkedinUrl !== undefined ||
+      dto.urlCv !== undefined ||
+      dto.idCarrera !== undefined ||
+      dto.semestre !== undefined ||
+      dto.disponibilidadHorasSemana !== undefined ||
+      dto.horasBecaRequeridas !== undefined ||
+      dto.horasExtensionRequeridas !== undefined;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (hasUsuarioFields) {
+        await tx.usuario.update({
+          where: { idUsuario: userId },
+          data: {
+            ...(dto.nombre !== undefined && { nombre: dto.nombre }),
+            ...(dto.apellido !== undefined && { apellido: dto.apellido }),
+          },
+        });
+      }
+
+      if (hasPerfilFields) {
+        await tx.perfilEstudiante.update({
+          where: { idUsuario: userId },
+          data: {
+            ...(dto.biografia !== undefined && { biografia: dto.biografia }),
+            ...(dto.enlacePortafolio !== undefined && { enlacePortafolio: dto.enlacePortafolio }),
+            ...(dto.githubUrl !== undefined && { githubUrl: dto.githubUrl }),
+            ...(dto.linkedinUrl !== undefined && { linkedinUrl: dto.linkedinUrl }),
+            ...(dto.urlCv !== undefined && { urlCv: dto.urlCv }),
+            ...(dto.idCarrera !== undefined && { idCarrera: dto.idCarrera }),
+            ...(dto.semestre !== undefined && { semestre: dto.semestre }),
+            ...(dto.disponibilidadHorasSemana !== undefined && {
+              disponibilidadHorasSemana: dto.disponibilidadHorasSemana,
+            }),
+            ...(dto.horasBecaRequeridas !== undefined && {
+              horasBecaRequeridas: dto.horasBecaRequeridas,
+            }),
+            ...(dto.horasExtensionRequeridas !== undefined && {
+              horasExtensionRequeridas: dto.horasExtensionRequeridas,
+            }),
+            fechaActualizacion: new Date(),
+          },
+        });
+      }
+
+      return this.getProfile(userId);
     });
   }
 
@@ -68,7 +131,7 @@ export class UsersService {
 
   async replaceHabilidades(
     userId: number,
-    habilidades: { idHabilidad: number; nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO' }[],
+    habilidades: { idHabilidad: number; nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO'; aniosExperiencia?: number }[],
   ) {
     return this.prisma.$transaction(async (tx) => {
       await tx.usuarioHabilidad.deleteMany({ where: { idUsuario: userId } });
@@ -78,6 +141,7 @@ export class UsersService {
             idUsuario: userId,
             idHabilidad: h.idHabilidad,
             nivelHabilidad: h.nivelHabilidad,
+            ...(h.aniosExperiencia !== undefined && { aniosExperiencia: h.aniosExperiencia }),
           })),
         });
       }
@@ -129,7 +193,10 @@ export class UsersService {
   async getDashboard(userId: number) {
     const perfil = await this.prisma.perfilEstudiante.findUnique({
       where: { idUsuario: userId },
-      select: { horasBecaRequeridas: true },
+      select: {
+        horasBecaRequeridas: true,
+        horasExtensionRequeridas: true,
+      },
     });
 
     const [horasData, proyectosActivos, postulacionesRecientes] =
@@ -184,8 +251,9 @@ export class UsersService {
 
     return {
       horasBeca: Number(horasBecaResult._sum.horasAprobadas ?? 0),
-      horasBecaRequeridas: perfil?.horasBecaRequeridas ?? 150,
+      horasBecaRequeridas: perfil?.horasBecaRequeridas ?? null,
       horasExtension: Number(horasExtensionResult._sum.horasAprobadas ?? 0),
+      horasExtensionRequeridas: perfil?.horasExtensionRequeridas ?? null,
       horasTotal: Number(horasData._sum.horasAprobadas ?? 0),
       proyectosActivos,
       postulacionesRecientes,

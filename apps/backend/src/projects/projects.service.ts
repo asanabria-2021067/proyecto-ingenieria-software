@@ -169,7 +169,6 @@ export class ProjectsService {
       },
       select: proyectoDetalleSelect,
     });
-
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
     }
@@ -181,7 +180,6 @@ export class ProjectsService {
       where: { idProyecto: id, eliminadoEn: null },
       select: proyectoDetalleSelect,
     });
-
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
     }
@@ -240,7 +238,6 @@ export class ProjectsService {
 
   async createFull(data: CreateProjectFullDto, creadoPor: number) {
     const { fechaInicio, fechaFinEstimada, organizacionesIds, roles, accion, ...rest } = data;
-
     const estadoProyecto =
       accion === 'EN_REVISION' ? EstadoProyecto.EN_REVISION : EstadoProyecto.BORRADOR;
 
@@ -280,6 +277,7 @@ export class ProjectsService {
         },
         select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
       });
+
       if (accion === 'EN_REVISION') {
         await this._crearRevisionPendiente(tx, proyecto.idProyecto, 1);
         await this.notifications.notifyAdmins(
@@ -292,34 +290,77 @@ export class ProjectsService {
           tx,
         );
       }
-
       return proyecto;
     });
   }
 
   async create(data: CreateProjectDto, creadoPor: number) {
-    const { fechaInicio, fechaFinEstimada, organizacionesIds, ...rest } = data;
+    const {
+      fechaInicio,
+      fechaFinEstimada,
+      organizacionesIds,
+      roles,
+      ...rest
+    } = data;
 
-    return this.prisma.proyecto.create({
-      data: {
-        ...rest,
-        estadoProyecto: EstadoProyecto.BORRADOR,
-        creadoPor,
-        fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
-        fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
-        ...(organizacionesIds?.length && {
-          organizaciones: {
-            create: organizacionesIds.map((idOrganizacion) => ({ idOrganizacion })),
-          },
-        }),
-      },
-      select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
+    return this.prisma.$transaction(async (tx) => {
+      const proyecto = await tx.proyecto.create({
+        data: {
+          ...rest,
+          estadoProyecto: EstadoProyecto.BORRADOR,
+          creadoPor,
+          fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
+          fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
+          ...(organizacionesIds?.length && {
+            organizaciones: {
+              create: organizacionesIds.map((idOrganizacion) => ({ idOrganizacion })),
+            },
+          }),
+        },
+      });
+
+      if (roles?.length) {
+        for (const rol of roles) {
+          const { requisitos, ...rolData } = rol;
+          const createdRol = await tx.rolProyecto.create({
+            data: {
+              idProyecto: proyecto.idProyecto,
+              nombreRol: rolData.nombreRol,
+              ...(rolData.descripcionRolProyecto !== undefined && {
+                descripcionRolProyecto: rolData.descripcionRolProyecto,
+              }),
+              ...(rolData.cupos !== undefined && { cupos: rolData.cupos }),
+              ...(rolData.idCarreraRequerida !== undefined && {
+                idCarreraRequerida: rolData.idCarreraRequerida,
+              }),
+              ...(rolData.horasSemanalesEstimadas !== undefined && {
+                horasSemanalesEstimadas: rolData.horasSemanalesEstimadas,
+              }),
+            },
+          });
+
+          if (requisitos?.length) {
+            await tx.requisitoHabilidadRol.createMany({
+              data: requisitos.map((req) => ({
+                idRolProyecto: createdRol.idRolProyecto,
+                idHabilidad: req.idHabilidad,
+                ...(req.nivelMinimo !== undefined && { nivelMinimo: req.nivelMinimo }),
+                ...(req.obligatorio !== undefined && { obligatorio: req.obligatorio }),
+              })),
+            });
+          }
+        }
+      }
+
+      return tx.proyecto.findUnique({
+        where: { idProyecto: proyecto.idProyecto },
+        select: proyectoDetalleSelect,
+      });
     });
   }
 
   async update(id: number, data: UpdateProjectDto, userId: number) {
     const proyecto = await this._requireOwner(id, userId);
-
     if (!ESTADOS_EDITABLES.includes(proyecto.estadoProyecto)) {
       throw new BadRequestException(
         `Solo se puede editar un proyecto en estado ${ESTADOS_EDITABLES.join(' o ')}`,
@@ -367,6 +408,7 @@ export class ProjectsService {
             where: { idRolProyecto: { in: idsRolesActuales } },
           });
         }
+
         await tx.rolProyecto.deleteMany({ where: { idProyecto: id } });
 
         if (roles.length > 0) {
@@ -381,7 +423,6 @@ export class ProjectsService {
                 horasSemanalesEstimadas: rol.horasSemanalesEstimadas,
               },
             });
-
             if (rol.requisitos?.length) {
               await tx.requisitoHabilidadRol.createMany({
                 data: rol.requisitos.map((req) => ({
@@ -405,17 +446,14 @@ export class ProjectsService {
 
   async submitForReview(id: number, userId: number) {
     const proyecto = await this._requireOwner(id, userId);
-
     if (proyecto.estadoProyecto !== EstadoProyecto.BORRADOR) {
       throw new BadRequestException(
         'Solo se puede enviar a revisión un proyecto en estado BORRADOR',
       );
     }
-
     const totalEnvios = await this.prisma.revisionProyecto.count({
       where: { idProyecto: id },
     });
-
     return this.prisma.$transaction(async (tx) => {
       await tx.proyecto.update({
         where: { idProyecto: id },
@@ -437,17 +475,14 @@ export class ProjectsService {
 
   async resubmit(id: number, userId: number) {
     const proyecto = await this._requireOwner(id, userId);
-
     if (proyecto.estadoProyecto !== EstadoProyecto.OBSERVADO) {
       throw new BadRequestException(
         'Solo se puede reenviar un proyecto en estado OBSERVADO',
       );
     }
-
     const totalEnvios = await this.prisma.revisionProyecto.count({
       where: { idProyecto: id },
     });
-
     return this.prisma.$transaction(async (tx) => {
       await tx.proyecto.update({
         where: { idProyecto: id },
@@ -474,7 +509,6 @@ export class ProjectsService {
         'Solo se puede solicitar cierre para proyectos en estado EN_PROGRESO',
       );
     }
-
     return this.prisma.$transaction(async (tx) => {
       const actualizado = await tx.proyecto.update({
         where: { idProyecto: id },
@@ -484,7 +518,6 @@ export class ProjectsService {
         },
         select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
       });
-
       await this.notifications.notifyAdmins(
         {
           tipoNotificacion: 'SOLICITUD_CIERRE_PROYECTO',
@@ -494,7 +527,6 @@ export class ProjectsService {
         },
         tx,
       );
-
       return actualizado;
     });
   }
@@ -511,7 +543,6 @@ export class ProjectsService {
         'Solo se puede aprobar cierre de proyectos en estado EN_SOLICITUD_CIERRE',
       );
     }
-
     return this.prisma.$transaction(async (tx) => {
       const ahora = new Date();
       await tx.proyecto.update({
@@ -522,12 +553,10 @@ export class ProjectsService {
           fechaActualizacion: ahora,
         },
       });
-
       await tx.participacionProyecto.updateMany({
         where: { estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: id } },
         data: { estadoParticipacion: 'RETIRADO', fechaSalida: ahora },
       });
-
       await tx.postulacion.updateMany({
         where: { estadoPostulacion: 'PENDIENTE', rolProyecto: { idProyecto: id } },
         data: {
@@ -537,17 +566,14 @@ export class ProjectsService {
           fechaResolucion: ahora,
         },
       });
-
       const participantes = await tx.participacionProyecto.findMany({
         where: { estadoParticipacion: 'RETIRADO', rolProyecto: { idProyecto: id } },
         distinct: ['idUsuario'],
         select: { idUsuario: true },
       });
-
       const destinatarios = Array.from(
         new Set([proyecto.creadoPor, ...participantes.map((p) => p.idUsuario)]),
       );
-
       await this.notifications.notifyUsers(
         destinatarios,
         {
@@ -558,10 +584,10 @@ export class ProjectsService {
         },
         tx,
       );
-
       return { idProyecto: id, estadoProyecto: EstadoProyecto.CANCELADO };
     });
   }
+
   async rejectClosure(id: number, adminId: number) {
     await this._requireAdmin(adminId);
     const proyecto = await this.prisma.proyecto.findUnique({
@@ -574,7 +600,6 @@ export class ProjectsService {
         'Solo se puede rechazar cierre de proyectos en estado EN_SOLICITUD_CIERRE',
       );
     }
-
     return this.prisma.$transaction(async (tx) => {
       await tx.proyecto.update({
         where: { idProyecto: id },
@@ -583,7 +608,6 @@ export class ProjectsService {
           fechaActualizacion: new Date(),
         },
       });
-
       await this.notifications.notifyUsers(
         [proyecto.creadoPor],
         {
@@ -594,10 +618,10 @@ export class ProjectsService {
         },
         tx,
       );
-
       return { idProyecto: id, estadoProyecto: EstadoProyecto.EN_PROGRESO };
     });
   }
+
   private async _requireOwner(idProyecto: number, userId: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
