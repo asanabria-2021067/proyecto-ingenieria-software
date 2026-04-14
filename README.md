@@ -3,7 +3,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Estado-En%20Desarrollo-yellow?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Corte-3%20de%203-blue?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Metodología-Design%20Thinking-purple?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Sprint-1%20Completado-success?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Metodología-Design%20Thinking%20%2B%20Scrum-purple?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Universidad-UVG-green?style=for-the-badge" />
 </p>
 
@@ -125,6 +126,17 @@ Empatizar → Definir → Idear → Prototipar → Probar
 #### XI. Informe de Gestión
 - [x] Formularios LOGT individuales
 - [x] Informe de gestión del tiempo del equipo
+
+---
+
+### 🏃 Sprint 1 — Primer Sprint Scrum *(Completado)*
+
+- [x] **Planificación del Sprint** — Definición de objetivos y selección de historias del backlog
+- [x] **Ejecución del Sprint** — Desarrollo de funcionalidades priorizadas
+- [x] **Documento colaborativo del Sprint** — Registro compartido del avance del equipo
+- [x] **Informe del Sprint** — Documento formal con resultados y entregables
+- [x] **Gestión del tiempo individual** — Formularios LOGT de los 5 integrantes
+- [x] **Retrospectiva del equipo** — Cierre del primer ciclo Scrum
 
 ---
 
@@ -395,6 +407,8 @@ npx prisma migrate reset
 | 📄 Informe Corte 2 | [Ver en repositorio](Corte%202/informe/Software%20Corte%202.pdf) |
 | 📄 Informe Corte 3 | [Ver en repositorio](Corte%203/informe/Software%20Corte%203.pdf) |
 | 📄 Documento Colaborativo Corte 3 | [Ver en SharePoint](https://uvggt-my.sharepoint.com/:w:/r/personal/san24725_uvg_edu_gt/_layouts/15/Doc.aspx?sourcedoc=%7B9D20A547-0488-43EA-BFE6-DB42C185A2D9%7D&file=Software%20Corte%203.docx&action=default&mobileredirect=true&DefaultItemOpen=1) |
+| 📄 Informe Sprint 1 | [Ver en repositorio](Scrum/Sprint%201/informe/Sprint%201%20Software.pdf) |
+| 📄 Documento Colaborativo Sprint 1 | [Ver en SharePoint](https://uvggt-my.sharepoint.com/:w:/g/personal/cor24732_uvg_edu_gt/IQCNDS1_2fGjRrLfY7EaD6RyAUgQs1A1iptdERqYPjgqQBA?e=NK0vXJ) |
 | 🗂️ DER del Sistema | [Ver diagrama](Corte%203/assets/DER.png) |
 
 ---
@@ -418,6 +432,7 @@ npx prisma migrate reset
  ┣ 📂 Avances 1/               # Primera entrega de avance
  ┣ 📂 Avances 2/               # Segunda entrega de avance
  ┣ 📂 Scrum/                   # Artefactos de Scrum
+ ┃  ┗ 📂 Sprint 1/             # Primer Sprint (informe, documento colaborativo, LOGT)
  ┣ 📄 docker-compose.yml       # Orquestacion completa (DB + Backend + Frontend)
  ┣ 📄 .env.example              # Plantilla de variables de entorno
  ┗ 📄 README.md
