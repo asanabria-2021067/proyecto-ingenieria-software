@@ -1,4 +1,24 @@
-export type EstadoProyecto = 'BORRADOR' | 'PUBLICADO' | 'EN_PROGRESO' | 'CERRADO';
+export type EstadoProyecto =
+  | 'BORRADOR'
+  | 'EN_REVISION'
+  | 'OBSERVADO'
+  | 'PUBLICADO'
+  | 'EN_PROGRESO'
+  | 'EN_SOLICITUD_CIERRE'
+  | 'CERRADO'
+  | 'CANCELADO';
+
+export type EstadoRevisionProyecto = 'PENDIENTE' | 'APROBADA' | 'OBSERVADA';
+
+export type RevisionProyecto = {
+  idRevisionProyecto: number;
+  estadoRevision: EstadoRevisionProyecto;
+  comentarioRevision: string | null;
+  numeroEnvio: number;
+  enviadaEn: string;
+  revisadaEn: string | null;
+  revisor?: { idUsuario: number; nombre: string; apellido: string } | null;
+};
 export type TipoProyecto =
   | 'ACADEMICO_HORAS_BECA'
   | 'ACADEMICO_EXPERIENCIA'
