@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── ENUMS ──────────────────────────────────────────────────────
 
 enum EstadoUsuario {
   ACTIVO
@@ -73,9 +72,19 @@ enum TipoProyecto {
 
 enum EstadoProyecto {
   BORRADOR
+  EN_REVISION
+  OBSERVADO
   PUBLICADO
   EN_PROGRESO
+  EN_SOLICITUD_CIERRE
   CERRADO
+  CANCELADO
+}
+
+enum EstadoRevisionProyecto {
+  PENDIENTE
+  APROBADA
+  OBSERVADA
 }
 
 enum ModalidadProyecto {
@@ -151,9 +160,22 @@ enum TipoNotificacion {
   HORAS_VALIDADAS
   CERTIFICADO_EMITIDO
   PARTICIPACION_ACTUALIZADA
+  PROYECTO_EN_REVISION
+  PROYECTO_OBSERVADO
+  PROYECTO_APROBADO
+  PROYECTO_ACTUALIZADO
+  SOLICITUD_CIERRE_PROYECTO
+  CIERRE_APROBADO
+  CIERRE_RECHAZADO
+  TAREA_ACTUALIZADA
+  HITO_ACTUALIZADO
+  COMENTARIO_PROYECTO
+  COMENTARIO_TAREA
+  COMENTARIO_HITO
+  MENSAJE_REVISION
+  PROYECTO_ADVERTENCIA_INACTIVIDAD
 }
 
-// ─── MODELS ─────────────────────────────────────────────────────
 
 model Usuario {
   idUsuario         Int            @id @default(autoincrement()) @map("id_usuario")
@@ -186,9 +208,12 @@ model Usuario {
   horasAprobadas              HorasParticipacion[]
   certificadosEmitidos        Certificado[]
   notificaciones              Notificacion[]
-  rolesAcceso                 UsuarioRolAcceso[]
-  auditorias                  BitacoraAuditoria[]
-  configuracionesActualizadas ConfiguracionSistema[]
+  rolesAcceso                  UsuarioRolAcceso[]
+  auditorias                   BitacoraAuditoria[]
+  configuracionesActualizadas  ConfiguracionSistema[]
+  revisionesProyectoRealizadas RevisionProyecto[]               @relation("RevisionesProyectoRealizadas")
+  comentariosEscritos          Comentario[]
+  mensajesRevisionEnviados     MensajeRevisionProyecto[]        @relation("MensajesEnviados")
 
   @@map("usuario")
 }
@@ -388,8 +413,28 @@ model Proyecto {
   roles          RolProyecto[]
   hitos          Hito[]
   tareas         Tarea[]
+  revisiones     RevisionProyecto[]
+  comentarios    Comentario[]
+  mensajesRevision MensajeRevisionProyecto[]
 
   @@map("proyecto")
+}
+
+model RevisionProyecto {
+  idRevisionProyecto Int                    @id @default(autoincrement()) @map("id_revision_proyecto")
+  idProyecto         Int                    @map("id_proyecto")
+  idRevisor          Int?                   @map("id_revisor")
+  estadoRevision     EstadoRevisionProyecto @default(PENDIENTE) @map("estado_revision")
+  comentarioRevision String?                @map("comentario_revision") @db.Text
+  numeroEnvio        Int                    @map("numero_envio")
+  enviadaEn          DateTime               @default(now()) @map("enviada_en")
+  revisadaEn         DateTime?              @map("revisada_en")
+
+  proyecto  Proyecto                    @relation(fields: [idProyecto], references: [idProyecto])
+  revisor   Usuario?                    @relation("RevisionesProyectoRealizadas", fields: [idRevisor], references: [idUsuario])
+  mensajes  MensajeRevisionProyecto[]
+
+  @@map("revision_proyecto")
 }
 
 model ProyectoOrganizacion {
@@ -496,8 +541,9 @@ model Hito {
   estadoHito      EstadoHito @default(PENDIENTE) @map("estado_hito")
   orden           Int
 
-  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
-  tareas   Tarea[]
+  proyecto    Proyecto     @relation(fields: [idProyecto], references: [idProyecto])
+  tareas      Tarea[]
+  comentarios Comentario[]
 
   @@map("hito")
 }
@@ -520,6 +566,7 @@ model Tarea {
   creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario])
   asignaciones AsignacionTarea[]
   evidencias   Evidencia[]
+  comentarios  Comentario[]
 
   @@map("tarea")
 }
@@ -689,4 +736,38 @@ model ConfiguracionSistema {
   actualizador Usuario? @relation(fields: [actualizadoPor], references: [idUsuario])
 
   @@map("configuracion_sistema")
+}
+
+model Comentario {
+  idComentario Int       @id @default(autoincrement()) @map("id_comentario")
+  idAutor      Int       @map("id_autor")
+  contenido    String    @db.Text
+  idProyecto   Int?      @map("id_proyecto")
+  idTarea      Int?      @map("id_tarea")
+  idHito       Int?      @map("id_hito")
+  creadoEn     DateTime  @default(now()) @map("creado_en")
+  editadoEn    DateTime? @map("editado_en")
+  eliminadoEn  DateTime? @map("eliminado_en")
+
+  autor    Usuario   @relation(fields: [idAutor], references: [idUsuario])
+  proyecto Proyecto? @relation(fields: [idProyecto], references: [idProyecto])
+  tarea    Tarea?    @relation(fields: [idTarea], references: [idTarea])
+  hito     Hito?     @relation(fields: [idHito], references: [idHito])
+
+  @@map("comentario")
+}
+model MensajeRevisionProyecto {
+  idMensaje   Int       @id @default(autoincrement()) @map("id_mensaje")
+  idProyecto  Int       @map("id_proyecto")
+  idRemitente Int       @map("id_remitente")
+  idRevision  Int?      @map("id_revision")
+  contenido   String    @db.Text
+  enviadoEn   DateTime  @default(now()) @map("enviado_en")
+  leidoEn     DateTime? @map("leido_en")
+
+  proyecto  Proyecto          @relation(fields: [idProyecto], references: [idProyecto])
+  remitente Usuario           @relation("MensajesEnviados", fields: [idRemitente], references: [idUsuario])
+  revision  RevisionProyecto? @relation(fields: [idRevision], references: [idRevisionProyecto])
+
+  @@map("mensaje_revision_proyecto")
 }
