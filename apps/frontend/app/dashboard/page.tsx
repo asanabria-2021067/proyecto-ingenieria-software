@@ -55,11 +55,21 @@ export default function DashboardPage() {
   }
 
   const horasBeca = stats?.horasBeca ?? 0;
-  const horasBecaRequeridas = stats?.horasBecaRequeridas ?? 150;
+  const horasBecaRequeridas = stats?.horasBecaRequeridas ?? null;
   const horasExtension = stats?.horasExtension ?? 0;
+  const horasExtensionRequeridas = stats?.horasExtensionRequeridas ?? null;
   const proyectosActivos = stats?.proyectosActivos ?? 0;
-  const progressBeca = horasBecaRequeridas > 0
-    ? Math.min(100, Math.round((horasBeca / horasBecaRequeridas) * 100))
+  const requiereHorasBeca = horasBecaRequeridas !== null && horasBecaRequeridas > 0;
+  const requiereHorasExtension =
+    horasExtensionRequeridas !== null && horasExtensionRequeridas > 0;
+  const progressBeca = requiereHorasBeca
+    ? Math.min(100, Math.round((horasBeca / (horasBecaRequeridas as number)) * 100))
+    : 0;
+  const progressExtension = requiereHorasExtension
+    ? Math.min(
+        100,
+        Math.round((horasExtension / (horasExtensionRequeridas as number)) * 100),
+      )
     : 0;
 
   return (
@@ -86,43 +96,60 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* Horas Beca */}
-          <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
-            <div className="relative z-10">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-tertiary">
-                Horas Beca Acumuladas
-              </span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-black leading-none tracking-tighter text-primary">
-                  {horasBeca}
+          {requiereHorasBeca && (
+            <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
+              <div className="relative z-10">
+                <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-tertiary">
+                  Horas Beca Acumuladas
                 </span>
-                <span className="text-lg font-bold text-primary-container">/ {horasBecaRequeridas}</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-black leading-none tracking-tighter text-primary">
+                    {horasBeca}
+                  </span>
+                  <span className="text-lg font-bold text-primary-container">
+                    / {horasBecaRequeridas}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${progressBeca}%` }}
+                />
+              </div>
+              <div className="absolute -bottom-4 -right-4 text-primary/5">
+                <GraduationCap className="h-16 w-16" />
               </div>
             </div>
-            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${progressBeca}%` }} />
-            </div>
-            <div className="absolute -bottom-4 -right-4 text-primary/5">
-              <GraduationCap className="h-16 w-16" />
-            </div>
-          </div>
+          )}
 
           {/* Horas Extension */}
-          <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
-            <div className="relative z-10">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-tertiary">
-                Horas de Extension
-              </span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-black leading-none tracking-tighter text-secondary">
-                  {horasExtension}
+          {requiereHorasExtension && (
+            <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
+              <div className="relative z-10">
+                <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-tertiary">
+                  Horas de Extension
                 </span>
-                <span className="text-lg font-bold text-secondary-container">HRS</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-black leading-none tracking-tighter text-secondary">
+                    {horasExtension}
+                  </span>
+                  <span className="text-lg font-bold text-secondary-container">
+                    / {horasExtensionRequeridas}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
+                <div
+                  className="h-full rounded-full bg-secondary"
+                  style={{ width: `${progressExtension}%` }}
+                />
+              </div>
+              <div className="absolute -bottom-4 -right-4 text-secondary/5">
+                <HeartHandshake className="h-16 w-16" />
               </div>
             </div>
-            <div className="absolute -bottom-4 -right-4 text-secondary/5">
-              <HeartHandshake className="h-16 w-16" />
-            </div>
-          </div>
+          )}
 
           {/* Proyectos Activos */}
           <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-primary p-8 text-on-primary">
