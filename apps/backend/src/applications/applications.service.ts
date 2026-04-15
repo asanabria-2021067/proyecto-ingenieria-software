@@ -5,7 +5,6 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { EstadoProyecto } from '@prisma/client';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
@@ -25,7 +24,7 @@ export class ApplicationsService {
       );
     }
 
-    // 2. Verificar que el rol existe y el proyecto está postulable
+    // 2. Verificar que el rol existe y el proyecto está PUBLICADO
     const rol = await this.prisma.rolProyecto.findUnique({
       where: { idRolProyecto: dto.idRolProyecto },
       include: { proyecto: true },
@@ -37,30 +36,13 @@ export class ApplicationsService {
       );
     }
 
-    const { estadoProyecto } = rol.proyecto;
-    const esPublicado = estadoProyecto === EstadoProyecto.PUBLICADO;
-    const esEnProgreso = estadoProyecto === EstadoProyecto.EN_PROGRESO;
-
-    if (!esPublicado && !esEnProgreso) {
+    if (rol.proyecto.estadoProyecto !== 'PUBLICADO') {
       throw new BadRequestException(
-        'Solo se puede postular a proyectos en estado PUBLICADO o EN_PROGRESO con cupos disponibles',
+        'Solo se puede postular a proyectos en estado PUBLICADO',
       );
     }
 
-    if (esEnProgreso) {
-      const activas = await this.prisma.participacionProyecto.count({
-        where: {
-          idRolProyecto: dto.idRolProyecto,
-          estadoParticipacion: 'ACTIVO',
-        },
-      });
-      if (activas >= rol.cupos) {
-        throw new BadRequestException(
-          'El rol ya alcanzó su límite de cupos activos en EN_PROGRESO',
-        );
-      }
-    }
-
+    // 3. Verificar que el usuario no se ha postulado ya a este rol
     const postulacionExistente = await this.prisma.postulacion.findFirst({
       where: {
         idUsuarioPostulante: dto.idUsuarioPostulante,
@@ -74,6 +56,7 @@ export class ApplicationsService {
       );
     }
 
+    // 4. Crear la postulación
     return this.prisma.postulacion.create({
       data: {
         idUsuarioPostulante: dto.idUsuarioPostulante,
