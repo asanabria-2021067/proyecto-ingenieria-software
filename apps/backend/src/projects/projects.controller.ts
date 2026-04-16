@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Param,
   Body,
   ParseIntPipe,
@@ -14,6 +15,7 @@ import {
 import { ProjectsService } from './projects.service';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { UpdateEstadoProyectoDto } from './dto/update-estado-proyecto.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -70,6 +72,17 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.update(id, data, user.userId);
+  }
+
+  @Patch(':id/estado')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  changeEstado(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: UpdateEstadoProyectoDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.changeEstado(id, user.userId, data.nuevoEstado);
   }
 
   @Post(':id/enviar-revision')
