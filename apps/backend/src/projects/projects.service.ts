@@ -8,6 +8,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import {
+  EstadoProyectoCreador,
+  TRANSICIONES_PERMITIDAS,
+} from './dto/update-estado-proyecto.dto';
 import { EstadoProyecto, Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -620,6 +624,32 @@ export class ProjectsService {
       );
       return { idProyecto: id, estadoProyecto: EstadoProyecto.EN_PROGRESO };
     });
+  }
+
+  async changeEstado(
+    id: number,
+    userId: number,
+    nuevoEstado: EstadoProyectoCreador,
+  ) {
+    const proyecto = await this._requireOwner(id, userId);
+    const permitidos = TRANSICIONES_PERMITIDAS[proyecto.estadoProyecto] ?? [];
+    if (!permitidos.includes(nuevoEstado as EstadoProyecto)) {
+      throw new BadRequestException(
+        `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
+      );
+    }
+    const actualizado = await this.prisma.proyecto.update({
+      where: { idProyecto: id },
+      data: {
+        estadoProyecto: nuevoEstado as EstadoProyecto,
+        fechaActualizacion: new Date(),
+        ...(nuevoEstado === EstadoProyectoCreador.PUBLICADO && {
+          fechaPublicacion: new Date(),
+        }),
+      },
+      select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
+    });
+    return actualizado;
   }
 
   private async _requireOwner(idProyecto: number, userId: number) {
