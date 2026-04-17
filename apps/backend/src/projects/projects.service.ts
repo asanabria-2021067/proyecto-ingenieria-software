@@ -12,7 +12,7 @@ import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoProyecto, Prisma } from '@prisma/client';
+import { EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
@@ -149,15 +149,40 @@ export class ProjectsService {
     private notifications: NotificationsService,
   ) {}
 
-  async findAll(q?: string) {
+  async findAll(filters: {
+    q?: string;
+    tipoProyecto?: string;
+    modalidad?: string;
+    organizacionId?: number;
+    habilidadId?: number;
+  } = {}) {
+    const { q, tipoProyecto, modalidad, organizacionId, habilidadId } = filters;
+
+    const andConditions: Prisma.ProyectoWhereInput[] = [
+      { estadoProyecto: { in: ESTADOS_VISIBLES } },
+      { eliminadoEn: null },
+    ];
+
+    if (q && q.trim().length > 0) {
+      andConditions.push({ tituloProyecto: { contains: q.trim(), mode: 'insensitive' } });
+    }
+    if (tipoProyecto) {
+      andConditions.push({ tipoProyecto: tipoProyecto as TipoProyecto });
+    }
+    if (modalidad) {
+      andConditions.push({ modalidadProyecto: modalidad as ModalidadProyecto });
+    }
+    if (organizacionId) {
+      andConditions.push({ organizaciones: { some: { idOrganizacion: organizacionId } } });
+    }
+    if (habilidadId) {
+      andConditions.push({
+        roles: { some: { requisitos: { some: { idHabilidad: habilidadId } } } },
+      });
+    }
+
     return this.prisma.proyecto.findMany({
-      where: {
-        estadoProyecto: { in: ESTADOS_VISIBLES },
-        eliminadoEn: null,
-        ...(q && q.trim().length > 0
-          ? { tituloProyecto: { contains: q.trim(), mode: 'insensitive' } }
-          : {}),
-      },
+      where: { AND: andConditions },
       select: proyectoListSelect,
       orderBy: { fechaCreacion: 'desc' },
       take: 20,
