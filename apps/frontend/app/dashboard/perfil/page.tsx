@@ -107,14 +107,30 @@ export default function PerfilPage() {
   ] as const
 
   async function onSubmit(payload: FormValues) {
-    try {
-      setSaving(true)
-      console.log(payload)
-      await new Promise((r) => setTimeout(r, 1000))
-    } finally {
-      setSaving(false)
+  try {
+    setSaving(true)
+
+    const response = await fetch("/api/profile/full", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result?.message || "No se pudo actualizar el perfil")
     }
+
+    console.log(result)
+  } catch (error) {
+    console.error(error)
+  } finally {
+    setSaving(false)
   }
+}
 
   if (loading) return <StateView icon={<Loader2 className="h-5 w-5 animate-spin text-primary" />} text="Cargando perfil..." />
   if (error || !data) return <StateView icon={<AlertCircle className="h-5 w-5 text-red-600" />} text={error || "Ocurrió un error al cargar la vista."} />
@@ -355,6 +371,10 @@ function MultiCheckField<T extends FormValues>({ control, name, label, descripti
 function StateView({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30">
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">{icon}<span>{text}</span></div>
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+        {icon}
+        <span>{text}</span>
+      </div>
     </div>
   )
+}
