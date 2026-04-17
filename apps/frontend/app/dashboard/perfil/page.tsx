@@ -106,9 +106,14 @@ export default function PerfilPage() {
     ["Oportunidades relevantes", "Acceso a proyectos que realmente te interesan", <Sparkles className="h-4 w-4 text-primary" key="s" />],
   ] as const
 
-  async function onSubmit(payload: FormValues) {
+const [successMessage, setSuccessMessage] = useState("")
+const [errorMessage, setErrorMessage] = useState("")
+
+async function onSubmit(payload: FormValues) {
   try {
     setSaving(true)
+    setSuccessMessage("")
+    setErrorMessage("")
 
     const response = await fetch("/api/profile/full", {
       method: "PATCH",
@@ -124,9 +129,13 @@ export default function PerfilPage() {
       throw new Error(result?.message || "No se pudo actualizar el perfil")
     }
 
+    setSuccessMessage("Cambios guardados correctamente")
     console.log(result)
   } catch (error) {
     console.error(error)
+    setErrorMessage(
+      error instanceof Error ? error.message : "Ocurrió un error al guardar el perfil",
+    )
   } finally {
     setSaving(false)
   }
@@ -201,7 +210,19 @@ export default function PerfilPage() {
                   </div>
                 </CardContent>
               </Card>
+              
+              {successMessage && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {successMessage}
+                </div>
+              )}
 
+              {errorMessage && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {errorMessage}
+                </div>
+              )}
+              
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <Section title="Información personal" description="Tu información básica de contacto" icon={<User className="h-5 w-5 text-primary" />}>
