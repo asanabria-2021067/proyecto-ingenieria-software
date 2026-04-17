@@ -1,19 +1,60 @@
 import {
+  IsArray,
+  IsEmail,
   IsOptional,
   IsString,
-  IsInt,
-  Min,
-  Max,
-  IsArray,
-  ValidateNested,
-  IsEnum,
+  Matches,
+  MinLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
+  @MinLength(2)
+  nombreCompleto?: string;
+
+  @IsOptional()
+  @IsEmail()
+  @Matches(/@uvg\.edu\.gt$/, {
+    message: 'Debe ser un correo institucional @uvg.edu.gt',
+  })
+  correoInstitucional?: string;
+
+  @IsOptional()
+  @IsString()
+  carrera?: string;
+
+  @IsOptional()
+  @IsString()
+  anioAcademico?: string;
+
+  @IsOptional()
+  @IsString()
   biografia?: string;
+
+  @IsOptional()
+  @IsArray()
+  habilidades?: string[];
+
+  @IsOptional()
+  @IsArray()
+  intereses?: string[];
+
+  @IsOptional()
+  @IsString()
+  disponibilidad?: string;
+
+  @IsOptional()
+  @IsString()
+  modalidadPreferida?: string;
+
+  @IsOptional()
+  @IsString()
+  horarioDisponible?: string;
+
+  @IsOptional()
+  @IsString()
+  objetivoColaboracion?: string;
 
   @IsOptional()
   @IsString()
@@ -34,57 +75,4 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   urlCv?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(80)
-  disponibilidadHorasSemana?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(500)
-  horasBecaRequeridas?: number;
-}
-
-export class HabilidadItemDto {
-  @IsInt()
-  idHabilidad!: number;
-
-  @IsString()
-  @IsEnum(['BASICO', 'INTERMEDIO', 'AVANZADO'])
-  nivelHabilidad!: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
-}
-
-export class ReplaceHabilidadesDto {
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => HabilidadItemDto)
-  habilidades!: HabilidadItemDto[];
-}
-
-export class ReplaceInteresesDto {
-  @IsArray()
-  @IsInt({ each: true })
-  intereses!: number[];
-}
-
-export class ReplaceCualidadesDto {
-  @IsArray()
-  @IsInt({ each: true })
-  cualidades!: number[];
-}
-
-export class CreateExperienciaDto {
-  @IsString()
-  tituloProyectoExperiencia!: string;
-
-  @IsOptional()
-  @IsString()
-  rolDesempenado?: string;
-
-  @IsOptional()
-  @IsString()
-  tipoExperiencia?: 'PROYECTO_UNIVERSITARIO' | 'PASANTIA' | 'VOLUNTARIADO' | 'INVESTIGACION' | 'OTRO';
 }
