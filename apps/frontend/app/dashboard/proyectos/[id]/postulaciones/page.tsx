@@ -7,26 +7,7 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle, XCircle, Clock, User } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
-import { EstadoPostulacion } from '@/types';
-
-type PostulacionProyecto = {
-  idPostulacion: number;
-  justificacion: string;
-  estadoPostulacion: EstadoPostulacion;
-  fechaPostulacion: string;
-  fechaResolucion?: string;
-  comentarioResolucion?: string;
-  postulante: {
-    idUsuario: number;
-    nombre: string;
-    apellido: string;
-    correo: string;
-  };
-  rolProyecto: {
-    idRolProyecto: number;
-    nombreRol: string;
-  };
-};
+import { EstadoPostulacion, PostulacionProyecto } from '@/types';
 
 const ESTADO_CONFIG: Record<
   EstadoPostulacion,

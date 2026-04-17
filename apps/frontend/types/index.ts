@@ -51,6 +51,24 @@ export type ProyectoResumen = {
   intereses: { interes: { nombreInteres: string } }[];
   roles: { idRolProyecto: number }[];
 };
+export type PostulacionProyecto = {
+  idPostulacion: number;
+  justificacion: string;
+  estadoPostulacion: EstadoPostulacion;
+  fechaPostulacion: string;
+  fechaResolucion?: string;
+  comentarioResolucion?: string;
+  postulante: {
+    idUsuario: number;
+    nombre: string;
+    apellido: string;
+    correo: string;
+  };
+  rolProyecto: {
+    idRolProyecto: number;
+    nombreRol: string;
+  };
+};
 export type Postulacion = {
   idPostulacion: number;
   justificacion: string;
