@@ -24,8 +24,20 @@ export class ProjectsController {
   constructor(private projectsService: ProjectsService) {}
 
   @Get()
-  findAll(@Query('q') q?: string) {
-    return this.projectsService.findAll(q);
+  findAll(
+    @Query('q') q?: string,
+    @Query('tipoProyecto') tipoProyecto?: string,
+    @Query('modalidad') modalidad?: string,
+    @Query('organizacionId') organizacionId?: string,
+    @Query('habilidad') habilidad?: string,
+  ) {
+    return this.projectsService.findAll({
+      q,
+      tipoProyecto,
+      modalidad,
+      organizacionId: organizacionId ? parseInt(organizacionId, 10) : undefined,
+      habilidadId: habilidad ? parseInt(habilidad, 10) : undefined,
+    });
   }
 
   @Get('mine')
