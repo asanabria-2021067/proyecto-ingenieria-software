@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle, XCircle, Clock, User } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, XCircle, User } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { EstadoPostulacion, PostulacionProyecto } from '@/types';
@@ -48,7 +48,11 @@ export default function PostulacionesProyectoPage() {
     comentario: '',
   });
 
-  const { data: postulaciones = [], isLoading, isError } = useQuery<PostulacionProyecto[]>({
+  const {
+    data: postulaciones = [],
+    isLoading,
+    isError,
+  } = useQuery<PostulacionProyecto[]>({
     queryKey: ['postulaciones-proyecto', id],
     queryFn: () => apiFetch(`/proyectos/${id}/postulaciones`),
   });
@@ -113,6 +117,7 @@ export default function PostulacionesProyectoPage() {
         {isLoading && (
           <div className="text-center py-16 text-tertiary text-sm">Cargando postulaciones...</div>
         )}
+
         {isError && (
           <div className="text-center py-16 text-error text-sm">
             No se pudieron cargar las postulaciones. Verifica que seas el creador del proyecto.
@@ -129,11 +134,13 @@ export default function PostulacionesProyectoPage() {
           {postulaciones.map((p) => {
             const config = ESTADO_CONFIG[p.estadoPostulacion];
             const Icon = config.icon;
+
             return (
               <div
                 key={p.idPostulacion}
                 className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6"
               >
+                {/* Cabecera */}
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center shrink-0">
@@ -146,6 +153,7 @@ export default function PostulacionesProyectoPage() {
                       <p className="text-tertiary text-xs">{p.postulante.correo}</p>
                     </div>
                   </div>
+
                   <span
                     className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${config.className}`}
                   >
@@ -154,6 +162,7 @@ export default function PostulacionesProyectoPage() {
                   </span>
                 </div>
 
+                {/* Rol */}
                 <div className="mb-3">
                   <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1">
                     Rol solicitado
@@ -161,6 +170,7 @@ export default function PostulacionesProyectoPage() {
                   <p className="text-on-surface text-sm font-medium">{p.rolProyecto.nombreRol}</p>
                 </div>
 
+                {/* Justificación */}
                 <div className="mb-4">
                   <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1">
                     Justificación
@@ -168,6 +178,7 @@ export default function PostulacionesProyectoPage() {
                   <p className="text-on-surface text-sm leading-relaxed">{p.justificacion}</p>
                 </div>
 
+                {/* Comentario de resolución (solo si existe) */}
                 {p.comentarioResolucion && (
                   <div className="bg-surface-container rounded-xl px-4 py-3 mb-4">
                     <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-0.5">
@@ -177,6 +188,7 @@ export default function PostulacionesProyectoPage() {
                   </div>
                 )}
 
+                {/* Footer: fecha + acciones */}
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-tertiary">
                     Enviada el{' '}
@@ -212,6 +224,7 @@ export default function PostulacionesProyectoPage() {
         </div>
       </div>
 
+      {/* Modal personalizado con soporte para comentario */}
       {modal.open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -224,6 +237,7 @@ export default function PostulacionesProyectoPage() {
             <h2 className="font-headline font-bold text-on-surface text-xl mb-2">
               {modal.accion === 'ACEPTADA' ? 'Aceptar postulación' : 'Rechazar postulación'}
             </h2>
+
             <p className="text-tertiary text-sm mb-5">
               {modal.accion === 'ACEPTADA'
                 ? '¿Confirmas que deseas aceptar esta postulación?'
@@ -253,6 +267,7 @@ export default function PostulacionesProyectoPage() {
               >
                 Cancelar
               </button>
+
               <button
                 onClick={confirmar}
                 disabled={isPending}
@@ -262,7 +277,11 @@ export default function PostulacionesProyectoPage() {
                     : 'bg-error text-on-error hover:shadow-md hover:scale-[1.02] active:scale-95'
                 }`}
               >
-                {isPending ? 'Guardando...' : modal.accion === 'ACEPTADA' ? 'Sí, aceptar' : 'Sí, rechazar'}
+                {isPending
+                  ? 'Guardando...'
+                  : modal.accion === 'ACEPTADA'
+                  ? 'Sí, aceptar'
+                  : 'Sí, rechazar'}
               </button>
             </div>
           </div>

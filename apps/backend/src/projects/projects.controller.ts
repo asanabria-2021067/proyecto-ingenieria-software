@@ -24,8 +24,20 @@ export class ProjectsController {
   constructor(private projectsService: ProjectsService) {}
 
   @Get()
-  findAll(@Query('q') q?: string) {
-    return this.projectsService.findAll(q);
+  findAll(
+    @Query('q') q?: string,
+    @Query('tipoProyecto') tipoProyecto?: string,
+    @Query('modalidad') modalidad?: string,
+    @Query('organizacionId') organizacionId?: string,
+    @Query('habilidad') habilidad?: string,
+  ) {
+    return this.projectsService.findAll({
+      q,
+      tipoProyecto,
+      modalidad,
+      organizacionId: organizacionId ? parseInt(organizacionId, 10) : undefined,
+      habilidadId: habilidad ? parseInt(habilidad, 10) : undefined,
+    });
   }
 
   @Get('mine')
@@ -136,4 +148,17 @@ export class ProjectsController {
   ) {
     return this.projectsService.rejectClosure(id, user.userId);
   }
+
+  // ---------- POSTULACIONES DEL PROYECTO ----------
+
+  @Get(':id/postulaciones')
+  @UseGuards(JwtAuthGuard)
+  findPostulaciones(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.findPostulacionesByProject(id, user.userId);
+  }
+
+  // -------------------------------------------------
 }

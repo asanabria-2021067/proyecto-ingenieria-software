@@ -119,3 +119,23 @@ export const NIVEL_LABEL: Record<NivelHabilidad, string> = {
   INTERMEDIO: 'Intermedio',
   AVANZADO: 'Avanzado',
 };
+
+// Postulación recibida desde la perspectiva del creador del proyecto
+export type PostulacionRecibida = {
+  idPostulacion: number;
+  justificacion: string;
+  estadoPostulacion: EstadoPostulacion;
+  fechaPostulacion: string;
+  fechaResolucion?: string;
+  comentarioResolucion?: string;
+  postulante: {
+    idUsuario: number;
+    nombre: string;
+    apellido: string;
+    correo: string;
+  };
+  rolProyecto: {
+    idRolProyecto: number;
+    nombreRol: string;
+  };
+};
