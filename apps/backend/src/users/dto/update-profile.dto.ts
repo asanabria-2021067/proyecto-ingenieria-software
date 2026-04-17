@@ -1,11 +1,56 @@
 import {
   IsArray,
   IsEmail,
+  IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   Matches,
+  Max,
+  Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class HabilidadInputDto {
+  @IsInt()
+  idHabilidad: number;
+
+  @IsEnum(['BASICO', 'INTERMEDIO', 'AVANZADO'])
+  nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
+}
+
+export class ReplaceHabilidadesDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HabilidadInputDto)
+  habilidades: HabilidadInputDto[];
+}
+
+export class ReplaceInteresesDto {
+  @IsArray()
+  @IsInt({ each: true })
+  intereses: number[];
+}
+
+export class ReplaceCualidadesDto {
+  @IsArray()
+  @IsInt({ each: true })
+  cualidades: number[];
+}
+
+export class CreateExperienciaDto {
+  @IsString()
+  tituloProyectoExperiencia: string;
+
+  @IsString()
+  rolDesempenado: string;
+
+  @IsOptional()
+  @IsString()
+  tipoExperiencia?: string;
+}
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -21,6 +66,10 @@ export class UpdateProfileDto {
   correoInstitucional?: string;
 
   @IsOptional()
+  @IsInt()
+  idCarrera?: number;
+
+  @IsOptional()
   @IsString()
   carrera?: string;
 
@@ -31,14 +80,6 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   biografia?: string;
-
-  @IsOptional()
-  @IsArray()
-  habilidades?: string[];
-
-  @IsOptional()
-  @IsArray()
-  intereses?: string[];
 
   @IsOptional()
   @IsString()
@@ -75,4 +116,31 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   urlCv?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(168)
+  disponibilidadHorasSemana?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  horasBecaRequeridas?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HabilidadInputDto)
+  habilidades?: HabilidadInputDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  intereses?: number[];
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  cualidades?: number[];
 }
