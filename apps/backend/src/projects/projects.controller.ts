@@ -136,4 +136,17 @@ export class ProjectsController {
   ) {
     return this.projectsService.rejectClosure(id, user.userId);
   }
+
+  // ---------- POSTULACIONES DEL PROYECTO ----------
+
+  @Get(':id/postulaciones')
+  @UseGuards(JwtAuthGuard)
+  findPostulaciones(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.findPostulacionesByProject(id, user.userId);
+  }
+
+  // -------------------------------------------------
 }

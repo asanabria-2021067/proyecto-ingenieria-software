@@ -673,6 +673,38 @@ export class ProjectsService {
     }
   }
 
+  // ---------- POSTULACIONES DEL PROYECTO ----------
+
+  async findPostulacionesByProject(idProyecto: number, userId: number) {
+    // Solo el creador del proyecto puede ver sus postulaciones recibidas
+    await this._requireOwner(idProyecto, userId);
+
+    return this.prisma.postulacion.findMany({
+      where: {
+        rolProyecto: { idProyecto },
+      },
+      include: {
+        postulante: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+          },
+        },
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+          },
+        },
+      },
+      orderBy: { fechaPostulacion: 'desc' },
+    });
+  }
+
+  // -------------------------------------------------
+
   private async _crearRevisionPendiente(
     tx: Prisma.TransactionClient,
     idProyecto: number,
