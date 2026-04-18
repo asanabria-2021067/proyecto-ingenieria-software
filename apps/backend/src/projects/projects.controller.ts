@@ -24,6 +24,12 @@ export class ProjectsController {
     return this.projectsService.findAll(q);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('mis-proyectos')
+  findMine(@CurrentUser() user: { userId: number; correo: string }) {
+    return this.projectsService.findMine(user.userId);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.projectsService.findOne(id);
