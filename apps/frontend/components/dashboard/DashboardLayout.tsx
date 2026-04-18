@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, FolderOpen, FileText, User, LogOut } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { NotificationsBell } from '@/components/layout/notifications-bell';
 import logo from '@/public/logo.png';
 
 const navItems = [
@@ -45,6 +46,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             );
           })}
         </nav>
+
+        <div className="px-3 py-2 border-t border-outline-variant">
+          <NotificationsBell />
+        </div>
 
         <div className="px-3 py-4 border-t border-outline-variant space-y-3">
           {user && (

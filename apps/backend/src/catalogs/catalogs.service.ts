@@ -40,7 +40,7 @@ export class CatalogsService {
 
     return {
       carreras: carreras.map((c) => ({
-        id: c.id.toString(),           // convertimos a string por si el frontend lo espera
+        id: c.id.toString(),
         nombre: c.nombreCarrera,
       })),
 
@@ -54,13 +54,12 @@ export class CatalogsService {
         nombre: i.nombreInteres,
       })),
 
-      // Cualidades también las devolvemos (estaba el método pero no se usaba)
       cualidades: cualidades.map((q) => ({
         id: q.id.toString(),
         nombre: q.nombreCualidad,
       })),
 
-      // Estos siguen siendo estáticos porque no tienen tabla en Prisma
+      // Estos permanecen estáticos porque no tienen tabla en Prisma
       disponibilidades: [
         { id: '1', nombre: 'Tiempo completo' },
         { id: '2', nombre: 'Tiempo parcial' },

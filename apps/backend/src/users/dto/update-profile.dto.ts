@@ -21,6 +21,19 @@ export class HabilidadInputDto {
   nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
 }
 
+export class HabilidadItemDto {
+  @IsInt()
+  idHabilidad!: number;
+
+  @IsEnum(['BASICO', 'INTERMEDIO', 'AVANZADO'])
+  nivelHabilidad!: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  aniosExperiencia?: number;
+}
+
 export class ReplaceHabilidadesDto {
   @IsArray()
   @ValidateNested({ each: true })
@@ -53,11 +66,24 @@ export class CreateExperienciaDto {
 }
 
 export class UpdateProfileDto {
+  // ==================== CAMPOS DE NOMBRE ====================
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  apellido?: string;
+
+  // Campo legacy (mantengo por compatibilidad si el frontend aún lo envía)
   @IsOptional()
   @IsString()
   @MinLength(2)
   nombreCompleto?: string;
 
+  // ==================== CORREO INSTITUCIONAL ====================
   @IsOptional()
   @IsEmail()
   @Matches(/@uvg\.edu\.gt$/, {
@@ -65,18 +91,26 @@ export class UpdateProfileDto {
   })
   correoInstitucional?: string;
 
+  // ==================== CARRERA Y SEMESTRE ====================
   @IsOptional()
   @IsInt()
-  idCarrera?: number;
+  idCarrera?: number | null;
 
   @IsOptional()
   @IsString()
-  carrera?: string;
+  carrera?: string; // campo legacy
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  semestre?: number | null;
 
   @IsOptional()
   @IsString()
   anioAcademico?: string;
 
+  // ==================== INFORMACIÓN GENERAL ====================
   @IsOptional()
   @IsString()
   biografia?: string;
@@ -97,6 +131,26 @@ export class UpdateProfileDto {
   @IsString()
   objetivoColaboracion?: string;
 
+  // ==================== HORAS ====================
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(168)
+  disponibilidadHorasSemana?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(500)
+  horasBecaRequeridas?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(500)
+  horasExtensionRequeridas?: number | null;
+
+  // ==================== ENLACES Y ARCHIVOS ====================
   @IsOptional()
   @IsString()
   fotoUrl?: string;
@@ -117,17 +171,7 @@ export class UpdateProfileDto {
   @IsString()
   urlCv?: string;
 
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(168)
-  disponibilidadHorasSemana?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  horasBecaRequeridas?: number;
-
+  // ==================== RELACIONES (para reemplazo masivo) ====================
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

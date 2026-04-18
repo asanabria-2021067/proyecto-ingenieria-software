@@ -28,6 +28,19 @@ export class UsersController {
     return this.usersService.getMe(user.userId);
   }
 
+  /**
+   * Endpoint para obtener los datos completos del perfil del usuario actual
+   * (incluye información básica + relaciones)
+   */
+  @Get('me/perfil')
+  getProfile(@CurrentUser() user: { userId: number }) {
+    return this.usersService.getProfile(user.userId);
+  }
+
+  /**
+   * Endpoint para obtener datos iniciales para el formulario de perfil
+   * (catálogos + datos actuales del usuario)
+   */
   @Get('me/perfil/bootstrap')
   getProfileBootstrap(@CurrentUser() user: { userId: number }) {
     return this.usersService.getProfileBootstrap(user.userId);
@@ -38,6 +51,11 @@ export class UsersController {
     @CurrentUser() user: { userId: number },
     @Body() dto: UpdateProfileDto,
   ) {
+    // Si viene fotoUrl, la actualizamos por separado (lógica especial)
+    if (dto.fotoUrl !== undefined) {
+      await this.usersService.updateFotoUrl(user.userId, dto.fotoUrl);
+    }
+
     return this.usersService.updateProfile(user.userId, dto);
   }
 
