@@ -30,7 +30,6 @@ export class CatalogsService {
     });
   }
 
-  /** 🔥 MÉTODO CORREGIDO */
   async getProfileCatalogs() {
     const [carreras, habilidades, intereses, cualidades] = await Promise.all([
       this.findCarreras(),
