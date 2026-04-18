@@ -41,6 +41,9 @@ export class ApplicationsController {
     return this.applicationsService.findOne(id);
   }
 
+  // VERIFICADO: el service valida que el usuario sea creador del proyecto
+  // (ForbiddenException si rolProyecto.proyecto.creadoPor !== resolutorId)
+  // y que la postulación esté en estado PENDIENTE (BadRequestException si ya fue resuelta).
   @Patch(':id/estado')
   @UseGuards(JwtAuthGuard)
   updateEstado(
