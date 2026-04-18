@@ -1,52 +1,80 @@
-async getProfileCatalogs() {
-  return {
-    carreras: [
-      { id: '1', nombre: 'Ingeniería en Ciencias de la Computación' },
-      { id: '2', nombre: 'Ingeniería en Sistemas' },
-      { id: '3', nombre: 'Ingeniería Industrial' },
-      { id: '4', nombre: 'Ingeniería Mecánica' },
-      { id: '5', nombre: 'Ingeniería Química' },
-      { id: '6', nombre: 'Administración de Empresas' },
-      { id: '7', nombre: 'Psicología' },
-      { id: '8', nombre: 'Arquitectura' },
-    ],
-    habilidades: [
-      { id: '1', nombre: 'JavaScript' },
-      { id: '2', nombre: 'React' },
-      { id: '3', nombre: 'Node.js' },
-      { id: '4', nombre: 'Python' },
-      { id: '5', nombre: 'Java' },
-      { id: '6', nombre: 'C++' },
-      { id: '7', nombre: 'SQL' },
-      { id: '8', nombre: 'Diseño UI/UX' },
-      { id: '9', nombre: 'Machine Learning' },
-      { id: '10', nombre: 'Data Analysis' },
-      { id: '11', nombre: 'Project Management' },
-      { id: '12', nombre: 'Comunicación' },
-    ],
-    intereses: [
-      { id: '1', nombre: 'Inteligencia Artificial' },
-      { id: '2', nombre: 'Desarrollo Web' },
-      { id: '3', nombre: 'Desarrollo Móvil' },
-      { id: '4', nombre: 'Ciencia de Datos' },
-      { id: '5', nombre: 'Ciberseguridad' },
-      { id: '6', nombre: 'IoT' },
-      { id: '7', nombre: 'Blockchain' },
-      { id: '8', nombre: 'Game Development' },
-      { id: '9', nombre: 'Cloud Computing' },
-      { id: '10', nombre: 'DevOps' },
-    ],
-    disponibilidades: [
-      { id: '1', nombre: 'Tiempo completo' },
-      { id: '2', nombre: 'Tiempo parcial' },
-      { id: '3', nombre: 'Fines de semana' },
-      { id: '4', nombre: 'Solo noches' },
-      { id: '5', nombre: 'Flexible' },
-    ],
-    modalidades: [
-      { value: 'presencial', label: 'Presencial' },
-      { value: 'remoto', label: 'Remoto' },
-      { value: 'hibrido', label: 'Híbrido' },
-    ],
-  };
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class CatalogsService {
+  constructor(private prisma: PrismaService) {}
+
+  findCarreras() {
+    return this.prisma.carrera.findMany({
+      where: { estado: 'ACTIVA' },
+      orderBy: { nombreCarrera: 'asc' },
+    });
+  }
+
+  findHabilidades() {
+    return this.prisma.habilidad.findMany({
+      orderBy: { nombreHabilidad: 'asc' },
+    });
+  }
+
+  findIntereses() {
+    return this.prisma.interes.findMany({
+      orderBy: { nombreInteres: 'asc' },
+    });
+  }
+
+  findCualidades() {
+    return this.prisma.cualidad.findMany({
+      orderBy: { nombreCualidad: 'asc' },
+    });
+  }
+
+  /** 🔥 MÉTODO CORREGIDO */
+  async getProfileCatalogs() {
+    const [carreras, habilidades, intereses, cualidades] = await Promise.all([
+      this.findCarreras(),
+      this.findHabilidades(),
+      this.findIntereses(),
+      this.findCualidades(),
+    ]);
+
+    return {
+      carreras: carreras.map((c) => ({
+        id: c.id.toString(),           // convertimos a string por si el frontend lo espera
+        nombre: c.nombreCarrera,
+      })),
+
+      habilidades: habilidades.map((h) => ({
+        id: h.id.toString(),
+        nombre: h.nombreHabilidad,
+      })),
+
+      intereses: intereses.map((i) => ({
+        id: i.id.toString(),
+        nombre: i.nombreInteres,
+      })),
+
+      // Cualidades también las devolvemos (estaba el método pero no se usaba)
+      cualidades: cualidades.map((q) => ({
+        id: q.id.toString(),
+        nombre: q.nombreCualidad,
+      })),
+
+      // Estos siguen siendo estáticos porque no tienen tabla en Prisma
+      disponibilidades: [
+        { id: '1', nombre: 'Tiempo completo' },
+        { id: '2', nombre: 'Tiempo parcial' },
+        { id: '3', nombre: 'Fines de semana' },
+        { id: '4', nombre: 'Solo noches' },
+        { id: '5', nombre: 'Flexible' },
+      ],
+
+      modalidades: [
+        { value: 'presencial', label: 'Presencial' },
+        { value: 'remoto', label: 'Remoto' },
+        { value: 'hibrido', label: 'Híbrido' },
+      ],
+    };
+  }
 }
