@@ -28,16 +28,14 @@ export class UsersController {
     return this.usersService.getMe(user.userId);
   }
 
-  @Get('me/perfil/bootstrap')
-  getProfileBootstrap(@CurrentUser() user: { userId: number }) {
-    return this.usersService.getProfileBootstrap(user.userId);
-  }
-
   @Patch('me/perfil')
-  async updateProfile(
+  updateProfile(
     @CurrentUser() user: { userId: number },
     @Body() dto: UpdateProfileDto,
   ) {
+    if (dto.fotoUrl) {
+      this.usersService.updateFotoUrl(user.userId, dto.fotoUrl);
+    }
     return this.usersService.updateProfile(user.userId, dto);
   }
 
