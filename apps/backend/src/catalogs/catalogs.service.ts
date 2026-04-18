@@ -30,13 +30,49 @@ export class CatalogsService {
     });
   }
 
-  async findAll() {
+  async getProfileCatalogs() {
     const [carreras, habilidades, intereses, cualidades] = await Promise.all([
       this.findCarreras(),
       this.findHabilidades(),
       this.findIntereses(),
       this.findCualidades(),
     ]);
-    return { carreras, habilidades, intereses, cualidades };
+
+    return {
+      carreras: carreras.map((c) => ({
+        id: c.id.toString(),
+        nombre: c.nombreCarrera,
+      })),
+
+      habilidades: habilidades.map((h) => ({
+        id: h.id.toString(),
+        nombre: h.nombreHabilidad,
+      })),
+
+      intereses: intereses.map((i) => ({
+        id: i.id.toString(),
+        nombre: i.nombreInteres,
+      })),
+
+      cualidades: cualidades.map((q) => ({
+        id: q.id.toString(),
+        nombre: q.nombreCualidad,
+      })),
+
+      // Estos permanecen estáticos porque no tienen tabla en Prisma
+      disponibilidades: [
+        { id: '1', nombre: 'Tiempo completo' },
+        { id: '2', nombre: 'Tiempo parcial' },
+        { id: '3', nombre: 'Fines de semana' },
+        { id: '4', nombre: 'Solo noches' },
+        { id: '5', nombre: 'Flexible' },
+      ],
+
+      modalidades: [
+        { value: 'presencial', label: 'Presencial' },
+        { value: 'remoto', label: 'Remoto' },
+        { value: 'hibrido', label: 'Híbrido' },
+      ],
+    };
   }
 }
