@@ -68,6 +68,71 @@ export class ProjectsService {
     });
   }
 
+  async findMine(userId: number) {
+    const proyectos = await this.prisma.proyecto.findMany({
+      where: {
+        creadoPor: userId,
+        eliminadoEn: null,
+      },
+      select: {
+        idProyecto: true,
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        estadoProyecto: true,
+        tipoProyecto: true,
+        modalidadProyecto: true,
+        fechaCreacion: true,
+        fechaPublicacion: true,
+        roles: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            cupos: true,
+            _count: {
+              select: {
+                postulaciones: true,
+                participaciones: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { fechaCreacion: 'desc' },
+    });
+
+    return proyectos.map((proyecto) => {
+      const cantidadPostulaciones = proyecto.roles.reduce(
+        (acc, rol) => acc + rol._count.postulaciones,
+        0,
+      );
+
+      const rolesCubiertos = proyecto.roles.filter(
+        (rol) => rol._count.participaciones > 0,
+      ).length;
+
+      return {
+        idProyecto: proyecto.idProyecto,
+        tituloProyecto: proyecto.tituloProyecto,
+        descripcionProyecto: proyecto.descripcionProyecto,
+        estadoProyecto: proyecto.estadoProyecto,
+        tipoProyecto: proyecto.tipoProyecto,
+        modalidadProyecto: proyecto.modalidadProyecto,
+        fechaCreacion: proyecto.fechaCreacion,
+        fechaPublicacion: proyecto.fechaPublicacion,
+        cantidadPostulaciones,
+        rolesCubiertos,
+        rolesTotales: proyecto.roles.length,
+        roles: proyecto.roles.map((rol) => ({
+          idRolProyecto: rol.idRolProyecto,
+          nombreRol: rol.nombreRol,
+          cupos: rol.cupos,
+          postulaciones: rol._count.postulaciones,
+          participaciones: rol._count.participaciones,
+        })),
+      };
+    });
+  }
+
   async findOne(id: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: {
@@ -198,12 +263,7 @@ export class ProjectsService {
   }
 
   async create(data: CreateProjectDto, creadoPor: number) {
-    const {
-      fechaInicio,
-      fechaFinEstimada,
-      organizacionesIds,
-      ...rest
-    } = data;
+    const { fechaInicio, fechaFinEstimada, organizacionesIds, ...rest } = data;
 
     return this.prisma.proyecto.create({
       data: {
