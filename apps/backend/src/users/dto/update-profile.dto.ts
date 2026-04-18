@@ -1,19 +1,101 @@
 import {
+  IsArray,
+  IsEmail,
+  IsEnum,
+  IsInt,
   IsOptional,
   IsString,
-  IsInt,
-  Min,
+  Matches,
   Max,
-  IsArray,
+  Min,
+  MinLength,
   ValidateNested,
-  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class HabilidadInputDto {
+  @IsInt()
+  idHabilidad: number;
+
+  @IsEnum(['BASICO', 'INTERMEDIO', 'AVANZADO'])
+  nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
+}
+
+export class ReplaceHabilidadesDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HabilidadInputDto)
+  habilidades: HabilidadInputDto[];
+}
+
+export class ReplaceInteresesDto {
+  @IsArray()
+  @IsInt({ each: true })
+  intereses: number[];
+}
+
+export class ReplaceCualidadesDto {
+  @IsArray()
+  @IsInt({ each: true })
+  cualidades: number[];
+}
+
+export class CreateExperienciaDto {
+  @IsString()
+  tituloProyectoExperiencia: string;
+
+  @IsString()
+  rolDesempenado: string;
+
+  @IsOptional()
+  @IsString()
+  tipoExperiencia?: string;
+}
 
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
+  @MinLength(2)
+  nombreCompleto?: string;
+
+  @IsOptional()
+  @IsEmail()
+  @Matches(/@uvg\.edu\.gt$/, {
+    message: 'Debe ser un correo institucional @uvg.edu.gt',
+  })
+  correoInstitucional?: string;
+
+  @IsOptional()
+  @IsInt()
+  idCarrera?: number;
+
+  @IsOptional()
+  @IsString()
+  carrera?: string;
+
+  @IsOptional()
+  @IsString()
+  anioAcademico?: string;
+
+  @IsOptional()
+  @IsString()
   biografia?: string;
+
+  @IsOptional()
+  @IsString()
+  disponibilidad?: string;
+
+  @IsOptional()
+  @IsString()
+  modalidadPreferida?: string;
+
+  @IsOptional()
+  @IsString()
+  horarioDisponible?: string;
+
+  @IsOptional()
+  @IsString()
+  objetivoColaboracion?: string;
 
   @IsOptional()
   @IsString()
@@ -37,54 +119,28 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
-  @Max(80)
+  @Min(0)
+  @Max(168)
   disponibilidadHorasSemana?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(1)
-  @Max(500)
+  @Min(0)
   horasBecaRequeridas?: number;
-}
 
-export class HabilidadItemDto {
-  @IsInt()
-  idHabilidad!: number;
-
-  @IsString()
-  @IsEnum(['BASICO', 'INTERMEDIO', 'AVANZADO'])
-  nivelHabilidad!: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
-}
-
-export class ReplaceHabilidadesDto {
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => HabilidadItemDto)
-  habilidades!: HabilidadItemDto[];
-}
-
-export class ReplaceInteresesDto {
-  @IsArray()
-  @IsInt({ each: true })
-  intereses!: number[];
-}
-
-export class ReplaceCualidadesDto {
-  @IsArray()
-  @IsInt({ each: true })
-  cualidades!: number[];
-}
-
-export class CreateExperienciaDto {
-  @IsString()
-  tituloProyectoExperiencia!: string;
+  @Type(() => HabilidadInputDto)
+  habilidades?: HabilidadInputDto[];
 
   @IsOptional()
-  @IsString()
-  rolDesempenado?: string;
+  @IsArray()
+  @IsInt({ each: true })
+  intereses?: number[];
 
   @IsOptional()
-  @IsString()
-  tipoExperiencia?: 'PROYECTO_UNIVERSITARIO' | 'PASANTIA' | 'VOLUNTARIADO' | 'INVESTIGACION' | 'OTRO';
+  @IsArray()
+  @IsInt({ each: true })
+  cualidades?: number[];
 }
