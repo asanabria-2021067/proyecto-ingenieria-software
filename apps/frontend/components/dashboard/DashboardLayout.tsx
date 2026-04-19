@@ -3,14 +3,15 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FolderOpen, FileText, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import logo from '@/public/logo.png';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/proyectos', label: 'Proyectos', icon: FolderOpen },
+  { href: '/dashboard/proyectos', label: 'Explorar Proyectos', icon: FolderOpen },
+  { href: '/dashboard/projects/mine', label: 'Mis Proyectos', icon: Briefcase },
   { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
   { href: '/dashboard/perfil', label: 'Perfil', icon: User },
 ];
@@ -34,7 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
                   active
                     ? 'bg-primary text-on-primary'
                     : 'text-on-surface hover:bg-surface-container-high'
@@ -80,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               localStorage.removeItem('token');
               window.location.href = '/login';
             }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-surface-container-high w-full transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-surface-container-high w-full outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             <LogOut className="w-5 h-5 shrink-0" />
             Cerrar sesion
