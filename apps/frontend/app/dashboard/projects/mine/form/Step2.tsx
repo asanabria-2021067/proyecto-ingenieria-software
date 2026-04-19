@@ -6,13 +6,14 @@ import type { Carrera, Habilidad } from '@/lib/services/catalogs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { inputClass, labelClass, type RolFormItem, type RequisitoFormItem } from './types';
+import { inputClass, labelClass, type RolFormItem, type RequisitoFormItem, type FieldErrors } from './types';
 
 type Props = {
   roles: RolFormItem[];
   carreras: Carrera[];
   habilidades: Habilidad[];
-  showErrors: boolean;
+  errors: Record<string, FieldErrors>;
+  noRolesError: boolean;
   onAddRol: () => void;
   onRemoveRol: (id: string) => void;
   onUpdateRol: (id: string, field: keyof Omit<RolFormItem, 'id' | 'requisitos'>, value: unknown) => void;
@@ -21,12 +22,11 @@ type Props = {
   onUpdateRequisito: (rolId: string, reqId: string, field: keyof Omit<RequisitoFormItem, 'id'>, value: unknown) => void;
 };
 
-const err = (msg: string) => (
-  <p className="text-xs text-error mt-1">{msg}</p>
-);
+const ErrMsg = ({ msg }: { msg?: string }) =>
+  msg ? <p className="text-xs text-error mt-1">{msg}</p> : null;
 
 export function Step2({
-  roles, carreras, habilidades, showErrors,
+  roles, carreras, habilidades, errors, noRolesError,
   onAddRol, onRemoveRol, onUpdateRol,
   onAddRequisito, onRemoveRequisito, onUpdateRequisito,
 }: Props) {
@@ -37,12 +37,14 @@ export function Step2({
       </p>
 
       {roles.length === 0 && (
-        <div className={`text-center py-10 text-sm border-2 border-dashed rounded-xl ${showErrors ? 'border-error text-error' : 'border-outline-variant text-tertiary'}`}>
-          {showErrors ? 'Debes agregar al menos un rol para enviar a revisión.' : 'No hay roles definidos aún.'}
+        <div className={`text-center py-10 text-sm border-2 border-dashed rounded-xl ${noRolesError ? 'border-error text-error' : 'border-outline-variant text-tertiary'}`}>
+          {noRolesError ? 'Debes agregar al menos un rol para enviar a revisión.' : 'No hay roles definidos aún.'}
         </div>
       )}
 
-      {roles.map((rol, rolIdx) => (
+      {roles.map((rol, rolIdx) => {
+        const rolErrors = errors[rol.id] ?? {};
+        return (
         <div key={rol.id} className="rounded-xl border border-outline-variant bg-surface-container-low p-5 space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-on-surface">Rol {rolIdx + 1}</span>
@@ -55,23 +57,23 @@ export function Step2({
             <div>
               <label className={labelClass}>Nombre del rol <span className="text-error">*</span></label>
               <input
-                className={`${inputClass} ${showErrors && rol.nombreRol.trim() === '' ? 'border-error focus:border-error focus:ring-error/20' : ''}`}
+                className={`${inputClass} ${rolErrors.nombreRol ? 'border-error focus:border-error focus:ring-error/20' : ''}`}
                 placeholder="ej. Desarrollador Frontend"
                 value={rol.nombreRol}
                 onChange={(e) => onUpdateRol(rol.id, 'nombreRol', e.target.value)}
               />
-              {showErrors && rol.nombreRol.trim() === '' && err('El nombre del rol es obligatorio.')}
+              <ErrMsg msg={rolErrors.nombreRol} />
             </div>
             <div>
               <label className={labelClass}>Cupos <span className="text-error">*</span></label>
               <input
                 type="number" min={1}
-                className={`${inputClass} ${showErrors && rol.cupos === '' ? 'border-error focus:border-error focus:ring-error/20' : ''}`}
+                className={`${inputClass} ${rolErrors.cupos ? 'border-error focus:border-error focus:ring-error/20' : ''}`}
                 placeholder="1"
                 value={rol.cupos}
                 onChange={(e) => onUpdateRol(rol.id, 'cupos', e.target.value === '' ? '' : Number(e.target.value))}
               />
-              {showErrors && rol.cupos === '' && err('La cantidad de cupos es obligatoria.')}
+              <ErrMsg msg={rolErrors.cupos} />
             </div>
           </div>
 
@@ -158,7 +160,8 @@ export function Step2({
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
 
       <button onClick={onAddRol} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-outline-variant text-sm font-bold text-primary hover:border-primary hover:bg-primary/5 transition-all duration-200">
         <Plus className="w-4 h-4" /> Agregar rol

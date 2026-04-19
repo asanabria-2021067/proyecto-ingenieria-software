@@ -13,8 +13,8 @@ import { Step1 } from './Step1';
 import { Step2 } from './Step2';
 import { Step3 } from './Step3';
 import {
-  STEPS, newRol, newRequisito,
-  type FormData, type RolFormItem, type RequisitoFormItem,
+  STEPS, newRol, newRequisito, step1Schema, rolSchema, formSchema, zodToFieldErrors,
+  type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from './types';
 
 export default function NewProjectFormPage() {
@@ -132,22 +132,40 @@ export default function NewProjectFormPage() {
     })) : undefined,
   });
 
+  const step1Errors: FieldErrors = triedStep1
+    ? zodToFieldErrors(step1Schema.safeParse(form))
+    : {};
+
+  const step2Errors: Record<string, FieldErrors> = triedStep2
+    ? Object.fromEntries(form.roles.map((r) => [r.id, zodToFieldErrors(rolSchema.safeParse(r))]))
+    : {};
+
+  const noRolesError = triedStep2 && form.roles.length === 0;
+
   const validateBeforeSubmit = (): string[] => {
-    const errors: string[] = [];
-    if (form.tituloProyecto.trim() === '') errors.push('El título del proyecto es obligatorio.');
-    else if (form.tituloProyecto.trim().length < 5) errors.push('El título debe tener al menos 5 caracteres.');
-    if (form.descripcionProyecto.trim() === '') errors.push('La descripción del proyecto es obligatoria.');
-    else if (form.descripcionProyecto.trim().length < 20) errors.push('La descripción debe tener al menos 20 caracteres.');
-    if (!form.tipoProyecto) errors.push('Debes seleccionar un tipo de proyecto.');
-    if (!form.modalidadProyecto) errors.push('Debes seleccionar una modalidad.');
-    if (form.fechaInicio && form.fechaFinEstimada && form.fechaFinEstimada < form.fechaInicio)
-      errors.push('La fecha de fin estimada no puede ser anterior a la fecha de inicio.');
-    form.roles.forEach((r, i) => {
-      if (r.nombreRol.trim() === '') errors.push(`Rol ${i + 1}: El nombre del rol es obligatorio.`);
-      if (r.cupos === '') errors.push(`Rol ${i + 1}: La cantidad de cupos es obligatoria.`);
-      else if (Number(r.cupos) < 1) errors.push(`Rol ${i + 1}: Los cupos deben ser al menos 1.`);
+    const result = formSchema.safeParse(form);
+    if (result.success) return [];
+    return result.error.issues.map((issue) => {
+      const path = issue.path.join('.');
+      const roleMatch = path.match(/^roles\.(\d+)\.(.+)$/);
+      if (roleMatch) return `Rol ${Number(roleMatch[1]) + 1}: ${issue.message}`;
+      return issue.message;
     });
-    return errors;
+  };
+
+  const API_FIELD_LABELS: Record<string, string> = {
+    nombreRol: 'Nombre del rol', cupos: 'Cupos',
+    horasSemanalesEstimadas: 'Horas semanales', descripcionRolProyecto: 'Descripción del rol',
+    idCarreraRequerida: 'Carrera requerida', tituloProyecto: 'Título del proyecto',
+    descripcionProyecto: 'Descripción', tipoProyecto: 'Tipo de proyecto',
+    modalidadProyecto: 'Modalidad', fechaInicio: 'Fecha de inicio', fechaFinEstimada: 'Fecha fin estimada',
+  };
+
+  const API_ISSUE_LABELS: Record<string, string> = {
+    'should not be empty': 'es obligatorio',
+    'must not be less than 1': 'debe ser al menos 1',
+    'must be an integer number': 'debe ser un número entero',
+    'should not exist': '',
   };
 
   const parseApiErrors = (raw: unknown): string => {
@@ -155,40 +173,22 @@ export default function NewProjectFormPage() {
       ? (raw as any).details
       : raw instanceof Error ? [raw.message] : ['No se pudo guardar el proyecto.'];
 
-    const fieldMap: Record<string, string> = {
-      nombreRol: 'Nombre del rol',
-      cupos: 'Cupos',
-      horasSemanalesEstimadas: 'Horas semanales',
-      descripcionRolProyecto: 'Descripción del rol',
-      idCarreraRequerida: 'Carrera requerida',
-      tituloProyecto: 'Título del proyecto',
-      descripcionProyecto: 'Descripción',
-      tipoProyecto: 'Tipo de proyecto',
-      modalidadProyecto: 'Modalidad',
-      fechaInicio: 'Fecha de inicio',
-      fechaFinEstimada: 'Fecha fin estimada',
-    };
-
     const translated = msgs.map((msg) => {
       const roleMatch = msg.match(/^roles\.(\d+)\.(\w+)\s+(.+)$/);
       if (roleMatch) {
-        const rolNum = Number(roleMatch[1]) + 1;
-        const field = fieldMap[roleMatch[2]] ?? roleMatch[2];
-        const issue = roleMatch[3]
-          .replace('should not be empty', 'es obligatorio')
-          .replace('must not be less than 1', 'debe ser al menos 1')
-          .replace('must be an integer number', 'debe ser un número entero')
-          .replace(/must be longer than or equal to (\d+) characters/, 'debe tener al menos $1 caracteres');
-        return `Rol ${rolNum} — ${field}: ${issue}.`;
+        const field = API_FIELD_LABELS[roleMatch[2]] ?? roleMatch[2];
+        const issueKey = Object.keys(API_ISSUE_LABELS).find((k) => roleMatch[3].startsWith(k));
+        const issue = issueKey ? API_ISSUE_LABELS[issueKey] : roleMatch[3];
+        return issue ? `Rol ${Number(roleMatch[1]) + 1} — ${field}: ${issue}.` : null;
       }
-      return msg
-        .replace('tituloProyecto should not be empty', 'El título del proyecto es obligatorio.')
-        .replace(/tituloProyecto must be longer than or equal to (\d+) characters/, 'El título debe tener al menos $1 caracteres.')
-        .replace('descripcionProyecto should not be empty', 'La descripción es obligatoria.')
-        .replace(/descripcionProyecto must be longer than or equal to (\d+) characters/, 'La descripción debe tener al menos $1 caracteres.')
-        .replace(/tipoProyecto must be one of.*/, 'El tipo de proyecto seleccionado no es válido.')
-        .replace(/modalidadProyecto must be one of.*/, 'La modalidad seleccionada no es válida.')
-        .replace(/property \w+ should not exist/, '');
+      const fieldKey = Object.keys(API_FIELD_LABELS).find((k) => msg.startsWith(k));
+      if (fieldKey) {
+        const rest = msg.slice(fieldKey.length).trim();
+        const issueKey = Object.keys(API_ISSUE_LABELS).find((k) => rest.startsWith(k));
+        const issue = issueKey ? API_ISSUE_LABELS[issueKey] : rest;
+        return issue ? `${API_FIELD_LABELS[fieldKey]}: ${issue}.` : null;
+      }
+      return msg;
     }).filter(Boolean);
 
     return translated.join('\n') || 'No se pudo guardar el proyecto.';
@@ -282,11 +282,11 @@ export default function NewProjectFormPage() {
 
           {/* Contenido animado */}
           <div key={step} className={`px-8 pb-6 ${animClass}`}>
-            {step === 0 && <Step1 form={form} update={updateForm} showErrors={triedStep1} />}
+            {step === 0 && <Step1 form={form} update={updateForm} errors={step1Errors} />}
             {step === 1 && (
               <Step2
                 roles={form.roles} carreras={carreras} habilidades={habilidades}
-                showErrors={triedStep2}
+                errors={step2Errors} noRolesError={noRolesError}
                 onAddRol={addRol} onRemoveRol={removeRol} onUpdateRol={updateRol}
                 onAddRequisito={addRequisito} onRemoveRequisito={removeRequisito} onUpdateRequisito={updateRequisito}
               />
