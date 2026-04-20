@@ -5,6 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CatalogsService {
   constructor(private prisma: PrismaService) {}
 
+  findAll() {
+    return this.getProfileCatalogs();
+  }
+
   findCarreras() {
     return this.prisma.carrera.findMany({
       where: { estado: 'ACTIVA' },
@@ -40,22 +44,22 @@ export class CatalogsService {
 
     return {
       carreras: carreras.map((c) => ({
-        id: c.id.toString(),
+        id: c.idCarrera.toString(),
         nombre: c.nombreCarrera,
       })),
 
       habilidades: habilidades.map((h) => ({
-        id: h.id.toString(),
+        id: h.idHabilidad.toString(),
         nombre: h.nombreHabilidad,
       })),
 
       intereses: intereses.map((i) => ({
-        id: i.id.toString(),
+        id: i.idInteres.toString(),
         nombre: i.nombreInteres,
       })),
 
       cualidades: cualidades.map((q) => ({
-        id: q.id.toString(),
+        id: q.idCualidad.toString(),
         nombre: q.nombreCualidad,
       })),
 
