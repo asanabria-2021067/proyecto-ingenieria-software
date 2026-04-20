@@ -54,6 +54,11 @@ html {
   scroll-behavior: smooth;
 }
 
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+
 body {
   font-family: var(--font-family-body);
 }
