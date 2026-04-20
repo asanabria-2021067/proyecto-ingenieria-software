@@ -219,12 +219,23 @@ export class ProjectsService {
   }
 
   async findMine(userId: number) {
-    return this.prisma.proyecto.findMany({
+    const proyectos = await this.prisma.proyecto.findMany({
       where: { creadoPor: userId, eliminadoEn: null },
       select: {
         ...proyectoListSelect,
         fechaCreacion: true,
         fechaActualizacion: true,
+        roles: {
+          select: {
+            idRolProyecto: true,
+            _count: {
+              select: {
+                postulaciones: true,
+                participaciones: true,
+              },
+            },
+          },
+        },
         revisiones: {
           select: {
             idRevisionProyecto: true,
@@ -239,6 +250,25 @@ export class ProjectsService {
         },
       },
       orderBy: { fechaCreacion: 'desc' },
+    });
+
+    return proyectos.map((proyecto) => {
+      const cantidadPostulaciones = proyecto.roles.reduce(
+        (acc, rol) => acc + rol._count.postulaciones,
+        0,
+      );
+
+      const rolesCubiertos = proyecto.roles.filter(
+        (rol) => rol._count.participaciones > 0,
+      ).length;
+
+      return {
+        ...proyecto,
+        roles: proyecto.roles.map((rol) => ({ idRolProyecto: rol.idRolProyecto })),
+        cantidadPostulaciones,
+        rolesCubiertos,
+        rolesTotales: proyecto.roles.length,
+      };
     });
   }
 
