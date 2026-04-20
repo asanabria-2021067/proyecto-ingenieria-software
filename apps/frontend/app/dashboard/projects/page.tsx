@@ -1,8 +1,13 @@
 import Link from 'next/link';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
 
+const API_BASE_URL =
+  process.env.API_URL_INTERNAL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  'http://localhost:3001';
+
 async function getProjects(q?: string): Promise<ProyectoListItemDTO[]> {
-  const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/proyectos`);
+  const url = new URL(`${API_BASE_URL}/proyectos`);
   if (q) url.searchParams.set('q', q);
   const res = await fetch(url.toString(), { cache: 'no-store' });
   if (!res.ok) return [];
