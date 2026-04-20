@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -17,7 +17,7 @@ import {
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from './types';
 
-export default function NewProjectFormPage() {
+function NewProjectFormContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -337,5 +337,24 @@ export default function NewProjectFormPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function NewProjectFormPage() {
+  return (
+    <Suspense
+      fallback={
+        <DashboardLayout>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
+              Cargando formulario...
+            </div>
+          </div>
+        </DashboardLayout>
+      }
+    >
+      <NewProjectFormContent />
+    </Suspense>
   );
 }
