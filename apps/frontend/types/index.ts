@@ -1,4 +1,24 @@
-export type EstadoProyecto = 'BORRADOR' | 'PUBLICADO' | 'EN_PROGRESO' | 'CERRADO';
+export type EstadoProyecto =
+  | 'BORRADOR'
+  | 'EN_REVISION'
+  | 'OBSERVADO'
+  | 'PUBLICADO'
+  | 'EN_PROGRESO'
+  | 'EN_SOLICITUD_CIERRE'
+  | 'CERRADO'
+  | 'CANCELADO';
+
+export type EstadoRevisionProyecto = 'PENDIENTE' | 'APROBADA' | 'OBSERVADA';
+
+export type RevisionProyecto = {
+  idRevisionProyecto: number;
+  estadoRevision: EstadoRevisionProyecto;
+  comentarioRevision: string | null;
+  numeroEnvio: number;
+  enviadaEn: string;
+  revisadaEn: string | null;
+  revisor?: { idUsuario: number; nombre: string; apellido: string } | null;
+};
 export type TipoProyecto =
   | 'ACADEMICO_HORAS_BECA'
   | 'ACADEMICO_EXPERIENCIA'
@@ -80,4 +100,24 @@ export const NIVEL_LABEL: Record<NivelHabilidad, string> = {
   BASICO: 'Básico',
   INTERMEDIO: 'Intermedio',
   AVANZADO: 'Avanzado',
+};
+
+// Postulación recibida desde la perspectiva del creador del proyecto
+export type PostulacionRecibida = {
+  idPostulacion: number;
+  justificacion: string;
+  estadoPostulacion: EstadoPostulacion;
+  fechaPostulacion: string;
+  fechaResolucion?: string;
+  comentarioResolucion?: string;
+  postulante: {
+    idUsuario: number;
+    nombre: string;
+    apellido: string;
+    correo: string;
+  };
+  rolProyecto: {
+    idRolProyecto: number;
+    nombreRol: string;
+  };
 };

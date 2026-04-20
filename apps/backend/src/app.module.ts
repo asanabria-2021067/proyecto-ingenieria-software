@@ -10,6 +10,9 @@ import { EvidenceModule } from './evidence/evidence.module';
 import { ValidationModule } from './validation/validation.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CatalogsModule } from './catalogs/catalogs.module';
+import { RevisionesModule } from './revisiones/revisiones.module';
+import { ComentariosModule } from './comentarios/comentarios.module';
+import { MensajesRevisionModule } from './mensajes-revision/mensajes-revision.module';
 
 @Module({
   imports: [
@@ -23,6 +26,9 @@ import { CatalogsModule } from './catalogs/catalogs.module';
     ValidationModule,
     NotificationsModule,
     CatalogsModule,
+    RevisionesModule,
+    ComentariosModule,
+    MensajesRevisionModule,
   ],
   controllers: [AppController],
 })

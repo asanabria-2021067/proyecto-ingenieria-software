@@ -3,5 +3,5 @@ import { EstadoProyecto } from '@prisma/client';
 
 export class UpdateProjectStatusDto {
   @IsEnum(EstadoProyecto)
-  estadoProyecto: EstadoProyecto;
+  estadoProyecto!: EstadoProyecto;
 }

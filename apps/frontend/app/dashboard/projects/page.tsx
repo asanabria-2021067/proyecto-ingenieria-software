@@ -13,6 +13,11 @@ const ESTADO_STYLES: Record<string, string> = {
   PUBLICADO:   'bg-[#006735] text-white',
   EN_PROGRESO: 'bg-[#416900] text-white',
   BORRADOR:    'bg-gray-100 text-gray-600',
+  EN_REVISION: 'bg-blue-100 text-blue-700',
+  OBSERVADO:   'bg-amber-100 text-amber-700',
+  EN_SOLICITUD_CIERRE: 'bg-purple-100 text-purple-700',
+  CERRADO:     'bg-gray-200 text-gray-500',
+  CANCELADO:   'bg-red-100 text-red-700',
 };
 
 interface Props {

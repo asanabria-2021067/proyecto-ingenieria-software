@@ -353,8 +353,65 @@ async function main() {
         tipoProyecto: 'ACADEMICO_HORAS_BECA', estadoProyecto: 'PUBLICADO', creadoPor: carlos.idUsuario, fechaInicio: new Date('2026-03-15'), fechaFinEstimada: new Date('2026-09-30'),
       },
     }),
+    prisma.proyecto.upsert({
+      where: { idProyecto: 6 },
+      update: {},
+      create: {
+        idProyecto: 6, tituloProyecto: 'Laboratorio de Datos Abiertos', descripcionProyecto: 'Consolidación de datasets universitarios para investigación aplicada',
+        tipoProyecto: 'ACADEMICO_EXPERIENCIA', estadoProyecto: 'EN_REVISION', creadoPor: maria.idUsuario, fechaInicio: new Date('2026-05-01'), fechaFinEstimada: new Date('2026-11-30'),
+      },
+    }),
+    prisma.proyecto.upsert({
+      where: { idProyecto: 7 },
+      update: {},
+      create: {
+        idProyecto: 7, tituloProyecto: 'Red de Mentores UVG', descripcionProyecto: 'Plataforma para conectar estudiantes con mentores de la industria',
+        tipoProyecto: 'EXTRACURRICULAR_EXTENSION', estadoProyecto: 'OBSERVADO', creadoPor: jose.idUsuario, fechaInicio: new Date('2026-05-15'), fechaFinEstimada: new Date('2026-12-15'),
+      },
+    }),
+    prisma.proyecto.upsert({
+      where: { idProyecto: 8 },
+      update: {},
+      create: {
+        idProyecto: 8, tituloProyecto: 'Sistema de Inventario Verde', descripcionProyecto: 'Digitalización de inventario para materiales reutilizables del campus',
+        tipoProyecto: 'ACADEMICO_HORAS_BECA', estadoProyecto: 'EN_SOLICITUD_CIERRE', creadoPor: carlos.idUsuario, fechaInicio: new Date('2026-01-10'), fechaFinEstimada: new Date('2026-07-10'),
+      },
+    }),
+    prisma.proyecto.upsert({
+      where: { idProyecto: 9 },
+      update: {},
+      create: {
+        idProyecto: 9, tituloProyecto: 'Archivo Histórico Digital', descripcionProyecto: 'Rescate y catalogación digital de documentos históricos universitarios',
+        tipoProyecto: 'ACADEMICO_EXPERIENCIA', estadoProyecto: 'CANCELADO', creadoPor: sofia.idUsuario, fechaInicio: new Date('2025-09-01'), fechaFinEstimada: new Date('2026-03-01'), eliminadoEn: new Date('2026-03-10'),
+      },
+    }),
   ]);
-  const [pTutorias, pAmbiental, pNeural, pRobot, pEmpleo] = proyectos;
+  const [pTutorias, pAmbiental, pNeural, pRobot, pEmpleo, pRevision, pObservado, pCierre, pCancelado] = proyectos;
+
+  // ─── Revisiones de proyecto (estados EN_REVISION / OBSERVADO) ─────────────
+  await prisma.revisionProyecto.upsert({
+    where: { idRevisionProyecto: 1 },
+    update: {},
+    create: {
+      idRevisionProyecto: 1,
+      idProyecto: pRevision.idProyecto,
+      estadoRevision: 'PENDIENTE',
+      numeroEnvio: 1,
+    },
+  });
+  await prisma.revisionProyecto.upsert({
+    where: { idRevisionProyecto: 2 },
+    update: {},
+    create: {
+      idRevisionProyecto: 2,
+      idProyecto: pObservado.idProyecto,
+      idRevisor: luis.idUsuario,
+      estadoRevision: 'OBSERVADA',
+      comentarioRevision: 'Agregar más detalle en objetivos y roles.',
+      numeroEnvio: 1,
+      revisadaEn: new Date('2026-04-01'),
+    },
+  });
 
   // ─── Proyecto ↔ Organización ───────────────────────────
   const poData = [
@@ -364,6 +421,10 @@ async function main() {
     { idProyecto: pRobot.idProyecto, idOrganizacion: orgRobot.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
     { idProyecto: pEmpleo.idProyecto, idOrganizacion: orgCompu.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
     { idProyecto: pEmpleo.idProyecto, idOrganizacion: orgIndust.idOrganizacion, rolOrganizacion: 'COLABORADORA' as const },
+    { idProyecto: pRevision.idProyecto, idOrganizacion: orgIndust.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
+    { idProyecto: pObservado.idProyecto, idOrganizacion: orgRobot.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
+    { idProyecto: pCierre.idProyecto, idOrganizacion: orgCompu.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
+    { idProyecto: pCancelado.idProyecto, idOrganizacion: orgSost.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
   ];
   for (const po of poData) {
     await prisma.proyectoOrganizacion.upsert({
@@ -381,6 +442,10 @@ async function main() {
     { idProyecto: pRobot.idProyecto, idInteres: robotica.idInteres },
     { idProyecto: pEmpleo.idProyecto, idInteres: devWeb.idInteres },
     { idProyecto: pNeural.idProyecto, idInteres: investigacionCientifica.idInteres },
+    { idProyecto: pRevision.idProyecto, idInteres: analisisDatos.idInteres },
+    { idProyecto: pObservado.idProyecto, idInteres: devWeb.idInteres },
+    { idProyecto: pCierre.idProyecto, idInteres: investigacionCientifica.idInteres },
+    { idProyecto: pCancelado.idProyecto, idInteres: investigacionCientifica.idInteres },
   ];
   for (const pi of piData) {
     await prisma.proyectoInteres.upsert({
