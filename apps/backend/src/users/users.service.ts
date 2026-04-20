@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { TipoExperiencia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   UpdateProfileDto,
@@ -124,10 +125,10 @@ export class UsersService {
       anioAcademico: '', // puedes completarlo si tienes el campo
       semestre: user.perfil?.semestre ?? null,
       biografia: user.perfil?.biografia ?? '',
-      disponibilidad: user.perfil?.disponibilidad ?? '',
-      modalidadPreferida: user.perfil?.modalidadPreferida ?? 'hibrido',
-      horarioDisponible: user.perfil?.horarioDisponible ?? '',
-      objetivoColaboracion: user.perfil?.objetivoColaboracion ?? '',
+      disponibilidad: '',
+      modalidadPreferida: 'hibrido',
+      horarioDisponible: '',
+      objetivoColaboracion: '',
       fotoUrl: user.fotoUrl ?? '',
       enlacePortafolio: user.perfil?.enlacePortafolio ?? '',
       githubUrl: user.perfil?.githubUrl ?? '',
@@ -323,7 +324,7 @@ export class UsersService {
         idUsuario: userId,
         tituloProyectoExperiencia: dto.tituloProyectoExperiencia,
         rolDesempenado: dto.rolDesempenado,
-        tipoExperiencia: dto.tipoExperiencia ?? 'OTRO',
+        tipoExperiencia: dto.tipoExperiencia ?? TipoExperiencia.OTRO,
       },
     });
   }
