@@ -9,9 +9,11 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectStatusDto } from './dto/update-project-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -22,6 +24,12 @@ export class ProjectsController {
   @Get()
   findAll(@Query('q') q?: string) {
     return this.projectsService.findAll(q);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('mis-proyectos')
+  findMine(@CurrentUser() user: { userId: number; correo: string }) {
+    return this.projectsService.findMine(user.userId);
   }
 
   @Get(':id')
@@ -37,5 +45,15 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number; correo: string },
   ) {
     return this.projectsService.create(data, user.userId);
+  }
+
+  @Patch(':id/estado')
+  @UseGuards(JwtAuthGuard)
+  updateEstado(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateProjectStatusDto,
+    @CurrentUser() user: { userId: number; correo: string },
+  ) {
+    return this.projectsService.updateEstado(id, dto, user.userId);
   }
 }
