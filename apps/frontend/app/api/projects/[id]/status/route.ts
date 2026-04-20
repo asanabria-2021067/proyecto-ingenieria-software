@@ -4,6 +4,10 @@ export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
+  const apiBase =
+    process.env.API_URL_INTERNAL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://localhost:3001"
   const body = await req.json()
   const authHeader = req.headers.get("authorization") ?? ""
   const { id } = await context.params
@@ -11,7 +15,7 @@ export async function PATCH(
     nuevoEstado: body?.nuevoEstado ?? body?.estadoProyecto,
   }
 
-  const response = await fetch(`http://localhost:3001/proyectos/${id}/estado`, {
+  const response = await fetch(`${apiBase}/proyectos/${id}/estado`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
