@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectStatusDto } from './dto/update-project-status.dto';
 import { EstadoProyecto } from '@prisma/client';
 
 const ESTADOS_VISIBLES = [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO];
@@ -65,6 +66,100 @@ export class ProjectsService {
       },
       orderBy: { fechaCreacion: 'desc' },
       take: 20,
+    });
+  }
+
+  async findMine(userId: number) {
+    const proyectos = await this.prisma.proyecto.findMany({
+      where: {
+        creadoPor: userId,
+        eliminadoEn: null,
+      },
+      select: {
+        idProyecto: true,
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        estadoProyecto: true,
+        tipoProyecto: true,
+        modalidadProyecto: true,
+        fechaCreacion: true,
+        fechaPublicacion: true,
+        roles: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            cupos: true,
+            _count: {
+              select: {
+                postulaciones: true,
+                participaciones: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { fechaCreacion: 'desc' },
+    });
+
+    return proyectos.map((proyecto) => {
+      const cantidadPostulaciones = proyecto.roles.reduce(
+        (acc, rol) => acc + rol._count.postulaciones,
+        0,
+      );
+
+      const rolesCubiertos = proyecto.roles.filter(
+        (rol) => rol._count.participaciones > 0,
+      ).length;
+
+      return {
+        idProyecto: proyecto.idProyecto,
+        tituloProyecto: proyecto.tituloProyecto,
+        descripcionProyecto: proyecto.descripcionProyecto,
+        estadoProyecto: proyecto.estadoProyecto,
+        tipoProyecto: proyecto.tipoProyecto,
+        modalidadProyecto: proyecto.modalidadProyecto,
+        fechaCreacion: proyecto.fechaCreacion,
+        fechaPublicacion: proyecto.fechaPublicacion,
+        cantidadPostulaciones,
+        rolesCubiertos,
+        rolesTotales: proyecto.roles.length,
+      };
+    });
+  }
+
+  async updateEstado(
+    idProyecto: number,
+    dto: UpdateProjectStatusDto,
+    userId: number,
+  ) {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: {
+        idProyecto,
+        eliminadoEn: null,
+      },
+      select: {
+        idProyecto: true,
+        creadoPor: true,
+      },
+    });
+
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
+    }
+
+    if (proyecto.creadoPor !== userId) {
+      throw new ForbiddenException('No tienes permiso para modificar este proyecto');
+    }
+
+    return this.prisma.proyecto.update({
+      where: { idProyecto },
+      data: {
+        estadoProyecto: dto.estadoProyecto,
+      },
+      select: {
+        idProyecto: true,
+        estadoProyecto: true,
+      },
     });
   }
 
@@ -198,12 +293,7 @@ export class ProjectsService {
   }
 
   async create(data: CreateProjectDto, creadoPor: number) {
-    const {
-      fechaInicio,
-      fechaFinEstimada,
-      organizacionesIds,
-      ...rest
-    } = data;
+    const { fechaInicio, fechaFinEstimada, organizacionesIds, ...rest } = data;
 
     return this.prisma.proyecto.create({
       data: {
