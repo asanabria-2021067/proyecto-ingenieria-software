@@ -1,4 +1,7 @@
 import {
+  TipoExperiencia,
+} from '@prisma/client';
+import {
   IsArray,
   IsEmail,
   IsEnum,
@@ -15,10 +18,10 @@ import { Type } from 'class-transformer';
 
 export class HabilidadInputDto {
   @IsInt()
-  idHabilidad: number;
+  idHabilidad!: number;
 
   @IsEnum(['BASICO', 'INTERMEDIO', 'AVANZADO'])
-  nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
+  nivelHabilidad!: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
 }
 
 export class HabilidadItemDto {
@@ -38,31 +41,31 @@ export class ReplaceHabilidadesDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => HabilidadInputDto)
-  habilidades: HabilidadInputDto[];
+  habilidades!: HabilidadInputDto[];
 }
 
 export class ReplaceInteresesDto {
   @IsArray()
   @IsInt({ each: true })
-  intereses: number[];
+  intereses!: number[];
 }
 
 export class ReplaceCualidadesDto {
   @IsArray()
   @IsInt({ each: true })
-  cualidades: number[];
+  cualidades!: number[];
 }
 
 export class CreateExperienciaDto {
   @IsString()
-  tituloProyectoExperiencia: string;
+  tituloProyectoExperiencia!: string;
 
   @IsString()
-  rolDesempenado: string;
+  rolDesempenado!: string;
 
   @IsOptional()
-  @IsString()
-  tipoExperiencia?: string;
+  @IsEnum(TipoExperiencia)
+  tipoExperiencia?: TipoExperiencia;
 }
 
 export class UpdateProfileDto {

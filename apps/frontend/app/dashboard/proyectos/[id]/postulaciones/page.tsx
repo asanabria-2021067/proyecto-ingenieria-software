@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ArrowLeft, Clock, CheckCircle, XCircle, User } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
-import { EstadoPostulacion, PostulacionProyecto } from '@/types';
+import { EstadoPostulacion, PostulacionRecibida } from '@/types';
 
 const ESTADO_CONFIG: Record<
   EstadoPostulacion,
@@ -52,7 +52,7 @@ export default function PostulacionesProyectoPage() {
     data: postulaciones = [],
     isLoading,
     isError,
-  } = useQuery<PostulacionProyecto[]>({
+  } = useQuery<PostulacionRecibida[]>({
     queryKey: ['postulaciones-proyecto', id],
     queryFn: () => apiFetch(`/proyectos/${id}/postulaciones`),
   });
