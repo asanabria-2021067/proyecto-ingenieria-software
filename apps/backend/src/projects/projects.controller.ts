@@ -46,6 +46,12 @@ export class ProjectsController {
     return this.projectsService.findMine(user.userId);
   }
 
+  @Get('mis-proyectos')
+  @UseGuards(JwtAuthGuard)
+  findMineLegacy(@CurrentUser() user: { userId: number }) {
+    return this.projectsService.findMine(user.userId);
+  }
+
   @Get('contributor')
   @UseGuards(JwtAuthGuard)
   findAsContributor(@CurrentUser() user: { userId: number }) {
