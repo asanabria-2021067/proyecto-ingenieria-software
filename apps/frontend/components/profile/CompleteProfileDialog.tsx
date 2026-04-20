@@ -56,7 +56,10 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [biografia, setBiografia] = useState('');
   const [disponibilidad, setDisponibilidad] = useState<number>(10);
+  const [requiereHorasBeca, setRequiereHorasBeca] = useState<boolean>(false);
   const [horasBecaRequeridas, setHorasBecaRequeridas] = useState<number>(150);
+  const [requiereHorasExtension, setRequiereHorasExtension] = useState<boolean>(false);
+  const [horasExtensionRequeridas, setHorasExtensionRequeridas] = useState<number>(40);
 
   // Step 2
   const [catalogHabilidades, setCatalogHabilidades] = useState<Habilidad[]>([]);
@@ -147,7 +150,10 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
         await updateProfile({
           biografia: biografia || undefined,
           disponibilidadHorasSemana: disponibilidad,
-          horasBecaRequeridas,
+          horasBecaRequeridas: requiereHorasBeca ? horasBecaRequeridas : null,
+          horasExtensionRequeridas: requiereHorasExtension
+            ? horasExtensionRequeridas
+            : null,
           ...(fotoUrl && { fotoUrl }),
         });
       } else if (step === 1) {
@@ -275,21 +281,71 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-3">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
-                Horas beca requeridas (total)
+                Que tipo de horas necesitas
               </label>
-              <input
-                type="number"
-                min={1}
-                max={500}
-                value={horasBecaRequeridas}
-                onChange={(e) => setHorasBecaRequeridas(Number(e.target.value))}
-                className={inputClass}
-              />
-              <p className="text-[11px] text-tertiary">
-                Cantidad total de horas beca que necesitas completar
+              <p className="text-[11px] text-tertiary -mt-2">
+                Selecciona las que apliquen a tu caso. Puedes dejar ambas sin marcar.
               </p>
+
+              <label className="flex items-start gap-3 rounded-xl border border-surface-container-highest bg-white p-3 cursor-pointer hover:border-primary/40 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={requiereHorasBeca}
+                  onChange={(e) => setRequiereHorasBeca(e.target.checked)}
+                  className="mt-1 h-4 w-4 accent-primary"
+                />
+                <div className="flex-1 space-y-2">
+                  <div>
+                    <p className="text-sm font-bold text-on-surface">Horas beca</p>
+                    <p className="text-[11px] text-tertiary">
+                      Requeridas por tu beca academica
+                    </p>
+                  </div>
+                  {requiereHorasBeca && (
+                    <input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={horasBecaRequeridas}
+                      onChange={(e) => setHorasBecaRequeridas(Number(e.target.value))}
+                      placeholder="Total de horas beca"
+                      className={inputClass}
+                    />
+                  )}
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-xl border border-surface-container-highest bg-white p-3 cursor-pointer hover:border-primary/40 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={requiereHorasExtension}
+                  onChange={(e) => setRequiereHorasExtension(e.target.checked)}
+                  className="mt-1 h-4 w-4 accent-primary"
+                />
+                <div className="flex-1 space-y-2">
+                  <div>
+                    <p className="text-sm font-bold text-on-surface">Horas de extension</p>
+                    <p className="text-[11px] text-tertiary">
+                      Para actividades extracurriculares
+                    </p>
+                  </div>
+                  {requiereHorasExtension && (
+                    <input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={horasExtensionRequeridas}
+                      onChange={(e) =>
+                        setHorasExtensionRequeridas(Number(e.target.value))
+                      }
+                      placeholder="Total de horas de extension"
+                      className={inputClass}
+                    />
+                  )}
+                </div>
+              </label>
             </div>
           </div>
         )}
