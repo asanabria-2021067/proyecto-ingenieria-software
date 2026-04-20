@@ -150,7 +150,7 @@ export default function LandingAnimatedSections() {
   useEffect(() => {
     let rafId = 0;
     let lastTs = 0;
-    const pxPerSecond = 22;
+    const pxPerSecond = 255;
 
     const autoScroll = (ts: number) => {
       if (!lastTs) lastTs = ts;
