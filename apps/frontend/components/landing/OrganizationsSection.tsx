@@ -10,8 +10,8 @@ const benefits = [
 export default function OrganizationsSection() {
   return (
     <section
-      id="como-funciona"
-      className="scroll-mt-20 bg-on-primary-fixed px-8 py-24 text-on-primary"
+      id="organizaciones"
+      className="min-h-[102svh] scroll-mt-32 bg-on-primary-fixed px-4 py-24 text-on-primary sm:px-6 md:min-h-[112svh] md:py-32 lg:px-8"
     >
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-16 lg:flex-row">
         <div className="space-y-8 lg:w-1/2">

@@ -309,7 +309,7 @@ export function CinematicHero({
           ".main-card",
           {
             width: isMobile ? "92vw" : "85vw",
-            height: isMobile ? "92vh" : "85vh",
+            height: isMobile ? "86vh" : "80vh",
             borderRadius: isMobile ? "32px" : "40px",
             ease: "expo.inOut",
             duration: 1.6,
@@ -327,7 +327,7 @@ export function CinematicHero({
     <div
       ref={containerRef}
       className={cn(
-        "relative flex h-screen w-screen items-center justify-center overflow-hidden bg-surface text-on-surface antialiased",
+        "relative flex h-[100svh] w-screen items-center justify-center overflow-hidden bg-surface text-on-surface antialiased",
         className,
       )}
       style={{ perspective: "1500px" }}
@@ -384,10 +384,13 @@ export function CinematicHero({
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center" style={{ perspective: "1500px" }}>
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-6 z-20 flex items-center justify-center md:top-8"
+        style={{ perspective: "1500px" }}
+      >
         <div
           ref={mainCardRef}
-          className="main-card premium-depth-card gsap-reveal pointer-events-auto relative flex h-[92vh] w-[92vw] items-center justify-center overflow-hidden rounded-[32px] md:h-[85vh] md:w-[85vw] md:rounded-[40px]"
+          className="main-card premium-depth-card gsap-reveal pointer-events-auto relative flex h-[86vh] w-[92vw] items-center justify-center overflow-hidden rounded-[32px] md:h-[80vh] md:w-[85vw] md:rounded-[40px]"
         >
           <div className="card-sheen" aria-hidden="true" />
 
