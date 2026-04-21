@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@theme inline {
+  --color-sparkles-color: var(--sparkles-color);
+  --color-gradient-color: var(--gradient-color);
+}
+
 @theme {
   --color-primary: #006735;
   --color-on-primary: #ffffff;
@@ -48,6 +53,16 @@
 
   --font-family-headline: var(--font-manrope, 'Manrope'), sans-serif;
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
+}
+
+:root {
+  --gradient-color: #006735;
+  --sparkles-color: #72dc93;
+}
+
+.dark {
+  --gradient-color: #8ff9ad;
+  --sparkles-color: #ffffff;
 }
 
 html {
