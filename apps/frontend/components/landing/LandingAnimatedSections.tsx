@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
 import FeaturesGrid from "@/components/landing/FeaturesGrid";
 import FormalizaExperienceSection from "@/components/landing/FormalizaExperienceSection";
@@ -15,38 +16,24 @@ if (typeof window !== "undefined") {
 
 type SectionConfig = {
   id: string;
-  curtainClass: string;
-  curtainClipPath: string;
   content: ReactNode;
 };
 
 const SECTION_CONFIGS: SectionConfig[] = [
   {
     id: "features",
-    curtainClass:
-      "bg-[linear-gradient(145deg,var(--color-primary-container)_0%,var(--color-primary)_48%,#052414_100%)]",
-    curtainClipPath: "polygon(0 6%, 100% 0, 100% 94%, 0 100%)",
     content: <FeaturesGrid />,
   },
   {
     id: "how",
-    curtainClass:
-      "bg-[linear-gradient(145deg,#0B5A31_0%,var(--color-primary)_48%,#03180F_100%)]",
-    curtainClipPath: "polygon(0 0, 100% 8%, 100% 100%, 0 92%)",
     content: <FormalizaExperienceSection />,
   },
   {
     id: "individual",
-    curtainClass:
-      "bg-[linear-gradient(145deg,var(--color-secondary)_0%,var(--color-primary)_48%,#072815_100%)]",
-    curtainClipPath: "polygon(0 4%, 100% 0, 100% 100%, 0 96%)",
     content: <IndividualProjectsSection />,
   },
   {
     id: "orgs",
-    curtainClass:
-      "bg-[linear-gradient(145deg,#2A6E45_0%,var(--color-primary)_48%,#062015_100%)]",
-    curtainClipPath: "polygon(0 0, 100% 4%, 100% 96%, 0 100%)",
     content: <OrganizationsSection />,
   },
 ];
@@ -69,11 +56,10 @@ export default function LandingAnimatedSections() {
         const sectionEnd = isNearEnd ? "top 62%" : "top 18%";
         const itemStart = isNearEnd ? "top 88%" : "top 76%";
         const itemEnd = isNearEnd ? "top 68%" : "top 42%";
-        const curtain = section.querySelector<HTMLElement>("[data-section-curtain]");
         const content = section.querySelector<HTMLElement>("[data-section-content]");
         const prevContent = sections[index - 1]?.querySelector<HTMLElement>("[data-section-content]");
 
-        if (!curtain || !content) return;
+        if (!content) return;
 
         const itemNodes = Array.from(
           content.querySelectorAll<HTMLElement>(
@@ -81,7 +67,6 @@ export default function LandingAnimatedSections() {
           ),
         );
 
-        gsap.set(curtain, { yPercent: 0, xPercent: 0, rotate: direction * 2, scale: 1.15 });
         gsap.set(content, { autoAlpha: 0, y: 110, scale: 0.98, filter: "blur(12px)" });
         gsap.set(itemNodes, { autoAlpha: 0, y: 26 });
 
@@ -95,17 +80,6 @@ export default function LandingAnimatedSections() {
         });
 
         sectionTl
-          .to(
-            curtain,
-            {
-              yPercent: -130,
-              xPercent: direction * 24,
-              rotate: direction * 8,
-              scale: 1,
-              ease: "none",
-            },
-            0,
-          )
           .to(
             content,
             {
@@ -147,41 +121,18 @@ export default function LandingAnimatedSections() {
     return () => ctx.revert();
   }, []);
 
-  useEffect(() => {
-    let rafId = 0;
-    let lastTs = 0;
-    const pxPerSecond = 255;
-
-    const autoScroll = (ts: number) => {
-      if (!lastTs) lastTs = ts;
-      const delta = (ts - lastTs) / 1000;
-      lastTs = ts;
-
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      if (window.scrollY < maxScroll) {
-        window.scrollTo(0, Math.min(window.scrollY + pxPerSecond * delta, maxScroll));
-      }
-
-      rafId = window.requestAnimationFrame(autoScroll);
-    };
-
-    rafId = window.requestAnimationFrame(autoScroll);
-    return () => window.cancelAnimationFrame(rafId);
-  }, []);
-
   return (
-    <div ref={rootRef} className="min-h-screen bg-surface text-on-surface font-headline">
+    <div
+      ref={rootRef}
+      className="min-h-screen bg-surface pt-20 text-on-surface font-headline md:pt-24"
+    >
+      <Navbar />
       <section data-cinematic-section className="relative overflow-hidden">
         <HeroSection />
       </section>
 
       {SECTION_CONFIGS.map((section) => (
         <section key={section.id} data-cinematic-section className="relative isolate overflow-hidden">
-          <div
-            data-section-curtain
-            className={`pointer-events-none absolute -inset-x-20 -inset-y-28 z-30 will-change-transform ${section.curtainClass}`}
-            style={{ clipPath: section.curtainClipPath }}
-          />
           <div data-section-content className="relative z-20 will-change-transform">
             {section.content}
           </div>
