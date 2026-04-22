@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 
 export const metadata = {
-  title: 'UVG Scholar | Excelencia Académica',
+  title: 'UVGENIUS | Excelencia Académica',
   description: 'Plataforma de colaboración y gestión académica de la Universidad del Valle de Guatemala.',
 };
 
