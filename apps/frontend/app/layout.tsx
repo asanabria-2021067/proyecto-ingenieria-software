@@ -16,8 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className={`${inter.variable} ${manrope.variable} font-body`}>
+    <html lang="es" data-scroll-behavior="smooth">
+      <body
+        suppressHydrationWarning
+        className={`${inter.variable} ${manrope.variable} font-body`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>
