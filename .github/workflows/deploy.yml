@@ -1,0 +1,64 @@
+name: Deploy to Azure VM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - 'docker-compose.yml'
+      - '.env.example'
+      - '.github/workflows/deploy.yml'
+
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            cd ~/proyecto-ingenieria-software
+
+            # Pull latest changes
+            git checkout main
+            git pull origin main
+
+            # Create/update .env for production
+            cat > .env << 'ENVEOF'
+            NODE_ENV=production
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=uvg_collab
+            DB_PORT=5432
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/uvg_collab?schema=public
+            NEXT_PUBLIC_API_URL=
+            NEXT_PUBLIC_API_PREFIX=/api
+            NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+            NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+            ENVEOF
+
+            # Build and deploy
+            docker compose --profile app down
+            docker compose --profile app up -d --build
+
+            # Wait for services
+            echo "Waiting for services to start..."
+            sleep 15
+
+            # Run database migrations
+            docker compose exec -T backend npx prisma migrate deploy
+
+            # Show status
+            docker compose --profile app ps
+
+            # Clean old images
+            docker image prune -f
+
