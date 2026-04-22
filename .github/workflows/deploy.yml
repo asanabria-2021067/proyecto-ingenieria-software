@@ -49,16 +49,15 @@ jobs:
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
             ENVEOF
 
-            # Build and deploy
+            # Stop previous app services
             docker compose --profile app down
-            docker compose --profile app up -d --build
+
+            # Build and deploy only required services (skip pgadmin in production)
+            docker compose --profile app up -d --build postgres backend frontend
 
             # Wait for services
             echo "Waiting for services to start..."
             sleep 15
-
-            # Run database migrations
-            docker compose exec -T backend npx prisma migrate deploy
 
             # Show status
             docker compose --profile app ps
