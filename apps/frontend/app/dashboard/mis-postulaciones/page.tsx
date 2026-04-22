@@ -32,6 +32,8 @@ export default function MisPostulacionesPage() {
   const { data: postulaciones = [], isLoading, isError } = useQuery<Postulacion[]>({
     queryKey: ['mis-postulaciones'],
     queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   return (

@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,8 +15,8 @@ import { Proyecto } from '@/types';
 const schema = z.object({
   justificacion: z
     .string()
-    .min(40, 'La justificación debe tener al menos 40 caracteres.')
-    .max(1000, 'La justificación no puede exceder 1000 caracteres.'),
+    .min(40, 'La justificaciÃ³n debe tener al menos 40 caracteres.')
+    .max(1000, 'La justificaciÃ³n no puede exceder 1000 caracteres.'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -24,6 +24,7 @@ type FormData = z.infer<typeof schema>;
 export default function PostularPage() {
   const { id, rolId } = useParams<{ id: string; rolId: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState('');
 
   const { data: proyecto, isLoading } = useQuery<Proyecto>({
@@ -45,7 +46,7 @@ export default function PostularPage() {
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       const userId = getUserIdFromToken();
-      if (!userId) throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+      if (!userId) throw new Error('Tu sesiÃ³n ha expirado. Por favor inicia sesiÃ³n nuevamente.');
       return apiFetch('/postulaciones', {
         method: 'POST',
         body: JSON.stringify({
@@ -58,8 +59,14 @@ export default function PostularPage() {
     onError: (err: unknown) => {
       const msg =
         (err as { message?: string })?.message ??
-        'Ocurrió un error al enviar tu postulación.';
+        'OcurriÃ³ un error al enviar tu postulaciÃ³n.';
       setErrorMsg(msg);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
+      ]);
     },
   });
 
@@ -70,11 +77,11 @@ export default function PostularPage() {
           <div className="text-center max-w-md">
             <CheckCircle className="w-16 h-16 text-primary mx-auto mb-4" />
             <h2 className="font-headline font-extrabold text-2xl text-on-surface mb-2">
-              ¡Postulación enviada!
+              Â¡PostulaciÃ³n enviada!
             </h2>
             <p className="text-tertiary text-sm mb-6">
-              Tu postulación fue recibida. El equipo del proyecto revisará tu solicitud y te
-              notificará el resultado.
+              Tu postulaciÃ³n fue recibida. El equipo del proyecto revisarÃ¡ tu solicitud y te
+              notificarÃ¡ el resultado.
             </p>
             <Link
               href="/dashboard/mis-postulaciones"
@@ -118,7 +125,7 @@ export default function PostularPage() {
             {rol.descripcionRolProyecto && (
               <div className="bg-surface-container-low rounded-xl border border-outline-variant p-4 mb-6">
                 <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1">
-                  Descripción del rol
+                  DescripciÃ³n del rol
                 </p>
                 <p className="text-on-surface text-sm leading-relaxed">
                   {rol.descripcionRolProyecto}
@@ -135,16 +142,16 @@ export default function PostularPage() {
             <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-on-surface mb-1.5">
-                  Justificación <span className="text-error">*</span>
+                  JustificaciÃ³n <span className="text-error">*</span>
                 </label>
                 <p className="text-xs text-tertiary mb-2">
-                  Explica por qué eres un buen candidato para este rol, tus experiencias relevantes
-                  y motivación.
+                  Explica por quÃ© eres un buen candidato para este rol, tus experiencias relevantes
+                  y motivaciÃ³n.
                 </p>
                 <textarea
                   {...register('justificacion')}
                   rows={8}
-                  placeholder="Escribe tu justificación aquí..."
+                  placeholder="Escribe tu justificaciÃ³n aquÃ­..."
                   className={`w-full px-4 py-3 rounded-xl border text-on-surface text-sm leading-relaxed outline-none resize-none transition-colors ${
                     errors.justificacion
                       ? 'border-error bg-error-container/10 focus:ring-2 focus:ring-error'
@@ -182,7 +189,7 @@ export default function PostularPage() {
                   disabled={mutation.isPending}
                   className="flex-1 bg-primary text-on-primary px-5 py-3 rounded-xl text-sm font-bold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-60 disabled:scale-100 disabled:shadow-none"
                 >
-                  {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
+                  {mutation.isPending ? 'Enviando...' : 'Enviar PostulaciÃ³n'}
                 </button>
               </div>
             </form>
@@ -192,3 +199,4 @@ export default function PostularPage() {
     </DashboardLayout>
   );
 }
+
