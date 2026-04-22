@@ -28,6 +28,7 @@ export default function LoginPage() {
           className="absolute inset-0 h-full w-full object-cover"
           src={img}
           fill
+          sizes="(min-width: 1024px) 50vw, 0px"
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent" />
