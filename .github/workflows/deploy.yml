@@ -26,9 +26,12 @@ jobs:
 
             cd ~/proyecto-ingenieria-software
 
-            # Pull latest changes
+            # Ensure branch and avoid pull failure when server has local changes
             git checkout main
-            git pull origin main
+            if ! git diff --quiet || ! git diff --cached --quiet; then
+              git stash push --include-untracked -m "auto-deploy-$(date +%Y%m%d-%H%M%S)" || true
+            fi
+            git pull --ff-only origin main
 
             # Create/update .env for production
             cat > .env << 'ENVEOF'
@@ -61,4 +64,3 @@ jobs:
 
             # Clean old images
             docker image prune -f
-
