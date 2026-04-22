@@ -22,6 +22,8 @@ export default function RegistroPage() {
   const [semestre, setSemestre] = useState<number>(1);
   const [carreras, setCarreras] = useState<Carrera[]>([]);
   const { mutate, isPending } = useRegister();
+  const selectedCarreraName =
+    carreras.find((carrera) => carrera.idCarrera === idCarrera)?.nombreCarrera ?? '';
 
   useEffect(() => {
     getCarreras().then(setCarreras).catch(() => {});
@@ -60,6 +62,7 @@ export default function RegistroPage() {
           className="absolute inset-0 h-full w-full object-cover"
           src={img}
           fill
+          sizes="(min-width: 1024px) 50vw, 0px"
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent" />
@@ -86,7 +89,7 @@ export default function RegistroPage() {
         </header>
 
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-lg">
             <div className="mb-8 text-left">
               <Image src={logo} alt="UVG Scholar" className="h-28 w-auto mx-auto mb-4" />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
@@ -147,22 +150,27 @@ export default function RegistroPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="space-y-1.5 md:col-span-2">
                   <label className={labelClass}>Carrera</label>
                   <select
                     required
                     value={idCarrera}
                     onChange={(e) => setIdCarrera(Number(e.target.value))}
-                    className={inputClass}
+                    className={`${inputClass} pr-10`}
                   >
                     <option value={0}>Seleccionar...</option>
                     {carreras.map((c) => (
-                      <option key={c.idCarrera} value={c.idCarrera}>
+                      <option key={c.idCarrera} value={c.idCarrera} title={c.nombreCarrera}>
                         {c.nombreCarrera}
                       </option>
                     ))}
                   </select>
+                  {selectedCarreraName && (
+                    <p className="text-xs text-tertiary break-words leading-snug">
+                      {selectedCarreraName}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <label className={labelClass}>Semestre</label>
