@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
+import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 
 const navItems = [
@@ -18,7 +20,27 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
+
+  const handleLogout = async () => {
+    const result = await uvgSwal.fire({
+      icon: 'question',
+      title: 'Cerrar sesion',
+      text: 'Tu sesion actual se cerrara en este dispositivo.',
+      showCancelButton: true,
+      confirmButtonText: 'Si, cerrar sesion',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#006735',
+    });
+
+    if (!result.isConfirmed) return;
+
+    localStorage.removeItem('token');
+    queryClient.clear();
+    router.replace('/login');
+  };
 
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
@@ -77,11 +99,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           )}
           <button
-            onClick={() => {
-              localStorage.removeItem('token');
-              window.location.href = '/login';
-            }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-surface-container-high w-full outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30"
+            onClick={handleLogout}
+            className="flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-primary hover:text-on-primary w-full outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             <LogOut className="w-5 h-5 shrink-0" />
             Cerrar sesion
