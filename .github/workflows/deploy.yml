@@ -59,6 +59,9 @@ jobs:
             echo "Waiting for services to start..."
             sleep 15
 
+            # Seed catalogs/base data (idempotent)
+            docker compose exec -T backend npx prisma db seed
+
             # Show status
             docker compose --profile app ps
 
