@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload, Plus, X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
-import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +34,7 @@ import { uploadToCloudinary } from '@/lib/cloudinary';
 interface Props {
   open: boolean;
   onComplete: () => void;
+  allowClose?: boolean;
 }
 
 type NivelHabilidad = 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
@@ -50,7 +50,7 @@ interface ExperienciaForm {
   tipoExperiencia: string;
 }
 
-export default function CompleteProfileDialog({ open, onComplete }: Props) {
+export default function CompleteProfileDialog({ open, onComplete, allowClose = false }: Props) {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const [step, setStep] = useState(0);
@@ -97,6 +97,7 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    setStep(0);
     refreshCatalogs().catch(() => {});
   }, [open, refreshCatalogs]);
 
@@ -341,7 +342,12 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
             await addExperiencia(exp);
           }
         }
-        queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['currentUser'] }),
+          queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
+          queryClient.invalidateQueries({ queryKey: ['dashboard-projects'] }),
+          queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] }),
+        ]);
         onComplete();
         return;
       }
@@ -365,9 +371,14 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
     'w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && allowClose) onComplete();
+      }}
+    >
       <DialogContent
-        showCloseButton={false}
+        showCloseButton={allowClose}
         className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-surface"
       >
         <DialogHeader>
