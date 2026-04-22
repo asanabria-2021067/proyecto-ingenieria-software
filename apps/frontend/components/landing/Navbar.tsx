@@ -47,7 +47,7 @@ export default function Navbar() {
           }`}
         >
           <div className="flex items-center gap-8">
-            <Image src={logo} alt="UVG Scholar" className="h-8 w-auto brightness-0 sm:h-9" />
+            <Image src={logo} alt="UVGenius" className="h-8 w-auto brightness-0 sm:h-9" />
             <div className="hidden gap-6 md:flex">
               {navLinks.map((link) => (
                 <a

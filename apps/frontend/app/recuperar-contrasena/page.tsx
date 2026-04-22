@@ -56,7 +56,7 @@ export default function RecuperarContrasenaPage() {
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
           <div className="w-full max-w-md">
             <div className="mb-10 text-left">
-              <Image src={logo} alt="UVG Scholar" className="h-40 w-auto mx-auto mb-4" />
+              <Image src={logo} alt="UVGENIUS" className="h-40 w-auto mx-auto mb-4" />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
                 Recuperar contrasena
               </h1>

@@ -91,7 +91,7 @@ export default function RegistroPage() {
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
           <div className="w-full max-w-lg">
             <div className="mb-8 text-left">
-              <Image src={logo} alt="UVG Scholar" className="h-28 w-auto mx-auto mb-4" />
+              <Image src={logo} alt="UVGENIUS" className="h-28 w-auto mx-auto mb-4" />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
                 Crear cuenta
               </h1>

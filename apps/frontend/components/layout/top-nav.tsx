@@ -32,7 +32,7 @@ export function TopNav() {
             href="/dashboard"
             className="text-[#006735] font-bold text-base tracking-tight whitespace-nowrap self-center"
           >
-            UVG Scholar
+            UVGenius
           </Link>
 
           <NavigationMenu viewport={false}>
