@@ -46,8 +46,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="h-screen bg-surface flex overflow-hidden">
       <aside className="w-64 h-screen bg-surface-container-low border-r border-outline-variant flex flex-col shrink-0 overflow-y-auto">
         <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
-          <Image src={logo} alt="UVG Scholar" className="h-10 w-auto" />
-          <span className="font-headline font-extrabold text-xl text-primary">UVG Scholar</span>
+          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
+          <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">

@@ -172,7 +172,7 @@ export function CinematicHero({
   cardHeading = "Colaboracion universitaria, ordenada.",
   cardDescription = (
     <>
-      <span className="font-semibold text-white">UVG Scholar</span> centraliza horas beca,
+      <span className="font-semibold text-white">UVGenius</span> centraliza horas beca,
       extension y proyectos academicos para que encuentres, postules y des seguimiento con
       evidencia y trazabilidad.
     </>
