@@ -90,8 +90,10 @@ export default function LandingAnimatedSections() {
               ease: "power3.out",
             },
             0.2,
-          )
-          .to(
+          );
+
+        if (prevContent) {
+          sectionTl.to(
             prevContent,
             {
               y: -48,
@@ -102,6 +104,7 @@ export default function LandingAnimatedSections() {
             },
             0,
           );
+        }
 
         gsap.to(itemNodes, {
           autoAlpha: 1,
