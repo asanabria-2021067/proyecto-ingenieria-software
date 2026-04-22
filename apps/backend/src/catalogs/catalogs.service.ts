@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateCatalogItemDto } from './dto/create-catalog-item.dto';
 
 @Injectable()
 export class CatalogsService {
   constructor(private prisma: PrismaService) {}
+
+  private normalizeNombre(nombre: string) {
+    return nombre.trim().replace(/\s+/g, ' ');
+  }
 
   findAll() {
     return this.getProfileCatalogs();
@@ -31,6 +36,46 @@ export class CatalogsService {
   findCualidades() {
     return this.prisma.cualidad.findMany({
       orderBy: { nombreCualidad: 'asc' },
+    });
+  }
+
+  async createHabilidad(dto: CreateCatalogItemDto) {
+    const nombre = this.normalizeNombre(dto.nombre);
+    const existing = await this.prisma.habilidad.findFirst({
+      where: { nombreHabilidad: { equals: nombre, mode: 'insensitive' } },
+    });
+    if (existing) return existing;
+    return this.prisma.habilidad.create({
+      data: {
+        nombreHabilidad: nombre,
+        categoriaHabilidad: dto.categoria?.trim() || null,
+      },
+    });
+  }
+
+  async createInteres(dto: CreateCatalogItemDto) {
+    const nombre = this.normalizeNombre(dto.nombre);
+    const existing = await this.prisma.interes.findFirst({
+      where: { nombreInteres: { equals: nombre, mode: 'insensitive' } },
+    });
+    if (existing) return existing;
+    return this.prisma.interes.create({
+      data: {
+        nombreInteres: nombre,
+      },
+    });
+  }
+
+  async createCualidad(dto: CreateCatalogItemDto) {
+    const nombre = this.normalizeNombre(dto.nombre);
+    const existing = await this.prisma.cualidad.findFirst({
+      where: { nombreCualidad: { equals: nombre, mode: 'insensitive' } },
+    });
+    if (existing) return existing;
+    return this.prisma.cualidad.create({
+      data: {
+        nombreCualidad: nombre,
+      },
     });
   }
 

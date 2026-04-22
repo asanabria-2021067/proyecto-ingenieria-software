@@ -1,5 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CatalogsService } from './catalogs.service';
+import { CreateCatalogItemDto } from './dto/create-catalog-item.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller()
 export class CatalogsController {
@@ -28,5 +30,23 @@ export class CatalogsController {
   @Get('cualidades')
   findCualidades() {
     return this.catalogsService.findCualidades();
+  }
+
+  @Post('habilidades')
+  @UseGuards(JwtAuthGuard)
+  createHabilidad(@Body() dto: CreateCatalogItemDto) {
+    return this.catalogsService.createHabilidad(dto);
+  }
+
+  @Post('intereses')
+  @UseGuards(JwtAuthGuard)
+  createInteres(@Body() dto: CreateCatalogItemDto) {
+    return this.catalogsService.createInteres(dto);
+  }
+
+  @Post('cualidades')
+  @UseGuards(JwtAuthGuard)
+  createCualidad(@Body() dto: CreateCatalogItemDto) {
+    return this.catalogsService.createCualidad(dto);
   }
 }
