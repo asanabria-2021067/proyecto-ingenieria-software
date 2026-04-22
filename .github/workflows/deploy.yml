@@ -33,6 +33,13 @@ jobs:
               git stash push --include-untracked -m "auto-deploy-$(date +%Y%m%d-%H%M%S)" || true
             fi
             git pull --ff-only origin main
+            # Keep only the 5 most recent auto-deploy stashes
+            AUTO_STASHES=$(git stash list | grep "auto-deploy-" | tail -n +6 | cut -d: -f1 || true)
+            if [ -n "$AUTO_STASHES" ]; then
+              echo "$AUTO_STASHES" | while read -r STASH_REF; do
+                [ -n "$STASH_REF" ] && git stash drop "$STASH_REF" || true
+              done
+            fi
 
             # Create/update .env for production
             cat > .env << 'ENVEOF'
@@ -55,9 +62,21 @@ jobs:
             # Build and deploy only required services (skip pgadmin in production)
             docker compose --profile app up -d --build postgres backend frontend
 
-            # Wait for services
-            echo "Waiting for services to start..."
-            sleep 15
+            # Wait for backend health endpoint
+            echo "Waiting for backend to be healthy..."
+            for i in $(seq 1 60); do
+              if curl -fsS http://127.0.0.1:3001/api >/dev/null; then
+                echo "Backend is healthy."
+                break
+              fi
+              if [ "$i" -eq 60 ]; then
+                echo "Backend did not become healthy in time"
+                docker compose --profile app ps
+                docker compose logs --tail=120 backend || true
+                exit 1
+              fi
+              sleep 5
+            done
 
             # Seed catalogs/base data (idempotent)
             docker compose exec -T backend npx prisma db seed
