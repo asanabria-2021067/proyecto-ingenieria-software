@@ -5,12 +5,17 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { EstadoProyecto, TipoNotificacion } from '@prisma/client';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
 @Injectable()
 export class ApplicationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async create(dto: CreatePostulacionDto) {
     // 1. Verificar que el usuario existe
@@ -24,7 +29,7 @@ export class ApplicationsService {
       );
     }
 
-    // 2. Verificar que el rol existe y el proyecto está PUBLICADO
+    // 2. Verificar que el rol existe y el proyecto está postulable
     const rol = await this.prisma.rolProyecto.findUnique({
       where: { idRolProyecto: dto.idRolProyecto },
       include: { proyecto: true },
@@ -36,13 +41,30 @@ export class ApplicationsService {
       );
     }
 
-    if (rol.proyecto.estadoProyecto !== 'PUBLICADO') {
+    const { estadoProyecto } = rol.proyecto;
+    const esPublicado = estadoProyecto === EstadoProyecto.PUBLICADO;
+    const esEnProgreso = estadoProyecto === EstadoProyecto.EN_PROGRESO;
+
+    if (!esPublicado && !esEnProgreso) {
       throw new BadRequestException(
-        'Solo se puede postular a proyectos en estado PUBLICADO',
+        'Solo se puede postular a proyectos en estado PUBLICADO o EN_PROGRESO con cupos disponibles',
       );
     }
 
-    // 3. Verificar que el usuario no se ha postulado ya a este rol
+    if (esEnProgreso) {
+      const activas = await this.prisma.participacionProyecto.count({
+        where: {
+          idRolProyecto: dto.idRolProyecto,
+          estadoParticipacion: 'ACTIVO',
+        },
+      });
+      if (activas >= rol.cupos) {
+        throw new BadRequestException(
+          'El rol ya alcanzó su límite de cupos activos en EN_PROGRESO',
+        );
+      }
+    }
+
     const postulacionExistente = await this.prisma.postulacion.findFirst({
       where: {
         idUsuarioPostulante: dto.idUsuarioPostulante,
@@ -56,7 +78,6 @@ export class ApplicationsService {
       );
     }
 
-    // 4. Crear la postulación
     return this.prisma.postulacion.create({
       data: {
         idUsuarioPostulante: dto.idUsuarioPostulante,
@@ -168,7 +189,7 @@ export class ApplicationsService {
       );
     }
 
-    return this.prisma.postulacion.update({
+    const postulacionActualizada = await this.prisma.postulacion.update({
       where: { idPostulacion: id },
       data: {
         estadoPostulacion: dto.estadoPostulacion,
@@ -182,5 +203,31 @@ export class ApplicationsService {
         },
       },
     });
+
+    const tituloProyecto = postulacion.rolProyecto.proyecto.tituloProyecto;
+    const nombreRol = postulacion.rolProyecto.nombreRol;
+    const estado = dto.estadoPostulacion;
+    const esAceptada = estado === 'ACEPTADA';
+
+    await this.notificationsService.notifyUsers(
+      [postulacion.idUsuarioPostulante],
+      {
+        tipoNotificacion: TipoNotificacion.POSTULACION_RESUELTA,
+        tituloNotificacion: esAceptada
+          ? 'Tu postulación fue aceptada'
+          : 'Tu postulación fue rechazada',
+        mensajeNotificacion: esAceptada
+          ? `Felicidades, tu postulación para el rol "${nombreRol}" en el proyecto "${tituloProyecto}" ha sido aceptada.`
+          : `Tu postulación para el rol "${nombreRol}" en el proyecto "${tituloProyecto}" ha sido rechazada.${dto.comentarioResolucion ? ` Comentario: ${dto.comentarioResolucion}` : ''}`,
+        datosJson: {
+          idPostulacion: postulacion.idPostulacion,
+          idProyecto: postulacion.rolProyecto.proyecto.idProyecto,
+          idRolProyecto: postulacion.idRolProyecto,
+          estadoPostulacion: estado,
+        },
+      },
+    );
+
+    return postulacionActualizada;
   }
 }
