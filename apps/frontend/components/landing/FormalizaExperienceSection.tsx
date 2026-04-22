@@ -69,6 +69,7 @@ export default function FormalizaExperienceSection() {
               src="/Foto-expereinincia-Portada.jpg"
               alt="Estudiantes colaborando"
               fill
+              sizes="(min-width: 768px) 50vw, 100vw"
               className="object-cover"
               priority
             />

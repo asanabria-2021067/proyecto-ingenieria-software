@@ -49,6 +49,7 @@ export default function OrganizationsSection() {
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   src="https://res.cloudinary.com/uvggt/image/upload/q_auto:best,f_auto,w_800/v1734455717/2025/01%20Enero/Innovacion%20e%20ingenio/Innovaci%C3%B3n-e-ingenio-Portada.jpg"
                   fill
+                  sizes="(min-width: 1024px) 25vw, 50vw"
                 />
               </div>
               <div className="rounded-3xl bg-secondary-container p-6 text-on-secondary-container transition-transform duration-300 hover:scale-[1.02]">
@@ -73,6 +74,7 @@ export default function OrganizationsSection() {
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   src="https://res.cloudinary.com/uvggt/image/upload/q_auto:best,f_auto,w_800/v1701711361/2023/12%20Diciembre/Proyectos%20Ingenieria%20Mecanica/Proyectos-Ingenieria-Mecanica.jpg"
                   fill
+                  sizes="(min-width: 1024px) 25vw, 50vw"
                 />
               </div>
             </div>
