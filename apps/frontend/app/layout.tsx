@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 
 export const metadata = {
-  title: 'UVG Scholar | Excelencia Académica',
+  title: 'UVGENIUS | Excelencia Académica',
   description: 'Plataforma de colaboración y gestión académica de la Universidad del Valle de Guatemala.',
 };
 
@@ -16,8 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className={`${inter.variable} ${manrope.variable} font-body`}>
+    <html lang="es" data-scroll-behavior="smooth">
+      <body
+        suppressHydrationWarning
+        className={`${inter.variable} ${manrope.variable} font-body`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

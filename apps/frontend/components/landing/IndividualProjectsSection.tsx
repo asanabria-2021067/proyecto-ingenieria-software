@@ -27,7 +27,10 @@ const projectTypes = [
 
 export default function IndividualProjectsSection() {
   return (
-    <section id="la-solucion"  className="px-8 py-24 bg-surface-container-low">
+    <section
+      id="proyectos-individuales"
+      className="min-h-[102svh] bg-surface-container-low px-4 py-24 sm:px-6 md:min-h-[112svh] md:py-32 lg:px-8"
+    >
       <div className="mx-auto max-w-7xl">
         <div className="grid items-center gap-16 lg:grid-cols-2">
           {/* Left: Content */}

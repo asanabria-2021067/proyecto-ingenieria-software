@@ -7,6 +7,24 @@ import { Search, MapPin, Users } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { ProyectoResumen, TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+const ESTADO_STYLES: Record<string, string> = {
+  PUBLICADO: 'bg-[#006735] text-white',
+  EN_PROGRESO: 'bg-[#416900] text-white',
+  BORRADOR: 'bg-gray-100 text-gray-600',
+  EN_REVISION: 'bg-blue-100 text-blue-700',
+  OBSERVADO: 'bg-amber-100 text-amber-700',
+  EN_SOLICITUD_CIERRE: 'bg-purple-100 text-purple-700',
+  CERRADO: 'bg-gray-200 text-gray-500',
+  CANCELADO: 'bg-red-100 text-red-700',
+};
 
 export default function ProyectosPage() {
   const [busqueda, setBusqueda] = useState('');
@@ -49,16 +67,17 @@ export default function ProyectosPage() {
               className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <select
-            value={tipoFiltro}
-            onChange={(e) => setTipoFiltro(e.target.value)}
-            className="px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Todos los tipos</option>
-            <option value="ACADEMICO_HORAS_BECA">Horas Beca</option>
-            <option value="ACADEMICO_EXPERIENCIA">Experiencia</option>
-            <option value="EXTRACURRICULAR_EXTENSION">Extensión</option>
-          </select>
+          <Select value={tipoFiltro || '__ALL__'} onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}>
+            <SelectTrigger className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="z-9999">
+              <SelectItem value="__ALL__" className="focus:bg-primary focus:text-on-primary">Todos los tipos</SelectItem>
+              <SelectItem value="ACADEMICO_HORAS_BECA" className="focus:bg-primary focus:text-on-primary">Horas Beca</SelectItem>
+              <SelectItem value="ACADEMICO_EXPERIENCIA" className="focus:bg-primary focus:text-on-primary">Experiencia</SelectItem>
+              <SelectItem value="EXTRACURRICULAR_EXTENSION" className="focus:bg-primary focus:text-on-primary">Extensión</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading && (
@@ -88,9 +107,18 @@ export default function ProyectosPage() {
                   <h2 className="font-headline font-bold text-on-surface text-lg leading-tight">
                     {proyecto.tituloProyecto}
                   </h2>
-                  <span className="shrink-0 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-bold">
-                    {TIPO_LABEL[proyecto.tipoProyecto]}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-bold">
+                      {TIPO_LABEL[proyecto.tipoProyecto]}
+                    </span>
+                    <span
+                      className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold ${
+                        ESTADO_STYLES[proyecto.estadoProyecto] ?? 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {proyecto.estadoProyecto}
+                    </span>
+                  </div>
                 </div>
 
                 {org && <p className="text-tertiary text-sm font-medium">{org}</p>}
