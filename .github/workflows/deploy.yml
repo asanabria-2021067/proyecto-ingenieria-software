@@ -32,7 +32,9 @@ jobs:
             if ! git diff --quiet || ! git diff --cached --quiet; then
               git stash push --include-untracked -m "auto-deploy-$(date +%Y%m%d-%H%M%S)" || true
             fi
-            git pull --ff-only origin main
+            # Force server working tree to match remote main (handles diverged history/force-push)
+            git fetch --prune origin main
+            git reset --hard origin/main
             # Keep only the 5 most recent auto-deploy stashes
             AUTO_STASHES=$(git stash list | grep "auto-deploy-" | tail -n +6 | cut -d: -f1 || true)
             if [ -n "$AUTO_STASHES" ]; then
