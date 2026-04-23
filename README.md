@@ -123,6 +123,23 @@ proyecto-ingenieria-software
 └─ README.md
 ```
 
+### Flujo en produccion (reverse-proxy)
+
+Como el proyecto es monorepo, el frontend y backend viven en el mismo despliegue.  
+Se usa un reverse-proxy para exponer una sola IP publica y redirigir trafico segun la ruta:
+
+- `/` -> Frontend (Next.js)
+- `/api/*` -> Backend (NestJS)
+
+```mermaid
+flowchart LR
+    A[Cliente / Navegador] --> B[IP publica 158.23.57.118]
+    B --> C[Reverse Proxy]
+    C -->|/| D[Frontend - Next.js :3000]
+    C -->|/api/*| E[Backend - NestJS :3001]
+    E --> F[(PostgreSQL)]
+```
+
 ---
 
 ## Configuracion del Entorno
@@ -180,6 +197,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile app up 
 | Backend API | http://localhost:3001 |
 | pgAdmin | http://localhost:5050 |
 | Prisma Studio | http://localhost:5555 |
+
+### 3.1) URL publica (hosteado)
+
+- Aplicacion: http://158.23.57.118/
 
 ### 4) Desarrollo local (sin contenedores de app)
 
