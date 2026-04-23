@@ -37,3 +37,24 @@ export function getIntereses(): Promise<Interes[]> {
 export function getCualidades(): Promise<Cualidad[]> {
   return apiFetch<Cualidad[]>('/cualidades');
 }
+
+export function createHabilidad(nombre: string, categoriaHabilidad?: string | null): Promise<Habilidad> {
+  return apiFetch<Habilidad>('/habilidades', {
+    method: 'POST',
+    body: JSON.stringify({ nombre, categoria: categoriaHabilidad ?? undefined }),
+  });
+}
+
+export function createInteres(nombre: string): Promise<Interes> {
+  return apiFetch<Interes>('/intereses', {
+    method: 'POST',
+    body: JSON.stringify({ nombre }),
+  });
+}
+
+export function createCualidad(nombre: string): Promise<Cualidad> {
+  return apiFetch<Cualidad>('/cualidades', {
+    method: 'POST',
+    body: JSON.stringify({ nombre }),
+  });
+}
