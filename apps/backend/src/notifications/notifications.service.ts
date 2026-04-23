@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -14,6 +14,53 @@ export class NotificationsService {
       orderBy: { creadaEn: 'desc' },
       take: 100,
     });
+  }
+
+  async findUnreadForUser(userId: number) {
+    return this.prisma.notificacion.findMany({
+      where: { idUsuario: userId, leidaEn: null },
+      orderBy: { creadaEn: 'desc' },
+    });
+  }
+
+  async getUnreadCount(userId: number): Promise<{ total: number }> {
+    const total = await this.prisma.notificacion.count({
+      where: { idUsuario: userId, leidaEn: null },
+    });
+    return { total };
+  }
+
+  async markAsRead(id: number, userId: number) {
+    const notificacion = await this.prisma.notificacion.findUnique({
+      where: { idNotificacion: id },
+    });
+
+    if (!notificacion) {
+      throw new NotFoundException(`Notificación con id ${id} no encontrada`);
+    }
+
+    if (notificacion.idUsuario !== userId) {
+      throw new ForbiddenException(
+        'No tienes permiso para acceder a esta notificación',
+      );
+    }
+
+    if (notificacion.leidaEn !== null) {
+      return notificacion;
+    }
+
+    return this.prisma.notificacion.update({
+      where: { idNotificacion: id },
+      data: { leidaEn: new Date() },
+    });
+  }
+
+  async markAllAsRead(userId: number): Promise<{ actualizadas: number }> {
+    const result = await this.prisma.notificacion.updateMany({
+      where: { idUsuario: userId, leidaEn: null },
+      data: { leidaEn: new Date() },
+    });
+    return { actualizadas: result.count };
   }
 
   async isAdmin(userId: number, tx?: TxClient): Promise<boolean> {

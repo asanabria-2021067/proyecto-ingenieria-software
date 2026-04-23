@@ -8,7 +8,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { EstadoProyecto, Prisma } from '@prisma/client';
+import {
+  EstadoProyectoCreador,
+  TRANSICIONES_PERMITIDAS,
+} from './dto/update-estado-proyecto.dto';
+import { EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
@@ -145,15 +149,40 @@ export class ProjectsService {
     private notifications: NotificationsService,
   ) {}
 
-  async findAll(q?: string) {
+  async findAll(filters: {
+    q?: string;
+    tipoProyecto?: string;
+    modalidad?: string;
+    organizacionId?: number;
+    habilidadId?: number;
+  } = {}) {
+    const { q, tipoProyecto, modalidad, organizacionId, habilidadId } = filters;
+
+    const andConditions: Prisma.ProyectoWhereInput[] = [
+      { estadoProyecto: { in: ESTADOS_VISIBLES } },
+      { eliminadoEn: null },
+    ];
+
+    if (q && q.trim().length > 0) {
+      andConditions.push({ tituloProyecto: { contains: q.trim(), mode: 'insensitive' } });
+    }
+    if (tipoProyecto) {
+      andConditions.push({ tipoProyecto: tipoProyecto as TipoProyecto });
+    }
+    if (modalidad) {
+      andConditions.push({ modalidadProyecto: modalidad as ModalidadProyecto });
+    }
+    if (organizacionId) {
+      andConditions.push({ organizaciones: { some: { idOrganizacion: organizacionId } } });
+    }
+    if (habilidadId) {
+      andConditions.push({
+        roles: { some: { requisitos: { some: { idHabilidad: habilidadId } } } },
+      });
+    }
+
     return this.prisma.proyecto.findMany({
-      where: {
-        estadoProyecto: { in: ESTADOS_VISIBLES },
-        eliminadoEn: null,
-        ...(q && q.trim().length > 0
-          ? { tituloProyecto: { contains: q.trim(), mode: 'insensitive' } }
-          : {}),
-      },
+      where: { AND: andConditions },
       select: proyectoListSelect,
       orderBy: { fechaCreacion: 'desc' },
       take: 20,
@@ -190,12 +219,23 @@ export class ProjectsService {
   }
 
   async findMine(userId: number) {
-    return this.prisma.proyecto.findMany({
+    const proyectos = await this.prisma.proyecto.findMany({
       where: { creadoPor: userId, eliminadoEn: null },
       select: {
         ...proyectoListSelect,
         fechaCreacion: true,
         fechaActualizacion: true,
+        roles: {
+          select: {
+            idRolProyecto: true,
+            _count: {
+              select: {
+                postulaciones: true,
+                participaciones: true,
+              },
+            },
+          },
+        },
         revisiones: {
           select: {
             idRevisionProyecto: true,
@@ -210,6 +250,25 @@ export class ProjectsService {
         },
       },
       orderBy: { fechaCreacion: 'desc' },
+    });
+
+    return proyectos.map((proyecto) => {
+      const cantidadPostulaciones = proyecto.roles.reduce(
+        (acc, rol) => acc + rol._count.postulaciones,
+        0,
+      );
+
+      const rolesCubiertos = proyecto.roles.filter(
+        (rol) => rol._count.participaciones > 0,
+      ).length;
+
+      return {
+        ...proyecto,
+        roles: proyecto.roles.map((rol) => ({ idRolProyecto: rol.idRolProyecto })),
+        cantidadPostulaciones,
+        rolesCubiertos,
+        rolesTotales: proyecto.roles.length,
+      };
     });
   }
 
@@ -622,6 +681,32 @@ export class ProjectsService {
     });
   }
 
+  async changeEstado(
+    id: number,
+    userId: number,
+    nuevoEstado: EstadoProyectoCreador,
+  ) {
+    const proyecto = await this._requireOwner(id, userId);
+    const permitidos = TRANSICIONES_PERMITIDAS[proyecto.estadoProyecto] ?? [];
+    if (!permitidos.includes(nuevoEstado as EstadoProyecto)) {
+      throw new BadRequestException(
+        `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
+      );
+    }
+    const actualizado = await this.prisma.proyecto.update({
+      where: { idProyecto: id },
+      data: {
+        estadoProyecto: nuevoEstado as EstadoProyecto,
+        fechaActualizacion: new Date(),
+        ...(nuevoEstado === EstadoProyectoCreador.PUBLICADO && {
+          fechaPublicacion: new Date(),
+        }),
+      },
+      select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
+    });
+    return actualizado;
+  }
+
   private async _requireOwner(idProyecto: number, userId: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
@@ -642,6 +727,38 @@ export class ProjectsService {
       throw new ForbiddenException('Se requieren permisos de administrador');
     }
   }
+
+  // ---------- POSTULACIONES DEL PROYECTO ----------
+
+  async findPostulacionesByProject(idProyecto: number, userId: number) {
+    // Solo el creador del proyecto puede ver sus postulaciones recibidas
+    await this._requireOwner(idProyecto, userId);
+
+    return this.prisma.postulacion.findMany({
+      where: {
+        rolProyecto: { idProyecto },
+      },
+      include: {
+        postulante: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+          },
+        },
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+          },
+        },
+      },
+      orderBy: { fechaPostulacion: 'desc' },
+    });
+  }
+
+  // -------------------------------------------------
 
   private async _crearRevisionPendiente(
     tx: Prisma.TransactionClient,
