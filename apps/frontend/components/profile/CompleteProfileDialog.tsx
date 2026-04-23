@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload, Plus, X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
-import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +14,9 @@ import {
   getHabilidades,
   getIntereses,
   getCualidades,
+  createHabilidad,
+  createInteres,
+  createCualidad,
   type Habilidad,
   type Interes,
   type Cualidad,
@@ -26,11 +28,13 @@ import {
   replaceCualidades,
   addExperiencia,
 } from '@/lib/services/users';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 
 interface Props {
   open: boolean;
   onComplete: () => void;
+  allowClose?: boolean;
 }
 
 type NivelHabilidad = 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
@@ -46,8 +50,9 @@ interface ExperienciaForm {
   tipoExperiencia: string;
 }
 
-export default function CompleteProfileDialog({ open, onComplete }: Props) {
+export default function CompleteProfileDialog({ open, onComplete, allowClose = false }: Props) {
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -61,15 +66,21 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
   const [requiereHorasExtension, setRequiereHorasExtension] = useState<boolean>(false);
   const [horasExtensionRequeridas, setHorasExtensionRequeridas] = useState<number>(40);
 
-  // Step 2
+  // Steps 2-4
   const [catalogHabilidades, setCatalogHabilidades] = useState<Habilidad[]>([]);
   const [catalogIntereses, setCatalogIntereses] = useState<Interes[]>([]);
   const [catalogCualidades, setCatalogCualidades] = useState<Cualidad[]>([]);
   const [selectedHabilidades, setSelectedHabilidades] = useState<SelectedHabilidad[]>([]);
   const [selectedIntereses, setSelectedIntereses] = useState<number[]>([]);
   const [selectedCualidades, setSelectedCualidades] = useState<number[]>([]);
+  const [habilidadesInput, setHabilidadesInput] = useState('');
+  const [interesesInput, setInteresesInput] = useState('');
+  const [cualidadesInput, setCualidadesInput] = useState('');
+  const [habilidadesMatchInfo, setHabilidadesMatchInfo] = useState('');
+  const [interesesMatchInfo, setInteresesMatchInfo] = useState('');
+  const [cualidadesMatchInfo, setCualidadesMatchInfo] = useState('');
 
-  // Step 3
+  // Step 5
   const [githubUrl, setGithubUrl] = useState('');
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [enlacePortafolio, setEnlacePortafolio] = useState('');
@@ -77,16 +88,168 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
   const [cvName, setCvName] = useState('');
   const [experiencias, setExperiencias] = useState<ExperienciaForm[]>([]);
 
+  const refreshCatalogs = useCallback(async () => {
+    const [h, i, c] = await Promise.all([getHabilidades(), getIntereses(), getCualidades()]);
+    setCatalogHabilidades(h);
+    setCatalogIntereses(i);
+    setCatalogCualidades(c);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
-    Promise.all([getHabilidades(), getIntereses(), getCualidades()]).then(
-      ([h, i, c]) => {
-        setCatalogHabilidades(h);
-        setCatalogIntereses(i);
-        setCatalogCualidades(c);
-      },
+    setStep(0);
+    refreshCatalogs().catch(() => {});
+  }, [open, refreshCatalogs]);
+
+  useEffect(() => {
+    if (!open || !currentUser) return;
+    setBiografia(currentUser.perfil?.biografia ?? '');
+    setDisponibilidad(currentUser.perfil?.disponibilidadHorasSemana ?? 10);
+    setRequiereHorasBeca((currentUser.perfil?.horasBecaRequeridas ?? 0) > 0);
+    setHorasBecaRequeridas(currentUser.perfil?.horasBecaRequeridas ?? 150);
+    setRequiereHorasExtension((currentUser.perfil?.horasExtensionRequeridas ?? 0) > 0);
+    setHorasExtensionRequeridas(currentUser.perfil?.horasExtensionRequeridas ?? 40);
+    setEnlacePortafolio(currentUser.perfil?.enlacePortafolio ?? '');
+    setGithubUrl(currentUser.perfil?.githubUrl ?? '');
+    setLinkedinUrl(currentUser.perfil?.linkedinUrl ?? '');
+    setSelectedHabilidades(
+      currentUser.habilidades.map((h) => ({
+        idHabilidad: h.idHabilidad,
+        nivelHabilidad: h.nivelHabilidad as NivelHabilidad,
+      })),
     );
-  }, [open]);
+    setSelectedIntereses(currentUser.intereses.map((i) => i.idInteres));
+    setSelectedCualidades(currentUser.cualidades.map((c) => c.idCualidad));
+  }, [open, currentUser]);
+
+  const normalizeText = (text: string) =>
+    text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+
+  const splitInputTokens = (value: string) =>
+    value
+      .split(',')
+      .map((token) => token.trim())
+      .filter(Boolean);
+
+  const findBestMatch = <T,>(
+    token: string,
+    items: T[],
+    getName: (item: T) => string,
+  ): T | null => {
+    const normalized = normalizeText(token);
+    const exact = items.find((item) => normalizeText(getName(item)) === normalized);
+    if (exact) return exact;
+    const partialMatches = items.filter((item) =>
+      normalizeText(getName(item)).includes(normalized),
+    );
+    return partialMatches.length === 1 ? partialMatches[0] : null;
+  };
+
+  const applyTypedHabilidades = async () => {
+    const tokens = splitInputTokens(habilidadesInput);
+    if (tokens.length === 0) return;
+    const matched: string[] = [];
+    const created: string[] = [];
+    const matchedIds: number[] = [];
+    for (const token of tokens) {
+      const match = findBestMatch(token, catalogHabilidades, (h) => h.nombreHabilidad);
+      if (match) {
+        matched.push(match.nombreHabilidad);
+        matchedIds.push(match.idHabilidad);
+        continue;
+      }
+      try {
+        const createdItem = await createHabilidad(token);
+        created.push(createdItem.nombreHabilidad);
+        matchedIds.push(createdItem.idHabilidad);
+      } catch {
+        continue;
+      }
+    }
+    if (matchedIds.length > 0) {
+      setSelectedHabilidades((prev) => {
+        const existing = new Set(prev.map((item) => item.idHabilidad));
+        const additions = matchedIds
+          .filter((id) => !existing.has(id))
+          .map((id) => ({ idHabilidad: id, nivelHabilidad: 'BASICO' as NivelHabilidad }));
+        return [...prev, ...additions];
+      });
+    }
+    const info: string[] = [];
+    if (matched.length > 0) info.push(`Seleccionadas: ${matched.join(', ')}`);
+    if (created.length > 0) info.push(`Creadas: ${created.join(', ')}`);
+    setHabilidadesMatchInfo(info.join(' | '));
+    setHabilidadesInput('');
+    await refreshCatalogs();
+  };
+
+  const applyTypedIntereses = async () => {
+    const tokens = splitInputTokens(interesesInput);
+    if (tokens.length === 0) return;
+    const matched: string[] = [];
+    const created: string[] = [];
+    const matchedIds: number[] = [];
+    for (const token of tokens) {
+      const match = findBestMatch(token, catalogIntereses, (i) => i.nombreInteres);
+      if (match) {
+        matched.push(match.nombreInteres);
+        matchedIds.push(match.idInteres);
+        continue;
+      }
+      try {
+        const createdItem = await createInteres(token);
+        created.push(createdItem.nombreInteres);
+        matchedIds.push(createdItem.idInteres);
+      } catch {
+        continue;
+      }
+    }
+    if (matchedIds.length > 0) {
+      setSelectedIntereses((prev) => Array.from(new Set([...prev, ...matchedIds])));
+    }
+    const info: string[] = [];
+    if (matched.length > 0) info.push(`Seleccionados: ${matched.join(', ')}`);
+    if (created.length > 0) info.push(`Creados: ${created.join(', ')}`);
+    setInteresesMatchInfo(info.join(' | '));
+    setInteresesInput('');
+    await refreshCatalogs();
+  };
+
+  const applyTypedCualidades = async () => {
+    const tokens = splitInputTokens(cualidadesInput);
+    if (tokens.length === 0) return;
+    const matched: string[] = [];
+    const created: string[] = [];
+    const matchedIds: number[] = [];
+    for (const token of tokens) {
+      const match = findBestMatch(token, catalogCualidades, (c) => c.nombreCualidad);
+      if (match) {
+        matched.push(match.nombreCualidad);
+        matchedIds.push(match.idCualidad);
+        continue;
+      }
+      try {
+        const createdItem = await createCualidad(token);
+        created.push(createdItem.nombreCualidad);
+        matchedIds.push(createdItem.idCualidad);
+      } catch {
+        continue;
+      }
+    }
+    if (matchedIds.length > 0) {
+      setSelectedCualidades((prev) => Array.from(new Set([...prev, ...matchedIds])));
+    }
+    const info: string[] = [];
+    if (matched.length > 0) info.push(`Seleccionadas: ${matched.join(', ')}`);
+    if (created.length > 0) info.push(`Creadas: ${created.join(', ')}`);
+    setCualidadesMatchInfo(info.join(' | '));
+    setCualidadesInput('');
+    await refreshCatalogs();
+  };
 
   const handleFotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -157,12 +320,12 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
           ...(fotoUrl && { fotoUrl }),
         });
       } else if (step === 1) {
-        await Promise.all([
-          replaceHabilidades(selectedHabilidades),
-          replaceIntereses(selectedIntereses),
-          replaceCualidades(selectedCualidades),
-        ]);
+        await replaceHabilidades(selectedHabilidades);
       } else if (step === 2) {
+        await replaceIntereses(selectedIntereses);
+      } else if (step === 3) {
+        await replaceCualidades(selectedCualidades);
+      } else if (step === 4) {
         let urlCv: string | undefined;
         if (cv) {
           const res = await uploadToCloudinary(cv, 'cvs');
@@ -179,7 +342,12 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
             await addExperiencia(exp);
           }
         }
-        queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['currentUser'] }),
+          queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
+          queryClient.invalidateQueries({ queryKey: ['dashboard-projects'] }),
+          queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] }),
+        ]);
         onComplete();
         return;
       }
@@ -191,15 +359,26 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
     }
   };
 
-  const steps = ['Datos personales', 'Habilidades e intereses', 'Links y experiencia'];
+  const steps = [
+    'Datos personales',
+    'Habilidades',
+    'Intereses',
+    'Cualidades',
+    'Links y experiencia',
+  ];
 
   const inputClass =
     'w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && allowClose) onComplete();
+      }}
+    >
       <DialogContent
-        showCloseButton={false}
+        showCloseButton={allowClose}
         className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-surface"
       >
         <DialogHeader>
@@ -350,18 +529,35 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
           </div>
         )}
 
-        {/* Step 2: Habilidades e intereses */}
+        {/* Step 2: Habilidades */}
         {step === 1 && (
           <div className="space-y-5 py-2">
             <p className="text-sm text-tertiary">
-              Esto nos ayudara a mostrarte proyectos mas relacionados a tus intereses
+              Esto nos ayudara a mostrarte proyectos mas relacionados a tu perfil
             </p>
 
-            {/* Habilidades */}
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
                 Habilidades
               </label>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={habilidadesInput}
+                  onChange={(e) => setHabilidadesInput(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      await applyTypedHabilidades();
+                    }
+                  }}
+                  placeholder="Escribe habilidades (ej: React, Python, Scrum) y presiona Enter"
+                  className={inputClass}
+                />
+                {habilidadesMatchInfo && (
+                  <p className="text-[11px] text-tertiary">{habilidadesMatchInfo}</p>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
                 {catalogHabilidades.map((h) => {
                   const sel = selectedHabilidades.find((s) => s.idHabilidad === h.idHabilidad);
@@ -396,12 +592,37 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
                 })}
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Intereses */}
+        {/* Step 3: Intereses */}
+        {step === 2 && (
+          <div className="space-y-5 py-2">
+            <p className="text-sm text-tertiary">
+              Agrega tus intereses. Si no existen, se crean automaticamente.
+            </p>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
                 Intereses
               </label>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={interesesInput}
+                  onChange={(e) => setInteresesInput(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      await applyTypedIntereses();
+                    }
+                  }}
+                  placeholder="Escribe intereses (ej: IA, Robotica) y presiona Enter"
+                  className={inputClass}
+                />
+                {interesesMatchInfo && (
+                  <p className="text-[11px] text-tertiary">{interesesMatchInfo}</p>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                 {catalogIntereses.map((i) => (
                   <button
@@ -419,12 +640,37 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
                 ))}
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Cualidades */}
+        {/* Step 4: Cualidades */}
+        {step === 3 && (
+          <div className="space-y-5 py-2">
+            <p className="text-sm text-tertiary">
+              Agrega cualidades personales. Si no existe una, se crea y se selecciona.
+            </p>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
                 Cualidades
               </label>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={cualidadesInput}
+                  onChange={(e) => setCualidadesInput(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      await applyTypedCualidades();
+                    }
+                  }}
+                  placeholder="Escribe cualidades (ej: Liderazgo, Comunicacion) y presiona Enter"
+                  className={inputClass}
+                />
+                {cualidadesMatchInfo && (
+                  <p className="text-[11px] text-tertiary">{cualidadesMatchInfo}</p>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                 {catalogCualidades.map((c) => (
                   <button
@@ -445,8 +691,8 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
           </div>
         )}
 
-        {/* Step 3: Links y experiencia */}
-        {step === 2 && (
+        {/* Step 5: Links y experiencia */}
+        {step === 4 && (
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
@@ -589,7 +835,7 @@ export default function CompleteProfileDialog({ open, onComplete }: Props) {
           >
             {saving
               ? 'Guardando...'
-              : step === 2
+              : step === 4
                 ? <>Finalizar <Check className="h-4 w-4" /></>
                 : <>Siguiente <ChevronRight className="h-4 w-4" /></>}
           </button>

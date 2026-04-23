@@ -5,13 +5,17 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { EstadoProyecto } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
+import { EstadoProyecto, TipoNotificacion } from '@prisma/client';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
 @Injectable()
 export class ApplicationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async create(dto: CreatePostulacionDto) {
     // 1. Verificar que el usuario existe
@@ -185,7 +189,7 @@ export class ApplicationsService {
       );
     }
 
-    return this.prisma.postulacion.update({
+    const postulacionActualizada = await this.prisma.postulacion.update({
       where: { idPostulacion: id },
       data: {
         estadoPostulacion: dto.estadoPostulacion,
@@ -199,5 +203,31 @@ export class ApplicationsService {
         },
       },
     });
+
+    const tituloProyecto = postulacion.rolProyecto.proyecto.tituloProyecto;
+    const nombreRol = postulacion.rolProyecto.nombreRol;
+    const estado = dto.estadoPostulacion;
+    const esAceptada = estado === 'ACEPTADA';
+
+    await this.notificationsService.notifyUsers(
+      [postulacion.idUsuarioPostulante],
+      {
+        tipoNotificacion: TipoNotificacion.POSTULACION_RESUELTA,
+        tituloNotificacion: esAceptada
+          ? 'Tu postulación fue aceptada'
+          : 'Tu postulación fue rechazada',
+        mensajeNotificacion: esAceptada
+          ? `Felicidades, tu postulación para el rol "${nombreRol}" en el proyecto "${tituloProyecto}" ha sido aceptada.`
+          : `Tu postulación para el rol "${nombreRol}" en el proyecto "${tituloProyecto}" ha sido rechazada.${dto.comentarioResolucion ? ` Comentario: ${dto.comentarioResolucion}` : ''}`,
+        datosJson: {
+          idPostulacion: postulacion.idPostulacion,
+          idProyecto: postulacion.rolProyecto.proyecto.idProyecto,
+          idRolProyecto: postulacion.idRolProyecto,
+          estadoPostulacion: estado,
+        },
+      },
+    );
+
+    return postulacionActualizada;
   }
 }
