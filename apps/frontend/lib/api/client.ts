@@ -1,4 +1,15 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL =
+  process.env.NODE_ENV === 'production'
+    ? ''
+    : process.env.NEXT_PUBLIC_API_URL || '';
+const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '/api';
+
+function joinUrl(base: string, prefix: string, path: string): string {
+  const normalizedBase = base.replace(/\/$/, '');
+  const normalizedPrefix = prefix.startsWith('/') ? prefix : `/${prefix}`;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPrefix}${normalizedPath}`;
+}
 
 function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -6,7 +17,7 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(joinUrl(API_URL, API_PREFIX, path), {
     ...options,
     headers: {
       'Content-Type': 'application/json',
