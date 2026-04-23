@@ -1,445 +1,282 @@
-# 🎓 Plataforma Digital para la Colaboración Interdisciplinaria entre Asociaciones Estudiantiles Universitarias
+# Plataforma Digital para la Colaboracion Interdisciplinaria entre Asociaciones Estudiantiles Universitarias
 
 <p align="center">
   <img src="https://img.shields.io/badge/Estado-En%20Desarrollo-yellow?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Corte-3%20de%203-blue?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Sprint-1%20Completado-success?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Metodología-Design%20Thinking%20%2B%20Scrum-purple?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Sprint-2%20Completado-success?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Metodologia-Design%20Thinking%20%2B%20Scrum-purple?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Universidad-UVG-green?style=for-the-badge" />
 </p>
 
-> Plataforma digital que centraliza la gestión de proyectos extracurriculares y de investigación dentro de la Universidad del Valle de Guatemala. Permite a asociaciones estudiantiles e institutos académicos publicar oportunidades de colaboración, gestionar equipos y dar seguimiento institucional al trabajo estudiantil de forma estructurada.
+Plataforma para centralizar proyectos extracurriculares y de investigacion en UVG, conectando estudiantes, asociaciones e institutos academicos en un solo sistema.
 
 ---
 
-## 📌 Información General
+## Informacion General
 
 | Campo | Detalle |
 |---|---|
-| **Curso** | CC3058 – Ingeniería de Software 1 |
-| **Sección** | 30 |
-| **Docente** | Lynette García |
-| **Universidad** | Universidad del Valle de Guatemala |
-| **Semestre** | Semestre I – 2026 |
+| Curso | CC3058 - Ingenieria de Software 1 |
+| Seccion | 30 |
+| Docente | Lynette Garcia |
+| Universidad | Universidad del Valle de Guatemala |
+| Semestre | Semestre I - 2026 |
 
 ---
 
-## 👥 Equipo de Desarrollo
+## Equipo
 
-| Nombre | Carné | GitHub |
+| Nombre | Carne | GitHub |
 |---|---|---|
 | Angel Gabriel Sanabria Morales | 24725 | [@asanabria-2021067](https://github.com/asanabria-2021067) |
 | Saul Esteban Castillo Arenas | 24915 | [@llAkihitoll](https://github.com/llAkihitoll) |
-| Vernel Josué Hernández Cáceres | 24584 | [@Junjey123-mx](https://github.com/Junjey123-mx) |
+| Vernel Josue Hernandez Caceres | 24584 | [@Junjey123-mx](https://github.com/Junjey123-mx) |
 | Derek Friedhelm Coronado Chilin | 24732 | [@dcoronado91](https://github.com/dcoronado91) |
-| Samuel Antonio Robledo López | 241282 | [@samuelrobledo52](https://github.com/samuelrobledo52) |
+| Samuel Antonio Robledo Lopez | 241282 | [@samuelrobledo52](https://github.com/samuelrobledo52) |
 
 ---
 
-## 🧩 Problema que Resuelve
+## Estado Actual (Cortes + Scrum)
 
-Las asociaciones estudiantiles y los institutos académicos de la UVG no cuentan con un canal centralizado para publicar, gestionar y dar visibilidad a sus proyectos de colaboración. Esto genera:
+### Cortes academicos
 
-- Oportunidades desaprovechadas por falta de difusión
-- Dificultad para armar equipos interdisciplinarios
-- Ausencia de registro institucional de la participación estudiantil
-- Comunicación fragmentada entre líderes, colaboradores y coordinadores
+- [x] Corte 1 - Empatizar y Definir
+- [x] Corte 2 - Idear y Modelar
+- [x] Corte 3 - Prototipar y Base de Datos
 
-La plataforma propuesta resuelve estos puntos ofreciendo un espacio unificado de publicación, postulación, gestión de equipos y certificación de horas.
+### Scrum
 
----
+- [x] Sprint 1 completado
+- [x] Sprint 2 completado
 
-## 👤 Actores del Sistema
+### Avance funcional implementado
 
-| Actor | Rol en la plataforma |
-|---|---|
-| **Estudiante sin información** | Descubre y se postula a proyectos extracurriculares |
-| **Estudiante colaborador activo** | Participa en proyectos, gestiona tareas y comunicación interna |
-| **Líder de asociación estudiantil** | Publica proyectos, forma equipos y supervisa avances |
-| **Coordinador académico / Investigador** | Valida participación estudiantil y certifica horas institucionales |
+Backend (NestJS + Prisma):
 
----
+- Autenticacion (`/auth/login`, `/auth/register`)
+- Perfil de usuario (`/usuarios/me`, perfil, habilidades, intereses, cualidades, experiencias)
+- Proyectos (`/proyectos`): crear, editar, listar, cambiar estado, flujo de revision y cierre
+- Postulaciones (`/postulaciones`): crear, listar, resolver estado
+- Revisiones (`/revisiones`) y mensajes de revision (`/mensajes-revision`)
+- Tareas (`/tareas`), evidencias (`/evidencias`) y comentarios (`/comentarios`)
+- Notificaciones (`/notificaciones`)
+- Catalogos (`/catalogs`, `/carreras`, `/habilidades`, `/intereses`, `/cualidades`)
 
-## 🗺️ Metodología — Design Thinking
+Frontend (Next.js):
 
-El proyecto sigue las 5 etapas del proceso de Design Thinking, distribuidas en 3 cortes de evaluación:
-
-```
-Empatizar → Definir → Idear → Prototipar → Probar
- ✅ Corte 1    ✅ Corte 1   ✅ Corte 2   ✅ Corte 2   ✅ Corte 3
-```
-
----
-
-## 📦 Estado de Entregas
-
-### ✅ Corte 1 — Empatía y Definición *(Completado)*
-
-- [x] Selección de perfiles y usuarios objetivo
-- [x] 12 entrevistas con usuarios reales
-- [x] Análisis con técnica Qué, Cómo y Por Qué
-- [x] Framework AEIOU aplicado
-- [x] Identificación de insights clave
-- [x] 17 preguntas *¿Cómo podríamos...?* formuladas
+- Landing page
+- Login y registro
+- Dashboard general
+- Mis proyectos, proyectos publicados y detalle de proyecto
+- Flujo de postulacion por rol
+- Mis postulaciones
+- Perfil de usuario
+- Vista de revisiones para admin
 
 ---
 
-### ✅ Corte 2 — Ideación y Modelación del Sistema *(Completado)*
-
-#### IV. Etapa de Ideación
-- [x] **Design Studio** — 17 preguntas *¿Cómo podríamos?* trabajadas con sketches y evidencia fotográfica
-- [x] **Prototipos en bruto** — Pantalla de inicio, ficha de proyecto, postulación y panel de seguimiento
-- [x] **Refinamiento iterativo** — 3+ iteraciones por prototipo (centralización, reconocimiento, comunicación, roles)
-- [x] **Testeo** — Sesión con 3 perfiles reales el 10/02/2026
-
-#### V. Modelación del Sistema
-- [x] **12 historias de usuario** — 4 perfiles cubiertos
-- [x] **4 actores identificados y descritos**
-- [x] **Diagrama de casos de uso UML**
-- [x] **Descripción formal de casos de uso**
-- [x] **Mapa de Historias de Usuario** — Flujo Awareness → Retention
-- [x] **Priorización MoSCoW** — Alta, Media y Baja
-- [x] **20 Requisitos No Funcionales** — Clasificados en: interfaz, usabilidad, rendimiento, seguridad, confiabilidad, soporte, portabilidad, legales y diseño
-
-#### VI. Trabajo con el Cliente y/o Usuarios
-- [x] **Bitácora** — 13 sesiones registradas (12 Corte 1 + 1 Corte 2)
-
-#### VII. Informe de Gestión
-- [x] Desglose de tareas por miembro
-- [x] Formularios LOGT individuales
-- [x] Informe de gestión del tiempo del equipo
-
----
-
-### ✅ Corte 3 — Prototipado y Diseño de Base de Datos *(Completado)*
-
-#### VIII. Diseño de Base de Datos
-- [x] **Diagrama Entidad-Relación (DER)** — Modelo completo del sistema con entidades, relaciones, PKs y atributos
-
-#### IX. Metodología Ágil
-- [x] **Scrum** — Implementación de marco de trabajo ágil para el desarrollo del proyecto
-
-#### X. Avances del Proyecto
-- [x] **Avance 1** — Primera entrega parcial de progreso
-- [x] **Avance 2** — Segunda entrega parcial de progreso
-
-#### XI. Informe de Gestión
-- [x] Formularios LOGT individuales
-- [x] Informe de gestión del tiempo del equipo
-
----
-
-### 🏃 Sprint 1 — Primer Sprint Scrum *(Completado)*
-
-- [x] **Planificación del Sprint** — Definición de objetivos y selección de historias del backlog
-- [x] **Ejecución del Sprint** — Desarrollo de funcionalidades priorizadas
-- [x] **Documento colaborativo del Sprint** — Registro compartido del avance del equipo
-- [x] **Informe del Sprint** — Documento formal con resultados y entregables
-- [x] **Gestión del tiempo individual** — Formularios LOGT de los 5 integrantes
-- [x] **Retrospectiva del equipo** — Cierre del primer ciclo Scrum
-
----
-
-## 🚀 Stack Tecnologico
+## Stack Tecnologico (actual del repo)
 
 | Capa | Tecnologia | Version |
 |---|---|---|
-| **Backend** | NestJS | 11.0.0 |
-| **ORM** | Prisma | 6.19.2 |
-| **Base de Datos** | PostgreSQL | 17 (Docker) |
-| **Frontend** | Next.js | 15.1.0 |
-| **UI** | React | 19.0.0 |
-| **Lenguaje** | TypeScript | 5.7.0 |
-| **Contenedores** | Docker | Alpine Linux |
-| **Runtime** | Node.js | 22+ |
+| Backend | NestJS | 11.x |
+| ORM | Prisma | 6.19.2 |
+| Base de datos | PostgreSQL | 17 (Docker) |
+| Frontend | Next.js | 16.2.0 |
+| UI | React | 19.2.4 |
+| Lenguaje | TypeScript | 5.7.x |
+| Testing | Vitest | 3.2.4 |
+| Contenedores | Docker Compose | v2+ |
+| Runtime | Node.js | 22+ |
 
 ---
 
-## ⚙️ Configuracion del Entorno
+## Arquitectura del Monorepo
+
+```txt
+proyecto-ingenieria-software
+├─ apps/
+│  ├─ backend/                 # API NestJS + Prisma
+│  │  ├─ src/                  # Modulos del backend
+│  │  ├─ prisma/               # Schema, migraciones y seed
+│  │  ├─ Dockerfile
+│  │  └─ Dockerfile.dev
+│  └─ frontend/                # Next.js App Router
+│     ├─ app/                  # Rutas y paginas
+│     ├─ components/           # Componentes UI
+│     ├─ lib/                  # Servicios, DTOs y utilidades
+│     ├─ hooks/
+│     ├─ public/
+│     ├─ Dockerfile
+│     └─ Dockerfile.dev
+├─ Corte 1/
+├─ Corte 2/
+├─ Corte 3/
+├─ Avances 1/
+├─ Avances 2/
+├─ Scrum/
+│  ├─ Sprint 1/
+│  └─ Sprint 2/
+├─ docker-compose.yml
+├─ docker-compose.dev.yml
+├─ .env.example
+└─ README.md
+```
+
+---
+
+## Configuracion del Entorno
 
 ### Prerrequisitos
 
-- [Node.js](https://nodejs.org/) v22+
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- npm (incluido con Node.js)
+- Node.js 22+
+- Docker Desktop
+- npm
 
-### 1. Clonar y configurar variables de entorno
+### 1) Clonar y variables de entorno
 
 ```bash
 git clone <url-del-repositorio>
 cd proyecto-ingenieria-software
+```
 
-# Copiar archivo de variables de entorno
+Linux/macOS:
+
+```bash
 cp .env.example .env
 ```
 
-### 2. Levantar el entorno con Docker
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+### 2) Levantar entorno con Docker
+
+Todo el entorno (DB + Backend + Frontend):
 
 ```bash
-# Desde la raiz del proyecto
-
-# Opcion 1: Levantar TODO el entorno (DB + Backend + Frontend)
 docker compose --profile app up -d --build
+```
 
-# Opcion 2: Levantar solo la base de datos (para desarrollo local)
+Solo base de datos + pgAdmin:
+
+```bash
 docker compose up -d
-
-# Verificar que los contenedores esten corriendo
-docker ps
 ```
 
-> **Nota:** El comando `docker compose --profile app up -d --build` levanta PostgreSQL, el backend (puerto 3001) y el frontend (puerto 3000) de forma automatica. Si solo necesitas la base de datos para desarrollar localmente, usa `docker compose up -d` sin el profile.
-
-### 3. Instalar dependencias
+Modo desarrollo con hot reload (backend + frontend):
 
 ```bash
-# Backend
-cd apps/backend
-npm install
-
-# Frontend
-cd apps/frontend
-npm install
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile app up -d --build
 ```
 
-### 4. Configurar la base de datos
-
-```bash
-cd apps/backend
-
-# Crear las tablas (migraciones)
-npx prisma migrate dev --name init
-
-# Poblar con datos de prueba
-npx prisma db seed
-
-# Generar el cliente de Prisma
-npx prisma generate
-```
-
----
-
-## 🖥️ Comandos por Rol
-
-### Desarrollador Backend
-
-**Con Docker (recomendado):**
-
-```bash
-# Desde la raiz del proyecto, levanta todo el entorno
-docker compose --profile app up -d --build
-
-# Ver logs del backend
-docker compose logs -f backend
-
-# Reconstruir solo el backend despues de cambios
-docker compose --profile app up -d --build backend
-```
-
-**Sin Docker (desarrollo local):**
-
-```bash
-cd apps/backend
-
-# Iniciar servidor en modo desarrollo (hot-reload, puerto 3001)
-npm run start:dev
-
-# Compilar el proyecto
-npm run build
-
-# Iniciar en modo produccion
-npm run start:prod
-```
-
-**Prisma (Base de datos):**
-
-```bash
-cd apps/backend
-
-# Crear una nueva migracion despues de cambiar schema.prisma
-npx prisma migrate dev --name descripcion_del_cambio
-
-# Aplicar schema directamente sin crear migracion (solo desarrollo)
-npm run prisma:push
-
-# Regenerar el cliente de Prisma (despues de cambios al schema)
-npm run prisma:generate
-
-# Abrir Prisma Studio (explorador visual de la BD en http://localhost:5555)
-npm run prisma:studio
-
-# Ejecutar el seed (datos de prueba)
-npm run prisma:seed
-```
-
-### Desarrollador Frontend
-
-**Con Docker (recomendado):**
-
-```bash
-# Desde la raiz del proyecto, levanta todo el entorno
-docker compose --profile app up -d --build
-
-# Ver logs del frontend
-docker compose logs -f frontend
-
-# Reconstruir solo el frontend despues de cambios
-docker compose --profile app up -d --build frontend
-```
-
-**Sin Docker (desarrollo local):**
-
-```bash
-cd apps/frontend
-
-# Iniciar servidor de desarrollo (puerto 3000)
-npm run dev
-
-# Compilar para produccion
-npm run build
-
-# Iniciar servidor de produccion
-npm run start
-```
-
-**URLs de desarrollo:**
+### 3) URLs locales
 
 | Servicio | URL |
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:3001 |
+| pgAdmin | http://localhost:5050 |
 | Prisma Studio | http://localhost:5555 |
 
-### Admin del Proyecto
-
-**Docker (desde la raiz del proyecto):**
+### 4) Desarrollo local (sin contenedores de app)
 
 ```bash
-# Levantar todo el entorno (DB + Backend + Frontend)
-docker compose --profile app up -d --build
+# Backend
+cd apps/backend
+npm install
+npm run start:dev
 
-# Levantar solo la base de datos
-docker compose up -d
+# Frontend (otra terminal)
+cd apps/frontend
+npm install
+npm run dev
+```
 
-# Detener todos los servicios
-docker compose --profile app down
+### 5) Base de datos (Prisma)
 
-# Ver logs de un servicio especifico
+```bash
+cd apps/backend
+npx prisma migrate dev
+npm run prisma:seed
+npm run prisma:generate
+```
+
+---
+
+## Comandos Utiles
+
+### Backend
+
+```bash
+cd apps/backend
+npm run start:dev
+npm run build
+npm run test
+npm run prisma:studio
+npm run prisma:migrate
+npm run prisma:seed
+```
+
+### Frontend
+
+```bash
+cd apps/frontend
+npm run dev
+npm run build
+npm run test
+npm run lint
+```
+
+### Docker
+
+```bash
+# Ver estado
+docker ps
+
+# Ver logs
 docker compose logs -f backend
 docker compose logs -f frontend
 docker compose logs -f postgres
 
-# Ver estado de los contenedores
-docker ps
-
-# Reiniciar todos los servicios
-docker compose --profile app restart
-
-# Eliminar volumen de datos (CUIDADO: borra toda la BD)
-docker compose --profile app down -v
-```
-
-**Git (flujo):**
-
-```bash
-# Ver estado de cambios
-git status
-
-# Crear rama para nueva feature
-git checkout -b feature/nombre-de-la-feature
-
-# Agregar y commitear cambios
-git add .
-git commit -m "feat: descripcion del cambio"
-
-# Subir rama
-git push -u origin feature/nombre-de-la-feature
-
-# Volver a main y actualizar
-git checkout main
-git pull origin main
-```
-
-**Migraciones en equipo:**
-
-```bash
-cd apps/backend
-
-# Cuando alguien agrego una migracion nueva, ejecutar:
-npx prisma migrate dev
-
-# Si hay conflictos de migracion, resetear la BD local:
-npx prisma migrate reset
+# Detener
+docker compose --profile app down
 ```
 
 ---
 
-## 🗄️ Usuarios de Prueba (Seed)
+## Usuarios Seed de Prueba
 
-| Correo | Contrasena | Rol |
-|---|---|---|
-| test1@uvg.edu.gt | Test1234! | Estudiante |
-| test2@uvg.edu.gt | Test1234! | Estudiante |
+Todos usan la misma contrasena: `Test1234!`
 
----
-
-## 🛠️ Técnicas Aplicadas
-
-| Técnica | Descripción |
-|---|---|
-| **Design Studio** | Ideación individual con sketches + discusión grupal + votación |
-| **Prototipos en bruto** | Storyboards por flujo de interacción |
-| **Refinamiento iterativo** | 3+ iteraciones por prototipo basadas en feedback de testeo |
-| **User Story Mapping** | Recorrido del usuario: Awareness → Consideration → Decision → Retention |
-| **Historias de usuario** | Formato: *Como [actor], deseo [funcionalidad], para [beneficio]* |
-| **Priorización MoSCoW** | Clasificación en Alta, Media y Baja prioridad |
-| **Formulario LOGT (PSP0)** | Registro de tiempo individual por fase del proyecto |
-| **Diagrama Entidad-Relación** | Modelado de la base de datos del sistema |
-| **Scrum** | Marco de trabajo ágil para gestión del proyecto |
+- `carlos.mendoza@uvg.edu.gt`
+- `maria.lopez@uvg.edu.gt`
+- `jose.ramirez@uvg.edu.gt`
+- `ana.garcia@uvg.edu.gt`
+- `luis.hernandez@uvg.edu.gt`
+- `sofia.martinez@uvg.edu.gt`
 
 ---
 
-## 🔗 Recursos del Proyecto
+## Recursos y Entregables
 
 | Recurso | Enlace |
 |---|---|
-| 📄 Informe Corte 1 | [Ver en repositorio](Corte%201/informe/Software%20Corte%201.pdf) |
-| 📄 Informe Corte 2 | [Ver en repositorio](Corte%202/informe/Software%20Corte%202.pdf) |
-| 📄 Informe Corte 3 | [Ver en repositorio](Corte%203/informe/Software%20Corte%203.pdf) |
-| 📄 Documento Colaborativo Corte 3 | [Ver en SharePoint](https://uvggt-my.sharepoint.com/:w:/r/personal/san24725_uvg_edu_gt/_layouts/15/Doc.aspx?sourcedoc=%7B9D20A547-0488-43EA-BFE6-DB42C185A2D9%7D&file=Software%20Corte%203.docx&action=default&mobileredirect=true&DefaultItemOpen=1) |
-| 📄 Informe Sprint 1 | [Ver en repositorio](Scrum/Sprint%201/informe/Sprint%201%20Software.pdf) |
-| 📄 Documento Colaborativo Sprint 1 | [Ver en SharePoint](https://uvggt-my.sharepoint.com/:w:/g/personal/cor24732_uvg_edu_gt/IQCNDS1_2fGjRrLfY7EaD6RyAUgQs1A1iptdERqYPjgqQBA?e=NK0vXJ) |
-| 🗂️ DER del Sistema | [Ver diagrama](Corte%203/assets/DER.png) |
-
----
-
-## 📁 Estructura del Repositorio
-
-```
-📦 proyecto-ingenieria-software
- ┣ 📂 apps/
- ┃  ┣ 📂 backend/              # API NestJS + Prisma
- ┃  ┃  ┣ 📂 src/               # Codigo fuente del backend
- ┃  ┃  ┣ 📂 prisma/            # Schema, migraciones y seed
- ┃  ┃  ┣ 📄 Dockerfile
- ┃  ┃  ┗ 📄 docker-compose.yml # PostgreSQL (Docker)
- ┃  ┗ 📂 frontend/             # Next.js + React
- ┃     ┣ 📂 src/               # Codigo fuente del frontend
- ┃     ┗ 📄 Dockerfile
- ┣ 📂 Corte 1/                 # Entregables Corte 1 (Empatia y Definicion)
- ┣ 📂 Corte 2/                 # Entregables Corte 2 (Ideacion y Modelacion)
- ┣ 📂 Corte 3/                 # Entregables Corte 3 (Prototipado y BD)
- ┣ 📂 Avances 1/               # Primera entrega de avance
- ┣ 📂 Avances 2/               # Segunda entrega de avance
- ┣ 📂 Scrum/                   # Artefactos de Scrum
- ┃  ┗ 📂 Sprint 1/             # Primer Sprint (informe, documento colaborativo, LOGT)
- ┣ 📄 docker-compose.yml       # Orquestacion completa (DB + Backend + Frontend)
- ┣ 📄 .env.example              # Plantilla de variables de entorno
- ┗ 📄 README.md
-```
+| Informe Corte 1 | [Ver PDF](Corte%201/informe/Software%20Corte%201.pdf) |
+| Informe Corte 2 | [Ver PDF](Corte%202/informe/Software%20Corte%202.pdf) |
+| Informe Corte 3 | [Ver PDF](Corte%203/informe/Software%20Corte%203.pdf) |
+| DER del sistema | [Ver imagen](Corte%203/assets/DER.png) |
+| Informe Sprint 1 | [Ver PDF](Scrum/Sprint%201/informe/Sprint%201%20Software.pdf) |
+| Documento colaborativo Sprint 1 | [SharePoint](https://uvggt-my.sharepoint.com/:w:/g/personal/cor24732_uvg_edu_gt/IQCNDS1_2fGjRrLfY7EaD6RyAUgQs1A1iptdERqYPjgqQBA?e=NK0vXJ) |
+| Informe Sprint 2 | [Ver PDF](Scrum/Sprint%202/informe/Sprint%202%20Software.pdf) |
+| Documento colaborativo Sprint 2 | [SharePoint](https://uvggt-my.sharepoint.com/:w:/g/personal/cor24732_uvg_edu_gt/IQDXGK22EE8LQJGk14JsesC1Adyou9bIyMeo2zArJsTgB34?e=7EaqDO) |
+| LOGT Sprint 1 | [Ver carpeta](Scrum/Sprint%201/gestion_tiempo/) |
+| LOGT Sprint 2 | [Ver carpeta](Scrum/Sprint%202/gestion_tiempo/) |
 
 ---
 
 <p align="center">
-  Proyecto desarrollado para el curso CC3058 – Ingeniería de Software 1 · UVG · 2026
+  Proyecto desarrollado para CC3058 - Ingenieria de Software 1 - UVG - 2026
 </p>
