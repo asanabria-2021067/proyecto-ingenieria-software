@@ -15,7 +15,7 @@ export function useRegister() {
       uvgSwal.fire({
         icon: 'success',
         title: 'Registro exitoso',
-        text: 'Bienvenido a UVG Scholar',
+        text: 'Bienvenido a UVGenius',
         timer: 1500,
         showConfirmButton: false,
       }).then(() => {

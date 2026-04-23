@@ -108,6 +108,62 @@ export interface ProyectoListItemDTO {
   descripcionProyecto: string | null;
 }
 
+/** DTO de revisión — parte de la respuesta de GET /revisiones/proyectos/:id */
+export interface RevisionProyectoDTO {
+  idRevisionProyecto: number;
+  estadoRevision: 'PENDIENTE' | 'APROBADA' | 'OBSERVADA';
+  comentarioRevision: string | null;
+  numeroEnvio: number;
+  enviadaEn: string;
+  revisadaEn: string | null;
+  revisor: { idUsuario: number; nombre: string; apellido: string } | null;
+}
+
+/** DTO para items del listado propio — GET /proyectos/mine */
+export interface MiProyectoListItemDTO extends ProyectoListItemDTO {
+  fechaCreacion: string;
+  fechaActualizacion: string | null;
+  /** Última revisión (si existe) */
+  revisiones: Pick<
+    RevisionProyectoDTO,
+    'idRevisionProyecto' | 'estadoRevision' | 'comentarioRevision' | 'numeroEnvio' | 'enviadaEn' | 'revisadaEn'
+  >[];
+}
+
+/** Payload para crear un proyecto completo */
+export interface CreateProjectPayload {
+  tituloProyecto: string;
+  descripcionProyecto: string;
+  tipoProyecto: string;
+  modalidadProyecto: string;
+  objetivosProyecto?: string;
+  ubicacionProyecto?: string;
+  contextoAcademico?: string;
+  urlRecursoExterno?: string;
+  fechaInicio?: string;
+  fechaFinEstimada?: string;
+  organizacionesIds?: number[];
+  roles?: {
+    nombreRol: string;
+    descripcionRolProyecto?: string;
+    idCarreraRequerida?: number;
+    cupos: number;
+    horasSemanalesEstimadas?: number;
+    requisitos?: {
+      idHabilidad: number;
+      nivelMinimo: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
+      obligatorio: boolean;
+    }[];
+  }[];
+  accion: 'BORRADOR' | 'EN_REVISION';
+}
+
+/** Payload para resolver una revisión (admin) */
+export interface ResolverRevisionPayload {
+  resultado: 'APROBADA' | 'OBSERVADA';
+  comentario?: string;
+}
+
 /** DTO raíz — contrato completo de GET /proyectos/:id */
 export interface ProyectoDetalleDTO {
   idProyecto: number;

@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@theme inline {
+  --color-sparkles-color: var(--sparkles-color);
+  --color-gradient-color: var(--gradient-color);
+}
+
 @theme {
   --color-primary: #006735;
   --color-on-primary: #ffffff;
@@ -50,9 +55,24 @@
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
 }
 
+:root {
+  --gradient-color: #006735;
+  --sparkles-color: #72dc93;
+}
+
+.dark {
+  --gradient-color: #8ff9ad;
+  --sparkles-color: #ffffff;
+}
+
 html {
   scroll-behavior: smooth;
 }
+
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
 
 body {
   font-family: var(--font-family-body);
@@ -60,4 +80,27 @@ body {
 
 .font-headline {
   font-family: var(--font-family-headline);
+}
+
+button {
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    filter 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(0.98);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
