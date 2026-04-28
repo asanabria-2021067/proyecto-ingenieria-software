@@ -41,10 +41,11 @@ export function ProjectFormContent({ editId }: ProjectFormContentProps) {
   const { data: carreras = [] } = useQuery<Carrera[]>({ queryKey: ['carreras'], queryFn: getCarreras });
   const { data: habilidades = [] } = useQuery<Habilidad[]>({ queryKey: ['habilidades'], queryFn: getHabilidades });
 
-  const { data: proyectoExistente, isLoading: loadingExistente } = useQuery({
+  const { data: proyectoExistente, isLoading: loadingExistente, isError: errorCargando, error: errorCarga } = useQuery({
     queryKey: ['proyecto-owner', editId],
     queryFn: () => getMyProjectById(editId!),
     enabled: editId !== null,
+    retry: false,
   });
 
   useEffect(() => {
@@ -254,6 +255,31 @@ export function ProjectFormContent({ editId }: ProjectFormContentProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
             Cargando proyecto...
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (errorCargando) {
+    const status = (errorCarga as any)?.statusCode;
+    const mensaje = status === 403
+      ? 'No tienes permiso para editar este proyecto.'
+      : status === 404
+        ? 'El proyecto no existe o fue eliminado.'
+        : 'No se pudo cargar el proyecto.';
+    return (
+      <DashboardLayout>
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 flex flex-col items-center gap-4 text-center">
+            <p className="text-error text-sm font-medium">{mensaje}</p>
+            <button
+              onClick={() => router.push('/dashboard/projects/mine')}
+              className="bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-all duration-200"
+            >
+              Volver a mis proyectos
+            </button>
           </div>
         </div>
       </DashboardLayout>
