@@ -181,12 +181,12 @@ export default function MyProjectsPage() {
                 </p>
               )}
 
-              {proyecto.estadoProyecto === 'BORRADOR' ? (
+              {['BORRADOR', 'OBSERVADO'].includes(proyecto.estadoProyecto) ? (
                 <Link
-                  href={`/dashboard/projects/mine/form?id=${proyecto.idProyecto}`}
+                  href={`/dashboard/proyectos/${proyecto.idProyecto}/editar`}
                   className="mt-auto inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
                 >
-                  Seguir editando Proyecto
+                  Editar Proyecto
                 </Link>
               ) : proyecto.estadoProyecto === 'EN_REVISION' ? (
                 <button
