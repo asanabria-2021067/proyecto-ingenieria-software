@@ -56,6 +56,14 @@ describe('frontend services wrappers', () => {
     expect((apiFetch as any).mock.calls.length).toBe(16);
   });
 
+  it('updateProject usa PATCH y la ruta correcta', async () => {
+    (apiFetch as any).mockResolvedValue({});
+    await updateProject(7, { tituloProyecto: 'editado' } as any);
+    const call = (apiFetch as any).mock.calls.at(-1);
+    expect(call[0]).toBe('/proyectos/7');
+    expect(call[1].method).toBe('PATCH');
+  });
+
   it('notifications/users/catalogs usan rutas esperadas', async () => {
     (apiFetch as any).mockResolvedValue({});
     await getNotificaciones();
