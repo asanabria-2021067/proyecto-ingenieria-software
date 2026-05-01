@@ -158,6 +158,37 @@ export interface CreateProjectPayload {
   accion: 'BORRADOR' | 'EN_REVISION';
 }
 
+/** DTO para GET /proyectos/destacados */
+export interface ProyectoDestacadoDTO {
+  idProyecto: number;
+  tituloProyecto: string;
+  descripcionProyecto: string | null;
+  tipoProyecto: string;
+  estadoProyecto: string;
+  modalidadProyecto: string;
+  fechaPublicacion: string | null;
+  cantidadPostulaciones: number;
+  cantidadRoles: number;
+  organizaciones: {
+    organizacion: { nombreOrganizacion: string };
+  }[];
+}
+
+/** DTO para GET /proyectos/:id/equipo — un miembro del equipo */
+export interface MiembroEquipoDTO {
+  idPostulacion: number;
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  carrera: { idCarrera: number; nombreCarrera: string; facultad: string | null } | null;
+  habilidades: {
+    nombreHabilidad: string;
+    categoriaHabilidad: string | null;
+    nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
+  }[];
+  rol: { idRolProyecto: number; nombreRol: string };
+}
+
 /** Payload para resolver una revisión (admin) */
 export interface ResolverRevisionPayload {
   resultado: 'APROBADA' | 'OBSERVADA';
