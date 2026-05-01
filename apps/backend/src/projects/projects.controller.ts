@@ -57,6 +57,13 @@ export class ProjectsController {
     return this.projectsService.findAsContributor(user.userId);
   }
 
+  // Ruta estática: debe ir ANTES de ':id' para que Express no la capture como parámetro
+  @Get('destacados')
+  findDestacados(@Query('limit') limit?: string) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 6;
+    return this.projectsService.findDestacados(isNaN(parsedLimit) ? 6 : parsedLimit);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.projectsService.findOne(id);
@@ -152,6 +159,17 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.rejectClosure(id, user.userId);
+  }
+
+  // ---------- EQUIPO DEL PROYECTO ----------
+
+  @Get(':id/equipo')
+  @UseGuards(JwtAuthGuard)
+  findEquipo(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.findEquipo(id, user.userId);
   }
 
   // ---------- POSTULACIONES DEL PROYECTO ----------
