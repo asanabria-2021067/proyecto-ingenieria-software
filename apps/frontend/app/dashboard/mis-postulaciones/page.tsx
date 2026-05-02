@@ -1,8 +1,15 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Clock, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
+import {
+  Clock,
+  CheckCircle,
+  XCircle,
+  ChevronRight,
+  Loader2,
+} from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { Postulacion, EstadoPostulacion } from '@/types';
@@ -29,10 +36,67 @@ const ESTADO_CONFIG: Record<
 };
 
 export default function MisPostulacionesPage() {
-  const { data: postulaciones = [], isLoading, isError } = useQuery<Postulacion[]>({
+  const queryClient = useQueryClient();
+  const [cancelingId, setCancelingId] = useState<number | null>(null);
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  const {
+    data: postulaciones = [],
+    isLoading,
+    isError,
+  } = useQuery<Postulacion[]>({
     queryKey: ['mis-postulaciones'],
     queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
   });
+
+  async function handleCancelApplication(idPostulacion: number) {
+    const confirmed = window.confirm(
+      '¿Seguro que deseas cancelar esta postulación?',
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setCancelingId(idPostulacion);
+      setNotification(null);
+
+      const response = await fetch(`/api/postulaciones/${idPostulacion}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          result?.message || 'No se pudo cancelar la postulación',
+        );
+      }
+
+      setNotification({
+        type: 'success',
+        message: 'Postulación cancelada correctamente',
+      });
+
+      queryClient.setQueryData<Postulacion[]>(
+        ['mis-postulaciones'],
+        (prev = []) =>
+          prev.filter((item) => item.idPostulacion !== idPostulacion),
+      );
+    } catch (error) {
+      setNotification({
+        type: 'error',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Ocurrió un error al cancelar la postulación',
+      });
+    } finally {
+      setCancelingId(null);
+    }
+  }
 
   return (
     <DashboardLayout>
@@ -46,11 +110,24 @@ export default function MisPostulacionesPage() {
           </p>
         </div>
 
+        {notification && (
+          <div
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm font-medium ${
+              notification.type === 'success'
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                : 'border-red-300 bg-red-50 text-red-800'
+            }`}
+          >
+            {notification.message}
+          </div>
+        )}
+
         {isLoading && (
           <div className="text-center py-16 text-tertiary text-sm">
             Cargando tus postulaciones...
           </div>
         )}
+
         {isError && (
           <div className="text-center py-16 text-error text-sm">
             No se pudieron cargar tus postulaciones. Verifica que hayas iniciado sesión.
@@ -74,6 +151,8 @@ export default function MisPostulacionesPage() {
           {postulaciones.map((p) => {
             const config = ESTADO_CONFIG[p.estadoPostulacion];
             const Icon = config.icon;
+            const isCanceling = cancelingId === p.idPostulacion;
+
             return (
               <div
                 key={p.idPostulacion}
@@ -109,7 +188,7 @@ export default function MisPostulacionesPage() {
                   </div>
                 )}
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 border-t border-outline-variant/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-xs text-tertiary">
                     Enviada el{' '}
                     {new Date(p.fechaPostulacion).toLocaleDateString('es-GT', {
@@ -118,13 +197,30 @@ export default function MisPostulacionesPage() {
                       year: 'numeric',
                     })}
                   </span>
-                  <Link
-                    href={`/dashboard/proyectos/${p.rolProyecto.proyecto.idProyecto}`}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                  >
-                    Ver proyecto
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {p.estadoPostulacion === 'PENDIENTE' && (
+                      <button
+                        type="button"
+                        disabled={isCanceling}
+                        onClick={() => handleCancelApplication(p.idPostulacion)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isCanceling && (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        )}
+                        {isCanceling ? 'Cancelando...' : 'Cancelar'}
+                      </button>
+                    )}
+
+                    <Link
+                      href={`/dashboard/proyectos/${p.rolProyecto.proyecto.idProyecto}`}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      Ver proyecto
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             );
