@@ -1,15 +1,20 @@
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
-import Image from 'next/image';
 import { useRegister } from '@/hooks/use-register';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
+import { ArrowLeft } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useState, type FormEvent } from 'react';
 
 import img from '@/public/login-foto.jpg';
 import logo from '@/public/logo.png';
+
+function generarCorreoInstitucional(carne: string) {
+  const carneLimpio = carne.replace(/\s+/g, '').trim();
+  return carneLimpio ? `${carneLimpio}@uvg.edu.gt` : '';
+}
 
 export default function RegistroPage() {
   const [nombre, setNombre] = useState('');
@@ -22,6 +27,7 @@ export default function RegistroPage() {
   const [semestre, setSemestre] = useState<number>(1);
   const [carreras, setCarreras] = useState<Carrera[]>([]);
   const { mutate, isPending } = useRegister();
+
   const selectedCarreraName =
     carreras.find((carrera) => carrera.idCarrera === idCarrera)?.nombreCarrera ?? '';
 
@@ -29,19 +35,37 @@ export default function RegistroPage() {
     getCarreras().then(setCarreras).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    setCorreo(generarCorreoInstitucional(carne));
+  }, [carne]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     if (contrasena !== confirmar) {
-      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'Las contrasenas no coinciden' });
+      uvgSwal.fire({
+        icon: 'warning',
+        title: 'Error',
+        text: 'Las contrasenas no coinciden',
+      });
       return;
     }
+
     if (!correo.endsWith('@uvg.edu.gt')) {
-      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'El correo debe ser @uvg.edu.gt' });
+      uvgSwal.fire({
+        icon: 'warning',
+        title: 'Error',
+        text: 'El correo debe ser @uvg.edu.gt',
+      });
       return;
     }
+
     if (idCarrera === 0) {
-      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'Selecciona una carrera' });
+      uvgSwal.fire({
+        icon: 'warning',
+        title: 'Error',
+        text: 'Selecciona una carrera',
+      });
       return;
     }
 
@@ -55,7 +79,6 @@ export default function RegistroPage() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-hidden bg-surface font-body text-on-surface antialiased lg:flex-row">
-      {/* Left Column: Image */}
       <div className="relative hidden overflow-hidden lg:block lg:w-1/2">
         <Image
           alt="Estudiantes UVG"
@@ -67,7 +90,7 @@ export default function RegistroPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent" />
         <div className="absolute bottom-12 left-12 max-w-md">
-          <h2 className="font-headline text-4xl font-extrabold text-white drop-shadow-lg mb-4">
+          <h2 className="mb-4 font-headline text-4xl font-extrabold text-white drop-shadow-lg">
             Comienza tu camino
           </h2>
           <p className="text-lg font-medium text-white/90 drop-shadow-md">
@@ -76,7 +99,6 @@ export default function RegistroPage() {
         </div>
       </div>
 
-      {/* Right Column: Form */}
       <div className="relative flex w-full flex-col bg-surface lg:w-1/2">
         <header className="z-10 flex items-center justify-between px-8 py-6">
           <Link
@@ -91,7 +113,7 @@ export default function RegistroPage() {
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
           <div className="w-full max-w-lg">
             <div className="mb-8 text-left">
-              <Image src={logo} alt="UVG Scholar" className="h-28 w-auto mx-auto mb-4" />
+              <Image src={logo} alt="UVG Scholar" className="mx-auto mb-4 h-28 w-auto" />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
                 Crear cuenta
               </h1>
@@ -127,18 +149,6 @@ export default function RegistroPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className={labelClass}>Correo Institucional</label>
-                <input
-                  type="email"
-                  required
-                  value={correo}
-                  onChange={(e) => setCorreo(e.target.value)}
-                  placeholder="usuario@uvg.edu.gt"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-1.5">
                 <label className={labelClass}>Carne</label>
                 <input
                   type="text"
@@ -146,6 +156,21 @@ export default function RegistroPage() {
                   value={carne}
                   onChange={(e) => setCarne(e.target.value)}
                   placeholder="24000"
+                  className={inputClass}
+                />
+                <p className="text-xs text-tertiary">
+                  Al escribir tu carne, el sistema sugiere tu correo institucional.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={labelClass}>Correo Institucional</label>
+                <input
+                  type="email"
+                  required
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  placeholder="usuario@uvg.edu.gt"
                   className={inputClass}
                 />
               </div>
@@ -167,11 +192,12 @@ export default function RegistroPage() {
                     ))}
                   </select>
                   {selectedCarreraName && (
-                    <p className="text-xs text-tertiary break-words leading-snug">
+                    <p className="break-words text-xs leading-snug text-tertiary">
                       {selectedCarreraName}
                     </p>
                   )}
                 </div>
+
                 <div className="space-y-1.5">
                   <label className={labelClass}>Semestre</label>
                   <select
@@ -237,10 +263,16 @@ export default function RegistroPage() {
             UVG 2025
           </span>
           <div className="flex gap-4">
-            <a href="#" className="text-[10px] font-bold uppercase tracking-wider text-outline transition-colors hover:text-primary">
+            <a
+              href="#"
+              className="text-[10px] font-bold uppercase tracking-wider text-outline transition-colors hover:text-primary"
+            >
               Privacidad
             </a>
-            <a href="#" className="text-[10px] font-bold uppercase tracking-wider text-outline transition-colors hover:text-primary">
+            <a
+              href="#"
+              className="text-[10px] font-bold uppercase tracking-wider text-outline transition-colors hover:text-primary"
+            >
               Soporte
             </a>
           </div>
