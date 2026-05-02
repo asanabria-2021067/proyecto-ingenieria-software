@@ -1,12 +1,16 @@
 import {
-  Injectable,
   BadRequestException,
-  NotFoundException,
   ForbiddenException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  EstadoPostulacion,
+  EstadoProyecto,
+  TipoNotificacion,
+} from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
-import { EstadoProyecto, TipoNotificacion } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
@@ -18,7 +22,6 @@ export class ApplicationsService {
   ) {}
 
   async create(dto: CreatePostulacionDto) {
-    // 1. Verificar que el usuario existe
     const usuario = await this.prisma.usuario.findUnique({
       where: { idUsuario: dto.idUsuarioPostulante },
     });
@@ -29,7 +32,6 @@ export class ApplicationsService {
       );
     }
 
-    // 2. Verificar que el rol existe y el proyecto está postulable
     const rol = await this.prisma.rolProyecto.findUnique({
       where: { idRolProyecto: dto.idRolProyecto },
       include: { proyecto: true },
@@ -58,6 +60,7 @@ export class ApplicationsService {
           estadoParticipacion: 'ACTIVO',
         },
       });
+
       if (activas >= rol.cupos) {
         throw new BadRequestException(
           'El rol ya alcanzó su límite de cupos activos en EN_PROGRESO',
@@ -229,5 +232,42 @@ export class ApplicationsService {
     );
 
     return postulacionActualizada;
+  }
+
+  async cancelApplication(idPostulacion: number, userId: number) {
+    const postulacion = await this.prisma.postulacion.findUnique({
+      where: { idPostulacion },
+      select: {
+        idPostulacion: true,
+        idUsuarioPostulante: true,
+        estadoPostulacion: true,
+      },
+    });
+
+    if (!postulacion) {
+      throw new NotFoundException(
+        `Postulación con id ${idPostulacion} no encontrada`,
+      );
+    }
+
+    if (postulacion.idUsuarioPostulante !== userId) {
+      throw new ForbiddenException(
+        'Solo el postulante dueño puede cancelar esta postulación',
+      );
+    }
+
+    if (postulacion.estadoPostulacion !== EstadoPostulacion.PENDIENTE) {
+      throw new BadRequestException(
+        'Solo se pueden cancelar postulaciones en estado PENDIENTE',
+      );
+    }
+
+    await this.prisma.postulacion.delete({
+      where: { idPostulacion },
+    });
+
+    return {
+      message: 'Postulación cancelada correctamente',
+    };
   }
 }

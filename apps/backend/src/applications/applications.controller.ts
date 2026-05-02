@@ -1,16 +1,17 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
   Body,
+  Controller,
+  Delete,
+  Get,
   Param,
   ParseIntPipe,
+  Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApplicationsService } from './applications.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApplicationsService } from './applications.service';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
@@ -41,9 +42,6 @@ export class ApplicationsController {
     return this.applicationsService.findOne(id);
   }
 
-  // VERIFICADO: el service valida que el usuario sea creador del proyecto
-  // (ForbiddenException si rolProyecto.proyecto.creadoPor !== resolutorId)
-  // y que la postulación esté en estado PENDIENTE (BadRequestException si ya fue resuelta).
   @Patch(':id/estado')
   @UseGuards(JwtAuthGuard)
   updateEstado(
@@ -52,5 +50,14 @@ export class ApplicationsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.applicationsService.updateEstado(id, dto, user.userId);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  cancelApplication(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.applicationsService.cancelApplication(id, user.userId);
   }
 }
