@@ -188,16 +188,17 @@ export class RevisionesService {
             ? `Tu proyecto "${proyecto.tituloProyecto}" fue aprobado y publicado.`
             : `Tu proyecto "${proyecto.tituloProyecto}" recibió observaciones. Revisa el feedback.`;
 
-        await tx.notificacion.create({
-          data: {
-            idUsuario: proyecto.creadoPor,
+        await this.notifications.notifyUsers(
+          [proyecto.creadoPor],
+          {
             tipoNotificacion,
             tituloNotificacion:
               dto.resultado === 'APROBADA' ? 'Proyecto aprobado' : 'Proyecto observado',
             mensajeNotificacion,
             datosJson: { idProyecto, idRevision: revision.idRevisionProyecto },
           },
-        });
+          tx,
+        );
       }
 
       return {

@@ -12,7 +12,7 @@ import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
+import { EstadoProyecto, ModalidadProyecto, Prisma, TipoNotificacion, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
@@ -704,6 +704,14 @@ export class ProjectsService {
       },
       select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
     });
+    if (nuevoEstado === EstadoProyectoCreador.PUBLICADO) {
+      await this.notifications.notifyProjectActiveParticipants(id, userId, {
+        tipoNotificacion: TipoNotificacion.PROYECTO_PUBLICADO,
+        tituloNotificacion: 'Proyecto publicado',
+        mensajeNotificacion: `El proyecto "${actualizado.tituloProyecto}" ha sido publicado.`,
+        datosJson: { idProyecto: id },
+      });
+    }
     return actualizado;
   }
 

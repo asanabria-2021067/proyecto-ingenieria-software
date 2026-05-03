@@ -1,6 +1,21 @@
 'use client';
 
-import { Bell, CheckCheck } from 'lucide-react';
+import {
+  AlertCircle,
+  Bell,
+  CheckCheck,
+  CheckCircle,
+  ClipboardList,
+  Clock,
+  FileText,
+  FolderCheck,
+  FolderX,
+  Megaphone,
+  MessageSquare,
+  RefreshCw,
+  UserCheck,
+  type LucideIcon,
+} from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -9,6 +24,31 @@ import {
   useMarcarLeida,
   useMarcarTodasLeidas,
 } from '@/hooks/use-notifications';
+
+type NotifIcon = { icon: LucideIcon; bg: string; text: string };
+
+const TIPO_ICON: Record<string, NotifIcon> = {
+  PROYECTO_EN_REVISION:          { icon: ClipboardList, bg: 'bg-blue-100',   text: 'text-blue-600' },
+  PROYECTO_APROBADO:             { icon: CheckCircle,   bg: 'bg-green-100',  text: 'text-green-600' },
+  PROYECTO_OBSERVADO:            { icon: AlertCircle,   bg: 'bg-amber-100',  text: 'text-amber-600' },
+  PROYECTO_PUBLICADO:            { icon: Megaphone,     bg: 'bg-green-100',  text: 'text-green-600' },
+  POSTULACION_RESUELTA:          { icon: UserCheck,     bg: 'bg-green-100',  text: 'text-green-600' },
+  PROYECTO_ACTUALIZADO:          { icon: RefreshCw,     bg: 'bg-blue-100',   text: 'text-blue-600' },
+  SOLICITUD_CIERRE_PROYECTO:     { icon: FolderX,       bg: 'bg-orange-100', text: 'text-orange-600' },
+  CIERRE_APROBADO:               { icon: FolderCheck,   bg: 'bg-green-100',  text: 'text-green-600' },
+  CIERRE_RECHAZADO:              { icon: FolderX,       bg: 'bg-red-100',    text: 'text-red-600' },
+  COMENTARIO_PROYECTO:           { icon: MessageSquare, bg: 'bg-purple-100', text: 'text-purple-600' },
+  COMENTARIO_TAREA:              { icon: MessageSquare, bg: 'bg-purple-100', text: 'text-purple-600' },
+  COMENTARIO_HITO:               { icon: MessageSquare, bg: 'bg-purple-100', text: 'text-purple-600' },
+  MENSAJE_REVISION:              { icon: FileText,      bg: 'bg-blue-100',   text: 'text-blue-600' },
+  PROYECTO_ADVERTENCIA_INACTIVIDAD: { icon: Clock,      bg: 'bg-amber-100',  text: 'text-amber-600' },
+};
+
+const DEFAULT_ICON: NotifIcon = { icon: Bell, bg: 'bg-gray-100', text: 'text-gray-500' };
+
+function getIcon(tipo: string): NotifIcon {
+  return TIPO_ICON[tipo] ?? DEFAULT_ICON;
+}
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -37,7 +77,7 @@ export function NotificationsBell() {
           <div className="relative">
             <Bell className="w-5 h-5 shrink-0" />
             {unread > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low">
+              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-lime-400 text-white text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-white">
                 {unread > 99 ? '99+' : unread}
               </span>
             )}
@@ -50,7 +90,7 @@ export function NotificationsBell() {
         side="right"
         align="end"
         sideOffset={8}
-        className="w-80 p-0 rounded-xl shadow-xl border border-outline-variant"
+        className="w-80 p-0 rounded-xl shadow-xl border border-outline-variant bg-white"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
@@ -84,6 +124,7 @@ export function NotificationsBell() {
             <ul className="divide-y divide-outline-variant/50">
               {notificaciones.map((n) => {
                 const isUnread = n.leidaEn === null;
+                const { icon: Icon, bg, text } = getIcon(n.tipoNotificacion);
                 return (
                   <li
                     key={n.idNotificacion}
@@ -93,11 +134,11 @@ export function NotificationsBell() {
                         : 'hover:bg-surface-container-low'
                     }`}
                   >
-                    <div className="flex items-start gap-2">
-                      {isUnread && (
-                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                      )}
-                      <div className={`flex-1 min-w-0 ${!isUnread ? 'pl-4' : ''}`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${bg}`}>
+                        <Icon className={`w-4 h-4 ${text}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <p className={`text-sm ${isUnread ? 'font-semibold text-on-surface' : 'font-medium text-on-surface-variant'}`}>
                           {n.tituloNotificacion}
                         </p>

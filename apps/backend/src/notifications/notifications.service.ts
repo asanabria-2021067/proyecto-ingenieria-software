@@ -118,6 +118,19 @@ export class NotificationsService {
     );
   }
 
+  async notifyProjectLider(
+    idLider: number,
+    payload: {
+      tipoNotificacion: Prisma.NotificacionCreateManyInput['tipoNotificacion'];
+      tituloNotificacion: string;
+      mensajeNotificacion?: string;
+      datosJson?: Prisma.InputJsonValue;
+    },
+    tx?: TxClient,
+  ) {
+    await this.notifyUsers([idLider], payload, tx);
+  }
+
   async notifyProjectActiveParticipants(
     idProyecto: number,
     autorId: number,

@@ -78,7 +78,7 @@ export class ApplicationsService {
       );
     }
 
-    return this.prisma.postulacion.create({
+    const postulacionCreada = await this.prisma.postulacion.create({
       data: {
         idUsuarioPostulante: dto.idUsuarioPostulante,
         idRolProyecto: dto.idRolProyecto,
@@ -90,6 +90,23 @@ export class ApplicationsService {
         },
       },
     });
+
+    const idLider = rol.proyecto.creadoPor;
+    if (dto.idUsuarioPostulante !== idLider) {
+      await this.notificationsService.notifyProjectLider(idLider, {
+        tipoNotificacion: TipoNotificacion.PROYECTO_ACTUALIZADO,
+        tituloNotificacion: 'Nueva postulación recibida',
+        mensajeNotificacion: `${usuario.nombre} ${usuario.apellido} se postuló al rol "${rol.nombreRol}" en tu proyecto "${rol.proyecto.tituloProyecto}".`,
+        datosJson: {
+          idPostulacion: postulacionCreada.idPostulacion,
+          idProyecto: rol.proyecto.idProyecto,
+          idRolProyecto: rol.idRolProyecto,
+          idPostulante: dto.idUsuarioPostulante,
+        },
+      });
+    }
+
+    return postulacionCreada;
   }
 
   async findAll() {
