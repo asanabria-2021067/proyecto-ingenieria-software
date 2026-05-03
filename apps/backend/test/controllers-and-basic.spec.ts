@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { RequestMethod } from '@nestjs/common';
+import { METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
+import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { AppController } from '../src/app.controller';
 import { ApplicationsController } from '../src/applications/applications.controller';
 import { AuthController } from '../src/auth/auth.controller';
@@ -148,5 +151,24 @@ describe('Controllers and basic services', () => {
     const evidence = new EvidenceController(evidenceService);
     expect(evidence.findAll()).toEqual({ message: 'Not implemented yet' });
     expect(evidence.create({})).toEqual({ message: 'Not implemented yet' });
+  });
+});
+
+describe('ProjectsController PATCH /:id', () => {
+  it('usa método HTTP PATCH', () => {
+    const method = Reflect.getMetadata(METHOD_METADATA, ProjectsController.prototype.update);
+    expect(method).toBe(RequestMethod.PATCH);
+  });
+
+  it('aplica JwtAuthGuard', () => {
+    const guards: unknown[] = Reflect.getMetadata(GUARDS_METADATA, ProjectsController.prototype.update) ?? [];
+    expect(guards).toContain(JwtAuthGuard);
+  });
+
+  it('delega a projectsService.update con id, data y userId', () => {
+    const svc = { update: vi.fn().mockReturnValue({ idProyecto: 1 }) };
+    const controller = new ProjectsController(svc as any);
+    controller.update(5, { tituloProyecto: 'nuevo' } as any, { userId: 42 });
+    expect(svc.update).toHaveBeenCalledWith(5, { tituloProyecto: 'nuevo' }, 42);
   });
 });

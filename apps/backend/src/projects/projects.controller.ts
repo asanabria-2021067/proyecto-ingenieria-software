@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Patch,
   Param,
   Body,
@@ -82,7 +81,7 @@ export class ProjectsController {
     return this.projectsService.createFull(data, user.userId);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @UseGuards(JwtAuthGuard)
   update(
     @Param('id', ParseIntPipe) id: number,

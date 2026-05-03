@@ -41,7 +41,7 @@ export async function updateProject(
   id: number,
   payload: Partial<CreateProjectPayload>,
 ): Promise<{ idProyecto: number; estadoProyecto: string }> {
-  return apiFetch(`/proyectos/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  return apiFetch(`/proyectos/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
 }
 
 export async function submitProjectForReview(

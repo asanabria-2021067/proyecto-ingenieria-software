@@ -152,6 +152,13 @@ describe('ProjectsService', () => {
     );
   });
 
+  it('update lanza ForbiddenException si usuario no es el creador', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, estadoProyecto: EstadoProyecto.BORRADOR, creadoPor: 99 });
+    const service = new ProjectsService(prisma, {} as any);
+    await expect(service.update(1, { tituloProyecto: 'x' }, 1)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('findPostulacionesByProject exige ownership', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({

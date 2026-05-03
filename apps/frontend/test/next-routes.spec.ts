@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { NextRequest } from 'next/server';
 import { GET } from '../app/api/projects/mine/route';
 import { PATCH } from '../app/api/projects/[id]/status/route';
@@ -38,5 +40,10 @@ describe('next api routes', () => {
     const call = (globalThis.fetch as any).mock.calls[0];
     expect(call[0]).toContain('/proyectos/1/estado');
     expect(call[1].body).toContain('PUBLICADO');
+  });
+
+  it('existe la página /dashboard/proyectos/[id]/editar', () => {
+    const rutaEditar = join(__dirname, '../app/dashboard/proyectos/[id]/editar/page.tsx');
+    expect(existsSync(rutaEditar)).toBe(true);
   });
 });
