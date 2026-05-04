@@ -12,7 +12,7 @@ import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoProyecto, ModalidadProyecto, Prisma, TipoNotificacion, TipoProyecto } from '@prisma/client';
+import { EstadoPostulacion, EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
@@ -704,14 +704,6 @@ export class ProjectsService {
       },
       select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
     });
-    if (nuevoEstado === EstadoProyectoCreador.PUBLICADO) {
-      await this.notifications.notifyProjectActiveParticipants(id, userId, {
-        tipoNotificacion: TipoNotificacion.PROYECTO_PUBLICADO,
-        tituloNotificacion: 'Proyecto publicado',
-        mensajeNotificacion: `El proyecto "${actualizado.tituloProyecto}" ha sido publicado.`,
-        datosJson: { idProyecto: id },
-      });
-    }
     return actualizado;
   }
 
@@ -735,6 +727,124 @@ export class ProjectsService {
       throw new ForbiddenException('Se requieren permisos de administrador');
     }
   }
+
+  // ---------- PROYECTOS DESTACADOS ----------
+
+  async findDestacados(limit = 6) {
+    // Trae proyectos visibles con sus conteos de postulaciones por rol
+    const proyectos = await this.prisma.proyecto.findMany({
+      where: {
+        estadoProyecto: { in: ESTADOS_VISIBLES },
+        eliminadoEn: null,
+      },
+      select: {
+        idProyecto: true,
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        tipoProyecto: true,
+        estadoProyecto: true,
+        modalidadProyecto: true,
+        fechaPublicacion: true,
+        organizaciones: {
+          select: {
+            organizacion: { select: { nombreOrganizacion: true } },
+          },
+        },
+        roles: {
+          select: {
+            idRolProyecto: true,
+            _count: { select: { postulaciones: true } },
+          },
+        },
+      },
+    });
+
+    // Suma postulaciones totales por proyecto y ordena descendente
+    const conConteo = proyectos.map((p) => ({
+      idProyecto: p.idProyecto,
+      tituloProyecto: p.tituloProyecto,
+      descripcionProyecto: p.descripcionProyecto,
+      tipoProyecto: p.tipoProyecto,
+      estadoProyecto: p.estadoProyecto,
+      modalidadProyecto: p.modalidadProyecto,
+      fechaPublicacion: p.fechaPublicacion,
+      organizaciones: p.organizaciones,
+      cantidadPostulaciones: p.roles.reduce(
+        (acc, rol) => acc + rol._count.postulaciones,
+        0,
+      ),
+      cantidadRoles: p.roles.length,
+    }));
+
+    return conConteo
+      .sort((a, b) => b.cantidadPostulaciones - a.cantidadPostulaciones)
+      .slice(0, limit);
+  }
+
+  // -------------------------------------------------
+
+  // ---------- EQUIPO DEL PROYECTO ----------
+
+  async findEquipo(idProyecto: number, userId: number) {
+    // Solo el líder puede ver el equipo completo
+    await this._requireOwner(idProyecto, userId);
+
+    const postulaciones = await this.prisma.postulacion.findMany({
+      where: {
+        rolProyecto: { idProyecto },
+        estadoPostulacion: EstadoPostulacion.ACEPTADA,
+      },
+      select: {
+        idPostulacion: true,
+        postulante: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            perfil: {
+              select: {
+                carrera: {
+                  select: { idCarrera: true, nombreCarrera: true, facultad: true },
+                },
+              },
+            },
+            habilidades: {
+              select: {
+                nivelHabilidad: true,
+                habilidad: {
+                  select: { idHabilidad: true, nombreHabilidad: true, categoriaHabilidad: true },
+                },
+              },
+            },
+          },
+        },
+        rolProyecto: {
+          select: { idRolProyecto: true, nombreRol: true },
+        },
+      },
+      orderBy: { fechaPostulacion: 'asc' },
+    });
+
+    // Normaliza la respuesta para el frontend
+    return postulaciones.map((p) => ({
+      idPostulacion: p.idPostulacion,
+      idUsuario: p.postulante.idUsuario,
+      nombre: p.postulante.nombre,
+      apellido: p.postulante.apellido,
+      carrera: p.postulante.perfil?.carrera ?? null,
+      habilidades: p.postulante.habilidades.map((h) => ({
+        nombreHabilidad: h.habilidad.nombreHabilidad,
+        categoriaHabilidad: h.habilidad.categoriaHabilidad,
+        nivelHabilidad: h.nivelHabilidad,
+      })),
+      rol: {
+        idRolProyecto: p.rolProyecto.idRolProyecto,
+        nombreRol: p.rolProyecto.nombreRol,
+      },
+    }));
+  }
+
+  // -----------------------------------------
 
   // ---------- POSTULACIONES DEL PROYECTO ----------
 
