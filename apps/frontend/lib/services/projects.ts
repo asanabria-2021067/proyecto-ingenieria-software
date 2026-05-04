@@ -6,6 +6,8 @@ import type {
   RevisionProyectoDTO,
   CreateProjectPayload,
   ResolverRevisionPayload,
+  ProyectoDestacadoDTO,
+  MiembroEquipoDTO,
 } from '@/lib/dto/project.dto';
 
 export async function getProjectById(id: number): Promise<ProyectoDetalleDTO> {
@@ -41,7 +43,7 @@ export async function updateProject(
   id: number,
   payload: Partial<CreateProjectPayload>,
 ): Promise<{ idProyecto: number; estadoProyecto: string }> {
-  return apiFetch(`/proyectos/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+  return apiFetch(`/proyectos/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
 export async function submitProjectForReview(
@@ -94,6 +96,14 @@ export async function resolverRevision(
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function getProyectosDestacados(limit = 6): Promise<ProyectoDestacadoDTO[]> {
+  return apiFetch<ProyectoDestacadoDTO[]>(`/proyectos/destacados?limit=${limit}`);
+}
+
+export async function getEquipoProyecto(id: number): Promise<MiembroEquipoDTO[]> {
+  return apiFetch<MiembroEquipoDTO[]>(`/proyectos/${id}/equipo`);
 }
 
 export async function getAdminReviewInbox(): Promise<{
