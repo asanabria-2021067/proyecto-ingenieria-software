@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   GraduationCap,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
+import ProyectosDestacados from '@/components/dashboard/ProyectosDestacados';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
@@ -30,19 +32,26 @@ const estadoColors: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient();
   const { data: user, isLoading: userLoading } = useCurrentUser();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [projects, setProjects] = useState<ProyectoListItemDTO[]>([]);
   const [wizardDismissed, setWizardDismissed] = useState(false);
   const showWizard = useMemo(
     () => !wizardDismissed && !!user && isProfileIncomplete(user),
     [wizardDismissed, user],
   );
 
-  useEffect(() => {
-    getDashboardStats().then(setStats).catch(() => {});
-    searchProjects('').then((p) => setProjects(p.slice(0, 4))).catch(() => {});
-  }, []);
+  const { data: stats } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: getDashboardStats,
+  });
+
+  const { data: projects = [] } = useQuery<ProyectoListItemDTO[]>({
+    queryKey: ['dashboard-projects'],
+    queryFn: async () => {
+      const p = await searchProjects('');
+      return p.slice(0, 4);
+    },
+  });
 
   if (userLoading) {
     return (
@@ -76,7 +85,14 @@ export default function DashboardPage() {
     <DashboardLayout>
       <CompleteProfileDialog
         open={showWizard}
-        onComplete={() => setWizardDismissed(true)}
+        onComplete={async () => {
+          setWizardDismissed(true);
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['currentUser'] }),
+            queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
+            queryClient.invalidateQueries({ queryKey: ['dashboard-projects'] }),
+          ]);
+        }}
       />
 
       <div className="px-8 pb-12 pt-8">
@@ -234,6 +250,9 @@ export default function DashboardPage() {
                 )}
               </div>
             </section>
+
+            {/* Proyectos Destacados */}
+            <ProyectosDestacados />
 
             {/* Applications Status */}
             <section>
