@@ -1,11 +1,13 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Clock, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, ChevronRight, Trash2 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { Postulacion, EstadoPostulacion } from '@/types';
+import uvgSwal from '@/lib/swal';
 
 const ESTADO_CONFIG: Record<
   EstadoPostulacion,
@@ -29,12 +31,53 @@ const ESTADO_CONFIG: Record<
 };
 
 export default function MisPostulacionesPage() {
+  const queryClient = useQueryClient();
+  const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
+
   const { data: postulaciones = [], isLoading, isError } = useQuery<Postulacion[]>({
     queryKey: ['mis-postulaciones'],
     queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiFetch(`/postulaciones/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] });
+      uvgSwal.fire({
+        icon: 'success',
+        title: 'Postulación cancelada',
+        text: 'Tu postulación fue cancelada exitosamente',
+        timer: 2000,
+      });
+      setConfirmingDelete(null);
+    },
+    onError: (error: any) => {
+      uvgSwal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'No se pudo cancelar la postulación',
+      });
+    },
+  });
+
+  const handleCancelar = (id: number) => {
+    uvgSwal
+      .fire({
+        icon: 'warning',
+        title: '¿Cancelar postulación?',
+        text: 'Esta acción no se puede deshacer',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, cancelar',
+        cancelButtonText: 'No',
+      })
+      .then((result) => {
+        if (result.isConfirmed) {
+          deleteMutation.mutate(id);
+        }
+      });
+  };
 
   return (
     <DashboardLayout>
@@ -120,13 +163,25 @@ export default function MisPostulacionesPage() {
                       year: 'numeric',
                     })}
                   </span>
-                  <Link
-                    href={`/dashboard/proyectos/${p.rolProyecto.proyecto.idProyecto}`}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                  >
-                    Ver proyecto
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    {p.estadoPostulacion === 'PENDIENTE' && (
+                      <button
+                        onClick={() => handleCancelar(p.idPostulacion)}
+                        disabled={deleteMutation.isPending}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error/10 text-error text-xs font-semibold hover:bg-error/20 transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Cancelar
+                      </button>
+                    )}
+                    <Link
+                      href={`/dashboard/proyectos/${p.rolProyecto.proyecto.idProyecto}`}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      Ver proyecto
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             );

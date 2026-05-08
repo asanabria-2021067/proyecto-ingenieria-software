@@ -58,9 +58,20 @@ export class ProjectsController {
     return this.projectsService.findAsContributor(user.userId);
   }
 
+  @Get('destacados')
+  findFeatured() {
+    return this.projectsService.findFeatured();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.projectsService.findOne(id);
+  }
+
+  @Get(':id/equipo')
+  @UseGuards(JwtAuthGuard)
+  findTeam(@Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.findTeam(id);
   }
 
   @Get(':id/owner')
@@ -85,6 +96,16 @@ export class ProjectsController {
   @Put(':id')
   @UseGuards(JwtAuthGuard)
   update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: UpdateProjectDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.update(id, data, user.userId);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  patch(
     @Param('id', ParseIntPipe) id: number,
     @Body() data: UpdateProjectDto,
     @CurrentUser() user: { userId: number },

@@ -78,7 +78,7 @@ export class ApplicationsService {
       );
     }
 
-    return this.prisma.postulacion.create({
+    const postulacion = await this.prisma.postulacion.create({
       data: {
         idUsuarioPostulante: dto.idUsuarioPostulante,
         idRolProyecto: dto.idRolProyecto,
@@ -88,8 +88,31 @@ export class ApplicationsService {
         rolProyecto: {
           include: { proyecto: true },
         },
+        postulante: {
+          select: {
+            nombre: true,
+            apellido: true,
+          },
+        },
       },
     });
+
+    // Notificar al líder del proyecto
+    await this.notificationsService.notifyUsers(
+      [rol.proyecto.creadoPor],
+      {
+        tipoNotificacion: 'NUEVA_POSTULACION',
+        tituloNotificacion: 'Nueva postulación recibida',
+        mensajeNotificacion: `${postulacion.postulante.nombre} ${postulacion.postulante.apellido} se postuló para el rol "${rol.nombreRol}" en tu proyecto "${rol.proyecto.tituloProyecto}".`,
+        datosJson: {
+          idPostulacion: postulacion.idPostulacion,
+          idProyecto: rol.proyecto.idProyecto,
+          idRolProyecto: dto.idRolProyecto,
+        },
+      },
+    );
+
+    return postulacion;
   }
 
   async findAll() {
@@ -229,5 +252,38 @@ export class ApplicationsService {
     );
 
     return postulacionActualizada;
+  }
+
+  async delete(id: number, userId: number) {
+    const postulacion = await this.prisma.postulacion.findUnique({
+      where: { idPostulacion: id },
+      select: {
+        idPostulacion: true,
+        idUsuarioPostulante: true,
+        estadoPostulacion: true,
+      },
+    });
+
+    if (!postulacion) {
+      throw new NotFoundException(`Postulación con id ${id} no encontrada`);
+    }
+
+    if (postulacion.idUsuarioPostulante !== userId) {
+      throw new ForbiddenException(
+        'No tienes permiso para cancelar esta postulación',
+      );
+    }
+
+    if (postulacion.estadoPostulacion !== 'PENDIENTE') {
+      throw new BadRequestException(
+        'Solo puedes cancelar postulaciones en estado PENDIENTE',
+      );
+    }
+
+    await this.prisma.postulacion.delete({
+      where: { idPostulacion: id },
+    });
+
+    return { mensaje: 'Postulación cancelada exitosamente' };
   }
 }

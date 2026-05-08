@@ -29,6 +29,12 @@ export default function RegistroPage() {
     getCarreras().then(setCarreras).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (carne && carne.trim() !== '' && !correo.includes('@')) {
+      setCorreo(`${carne.trim()}@uvg.edu.gt`);
+    }
+  }, [carne]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
 

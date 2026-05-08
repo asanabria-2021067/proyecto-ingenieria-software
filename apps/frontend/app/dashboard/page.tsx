@@ -52,6 +52,11 @@ export default function DashboardPage() {
     },
   });
 
+  const { data: featured = [] } = useQuery<ProyectoListItemDTO[]>({
+    queryKey: ['dashboard-featured'],
+    queryFn: () => apiFetch('/proyectos/destacados'),
+  });
+
   if (userLoading) {
     return (
       <DashboardLayout>
@@ -190,6 +195,63 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           <div className="space-y-12 lg:col-span-8">
+            {/* Featured Projects */}
+            {featured.length > 0 && (
+              <section>
+                <div className="mb-6 flex items-end justify-between">
+                  <div>
+                    <h2 className="font-headline text-2xl font-black tracking-tight">
+                      Proyectos Destacados
+                    </h2>
+                    <p className="text-sm text-on-surface-variant">
+                      Los proyectos más populares con más postulaciones
+                    </p>
+                  </div>
+                  <Link
+                    href="/dashboard/proyectos"
+                    className="text-sm font-bold text-primary hover:underline"
+                  >
+                    Ver todos
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  {featured.slice(0, 4).map((p) => (
+                    <div
+                      key={p.idProyecto}
+                      className="group rounded-xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                    >
+                      <div className="mb-4 flex items-start justify-between">
+                        <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-secondary-container text-on-secondary-container">
+                          {tipoLabel[p.tipoProyecto] ?? p.tipoProyecto}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                          ID: {p.idProyecto}
+                        </span>
+                      </div>
+                      <h3 className="mb-2 text-lg font-bold text-on-surface transition-colors group-hover:text-primary">
+                        {p.tituloProyecto}
+                      </h3>
+                      <p className="mb-6 line-clamp-2 text-sm text-on-surface-variant">
+                        {p.descripcionProyecto}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-medium text-on-surface-variant">
+                          <Clock className="h-4 w-4" />
+                          {p.modalidadProyecto}
+                        </div>
+                        <Link
+                          href={`/dashboard/proyectos/${p.idProyecto}`}
+                          className="rounded-xl bg-surface-container-high px-6 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+                        >
+                          Ver
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Recommended Projects */}
             <section>
               <div className="mb-6 flex items-end justify-between">
