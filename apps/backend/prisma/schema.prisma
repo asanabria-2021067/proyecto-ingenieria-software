@@ -187,6 +187,8 @@ model Usuario {
   estado            EstadoUsuario  @default(ACTIVO)
   fechaCreacion     DateTime       @default(now()) @map("fecha_creacion")
   fechaUltimaSesion DateTime?      @map("fecha_ultima_sesion")
+  resetPasswordToken String?       @map("reset_password_token") @db.VarChar(500)
+  resetPasswordExpires DateTime?   @map("reset_password_expires")
 
   telefonos                   UsuarioTelefono[]
   perfil                      PerfilEstudiante?
