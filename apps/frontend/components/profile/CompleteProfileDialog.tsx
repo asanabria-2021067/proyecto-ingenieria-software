@@ -97,7 +97,6 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
 
   useEffect(() => {
     if (!open) return;
-    setStep(0);
     refreshCatalogs().catch(() => {});
   }, [open, refreshCatalogs]);
 
