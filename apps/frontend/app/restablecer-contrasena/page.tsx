@@ -1,33 +1,75 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { ArrowLeft, Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { useState, useEffect, type FormEvent, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { ArrowLeft, Lock, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
 import logo from '@/public/logo.png';
 import img from '@/public/login-foto.jpg';
-import { forgotPassword } from '@/lib/services/auth';
+import { resetPassword } from '@/lib/services/auth';
 
-export default function RecuperarContrasenaPage() {
-  const [correo, setCorreo] = useState('');
-  const [enviado, setEnviado] = useState(false);
+function RestablecerContrasenaContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [token, setToken] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [validationError, setValidationError] = useState('');
+
+  useEffect(() => {
+    const tokenParam = searchParams.get('token');
+    if (!tokenParam) {
+      router.push('/recuperar-contrasena');
+    } else {
+      setToken(tokenParam);
+    }
+  }, [searchParams, router]);
+
+  function validatePasswords(): boolean {
+    if (password.length < 8) {
+      setValidationError('La contraseña debe tener al menos 8 caracteres');
+      return false;
+    }
+    if (password !== confirmPassword) {
+      setValidationError('Las contraseñas no coinciden');
+      return false;
+    }
+    setValidationError('');
+    return true;
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
+    if (!validatePasswords() || !token) return;
+
     setLoading(true);
     setError('');
 
     try {
-      await forgotPassword(correo);
-      setEnviado(true);
+      await resetPassword(token, password);
+      setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Ocurrió un error al enviar el correo');
+      const errorMsg = err.message || 'Ocurrió un error al restablecer la contraseña';
+      if (errorMsg.includes('expirado')) {
+        setError('El enlace ha expirado. Solicita uno nuevo.');
+      } else if (errorMsg.includes('inválido')) {
+        setError('El enlace es inválido. Verifica que hayas copiado la URL completa.');
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!token) {
+    return null;
   }
 
   return (
@@ -45,10 +87,10 @@ export default function RecuperarContrasenaPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent" />
         <div className="absolute bottom-12 left-12 max-w-md">
           <h2 className="font-headline text-4xl font-extrabold text-white drop-shadow-lg mb-4">
-            Recupera tu acceso
+            Nueva contraseña
           </h2>
           <p className="text-lg font-medium text-white/90 drop-shadow-md">
-            Te enviaremos un enlace para restablecer tu contrasena de forma segura.
+            Crea una contraseña segura para proteger tu cuenta.
           </p>
         </div>
       </div>
@@ -70,14 +112,14 @@ export default function RecuperarContrasenaPage() {
             <div className="mb-10 text-left">
               <Image src={logo} alt="UVG Scholar" className="h-40 w-auto mx-auto mb-4" />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
-                Recuperar contrasena
+                Restablecer contraseña
               </h1>
               <p className="mt-2 text-base text-tertiary">
-                Ingresa tu correo institucional y te enviaremos un enlace para restablecer tu contrasena
+                Ingresa tu nueva contraseña
               </p>
             </div>
 
-            {!enviado ? (
+            {!success ? (
               <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                   <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
@@ -86,18 +128,43 @@ export default function RecuperarContrasenaPage() {
                   </div>
                 )}
 
+                {validationError && (
+                  <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-800">{validationError}</p>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="font-label text-xs font-bold uppercase tracking-widest text-tertiary">
-                    Correo Institucional
+                    Nueva Contraseña
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-outline-variant" />
+                    <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-outline-variant" />
                     <input
-                      type="email"
+                      type="password"
                       required
-                      value={correo}
-                      onChange={(e) => setCorreo(e.target.value)}
-                      placeholder="usuario@uvg.edu.gt"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Mínimo 8 caracteres"
+                      disabled={loading}
+                      className="w-full rounded-xl border border-surface-container-highest bg-white pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="font-label text-xs font-bold uppercase tracking-widest text-tertiary">
+                    Confirmar Contraseña
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-outline-variant" />
+                    <input
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repite la contraseña"
                       disabled={loading}
                       className="w-full rounded-xl border border-surface-container-highest bg-white pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
@@ -109,39 +176,31 @@ export default function RecuperarContrasenaPage() {
                   disabled={loading}
                   className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-container disabled:active:scale-100"
                 >
-                  {loading ? 'Enviando...' : 'Enviar enlace de recuperacion'}
+                  {loading ? 'Actualizando...' : 'Actualizar contraseña'}
                 </button>
               </form>
             ) : (
               <div className="rounded-2xl border border-primary/20 bg-primary/5 p-8 text-center">
                 <CheckCircle className="mx-auto mb-4 h-12 w-12 text-primary" />
                 <h2 className="font-headline text-xl font-bold text-on-surface mb-2">
-                  Correo enviado
+                  Contraseña actualizada
                 </h2>
                 <p className="text-sm text-tertiary mb-6">
-                  Si existe una cuenta asociada a{' '}
-                  <span className="font-bold text-on-surface">{correo}</span>, recibiras un
-                  enlace para restablecer tu contrasena en los proximos minutos.
+                  Tu contraseña ha sido actualizada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.
                 </p>
-                <p className="text-xs text-tertiary mb-6">
-                  Revisa tu bandeja de entrada y la carpeta de spam.
-                </p>
-                <button
-                  onClick={() => {
-                    setEnviado(false);
-                    setCorreo('');
-                  }}
-                  className="text-sm font-bold text-primary hover:underline"
+                <Link
+                  href="/login"
+                  className="inline-block rounded-xl bg-primary-container px-8 py-3 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary active:scale-[0.98]"
                 >
-                  Enviar a otro correo
-                </button>
+                  Ir al login
+                </Link>
               </div>
             )}
 
             <p className="mt-10 text-center text-xs text-tertiary">
-              Recordaste tu contrasena?{' '}
+              Recordaste tu contraseña?{' '}
               <Link href="/login" className="font-bold text-primary hover:underline">
-                Inicia sesion
+                Inicia sesión
               </Link>
             </p>
           </div>
@@ -162,5 +221,13 @@ export default function RecuperarContrasenaPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function RestablecerContrasenaPage() {
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <RestablecerContrasenaContent />
+    </Suspense>
   );
 }
