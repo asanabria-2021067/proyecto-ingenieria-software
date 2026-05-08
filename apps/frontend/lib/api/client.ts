@@ -1,7 +1,4 @@
-const API_URL =
-  process.env.NODE_ENV === 'production'
-    ? ''
-    : process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '/api';
 
 function joinUrl(base: string, prefix: string, path: string): string {

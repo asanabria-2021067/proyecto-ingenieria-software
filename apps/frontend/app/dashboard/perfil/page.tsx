@@ -1,7 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
   Code2,
@@ -16,7 +15,6 @@ import {
   UserRound,
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 
@@ -44,13 +42,12 @@ function experienciaLabel(tipo: string) {
 }
 
 export default function PerfilPage() {
-  const queryClient = useQueryClient();
   const { data: user, isLoading } = useCurrentUser();
-  const [editingProfile, setEditingProfile] = useState(false);
-  const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
-    queryFn: getDashboardStats,
-  });
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  useEffect(() => {
+    getDashboardStats().then(setStats).catch(() => {});
+  }, []);
 
   const fullName = useMemo(() => {
     if (!user) return '';
@@ -67,26 +64,8 @@ export default function PerfilPage() {
     );
   }
 
-  const requiereHorasBeca =
-    (stats?.horasBecaRequeridas ?? 0) > 0 || (user?.perfil?.horasBecaRequeridas ?? 0) > 0;
-  const requiereHorasExtension =
-    (stats?.horasExtensionRequeridas ?? 0) > 0 ||
-    (user?.perfil?.horasExtensionRequeridas ?? 0) > 0;
-
   return (
     <DashboardLayout>
-      <CompleteProfileDialog
-        open={editingProfile}
-        allowClose
-        onComplete={async () => {
-          setEditingProfile(false);
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['currentUser'] }),
-            queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
-          ]);
-        }}
-      />
-
       <div className="mx-auto max-w-7xl px-8 py-8">
         <section className="mb-10 rounded-2xl bg-surface-container-low p-6 md:p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-end">
@@ -130,21 +109,13 @@ export default function PerfilPage() {
                 </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setEditingProfile(true)}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary-container transition-colors"
-            >
-              Editar perfil
-            </button>
           </div>
         </section>
 
         <div className="grid grid-cols-12 gap-8">
           <div className="col-span-12 lg:col-span-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {requiereHorasBeca && (
-                <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
+              <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-outline">
                     Horas beca
@@ -167,11 +138,9 @@ export default function PerfilPage() {
                     }}
                   />
                 </div>
-                </article>
-              )}
+              </article>
 
-              {requiereHorasExtension && (
-                <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
+              <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-outline">
                     Horas extension
@@ -197,8 +166,7 @@ export default function PerfilPage() {
                     }}
                   />
                 </div>
-                </article>
-              )}
+              </article>
             </div>
 
             <section className="rounded-2xl bg-surface-container-lowest p-8 shadow-sm">
