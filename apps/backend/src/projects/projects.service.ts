@@ -295,6 +295,86 @@ export class ProjectsService {
     });
   }
 
+  async findTeam(id: number) {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: { idProyecto: id, eliminadoEn: null },
+      select: { idProyecto: true },
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
+    }
+
+    const participaciones = await this.prisma.participacionProyecto.findMany({
+      where: {
+        rolProyecto: { idProyecto: id },
+        estadoParticipacion: 'ACTIVO',
+      },
+      select: {
+        idParticipacionProyecto: true,
+        fechaInicio: true,
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+          },
+        },
+        usuario: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+            perfil: {
+              select: {
+                carrera: {
+                  select: {
+                    nombreCarrera: true,
+                  },
+                },
+              },
+            },
+            habilidades: {
+              select: {
+                habilidad: {
+                  select: {
+                    idHabilidad: true,
+                    nombreHabilidad: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { fechaInicio: 'asc' },
+    });
+
+    return participaciones;
+  }
+
+  async findFeatured() {
+    const proyectos = await this.prisma.proyecto.findMany({
+      where: {
+        estadoProyecto: EstadoProyecto.PUBLICADO,
+        eliminadoEn: null,
+      },
+      select: {
+        ...proyectoListSelect,
+        _count: {
+          select: { roles: { where: { postulaciones: { some: {} } } } },
+        },
+      },
+      orderBy: {
+        roles: {
+          _count: 'desc',
+        },
+      },
+      take: 6,
+    });
+
+    return proyectos;
+  }
+
   async createFull(data: CreateProjectFullDto, creadoPor: number) {
     const { fechaInicio, fechaFinEstimada, organizacionesIds, roles, accion, ...rest } = data;
     const estadoProyecto =
@@ -704,6 +784,25 @@ export class ProjectsService {
       },
       select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
     });
+
+    // Notificar a miembros activos sobre cambios de estado relevantes
+    if (
+      nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
+      nuevoEstado === EstadoProyectoCreador.EN_PROGRESO ||
+      nuevoEstado === EstadoProyectoCreador.CERRADO
+    ) {
+      await this.notifications.notifyProjectActiveParticipants(
+        id,
+        userId,
+        {
+          tipoNotificacion: 'CAMBIO_ESTADO_PROYECTO',
+          tituloNotificacion: `Proyecto cambió a ${nuevoEstado}`,
+          mensajeNotificacion: `El proyecto "${actualizado.tituloProyecto}" cambió su estado a ${nuevoEstado}.`,
+          datosJson: { idProyecto: id, nuevoEstado },
+        },
+      );
+    }
+
     return actualizado;
   }
 

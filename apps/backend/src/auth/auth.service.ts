@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -75,5 +75,61 @@ export class AuthService {
     return {
       accessToken: this.jwtService.sign(payload),
     };
+  }
+
+  async forgotPassword(correo: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { correo },
+      select: { idUsuario: true, correo: true },
+    });
+
+    if (!usuario) {
+      // Por seguridad, no revelar si el correo existe
+      return {
+        mensaje: 'Si el correo existe, recibirás un enlace de recuperación',
+      };
+    }
+
+    const resetToken = this.jwtService.sign(
+      { sub: usuario.idUsuario, correo: usuario.correo, tipo: 'reset' },
+      { expiresIn: '1h' },
+    );
+
+    // TODO: En producción, enviar email con el token
+    // Por ahora devolvemos el token directamente para desarrollo
+    return {
+      mensaje: 'Si el correo existe, recibirás un enlace de recuperación',
+      resetToken, // Solo para desarrollo
+    };
+  }
+
+  async resetPassword(token: string, nuevaContrasena: string) {
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(token);
+    } catch (error) {
+      throw new BadRequestException('Token inválido o expirado');
+    }
+
+    if (payload.tipo !== 'reset') {
+      throw new BadRequestException('Token no válido para esta operación');
+    }
+
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { idUsuario: payload.sub },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const contrasenaHash = await bcrypt.hash(nuevaContrasena, 10);
+
+    await this.prisma.usuario.update({
+      where: { idUsuario: usuario.idUsuario },
+      data: { contrasena: contrasenaHash },
+    });
+
+    return { mensaje: 'Contraseña actualizada exitosamente' };
   }
 }

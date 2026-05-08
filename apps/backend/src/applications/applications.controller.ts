@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   ParseIntPipe,
@@ -52,5 +53,14 @@ export class ApplicationsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.applicationsService.updateEstado(id, dto, user.userId);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  delete(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.applicationsService.delete(id, user.userId);
   }
 }
