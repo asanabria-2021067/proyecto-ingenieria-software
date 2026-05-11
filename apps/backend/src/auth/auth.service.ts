@@ -107,7 +107,7 @@ export class AuthService {
     let payload: any;
     try {
       payload = this.jwtService.verify(token);
-    } catch (error) {
+    } catch {
       throw new BadRequestException('Token inválido o expirado');
     }
 

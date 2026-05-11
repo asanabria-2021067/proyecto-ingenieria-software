@@ -9,11 +9,11 @@ export class TasksService {
     return { message: 'Not implemented yet' };
   }
 
-  create(data: any) {
+  create(_data: any) {
     return { message: 'Not implemented yet' };
   }
 
-  update(id: number, data: any) {
+  update(_id: number, _data: any) {
     return { message: 'Not implemented yet' };
   }
 }
