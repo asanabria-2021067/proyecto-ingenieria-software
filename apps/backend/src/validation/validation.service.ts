@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ValidationService {
   constructor(private prisma: PrismaService) {}
 
-  create(data: any) {
+  create(_data: any) {
     return { message: 'Not implemented yet' };
   }
 

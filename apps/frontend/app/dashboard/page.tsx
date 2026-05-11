@@ -17,6 +17,7 @@ import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
+import { apiFetch } from '@/lib/api/client';
 
 const tipoLabel: Record<string, string> = {
   ACADEMICO_HORAS_BECA: 'Hora Beca',
