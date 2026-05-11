@@ -310,8 +310,8 @@ export class ProjectsService {
         estadoParticipacion: 'ACTIVO',
       },
       select: {
-        idParticipacionProyecto: true,
-        fechaInicio: true,
+        idParticipacion: true,
+        fechaIngreso: true,
         rolProyecto: {
           select: {
             idRolProyecto: true,
@@ -346,7 +346,7 @@ export class ProjectsService {
           },
         },
       },
-      orderBy: { fechaInicio: 'asc' },
+      orderBy: { fechaIngreso: 'asc' },
     });
 
     return participaciones;
