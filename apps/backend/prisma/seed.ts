@@ -661,6 +661,244 @@ async function main() {
     });
   }
 
+  // ─── Usuario de prueba san24725 ────────────────────────
+  const TEST_PASSWORD = hashSync('12345678', 10);
+  const angelUser = await prisma.usuario.upsert({
+    where: { correo: 'san24725@uvg.edu.gt' },
+    update: {},
+    create: {
+      correo: 'san24725@uvg.edu.gt',
+      contrasena: TEST_PASSWORD,
+      nombre: 'Angel',
+      apellido: 'Sanabria',
+    },
+  });
+
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: angelUser.idUsuario },
+    update: {},
+    create: {
+      idUsuario: angelUser.idUsuario,
+      carne: '24725',
+      idCarrera: computacion.idCarrera,
+      semestre: 5,
+      disponibilidadHorasSemana: 12,
+      biografia: 'Estudiante de Ingeniería en Ciencias de la Computación',
+    },
+  });
+
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: angelUser.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: angelUser.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+
+  // 4 proyectos de Angel
+  const angelProyectos = await Promise.all([
+    prisma.proyecto.create({
+      data: {
+        tituloProyecto: 'Sistema de Gestión Académica',
+        descripcionProyecto: 'Plataforma web para gestión de cursos, tareas y calificaciones',
+        tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+        estadoProyecto: 'PUBLICADO',
+        creadoPor: angelUser.idUsuario,
+        fechaInicio: new Date('2026-05-01'),
+        fechaFinEstimada: new Date('2026-12-01'),
+      },
+    }),
+    prisma.proyecto.create({
+      data: {
+        tituloProyecto: 'App Móvil de Salud Mental',
+        descripcionProyecto: 'Aplicación para seguimiento de bienestar emocional estudiantil',
+        tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
+        estadoProyecto: 'PUBLICADO',
+        creadoPor: angelUser.idUsuario,
+        fechaInicio: new Date('2026-06-01'),
+        fechaFinEstimada: new Date('2026-11-01'),
+      },
+    }),
+    prisma.proyecto.create({
+      data: {
+        tituloProyecto: 'Plataforma de E-Learning',
+        descripcionProyecto: 'Sistema de cursos en línea con evaluaciones automáticas',
+        tipoProyecto: 'ACADEMICO_HORAS_BECA',
+        estadoProyecto: 'PUBLICADO',
+        creadoPor: angelUser.idUsuario,
+        fechaInicio: new Date('2026-04-15'),
+        fechaFinEstimada: new Date('2026-10-15'),
+      },
+    }),
+    prisma.proyecto.create({
+      data: {
+        tituloProyecto: 'Dashboard de Análisis Deportivo',
+        descripcionProyecto: 'Visualización de estadísticas deportivas universitarias',
+        tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
+        estadoProyecto: 'PUBLICADO',
+        creadoPor: angelUser.idUsuario,
+        fechaInicio: new Date('2026-05-10'),
+        fechaFinEstimada: new Date('2026-09-10'),
+      },
+    }),
+  ]);
+
+  // Roles para los proyectos de Angel
+  const angelRoles = await Promise.all([
+    // Proyecto 1: Sistema de Gestión Académica
+    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[0].idProyecto, nombreRol: 'Backend Developer', descripcionRolProyecto: 'Desarrollador Node.js/NestJS', cupos: 2 } }),
+    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[0].idProyecto, nombreRol: 'Frontend Developer', descripcionRolProyecto: 'Desarrollador React/Next.js', cupos: 2 } }),
+    // Proyecto 2: App Móvil
+    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[1].idProyecto, nombreRol: 'Mobile Developer', descripcionRolProyecto: 'Desarrollador React Native', cupos: 2 } }),
+    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[1].idProyecto, nombreRol: 'UX Designer', descripcionRolProyecto: 'Diseñador de experiencia de usuario', cupos: 1 } }),
+    // Proyecto 3: E-Learning
+    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[2].idProyecto, nombreRol: 'Full Stack Developer', descripcionRolProyecto: 'Desarrollador Full Stack', cupos: 3 } }),
+    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[2].idProyecto, nombreRol: 'DevOps Engineer', descripcionRolProyecto: 'Ingeniero de DevOps', cupos: 1 } }),
+    // Proyecto 4: Dashboard Deportivo
+    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[3].idProyecto, nombreRol: 'Data Analyst', descripcionRolProyecto: 'Analista de datos deportivos', cupos: 1 } }),
+    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[3].idProyecto, nombreRol: 'Frontend Developer', descripcionRolProyecto: 'Desarrollador de visualizaciones', cupos: 2 } }),
+  ]);
+
+  // Participaciones - Agregar Angel y otros usuarios a sus equipos
+  await prisma.participacionProyecto.create({
+    data: {
+      idUsuario: angelUser.idUsuario,
+      idRolProyecto: angelRoles[0].idRolProyecto,
+      estadoParticipacion: 'ACTIVO',
+      fechaIngreso: new Date('2026-05-01'),
+    },
+  });
+
+  await prisma.participacionProyecto.create({
+    data: {
+      idUsuario: maria.idUsuario,
+      idRolProyecto: angelRoles[1].idRolProyecto,
+      estadoParticipacion: 'ACTIVO',
+      fechaIngreso: new Date('2026-05-05'),
+    },
+  });
+
+  await prisma.participacionProyecto.create({
+    data: {
+      idUsuario: jose.idUsuario,
+      idRolProyecto: angelRoles[2].idRolProyecto,
+      estadoParticipacion: 'ACTIVO',
+      fechaIngreso: new Date('2026-06-02'),
+    },
+  });
+
+  await prisma.participacionProyecto.create({
+    data: {
+      idUsuario: ana.idUsuario,
+      idRolProyecto: angelRoles[3].idRolProyecto,
+      estadoParticipacion: 'ACTIVO',
+      fechaIngreso: new Date('2026-06-03'),
+    },
+  });
+
+  await prisma.participacionProyecto.create({
+    data: {
+      idUsuario: luis.idUsuario,
+      idRolProyecto: angelRoles[4].idRolProyecto,
+      estadoParticipacion: 'ACTIVO',
+      fechaIngreso: new Date('2026-04-20'),
+    },
+  });
+
+  await prisma.participacionProyecto.create({
+    data: {
+      idUsuario: sofia.idUsuario,
+      idRolProyecto: angelRoles[6].idRolProyecto,
+      estadoParticipacion: 'ACTIVO',
+      fechaIngreso: new Date('2026-05-12'),
+    },
+  });
+
+  // Postulaciones - Algunos usuarios postulando a proyectos de Angel
+  await prisma.postulacion.create({
+    data: {
+      idUsuarioPostulante: carlos.idUsuario,
+      idRolProyecto: angelRoles[0].idRolProyecto,
+      justificacion: 'Tengo experiencia con NestJS y arquitectura backend escalable',
+      estadoPostulacion: 'PENDIENTE',
+    },
+  });
+
+  await prisma.postulacion.create({
+    data: {
+      idUsuarioPostulante: sofia.idUsuario,
+      idRolProyecto: angelRoles[1].idRolProyecto,
+      justificacion: 'Me apasiona el frontend moderno con React y TypeScript',
+      estadoPostulacion: 'PENDIENTE',
+    },
+  });
+
+  await prisma.postulacion.create({
+    data: {
+      idUsuarioPostulante: luis.idUsuario,
+      idRolProyecto: angelRoles[5].idRolProyecto,
+      justificacion: 'Experiencia en Docker, CI/CD y cloud deployments',
+      estadoPostulacion: 'ACEPTADA',
+      resueltaPor: angelUser.idUsuario,
+      fechaResolucion: new Date(),
+    },
+  });
+
+  // Angel postulando a proyectos de otros
+  await prisma.postulacion.create({
+    data: {
+      idUsuarioPostulante: angelUser.idUsuario,
+      idRolProyecto: rolMobile.idRolProyecto,
+      justificacion: 'Quiero contribuir al desarrollo móvil del proyecto ambiental',
+      estadoPostulacion: 'PENDIENTE',
+    },
+  });
+
+  await prisma.postulacion.create({
+    data: {
+      idUsuarioPostulante: angelUser.idUsuario,
+      idRolProyecto: rolFullstack.idRolProyecto,
+      justificacion: 'Experiencia en MERN stack y arquitectura de aplicaciones',
+      estadoPostulacion: 'ACEPTADA',
+      resueltaPor: carlos.idUsuario,
+      fechaResolucion: new Date(),
+    },
+  });
+
+  // Notificaciones para Angel
+  await prisma.notificacion.createMany({
+    data: [
+      {
+        idUsuario: angelUser.idUsuario,
+        tipoNotificacion: 'NUEVA_POSTULACION',
+        tituloNotificacion: 'Nueva postulación recibida',
+        mensajeNotificacion: `${carlos.nombre} ${carlos.apellido} se postuló para el rol "Backend Developer" en tu proyecto "${angelProyectos[0].tituloProyecto}".`,
+        datosJson: { projectId: angelProyectos[0].idProyecto },
+      },
+      {
+        idUsuario: angelUser.idUsuario,
+        tipoNotificacion: 'NUEVA_POSTULACION',
+        tituloNotificacion: 'Nueva postulación recibida',
+        mensajeNotificacion: `${sofia.nombre} ${sofia.apellido} se postuló para el rol "Frontend Developer" en tu proyecto "${angelProyectos[0].tituloProyecto}".`,
+        datosJson: { projectId: angelProyectos[0].idProyecto },
+      },
+      {
+        idUsuario: angelUser.idUsuario,
+        tipoNotificacion: 'POSTULACION_RESUELTA',
+        tituloNotificacion: 'Tu postulación fue aceptada',
+        mensajeNotificacion: `Tu postulación para el rol "Desarrollador Fullstack" en el proyecto "${pEmpleo.tituloProyecto}" fue aceptada.`,
+        datosJson: { projectId: pEmpleo.idProyecto },
+        leidaEn: new Date(),
+      },
+      {
+        idUsuario: angelUser.idUsuario,
+        tipoNotificacion: 'PROYECTO_APROBADO',
+        tituloNotificacion: 'Tu proyecto fue aprobado',
+        mensajeNotificacion: `Tu proyecto "${angelProyectos[0].tituloProyecto}" ha sido aprobado y ahora está visible.`,
+        datosJson: { projectId: angelProyectos[0].idProyecto },
+        leidaEn: new Date(),
+      },
+    ],
+  });
+
   // ─── Configuración del sistema ──────────────────────────
   const configData = [
     { clave: 'max_horas_semana', valor: '40', descripcionParametro: 'Máximo de horas semanales permitidas' },
