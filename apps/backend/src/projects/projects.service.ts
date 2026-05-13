@@ -296,60 +296,36 @@ export class ProjectsService {
   }
 
   async findTeam(id: number) {
-    const proyecto = await this.prisma.proyecto.findFirst({
-      where: { idProyecto: id, eliminadoEn: null },
-      select: { idProyecto: true },
-    });
-    if (!proyecto) {
-      throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
-    }
-
-    const participaciones = await this.prisma.participacionProyecto.findMany({
+    return this.prisma.participacionProyecto.findMany({
       where: {
         rolProyecto: { idProyecto: id },
         estadoParticipacion: 'ACTIVO',
       },
       select: {
         idParticipacion: true,
+        estadoParticipacion: true,
         fechaIngreso: true,
-        rolProyecto: {
-          select: {
-            idRolProyecto: true,
-            nombreRol: true,
-          },
-        },
         usuario: {
           select: {
             idUsuario: true,
             nombre: true,
             apellido: true,
             correo: true,
-            perfil: {
-              select: {
-                carrera: {
-                  select: {
-                    nombreCarrera: true,
-                  },
-                },
-              },
-            },
-            habilidades: {
-              select: {
-                habilidad: {
-                  select: {
-                    idHabilidad: true,
-                    nombreHabilidad: true,
-                  },
-                },
-              },
-            },
+            fotoUrl: true,
+          },
+        },
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
           },
         },
       },
-      orderBy: { fechaIngreso: 'asc' },
+      orderBy: {
+        fechaIngreso: 'asc',
+      },
     });
-
-    return participaciones;
   }
 
   async findFeatured() {
