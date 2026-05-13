@@ -139,6 +139,18 @@ export default function RegistroPage() {
               </div>
 
               <div className="space-y-1.5">
+                <label className={labelClass}>Carnet</label>
+                <input
+                  type="text"
+                  required
+                  value={carne}
+                  onChange={(e) => setCarne(e.target.value)}
+                  placeholder="24000"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1.5">
                 <label className={labelClass}>Correo Institucional</label>
                 <input
                   type="email"
@@ -154,18 +166,6 @@ export default function RegistroPage() {
                     ✓ Correo generado automáticamente
                   </p>
                 )}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className={labelClass}>Carne</label>
-                <input
-                  type="text"
-                  required
-                  value={carne}
-                  onChange={(e) => setCarne(e.target.value)}
-                  placeholder="24000"
-                  className={inputClass}
-                />
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
