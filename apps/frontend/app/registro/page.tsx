@@ -30,10 +30,16 @@ export default function RegistroPage() {
   }, []);
 
   useEffect(() => {
-    if (carne && carne.trim() !== '' && !correo.includes('@')) {
-      setCorreo(`${carne.trim()}@uvg.edu.gt`);
+    if (apellido && carne) {
+      const apellidoTrimmed = apellido.trim();
+      const carneTrimmed = carne.trim();
+      if (apellidoTrimmed && carneTrimmed) {
+        const firstThreeLetters = apellidoTrimmed.substring(0, 3).toLowerCase();
+        const generatedEmail = `${firstThreeLetters}${carneTrimmed}@uvg.edu.gt`;
+        setCorreo(generatedEmail);
+      }
     }
-  }, [carne]);
+  }, [apellido, carne]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -140,8 +146,14 @@ export default function RegistroPage() {
                   value={correo}
                   onChange={(e) => setCorreo(e.target.value)}
                   placeholder="usuario@uvg.edu.gt"
-                  className={inputClass}
+                  className={`${inputClass} ${correo && apellido && carne ? 'bg-green-50' : ''}`}
+                  readOnly={!!(apellido && carne && correo)}
                 />
+                {correo && apellido && carne && (
+                  <p className="text-xs text-green-600">
+                    ✓ Correo generado automáticamente
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">

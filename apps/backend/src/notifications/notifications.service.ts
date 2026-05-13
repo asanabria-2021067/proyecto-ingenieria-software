@@ -1,12 +1,22 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsGateway } from './notifications.gateway';
+import {
+  NOTIFICATION_TEMPLATES,
+  NotificationTemplateKey,
+  NotificationTemplateData,
+} from './templates/notification.templates';
 
 type TxClient = Prisma.TransactionClient;
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsGateway))
+    private gateway: NotificationsGateway,
+  ) {}
 
   findAll(userId?: number) {
     return this.prisma.notificacion.findMany({
@@ -72,6 +82,28 @@ export class NotificationsService {
     return !!rol;
   }
 
+  async notifyFromTemplate<K extends NotificationTemplateKey>(
+    userIds: number[],
+    templateKey: K,
+    data: NotificationTemplateData[K],
+    tx?: TxClient,
+  ) {
+    const template = NOTIFICATION_TEMPLATES[templateKey];
+    const title = typeof template.title === 'function' ? template.title(data as any) : template.title;
+    const message = template.message(data as any);
+
+    await this.notifyUsers(
+      userIds,
+      {
+        tipoNotificacion: templateKey,
+        tituloNotificacion: title,
+        mensajeNotificacion: message,
+        datosJson: data,
+      },
+      tx,
+    );
+  }
+
   async notifyUsers(
     userIds: number[],
     payload: {
@@ -84,7 +116,8 @@ export class NotificationsService {
   ) {
     if (userIds.length === 0) return;
     const db = tx ?? this.prisma;
-    await db.notificacion.createMany({
+
+    const notifications = await db.notificacion.createMany({
       data: userIds.map((idUsuario) => ({
         idUsuario,
         tipoNotificacion: payload.tipoNotificacion,
@@ -94,6 +127,12 @@ export class NotificationsService {
       })),
       skipDuplicates: false,
     });
+
+    if (this.gateway?.server) {
+      await this.gateway.notifyUsers(userIds, payload);
+    }
+
+    return notifications;
   }
 
   async notifyAdmins(
