@@ -227,7 +227,7 @@ export default function RegistroPage() {
                   required
                   value={confirmar}
                   onChange={(e) => setConfirmar(e.target.value)}
-                  placeholder="--------"
+                  placeholder="••••••••"
                   className={inputClass}
                 />
               </div>

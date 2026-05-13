@@ -142,16 +142,16 @@ export default function PostularPage() {
             <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-on-surface mb-1.5">
-                  JustificaciÃ³n <span className="text-error">*</span>
+                  Justificación <span className="text-error">*</span>
                 </label>
                 <p className="text-xs text-tertiary mb-2">
-                  Explica por quÃ© eres un buen candidato para este rol, tus experiencias relevantes
-                  y motivaciÃ³n.
+                  Explica por qué eres un buen candidato para este rol, tus experiencias relevantes
+                  y motivación.
                 </p>
                 <textarea
                   {...register('justificacion')}
                   rows={8}
-                  placeholder="Escribe tu justificaciÃ³n aquÃ­..."
+                  placeholder="Escribe tu justificación aquí..."
                   className={`w-full px-4 py-3 rounded-xl border text-on-surface text-sm leading-relaxed outline-none resize-none transition-colors ${
                     errors.justificacion
                       ? 'border-error bg-error-container/10 focus:ring-2 focus:ring-error'
