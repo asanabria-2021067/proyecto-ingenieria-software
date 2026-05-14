@@ -695,8 +695,11 @@ async function main() {
 
   // 4 proyectos de Angel
   const angelProyectos = await Promise.all([
-    prisma.proyecto.create({
-      data: {
+    prisma.proyecto.upsert({
+      where: { idProyecto: 10 },
+      update: {},
+      create: {
+        idProyecto: 10,
         tituloProyecto: 'Sistema de Gestión Académica',
         descripcionProyecto: 'Plataforma web para gestión de cursos, tareas y calificaciones',
         tipoProyecto: 'ACADEMICO_EXPERIENCIA',
@@ -706,8 +709,11 @@ async function main() {
         fechaFinEstimada: new Date('2026-12-01'),
       },
     }),
-    prisma.proyecto.create({
-      data: {
+    prisma.proyecto.upsert({
+      where: { idProyecto: 11 },
+      update: {},
+      create: {
+        idProyecto: 11,
         tituloProyecto: 'App Móvil de Salud Mental',
         descripcionProyecto: 'Aplicación para seguimiento de bienestar emocional estudiantil',
         tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
@@ -717,8 +723,11 @@ async function main() {
         fechaFinEstimada: new Date('2026-11-01'),
       },
     }),
-    prisma.proyecto.create({
-      data: {
+    prisma.proyecto.upsert({
+      where: { idProyecto: 12 },
+      update: {},
+      create: {
+        idProyecto: 12,
         tituloProyecto: 'Plataforma de E-Learning',
         descripcionProyecto: 'Sistema de cursos en línea con evaluaciones automáticas',
         tipoProyecto: 'ACADEMICO_HORAS_BECA',
@@ -728,8 +737,11 @@ async function main() {
         fechaFinEstimada: new Date('2026-10-15'),
       },
     }),
-    prisma.proyecto.create({
-      data: {
+    prisma.proyecto.upsert({
+      where: { idProyecto: 13 },
+      update: {},
+      create: {
+        idProyecto: 13,
         tituloProyecto: 'Dashboard de Análisis Deportivo',
         descripcionProyecto: 'Visualización de estadísticas deportivas universitarias',
         tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
@@ -744,22 +756,25 @@ async function main() {
   // Roles para los proyectos de Angel
   const angelRoles = await Promise.all([
     // Proyecto 1: Sistema de Gestión Académica
-    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[0].idProyecto, nombreRol: 'Backend Developer', descripcionRolProyecto: 'Desarrollador Node.js/NestJS', cupos: 2 } }),
-    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[0].idProyecto, nombreRol: 'Frontend Developer', descripcionRolProyecto: 'Desarrollador React/Next.js', cupos: 2 } }),
+    prisma.rolProyecto.upsert({ where: { idRolProyecto: 8 }, update: {}, create: { idRolProyecto: 8, idProyecto: angelProyectos[0].idProyecto, nombreRol: 'Backend Developer', descripcionRolProyecto: 'Desarrollador Node.js/NestJS', cupos: 2 } }),
+    prisma.rolProyecto.upsert({ where: { idRolProyecto: 9 }, update: {}, create: { idRolProyecto: 9, idProyecto: angelProyectos[0].idProyecto, nombreRol: 'Frontend Developer', descripcionRolProyecto: 'Desarrollador React/Next.js', cupos: 2 } }),
     // Proyecto 2: App Móvil
-    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[1].idProyecto, nombreRol: 'Mobile Developer', descripcionRolProyecto: 'Desarrollador React Native', cupos: 2 } }),
-    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[1].idProyecto, nombreRol: 'UX Designer', descripcionRolProyecto: 'Diseñador de experiencia de usuario', cupos: 1 } }),
+    prisma.rolProyecto.upsert({ where: { idRolProyecto: 10 }, update: {}, create: { idRolProyecto: 10, idProyecto: angelProyectos[1].idProyecto, nombreRol: 'Mobile Developer', descripcionRolProyecto: 'Desarrollador React Native', cupos: 2 } }),
+    prisma.rolProyecto.upsert({ where: { idRolProyecto: 11 }, update: {}, create: { idRolProyecto: 11, idProyecto: angelProyectos[1].idProyecto, nombreRol: 'UX Designer', descripcionRolProyecto: 'Diseñador de experiencia de usuario', cupos: 1 } }),
     // Proyecto 3: E-Learning
-    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[2].idProyecto, nombreRol: 'Full Stack Developer', descripcionRolProyecto: 'Desarrollador Full Stack', cupos: 3 } }),
-    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[2].idProyecto, nombreRol: 'DevOps Engineer', descripcionRolProyecto: 'Ingeniero de DevOps', cupos: 1 } }),
+    prisma.rolProyecto.upsert({ where: { idRolProyecto: 12 }, update: {}, create: { idRolProyecto: 12, idProyecto: angelProyectos[2].idProyecto, nombreRol: 'Full Stack Developer', descripcionRolProyecto: 'Desarrollador Full Stack', cupos: 3 } }),
+    prisma.rolProyecto.upsert({ where: { idRolProyecto: 13 }, update: {}, create: { idRolProyecto: 13, idProyecto: angelProyectos[2].idProyecto, nombreRol: 'DevOps Engineer', descripcionRolProyecto: 'Ingeniero de DevOps', cupos: 1 } }),
     // Proyecto 4: Dashboard Deportivo
-    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[3].idProyecto, nombreRol: 'Data Analyst', descripcionRolProyecto: 'Analista de datos deportivos', cupos: 1 } }),
-    prisma.rolProyecto.create({ data: { idProyecto: angelProyectos[3].idProyecto, nombreRol: 'Frontend Developer', descripcionRolProyecto: 'Desarrollador de visualizaciones', cupos: 2 } }),
+    prisma.rolProyecto.upsert({ where: { idRolProyecto: 14 }, update: {}, create: { idRolProyecto: 14, idProyecto: angelProyectos[3].idProyecto, nombreRol: 'Data Analyst', descripcionRolProyecto: 'Analista de datos deportivos', cupos: 1 } }),
+    prisma.rolProyecto.upsert({ where: { idRolProyecto: 15 }, update: {}, create: { idRolProyecto: 15, idProyecto: angelProyectos[3].idProyecto, nombreRol: 'Frontend Developer', descripcionRolProyecto: 'Desarrollador de visualizaciones', cupos: 2 } }),
   ]);
 
   // Participaciones - Agregar Angel y otros usuarios a sus equipos
-  await prisma.participacionProyecto.create({
-    data: {
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 6 },
+    update: {},
+    create: {
+      idParticipacion: 6,
       idUsuario: angelUser.idUsuario,
       idRolProyecto: angelRoles[0].idRolProyecto,
       estadoParticipacion: 'ACTIVO',
@@ -767,8 +782,11 @@ async function main() {
     },
   });
 
-  await prisma.participacionProyecto.create({
-    data: {
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 7 },
+    update: {},
+    create: {
+      idParticipacion: 7,
       idUsuario: maria.idUsuario,
       idRolProyecto: angelRoles[1].idRolProyecto,
       estadoParticipacion: 'ACTIVO',
@@ -776,8 +794,11 @@ async function main() {
     },
   });
 
-  await prisma.participacionProyecto.create({
-    data: {
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 8 },
+    update: {},
+    create: {
+      idParticipacion: 8,
       idUsuario: jose.idUsuario,
       idRolProyecto: angelRoles[2].idRolProyecto,
       estadoParticipacion: 'ACTIVO',
@@ -785,8 +806,11 @@ async function main() {
     },
   });
 
-  await prisma.participacionProyecto.create({
-    data: {
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 9 },
+    update: {},
+    create: {
+      idParticipacion: 9,
       idUsuario: ana.idUsuario,
       idRolProyecto: angelRoles[3].idRolProyecto,
       estadoParticipacion: 'ACTIVO',
@@ -794,8 +818,11 @@ async function main() {
     },
   });
 
-  await prisma.participacionProyecto.create({
-    data: {
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 10 },
+    update: {},
+    create: {
+      idParticipacion: 10,
       idUsuario: luis.idUsuario,
       idRolProyecto: angelRoles[4].idRolProyecto,
       estadoParticipacion: 'ACTIVO',
@@ -803,8 +830,11 @@ async function main() {
     },
   });
 
-  await prisma.participacionProyecto.create({
-    data: {
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 11 },
+    update: {},
+    create: {
+      idParticipacion: 11,
       idUsuario: sofia.idUsuario,
       idRolProyecto: angelRoles[6].idRolProyecto,
       estadoParticipacion: 'ACTIVO',
@@ -813,8 +843,11 @@ async function main() {
   });
 
   // Postulaciones - Algunos usuarios postulando a proyectos de Angel
-  await prisma.postulacion.create({
-    data: {
+  await prisma.postulacion.upsert({
+    where: { idPostulacion: 7 },
+    update: {},
+    create: {
+      idPostulacion: 7,
       idUsuarioPostulante: carlos.idUsuario,
       idRolProyecto: angelRoles[0].idRolProyecto,
       justificacion: 'Tengo experiencia con NestJS y arquitectura backend escalable',
@@ -822,8 +855,11 @@ async function main() {
     },
   });
 
-  await prisma.postulacion.create({
-    data: {
+  await prisma.postulacion.upsert({
+    where: { idPostulacion: 8 },
+    update: {},
+    create: {
+      idPostulacion: 8,
       idUsuarioPostulante: sofia.idUsuario,
       idRolProyecto: angelRoles[1].idRolProyecto,
       justificacion: 'Me apasiona el frontend moderno con React y TypeScript',
@@ -831,8 +867,11 @@ async function main() {
     },
   });
 
-  await prisma.postulacion.create({
-    data: {
+  await prisma.postulacion.upsert({
+    where: { idPostulacion: 9 },
+    update: {},
+    create: {
+      idPostulacion: 9,
       idUsuarioPostulante: luis.idUsuario,
       idRolProyecto: angelRoles[5].idRolProyecto,
       justificacion: 'Experiencia en Docker, CI/CD y cloud deployments',
@@ -843,8 +882,11 @@ async function main() {
   });
 
   // Angel postulando a proyectos de otros
-  await prisma.postulacion.create({
-    data: {
+  await prisma.postulacion.upsert({
+    where: { idPostulacion: 10 },
+    update: {},
+    create: {
+      idPostulacion: 10,
       idUsuarioPostulante: angelUser.idUsuario,
       idRolProyecto: rolMobile.idRolProyecto,
       justificacion: 'Quiero contribuir al desarrollo móvil del proyecto ambiental',
@@ -852,8 +894,11 @@ async function main() {
     },
   });
 
-  await prisma.postulacion.create({
-    data: {
+  await prisma.postulacion.upsert({
+    where: { idPostulacion: 11 },
+    update: {},
+    create: {
+      idPostulacion: 11,
       idUsuarioPostulante: angelUser.idUsuario,
       idRolProyecto: rolFullstack.idRolProyecto,
       justificacion: 'Experiencia en MERN stack y arquitectura de aplicaciones',
