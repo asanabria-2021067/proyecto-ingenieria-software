@@ -749,6 +749,8 @@ export class ProjectsService {
         `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
       );
     }
+    const estadoAnterior = proyecto.estadoProyecto;
+
     const actualizado = await this.prisma.proyecto.update({
       where: { idProyecto: id },
       data: {
@@ -761,20 +763,50 @@ export class ProjectsService {
       select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
     });
 
-    // Notificar a miembros activos sobre cambios de estado relevantes
+    const templateData = {
+      projectTitle: actualizado.tituloProyecto,
+      projectId: actualizado.idProyecto,
+      oldStatus: estadoAnterior,
+      newStatus: actualizado.estadoProyecto,
+    } as const;
+
+    await this.notifications.notifyFromTemplate(
+      [proyecto.creadoPor],
+      'CAMBIO_ESTADO_PROYECTO',
+      templateData,
+    );
+
     if (
       nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
       nuevoEstado === EstadoProyectoCreador.EN_PROGRESO ||
       nuevoEstado === EstadoProyectoCreador.CERRADO
     ) {
-      await this.notifications.notifyProjectActiveParticipants(
-        id,
-        userId,
+      const participaciones = await this.prisma.participacionProyecto.findMany({
+        where: {
+          estadoParticipacion: 'ACTIVO',
+          idUsuario: { notIn: [userId, proyecto.creadoPor] },
+          rolProyecto: { idProyecto: id },
+        },
+        distinct: ['idUsuario'],
+        select: { idUsuario: true },
+      });
+      const destinatarios = participaciones.map((p) => p.idUsuario);
+      if (destinatarios.length) {
+        await this.notifications.notifyFromTemplate(
+          destinatarios,
+          'CAMBIO_ESTADO_PROYECTO',
+          templateData,
+        );
+      }
+    }
+
+    if (nuevoEstado === EstadoProyectoCreador.PUBLICADO) {
+      await this.notifications.notifyFromTemplate(
+        [proyecto.creadoPor],
+        'PROYECTO_PUBLICADO',
         {
-          tipoNotificacion: 'CAMBIO_ESTADO_PROYECTO',
-          tituloNotificacion: `Proyecto cambió a ${nuevoEstado}`,
-          mensajeNotificacion: `El proyecto "${actualizado.tituloProyecto}" cambió su estado a ${nuevoEstado}.`,
-          datosJson: { idProyecto: id, nuevoEstado },
+          projectTitle: actualizado.tituloProyecto,
+          projectId: actualizado.idProyecto,
         },
       );
     }
