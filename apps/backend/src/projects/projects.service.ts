@@ -879,7 +879,11 @@ export class ProjectsService {
       throw new NotFoundException('Proyecto no encontrado');
     }
 
-    if (![EstadoProyecto.BORRADOR, EstadoProyecto.OBSERVADO].includes(proyecto.estadoProyecto)) {
+    const estadosEliminables: EstadoProyecto[] = [
+      EstadoProyecto.BORRADOR,
+      EstadoProyecto.OBSERVADO,
+    ];
+    if (!estadosEliminables.includes(proyecto.estadoProyecto)) {
       throw new BadRequestException('Solo se pueden eliminar proyectos en estado BORRADOR u OBSERVADO');
     }
 
