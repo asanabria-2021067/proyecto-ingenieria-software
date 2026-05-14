@@ -20,9 +20,8 @@ services:
       retries: 3
 
   backend:
-    build:
-      context: ./apps/backend
-      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE:-ghcr.io/${GHCR_NAMESPACE:-local}/proyecto-ingenieria-software-backend:latest}
+    pull_policy: always
     container_name: uvg-collab-backend
     profiles:
       - app
@@ -46,13 +45,8 @@ services:
       - uvg-network
 
   frontend:
-    build:
-      context: ./apps/frontend
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
-        - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-}
-        - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET:-}
+    image: ${FRONTEND_IMAGE:-ghcr.io/${GHCR_NAMESPACE:-local}/proyecto-ingenieria-software-frontend:latest}
+    pull_policy: always
     container_name: uvg-collab-frontend
     profiles:
       - app
