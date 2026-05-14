@@ -114,3 +114,7 @@ export async function getAdminReviewInbox(): Promise<{
 }> {
   return apiFetch('/revisiones/admin/bandeja');
 }
+
+export async function deleteProject(id: number): Promise<{ mensaje: string }> {
+  return apiFetch(`/proyectos/${id}`, { method: 'DELETE' });
+}

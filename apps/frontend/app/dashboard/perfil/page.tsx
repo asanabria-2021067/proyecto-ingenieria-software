@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CalendarDays,
   Code2,
   Download,
+  Edit,
   ExternalLink,
   GraduationCap,
   HeartHandshake,
@@ -42,6 +44,7 @@ function experienciaLabel(tipo: string) {
 }
 
 export default function PerfilPage() {
+  const router = useRouter();
   const { data: user, isLoading } = useCurrentUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
@@ -67,6 +70,15 @@ export default function PerfilPage() {
   return (
     <DashboardLayout>
       <div className="mx-auto max-w-7xl px-8 py-8">
+        <div className="mb-6 flex items-center justify-end">
+          <button
+            onClick={() => router.push('/dashboard/perfil/editar')}
+            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 transition-colors"
+          >
+            <Edit className="h-4 w-4" />
+            Editar perfil
+          </button>
+        </div>
         <section className="mb-10 rounded-2xl bg-surface-container-low p-6 md:p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-end">
             <div className="relative">

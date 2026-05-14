@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Search, MapPin, Plus } from 'lucide-react';
+import { Search, MapPin, Plus, Trash2 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { getMyProjects } from '@/lib/services/projects';
+import { getMyProjects, deleteProject } from '@/lib/services/projects';
 import { TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
+import uvgSwal from '@/lib/swal';
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 export default function MyProjectsPage() {
+  const queryClient = useQueryClient();
   const [busqueda, setBusqueda] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
@@ -47,6 +49,38 @@ export default function MyProjectsPage() {
     queryKey: ['mis-proyectos'],
     queryFn: () => getMyProjects(),
   });
+
+  async function handleDelete(proyecto: MiProyectoListItemDTO) {
+    const result = await uvgSwal.fire({
+      icon: 'warning',
+      title: 'Eliminar proyecto',
+      html: `¿Estás seguro que deseas eliminar <strong>${proyecto.tituloProyecto}</strong>?<br/><br/>Esta acción no se puede deshacer.`,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await deleteProject(proyecto.idProyecto);
+        await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
+        await uvgSwal.fire({
+          icon: 'success',
+          title: 'Proyecto eliminado',
+          text: 'El proyecto ha sido eliminado correctamente',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } catch (error: any) {
+        uvgSwal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: error.message || 'No se pudo eliminar el proyecto',
+        });
+      }
+    }
+  }
 
   const filtrados = proyectos.filter((p) => {
     const matchBusqueda =
@@ -181,28 +215,55 @@ export default function MyProjectsPage() {
                 </p>
               )}
 
-              {proyecto.estadoProyecto === 'BORRADOR' ? (
-                <Link
-                  href={`/dashboard/projects/mine/form?id=${proyecto.idProyecto}`}
-                  className="mt-auto inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
-                >
-                  Seguir editando Proyecto
-                </Link>
-              ) : proyecto.estadoProyecto === 'EN_REVISION' ? (
-                <button
-                  disabled
-                  className="mt-auto inline-flex items-center justify-center bg-surface-container-highest text-tertiary px-5 py-2.5 rounded-xl text-sm font-bold cursor-not-allowed opacity-70"
-                >
-                  Espera de Retroalimentación
-                </button>
-              ) : (
-                <Link
-                  href={`/dashboard/projects/${proyecto.idProyecto}`}
-                  className="mt-auto inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
-                >
-                  Ver Proyecto
-                </Link>
-              )}
+              <div className="mt-auto flex items-center gap-2">
+                {proyecto.estadoProyecto === 'BORRADOR' ? (
+                  <>
+                    <Link
+                      href={`/dashboard/projects/mine/form?id=${proyecto.idProyecto}`}
+                      className="flex-1 inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
+                    >
+                      Seguir editando Proyecto
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(proyecto)}
+                      className="inline-flex items-center justify-center bg-error text-on-error p-2.5 rounded-xl hover:bg-error/90 active:scale-95 transition-all duration-200"
+                      title="Eliminar proyecto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : proyecto.estadoProyecto === 'OBSERVADO' ? (
+                  <>
+                    <Link
+                      href={`/dashboard/projects/mine/form?id=${proyecto.idProyecto}`}
+                      className="flex-1 inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
+                    >
+                      Editar y Reenviar
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(proyecto)}
+                      className="inline-flex items-center justify-center bg-error text-on-error p-2.5 rounded-xl hover:bg-error/90 active:scale-95 transition-all duration-200"
+                      title="Eliminar proyecto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : proyecto.estadoProyecto === 'EN_REVISION' ? (
+                  <button
+                    disabled
+                    className="flex-1 inline-flex items-center justify-center bg-surface-container-highest text-tertiary px-5 py-2.5 rounded-xl text-sm font-bold cursor-not-allowed opacity-70"
+                  >
+                    Espera de Retroalimentación
+                  </button>
+                ) : (
+                  <Link
+                    href={`/dashboard/projects/${proyecto.idProyecto}`}
+                    className="flex-1 inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
+                  >
+                    Ver Proyecto
+                  </Link>
+                )}
+              </div>
             </div>
           ))}
         </div>

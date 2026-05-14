@@ -3,6 +3,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { login, type LoginPayload } from '@/lib/services/auth';
+import { setTokens } from '@/lib/utils/token';
 import uvgSwal from '@/lib/swal';
 
 export function useLogin() {
@@ -11,7 +12,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: (data: LoginPayload) => login(data),
     onSuccess: (res) => {
-      localStorage.setItem('token', res.accessToken);
+      setTokens(res.accessToken, res.refreshToken);
       uvgSwal.fire({
         icon: 'success',
         title: 'Bienvenido',
