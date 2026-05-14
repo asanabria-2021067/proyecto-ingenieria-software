@@ -835,6 +835,32 @@ export class ProjectsService {
 
   // -------------------------------------------------
 
+  async delete(id: number, userId: number) {
+    await this._requireOwner(id, userId);
+
+    const proyecto = await this.prisma.proyecto.findUnique({
+      where: { idProyecto: id },
+      select: { estadoProyecto: true },
+    });
+
+    if (!proyecto) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+
+    if (![EstadoProyecto.BORRADOR, EstadoProyecto.OBSERVADO].includes(proyecto.estadoProyecto)) {
+      throw new BadRequestException('Solo se pueden eliminar proyectos en estado BORRADOR u OBSERVADO');
+    }
+
+    await this.prisma.proyecto.update({
+      where: { idProyecto: id },
+      data: { eliminadoEn: new Date() },
+    });
+
+    return { mensaje: 'Proyecto eliminado correctamente' };
+  }
+
+  // -------------------------------------------------
+
   private async _crearRevisionPendiente(
     tx: Prisma.TransactionClient,
     idProyecto: number,

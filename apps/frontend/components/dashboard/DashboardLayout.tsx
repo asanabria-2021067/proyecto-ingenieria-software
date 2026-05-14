@@ -7,6 +7,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
+import { TokenRefreshManager } from '@/components/TokenRefreshManager';
+import { clearTokens } from '@/lib/utils/token';
 import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 
@@ -37,13 +39,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (!result.isConfirmed) return;
 
-    localStorage.removeItem('token');
+    clearTokens();
     queryClient.clear();
     router.replace('/login');
   };
 
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
+      <TokenRefreshManager />
       <aside className="w-64 h-screen bg-surface-container-low border-r border-outline-variant flex flex-col shrink-0 overflow-y-auto">
         <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />

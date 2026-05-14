@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -15,8 +15,8 @@ import { Proyecto } from '@/types';
 const schema = z.object({
   justificacion: z
     .string()
-    .min(40, 'La justificaciÃ³n debe tener al menos 40 caracteres.')
-    .max(1000, 'La justificaciÃ³n no puede exceder 1000 caracteres.'),
+    .min(40, 'La justificación debe tener al menos 40 caracteres.')
+    .max(1000, 'La justificación no puede exceder 1000 caracteres.'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -46,7 +46,7 @@ export default function PostularPage() {
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       const userId = getUserIdFromToken();
-      if (!userId) throw new Error('Tu sesiÃ³n ha expirado. Por favor inicia sesiÃ³n nuevamente.');
+      if (!userId) throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
       return apiFetch('/postulaciones', {
         method: 'POST',
         body: JSON.stringify({
@@ -59,7 +59,7 @@ export default function PostularPage() {
     onError: (err: unknown) => {
       const msg =
         (err as { message?: string })?.message ??
-        'OcurriÃ³ un error al enviar tu postulaciÃ³n.';
+        'Ocurrió un error al enviar tu postulación.';
       setErrorMsg(msg);
     },
     onSuccess: async () => {
@@ -77,11 +77,11 @@ export default function PostularPage() {
           <div className="text-center max-w-md">
             <CheckCircle className="w-16 h-16 text-primary mx-auto mb-4" />
             <h2 className="font-headline font-extrabold text-2xl text-on-surface mb-2">
-              Â¡PostulaciÃ³n enviada!
+              ¡Postulación enviada!
             </h2>
             <p className="text-tertiary text-sm mb-6">
-              Tu postulaciÃ³n fue recibida. El equipo del proyecto revisarÃ¡ tu solicitud y te
-              notificarÃ¡ el resultado.
+              Tu postulación fue recibida. El equipo del proyecto revisará tu solicitud y te
+              notificará el resultado.
             </p>
             <Link
               href="/dashboard/mis-postulaciones"
@@ -125,7 +125,7 @@ export default function PostularPage() {
             {rol.descripcionRolProyecto && (
               <div className="bg-surface-container-low rounded-xl border border-outline-variant p-4 mb-6">
                 <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1">
-                  DescripciÃ³n del rol
+                  Descripción del rol
                 </p>
                 <p className="text-on-surface text-sm leading-relaxed">
                   {rol.descripcionRolProyecto}
@@ -189,7 +189,7 @@ export default function PostularPage() {
                   disabled={mutation.isPending}
                   className="flex-1 bg-primary text-on-primary px-5 py-3 rounded-xl text-sm font-bold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-60 disabled:scale-100 disabled:shadow-none"
                 >
-                  {mutation.isPending ? 'Enviando...' : 'Enviar PostulaciÃ³n'}
+                  {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
                 </button>
               </div>
             </form>
@@ -199,4 +199,3 @@ export default function PostularPage() {
     </DashboardLayout>
   );
 }
-
