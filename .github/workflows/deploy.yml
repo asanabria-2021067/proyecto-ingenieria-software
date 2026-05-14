@@ -34,10 +34,12 @@ jobs:
       - name: Prepare image names
         id: vars
         run: |
-          repo="${GITHUB_REPOSITORY,,}"
-          echo "repo=${repo}" >> "$GITHUB_OUTPUT"
-          echo "frontend_image=ghcr.io/${repo}-frontend" >> "$GITHUB_OUTPUT"
-          echo "backend_image=ghcr.io/${repo}-backend" >> "$GITHUB_OUTPUT"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
+          frontend_image="ghcr.io/${owner}/${repo_name}-frontend"
+          backend_image="ghcr.io/${owner}/${repo_name}-backend"
+          echo "frontend_image=${frontend_image}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=${backend_image}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push frontend image
         id: build_frontend
