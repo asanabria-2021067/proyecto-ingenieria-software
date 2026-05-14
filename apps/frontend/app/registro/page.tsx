@@ -7,9 +7,53 @@ import Image from 'next/image';
 import { useRegister } from '@/hooks/use-register';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
+import { z } from 'zod';
 
 import img from '@/public/login-foto.jpg';
 import logo from '@/public/logo.png';
+
+const registerSchema = z
+  .object({
+    nombre: z
+      .string({ required_error: 'El nombre es obligatorio' })
+      .trim()
+      .min(1, 'El nombre es obligatorio'),
+    apellido: z
+      .string({ required_error: 'El apellido es obligatorio' })
+      .trim()
+      .min(1, 'El apellido es obligatorio'),
+    carne: z
+      .string({ required_error: 'El carnet es obligatorio' })
+      .trim()
+      .min(1, 'El carnet es obligatorio'),
+    correo: z
+      .string({ required_error: 'El correo es obligatorio' })
+      .trim()
+      .min(1, 'El correo es obligatorio')
+      .email('El correo es inválido')
+      .refine((value) => value.endsWith('@uvg.edu.gt'), {
+        message: 'El correo debe ser institucional (@uvg.edu.gt)',
+      }),
+    contrasena: z
+      .string({ required_error: 'La contraseña es obligatoria' })
+      .min(8, 'La contraseña debe tener al menos 8 caracteres'),
+    confirmar: z
+      .string({ required_error: 'Debes confirmar la contraseña' })
+      .min(8, 'Debes confirmar la contraseña'),
+    idCarrera: z
+      .number({ required_error: 'Selecciona una carrera' })
+      .int({ message: 'Selecciona una carrera' })
+      .positive('Selecciona una carrera'),
+    semestre: z
+      .number({ required_error: 'Selecciona tu semestre' })
+      .int({ message: 'El semestre es inválido' })
+      .min(1, 'El semestre es inválido')
+      .max(12, 'El semestre es inválido'),
+  })
+  .refine((data) => data.contrasena === data.confirmar, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmar'],
+  });
 
 export default function RegistroPage() {
   const [nombre, setNombre] = useState('');
@@ -21,6 +65,7 @@ export default function RegistroPage() {
   const [idCarrera, setIdCarrera] = useState<number>(0);
   const [semestre, setSemestre] = useState<number>(1);
   const [carreras, setCarreras] = useState<Carrera[]>([]);
+  const [errores, setErrores] = useState<Record<string, string | undefined>>({});
   const { mutate, isPending } = useRegister();
   const selectedCarreraName =
     carreras.find((carrera) => carrera.idCarrera === idCarrera)?.nombreCarrera ?? '';
@@ -44,20 +89,40 @@ export default function RegistroPage() {
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
-    if (contrasena !== confirmar) {
-      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'Las contrasenas no coinciden' });
-      return;
-    }
-    if (!correo.endsWith('@uvg.edu.gt')) {
-      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'El correo debe ser @uvg.edu.gt' });
-      return;
-    }
-    if (idCarrera === 0) {
-      uvgSwal.fire({ icon: 'warning', title: 'Error', text: 'Selecciona una carrera' });
+    const resultado = registerSchema.safeParse({
+      nombre,
+      apellido,
+      carne,
+      correo,
+      contrasena,
+      confirmar,
+      idCarrera,
+      semestre,
+    });
+
+    if (!resultado.success) {
+      const fieldErrors = resultado.error.flatten().fieldErrors;
+      setErrores({
+        nombre: fieldErrors.nombre?.[0],
+        apellido: fieldErrors.apellido?.[0],
+        carne: fieldErrors.carne?.[0],
+        correo: fieldErrors.correo?.[0],
+        contrasena: fieldErrors.contrasena?.[0],
+        confirmar: fieldErrors.confirmar?.[0],
+        idCarrera: fieldErrors.idCarrera?.[0],
+        semestre: fieldErrors.semestre?.[0],
+      });
+      const formErrors = resultado.error.flatten().formErrors;
+      if (formErrors.length) {
+        uvgSwal.fire({ icon: 'warning', title: 'Error', text: formErrors[0] });
+      }
       return;
     }
 
-    mutate({ correo, contrasena, nombre, apellido, carne, idCarrera, semestre });
+    setErrores({});
+
+    const { confirmar: _omit, ...payload } = resultado.data;
+    mutate(payload);
   }
 
   const inputClass =
@@ -120,10 +185,16 @@ export default function RegistroPage() {
                     type="text"
                     required
                     value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
+                    onChange={(e) => {
+                      setNombre(e.target.value);
+                      if (errores.nombre) {
+                        setErrores((prev) => ({ ...prev, nombre: undefined }));
+                      }
+                    }}
                     placeholder="Juan"
                     className={inputClass}
                   />
+                  {errores.nombre && <p className="text-xs text-error">{errores.nombre}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <label className={labelClass}>Apellido</label>
@@ -131,10 +202,16 @@ export default function RegistroPage() {
                     type="text"
                     required
                     value={apellido}
-                    onChange={(e) => setApellido(e.target.value)}
+                    onChange={(e) => {
+                      setApellido(e.target.value);
+                      if (errores.apellido) {
+                        setErrores((prev) => ({ ...prev, apellido: undefined }));
+                      }
+                    }}
                     placeholder="Perez"
                     className={inputClass}
                   />
+                  {errores.apellido && <p className="text-xs text-error">{errores.apellido}</p>}
                 </div>
               </div>
 
@@ -144,10 +221,16 @@ export default function RegistroPage() {
                   type="text"
                   required
                   value={carne}
-                  onChange={(e) => setCarne(e.target.value)}
+                  onChange={(e) => {
+                    setCarne(e.target.value);
+                    if (errores.carne) {
+                      setErrores((prev) => ({ ...prev, carne: undefined }));
+                    }
+                  }}
                   placeholder="24000"
                   className={inputClass}
                 />
+                {errores.carne && <p className="text-xs text-error">{errores.carne}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -156,7 +239,12 @@ export default function RegistroPage() {
                   type="email"
                   required
                   value={correo}
-                  onChange={(e) => setCorreo(e.target.value)}
+                  onChange={(e) => {
+                    setCorreo(e.target.value);
+                    if (errores.correo) {
+                      setErrores((prev) => ({ ...prev, correo: undefined }));
+                    }
+                  }}
                   placeholder="usuario@uvg.edu.gt"
                   className={`${inputClass} ${correo && apellido && carne ? 'bg-green-50' : ''}`}
                   readOnly={!!(apellido && carne && correo)}
@@ -166,6 +254,7 @@ export default function RegistroPage() {
                     ✓ Correo generado automáticamente
                   </p>
                 )}
+                {errores.correo && <p className="text-xs text-error">{errores.correo}</p>}
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -174,7 +263,13 @@ export default function RegistroPage() {
                   <select
                     required
                     value={idCarrera}
-                    onChange={(e) => setIdCarrera(Number(e.target.value))}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setIdCarrera(value);
+                      if (errores.idCarrera) {
+                        setErrores((prev) => ({ ...prev, idCarrera: undefined }));
+                      }
+                    }}
                     className={`${inputClass} pr-10`}
                   >
                     <option value={0}>Seleccionar...</option>
@@ -184,6 +279,7 @@ export default function RegistroPage() {
                       </option>
                     ))}
                   </select>
+                  {errores.idCarrera && <p className="text-xs text-error">{errores.idCarrera}</p>}
                   {selectedCarreraName && (
                     <p className="text-xs text-tertiary break-words leading-snug">
                       {selectedCarreraName}
@@ -195,7 +291,13 @@ export default function RegistroPage() {
                   <select
                     required
                     value={semestre}
-                    onChange={(e) => setSemestre(Number(e.target.value))}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setSemestre(value);
+                      if (errores.semestre) {
+                        setErrores((prev) => ({ ...prev, semestre: undefined }));
+                      }
+                    }}
                     className={inputClass}
                   >
                     {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => (
@@ -204,6 +306,7 @@ export default function RegistroPage() {
                       </option>
                     ))}
                   </select>
+                  {errores.semestre && <p className="text-xs text-error">{errores.semestre}</p>}
                 </div>
               </div>
 
@@ -214,10 +317,16 @@ export default function RegistroPage() {
                   required
                   minLength={8}
                   value={contrasena}
-                  onChange={(e) => setContrasena(e.target.value)}
+                  onChange={(e) => {
+                    setContrasena(e.target.value);
+                    if (errores.contrasena) {
+                      setErrores((prev) => ({ ...prev, contrasena: undefined }));
+                    }
+                  }}
                   placeholder="Minimo 8 caracteres"
                   className={inputClass}
                 />
+                {errores.contrasena && <p className="text-xs text-error">{errores.contrasena}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -226,10 +335,16 @@ export default function RegistroPage() {
                   type="password"
                   required
                   value={confirmar}
-                  onChange={(e) => setConfirmar(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmar(e.target.value);
+                    if (errores.confirmar) {
+                      setErrores((prev) => ({ ...prev, confirmar: undefined }));
+                    }
+                  }}
                   placeholder="••••••••"
                   className={inputClass}
                 />
+                {errores.confirmar && <p className="text-xs text-error">{errores.confirmar}</p>}
               </div>
 
               <button

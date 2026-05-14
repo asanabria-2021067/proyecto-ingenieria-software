@@ -7,6 +7,7 @@ import { Search, MapPin, Users } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { ProyectoResumen, TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
+import { getOrganizaciones, type Organizacion } from '@/lib/services/catalogs';
 import {
   Select,
   SelectContent,
@@ -29,10 +30,25 @@ const ESTADO_STYLES: Record<string, string> = {
 export default function ProyectosPage() {
   const [busqueda, setBusqueda] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
+  const [organizacionFiltro, setOrganizacionFiltro] = useState('');
+
+  const { data: organizaciones = [], isLoading: cargandoOrganizaciones, isError: errorOrganizaciones } = useQuery<Organizacion[]>(
+    {
+      queryKey: ['organizaciones'],
+      queryFn: getOrganizaciones,
+    },
+  );
 
   const { data: proyectos = [], isLoading, isError } = useQuery<ProyectoResumen[]>({
-    queryKey: ['proyectos'],
-    queryFn: () => apiFetch('/proyectos'),
+    queryKey: ['proyectos', organizacionFiltro],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (organizacionFiltro) {
+        params.set('organizacionId', organizacionFiltro);
+      }
+      const query = params.toString();
+      return apiFetch(`/proyectos${query ? `?${query}` : ''}`);
+    },
   });
 
   const filtrados = proyectos.filter((p) => {
@@ -67,6 +83,39 @@ export default function ProyectosPage() {
               className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+          <Select
+            value={organizacionFiltro || '__ALL__'}
+            onValueChange={(value) => setOrganizacionFiltro(value === '__ALL__' ? '' : value)}
+          >
+            <SelectTrigger className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+              <SelectValue placeholder="Todas las organizaciones" />
+            </SelectTrigger>
+            <SelectContent className="z-9999 max-h-64">
+              <SelectItem value="__ALL__" className="focus:bg-primary focus:text-on-primary">
+                Todas las organizaciones
+              </SelectItem>
+              {cargandoOrganizaciones && (
+                <SelectItem value="__loading__" disabled>
+                  Cargando...
+                </SelectItem>
+              )}
+              {errorOrganizaciones && !cargandoOrganizaciones && (
+                <SelectItem value="__error__" disabled>
+                  No se pudieron cargar las organizaciones
+                </SelectItem>
+              )}
+              {!cargandoOrganizaciones && !errorOrganizaciones &&
+                organizaciones.map((organizacion) => (
+                  <SelectItem
+                    key={organizacion.idOrganizacion}
+                    value={String(organizacion.idOrganizacion)}
+                    className="focus:bg-primary focus:text-on-primary"
+                  >
+                    {organizacion.nombreOrganizacion}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
           <Select value={tipoFiltro || '__ALL__'} onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}>
             <SelectTrigger className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
               <SelectValue />
