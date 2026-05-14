@@ -909,40 +909,57 @@ async function main() {
   });
 
   // Notificaciones para Angel
-  await prisma.notificacion.createMany({
-    data: [
-      {
-        idUsuario: angelUser.idUsuario,
-        tipoNotificacion: 'NUEVA_POSTULACION',
-        tituloNotificacion: 'Nueva postulación recibida',
-        mensajeNotificacion: `${carlos.nombre} ${carlos.apellido} se postuló para el rol "Backend Developer" en tu proyecto "${angelProyectos[0].tituloProyecto}".`,
-        datosJson: { projectId: angelProyectos[0].idProyecto },
+  const notificacionesData = [
+    {
+      idNotificacion: 1,
+      idUsuario: angelUser.idUsuario,
+      tipoNotificacion: 'NUEVA_POSTULACION' as const,
+      tituloNotificacion: 'Nueva postulación recibida',
+      mensajeNotificacion: `${carlos.nombre} ${carlos.apellido} se postuló para el rol "Backend Developer" en tu proyecto "${angelProyectos[0].tituloProyecto}".`,
+      datosJson: { projectId: angelProyectos[0].idProyecto },
+    },
+    {
+      idNotificacion: 2,
+      idUsuario: angelUser.idUsuario,
+      tipoNotificacion: 'NUEVA_POSTULACION' as const,
+      tituloNotificacion: 'Nueva postulación recibida',
+      mensajeNotificacion: `${sofia.nombre} ${sofia.apellido} se postuló para el rol "Frontend Developer" en tu proyecto "${angelProyectos[0].tituloProyecto}".`,
+      datosJson: { projectId: angelProyectos[0].idProyecto },
+    },
+    {
+      idNotificacion: 3,
+      idUsuario: angelUser.idUsuario,
+      tipoNotificacion: 'POSTULACION_RESUELTA' as const,
+      tituloNotificacion: 'Tu postulación fue aceptada',
+      mensajeNotificacion: `Tu postulación para el rol "Desarrollador Fullstack" en el proyecto "${pEmpleo.tituloProyecto}" fue aceptada.`,
+      datosJson: { projectId: pEmpleo.idProyecto },
+      leidaEn: new Date(),
+    },
+    {
+      idNotificacion: 4,
+      idUsuario: angelUser.idUsuario,
+      tipoNotificacion: 'PROYECTO_APROBADO' as const,
+      tituloNotificacion: 'Tu proyecto fue aprobado',
+      mensajeNotificacion: `Tu proyecto "${angelProyectos[0].tituloProyecto}" ha sido aprobado y ahora está visible.`,
+      datosJson: { projectId: angelProyectos[0].idProyecto },
+      leidaEn: new Date(),
+    },
+  ];
+
+  for (const notif of notificacionesData) {
+    await prisma.notificacion.upsert({
+      where: { idNotificacion: notif.idNotificacion },
+      update: {
+        tituloNotificacion: notif.tituloNotificacion,
+        mensajeNotificacion: notif.mensajeNotificacion,
+        datosJson: notif.datosJson,
+        leidaEn: notif.leidaEn ?? null,
+        tipoNotificacion: notif.tipoNotificacion,
+        idUsuario: notif.idUsuario,
       },
-      {
-        idUsuario: angelUser.idUsuario,
-        tipoNotificacion: 'NUEVA_POSTULACION',
-        tituloNotificacion: 'Nueva postulación recibida',
-        mensajeNotificacion: `${sofia.nombre} ${sofia.apellido} se postuló para el rol "Frontend Developer" en tu proyecto "${angelProyectos[0].tituloProyecto}".`,
-        datosJson: { projectId: angelProyectos[0].idProyecto },
-      },
-      {
-        idUsuario: angelUser.idUsuario,
-        tipoNotificacion: 'POSTULACION_RESUELTA',
-        tituloNotificacion: 'Tu postulación fue aceptada',
-        mensajeNotificacion: `Tu postulación para el rol "Desarrollador Fullstack" en el proyecto "${pEmpleo.tituloProyecto}" fue aceptada.`,
-        datosJson: { projectId: pEmpleo.idProyecto },
-        leidaEn: new Date(),
-      },
-      {
-        idUsuario: angelUser.idUsuario,
-        tipoNotificacion: 'PROYECTO_APROBADO',
-        tituloNotificacion: 'Tu proyecto fue aprobado',
-        mensajeNotificacion: `Tu proyecto "${angelProyectos[0].tituloProyecto}" ha sido aprobado y ahora está visible.`,
-        datosJson: { projectId: angelProyectos[0].idProyecto },
-        leidaEn: new Date(),
-      },
-    ],
-  });
+      create: notif,
+    });
+  }
 
   // ─── Configuración del sistema ──────────────────────────
   const configData = [
