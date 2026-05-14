@@ -20,7 +20,7 @@ services:
       retries: 3
 
   backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/${GHCR_NAMESPACE:-local}/proyecto-ingenieria-software-backend:latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/asanabria-2021067/proyecto-ingenieria-software-backend:latest}
     pull_policy: always
     container_name: uvg-collab-backend
     profiles:
@@ -45,7 +45,7 @@ services:
       - uvg-network
 
   frontend:
-    image: ${FRONTEND_IMAGE:-ghcr.io/${GHCR_NAMESPACE:-local}/proyecto-ingenieria-software-frontend:latest}
+    image: ${FRONTEND_IMAGE:-ghcr.io/asanabria-2021067/proyecto-ingenieria-software-frontend:latest}
     pull_policy: always
     container_name: uvg-collab-frontend
     profiles:
