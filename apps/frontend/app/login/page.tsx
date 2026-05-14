@@ -5,18 +5,42 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useLogin } from '@/hooks/use-login';
+import { z } from 'zod';
 
 import img from '@/public/login-foto.jpg'
 import logo from '@/public/logo.png';
 
+const loginSchema = z.object({
+  correo: z
+    .string({ required_error: 'El correo es obligatorio' })
+    .trim()
+    .min(1, 'El correo es obligatorio')
+    .email('El correo es inválido'),
+  contrasena: z
+    .string({ required_error: 'La contraseña es obligatoria' })
+    .min(1, 'La contraseña es obligatoria'),
+});
+
 export default function LoginPage() {
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [errores, setErrores] = useState<{ correo?: string; contrasena?: string }>({});
   const { mutate, isPending } = useLogin();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    mutate({ correo, contrasena });
+    const resultado = loginSchema.safeParse({ correo, contrasena });
+    if (!resultado.success) {
+      const fieldErrors = resultado.error.flatten().fieldErrors;
+      setErrores({
+        correo: fieldErrors.correo?.[0],
+        contrasena: fieldErrors.contrasena?.[0],
+      });
+      return;
+    }
+
+    setErrores({});
+    mutate(resultado.data);
   }
 
   return (
@@ -77,12 +101,21 @@ export default function LoginPage() {
                 </label>
                 <input
                   type="email"
-                  required
                   value={correo}
-                  onChange={(e) => setCorreo(e.target.value)}
+                  required
+                  onChange={(e) => {
+                    setCorreo(e.target.value);
+                    if (errores.correo) {
+                      setErrores((prev) => ({ ...prev, correo: undefined }));
+                    }
+                  }}
                   placeholder="usuario@uvg.edu.gt"
                   className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  aria-invalid={errores.correo ? 'true' : 'false'}
                 />
+                {errores.correo && (
+                  <p className="text-xs text-error text-left">{errores.correo}</p>
+                )}
               </div>
 
               {/* Password */}
@@ -100,12 +133,21 @@ export default function LoginPage() {
                 </div>
                 <input
                   type="password"
-                  required
                   value={contrasena}
-                  onChange={(e) => setContrasena(e.target.value)}
+                  required
+                  onChange={(e) => {
+                    setContrasena(e.target.value);
+                    if (errores.contrasena) {
+                      setErrores((prev) => ({ ...prev, contrasena: undefined }));
+                    }
+                  }}
                   placeholder="--------"
                   className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  aria-invalid={errores.contrasena ? 'true' : 'false'}
                 />
+                {errores.contrasena && (
+                  <p className="text-xs text-error text-left">{errores.contrasena}</p>
+                )}
               </div>
 
               {/* Submit */}
