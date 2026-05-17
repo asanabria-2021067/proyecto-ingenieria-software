@@ -18,6 +18,9 @@ import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
 import { apiFetch } from '@/lib/api/client';
+import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
+import { useTheme } from 'next-themes';
 
 const tipoLabel: Record<string, string> = {
   ACADEMICO_HORAS_BECA: 'Hora Beca',
@@ -31,6 +34,43 @@ const estadoColors: Record<string, string> = {
   RECHAZADA: 'bg-red-100 text-red-800',
 };
 
+function DashboardSkeleton() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const baseColor = isDark ? '#202020' : '#ebebeb';
+  const highlightColor = isDark ? '#444' : '#f5f5f5';
+
+  return (
+    <DashboardLayout>
+      <SkeletonTheme baseColor={baseColor} highlightColor={highlightColor}>
+        <div className="px-8 pb-12 pt-8">
+          <section className="mb-12">
+            <Skeleton width={150} height={16} className="mb-2" />
+            <Skeleton width={300} height={48} />
+            <Skeleton width={500} height={20} className="mt-2" />
+          </section>
+
+          <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <Skeleton height={192} borderRadius={12} />
+            <Skeleton height={192} borderRadius={12} />
+            <Skeleton height={192} borderRadius={12} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <Skeleton width={200} height={32} className="mb-8" />
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                 <Skeleton height={200} borderRadius={12} />
+                 <Skeleton height={200} borderRadius={12} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </SkeletonTheme>
+    </DashboardLayout>
+  );
+}
+
 export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: user, isLoading: userLoading } = useCurrentUser();
@@ -40,12 +80,12 @@ export default function DashboardPage() {
     [wizardDismissed, user],
   );
 
-  const { data: stats } = useQuery<DashboardStats>({
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: getDashboardStats,
   });
 
-  const { data: projects = [] } = useQuery<ProyectoListItemDTO[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<ProyectoListItemDTO[]>({
     queryKey: ['dashboard-projects'],
     queryFn: async () => {
       const p = await searchProjects('');
@@ -53,19 +93,15 @@ export default function DashboardPage() {
     },
   });
 
-  const { data: featured = [] } = useQuery<ProyectoListItemDTO[]>({
+  const { data: featured = [], isLoading: featuredLoading } = useQuery<ProyectoListItemDTO[]>({
     queryKey: ['dashboard-featured'],
     queryFn: () => apiFetch('/proyectos/destacados'),
   });
 
-  if (userLoading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-96">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      </DashboardLayout>
-    );
+  const isLoading = userLoading || statsLoading || projectsLoading || featuredLoading;
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
   }
 
   const horasBeca = stats?.horasBeca ?? 0;
