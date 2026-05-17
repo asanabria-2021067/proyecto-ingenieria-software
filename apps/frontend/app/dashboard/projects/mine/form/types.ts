@@ -100,10 +100,10 @@ export function zodToFieldErrors(result: z.SafeParseReturnType<unknown, unknown>
 export const STEPS = ['Datos generales', 'Roles y habilidades', 'Resumen'];
 
 export const inputClass =
-  'w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200';
+  'w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200';
 
 export const labelClass =
-  'block text-xs font-bold uppercase tracking-widest text-tertiary mb-1.5';
+  'block text-xs font-black uppercase tracking-widest text-tertiary mb-1.5';
 
 export function newRol(): RolFormItem {
   return {
