@@ -110,3 +110,60 @@ export function addExperiencia(data: {
     body: JSON.stringify(data),
   });
 }
+
+export function replaceExperiencias(
+  experiencias: {
+    tituloProyectoExperiencia: string;
+    rolDesempenado?: string;
+    tipoExperiencia?: string;
+  }[],
+) {
+  return apiFetch('/usuarios/me/experiencias', {
+    method: 'PUT',
+    body: JSON.stringify({ experiencias }),
+  });
+}
+
+export interface ProfileBootstrap {
+  profile: {
+    nombreCompleto: string;
+    correoInstitucional: string;
+    idCarrera: number | null;
+    carrera: string;
+    anioAcademico: string;
+    semestre: number | null;
+    biografia: string;
+    disponibilidad: string;
+    modalidadPreferida: string;
+    horarioDisponible: string;
+    objetivoColaboracion: string;
+    fotoUrl: string;
+    enlacePortafolio: string;
+    githubUrl: string;
+    linkedinUrl: string;
+    urlCv: string;
+    disponibilidadHorasSemana: number;
+    horasBecaRequeridas: number | null;
+    horasExtensionRequeridas: number | null;
+    habilidades: {
+      idHabilidad: number;
+      nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
+      aniosExperiencia: number;
+      nombre: string;
+    }[];
+    intereses: number[];
+    cualidades: number[];
+  };
+  catalogs: {
+    carreras: { id: string; nombre: string }[];
+    habilidades: { id: string; nombre: string }[];
+    intereses: { id: string; nombre: string }[];
+    cualidades: { id: string; nombre: string }[];
+    disponibilidades: { id: string; nombre: string }[];
+    modalidades: { value: string; label: string }[];
+  };
+}
+
+export function getProfileBootstrap(): Promise<ProfileBootstrap> {
+  return apiFetch<ProfileBootstrap>('/usuarios/me/perfil/bootstrap');
+}
