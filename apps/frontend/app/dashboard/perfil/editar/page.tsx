@@ -27,6 +27,7 @@ import {
   type ProfileBootstrap 
 } from '@/lib/services/users';
 import uvgSwal from '@/lib/swal';
+import { createHabilidad, createInteres, createCualidad } from '@/lib/services/catalogs';
 
 const STEPS = [
   { title: 'Personal', icon: UserIcon, desc: 'Datos básicos y académicos' },
@@ -72,13 +73,15 @@ export default function EditarPerfilPage() {
     nivelHabilidad: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
     aniosExperiencia: number;
   }[]>([]);
-  const [selHabilidad, setSelHabilidad] = useState<number | null>(null);
+  const [selHabilidadInput, setSelHabilidadInput] = useState('');
   const [selNivel, setSelNivel] = useState<'BASICO' | 'INTERMEDIO' | 'AVANZADO'>('BASICO');
   const [selAnios, setSelAnios] = useState<number>(0);
 
   // --- Step 3 State (Intereses y Cualidades) ---
   const [interesesSeleccionados, setInteresesSeleccionados] = useState<number[]>([]);
+  const [interesInput, setInteresInput] = useState('');
   const [cualidadesSeleccionadas, setCualidadesSeleccionadas] = useState<number[]>([]);
+  const [cualidadInput, setCualidadInput] = useState('');
 
   // --- Step 4 State (Experiencias) ---
   const [experienciasUsuario, setExperienciasUsuario] = useState<{
@@ -146,11 +149,40 @@ export default function EditarPerfilPage() {
   }, [user]);
 
   // --- Handlers for Skills ---
-  const handleAddHabilidad = () => {
-    if (!selHabilidad || !bootstrapData) return;
+  const handleAddHabilidad = async () => {
+    if (!selHabilidadInput.trim() || !bootstrapData) return;
     
-    // Check if skill already added
-    if (habilidadesUsuario.some(h => h.idHabilidad === selHabilidad)) {
+    const inputVal = selHabilidadInput.trim();
+    let targetId: number | null = null;
+    let targetName = inputVal;
+
+    const matched = bootstrapData.catalogs.habilidades.find(
+      h => h.nombre.toLowerCase() === inputVal.toLowerCase()
+    );
+
+    if (matched) {
+      targetId = Number(matched.id);
+      targetName = matched.nombre;
+    } else {
+      try {
+        const newHabilidad = await createHabilidad(inputVal);
+        targetId = newHabilidad.idHabilidad;
+        targetName = newHabilidad.nombreHabilidad;
+        
+        setBootstrapData({
+          ...bootstrapData,
+          catalogs: {
+            ...bootstrapData.catalogs,
+            habilidades: [...bootstrapData.catalogs.habilidades, { id: targetId.toString(), nombre: targetName }]
+          }
+        });
+      } catch (error) {
+        uvgSwal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear la habilidad.' });
+        return;
+      }
+    }
+
+    if (habilidadesUsuario.some(h => h.idHabilidad === targetId)) {
       uvgSwal.fire({
         icon: 'warning',
         title: 'Habilidad ya agregada',
@@ -159,21 +191,18 @@ export default function EditarPerfilPage() {
       return;
     }
 
-    const matched = bootstrapData.catalogs.habilidades.find(h => Number(h.id) === selHabilidad);
-    if (!matched) return;
-
     setHabilidadesUsuario([
       ...habilidadesUsuario,
       {
-        idHabilidad: selHabilidad,
-        nombre: matched.nombre,
+        idHabilidad: targetId,
+        nombre: targetName,
         nivelHabilidad: selNivel,
         aniosExperiencia: selAnios
       }
     ]);
     
     // Reset inputs
-    setSelHabilidad(null);
+    setSelHabilidadInput('');
     setSelNivel('BASICO');
     setSelAnios(0);
   };
@@ -488,16 +517,19 @@ export default function EditarPerfilPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-tertiary mb-1">Seleccionar Habilidad</label>
-                    <select
-                      value={selHabilidad || ''}
-                      onChange={(e) => setSelHabilidad(e.target.value ? Number(e.target.value) : null)}
+                    <input
+                      type="text"
+                      list="habilidades-list"
+                      placeholder="Escribe o selecciona..."
+                      value={selHabilidadInput}
+                      onChange={(e) => setSelHabilidadInput(e.target.value)}
                       className="w-full rounded-xl border border-outline-variant/30 bg-surface px-3 py-2.5 text-sm text-on-surface transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    >
-                      <option value="">-- Elige una habilidad --</option>
+                    />
+                    <datalist id="habilidades-list">
                       {bootstrapData?.catalogs.habilidades.map(h => (
-                        <option key={h.id} value={h.id}>{h.nombre}</option>
+                        <option key={h.id} value={h.nombre} />
                       ))}
-                    </select>
+                    </datalist>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-tertiary mb-1">Nivel Habilidad</label>
@@ -572,6 +604,41 @@ export default function EditarPerfilPage() {
                 <p className="text-xs text-on-surface-variant leading-relaxed">
                   Haz clic en las categorías que más te llamen la atención. Las utilizaremos para sugerirte proyectos destacados.
                 </p>
+                <div className="mt-2">
+                  <input 
+                    type="text" 
+                    placeholder="¿No encuentras tu interés? Escríbelo y presiona Enter" 
+                    value={interesInput}
+                    onChange={(e) => setInteresInput(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (!interesInput.trim() || !bootstrapData) return;
+                        const inputVal = interesInput.trim();
+                        const existing = bootstrapData.catalogs.intereses.find(i => i.nombre.toLowerCase() === inputVal.toLowerCase());
+                        let targetId = existing?.id;
+                        if (!targetId) {
+                          try {
+                            const newI = await createInteres(inputVal);
+                            targetId = newI.idInteres.toString();
+                            setBootstrapData({
+                              ...bootstrapData,
+                              catalogs: {
+                                ...bootstrapData.catalogs,
+                                intereses: [...bootstrapData.catalogs.intereses, { id: targetId, nombre: newI.nombreInteres }]
+                              }
+                            });
+                          } catch (err) { return; }
+                        }
+                        if (!interesesSeleccionados.includes(Number(targetId))) {
+                          setInteresesSeleccionados([...interesesSeleccionados, Number(targetId)]);
+                        }
+                        setInteresInput('');
+                      }
+                    }}
+                    className="w-full md:w-1/2 rounded-xl border border-outline-variant/30 bg-surface px-4 py-2.5 text-sm text-on-surface transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
                 <div className="flex flex-wrap gap-2.5 mt-4">
                   {bootstrapData?.catalogs.intereses.map(i => {
                     const isSelected = interesesSeleccionados.includes(Number(i.id));
@@ -600,6 +667,41 @@ export default function EditarPerfilPage() {
                 <p className="text-xs text-on-surface-variant leading-relaxed">
                   ¿Cuáles de estas palabras describen mejor tu forma de trabajar en equipo? Elige las cualidades que te representen.
                 </p>
+                <div className="mt-2">
+                  <input 
+                    type="text" 
+                    placeholder="¿No encuentras tu cualidad? Escríbela y presiona Enter" 
+                    value={cualidadInput}
+                    onChange={(e) => setCualidadInput(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (!cualidadInput.trim() || !bootstrapData) return;
+                        const inputVal = cualidadInput.trim();
+                        const existing = bootstrapData.catalogs.cualidades.find(c => c.nombre.toLowerCase() === inputVal.toLowerCase());
+                        let targetId = existing?.id;
+                        if (!targetId) {
+                          try {
+                            const newC = await createCualidad(inputVal);
+                            targetId = newC.idCualidad.toString();
+                            setBootstrapData({
+                              ...bootstrapData,
+                              catalogs: {
+                                ...bootstrapData.catalogs,
+                                cualidades: [...bootstrapData.catalogs.cualidades, { id: targetId, nombre: newC.nombreCualidad }]
+                              }
+                            });
+                          } catch (err) { return; }
+                        }
+                        if (!cualidadesSeleccionadas.includes(Number(targetId))) {
+                          setCualidadesSeleccionadas([...cualidadesSeleccionadas, Number(targetId)]);
+                        }
+                        setCualidadInput('');
+                      }
+                    }}
+                    className="w-full md:w-1/2 rounded-xl border border-outline-variant/30 bg-surface px-4 py-2.5 text-sm text-on-surface transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
                 <div className="flex flex-wrap gap-2.5 mt-4">
                   {bootstrapData?.catalogs.cualidades.map(q => {
                     const isSelected = cualidadesSeleccionadas.includes(Number(q.id));
