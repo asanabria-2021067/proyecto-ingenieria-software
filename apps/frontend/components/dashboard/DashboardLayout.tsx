@@ -11,6 +11,7 @@ import { TokenRefreshManager } from '@/components/TokenRefreshManager';
 import { clearTokens } from '@/lib/utils/token';
 import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
+import OnboardingTour from '@/components/dashboard/OnboardingTour';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -60,6 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={href}
                 href={href}
+                id={`nav-item-${label.toLowerCase().replace(/\s+/g, '-')}`}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
                   active
                     ? 'bg-primary text-on-primary'
@@ -73,7 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        <div className="px-3 py-2 border-t border-outline-variant">
+        <div id="sidebar-notifications" className="px-3 py-2 border-t border-outline-variant">
           <NotificationsBell />
         </div>
 
@@ -114,6 +116,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 overflow-auto bg-surface">
         {children}
       </main>
+      <OnboardingTour />
     </div>
   );
 }

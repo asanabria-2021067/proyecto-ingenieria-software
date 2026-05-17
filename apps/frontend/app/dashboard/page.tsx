@@ -115,7 +115,7 @@ export default function DashboardPage() {
         </section>
 
         {/* Stats */}
-        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div id="stats-container" className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* Horas Beca */}
           {requiereHorasBeca && (
             <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
@@ -384,8 +384,16 @@ export default function DashboardPage() {
           {/* Right Column */}
           <div className="space-y-8 lg:col-span-4">
             {/* Quick info */}
-            <div className="rounded-xl bg-surface-container-low p-6">
-              <h3 className="font-headline text-lg font-black tracking-tight mb-4">Tu perfil</h3>
+            <div id="dashboard-profile-card" className="rounded-xl bg-surface-container-low p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-headline text-lg font-black tracking-tight">Tu perfil</h3>
+                <button
+                  onClick={() => window.dispatchEvent(new Event('start-onboarding-tour'))}
+                  className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                >
+                  Repetir Tour 🔄
+                </button>
+              </div>
               {user?.perfil?.carrera && (
                 <div className="mb-3">
                   <span className="text-xs font-bold uppercase tracking-widest text-tertiary">Carrera</span>
