@@ -8,6 +8,7 @@ import { useRegister } from '@/hooks/use-register';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
 import { z } from 'zod';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 import img from '@/public/login-foto.jpg';
 import logo from '@/public/logo.png';
@@ -189,6 +190,7 @@ export default function RegistroPage() {
             <ArrowLeft className="h-4 w-4" />
             <span className="text-xs font-bold uppercase tracking-wider">Volver</span>
           </Link>
+          <ThemeToggle />
         </header>
 
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
