@@ -47,7 +47,7 @@ export function Step1({ form, update, errors }: Props) {
         <div>
           <label className={labelClass}>Tipo <span className="text-error">*</span></label>
           <Select value={form.tipoProyecto || '__NONE__'} onValueChange={(v) => update('tipoProyecto', v === '__NONE__' ? '' : v)}>
-            <SelectTrigger className={`h-auto py-3 rounded-xl border-surface-container-highest bg-white text-sm focus-visible:ring-primary/20 ${hasError('tipoProyecto', errors) ? 'border-error' : ''}`}>
+            <SelectTrigger className={`h-auto py-3 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm focus-visible:ring-primary/20 ${hasError('tipoProyecto', errors) ? 'border-error' : ''}`}>
               <SelectValue placeholder="Selecciona un tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -61,7 +61,7 @@ export function Step1({ form, update, errors }: Props) {
         <div>
           <label className={labelClass}>Modalidad <span className="text-error">*</span></label>
           <Select value={form.modalidadProyecto || '__NONE__'} onValueChange={(v) => update('modalidadProyecto', v === '__NONE__' ? '' : v)}>
-            <SelectTrigger className={`h-auto py-3 rounded-xl border-surface-container-highest bg-white text-sm focus-visible:ring-primary/20 ${hasError('modalidadProyecto', errors) ? 'border-error' : ''}`}>
+            <SelectTrigger className={`h-auto py-3 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm focus-visible:ring-primary/20 ${hasError('modalidadProyecto', errors) ? 'border-error' : ''}`}>
               <SelectValue placeholder="Selecciona modalidad" />
             </SelectTrigger>
             <SelectContent>

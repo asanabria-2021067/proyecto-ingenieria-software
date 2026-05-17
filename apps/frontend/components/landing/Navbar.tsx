@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/Logo UVG-08.png';
 
 const navLinks = [
@@ -73,15 +74,19 @@ export default function Navbar() {
             >
               Registrarse
             </Link>
+            <ThemeToggle />
           </div>
-          <button
-            type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-on-surface md:hidden"
-            onClick={() => setMenuOpen((prev) => !prev)}
-            aria-label="Abrir menu"
-          >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex md:hidden items-center gap-2">
+            <ThemeToggle />
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-on-surface"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="Abrir menu"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
         {menuOpen && (
           <div className="mt-2 rounded-2xl border border-white/25 bg-white/15 p-4 shadow-lg backdrop-blur-xl md:hidden">
