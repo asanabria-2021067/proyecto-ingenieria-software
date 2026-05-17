@@ -1,16 +1,90 @@
-import { useEffect, useCallback } from 'react';
-import { driver } from 'driver.js';
-import 'driver.js/dist/driver.css';
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { Joyride, STATUS } from 'react-joyride';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
+
+// Custom Tooltip component for React Joyride
+const CustomTooltip = ({
+  index,
+  step,
+  backProps,
+  primaryProps,
+  skipProps,
+  tooltipProps,
+  isLastStep,
+  size,
+}: any) => {
+  return (
+    <div
+      {...tooltipProps}
+      className="bg-surface-container-lowest border border-outline-variant/30 text-on-surface rounded-2xl shadow-2xl p-5 md:p-6 max-w-sm w-full backdrop-blur-md animate-fade-in relative border-l-6 border-l-primary focus:outline-none"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 select-none">
+        <span className="text-[10px] font-black uppercase tracking-widest text-[#006735] bg-[#006735]/10 px-3 py-1 rounded-full font-headline">
+          Guía UVGenius
+        </span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-tertiary bg-surface-container-high px-2.5 py-1 rounded-full font-headline">
+          Paso {index + 1} de {size}
+        </span>
+      </div>
+
+      {/* Content */}
+      <div className="space-y-2 mb-6">
+        {step.title && (
+          <h3 className="font-headline font-black text-base text-primary">
+            {step.title}
+          </h3>
+        )}
+        <div className="text-on-surface-variant text-xs md:text-sm leading-relaxed">
+          {step.content}
+        </div>
+      </div>
+
+      {/* Footer Navigation */}
+      <div className="flex items-center justify-between gap-4 border-t border-outline-variant/20 pt-4">
+        {/* Skip/Cerrar */}
+        <button
+          {...skipProps}
+          className="text-xs font-bold text-tertiary hover:text-error transition-colors px-3 py-2 rounded-xl hover:bg-error/5 cursor-pointer outline-none"
+        >
+          {isLastStep ? 'Cerrar' : 'Saltar tour'}
+        </button>
+
+        <div className="flex items-center gap-2">
+          {/* Back Button */}
+          {index > 0 && (
+            <button
+              {...backProps}
+              className="text-xs font-bold text-primary border border-primary hover:bg-primary/5 transition-all px-4 py-2 rounded-xl cursor-pointer outline-none"
+            >
+              Anterior
+            </button>
+          )}
+
+          {/* Next/Last Button */}
+          <button
+            {...primaryProps}
+            className="text-xs font-bold text-white bg-primary hover:bg-primary/95 transition-all px-4 py-2 rounded-xl shadow-md cursor-pointer outline-none"
+          >
+            {isLastStep ? 'Finalizar' : 'Siguiente'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function OnboardingTour() {
   const { data: user } = useCurrentUser();
+  const [run, setRun] = useState(false);
 
   const startTour = useCallback((force = false) => {
     if (!user) return;
 
-    // Si el perfil está incompleto (es decir, sale la pantalla de "Completa tu perfil"),
-    // no mostramos el tour hasta que termine de completarlo, a menos que sea forzado (ej: clic en botón de ayuda)
+    // Si el perfil está incompleto (sale la pantalla de "Completa tu perfil"),
+    // no mostramos el tour hasta que termine de completarlo, a menos que sea forzado (ayuda)
     if (isProfileIncomplete(user) && !force) {
       return;
     }
@@ -22,80 +96,10 @@ export default function OnboardingTour() {
       return;
     }
 
-    // Esperar a que el DOM esté completamente listo y los IDs renderizados
+    // Retardo para asegurar que los elementos del DOM estén completamente listos
     setTimeout(() => {
-      const driverObj = driver({
-        showProgress: true,
-        animate: true,
-        allowClose: true,
-        overlayColor: 'rgba(5, 12, 8, 0.75)', // Tono oscuro profundo con matiz de contraste
-        nextBtnText: 'Siguiente ➔',
-        prevBtnText: '← Atrás',
-        doneBtnText: '¡Listo, a explorar! 🚀',
-        steps: [
-          {
-            element: 'body',
-            popover: {
-              title: '¡Bienvenido a UVGenius! 🎉',
-              description: 'Tu portal inteligente para gestionar proyectos, horas beca y extensión en la UVG. Permítenos darte un recorrido rápido de 1 minuto por tus herramientas principales.',
-              side: 'over',
-              align: 'center',
-            },
-          },
-          {
-            element: '#stats-container',
-            popover: {
-              title: 'Progreso y Horas Académicas 📊',
-              description: 'Mantén el control en tiempo real de tus Horas Beca y de Extensión acumuladas. Aquí verás tu avance respecto a la meta y tus proyectos activos.',
-              side: 'bottom',
-              align: 'center',
-            },
-          },
-          {
-            element: '#nav-item-explorar-proyectos',
-            popover: {
-              title: 'Búsqueda de Proyectos 🔍',
-              description: '¡La sección estrella! Explora la lista completa de proyectos disponibles en la universidad, fístralos por tus intereses y postúlate en un clic.',
-              side: 'right',
-              align: 'start',
-            },
-          },
-          {
-            element: '#nav-item-mis-postulaciones',
-            popover: {
-              title: 'Tus Postulaciones 📑',
-              description: 'Lleva el control del estado de tus aplicaciones. Descubre de inmediato si has sido aceptado, si estás en revisión o si hay feedback de los directores.',
-              side: 'right',
-              align: 'start',
-            },
-          },
-          {
-            element: '#sidebar-notifications',
-            popover: {
-              title: 'Notificaciones 🔔',
-              description: '¡Entérate al instante! Recibe alertas directas sobre postulaciones aceptadas, comentarios nuevos o recordatorios académicos importantes.',
-              side: 'right',
-              align: 'start',
-            },
-          },
-          {
-            element: '#dashboard-profile-card',
-            popover: {
-              title: 'Tu Perfil Profesional 👤',
-              description: '¡Hazte notar! Mantén al día tus habilidades e intereses en esta sección para que los directores de proyectos puedan invitarte a colaborar.',
-              side: 'left',
-              align: 'start',
-            },
-          },
-        ],
-        onDestroyed: () => {
-          // Marcar el tour como visto al finalizar o cerrar
-          localStorage.setItem(tourKey, 'true');
-        },
-      });
-
-      driverObj.drive();
-    }, 500);
+      setRun(true);
+    }, 800);
   }, [user]);
 
   useEffect(() => {
@@ -115,140 +119,107 @@ export default function OnboardingTour() {
     };
   }, [startTour]);
 
+  const handleJoyrideCallback = (data: any) => {
+    const { status } = data;
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+
+    if (finishedStatuses.includes(status)) {
+      setRun(false);
+      if (user) {
+        const tourKey = `onboarding_seen_${user.idUsuario}`;
+        localStorage.setItem(tourKey, 'true');
+      }
+    }
+  };
+
+  const steps: any[] = [
+    {
+      target: 'body',
+      title: '¡Bienvenido a UVGenius!',
+      content: 'Tu portal inteligente para gestionar proyectos, horas beca y extensión en la UVG. Permítenos darte un recorrido rápido de 1 minuto por tus herramientas principales.',
+      placement: 'center',
+      disableBeacon: true,
+    },
+    {
+      target: '#stats-container',
+      title: 'Progreso y Horas Académicas',
+      content: 'Mantén el control en tiempo real de tus Horas Beca y de Extensión acumuladas. Aquí verás tu avance respecto a la meta y tus proyectos activos.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+    {
+      target: '#nav-item-explorar-proyectos',
+      title: 'Búsqueda de Proyectos',
+      content: 'Explora la lista completa de proyectos disponibles en la universidad, fíltralos por tus intereses y postúlate fácilmente.',
+      placement: 'right',
+      disableBeacon: true,
+    },
+    {
+      target: '#nav-item-mis-postulaciones',
+      title: 'Tus Postulaciones',
+      content: 'Lleva el control del estado de tus aplicaciones. Descubre de inmediato si has sido aceptado, si estás en revisión o si hay feedback de los directores.',
+      placement: 'right',
+      disableBeacon: true,
+    },
+    {
+      target: '#dashboard-theme-toggle',
+      title: 'Tema Claro / Oscuro',
+      content: 'Cambia el aspecto visual de la aplicación según tu preferencia con un solo clic.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+    {
+      target: '#dashboard-profile-card',
+      title: 'Tu Perfil Profesional',
+      content: 'Mantén al día tus habilidades e intereses en esta sección para que los directores de proyectos puedan invitarte a colaborar.',
+      placement: 'left',
+      disableBeacon: true,
+    },
+  ];
+
+  if (!user) return null;
+
   return (
-    <style dangerouslySetInnerHTML={{ __html: `
-      /* Estilos Premium y Animaciones para los Tooltips de driver.js */
-      .driver-popover.driverjs-theme {
-        background-color: var(--color-surface-container-lowest, #ffffff) !important;
-        color: var(--color-on-surface, #181c20) !important;
-        border-radius: 20px !important;
-        border: 1px solid var(--color-outline-variant, rgba(189, 202, 189, 0.4)) !important;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-        padding: 24px !important;
-        max-width: 340px !important;
-        font-family: var(--font-family-body, 'Inter', sans-serif) !important;
-        backdrop-filter: blur(12px) !important;
-      }
-
-      .driver-popover-title {
-        font-family: var(--font-family-headline, 'Manrope', sans-serif) !important;
-        font-size: 1.15rem !important;
-        font-weight: 800 !important;
-        color: var(--color-primary, #006735) !important;
-        margin-bottom: 10px !important;
-        letter-spacing: -0.02em !important;
-        display: flex !important;
-        align-items: center !important;
-        gap: 6px !important;
-      }
-
-      .driver-popover-description {
-        font-size: 0.9rem !important;
-        line-height: 1.6 !important;
-        color: var(--color-on-surface-variant, #3a3f3a) !important;
-      }
-
-      .driver-popover-footer {
-        margin-top: 20px !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        gap: 12px !important;
-      }
-
-      .driver-popover-progress-text {
-        font-size: 0.78rem !important;
-        font-weight: 800 !important;
-        color: var(--color-secondary, #416900) !important;
-        background-color: var(--color-on-primary-container, #e3ffe5) !important;
-        padding: 4px 10px !important;
-        border-radius: 9999px !important;
-        letter-spacing: 0.05em !important;
-      }
-
-      .driver-popover-navigation-btns {
-        display: flex !important;
-        gap: 8px !important;
-      }
-
-      .driver-popover-btn {
-        background-color: var(--color-surface-container-high, #e5e8ee) !important;
-        color: var(--color-on-surface, #181c20) !important;
-        border: none !important;
-        border-radius: 12px !important;
-        padding: 8px 16px !important;
-        font-size: 0.78rem !important;
-        font-weight: 700 !important;
-        cursor: pointer !important;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
-        text-shadow: none !important;
-      }
-
-      .driver-popover-btn:hover {
-        background-color: var(--color-surface-container-highest, #dfe3e8) !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
-      }
-
-      /* Botón Siguiente / Finalizar con Gradiente UVG */
-      .driver-popover-next-btn, .driver-popover-next-btn:focus {
-        background: linear-gradient(135deg, var(--color-primary, #006735) 0%, var(--color-primary-container, #008345) 100%) !important;
-        color: var(--color-on-primary, #ffffff) !important;
-        box-shadow: 0 4px 12px rgba(0, 103, 53, 0.2) !important;
-      }
-
-      .driver-popover-next-btn:hover {
-        filter: brightness(1.1) !important;
-        box-shadow: 0 6px 16px rgba(0, 103, 53, 0.3) !important;
-        transform: translateY(-1px) !important;
-      }
-
-      .driver-popover-close-btn {
-        color: var(--color-outline, #6e7a6f) !important;
-        font-weight: 400 !important;
-        font-size: 1.1rem !important;
-        transition: color 0.15s ease !important;
-        padding: 4px !important;
-      }
-
-      .driver-popover-close-btn:hover {
-        color: var(--color-error, #ba1a1a) !important;
-      }
-
-      .driver-popover-arrow {
-        border-color: var(--color-surface-container-lowest, #ffffff) !important;
-      }
-
-      /* Animación de spotlight con pulso premium de color de marca */
-      @keyframes pulse-spotlight {
-        0% {
-          box-shadow: 0 0 0 0 rgba(0, 103, 53, 0.4), 0 0 0 1px rgba(0, 103, 53, 0.2);
+    <>
+      <Joyride
+        run={run}
+        steps={steps}
+        continuous={true}
+        showProgress={false}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        tooltipComponent={(props: any) => <CustomTooltip {...props} size={steps.length} />}
+        styles={{
+          options: {
+            overlayColor: 'rgba(5, 12, 8, 0.7)',
+            zIndex: 10000,
+          },
+          spotlight: {
+            borderRadius: '16px',
+          },
+        }}
+      />
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Animación y estilos de spotlight personalizados para React Joyride */
+        @keyframes pulse-joyride-spotlight {
+          0% {
+            box-shadow: 0 0 0 0 rgba(0, 103, 53, 0.4), 0 0 0 1px rgba(0, 103, 53, 0.2);
+          }
+          70% {
+            box-shadow: 0 0 0 12px rgba(0, 103, 53, 0), 0 0 0 4px rgba(0, 103, 53, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(0, 103, 53, 0), 0 0 0 0 rgba(0, 103, 53, 0);
+          }
         }
-        70% {
-          box-shadow: 0 0 0 12px rgba(0, 103, 53, 0), 0 0 0 4px rgba(0, 103, 53, 0);
-        }
-        100% {
-          box-shadow: 0 0 0 0 rgba(0, 103, 53, 0), 0 0 0 0 rgba(0, 103, 53, 0);
-        }
-      }
 
-      .driverjs-active-element {
-        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
-                    outline 0.2s ease !important;
-        border-radius: 16px !important;
-        animation: pulse-spotlight 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
-        outline: 3px solid var(--color-primary, #006735) !important;
-        outline-offset: 2px !important;
-      }
-      
-      /* Ajuste responsivo de tooltips */
-      @media (max-width: 640px) {
-        .driver-popover.driverjs-theme {
-          max-width: 290px !important;
-          padding: 16px !important;
+        .react-joyride__spotlight {
+          animation: pulse-joyride-spotlight 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+          outline: 3px solid var(--color-primary, #006735) !important;
+          outline-offset: 4px !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
-      }
-    `}} />
+      `}} />
+    </>
   );
 }
