@@ -18,7 +18,7 @@ function timeAgo(dateStr: string): string {
   return `Hace ${Math.floor(diff / 86400)} d`;
 }
 
-export function NotificationsBell() {
+export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) {
   const { data: notificaciones = [] } = useNotificaciones();
   const { data: conteo } = useConteoNoLeidas();
   const marcarLeida = useMarcarLeida();
@@ -29,28 +29,45 @@ export function NotificationsBell() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label="Notificaciones"
-          className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-on-surface hover:bg-surface-container-high w-full transition-colors"
-        >
-          <div className="relative">
-            <Bell className="w-5 h-5 shrink-0" />
-            {unread > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low">
-                {unread > 99 ? '99+' : unread}
-              </span>
-            )}
-          </div>
-          Notificaciones
-        </button>
+        {onlyIcon ? (
+          <button
+            type="button"
+            aria-label="Notificaciones"
+            className="relative flex items-center justify-center h-10 w-10 rounded-xl text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+          >
+            <div className="relative">
+              <Bell className="w-5 h-5 shrink-0" />
+              {unread > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
+            </div>
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label="Notificaciones"
+            className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-on-surface hover:bg-surface-container-high w-full transition-colors cursor-pointer"
+          >
+            <div className="relative">
+              <Bell className="w-5 h-5 shrink-0" />
+              {unread > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
+            </div>
+            Notificaciones
+          </button>
+        )}
       </PopoverTrigger>
 
       <PopoverContent
-        side="right"
+        side="bottom"
         align="end"
         sideOffset={8}
-        className="w-80 p-0 rounded-xl shadow-xl border border-outline-variant"
+        className="w-80 p-0 rounded-xl shadow-xl border border-outline-variant bg-surface-container-lowest opacity-100! z-50"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
