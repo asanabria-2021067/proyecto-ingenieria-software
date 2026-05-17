@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Joyride, STATUS } from 'react-joyride';
+import { useJoyride, STATUS } from 'react-joyride';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
 
 // Custom Tooltip component for React Joyride
@@ -177,28 +177,28 @@ export default function OnboardingTour() {
     },
   ];
 
+  const { Tour } = useJoyride({
+    run,
+    steps,
+    continuous: true,
+    onEvent: handleJoyrideCallback,
+    tooltipComponent: (props: any) => <CustomTooltip {...props} size={steps.length} />,
+    styles: {
+      options: {
+        overlayColor: 'rgba(5, 12, 8, 0.7)',
+        zIndex: 10000,
+      },
+      spotlight: {
+        borderRadius: '16px',
+      },
+    } as any,
+  });
+
   if (!user) return null;
 
   return (
     <>
-      <Joyride
-        run={run}
-        steps={steps}
-        continuous={true}
-        showProgress={false}
-        showSkipButton={true}
-        callback={handleJoyrideCallback}
-        tooltipComponent={(props: any) => <CustomTooltip {...props} size={steps.length} />}
-        styles={{
-          options: {
-            overlayColor: 'rgba(5, 12, 8, 0.7)',
-            zIndex: 10000,
-          },
-          spotlight: {
-            borderRadius: '16px',
-          },
-        }}
-      />
+      {Tour}
       <style dangerouslySetInnerHTML={{ __html: `
         /* Animación y estilos de spotlight personalizados para React Joyride */
         @keyframes pulse-joyride-spotlight {
