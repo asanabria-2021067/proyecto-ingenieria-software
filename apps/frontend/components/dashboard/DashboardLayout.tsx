@@ -12,6 +12,7 @@ import { clearTokens } from '@/lib/utils/token';
 import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -75,8 +76,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        <div id="sidebar-notifications" className="px-3 py-2 border-t border-outline-variant">
+        <div id="sidebar-notifications" className="px-3 py-2 border-t border-outline-variant flex items-center justify-between">
           <NotificationsBell />
+          <ThemeToggle />
         </div>
 
         <div className="px-3 py-4 border-t border-outline-variant space-y-3">
