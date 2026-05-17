@@ -142,7 +142,7 @@ export default function LoginPage() {
                       setErrores((prev) => ({ ...prev, contrasena: undefined }));
                     }
                   }}
-                  placeholder="--------"
+                  placeholder="Minimo 8 caracteres"
                   className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   aria-invalid={errores.contrasena ? 'true' : 'false'}
                 />
