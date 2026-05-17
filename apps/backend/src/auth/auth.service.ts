@@ -14,7 +14,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {
-    this.resend = new Resend(process.env.RESEND_API_KEY);
+    // Fallback to a dummy key if RESEND_API_KEY is not defined to prevent app crash at startup
+    this.resend = new Resend(process.env.RESEND_API_KEY || 're_1234567890abcdef1234567890abcdef');
   }
 
   async login(loginDto: LoginDto) {
