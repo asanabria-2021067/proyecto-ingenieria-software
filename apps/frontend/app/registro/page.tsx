@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -8,6 +8,7 @@ import { useRegister } from '@/hooks/use-register';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
 import { z } from 'zod';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 import img from '@/public/login-foto.jpg';
 import logo from '@/public/logo.png';
@@ -67,6 +68,32 @@ export default function RegistroPage() {
   const [carreras, setCarreras] = useState<Carrera[]>([]);
   const [errores, setErrores] = useState<Record<string, string | undefined>>({});
   const { mutate, isPending } = useRegister();
+
+  const passwordStrength = useMemo(() => {
+    if (!contrasena) return null;
+    let score = 0;
+    if (contrasena.length >= 8) score += 1;
+    if (/[0-9]/.test(contrasena)) score += 1;
+    if (/[A-Z]/.test(contrasena) && /[a-z]/.test(contrasena)) score += 1;
+    if (/[^A-Za-z0-9]/.test(contrasena)) score += 1;
+
+    if (contrasena.length < 6) {
+      return { score: 1, label: 'Muy débil ⚠️', color: 'bg-red-500', width: '33%' };
+    }
+    if (score <= 2) {
+      return { score: 1, label: 'Débil ⚠️', color: 'bg-red-500', width: '33%' };
+    }
+    if (score === 3) {
+      return { score: 2, label: 'Media 🔑', color: 'bg-amber-500', width: '66%' };
+    }
+    return { score: 3, label: 'Fuerte 🔒', color: 'bg-green-600', width: '100%' };
+  }, [contrasena]);
+
+  const passwordsMatch = useMemo(() => {
+    if (!confirmar) return null;
+    return contrasena === confirmar;
+  }, [contrasena, confirmar]);
+
   const selectedCarreraName =
     carreras.find((carrera) => carrera.idCarrera === idCarrera)?.nombreCarrera ?? '';
 
@@ -163,6 +190,7 @@ export default function RegistroPage() {
             <ArrowLeft className="h-4 w-4" />
             <span className="text-xs font-bold uppercase tracking-wider">Volver</span>
           </Link>
+          <ThemeToggle />
         </header>
 
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
@@ -326,6 +354,22 @@ export default function RegistroPage() {
                   placeholder="Minimo 8 caracteres"
                   className={inputClass}
                 />
+                {passwordStrength && (
+                  <div className="mt-2 space-y-1.5 transition-all duration-300">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-tertiary">
+                      <span>Fuerza de la contraseña:</span>
+                      <span className={passwordStrength.score === 1 ? 'text-red-500' : passwordStrength.score === 2 ? 'text-amber-600' : 'text-green-600'}>
+                        {passwordStrength.label}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-surface-container-highest overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${passwordStrength.color}`}
+                        style={{ width: passwordStrength.width }}
+                      />
+                    </div>
+                  </div>
+                )}
                 {errores.contrasena && <p className="text-xs text-error">{errores.contrasena}</p>}
               </div>
 
@@ -344,6 +388,11 @@ export default function RegistroPage() {
                   placeholder="••••••••"
                   className={inputClass}
                 />
+                {confirmar && (
+                  <p className={`mt-1.5 text-xs font-semibold ${passwordsMatch ? 'text-green-600' : 'text-red-500'}`}>
+                    {passwordsMatch ? '✓ Las contraseñas coinciden' : '✗ Las contraseñas no coinciden'}
+                  </p>
+                )}
                 {errores.confirmar && <p className="text-xs text-error">{errores.confirmar}</p>}
               </div>
 

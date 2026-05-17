@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useLogin } from '@/hooks/use-login';
 import { z } from 'zod';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 import img from '@/public/login-foto.jpg'
 import logo from '@/public/logo.png';
@@ -77,7 +78,7 @@ export default function LoginPage() {
             <ArrowLeft className="h-4 w-4" />
             <span className="text-xs font-bold uppercase tracking-wider">Volver</span>
           </Link>
-
+          <ThemeToggle />
         </header>
 
         <main className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12">
@@ -141,7 +142,7 @@ export default function LoginPage() {
                       setErrores((prev) => ({ ...prev, contrasena: undefined }));
                     }
                   }}
-                  placeholder="--------"
+                  placeholder="Minimo 8 caracteres"
                   className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   aria-invalid={errores.contrasena ? 'true' : 'false'}
                 />

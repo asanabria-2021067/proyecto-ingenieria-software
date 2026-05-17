@@ -329,6 +329,23 @@ export class UsersService {
     });
   }
 
+  async replaceExperiencias(userId: number, experiencias: CreateExperienciaDto[]) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.experienciaPrevia.deleteMany({ where: { idUsuario: userId } });
+      if (experiencias.length > 0) {
+        await tx.experienciaPrevia.createMany({
+          data: experiencias.map((e) => ({
+            idUsuario: userId,
+            tituloProyectoExperiencia: e.tituloProyectoExperiencia,
+            rolDesempenado: e.rolDesempenado,
+            tipoExperiencia: e.tipoExperiencia ?? TipoExperiencia.OTRO,
+          })),
+        });
+      }
+      return { count: experiencias.length };
+    });
+  }
+
   async getDashboard(userId: number) {
     const perfil = await this.prisma.perfilEstudiante.findUnique({
       where: { idUsuario: userId },

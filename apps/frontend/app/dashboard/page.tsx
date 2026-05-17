@@ -18,6 +18,9 @@ import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
 import { apiFetch } from '@/lib/api/client';
+import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
+import { useTheme } from 'next-themes';
 
 const tipoLabel: Record<string, string> = {
   ACADEMICO_HORAS_BECA: 'Hora Beca',
@@ -31,6 +34,43 @@ const estadoColors: Record<string, string> = {
   RECHAZADA: 'bg-red-100 text-red-800',
 };
 
+function DashboardSkeleton() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const baseColor = isDark ? '#202020' : '#ebebeb';
+  const highlightColor = isDark ? '#444' : '#f5f5f5';
+
+  return (
+    <DashboardLayout>
+      <SkeletonTheme baseColor={baseColor} highlightColor={highlightColor}>
+        <div className="px-8 pb-12 pt-8">
+          <section className="mb-12">
+            <Skeleton width={150} height={16} className="mb-2" />
+            <Skeleton width={300} height={48} />
+            <Skeleton width={500} height={20} className="mt-2" />
+          </section>
+
+          <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <Skeleton height={192} borderRadius={12} />
+            <Skeleton height={192} borderRadius={12} />
+            <Skeleton height={192} borderRadius={12} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <Skeleton width={200} height={32} className="mb-8" />
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                 <Skeleton height={200} borderRadius={12} />
+                 <Skeleton height={200} borderRadius={12} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </SkeletonTheme>
+    </DashboardLayout>
+  );
+}
+
 export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: user, isLoading: userLoading } = useCurrentUser();
@@ -40,12 +80,12 @@ export default function DashboardPage() {
     [wizardDismissed, user],
   );
 
-  const { data: stats } = useQuery<DashboardStats>({
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: getDashboardStats,
   });
 
-  const { data: projects = [] } = useQuery<ProyectoListItemDTO[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<ProyectoListItemDTO[]>({
     queryKey: ['dashboard-projects'],
     queryFn: async () => {
       const p = await searchProjects('');
@@ -53,19 +93,15 @@ export default function DashboardPage() {
     },
   });
 
-  const { data: featured = [] } = useQuery<ProyectoListItemDTO[]>({
+  const { data: featured = [], isLoading: featuredLoading } = useQuery<ProyectoListItemDTO[]>({
     queryKey: ['dashboard-featured'],
     queryFn: () => apiFetch('/proyectos/destacados'),
   });
 
-  if (userLoading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-96">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      </DashboardLayout>
-    );
+  const isLoading = userLoading || statsLoading || projectsLoading || featuredLoading;
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
   }
 
   const horasBeca = stats?.horasBeca ?? 0;
@@ -115,7 +151,7 @@ export default function DashboardPage() {
         </section>
 
         {/* Stats */}
-        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div id="stats-container" className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* Horas Beca */}
           {requiereHorasBeca && (
             <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
@@ -219,7 +255,7 @@ export default function DashboardPage() {
                   {featured.slice(0, 4).map((p) => (
                     <div
                       key={p.idProyecto}
-                      className="group rounded-xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                      className="group rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-6 shadow-sm transition-shadow hover:shadow-md"
                     >
                       <div className="mb-4 flex items-start justify-between">
                         <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-secondary-container text-on-secondary-container">
@@ -275,7 +311,7 @@ export default function DashboardPage() {
                 {projects.map((p) => (
                   <div
                     key={p.idProyecto}
-                    className="group rounded-xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                    className="group rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-6 shadow-sm transition-shadow hover:shadow-md"
                   >
                     <div className="mb-4 flex items-start justify-between">
                       <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-secondary-container text-on-secondary-container">
@@ -318,7 +354,7 @@ export default function DashboardPage() {
               <h2 className="mb-6 font-headline text-2xl font-black tracking-tight">
                 Estado de Aplicaciones
               </h2>
-              <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead className="bg-surface-container-low">
@@ -384,8 +420,16 @@ export default function DashboardPage() {
           {/* Right Column */}
           <div className="space-y-8 lg:col-span-4">
             {/* Quick info */}
-            <div className="rounded-xl bg-surface-container-low p-6">
-              <h3 className="font-headline text-lg font-black tracking-tight mb-4">Tu perfil</h3>
+            <div id="dashboard-profile-card" className="rounded-xl bg-surface-container-low p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-headline text-lg font-black tracking-tight">Tu perfil</h3>
+                <button
+                  onClick={() => window.dispatchEvent(new Event('start-onboarding-tour'))}
+                  className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                >
+                  Repetir Tour 🔄
+                </button>
+              </div>
               {user?.perfil?.carrera && (
                 <div className="mb-3">
                   <span className="text-xs font-bold uppercase tracking-widest text-tertiary">Carrera</span>
