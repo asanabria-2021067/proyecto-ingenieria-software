@@ -49,7 +49,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
       <TokenRefreshManager />
-      <aside className="w-64 h-screen bg-surface-container-low border-r border-outline-variant flex flex-col shrink-0 overflow-y-auto">
+      
+      {/* Sidebar - Desktop Only */}
+      <aside className="hidden md:flex w-64 h-screen bg-surface-container-low border-r border-outline-variant flex-col shrink-0 overflow-y-auto">
         <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
           <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
@@ -75,11 +77,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             );
           })}
         </nav>
-
-        <div id="sidebar-notifications" className="px-3 py-2 border-t border-outline-variant flex items-center justify-between">
-          <NotificationsBell />
-          <ThemeToggle />
-        </div>
 
         <div className="px-3 py-4 border-t border-outline-variant space-y-3">
           {user && (
@@ -115,9 +112,69 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto bg-surface">
-        {children}
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col overflow-hidden bg-surface">
+        {/* Top Header Bar */}
+        <header className="h-16 border-b border-outline-variant px-4 md:px-8 flex items-center justify-between shrink-0 bg-surface-container-low z-30">
+          <div className="flex items-center gap-3">
+            {/* Mobile-only logo */}
+            <div className="md:hidden flex items-center gap-2">
+              <Image src={logo} alt="UVGENIUS" className="h-8 w-auto" />
+              <span className="font-headline font-black text-base text-primary">UVGenius</span>
+            </div>
+            <span className="hidden md:inline font-headline font-bold text-sm text-tertiary">
+              Universidad del Valle de Guatemala
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <NotificationsBell onlyIcon />
+            <div id="dashboard-theme-toggle">
+              <ThemeToggle />
+            </div>
+            {/* Mobile-only logout button */}
+            <button
+              onClick={handleLogout}
+              className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl text-error hover:bg-error/10 transition-colors cursor-pointer"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-5 h-5 shrink-0" />
+            </button>
+          </div>
+        </header>
+
+        {/* Scrollable page body */}
+        <div className="flex-1 overflow-auto pb-20 md:pb-0">
+          {children}
+        </div>
       </main>
+
+      {/* Bottom Navigation Bar - Mobile Only */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2">
+        {navItems.map(({ href, label, icon: Icon, exact }) => {
+          const active = exact ? pathname === href : pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              id={`nav-item-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`}
+              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ${
+                active ? 'text-primary bg-primary/10' : 'text-outline hover:text-on-surface'
+              }`}
+              title={label}
+            >
+              <Icon className="w-6 h-6 shrink-0" />
+            </Link>
+          );
+        })}
+        <button
+          onClick={handleLogout}
+          className="flex flex-col items-center justify-center w-12 h-12 rounded-xl text-error hover:bg-error/10 transition-all duration-200 cursor-pointer"
+          title="Cerrar sesión"
+        >
+          <LogOut className="w-6 h-6 shrink-0" />
+        </button>
+      </nav>
+
       <OnboardingTour />
     </div>
   );
