@@ -255,7 +255,7 @@ export default function DashboardPage() {
                   {featured.slice(0, 4).map((p) => (
                     <div
                       key={p.idProyecto}
-                      className="group rounded-xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                      className="group rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-6 shadow-sm transition-shadow hover:shadow-md"
                     >
                       <div className="mb-4 flex items-start justify-between">
                         <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-secondary-container text-on-secondary-container">
@@ -311,7 +311,7 @@ export default function DashboardPage() {
                 {projects.map((p) => (
                   <div
                     key={p.idProyecto}
-                    className="group rounded-xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                    className="group rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-6 shadow-sm transition-shadow hover:shadow-md"
                   >
                     <div className="mb-4 flex items-start justify-between">
                       <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-secondary-container text-on-secondary-container">
@@ -354,7 +354,7 @@ export default function DashboardPage() {
               <h2 className="mb-6 font-headline text-2xl font-black tracking-tight">
                 Estado de Aplicaciones
               </h2>
-              <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead className="bg-surface-container-low">
