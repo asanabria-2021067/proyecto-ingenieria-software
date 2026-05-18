@@ -3,7 +3,10 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
@@ -14,6 +17,9 @@ import {
 } from './dto/update-estado-proyecto.dto';
 import { EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+
+const FEATURED_CACHE_KEY = 'projects:featured';
+const FEATURED_CACHE_TTL = 300_000; // 5 minutos en ms
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
   EstadoProyecto.PUBLICADO,
@@ -41,7 +47,7 @@ const proyectoListSelect = {
   intereses: {
     select: { interes: { select: { nombreInteres: true } } },
   },
-  roles: { select: { idRolProyecto: true } },
+  _count: { select: { roles: true } },
 } as const;
 
 const proyectoDetalleSelect = {
@@ -147,22 +153,21 @@ export class ProjectsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  async findAll(filters: {
+  private _buildListConditions(filters: {
     q?: string;
     tipoProyecto?: string;
     modalidad?: string;
     organizacionId?: number;
     habilidadId?: number;
-  } = {}) {
+  }): Prisma.ProyectoWhereInput[] {
     const { q, tipoProyecto, modalidad, organizacionId, habilidadId } = filters;
-
     const andConditions: Prisma.ProyectoWhereInput[] = [
       { estadoProyecto: { in: ESTADOS_VISIBLES } },
       { eliminadoEn: null },
     ];
-
     if (q && q.trim().length > 0) {
       andConditions.push({ tituloProyecto: { contains: q.trim(), mode: 'insensitive' } });
     }
@@ -180,13 +185,55 @@ export class ProjectsService {
         roles: { some: { requisitos: { some: { idHabilidad: habilidadId } } } },
       });
     }
+    return andConditions;
+  }
 
+  async findAll(filters: {
+    q?: string;
+    tipoProyecto?: string;
+    modalidad?: string;
+    organizacionId?: number;
+    habilidadId?: number;
+  } = {}) {
+    const andConditions = this._buildListConditions(filters);
     return this.prisma.proyecto.findMany({
       where: { AND: andConditions },
       select: proyectoListSelect,
       orderBy: { fechaCreacion: 'desc' },
       take: 20,
     });
+  }
+
+  async findAllPaginated(filters: {
+    q?: string;
+    tipoProyecto?: string;
+    modalidad?: string;
+    organizacionId?: number;
+    habilidadId?: number;
+    page: number;
+    limit: number;
+  }) {
+    const { page, limit } = filters;
+    const skip = (page - 1) * limit;
+    const andConditions = this._buildListConditions(filters);
+
+    const [data, total] = await Promise.all([
+      this.prisma.proyecto.findMany({
+        where: { AND: andConditions },
+        select: proyectoListSelect,
+        orderBy: { fechaCreacion: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.proyecto.count({ where: { AND: andConditions } }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: number) {
@@ -329,6 +376,9 @@ export class ProjectsService {
   }
 
   async findFeatured() {
+    const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
+    if (cached) return cached;
+
     const proyectos = await this.prisma.proyecto.findMany({
       where: {
         estadoProyecto: EstadoProyecto.PUBLICADO,
@@ -348,7 +398,12 @@ export class ProjectsService {
       take: 6,
     });
 
+    await this.cacheManager.set(FEATURED_CACHE_KEY, proyectos, FEATURED_CACHE_TTL).catch(() => {});
     return proyectos;
+  }
+
+  private async _invalidateFeaturedCache(): Promise<void> {
+    await this.cacheManager.del(FEATURED_CACHE_KEY).catch(() => {});
   }
 
   async createFull(data: CreateProjectFullDto, creadoPor: number) {
@@ -809,6 +864,14 @@ export class ProjectsService {
           projectId: actualizado.idProyecto,
         },
       );
+    }
+
+    // Invalidar caché de destacados cuando cambia el conjunto de proyectos PUBLICADOS
+    if (
+      nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
+      estadoAnterior === EstadoProyecto.PUBLICADO
+    ) {
+      await this._invalidateFeaturedCache();
     }
 
     return actualizado;
