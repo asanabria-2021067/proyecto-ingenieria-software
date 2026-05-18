@@ -1,12 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import { Search, MapPin, Users } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { apiFetch } from '@/lib/api/client';
-import { ProyectoResumen, TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
 import {
   Select,
   SelectContent,
@@ -14,6 +8,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { apiFetch } from '@/lib/api/client';
+import { MODALIDAD_LABEL, ProyectoResumen, TIPO_LABEL } from '@/types';
+import { useQuery } from '@tanstack/react-query';
+import { MapPin, Search, Users } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
+
+type OrganizacionFiltro = {
+  idOrganizacion: number;
+  nombreOrganizacion: string;
+};
+
+type ProyectoResumenConOrganizaciones = Omit<ProyectoResumen, 'organizaciones'> & {
+  organizaciones?: {
+    organizacion: OrganizacionFiltro;
+  }[];
+};
 
 const ESTADO_STYLES: Record<string, string> = {
   PUBLICADO: 'bg-[#006735] text-white',
@@ -29,10 +40,24 @@ const ESTADO_STYLES: Record<string, string> = {
 export default function ProyectosPage() {
   const [busqueda, setBusqueda] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
+  const [organizacionFiltro, setOrganizacionFiltro] = useState('');
 
-  const { data: proyectos = [], isLoading, isError } = useQuery<ProyectoResumen[]>({
+  const {
+    data: proyectos = [],
+    isLoading,
+    isError,
+  } = useQuery<ProyectoResumenConOrganizaciones[]>({
     queryKey: ['proyectos'],
     queryFn: () => apiFetch('/proyectos'),
+  });
+
+  const {
+    data: organizaciones = [],
+    isLoading: isLoadingOrganizaciones,
+    isError: isErrorOrganizaciones,
+  } = useQuery<OrganizacionFiltro[]>({
+    queryKey: ['organizaciones'],
+    queryFn: () => apiFetch('/organizaciones'),
   });
 
   const filtrados = proyectos.filter((p) => {
@@ -40,8 +65,17 @@ export default function ProyectosPage() {
       !busqueda ||
       p.tituloProyecto.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.descripcionProyecto.toLowerCase().includes(busqueda.toLowerCase());
+
     const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
-    return coincideBusqueda && coincideTipo;
+
+    const coincideOrganizacion =
+      !organizacionFiltro ||
+      p.organizaciones?.some(
+        ({ organizacion }) =>
+          String(organizacion.idOrganizacion) === organizacionFiltro,
+      );
+
+    return coincideBusqueda && coincideTipo && coincideOrganizacion;
   });
 
   return (
@@ -67,22 +101,92 @@ export default function ProyectosPage() {
               className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <Select value={tipoFiltro || '__ALL__'} onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}>
+
+          <Select
+            value={tipoFiltro || '__ALL__'}
+            onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}
+          >
             <SelectTrigger className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="z-9999">
-              <SelectItem value="__ALL__" className="focus:bg-primary focus:text-on-primary">Todos los tipos</SelectItem>
-              <SelectItem value="ACADEMICO_HORAS_BECA" className="focus:bg-primary focus:text-on-primary">Horas Beca</SelectItem>
-              <SelectItem value="ACADEMICO_EXPERIENCIA" className="focus:bg-primary focus:text-on-primary">Experiencia</SelectItem>
-              <SelectItem value="EXTRACURRICULAR_EXTENSION" className="focus:bg-primary focus:text-on-primary">Extensión</SelectItem>
+            <SelectContent className="z-50">
+              <SelectItem
+                value="__ALL__"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Todos los tipos
+              </SelectItem>
+              <SelectItem
+                value="ACADEMICO_HORAS_BECA"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Horas Beca
+              </SelectItem>
+              <SelectItem
+                value="ACADEMICO_EXPERIENCIA"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Experiencia
+              </SelectItem>
+              <SelectItem
+                value="EXTRACURRICULAR_EXTENSION"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Extensión
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={organizacionFiltro || '__ALL__'}
+            onValueChange={(v) =>
+              setOrganizacionFiltro(v === '__ALL__' ? '' : v)
+            }
+            disabled={isLoadingOrganizaciones || isErrorOrganizaciones}
+          >
+            <SelectTrigger className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+              <SelectValue
+                placeholder={
+                  isLoadingOrganizaciones
+                    ? 'Cargando organizaciones...'
+                    : isErrorOrganizaciones
+                      ? 'Error al cargar organizaciones'
+                      : 'Todas las organizaciones'
+                }
+              />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              <SelectItem
+                value="__ALL__"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Todas las organizaciones
+              </SelectItem>
+              {organizaciones.map((organizacion) => (
+                <SelectItem
+                  key={organizacion.idOrganizacion}
+                  value={String(organizacion.idOrganizacion)}
+                  className="focus:bg-primary focus:text-on-primary"
+                >
+                  {organizacion.nombreOrganizacion}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
-        {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">Cargando proyectos...</div>
+        {isErrorOrganizaciones && (
+          <div className="mb-6 text-error text-sm">
+            No se pudieron cargar las organizaciones para filtrar.
+          </div>
         )}
+
+        {isLoading && (
+          <div className="text-center py-16 text-tertiary text-sm">
+            Cargando proyectos...
+          </div>
+        )}
+
         {isError && (
           <div className="text-center py-16 text-error text-sm">
             No se pudieron cargar los proyectos.
@@ -97,7 +201,8 @@ export default function ProyectosPage() {
 
         <div className="grid gap-5 md:grid-cols-2">
           {filtrados.map((proyecto) => {
-            const org = proyecto.organizaciones[0]?.organizacion.nombreOrganizacion;
+            const org = proyecto.organizaciones?.[0]?.organizacion.nombreOrganizacion;
+
             return (
               <div
                 key={proyecto.idProyecto}
@@ -113,7 +218,8 @@ export default function ProyectosPage() {
                     </span>
                     <span
                       className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold ${
-                        ESTADO_STYLES[proyecto.estadoProyecto] ?? 'bg-gray-100 text-gray-600'
+                        ESTADO_STYLES[proyecto.estadoProyecto] ??
+                        'bg-gray-100 text-gray-600'
                       }`}
                     >
                       {proyecto.estadoProyecto}
@@ -145,7 +251,8 @@ export default function ProyectosPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5" />
-                    {proyecto.roles.length} {proyecto.roles.length === 1 ? 'rol' : 'roles'}
+                    {proyecto.roles.length}{' '}
+                    {proyecto.roles.length === 1 ? 'rol' : 'roles'}
                   </span>
                 </div>
 
