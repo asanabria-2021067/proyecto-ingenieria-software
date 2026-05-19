@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Bell, CheckCheck } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -146,6 +147,15 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
             </ul>
           )}
         </ScrollArea>
+
+        <div className="border-t border-outline-variant px-4 py-3">
+          <Link
+            href="/dashboard/notificaciones"
+            className="block w-full rounded-lg px-3 py-2 text-center text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
+          >
+            Ver todas
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   );
