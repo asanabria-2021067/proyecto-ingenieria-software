@@ -276,8 +276,11 @@ docker compose logs -f frontend
 docker compose logs -f postgres
 docker compose logs -f redis
 
-# Detener
+# Bajar todo el entorno de la app
 docker compose --profile app down
+
+# Reiniciar todo el entorno de la app
+docker compose --profile app restart
 
 # Reiniciar un servicio
 docker compose restart backend
