@@ -56,6 +56,9 @@
 }
 
 :root {
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --gradient-color: #006735;
   --sparkles-color: #72dc93;
 }
@@ -113,6 +116,87 @@ html {
   scroll-behavior: smooth;
 }
 
+@keyframes surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes empty-state-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.surface-enter {
+  animation: surface-enter 0.38s var(--ease-out-quint) both;
+}
+
+.empty-state-visual {
+  animation: empty-state-float 5s var(--ease-out-quart) infinite;
+}
+
+.interactive-lift {
+  transition:
+    transform 0.18s var(--ease-out-quart),
+    box-shadow 0.18s var(--ease-out-quart),
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.interactive-lift:hover {
+  transform: translateY(-2px);
+}
+
+.interactive-lift:active {
+  transform: translateY(0);
+}
+
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 10000;
+  transform: translateY(-140%);
+  border-radius: 0.75rem;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
+  transition: transform 0.18s var(--ease-out-quart);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 3px solid color-mix(in srgb, var(--color-on-primary) 70%, transparent);
+  outline-offset: 3px;
+}
+
+:where(
+  a[href],
+  button,
+  input,
+  textarea,
+  select,
+  [role='button'],
+  [tabindex]:not([tabindex='-1'])
+):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-primary) 62%, transparent);
+  outline-offset: 3px;
+}
+
 [data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
 }
@@ -147,4 +231,24 @@ button:active:not(:disabled) {
 
 button:disabled {
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .interactive-lift:hover,
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }
