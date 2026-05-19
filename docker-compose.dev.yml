@@ -26,7 +26,8 @@ services:
       - ./apps/frontend/types:/app/types
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - API_URL_INTERNAL=http://backend:3001
+      - NEXT_PUBLIC_API_URL=
       - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-dez2bbiiw}
       - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET:-dez2bbiiw}
       - WATCHPACK_POLLING=true
