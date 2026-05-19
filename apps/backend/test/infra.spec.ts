@@ -38,12 +38,12 @@ describe('Infra', () => {
         update: vi.fn(),
       },
     };
-    const notifications = { notifyUsers: vi.fn() };
+    const notifications = { notifyFromTemplate: vi.fn() };
     const service = new DraftInactivityService(prisma as any, notifications as any);
 
     await (service as any).runDailyCheck();
 
     expect(prisma.proyecto.update).toHaveBeenCalled();
-    expect(notifications.notifyUsers).toHaveBeenCalled();
+    expect(notifications.notifyFromTemplate).toHaveBeenCalled();
   });
 });
