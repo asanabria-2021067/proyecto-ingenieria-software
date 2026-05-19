@@ -18,7 +18,7 @@ const CustomTooltip = ({
   return (
     <div
       {...tooltipProps}
-      className="bg-surface-container-lowest border border-outline-variant/30 text-on-surface rounded-2xl shadow-2xl p-5 md:p-6 max-w-sm w-full backdrop-blur-md animate-fade-in relative border-l-6 border-l-primary focus:outline-none"
+      className="surface-enter bg-surface-container-lowest border border-outline-variant/30 text-on-surface rounded-2xl shadow-2xl p-5 md:p-6 max-w-sm w-full backdrop-blur-md relative ring-1 ring-primary/15 focus:outline-none"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4 select-none">
@@ -46,6 +46,7 @@ const CustomTooltip = ({
       <div className="flex items-center justify-between gap-4 border-t border-outline-variant/20 pt-4">
         {/* Skip/Cerrar */}
         <button
+          type="button"
           {...skipProps}
           className="text-xs font-bold text-tertiary hover:text-error transition-colors px-3 py-2 rounded-xl hover:bg-error/5 cursor-pointer outline-none"
         >
@@ -56,6 +57,7 @@ const CustomTooltip = ({
           {/* Back Button */}
           {index > 0 && (
             <button
+              type="button"
               {...backProps}
               className="text-xs font-bold text-primary border border-primary hover:bg-primary/5 transition-all px-4 py-2 rounded-xl cursor-pointer outline-none"
             >
@@ -65,6 +67,7 @@ const CustomTooltip = ({
 
           {/* Next/Last Button */}
           <button
+            type="button"
             {...primaryProps}
             className="text-xs font-bold text-white bg-primary hover:bg-primary/95 transition-all px-4 py-2 rounded-xl shadow-md cursor-pointer outline-none"
           >
@@ -218,6 +221,13 @@ export default function OnboardingTour() {
           outline: 3px solid var(--color-primary, #006735) !important;
           outline-offset: 4px !important;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .react-joyride__spotlight {
+            animation: none !important;
+            transition: none !important;
+          }
         }
       `}} />
     </>
