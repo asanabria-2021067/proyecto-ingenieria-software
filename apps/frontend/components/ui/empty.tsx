@@ -2,14 +2,34 @@ import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
 
-function Empty({ className, ...props }: React.ComponentProps<'div'>) {
+const emptyVariants = cva(
+  'relative isolate flex min-w-0 flex-1 flex-col items-center justify-center gap-6 overflow-hidden rounded-2xl border px-6 py-10 text-center text-balance shadow-sm md:px-10 md:py-12',
+  {
+    variants: {
+      tone: {
+        default:
+          'border-outline-variant/70 bg-surface-container-lowest text-on-surface',
+        muted:
+          'border-dashed border-outline-variant bg-surface-container-low text-on-surface',
+        danger:
+          'border-error/25 bg-error-container/20 text-on-surface',
+      },
+    },
+    defaultVariants: {
+      tone: 'default',
+    },
+  },
+)
+
+function Empty({
+  className,
+  tone = 'default',
+  ...props
+}: React.ComponentProps<'section'> & VariantProps<typeof emptyVariants>) {
   return (
-    <div
+    <section
       data-slot="empty"
-      className={cn(
-        'flex min-w-0 flex-1 flex-col items-center justify-center gap-6 rounded-lg border-dashed p-6 text-center text-balance md:p-12',
-        className,
-      )}
+      className={cn(emptyVariants({ tone, className }))}
       {...props}
     />
   )
@@ -29,12 +49,14 @@ function EmptyHeader({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 const emptyMediaVariants = cva(
-  'flex shrink-0 items-center justify-center mb-2 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  'empty-state-visual relative mb-1 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0',
   {
     variants: {
       variant: {
         default: 'bg-transparent',
-        icon: "bg-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-lg [&_svg:not([class*='size-'])]:size-6",
+        icon: "flex size-16 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm ring-8 ring-primary/5 [&_svg:not([class*='size-'])]:size-7",
+        compact:
+          "flex size-12 shrink-0 items-center justify-center rounded-xl border border-outline-variant bg-surface-container text-primary [&_svg:not([class*='size-'])]:size-6",
       },
     },
     defaultVariants: {
@@ -62,18 +84,18 @@ function EmptyTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="empty-title"
-      className={cn('text-lg font-medium tracking-tight', className)}
+      className={cn('font-headline text-xl font-extrabold tracking-tight text-on-surface', className)}
       {...props}
     />
   )
 }
 
-function EmptyDescription({ className, ...props }: React.ComponentProps<'p'>) {
+function EmptyDescription({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="empty-description"
       className={cn(
-        'text-muted-foreground [&>a:hover]:text-primary text-sm/relaxed [&>a]:underline [&>a]:underline-offset-4',
+        'text-tertiary [&>a:hover]:text-primary max-w-md text-sm/relaxed [&>a]:font-semibold [&>a]:underline [&>a]:underline-offset-4',
         className,
       )}
       {...props}
@@ -86,11 +108,26 @@ function EmptyContent({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="empty-content"
       className={cn(
-        'flex w-full max-w-sm min-w-0 flex-col items-center gap-4 text-sm text-balance',
+        'flex w-full max-w-sm min-w-0 flex-col items-center gap-3 text-sm text-balance sm:flex-row sm:justify-center',
         className,
       )}
       {...props}
     />
+  )
+}
+
+function EmptySteps({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      aria-hidden="true"
+      data-slot="empty-steps"
+      className={cn('mt-1 flex items-center gap-1.5 text-primary/70', className)}
+      {...props}
+    >
+      <span className="h-1.5 w-8 rounded-full bg-current" />
+      <span className="h-1.5 w-3 rounded-full bg-current opacity-60" />
+      <span className="h-1.5 w-5 rounded-full bg-current opacity-30" />
+    </div>
   )
 }
 
@@ -101,4 +138,5 @@ export {
   EmptyDescription,
   EmptyContent,
   EmptyMedia,
+  EmptySteps,
 }
