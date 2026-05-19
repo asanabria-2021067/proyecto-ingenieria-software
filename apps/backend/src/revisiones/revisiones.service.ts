@@ -180,24 +180,30 @@ export class RevisionesService {
       });
 
       if (proyecto) {
-        const tipoNotificacion =
-          dto.resultado === 'APROBADA' ? 'PROYECTO_APROBADO' : 'PROYECTO_OBSERVADO';
-
-        const mensajeNotificacion =
-          dto.resultado === 'APROBADA'
-            ? `Tu proyecto "${proyecto.tituloProyecto}" fue aprobado y publicado.`
-            : `Tu proyecto "${proyecto.tituloProyecto}" recibió observaciones. Revisa el feedback.`;
-
-        await tx.notificacion.create({
-          data: {
-            idUsuario: proyecto.creadoPor,
-            tipoNotificacion,
-            tituloNotificacion:
-              dto.resultado === 'APROBADA' ? 'Proyecto aprobado' : 'Proyecto observado',
-            mensajeNotificacion,
-            datosJson: { idProyecto, idRevision: revision.idRevisionProyecto },
-          },
-        });
+        if (dto.resultado === 'APROBADA') {
+          await this.notifications.notifyFromTemplate(
+            [proyecto.creadoPor],
+            'PROYECTO_APROBADO',
+            {
+              projectTitle: proyecto.tituloProyecto,
+              projectId: idProyecto,
+              revisionId: revision.idRevisionProyecto,
+            },
+            tx,
+          );
+        } else {
+          await this.notifications.notifyFromTemplate(
+            [proyecto.creadoPor],
+            'PROYECTO_OBSERVADO',
+            {
+              projectTitle: proyecto.tituloProyecto,
+              projectId: idProyecto,
+              revisionId: revision.idRevisionProyecto,
+              comment: dto.comentario ?? null,
+            },
+            tx,
+          );
+        }
       }
 
       return {

@@ -19,7 +19,7 @@ import { EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma
 import { NotificationsService } from '../notifications/notifications.service';
 
 const FEATURED_CACHE_KEY = 'projects:featured';
-const FEATURED_CACHE_TTL = 300_000; // 5 minutos en ms
+const FEATURED_CACHE_TTL = 300_000;
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
   EstadoProyecto.PUBLICADO,
@@ -450,12 +450,12 @@ export class ProjectsService {
 
       if (accion === 'EN_REVISION') {
         await this._crearRevisionPendiente(tx, proyecto.idProyecto, 1);
-        await this.notifications.notifyAdmins(
+        await this.notifications.notifyAdminsFromTemplate(
+          'PROYECTO_EN_REVISION',
           {
-            tipoNotificacion: 'PROYECTO_EN_REVISION',
-            tituloNotificacion: 'Proyecto enviado a revisión',
-            mensajeNotificacion: `El proyecto "${proyecto.tituloProyecto}" fue enviado a revisión.`,
-            datosJson: { idProyecto: proyecto.idProyecto, numeroEnvio: 1 },
+            projectTitle: proyecto.tituloProyecto,
+            projectId: proyecto.idProyecto,
+            numeroEnvio: 1,
           },
           tx,
         );
@@ -630,12 +630,12 @@ export class ProjectsService {
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
       await this._crearRevisionPendiente(tx, id, totalEnvios + 1);
-      await this.notifications.notifyAdmins(
+      await this.notifications.notifyAdminsFromTemplate(
+        'PROYECTO_EN_REVISION',
         {
-          tipoNotificacion: 'PROYECTO_EN_REVISION',
-          tituloNotificacion: 'Proyecto enviado a revisión',
-          mensajeNotificacion: `Se recibió un nuevo envío a revisión (round ${totalEnvios + 1}).`,
-          datosJson: { idProyecto: id, numeroEnvio: totalEnvios + 1 },
+          projectTitle: proyecto.tituloProyecto,
+          projectId: id,
+          numeroEnvio: totalEnvios + 1,
         },
         tx,
       );
@@ -659,12 +659,13 @@ export class ProjectsService {
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
       await this._crearRevisionPendiente(tx, id, totalEnvios + 1);
-      await this.notifications.notifyAdmins(
+      await this.notifications.notifyAdminsFromTemplate(
+        'PROYECTO_EN_REVISION',
         {
-          tipoNotificacion: 'PROYECTO_EN_REVISION',
-          tituloNotificacion: 'Proyecto reenviado a revisión',
-          mensajeNotificacion: `El proyecto ${id} fue reenviado a revisión (round ${totalEnvios + 1}).`,
-          datosJson: { idProyecto: id, numeroEnvio: totalEnvios + 1 },
+          projectTitle: proyecto.tituloProyecto,
+          projectId: id,
+          numeroEnvio: totalEnvios + 1,
+          isResubmission: true,
         },
         tx,
       );
@@ -688,12 +689,11 @@ export class ProjectsService {
         },
         select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
       });
-      await this.notifications.notifyAdmins(
+      await this.notifications.notifyAdminsFromTemplate(
+        'SOLICITUD_CIERRE_PROYECTO',
         {
-          tipoNotificacion: 'SOLICITUD_CIERRE_PROYECTO',
-          tituloNotificacion: 'Solicitud de cierre de proyecto',
-          mensajeNotificacion: `El líder solicitó cierre para "${actualizado.tituloProyecto}".`,
-          datosJson: { idProyecto: id },
+          projectTitle: actualizado.tituloProyecto,
+          projectId: id,
         },
         tx,
       );
@@ -744,13 +744,12 @@ export class ProjectsService {
       const destinatarios = Array.from(
         new Set([proyecto.creadoPor, ...participantes.map((p) => p.idUsuario)]),
       );
-      await this.notifications.notifyUsers(
+      await this.notifications.notifyFromTemplate(
         destinatarios,
+        'CIERRE_APROBADO',
         {
-          tipoNotificacion: 'CIERRE_APROBADO',
-          tituloNotificacion: 'Cierre de proyecto aprobado',
-          mensajeNotificacion: `El cierre administrativo de "${proyecto.tituloProyecto}" fue aprobado.`,
-          datosJson: { idProyecto: id },
+          projectTitle: proyecto.tituloProyecto,
+          projectId: id,
         },
         tx,
       );
@@ -778,13 +777,12 @@ export class ProjectsService {
           fechaActualizacion: new Date(),
         },
       });
-      await this.notifications.notifyUsers(
+      await this.notifications.notifyFromTemplate(
         [proyecto.creadoPor],
+        'CIERRE_RECHAZADO',
         {
-          tipoNotificacion: 'CIERRE_RECHAZADO',
-          tituloNotificacion: 'Cierre de proyecto rechazado',
-          mensajeNotificacion: `La solicitud de cierre de "${proyecto.tituloProyecto}" fue rechazada.`,
-          datosJson: { idProyecto: id },
+          projectTitle: proyecto.tituloProyecto,
+          projectId: id,
         },
         tx,
       );
@@ -866,7 +864,6 @@ export class ProjectsService {
       );
     }
 
-    // Invalidar caché de destacados cuando cambia el conjunto de proyectos PUBLICADOS
     if (
       nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
       estadoAnterior === EstadoProyecto.PUBLICADO
@@ -880,7 +877,7 @@ export class ProjectsService {
   private async _requireOwner(idProyecto: number, userId: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
-      select: { idProyecto: true, estadoProyecto: true, creadoPor: true },
+      select: { idProyecto: true, estadoProyecto: true, creadoPor: true, tituloProyecto: true },
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
@@ -898,10 +895,7 @@ export class ProjectsService {
     }
   }
 
-  // ---------- POSTULACIONES DEL PROYECTO ----------
-
   async findPostulacionesByProject(idProyecto: number, userId: number) {
-    // Solo el creador del proyecto puede ver sus postulaciones recibidas
     await this._requireOwner(idProyecto, userId);
 
     return this.prisma.postulacion.findMany({
@@ -927,8 +921,6 @@ export class ProjectsService {
       orderBy: { fechaPostulacion: 'desc' },
     });
   }
-
-  // -------------------------------------------------
 
   async delete(id: number, userId: number) {
     await this._requireOwner(id, userId);
@@ -957,8 +949,6 @@ export class ProjectsService {
 
     return { mensaje: 'Proyecto eliminado correctamente' };
   }
-
-  // -------------------------------------------------
 
   private async _crearRevisionPendiente(
     tx: Prisma.TransactionClient,
