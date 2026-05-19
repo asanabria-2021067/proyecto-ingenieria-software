@@ -31,6 +31,7 @@ export function useMarcarLeida() {
     mutationFn: marcarLeida,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
     },
   });
 }
@@ -41,6 +42,7 @@ export function useMarcarTodasLeidas() {
     mutationFn: marcarTodasLeidas,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
     },
   });
 }
