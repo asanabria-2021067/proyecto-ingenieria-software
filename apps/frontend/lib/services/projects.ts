@@ -17,6 +17,30 @@ export async function searchProjects(q: string): Promise<ProyectoListItemDTO[]> 
   return apiFetch<ProyectoListItemDTO[]>(`/proyectos${params}`);
 }
 
+export interface PaginatedProyectosResult {
+  data: ProyectoListItemDTO[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export async function getProjectsPaginated(opts: {
+  page?: number;
+  limit?: number;
+  q?: string;
+  tipoProyecto?: string;
+  modalidad?: string;
+}): Promise<PaginatedProyectosResult> {
+  const params = new URLSearchParams({
+    page: String(opts.page ?? 1),
+    limit: String(opts.limit ?? 12),
+  });
+  if (opts.q) params.set('q', opts.q);
+  if (opts.tipoProyecto) params.set('tipoProyecto', opts.tipoProyecto);
+  if (opts.modalidad) params.set('modalidad', opts.modalidad);
+  return apiFetch<PaginatedProyectosResult>(`/proyectos?${params.toString()}`);
+}
+
 export async function getMyProjectById(id: number): Promise<ProyectoDetalleDTO> {
   return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}/owner`);
 }
