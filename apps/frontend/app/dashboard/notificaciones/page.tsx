@@ -3,33 +3,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { apiFetch } from '@/lib/api/client';
 import uvgSwal from '@/lib/swal';
-
-interface Notificacion {
-  idNotificacion: number;
-  tipoNotificacion: string;
-  tituloNotificacion: string;
-  mensajeNotificacion: string | null;
-  datosJson: any;
-  creadaEn: string;
-  leidaEn: string | null;
-}
+import {
+  getNotificaciones,
+  marcarLeida,
+  marcarTodasLeidas,
+  type Notificacion,
+} from '@/lib/services/notifications';
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
 
   const { data: notificaciones = [], isLoading } = useQuery<Notificacion[]>({
-    queryKey: ['notificaciones-todas'],
-    queryFn: () => apiFetch('/notificaciones'),
+    queryKey: ['notificaciones'],
+    queryFn: getNotificaciones,
     refetchOnMount: 'always',
   });
 
   const markAllMutation = useMutation({
-    mutationFn: () => apiFetch('/notificaciones/marcar-todas', { method: 'POST' }),
+    mutationFn: marcarTodasLeidas,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notificaciones-todas'] });
-      queryClient.invalidateQueries({ queryKey: ['notificaciones-count'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
       uvgSwal.fire({
         icon: 'success',
         title: 'Listo',
@@ -47,10 +42,10 @@ export default function NotificacionesPage() {
   });
 
   const markOneMutation = useMutation({
-    mutationFn: (id: number) => apiFetch(`/notificaciones/${id}/leer`, { method: 'PATCH' }),
+    mutationFn: marcarLeida,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notificaciones-todas'] });
-      queryClient.invalidateQueries({ queryKey: ['notificaciones-count'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
     },
   });
 
