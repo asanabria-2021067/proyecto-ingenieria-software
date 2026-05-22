@@ -43,6 +43,7 @@ export interface UserProfile {
     rolDesempenado: string | null;
     tipoExperiencia: string;
   }[];
+  roles?: string[];
 }
 
 export interface DashboardStats {
