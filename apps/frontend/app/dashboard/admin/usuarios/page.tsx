@@ -19,6 +19,7 @@ import {
 import AdminLayout from '@/components/admin/AdminLayout';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
+import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -270,12 +271,12 @@ export default function AdminUsuariosPage() {
   // Pending confirmation
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
-  // TODO (Tarea 7): abrir drawer con este id
-  const [, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const handleViewProfile = useCallback((id: number) => {
     setSelectedUserId(id);
-    // Drawer se implementará en Tarea 7
+    setDetailOpen(true);
   }, []);
 
   const queryParams: ListAdminUsersParams = {
@@ -658,6 +659,19 @@ export default function AdminUsuariosPage() {
           onCancel={() => setPendingAction(null)}
         />
       )}
+
+      {/* User detail drawer */}
+      <UserDetailSheet
+        userId={selectedUserId}
+        open={detailOpen}
+        onOpenChange={(v) => {
+          setDetailOpen(v);
+          if (!v) setSelectedUserId(null);
+        }}
+        onStatusChanged={() => {
+          queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+        }}
+      />
     </AdminLayout>
   );
 }
