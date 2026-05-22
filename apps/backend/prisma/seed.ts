@@ -961,6 +961,24 @@ async function main() {
     });
   }
 
+  // ─── Usuario administrador ─────────────────────────────
+  const adminUser = await prisma.usuario.upsert({
+    where: { correo: 'admin@uvg.edu.gt' },
+    update: {},
+    create: {
+      correo: 'admin@uvg.edu.gt',
+      contrasena: PASSWORD_HASH,
+      nombre: 'Admin',
+      apellido: 'UVG',
+    },
+  });
+
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: adminUser.idUsuario, idRolAcceso: rolAdmin.idRolAcceso } },
+    update: {},
+    create: { idUsuario: adminUser.idUsuario, idRolAcceso: rolAdmin.idRolAcceso },
+  });
+
   // ─── Configuración del sistema ──────────────────────────
   const configData = [
     { clave: 'max_horas_semana', valor: '40', descripcionParametro: 'Máximo de horas semanales permitidas' },
