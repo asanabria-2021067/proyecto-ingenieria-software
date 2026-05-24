@@ -79,7 +79,7 @@ export default function ProyectosPage() {
   });
 
   return (
-    <DashboardLayout>
+    <DashboardLayout allowAdmin>
       <div className="px-8 py-8 max-w-6xl mx-auto">
         <div className="mb-8">
           <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
@@ -251,8 +251,8 @@ export default function ProyectosPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5" />
-                    {proyecto.roles.length}{' '}
-                    {proyecto.roles.length === 1 ? 'rol' : 'roles'}
+                    {(proyecto._count?.roles ?? proyecto.roles?.length ?? 0)}{' '}
+                    {(proyecto._count?.roles ?? proyecto.roles?.length ?? 0) === 1 ? 'rol' : 'roles'}
                   </span>
                 </div>
 

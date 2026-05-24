@@ -24,19 +24,25 @@ const navItems = [
   { href: '/dashboard/perfil', label: 'Perfil', icon: User },
 ];
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+  allowAdmin = false,
+}: {
+  children: React.ReactNode;
+  allowAdmin?: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user, isLoading } = useCurrentUser();
 
   useEffect(() => {
-    if (!isLoading && isAdminUser(user)) {
+    if (!allowAdmin && !isLoading && isAdminUser(user)) {
       router.replace('/dashboard/admin');
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, allowAdmin]);
 
-  if (isLoading || isAdminUser(user)) {
+  if (isLoading || (!allowAdmin && isAdminUser(user))) {
     return (
       <div className="h-screen bg-surface flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
