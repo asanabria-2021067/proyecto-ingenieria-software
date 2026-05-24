@@ -8,10 +8,6 @@ import {
   Search,
   X,
   AlertCircle,
-  MoreHorizontal,
-  UserCheck,
-  UserX,
-  ShieldOff,
   Eye,
   ChevronLeft,
   ChevronRight,
@@ -29,12 +25,6 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectTrigger,
@@ -140,49 +130,12 @@ function SkeletonRows() {
 function UserActions({
   user,
   onViewProfile,
-  onChangeStatus,
 }: {
   user: AdminUserRow;
   onViewProfile: (id: number) => void;
-  onChangeStatus: (action: PendingAction) => void;
 }) {
-  const userName = `${user.nombre} ${user.apellido}`;
-
-  const triggerAction = (nuevoEstado: AdminUserStatus) => {
-    const configs: Record<AdminUserStatus, Omit<PendingAction, 'userId' | 'userName' | 'nuevoEstado'>> = {
-      INACTIVO: {
-        title: 'Desactivar usuario',
-        description: `¿Deseas desactivar a ${userName}? El usuario perderá acceso activo a la plataforma.`,
-        actionLabel: 'Desactivar',
-        variant: 'warning',
-      },
-      BLOQUEADO: {
-        title: 'Bloquear usuario',
-        description: `¿Deseas bloquear a ${userName}? El usuario no podrá iniciar sesión.`,
-        actionLabel: 'Bloquear',
-        variant: 'destructive',
-      },
-      ACTIVO: {
-        title: user.estado === 'BLOQUEADO' ? 'Desbloquear usuario' : 'Activar usuario',
-        description:
-          user.estado === 'BLOQUEADO'
-            ? `¿Deseas desbloquear a ${userName}? Recuperará acceso normal.`
-            : `¿Deseas activar a ${userName}? Recuperará acceso a la plataforma.`,
-        actionLabel: user.estado === 'BLOQUEADO' ? 'Desbloquear' : 'Activar',
-        variant: 'default',
-      },
-    };
-    onChangeStatus({
-      userId: user.idUsuario,
-      userName,
-      nuevoEstado,
-      ...configs[nuevoEstado],
-    });
-  };
-
   return (
     <div className="flex items-center gap-1">
-      {/* Ver perfil — preparado para Tarea 7 */}
       <button
         onClick={() => onViewProfile(user.idUsuario)}
         className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
@@ -191,67 +144,6 @@ function UserActions({
         <Eye className="h-3.5 w-3.5" />
         Ver perfil
       </button>
-
-      {!isAdmin(user) && (
-        <>
-          {user.estado === 'ACTIVO' && (
-            <>
-              <button
-                onClick={() => triggerAction('INACTIVO')}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-tertiary hover:bg-surface-container-high transition-colors"
-                title="Desactivar"
-              >
-                <UserX className="h-3.5 w-3.5" />
-                Desactivar
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-tertiary hover:bg-surface-container-high transition-colors"
-                    title="Más acciones"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface"
-                >
-                  <DropdownMenuItem
-                    onClick={() => triggerAction('BLOQUEADO')}
-                    className="text-error focus:bg-error/10 focus:text-error cursor-pointer"
-                  >
-                    <ShieldOff className="h-4 w-4 mr-2" />
-                    Bloquear
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          )}
-
-          {user.estado === 'INACTIVO' && (
-            <button
-              onClick={() => triggerAction('ACTIVO')}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-              title="Activar"
-            >
-              <UserCheck className="h-3.5 w-3.5" />
-              Activar
-            </button>
-          )}
-
-          {user.estado === 'BLOQUEADO' && (
-            <button
-              onClick={() => triggerAction('ACTIVO')}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-              title="Desbloquear"
-            >
-              <UserCheck className="h-3.5 w-3.5" />
-              Desbloquear
-            </button>
-          )}
-        </>
-      )}
     </div>
   );
 }
@@ -370,7 +262,7 @@ export default function AdminUsuariosPage() {
           </div>
           <button
             onClick={() => refetch()}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-on-primary transition-colors hover:bg-primary/90 self-start"
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary self-start"
           >
             <RefreshCw className="h-4 w-4" />
             Actualizar
@@ -378,81 +270,79 @@ export default function AdminUsuariosPage() {
         </section>
 
         {/* Filters */}
-        <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary pointer-events-none" />
-              <input
-                type="text"
-                value={search}
-                onChange={handleSearchChange}
-                placeholder="Buscar por nombre o correo institucional…"
-                className="w-full rounded-xl border border-outline-variant bg-surface-container-low py-2 pl-9 pr-4 text-sm text-on-surface placeholder:text-tertiary outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary/30"
-              />
-            </div>
-
-            {/* Rol */}
-            <Select
-              value={rol || '__all__'}
-              onValueChange={(v) => handleFilterChange(setRol, v === '__all__' ? '' : v)}
-            >
-              <SelectTrigger className="w-full sm:w-48 rounded-xl border-outline-variant bg-surface-container-low text-sm text-on-surface">
-                <SelectValue placeholder="Todos los roles" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface">
-                <SelectItem value="__all__">Todos los roles</SelectItem>
-                <SelectItem value="estudiante">Estudiante</SelectItem>
-                <SelectItem value="mentor">Mentor</SelectItem>
-                <SelectItem value="lider_asociacion">Líder de asociación</SelectItem>
-                <SelectItem value="coordinador_academico">Coordinador académico</SelectItem>
-                <SelectItem value="administrador">Administrador</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Estado */}
-            <Select
-              value={estado || '__all__'}
-              onValueChange={(v) => handleFilterChange(setEstado, v === '__all__' ? '' : v)}
-            >
-              <SelectTrigger className="w-full sm:w-44 rounded-xl border-outline-variant bg-surface-container-low text-sm text-on-surface">
-                <SelectValue placeholder="Todos los estados" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface">
-                <SelectItem value="__all__">Todos los estados</SelectItem>
-                <SelectItem value="ACTIVO">Activo</SelectItem>
-                <SelectItem value="INACTIVO">Inactivo</SelectItem>
-                <SelectItem value="BLOQUEADO">Bloqueado</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Año */}
-            <Select
-              value={year || '__all__'}
-              onValueChange={(v) => handleFilterChange(setYear, v === '__all__' ? '' : v)}
-            >
-              <SelectTrigger className="w-full sm:w-40 rounded-xl border-outline-variant bg-surface-container-low text-sm text-on-surface">
-                <SelectValue placeholder="Todos los años" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface">
-                <SelectItem value="__all__">Todos los años</SelectItem>
-                <SelectItem value="2026">2026</SelectItem>
-                <SelectItem value="2025">2025</SelectItem>
-                <SelectItem value="2024">2024</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Clear */}
-            {(search || rol || estado || year) && (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-tertiary hover:bg-surface-container-high transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-                Limpiar filtros
-              </button>
-            )}
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          {/* Search */}
+          <div className="relative flex-1 min-w-50">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-tertiary pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Buscar por nombre o correo institucional…"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
           </div>
+
+          {/* Rol */}
+          <Select
+            value={rol || '__all__'}
+            onValueChange={(v) => handleFilterChange(setRol, v === '__all__' ? '' : v)}
+          >
+            <SelectTrigger className="w-full sm:w-48 py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+              <SelectValue placeholder="Todos los roles" />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              <SelectItem value="__all__" className="focus:bg-primary focus:text-on-primary">Todos los roles</SelectItem>
+              <SelectItem value="estudiante" className="focus:bg-primary focus:text-on-primary">Estudiante</SelectItem>
+              <SelectItem value="mentor" className="focus:bg-primary focus:text-on-primary">Mentor</SelectItem>
+              <SelectItem value="lider_asociacion" className="focus:bg-primary focus:text-on-primary">Líder de asociación</SelectItem>
+              <SelectItem value="coordinador_academico" className="focus:bg-primary focus:text-on-primary">Coordinador académico</SelectItem>
+              <SelectItem value="administrador" className="focus:bg-primary focus:text-on-primary">Administrador</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Estado */}
+          <Select
+            value={estado || '__all__'}
+            onValueChange={(v) => handleFilterChange(setEstado, v === '__all__' ? '' : v)}
+          >
+            <SelectTrigger className="w-full sm:w-44 py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+              <SelectValue placeholder="Todos los estados" />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              <SelectItem value="__all__" className="focus:bg-primary focus:text-on-primary">Todos los estados</SelectItem>
+              <SelectItem value="ACTIVO" className="focus:bg-primary focus:text-on-primary">Activo</SelectItem>
+              <SelectItem value="INACTIVO" className="focus:bg-primary focus:text-on-primary">Inactivo</SelectItem>
+              <SelectItem value="BLOQUEADO" className="focus:bg-primary focus:text-on-primary">Bloqueado</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Año */}
+          <Select
+            value={year || '__all__'}
+            onValueChange={(v) => handleFilterChange(setYear, v === '__all__' ? '' : v)}
+          >
+            <SelectTrigger className="w-full sm:w-40 py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+              <SelectValue placeholder="Todos los años" />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              <SelectItem value="__all__" className="focus:bg-primary focus:text-on-primary">Todos los años</SelectItem>
+              <SelectItem value="2026" className="focus:bg-primary focus:text-on-primary">2026</SelectItem>
+              <SelectItem value="2025" className="focus:bg-primary focus:text-on-primary">2025</SelectItem>
+              <SelectItem value="2024" className="focus:bg-primary focus:text-on-primary">2024</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Clear */}
+          {(search || rol || estado || year) && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+              Limpiar filtros
+            </button>
+          )}
         </div>
 
         {/* Table card */}
@@ -577,7 +467,6 @@ export default function AdminUsuariosPage() {
                         <UserActions
                           user={user}
                           onViewProfile={handleViewProfile}
-                          onChangeStatus={setPendingAction}
                         />
                       </TableCell>
                     </TableRow>

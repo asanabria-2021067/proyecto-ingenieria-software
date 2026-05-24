@@ -33,18 +33,18 @@ function timeAgo(dateStr: string | null): string {
   return `Hace ${Math.floor(diff / 86400)} d`;
 }
 
-function estadoProyectoClasses(estado: string): string {
+function estadoBadgeStyle(estado: string): React.CSSProperties {
   const e = estado.toUpperCase();
   if (e.includes('ACTIVO') || e.includes('PUBLICADO')) {
-    return 'bg-primary/10 text-primary';
+    return { backgroundColor: '#E6F4EC', color: '#006735' };
   }
   if (e.includes('REVISION') || e.includes('REVISIÓN')) {
-    return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200';
+    return { backgroundColor: '#FEF3C7', color: '#92400E' };
   }
   if (e.includes('CIERRE') || e.includes('CERRADO')) {
-    return 'bg-surface-container-high text-tertiary';
+    return { backgroundColor: '#F3F4F6', color: '#6B7280' };
   }
-  return 'bg-surface-container-high text-on-surface';
+  return { backgroundColor: '#F3F4F6', color: '#374151' };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -94,6 +94,12 @@ function ActionCard({
   cardBg,
   iconBg,
   iconColor,
+  cardStyle,
+  iconStyle,
+  badgeStyle,
+  labelStyle,
+  valueStyle,
+  subtextoStyle,
 }: {
   label: string;
   value: number;
@@ -104,25 +110,31 @@ function ActionCard({
   cardBg: string;
   iconBg: string;
   iconColor: string;
+  cardStyle?: React.CSSProperties;
+  iconStyle?: React.CSSProperties;
+  badgeStyle?: React.CSSProperties;
+  labelStyle?: React.CSSProperties;
+  valueStyle?: React.CSSProperties;
+  subtextoStyle?: React.CSSProperties;
 }) {
   return (
-    <div className={`flex flex-col gap-4 rounded-xl border p-6 ${cardBg}`}>
+    <div className={`flex flex-col gap-4 rounded-xl border p-6 ${cardBg}`} style={cardStyle}>
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-tertiary">
+          <span className="text-[10px] font-black uppercase tracking-widest text-tertiary" style={labelStyle}>
             {label}
           </span>
-          <p className="mt-1 text-4xl font-black tracking-tighter text-on-surface">
+          <p className="mt-1 text-4xl font-black tracking-tighter text-on-surface" style={valueStyle}>
             {value}
           </p>
         </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
-          <Icon className={`h-5 w-5 ${iconColor}`} />
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`} style={iconStyle}>
+          <Icon className={`h-5 w-5 ${iconColor}`} style={iconStyle ? { color: iconStyle.color } : undefined} />
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <p className="text-xs text-tertiary">{subtexto}</p>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${badgeClasses}`}>
+        <p className="text-xs text-tertiary" style={subtextoStyle}>{subtexto}</p>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${badgeClasses}`} style={badgeStyle}>
           {badgeLabel}
         </span>
       </div>
@@ -180,32 +192,47 @@ function AdminStatsSkeleton() {
 
 function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] }) {
   return (
-    <div className="rounded-xl bg-surface-container-lowest border border-outline-variant p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <Activity className="h-4 w-4 text-primary" />
-        <h3 className="font-headline text-base font-black tracking-tight text-on-surface">
+    <div
+      className="flex h-full flex-col gap-4 rounded-xl border p-6"
+      style={{ backgroundColor: '#FFFFFF', borderColor: '#C8D6C8' }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+          style={{ backgroundColor: '#E6F4EC' }}
+        >
+          <Activity className="h-5 w-5" style={{ color: '#006735' }} />
+        </div>
+        <h3 className="font-headline text-base font-black tracking-tight" style={{ color: '#111827' }}>
           Actividad reciente
         </h3>
       </div>
       {items.length === 0 ? (
-        <p className="text-sm text-tertiary">No hay actividad reciente.</p>
+        <p className="text-sm" style={{ color: '#6B7280' }}>No hay actividad reciente</p>
       ) : (
-        <ul className="divide-y divide-outline-variant/40">
+        <ul className="divide-y" style={{ borderColor: '#E5E7EB' }}>
           {items.map((item) => (
-            <li key={item.idProyecto} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-medium text-on-surface line-clamp-1 flex-1">
+            <li key={item.idProyecto} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold line-clamp-1" style={{ color: '#111827' }}>
                   {item.tituloProyecto}
                 </p>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${estadoProyectoClasses(item.estadoProyecto)}`}
-                >
-                  {item.estadoProyecto}
-                </span>
+                <p className="mt-0.5 text-xs" style={{ color: '#6B7280' }}>
+                  {timeAgo(item.fechaActualizacion)}
+                </p>
               </div>
-              <p className="mt-0.5 text-xs text-tertiary">
-                {timeAgo(item.fechaActualizacion)}
-              </p>
+              <span
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
+                style={estadoBadgeStyle(item.estadoProyecto)}
+              >
+                {item.estadoProyecto}
+              </span>
+              <Link
+                href={`/dashboard/proyectos/${item.idProyecto}`}
+                className="shrink-0 rounded-xl bg-surface-container-high px-4 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+              >
+                Ver proyecto
+              </Link>
             </li>
           ))}
         </ul>
@@ -218,45 +245,57 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
 
 function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) {
   return (
-    <div className="rounded-xl bg-surface-container-lowest border border-outline-variant p-6">
-      <div className="mb-1 flex items-center gap-2">
-        <GraduationCap className="h-4 w-4 text-error" />
-        <h3 className="font-headline text-base font-black tracking-tight text-on-surface">
-          Estudiantes en riesgo de horas
-        </h3>
+    <div
+      className="flex h-full flex-col gap-4 rounded-xl border p-6"
+      style={{ backgroundColor: '#FFFFFF', borderColor: '#C8D6C8' }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+          style={{ backgroundColor: '#FEE2E2' }}
+        >
+          <GraduationCap className="h-5 w-5" style={{ color: '#DC2626' }} />
+        </div>
+        <div>
+          <h3 className="font-headline text-base font-black tracking-tight" style={{ color: '#111827' }}>
+            Estudiantes en riesgo de horas
+          </h3>
+          <p className="text-xs" style={{ color: '#6B7280' }}>
+            Estudiantes del semestre 7 en adelante con pocas horas acumuladas
+          </p>
+        </div>
       </div>
-      <p className="mb-4 text-xs text-tertiary">
-        Semestre ≥ 7 con pocas horas acumuladas
-      </p>
       {items.length === 0 ? (
-        <p className="text-sm text-tertiary">No hay estudiantes en riesgo registrados.</p>
+        <p className="text-sm" style={{ color: '#6B7280' }}>No hay estudiantes en riesgo</p>
       ) : (
         <>
-          <ul className="divide-y divide-outline-variant/40">
+          <ul className="divide-y" style={{ borderColor: '#E5E7EB' }}>
             {items.map((est) => (
-              <li key={est.idUsuario} className="py-3 first:pt-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-on-surface">
-                    {est.nombre} {est.apellido}
-                  </p>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {est.semestre !== null && (
-                      <span className="text-[10px] font-black uppercase tracking-wider text-tertiary">
-                        S{est.semestre}
-                      </span>
-                    )}
-                    <span className="rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-black text-error">
-                      {est.horasExtension} / {est.horasExtensionRequeridas} hrs
-                    </span>
-                  </div>
-                </div>
+              <li key={est.idUsuario} className="flex items-center py-3 first:pt-0 last:pb-0">
+                <p className="flex-1 text-sm font-medium" style={{ color: '#111827' }}>
+                  {est.nombre} {est.apellido}
+                </p>
+                {est.semestre !== null && (
+                  <span
+                    className="w-16 text-center text-sm font-medium"
+                    style={{ color: '#525252' }}
+                  >
+                    S{est.semestre}
+                  </span>
+                )}
+                <span
+                  className="ml-3 shrink-0 rounded-full px-3 py-0.5 text-xs font-bold"
+                  style={{ backgroundColor: '#FEE2E2', color: '#DC2626' }}
+                >
+                  {est.horasExtension} / {est.horasExtensionRequeridas} hrs
+                </span>
               </li>
             ))}
           </ul>
-          <div className="mt-4 pt-3 border-t border-outline-variant/40">
+          <div className="pt-1">
             <Link
               href="/dashboard/admin/usuarios?riesgo=horas"
-              className="text-sm font-bold text-primary hover:underline"
+              className="font-label text-xs font-bold uppercase tracking-widest text-primary transition-all hover:underline"
             >
               Ver todos
             </Link>
@@ -318,33 +357,51 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               value={stats.enRevision}
               subtexto="Proyectos pendientes de revisión"
               badgeLabel="Pendiente"
-              badgeClasses="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+              badgeClasses=""
               icon={ClipboardList}
-              cardBg="bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900/30"
-              iconBg="bg-amber-100 dark:bg-amber-900/40"
-              iconColor="text-amber-700 dark:text-amber-300"
+              cardBg="dark:bg-amber-900/10 dark:border-amber-900/30"
+              iconBg="dark:bg-amber-900/40"
+              iconColor="dark:text-amber-300"
+              cardStyle={{ backgroundColor: '#FCF8F4', borderColor: '#E6D6C3' }}
+              iconStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
+              badgeStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
+              labelStyle={{ color: '#6B6B6B' }}
+              valueStyle={{ color: '#1A1C1E' }}
+              subtextoStyle={{ color: '#6B6B6B' }}
             />
             <ActionCard
               label="Cierre Pendiente"
               value={stats.cierrePendiente}
               subtexto="Solicitudes de cierre por aprobar"
               badgeLabel="Acción requerida"
-              badgeClasses="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+              badgeClasses=""
               icon={Clock}
-              cardBg="bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900/30"
-              iconBg="bg-amber-100 dark:bg-amber-900/40"
-              iconColor="text-amber-700 dark:text-amber-300"
+              cardBg="dark:bg-amber-900/10 dark:border-amber-900/30"
+              iconBg="dark:bg-amber-900/40"
+              iconColor="dark:text-amber-300"
+              cardStyle={{ backgroundColor: '#FCF8F4', borderColor: '#E6D6C3' }}
+              iconStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
+              badgeStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
+              labelStyle={{ color: '#6B6B6B' }}
+              valueStyle={{ color: '#1A1C1E' }}
+              subtextoStyle={{ color: '#6B6B6B' }}
             />
             <ActionCard
               label="Bloqueados"
               value={stats.usuariosBloqueados}
               subtexto="Usuarios con acceso restringido"
               badgeLabel="Revisar"
-              badgeClasses="bg-error-container text-error dark:bg-error/20 dark:text-error"
+              badgeClasses=""
               icon={AlertTriangle}
-              cardBg="bg-error-container/30 border-error/20 dark:bg-error/10 dark:border-error/20"
-              iconBg="bg-error-container dark:bg-error/20"
-              iconColor="text-error"
+              cardBg=""
+              iconBg=""
+              iconColor=""
+              cardStyle={{ backgroundColor: '#FCF3F4', borderColor: '#EACCD0' }}
+              iconStyle={{ backgroundColor: '#F4DADC', color: '#CC292B' }}
+              badgeStyle={{ backgroundColor: '#F4DADC', color: '#CC292B' }}
+              labelStyle={{ color: '#6B6B6B' }}
+              valueStyle={{ color: '#1A1C1E' }}
+              subtextoStyle={{ color: '#6B6B6B' }}
             />
           </div>
         </section>
@@ -376,7 +433,7 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
 
         {/* Sección 4: Actividad y alertas */}
         <section>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
             <ActividadRecienteCard items={stats.actividadReciente} />
             <EstudiantesRiesgoCard items={stats.estudiantesEnRiesgo} />
           </div>

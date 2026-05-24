@@ -69,7 +69,8 @@ export type ProyectoResumen = {
   fechaPublicacion?: string;
   organizaciones: { organizacion: { nombreOrganizacion: string } }[];
   intereses: { interes: { nombreInteres: string } }[];
-  roles: { idRolProyecto: number }[];
+  roles?: { idRolProyecto: number }[];
+  _count?: { roles: number };
 };
 export type Postulacion = {
   idPostulacion: number;
