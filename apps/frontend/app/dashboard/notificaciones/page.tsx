@@ -3,6 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import AdminLayout from '@/components/admin/AdminLayout';
+import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import uvgSwal from '@/lib/swal';
 import {
   getNotificaciones,
@@ -13,6 +15,7 @@ import {
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
+  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
 
   const { data: notificaciones = [], isLoading } = useQuery<Notificacion[]>({
     queryKey: ['notificaciones'],
@@ -66,8 +69,18 @@ export default function NotificacionesPage() {
   const grouped = groupByDate(notificaciones);
   const unreadCount = notificaciones.filter((n) => !n.leidaEn).length;
 
+  if (userLoading) {
+    return (
+      <div className="h-screen bg-surface flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  const Layout = isAdminUser(currentUser) ? AdminLayout : DashboardLayout;
+
   return (
-    <DashboardLayout>
+    <Layout>
       <div className="px-8 py-8 max-w-4xl mx-auto">
         <div className="flex items-start justify-between mb-8">
           <div>
@@ -168,6 +181,6 @@ export default function NotificacionesPage() {
           ))}
         </div>
       </div>
-    </DashboardLayout>
+    </Layout>
   );
 }

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut, Bell } from 'lucide-react';
-import { useCurrentUser } from '@/hooks/use-current-user';
+import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { TokenRefreshManager } from '@/components/TokenRefreshManager';
 import { clearTokens } from '@/lib/utils/token';
@@ -27,7 +28,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: user } = useCurrentUser();
+  const { data: user, isLoading } = useCurrentUser();
+
+  useEffect(() => {
+    if (!isLoading && isAdminUser(user)) {
+      router.replace('/dashboard/admin');
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || isAdminUser(user)) {
+    return (
+      <div className="h-screen bg-surface flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   const handleLogout = async () => {
     const result = await uvgSwal.fire({
