@@ -510,7 +510,7 @@ function AdminActions({
                   variant: 'warning',
                 })
               }
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-outline-variant py-2 text-sm font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-surface-container-high py-2 text-sm font-semibold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
             >
               <UserX className="h-4 w-4" />
               Desactivar usuario

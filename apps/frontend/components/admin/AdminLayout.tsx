@@ -82,14 +82,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <TokenRefreshManager />
 
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden md:flex w-64 h-screen bg-surface-container-low border-r border-outline-variant flex-col shrink-0 overflow-y-auto">
-        <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
+      <aside
+        className="hidden md:flex w-64 h-screen flex-col shrink-0 overflow-y-auto"
+        style={{ backgroundColor: 'var(--admin-bg)', borderRight: '1px solid var(--admin-border)' }}
+      >
+        <div className="px-6 py-5 flex items-center gap-3" style={{ borderBottom: '1px solid var(--admin-border)' }}>
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
-          <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
+          <span className="font-headline font-extrabold text-xl" style={{ color: 'var(--admin-text)' }}>UVGenius</span>
         </div>
 
         <div className="px-3 pt-3 pb-1">
-          <span className="px-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+          <span className="px-3 text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--admin-text-muted)' }}>
             Administración
           </span>
         </div>
@@ -101,11 +104,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`}
+                style={
                   active
-                    ? 'bg-primary text-on-primary'
-                    : 'text-on-surface hover:bg-surface-container-high'
-                }`}
+                    ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
+                    : { color: 'var(--admin-text-dim)' }
+                }
               >
                 <Icon className="w-5 h-5 shrink-0" />
                 {label}
@@ -114,7 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="px-3 py-4 border-t border-outline-variant space-y-3">
+        <div className="px-3 py-4 space-y-3" style={{ borderTop: '1px solid var(--admin-border)' }}>
           <div className="flex items-center gap-3 px-3 py-2">
             {user?.fotoUrl ? (
               <Image
@@ -122,25 +126,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 alt=""
                 width={32}
                 height={32}
-                className="h-8 w-8 rounded-full object-cover border border-outline-variant/30"
+                className="h-8 w-8 rounded-full object-cover"
+                style={{ border: '1px solid var(--admin-border)' }}
               />
             ) : (
-              <div className="h-8 w-8 rounded-full bg-primary-container flex items-center justify-center text-xs font-bold text-on-primary-container">
+              <div
+                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{ backgroundColor: 'var(--admin-avatar-bg)', color: 'var(--admin-avatar-fg)' }}
+              >
                 {user ? `${user.nombre[0]}${user.apellido[0]}` : 'A'}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-on-surface truncate">
+              <p className="text-sm font-medium truncate" style={{ color: 'var(--admin-text)' }}>
                 {user ? `${user.nombre} ${user.apellido}` : 'Admin UVG'}
               </p>
-              <p className="text-xs text-tertiary truncate">
+              <p className="text-xs truncate" style={{ color: 'var(--admin-text-muted)' }}>
                 {user?.correo ?? 'admin@uvg.edu.gt'}
               </p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-primary hover:text-on-primary w-full outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="admin-nav-inactive flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium w-full outline-none transition-all duration-200"
+            style={{ color: 'var(--admin-text-muted)' }}
           >
             <LogOut className="w-5 h-5 shrink-0" />
             Cerrar sesion
