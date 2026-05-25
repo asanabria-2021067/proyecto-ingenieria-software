@@ -10,9 +10,19 @@ import {
   Clock,
   Eye,
   Calendar,
+  ClipboardList,
+  FolderOpen,
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptySteps,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
@@ -342,9 +352,20 @@ export default function DashboardPage() {
                   </div>
                 ))}
                 {projects.length === 0 && (
-                  <p className="col-span-2 text-center text-sm text-tertiary py-8">
-                    No hay proyectos disponibles aun
-                  </p>
+                  <div className="col-span-2">
+                    <Empty tone="muted" className="surface-enter" aria-live="polite">
+                      <EmptyMedia variant="compact">
+                        <FolderOpen aria-hidden="true" className="h-6 w-6" />
+                      </EmptyMedia>
+                      <EmptyHeader>
+                        <EmptyTitle className="text-lg">No hay proyectos disponibles</EmptyTitle>
+                        <EmptyDescription>
+                          Cuando se publiquen nuevas oportunidades, apareceran aqui para que puedas revisarlas rapido.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                      <EmptySteps />
+                    </Empty>
+                  </div>
                 )}
               </div>
             </section>
@@ -397,16 +418,31 @@ export default function DashboardPage() {
                             </span>
                           </td>
                           <td className="px-6 py-5">
-                            <button className="text-primary">
+                            <Link
+                              href="/dashboard/mis-postulaciones"
+                              aria-label={`Ver postulacion para ${a.rolProyecto.proyecto.tituloProyecto}`}
+                              className="inline-flex rounded-lg p-2 text-primary hover:bg-primary/10"
+                            >
                               <Eye className="h-5 w-5" />
-                            </button>
+                            </Link>
                           </td>
                         </tr>
                       ))}
                       {(!stats || stats.postulacionesRecientes.length === 0) && (
                         <tr>
-                          <td colSpan={4} className="px-6 py-8 text-center text-sm text-tertiary">
-                            No tienes postulaciones aun
+                          <td colSpan={4} className="px-6 py-8">
+                            <div className="flex flex-col items-center gap-2 text-center">
+                              <ClipboardList aria-hidden="true" className="h-7 w-7 text-primary" />
+                              <p className="text-sm font-semibold text-on-surface">
+                                No tienes postulaciones aun
+                              </p>
+                              <Link
+                                href="/dashboard/proyectos"
+                                className="text-sm font-bold text-primary hover:underline"
+                              >
+                                Explorar proyectos
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -424,7 +460,9 @@ export default function DashboardPage() {
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-headline text-lg font-black tracking-tight">Tu perfil</h3>
                 <button
+                  type="button"
                   onClick={() => window.dispatchEvent(new Event('start-onboarding-tour'))}
+                  aria-label="Repetir tour de bienvenida"
                   className="text-xs font-bold text-primary hover:underline cursor-pointer"
                 >
                   Repetir Tour 🔄
