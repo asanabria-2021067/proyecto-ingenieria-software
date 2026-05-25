@@ -81,11 +81,11 @@ export default function MyProjectsPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-      } catch (error: any) {
+      } catch (err) {
         uvgSwal.fire({
           icon: 'error',
           title: 'Error',
-          text: error.message || 'No se pudo eliminar el proyecto',
+          text: err instanceof Error ? err.message : 'No se pudo eliminar el proyecto',
         });
       }
     }
