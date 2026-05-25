@@ -12,6 +12,10 @@ export async function getProjectById(id: number): Promise<ProyectoDetalleDTO> {
   return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}`);
 }
 
+export async function getAdminProjectById(id: number): Promise<ProyectoDetalleDTO> {
+  return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}/admin`);
+}
+
 export async function searchProjects(q: string): Promise<ProyectoListItemDTO[]> {
   const params = q ? `?q=${encodeURIComponent(q)}` : '';
   return apiFetch<ProyectoListItemDTO[]>(`/proyectos${params}`);

@@ -251,6 +251,21 @@ export class ProjectsService {
     return proyecto;
   }
 
+  async findOneAdmin(id: number, adminId: number) {
+    const isAdmin = await this.notifications.isAdmin(adminId);
+    if (!isAdmin) {
+      throw new ForbiddenException('Se requieren permisos de administrador');
+    }
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: { idProyecto: id, eliminadoEn: null },
+      select: proyectoDetalleSelect,
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
+    }
+    return proyecto;
+  }
+
   async findOneOwner(id: number, userId: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },

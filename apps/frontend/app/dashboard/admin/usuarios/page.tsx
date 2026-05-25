@@ -138,7 +138,7 @@ function UserActions({
     <div className="flex items-center gap-1">
       <button
         onClick={() => onViewProfile(user.idUsuario)}
-        className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+        className="flex items-center gap-1.5 rounded-xl bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
         title="Ver perfil"
       >
         <Eye className="h-3.5 w-3.5" />

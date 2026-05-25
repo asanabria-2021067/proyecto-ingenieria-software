@@ -128,8 +128,7 @@ export class AdminService {
           apellido: p.usuario.apellido,
           semestre: p.semestre,
           horasExtension: Number(agg._sum.horasAprobadas ?? 0),
-          // fallback 20 si el perfil no tiene horasExtensionRequeridas configuradas
-          horasExtensionRequeridas: p.horasExtensionRequeridas ?? 20,
+          horasExtensionRequeridas: p.horasExtensionRequeridas ?? 100,
         };
       }),
     );
@@ -321,8 +320,7 @@ export class AdminService {
       semestre: perfil.semestre,
       disponibilidadHorasSemana: perfil.disponibilidadHorasSemana,
       horasBecaRequeridas: perfil.horasBecaRequeridas,
-      // fallback 20 si el perfil no tiene horasExtensionRequeridas configuradas
-      horasExtensionRequeridas: perfil.horasExtensionRequeridas ?? 20,
+      horasExtensionRequeridas: perfil.horasExtensionRequeridas ?? 100,
     };
   }
 
