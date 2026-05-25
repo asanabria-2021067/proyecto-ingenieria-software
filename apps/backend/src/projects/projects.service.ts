@@ -478,7 +478,8 @@ export class ProjectsService {
       });
 
       if (accion === 'EN_REVISION') {
-        await this._crearRevisionPendiente(tx, proyecto.idProyecto, 1);
+        const snapshot = await this._buildProjectSnapshot(tx, proyecto.idProyecto);
+        await this._crearRevisionPendiente(tx, proyecto.idProyecto, 1, snapshot);
         await this.notifications.notifyAdminsFromTemplate(
           'PROYECTO_EN_REVISION',
           {
@@ -654,11 +655,12 @@ export class ProjectsService {
       where: { idProyecto: id },
     });
     return this.prisma.$transaction(async (tx) => {
+      const snapshot = await this._buildProjectSnapshot(tx, id);
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
-      await this._crearRevisionPendiente(tx, id, totalEnvios + 1);
+      await this._crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
       await this.notifications.notifyAdminsFromTemplate(
         'PROYECTO_EN_REVISION',
         {
@@ -683,11 +685,12 @@ export class ProjectsService {
       where: { idProyecto: id },
     });
     return this.prisma.$transaction(async (tx) => {
+      const snapshot = await this._buildProjectSnapshot(tx, id);
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
-      await this._crearRevisionPendiente(tx, id, totalEnvios + 1);
+      await this._crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
       await this.notifications.notifyAdminsFromTemplate(
         'PROYECTO_EN_REVISION',
         {
@@ -979,10 +982,51 @@ export class ProjectsService {
     return { mensaje: 'Proyecto eliminado correctamente' };
   }
 
+  private async _buildProjectSnapshot(tx: Prisma.TransactionClient, idProyecto: number) {
+    return tx.proyecto.findUnique({
+      where: { idProyecto },
+      select: {
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        objetivosProyecto: true,
+        tipoProyecto: true,
+        modalidadProyecto: true,
+        ubicacionProyecto: true,
+        contextoAcademico: true,
+        urlRecursoExterno: true,
+        fechaInicio: true,
+        fechaFinEstimada: true,
+        roles: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
+            cupos: true,
+            horasSemanalesEstimadas: true,
+            carreraRequerida: {
+              select: { idCarrera: true, nombreCarrera: true, facultad: true },
+            },
+            requisitos: {
+              select: {
+                idRequisitoHabilidad: true,
+                nivelMinimo: true,
+                obligatorio: true,
+                habilidad: {
+                  select: { idHabilidad: true, nombreHabilidad: true, categoriaHabilidad: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   private async _crearRevisionPendiente(
     tx: Prisma.TransactionClient,
     idProyecto: number,
     numeroEnvio: number,
+    snapshot?: object | null,
   ) {
     const existente = await tx.revisionProyecto.findFirst({
       where: { idProyecto, estadoRevision: 'PENDIENTE' },
@@ -991,7 +1035,12 @@ export class ProjectsService {
       throw new BadRequestException('Ya existe una revisión pendiente para este proyecto');
     }
     return tx.revisionProyecto.create({
-      data: { idProyecto, numeroEnvio, estadoRevision: 'PENDIENTE' },
+      data: {
+        idProyecto,
+        numeroEnvio,
+        estadoRevision: 'PENDIENTE',
+        ...(snapshot ? { snapshotProyecto: snapshot as Prisma.InputJsonValue } : {}),
+      },
     });
   }
 }

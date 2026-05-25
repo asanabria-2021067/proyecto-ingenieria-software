@@ -244,12 +244,12 @@ export default function AdminReviewsInboxPage() {
                         <div className="flex items-center gap-2 shrink-0">
                           <button
                             onClick={() => openFeedbackSheet(p.idProyecto)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-surface-container-high px-3 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-highest"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-700"
                           >
                             <Eye className="h-3.5 w-3.5" />
                             Ver retroalimentación
                           </button>
-                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-400">
+                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-on-surface dark:border-orange-500/30 dark:bg-orange-500/10">
                             <MessageSquareWarning className="h-3.5 w-3.5" />
                             Esperando corrección
                           </span>

@@ -35,7 +35,7 @@ export class RevisionesService {
             },
           },
         },
-        orderBy: { enviadaEn: 'asc' },
+        orderBy: { enviadaEn: 'desc' },
       }),
       this.prisma.proyecto.findMany({
         where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE },
@@ -45,7 +45,7 @@ export class RevisionesService {
           creadoPor: true,
           fechaActualizacion: true,
         },
-        orderBy: { fechaActualizacion: 'asc' },
+        orderBy: { fechaActualizacion: 'desc' },
       }),
       this.prisma.proyecto.findMany({
         where: { estadoProyecto: EstadoProyecto.OBSERVADO, eliminadoEn: null },
@@ -92,6 +92,7 @@ export class RevisionesService {
         idRevisionProyecto: true,
         estadoRevision: true,
         comentarioRevision: true,
+        snapshotProyecto: true,
         numeroEnvio: true,
         enviadaEn: true,
         revisadaEn: true,
