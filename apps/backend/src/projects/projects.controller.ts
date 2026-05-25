@@ -31,14 +31,24 @@ export class ProjectsController {
     @Query('modalidad') modalidad?: string,
     @Query('organizacionId') organizacionId?: string,
     @Query('habilidad') habilidad?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.projectsService.findAll({
+    const filters = {
       q,
       tipoProyecto,
       modalidad,
       organizacionId: organizacionId ? parseInt(organizacionId, 10) : undefined,
       habilidadId: habilidad ? parseInt(habilidad, 10) : undefined,
-    });
+    };
+
+    if (page !== undefined) {
+      const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+      const parsedLimit = Math.min(50, Math.max(1, parseInt(limit || '12', 10) || 12));
+      return this.projectsService.findAllPaginated({ ...filters, page: parsedPage, limit: parsedLimit });
+    }
+
+    return this.projectsService.findAll(filters);
   }
 
   @Get('mine')
@@ -67,6 +77,15 @@ export class ProjectsController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.projectsService.findOne(id);
+  }
+
+  @Get(':id/admin')
+  @UseGuards(JwtAuthGuard)
+  findOneAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.findOneAdmin(id, user.userId);
   }
 
   @Get(':id/equipo')

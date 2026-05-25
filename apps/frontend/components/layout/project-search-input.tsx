@@ -44,32 +44,49 @@ export function ProjectSearchInput() {
         <input
           type="text"
           value={query}
-          placeholder="Search projects..."
+          aria-label="Buscar proyectos"
+          aria-expanded={showDropdown}
+          aria-controls="project-search-results"
+          role="combobox"
+          placeholder="Buscar proyectos..."
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
           }}
           onFocus={() => query.trim().length > 0 && setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setOpen(false);
+          }}
           className="pl-8 h-8 w-44 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-[#006735]/60 focus:ring-1 focus:ring-[#006735]/30 transition-colors"
         />
       </div>
 
       {/* Dropdown */}
       {showDropdown && (
-        <div className="absolute top-full mt-1.5 right-0 w-72 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
+        <div
+          id="project-search-results"
+          role="listbox"
+          aria-label="Resultados de busqueda de proyectos"
+          className="surface-enter absolute top-full mt-1.5 right-0 w-72 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden"
+        >
           {results.length === 0 && !isFetching && (
-            <p className="px-4 py-3 text-xs text-gray-400 text-center">
-              No se encontraron proyectos
-            </p>
+            <div className="px-4 py-4 text-center" role="status">
+              <p className="text-xs font-semibold text-gray-700">Sin coincidencias</p>
+              <p className="mt-1 text-[11px] text-gray-400">
+                Prueba con otro titulo o area de interes.
+              </p>
+            </div>
           )}
           {results.length > 0 && (
             <ul>
               {results.map((proyecto) => (
-                <li key={proyecto.idProyecto}>
+                <li key={proyecto.idProyecto} role="none">
                   <button
                     type="button"
+                    role="option"
+                    aria-selected="false"
                     onClick={() => handleSelect(proyecto.idProyecto)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors group"
+                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors group focus-visible:bg-gray-50"
                   >
                     <p className="text-sm font-medium text-gray-900 group-hover:text-[#006735] truncate">
                       {proyecto.tituloProyecto}
