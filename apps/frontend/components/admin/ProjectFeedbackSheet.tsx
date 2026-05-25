@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAdminProjectById, getProjectRevisions } from '@/lib/services/projects';
 import { TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
+import type { RevisionProyectoDTO } from '@/lib/dto/project.dto';
+import { RevisionHistoryPanel } from './RevisionHistoryPanel';
 
 export interface ProjectFeedbackSheetProps {
   idProyecto: number | null;
@@ -73,10 +75,12 @@ function parseComments(raw: string | null | undefined): { general: string; roles
 export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: ProjectFeedbackSheetProps) {
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
+  const [selectedRevision, setSelectedRevision] = useState<RevisionProyectoDTO | null>(null);
 
   useEffect(() => {
     if (open) {
       setVisible(true);
+      setSelectedRevision(null);
       requestAnimationFrame(() => requestAnimationFrame(() => setAnimating(true)));
     } else {
       setAnimating(false);
@@ -104,6 +108,10 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
     .sort((a, b) => (b.revisadaEn ?? '').localeCompare(a.revisadaEn ?? ''))
     .at(0) ?? null;
 
+  const revisionesRevisadas = (revisiones ?? [])
+    .filter((r) => r.estadoRevision !== 'PENDIENTE')
+    .sort((a, b) => a.numeroEnvio - b.numeroEnvio);
+
   const comentarios = parseComments(ultimaRevisionObservada?.comentarioRevision);
   const isLoading = loadingProyecto || loadingRevisiones;
 
@@ -121,22 +129,36 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         <button
           onClick={() => onOpenChange(false)}
-          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container-high"
+          className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </button>
         <div className="h-5 w-px bg-outline-variant/40" />
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">
             Administración · Retroalimentación enviada
           </p>
-          <h1 className="font-headline text-lg font-black text-on-surface leading-tight">
+          <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
             {proyecto?.tituloProyecto ?? 'Retroalimentación'}
           </h1>
+          {revisionesRevisadas.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {revisionesRevisadas.map((r) => (
+                <button
+                  key={r.idRevisionProyecto}
+                  onClick={() => setSelectedRevision(r)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+                >
+                  <Eye className="h-3 w-3" />
+                  Ver Revisión {r.numeroEnvio}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {ultimaRevisionObservada?.revisadaEn && (
-          <div className="ml-auto shrink-0">
+          <div className="shrink-0">
             <span className="text-xs text-tertiary">
               Revisado el {formatDate(ultimaRevisionObservada.revisadaEn)}
             </span>
@@ -260,12 +282,20 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
         <div className="max-w-3xl mx-auto">
           <button
             onClick={() => onOpenChange(false)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container-highest"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
           >
             Cerrar
           </button>
         </div>
       </div>
+
+      {selectedRevision && (
+        <RevisionHistoryPanel
+          revision={selectedRevision}
+          projectTitle={proyecto?.tituloProyecto ?? ''}
+          onClose={() => setSelectedRevision(null)}
+        />
+      )}
     </div>
   );
 }
