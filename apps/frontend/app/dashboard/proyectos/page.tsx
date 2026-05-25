@@ -47,8 +47,13 @@ export default function ProyectosPage() {
     isLoading,
     isError,
   } = useQuery<ProyectoResumenConOrganizaciones[]>({
-    queryKey: ['proyectos'],
-    queryFn: () => apiFetch('/proyectos'),
+    queryKey: ['proyectos', organizacionFiltro],
+    queryFn: () =>
+      apiFetch(
+        organizacionFiltro
+          ? `/proyectos?organizacionId=${organizacionFiltro}`
+          : '/proyectos',
+      ),
   });
 
   const {
@@ -68,14 +73,7 @@ export default function ProyectosPage() {
 
     const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
 
-    const coincideOrganizacion =
-      !organizacionFiltro ||
-      p.organizaciones?.some(
-        ({ organizacion }) =>
-          String(organizacion.idOrganizacion) === organizacionFiltro,
-      );
-
-    return coincideBusqueda && coincideTipo && coincideOrganizacion;
+    return coincideBusqueda && coincideTipo;
   });
 
   return (
