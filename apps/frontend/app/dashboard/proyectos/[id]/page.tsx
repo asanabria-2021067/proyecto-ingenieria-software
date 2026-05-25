@@ -17,7 +17,7 @@ export default function ProyectoDetallePage() {
   });
 
   return (
-    <DashboardLayout>
+    <DashboardLayout allowAdmin>
       <div className="px-8 py-8 max-w-4xl mx-auto">
         <Link
           href="/dashboard/proyectos"
