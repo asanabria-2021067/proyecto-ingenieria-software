@@ -233,6 +233,35 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* Admin sidebar CSS variables - change automatically with dark mode */
+:root {
+  --admin-bg:           #054526;
+  --admin-border:       rgba(255, 255, 255, 0.1);
+  --admin-text:         #ffffff;
+  --admin-text-muted:   rgba(255, 255, 255, 0.55);
+  --admin-text-dim:     rgba(255, 255, 255, 0.75);
+  --admin-selector-bg:  #5AB33E;
+  --admin-selector-fg:  #ffffff;
+  --admin-hover-bg:     rgba(255, 255, 255, 0.08);
+  --admin-avatar-bg:    #5AB33E;
+  --admin-avatar-fg:    #ffffff;
+}
+
+.dark {
+  --admin-bg:           var(--color-surface-container-low);
+  --admin-border:       var(--color-outline-variant);
+  --admin-text:         var(--color-on-surface);
+  --admin-text-muted:   var(--color-tertiary);
+  --admin-text-dim:     var(--color-on-surface);
+  --admin-selector-bg:  var(--color-primary);
+  --admin-selector-fg:  var(--color-on-primary);
+  --admin-hover-bg:     var(--color-surface-container-high);
+  --admin-avatar-bg:    var(--color-primary-container);
+  --admin-avatar-fg:    var(--color-on-primary-container);
+}
+
+.admin-nav-inactive:hover {
+  background-color: var(--admin-hover-bg);
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

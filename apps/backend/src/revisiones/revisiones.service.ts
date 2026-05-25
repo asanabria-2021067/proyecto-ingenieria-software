@@ -18,7 +18,7 @@ export class RevisionesService {
   async findAdminInbox(adminId: number) {
     await this._requireAdmin(adminId);
 
-    const [revisionesPendientes, cierresPendientes] = await Promise.all([
+    const [revisionesPendientes, cierresPendientes, correccionesEnviadas] = await Promise.all([
       this.prisma.revisionProyecto.findMany({
         where: { estadoRevision: 'PENDIENTE', proyecto: { estadoProyecto: EstadoProyecto.EN_REVISION } },
         select: {
@@ -27,9 +27,15 @@ export class RevisionesService {
           numeroEnvio: true,
           enviadaEn: true,
           idRevisor: true,
-          proyecto: { select: { tituloProyecto: true, creadoPor: true } },
+          proyecto: {
+            select: {
+              tituloProyecto: true,
+              creadoPor: true,
+              creador: { select: { nombre: true, apellido: true } },
+            },
+          },
         },
-        orderBy: { enviadaEn: 'asc' },
+        orderBy: { enviadaEn: 'desc' },
       }),
       this.prisma.proyecto.findMany({
         where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE },
@@ -39,11 +45,30 @@ export class RevisionesService {
           creadoPor: true,
           fechaActualizacion: true,
         },
-        orderBy: { fechaActualizacion: 'asc' },
+        orderBy: { fechaActualizacion: 'desc' },
+      }),
+      this.prisma.proyecto.findMany({
+        where: { estadoProyecto: EstadoProyecto.OBSERVADO, eliminadoEn: null },
+        select: {
+          idProyecto: true,
+          tituloProyecto: true,
+          creador: { select: { nombre: true, apellido: true } },
+          revisiones: {
+            where: { estadoRevision: 'OBSERVADA' },
+            select: {
+              idRevisionProyecto: true,
+              numeroEnvio: true,
+              revisadaEn: true,
+            },
+            orderBy: { enviadaEn: 'desc' as const },
+            take: 1,
+          },
+        },
+        orderBy: { fechaActualizacion: 'desc' },
       }),
     ]);
 
-    return { revisionesPendientes, cierresPendientes };
+    return { revisionesPendientes, cierresPendientes, correccionesEnviadas };
   }
 
   async findByProyecto(idProyecto: number, userId: number) {
@@ -67,6 +92,7 @@ export class RevisionesService {
         idRevisionProyecto: true,
         estadoRevision: true,
         comentarioRevision: true,
+        snapshotProyecto: true,
         numeroEnvio: true,
         enviadaEn: true,
         revisadaEn: true,
@@ -135,10 +161,19 @@ export class RevisionesService {
       throw new NotFoundException('No hay revisión pendiente para este proyecto');
     }
 
-    if (revision.idRevisor !== adminId) {
+    // Si otro admin ya reclamó esta revisión, bloquear
+    if (revision.idRevisor !== null && revision.idRevisor !== adminId) {
       throw new ForbiddenException(
-        'Solo el admin que reclamó esta revisión puede resolverla',
+        'Esta revisión ya fue reclamada por otro administrador',
       );
+    }
+
+    // Auto-asignar al admin si aún no fue reclamada
+    if (revision.idRevisor === null) {
+      await this.prisma.revisionProyecto.update({
+        where: { idRevisionProyecto: revision.idRevisionProyecto },
+        data: { idRevisor: adminId },
+      });
     }
 
     const ahora = new Date();
