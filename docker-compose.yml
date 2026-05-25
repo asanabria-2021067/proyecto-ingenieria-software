@@ -21,7 +21,10 @@ services:
 
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/asanabria-2021067/proyecto-ingenieria-software-backend:latest}
-    pull_policy: always
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    pull_policy: missing
     container_name: uvg-collab-backend
     profiles:
       - app
@@ -46,7 +49,10 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/asanabria-2021067/proyecto-ingenieria-software-frontend:latest}
-    pull_policy: always
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    pull_policy: missing
     container_name: uvg-collab-frontend
     profiles:
       - app
