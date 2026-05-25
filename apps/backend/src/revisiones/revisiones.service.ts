@@ -135,10 +135,19 @@ export class RevisionesService {
       throw new NotFoundException('No hay revisión pendiente para este proyecto');
     }
 
-    if (revision.idRevisor !== adminId) {
+    // Si otro admin ya reclamó esta revisión, bloquear
+    if (revision.idRevisor !== null && revision.idRevisor !== adminId) {
       throw new ForbiddenException(
-        'Solo el admin que reclamó esta revisión puede resolverla',
+        'Esta revisión ya fue reclamada por otro administrador',
       );
+    }
+
+    // Auto-asignar al admin si aún no fue reclamada
+    if (revision.idRevisor === null) {
+      await this.prisma.revisionProyecto.update({
+        where: { idRevisionProyecto: revision.idRevisionProyecto },
+        data: { idRevisor: adminId },
+      });
     }
 
     const ahora = new Date();
