@@ -49,6 +49,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
+      <a href="#dashboard-main" className="skip-link">
+        Saltar al contenido principal
+      </a>
       <TokenRefreshManager />
       
       {/* Sidebar - Desktop Only */}
@@ -66,6 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 key={href}
                 href={href}
                 id={`nav-item-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                aria-current={active ? 'page' : undefined}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
                   active
                     ? 'bg-primary text-on-primary'
@@ -104,6 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           )}
           <button
+            type="button"
             onClick={handleLogout}
             className="flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-primary hover:text-on-primary w-full outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30"
           >
@@ -114,7 +119,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-surface">
+      <main
+        id="dashboard-main"
+        tabIndex={-1}
+        className="flex-1 flex flex-col overflow-hidden bg-surface focus:outline-none"
+      >
         {/* Top Header Bar */}
         <header className="h-16 border-b border-outline-variant px-4 md:px-8 flex items-center justify-between shrink-0 bg-surface-container-low z-30">
           <div className="flex items-center gap-3">
@@ -134,7 +143,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             {/* Mobile-only logout button */}
             <button
+              type="button"
               onClick={handleLogout}
+              aria-label="Cerrar sesion"
               className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl text-error hover:bg-error/10 transition-colors cursor-pointer"
               title="Cerrar sesión"
             >
@@ -158,6 +169,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               key={href}
               href={href}
               id={`nav-item-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`}
+              aria-label={label}
+              aria-current={active ? 'page' : undefined}
               className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ${
                 active ? 'text-primary bg-primary/10' : 'text-outline hover:text-on-surface'
               }`}
@@ -168,7 +181,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           );
         })}
         <button
+          type="button"
           onClick={handleLogout}
+          aria-label="Cerrar sesion"
           className="flex flex-col items-center justify-center w-12 h-12 rounded-xl text-error hover:bg-error/10 transition-all duration-200 cursor-pointer"
           title="Cerrar sesión"
         >
