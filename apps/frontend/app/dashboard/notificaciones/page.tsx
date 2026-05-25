@@ -1,9 +1,18 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, CheckCheck } from 'lucide-react';
+import { AlertCircle, Bell, BellOff, Check, CheckCheck } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import uvgSwal from '@/lib/swal';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptySteps,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import {
   getNotificaciones,
   marcarLeida,
@@ -14,7 +23,7 @@ import {
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
 
-  const { data: notificaciones = [], isLoading } = useQuery<Notificacion[]>({
+  const { data: notificaciones = [], isLoading, isError, refetch } = useQuery<Notificacion[]>({
     queryKey: ['notificaciones'],
     queryFn: getNotificaciones,
     refetchOnMount: 'always',
@@ -85,8 +94,10 @@ export default function NotificacionesPage() {
           </div>
           {unreadCount > 0 && (
             <button
+              type="button"
               onClick={() => markAllMutation.mutate()}
               disabled={markAllMutation.isPending}
+              aria-label="Marcar todas las notificaciones como leidas"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <CheckCheck className="w-4 h-4" />
@@ -96,21 +107,56 @@ export default function NotificacionesPage() {
         </div>
 
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">
+          <div className="text-center py-16 text-tertiary text-sm" role="status">
             Cargando notificaciones...
           </div>
         )}
 
-        {!isLoading && notificaciones.length === 0 && (
-          <div className="text-center py-16">
-            <Bell className="w-12 h-12 text-tertiary mx-auto mb-4 opacity-50" />
-            <p className="text-tertiary text-sm">No tienes notificaciones aún.</p>
-          </div>
+        {isError && (
+          <Empty tone="danger" className="surface-enter" role="alert">
+            <EmptyMedia variant="icon">
+              <AlertCircle aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No se pudieron cargar las notificaciones</EmptyTitle>
+              <EmptyDescription>
+                Intenta nuevamente para revisar avisos recientes y cambios en tus postulaciones.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Reintentar
+              </button>
+            </EmptyContent>
+          </Empty>
+        )}
+
+        {!isLoading && !isError && notificaciones.length === 0 && (
+          <Empty className="surface-enter" aria-live="polite">
+            <EmptyMedia variant="icon">
+              <BellOff aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>Todo esta al dia</EmptyTitle>
+              <EmptyDescription>
+                Las alertas de postulaciones, revisiones y avances apareceran aqui cuando haya actividad nueva.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptySteps />
+          </Empty>
         )}
 
         <div className="space-y-6">
-          {Object.entries(grouped).map(([fecha, notifs]) => (
-            <div key={fecha}>
+          {Object.entries(grouped).map(([fecha, notifs], groupIndex) => (
+            <div
+              key={fecha}
+              className="surface-enter"
+              style={{ animationDelay: `${Math.min(groupIndex, 8) * 45}ms` }}
+            >
               <h2 className="font-headline font-bold text-sm text-tertiary uppercase tracking-wider mb-3">
                 {fecha}
               </h2>
@@ -152,8 +198,10 @@ export default function NotificacionesPage() {
                       </div>
                       {!n.leidaEn && (
                         <button
+                          type="button"
                           onClick={() => markOneMutation.mutate(n.idNotificacion)}
                           disabled={markOneMutation.isPending}
+                          aria-label={`Marcar como leida la notificacion ${n.tituloNotificacion}`}
                           className="shrink-0 p-2 rounded-lg hover:bg-surface-container transition-colors disabled:opacity-50"
                           title="Marcar como leída"
                         >
