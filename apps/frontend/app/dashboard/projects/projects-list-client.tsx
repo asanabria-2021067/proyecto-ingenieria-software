@@ -2,7 +2,16 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { FolderOpen, SearchX } from 'lucide-react';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptySteps,
+  EmptyTitle,
+} from '@/components/ui/empty';
 
 interface PaginatedResult {
   data: ProyectoListItemDTO[];
@@ -60,22 +69,38 @@ export function ProjectsListClient({ initialData, initialTotalPages, searchQuery
 
   if (projects.length === 0) {
     return (
-      <p className="text-sm text-gray-400 text-center py-16">
-        {searchQuery
-          ? `No se encontraron proyectos para "${searchQuery}".`
-          : 'No hay proyectos disponibles.'}
-      </p>
+      <Empty tone="muted" className="surface-enter" aria-live="polite">
+        <EmptyMedia variant="icon">
+          {searchQuery ? (
+            <SearchX aria-hidden="true" className="h-7 w-7" />
+          ) : (
+            <FolderOpen aria-hidden="true" className="h-7 w-7" />
+          )}
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>
+            {searchQuery ? 'No hay proyectos con esa busqueda' : 'No hay proyectos disponibles'}
+          </EmptyTitle>
+          <EmptyDescription>
+            {searchQuery
+              ? `No encontramos coincidencias para "${searchQuery}". Prueba con otro termino.`
+              : 'Las oportunidades publicadas apareceran aqui cuando esten disponibles.'}
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptySteps />
+      </Empty>
     );
   }
 
   return (
     <div className="space-y-8">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {projects.map((project) => (
+        {projects.map((project, index) => (
           <Link
             key={project.idProyecto}
             href={`/dashboard/projects/${project.idProyecto}`}
-            className="group block bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
+            className="surface-enter interactive-lift group block bg-white rounded-2xl p-6 shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
           >
             <div className="flex items-start justify-between gap-3 mb-3">
               <h2 className="text-sm font-semibold text-gray-900 group-hover:text-[#006735] transition-colors line-clamp-2">
@@ -109,6 +134,7 @@ export function ProjectsListClient({ initialData, initialTotalPages, searchQuery
       {currentPage < totalPages && (
         <div className="flex justify-center pt-2">
           <button
+            type="button"
             onClick={handleLoadMore}
             disabled={loading}
             className="px-8 py-3 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-gray-700 shadow-sm hover:shadow-md hover:border-[#006735] hover:text-[#006735] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
