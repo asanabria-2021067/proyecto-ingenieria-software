@@ -193,7 +193,7 @@ function EstudianteContent({ user }: { user: AdminUserDetail }) {
   const perfil = user.perfilEstudiante;
   const actividad = user.actividadEstudiante;
 
-  const horasExtReq = perfil?.horasExtensionRequeridas ?? 20;
+  const horasExtReq = perfil?.horasExtensionRequeridas ?? 100;
   const horasExtAcum = actividad?.horasExtensionAcumuladas ?? 0;
   const progreso = Math.min(100, Math.round((horasExtAcum / horasExtReq) * 100));
   const semestre = perfil?.semestre ?? null;
@@ -210,9 +210,12 @@ function EstudianteContent({ user }: { user: AdminUserDetail }) {
   return (
     <div className="space-y-3">
       {enRiesgo && (
-        <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/30 dark:bg-amber-900/10">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300 mt-0.5" />
-          <p className="text-xs text-amber-800 dark:text-amber-200">
+        <div
+          className="flex gap-2 rounded-xl border p-3"
+          style={{ backgroundColor: '#FCF8F4', borderColor: '#E6D6C3' }}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: '#C07D2C' }} />
+          <p className="text-xs" style={{ color: '#8B5A1A' }}>
             Semestre {semestre} · {horasExtAcum} horas de extensión acumuladas. Estudiante en riesgo
             de no cumplir requisito de graduación.
           </p>

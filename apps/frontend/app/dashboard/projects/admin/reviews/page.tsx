@@ -1,19 +1,24 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, RefreshCw, CheckCircle2, Eye, GitPullRequest, XCircle, CheckCheck } from 'lucide-react';
+import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequest, XCircle, CheckCheck } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import uvgSwal from '@/lib/swal';
 import {
   approveProjectClosure,
   getAdminReviewInbox,
-  reclamarRevision,
   rejectProjectClosure,
   resolverRevision,
 } from '@/lib/services/projects';
 
 export default function AdminReviewsInboxPage() {
   const queryClient = useQueryClient();
+  const [reviewSheet, setReviewSheet] = useState<{ open: boolean; idProyecto: number | null }>({
+    open: false,
+    idProyecto: null,
+  });
 
   const { data: inbox, isLoading: loading, error } = useQuery({
     queryKey: ['adminReviewInbox'],
@@ -22,25 +27,22 @@ export default function AdminReviewsInboxPage() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['adminReviewInbox'] });
 
-  async function claim(idProyecto: number) {
-    await reclamarRevision(idProyecto);
-    await refresh();
+  function openReviewSheet(idProyecto: number) {
+    setReviewSheet({ open: true, idProyecto });
   }
 
-  async function resolve(idProyecto: number, resultado: 'APROBADA' | 'OBSERVADA') {
-    const { value: comentario, isConfirmed } = await uvgSwal.fire({
-      icon: resultado === 'APROBADA' ? 'success' : 'warning',
-      title: resultado === 'APROBADA' ? 'Aprobar proyecto' : 'Observar proyecto',
-      input: 'textarea',
-      inputLabel: 'Comentario de revisión (opcional)',
-      inputPlaceholder: 'Escribe un comentario...',
+  async function resolveApprove(idProyecto: number) {
+    const { isConfirmed } = await uvgSwal.fire({
+      icon: 'success',
+      title: 'Aprobar proyecto',
+      text: '¿Confirmas que el proyecto cumple con los requisitos?',
       showCancelButton: true,
-      confirmButtonText: resultado === 'APROBADA' ? 'Aprobar' : 'Observar',
+      confirmButtonText: 'Aprobar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: resultado === 'APROBADA' ? '#006735' : '#b45309',
+      confirmButtonColor: '#006735',
     });
     if (!isConfirmed) return;
-    await resolverRevision(idProyecto, { resultado, comentario: comentario ?? undefined });
+    await resolverRevision(idProyecto, { resultado: 'APROBADA' });
     await refresh();
   }
 
@@ -161,25 +163,18 @@ export default function AdminReviewsInboxPage() {
                       </div>
                       <div className="flex flex-wrap gap-2 sm:shrink-0">
                         <button
-                          onClick={() => void claim(r.idProyecto)}
-                          className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container px-3 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Reclamar
-                        </button>
-                        <button
-                          onClick={() => void resolve(r.idProyecto, 'APROBADA')}
+                          onClick={() => void resolveApprove(r.idProyecto)}
                           className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-on-primary transition-colors hover:bg-primary/90"
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Aprobar
                         </button>
                         <button
-                          onClick={() => void resolve(r.idProyecto, 'OBSERVADA')}
+                          onClick={() => openReviewSheet(r.idProyecto)}
                           className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-700"
                         >
-                          <Eye className="h-3.5 w-3.5" />
-                          Observar
+                          <SendHorizonal className="h-3.5 w-3.5" />
+                          Revisar
                         </button>
                       </div>
                     </div>
@@ -240,6 +235,13 @@ export default function AdminReviewsInboxPage() {
           </div>
         )}
       </div>
+
+      <ProjectReviewSheet
+        idProyecto={reviewSheet.idProyecto}
+        open={reviewSheet.open}
+        onOpenChange={(open) => setReviewSheet((s) => ({ ...s, open }))}
+        onResolved={() => void refresh()}
+      />
     </AdminLayout>
   );
 }
