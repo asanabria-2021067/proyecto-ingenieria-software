@@ -1117,11 +1117,22 @@ async function main() {
   // Proyectos adicionales: más EN_REVISION, un EN_SOLICITUD_CIERRE extra, y 2 CERRADOS en 2026
   const pVoluntariado = await prisma.proyecto.upsert({
     where: { idProyecto: 14 },
-    update: {},
+    update: {
+      objetivosProyecto: 'Facilitar la gestión de oportunidades de voluntariado estudiantil, mejorar la comunicación entre estudiantes y organizaciones, y permitir el seguimiento de participación mediante una plataforma centralizada.',
+      contextoAcademico: 'Proyecto desarrollado como parte del curso de Ingeniería de Software en la Universidad del Valle de Guatemala.',
+      ubicacionProyecto: 'Universidad del Valle de Guatemala, Campus Central',
+      urlRecursoExterno: 'https://voluntariado.uvg.edu.gt',
+      modalidadProyecto: 'MIXTA',
+    },
     create: {
       idProyecto: 14,
       tituloProyecto: 'Plataforma de Voluntariado Estudiantil',
       descripcionProyecto: 'Sistema para conectar estudiantes con oportunidades de voluntariado en la comunidad',
+      objetivosProyecto: 'Facilitar la gestión de oportunidades de voluntariado estudiantil, mejorar la comunicación entre estudiantes y organizaciones, y permitir el seguimiento de participación mediante una plataforma centralizada.',
+      contextoAcademico: 'Proyecto desarrollado como parte del curso de Ingeniería de Software en la Universidad del Valle de Guatemala.',
+      ubicacionProyecto: 'Universidad del Valle de Guatemala, Campus Central',
+      urlRecursoExterno: 'https://voluntariado.uvg.edu.gt',
+      modalidadProyecto: 'MIXTA',
       tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
       estadoProyecto: 'EN_REVISION',
       creadoPor: jose.idUsuario,

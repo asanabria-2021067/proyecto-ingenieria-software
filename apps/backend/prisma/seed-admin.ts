@@ -206,11 +206,23 @@ async function main() {
   // ─── Proyectos EN_REVISION (bandeja de revisiones + stat dashboard) ───────────
   const pVoluntariado = await prisma.proyecto.upsert({
     where: { idProyecto: 20 },
-    update: {},
+    update: {
+      descripcionProyecto: 'Sistema web para conectar estudiantes de la Universidad del Valle de Guatemala con oportunidades de voluntariado comunitario, permitiendo registrar proyectos, postularse a actividades y dar seguimiento a las horas de servicio realizadas.',
+      objetivosProyecto: 'Facilitar la gestión de oportunidades de voluntariado estudiantil, mejorar la comunicación entre estudiantes y organizaciones, y permitir el seguimiento de participación mediante una plataforma centralizada.',
+      contextoAcademico: 'Proyecto desarrollado como parte del curso de Ingeniería de Software en la Universidad del Valle de Guatemala.',
+      ubicacionProyecto: 'Universidad del Valle de Guatemala, Campus Central',
+      urlRecursoExterno: 'https://voluntariado.uvg.edu.gt',
+      modalidadProyecto: 'MIXTA',
+    },
     create: {
       idProyecto: 20,
       tituloProyecto: 'Plataforma de Voluntariado Estudiantil',
-      descripcionProyecto: 'Sistema para conectar estudiantes con oportunidades de voluntariado comunitario',
+      descripcionProyecto: 'Sistema web para conectar estudiantes de la Universidad del Valle de Guatemala con oportunidades de voluntariado comunitario, permitiendo registrar proyectos, postularse a actividades y dar seguimiento a las horas de servicio realizadas.',
+      objetivosProyecto: 'Facilitar la gestión de oportunidades de voluntariado estudiantil, mejorar la comunicación entre estudiantes y organizaciones, y permitir el seguimiento de participación mediante una plataforma centralizada.',
+      contextoAcademico: 'Proyecto desarrollado como parte del curso de Ingeniería de Software en la Universidad del Valle de Guatemala.',
+      ubicacionProyecto: 'Universidad del Valle de Guatemala, Campus Central',
+      urlRecursoExterno: 'https://voluntariado.uvg.edu.gt',
+      modalidadProyecto: 'MIXTA',
       tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
       estadoProyecto: 'EN_REVISION',
       creadoPor: jose.idUsuario,
@@ -312,9 +324,65 @@ async function main() {
   // ─── Roles en nuevos proyectos ────────────────────────────────────────────────
   const rolVoluntariado = await prisma.rolProyecto.upsert({
     where: { idRolProyecto: 30 },
-    update: {},
-    create: { idRolProyecto: 30, idProyecto: pVoluntariado.idProyecto, nombreRol: 'Coordinador de Actividades', cupos: 3 },
+    update: {
+      descripcionRolProyecto: 'Encargado de coordinar las actividades de voluntariado, dar seguimiento a los estudiantes participantes y apoyar en la comunicación entre la universidad y las organizaciones comunitarias.',
+      horasSemanalesEstimadas: 6,
+    },
+    create: {
+      idRolProyecto: 30,
+      idProyecto: pVoluntariado.idProyecto,
+      nombreRol: 'Coordinador de Actividades',
+      cupos: 3,
+      descripcionRolProyecto: 'Encargado de coordinar las actividades de voluntariado, dar seguimiento a los estudiantes participantes y apoyar en la comunicación entre la universidad y las organizaciones comunitarias.',
+      horasSemanalesEstimadas: 6,
+    },
   });
+  // Habilidades para el primer rol (Coordinador de Actividades)
+  const disenioSkill = await prisma.habilidad.findFirst({ where: { nombreHabilidad: 'Diseño UI/UX' } });
+  const pythonSkill  = await prisma.habilidad.findFirst({ where: { nombreHabilidad: 'Python' } });
+  if (disenioSkill) {
+    await prisma.requisitoHabilidadRol.upsert({
+      where: { idRolProyecto_idHabilidad: { idRolProyecto: rolVoluntariado.idRolProyecto, idHabilidad: disenioSkill.idHabilidad } },
+      update: {},
+      create: { idRolProyecto: rolVoluntariado.idRolProyecto, idHabilidad: disenioSkill.idHabilidad, nivelMinimo: 'INTERMEDIO', obligatorio: true },
+    });
+  }
+  if (pythonSkill) {
+    await prisma.requisitoHabilidadRol.upsert({
+      where: { idRolProyecto_idHabilidad: { idRolProyecto: rolVoluntariado.idRolProyecto, idHabilidad: pythonSkill.idHabilidad } },
+      update: {},
+      create: { idRolProyecto: rolVoluntariado.idRolProyecto, idHabilidad: pythonSkill.idHabilidad, nivelMinimo: 'BASICO', obligatorio: false },
+    });
+  }
+
+  const rolVoluntariado2 = await prisma.rolProyecto.upsert({
+    where: { idRolProyecto: 34 },
+    update: {},
+    create: {
+      idRolProyecto: 34,
+      idProyecto: pVoluntariado.idProyecto,
+      nombreRol: 'Desarrollador Fullstack',
+      cupos: 3,
+    },
+  });
+  // Habilidades para el segundo rol de voluntariado (NestJS y React)
+  const nestjsSkill = await prisma.habilidad.findFirst({ where: { nombreHabilidad: 'NestJS' } });
+  const reactSkill  = await prisma.habilidad.findFirst({ where: { nombreHabilidad: 'React' } });
+  if (nestjsSkill) {
+    await prisma.requisitoHabilidadRol.upsert({
+      where: { idRolProyecto_idHabilidad: { idRolProyecto: rolVoluntariado2.idRolProyecto, idHabilidad: nestjsSkill.idHabilidad } },
+      update: {},
+      create: { idRolProyecto: rolVoluntariado2.idRolProyecto, idHabilidad: nestjsSkill.idHabilidad, nivelMinimo: 'BASICO', obligatorio: true },
+    });
+  }
+  if (reactSkill) {
+    await prisma.requisitoHabilidadRol.upsert({
+      where: { idRolProyecto_idHabilidad: { idRolProyecto: rolVoluntariado2.idRolProyecto, idHabilidad: reactSkill.idHabilidad } },
+      update: {},
+      create: { idRolProyecto: rolVoluntariado2.idRolProyecto, idHabilidad: reactSkill.idHabilidad, nivelMinimo: 'BASICO', obligatorio: true },
+    });
+  }
+
   const rolFeria = await prisma.rolProyecto.upsert({
     where: { idRolProyecto: 31 },
     update: {},
