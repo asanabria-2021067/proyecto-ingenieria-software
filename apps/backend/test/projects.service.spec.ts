@@ -43,7 +43,10 @@ describe('ProjectsService', () => {
   it('findAll aplica filtros', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findMany.mockResolvedValue([]);
-    const service = new ProjectsService(prisma, { isAdmin: vi.fn(), notifyAdmins: vi.fn(), notifyUsers: vi.fn() } as any);
+    const service = new ProjectsService(
+      prisma,
+      { isAdmin: vi.fn(), notifyAdminsFromTemplate: vi.fn(), notifyFromTemplate: vi.fn() } as any,
+    );
 
     await service.findAll({ q: 'alpha', habilidadId: 3, organizacionId: 8 });
 
@@ -90,13 +93,13 @@ describe('ProjectsService', () => {
       revisionProyecto: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
     };
     prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
-    const notifications = { notifyAdmins: vi.fn(), isAdmin: vi.fn() } as any;
+    const notifications = { notifyAdminsFromTemplate: vi.fn(), isAdmin: vi.fn() } as any;
     const service = new ProjectsService(prisma, notifications);
 
     const result = await service.submitForReview(1, 1);
 
     expect(result.estadoProyecto).toBe(EstadoProyecto.EN_REVISION);
-    expect(notifications.notifyAdmins).toHaveBeenCalled();
+    expect(notifications.notifyAdminsFromTemplate).toHaveBeenCalled();
   });
 
   it('resubmit falla si estado no es observado', async () => {
@@ -130,13 +133,13 @@ describe('ProjectsService', () => {
     });
     const tx = { proyecto: { update: vi.fn() } };
     prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
-    const notifications = { isAdmin: vi.fn().mockResolvedValue(true), notifyUsers: vi.fn() } as any;
+    const notifications = { isAdmin: vi.fn().mockResolvedValue(true), notifyFromTemplate: vi.fn() } as any;
     const service = new ProjectsService(prisma, notifications);
 
     const result = await service.rejectClosure(1, 99);
 
     expect(result.estadoProyecto).toBe(EstadoProyecto.EN_PROGRESO);
-    expect(notifications.notifyUsers).toHaveBeenCalled();
+    expect(notifications.notifyFromTemplate).toHaveBeenCalled();
   });
 
   it('changeEstado valida transición', async () => {

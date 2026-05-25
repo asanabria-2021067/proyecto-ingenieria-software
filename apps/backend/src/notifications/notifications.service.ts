@@ -91,6 +91,7 @@ export class NotificationsService {
     const template = NOTIFICATION_TEMPLATES[templateKey];
     const title = typeof template.title === 'function' ? template.title(data as any) : template.title;
     const message = template.message(data as any);
+    const datosJson = JSON.parse(JSON.stringify(data)) as Prisma.InputJsonValue;
 
     await this.notifyUsers(
       userIds,
@@ -98,8 +99,28 @@ export class NotificationsService {
         tipoNotificacion: templateKey,
         tituloNotificacion: title,
         mensajeNotificacion: message,
-        datosJson: data,
+        datosJson,
       },
+      tx,
+    );
+  }
+
+  async notifyAdminsFromTemplate<K extends NotificationTemplateKey>(
+    templateKey: K,
+    data: NotificationTemplateData[K],
+    tx?: TxClient,
+  ) {
+    const db = tx ?? this.prisma;
+    const admins = await db.usuarioRolAcceso.findMany({
+      where: { rolAcceso: { nombrePerfil: 'administrador' } },
+      distinct: ['idUsuario'],
+      select: { idUsuario: true },
+    });
+
+    await this.notifyFromTemplate(
+      admins.map((a) => a.idUsuario),
+      templateKey,
+      data,
       tx,
     );
   }

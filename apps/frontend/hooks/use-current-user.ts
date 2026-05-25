@@ -17,3 +17,14 @@ export function isProfileIncomplete(user: UserProfile): boolean {
     user.perfil?.biografia === null && user.habilidades.length === 0
   );
 }
+
+export function isAdminUser(user?: UserProfile | null): boolean {
+  return (user?.roles ?? []).some(
+    (r) => r.toLowerCase() === 'administrador',
+  );
+}
+
+export function useIsAdmin(): boolean {
+  const { data } = useCurrentUser();
+  return isAdminUser(data);
+}

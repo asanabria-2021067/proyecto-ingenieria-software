@@ -19,6 +19,7 @@ import { CatalogsModule } from './catalogs/catalogs.module';
 import { RevisionesModule } from './revisiones/revisiones.module';
 import { ComentariosModule } from './comentarios/comentarios.module';
 import { MensajesRevisionModule } from './mensajes-revision/mensajes-revision.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { MensajesRevisionModule } from './mensajes-revision/mensajes-revision.mo
     RevisionesModule,
     ComentariosModule,
     MensajesRevisionModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

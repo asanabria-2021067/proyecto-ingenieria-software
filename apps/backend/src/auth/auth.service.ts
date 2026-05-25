@@ -14,7 +14,14 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {
-    this.resend = new Resend(process.env.RESEND_API_KEY);
+    const resendKey = process.env.RESEND_API_KEY;
+    if (!resendKey) {
+      console.warn('[AuthService] RESEND_API_KEY no está configurada — los emails de recuperación NO se enviarán en producción');
+    }
+    if (!process.env.FRONTEND_URL) {
+      console.warn('[AuthService] FRONTEND_URL no está configurada — los links de recuperación serán inválidos');
+    }
+    this.resend = new Resend(resendKey || 're_dummy_key_not_configured');
   }
 
   async login(loginDto: LoginDto) {
@@ -105,7 +112,8 @@ export class AuthService {
       { expiresIn: '1h' },
     );
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '') || 'https://uvgenius.com';
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
 
     try {
       await this.resend.emails.send({

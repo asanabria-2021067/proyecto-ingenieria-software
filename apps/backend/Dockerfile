@@ -28,4 +28,4 @@ COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
 
 USER nestjs
 EXPOSE 3001
-CMD npx prisma migrate deploy && node dist/main.js
+CMD npx prisma migrate deploy && (npx prisma db seed || echo "Seed skipped: data already exists") && node dist/main.js
