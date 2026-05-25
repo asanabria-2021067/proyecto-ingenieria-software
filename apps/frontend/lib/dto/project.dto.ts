@@ -164,6 +164,15 @@ export interface ResolverRevisionPayload {
   comentario?: string;
 }
 
+export interface UltimaRevisionDTO {
+  idRevisionProyecto: number;
+  estadoRevision: string;
+  comentarioRevision: string | null;
+  numeroEnvio: number;
+  enviadaEn: string;
+  revisadaEn: string | null;
+}
+
 /** DTO raíz — contrato completo de GET /proyectos/:id */
 export interface ProyectoDetalleDTO {
   idProyecto: number;
@@ -186,4 +195,5 @@ export interface ProyectoDetalleDTO {
   roles: RolProyectoDTO[];
   hitos: HitoDTO[];
   tareas?: TareaDTO[];
+  revisiones?: UltimaRevisionDTO[];
 }

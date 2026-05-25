@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequest, XCircle, CheckCheck } from 'lucide-react';
+import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequest, XCircle, CheckCheck, MessageSquareWarning } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
+import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal from '@/lib/swal';
 import {
   approveProjectClosure,
@@ -19,6 +20,10 @@ export default function AdminReviewsInboxPage() {
     open: false,
     idProyecto: null,
   });
+  const [feedbackSheet, setFeedbackSheet] = useState<{ open: boolean; idProyecto: number | null }>({
+    open: false,
+    idProyecto: null,
+  });
 
   const { data: inbox, isLoading: loading, error } = useQuery({
     queryKey: ['adminReviewInbox'],
@@ -29,6 +34,10 @@ export default function AdminReviewsInboxPage() {
 
   function openReviewSheet(idProyecto: number) {
     setReviewSheet({ open: true, idProyecto });
+  }
+
+  function openFeedbackSheet(idProyecto: number) {
+    setFeedbackSheet({ open: true, idProyecto });
   }
 
   async function resolveApprove(idProyecto: number) {
@@ -68,7 +77,7 @@ export default function AdminReviewsInboxPage() {
   }
 
   const totalPendientes =
-    (inbox?.revisionesPendientes.length ?? 0) + (inbox?.cierresPendientes.length ?? 0);
+    (inbox?.revisionesPendientes.length ?? 0) + (inbox?.cierresPendientes.length ?? 0) + (inbox?.correccionesEnviadas.length ?? 0);
 
   return (
     <AdminLayout>
@@ -111,7 +120,7 @@ export default function AdminReviewsInboxPage() {
         {!loading && inbox && (
           <div className="space-y-10">
             {/* Resumen */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                   <ClipboardList className="h-6 w-6 text-primary" />
@@ -134,6 +143,18 @@ export default function AdminReviewsInboxPage() {
                     {inbox.cierresPendientes.length}
                   </p>
                   <p className="text-xs text-tertiary">Solicitudes de cierre por aprobar</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
+                  <MessageSquareWarning className="h-6 w-6 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Correcciones enviadas</p>
+                  <p className="text-3xl font-black tracking-tighter text-on-surface">
+                    {inbox.correccionesEnviadas.length}
+                  </p>
+                  <p className="text-xs text-tertiary">Esperando corrección del estudiante</p>
                 </div>
               </div>
             </div>
@@ -159,7 +180,9 @@ export default function AdminReviewsInboxPage() {
                         <p className="font-headline text-base font-black text-on-surface">
                           {r.proyecto.tituloProyecto}
                         </p>
-                        <p className="mt-0.5 text-xs text-tertiary">Envío #{r.numeroEnvio}</p>
+                        <p className="mt-0.5 text-xs text-tertiary">
+                          {r.proyecto.creador.nombre} {r.proyecto.creador.apellido} · Envío #{r.numeroEnvio}
+                        </p>
                       </div>
                       <div className="flex flex-wrap gap-2 sm:shrink-0">
                         <button
@@ -179,6 +202,61 @@ export default function AdminReviewsInboxPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </section>
+
+            {/* Correcciones enviadas */}
+            <section>
+              <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
+                Correcciones enviadas
+              </h2>
+              {inbox.correccionesEnviadas.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
+                  <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" />
+                  <p className="text-sm font-medium text-tertiary">No hay proyectos esperando corrección</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {inbox.correccionesEnviadas.map((p) => {
+                    const revision = p.revisiones[0];
+                    return (
+                      <div
+                        key={p.idProyecto}
+                        className="flex flex-col gap-4 rounded-2xl border border-orange-200 bg-orange-50/50 dark:border-orange-500/20 dark:bg-orange-500/5 p-5 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-headline text-base font-black text-on-surface">
+                            {p.tituloProyecto}
+                          </p>
+                          <p className="mt-0.5 text-xs text-tertiary">
+                            {p.creador.nombre} {p.creador.apellido}
+                          </p>
+                          {revision && (
+                            <p className="mt-0.5 text-xs text-tertiary">
+                              Envío #{revision.numeroEnvio}
+                              {revision.revisadaEn && (
+                                <> · Revisado el {new Intl.DateTimeFormat('es-GT', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(revision.revisadaEn))}</>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => openFeedbackSheet(p.idProyecto)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-surface-container-high px-3 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-highest"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver retroalimentación
+                          </button>
+                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-400">
+                            <MessageSquareWarning className="h-3.5 w-3.5" />
+                            Esperando corrección
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -241,6 +319,12 @@ export default function AdminReviewsInboxPage() {
         open={reviewSheet.open}
         onOpenChange={(open) => setReviewSheet((s) => ({ ...s, open }))}
         onResolved={() => void refresh()}
+      />
+
+      <ProjectFeedbackSheet
+        idProyecto={feedbackSheet.idProyecto}
+        open={feedbackSheet.open}
+        onOpenChange={(open) => setFeedbackSheet((s) => ({ ...s, open }))}
       />
     </AdminLayout>
   );

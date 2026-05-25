@@ -131,13 +131,19 @@ export async function getAdminReviewInbox(): Promise<{
     numeroEnvio: number;
     enviadaEn: string;
     idRevisor: number | null;
-    proyecto: { tituloProyecto: string; creadoPor: number };
+    proyecto: { tituloProyecto: string; creadoPor: number; creador: { nombre: string; apellido: string } };
   }>;
   cierresPendientes: Array<{
     idProyecto: number;
     tituloProyecto: string;
     creadoPor: number;
     fechaActualizacion: string | null;
+  }>;
+  correccionesEnviadas: Array<{
+    idProyecto: number;
+    tituloProyecto: string;
+    creador: { nombre: string; apellido: string };
+    revisiones: Array<{ idRevisionProyecto: number; numeroEnvio: number; revisadaEn: string | null }>;
   }>;
 }> {
   return apiFetch('/revisiones/admin/bandeja');
