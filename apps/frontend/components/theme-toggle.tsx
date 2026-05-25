@@ -9,7 +9,8 @@ export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timeoutId = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   if (!mounted) {
@@ -18,9 +19,10 @@ export function ThemeToggle() {
 
   return (
     <button
+      type="button"
       onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
       className="p-2 rounded-full bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface"
-      aria-label="Toggle theme"
+      aria-label="Cambiar tema"
     >
       {resolvedTheme === 'dark' ? (
         <Sun className="w-5 h-5 text-amber-500" />
