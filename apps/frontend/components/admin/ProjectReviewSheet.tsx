@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, SendHorizonal, MessageSquare } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, SendHorizonal, MessageSquare, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getAdminProjectById, resolverRevision } from '@/lib/services/projects';
+import { getAdminProjectById, getProjectRevisions, resolverRevision } from '@/lib/services/projects';
 import { TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
+import type { RevisionProyectoDTO } from '@/lib/dto/project.dto';
+import { RevisionHistoryPanel } from './RevisionHistoryPanel';
 import uvgSwal from '@/lib/swal';
 
 export interface ProjectReviewSheetProps {
@@ -87,6 +89,7 @@ export function ProjectReviewSheet({
   const [animating, setAnimating] = useState(false);
   const [comments, setComments] = useState({ general: '', roles: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [selectedRevision, setSelectedRevision] = useState<RevisionProyectoDTO | null>(null);
 
   // Maneja la animación de entrada y salida
   useEffect(() => {
@@ -103,7 +106,7 @@ export function ProjectReviewSheet({
   }, [open]);
 
   useEffect(() => {
-    if (open) setComments({ general: '', roles: '' });
+    if (open) { setComments({ general: '', roles: '' }); setSelectedRevision(null); }
   }, [idProyecto, open]);
 
   const { data: proyecto, isLoading } = useQuery({
@@ -111,6 +114,17 @@ export function ProjectReviewSheet({
     queryFn: () => getAdminProjectById(idProyecto!),
     enabled: open && idProyecto !== null,
   });
+
+  const { data: revisiones = [] } = useQuery<RevisionProyectoDTO[]>({
+    queryKey: ['projectRevisions', idProyecto],
+    queryFn: () => getProjectRevisions(idProyecto!),
+    enabled: open && idProyecto !== null,
+    staleTime: 0,
+  });
+
+  const revisionesRevisadas = revisiones
+    .filter((r) => r.estadoRevision !== 'PENDIENTE')
+    .sort((a, b) => a.numeroEnvio - b.numeroEnvio);
 
   function buildComentario(): string | undefined {
     const parts: string[] = [];
@@ -194,19 +208,33 @@ export function ProjectReviewSheet({
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         <button
           onClick={() => onOpenChange(false)}
-          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container-high"
+          className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </button>
         <div className="h-5 w-px bg-outline-variant/40" />
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="text-[10px] font-black uppercase tracking-widest text-primary">
             Administración · Revisiones
           </p>
-          <h1 className="font-headline text-lg font-black text-on-surface leading-tight">
+          <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
             {proyecto?.tituloProyecto ?? 'Revisión de proyecto'}
           </h1>
+          {revisionesRevisadas.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {revisionesRevisadas.map((r) => (
+                <button
+                  key={r.idRevisionProyecto}
+                  onClick={() => setSelectedRevision(r)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+                >
+                  <Eye className="h-3 w-3" />
+                  Ver Revisión {r.numeroEnvio}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -333,7 +361,7 @@ export function ProjectReviewSheet({
           <button
             disabled={submitting || !proyecto}
             onClick={() => void handleResolve('APROBADA')}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckCircle2 className="h-4 w-4" />
             Aprobar proyecto
@@ -348,6 +376,14 @@ export function ProjectReviewSheet({
           </button>
         </div>
       </div>
+
+      {selectedRevision && (
+        <RevisionHistoryPanel
+          revision={selectedRevision}
+          projectTitle={proyecto?.tituloProyecto ?? ''}
+          onClose={() => setSelectedRevision(null)}
+        />
+      )}
     </div>
   );
 }
