@@ -12,6 +12,10 @@ export async function getProjectById(id: number): Promise<ProyectoDetalleDTO> {
   return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}`);
 }
 
+export async function getAdminProjectById(id: number): Promise<ProyectoDetalleDTO> {
+  return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}/admin`);
+}
+
 export async function searchProjects(q: string): Promise<ProyectoListItemDTO[]> {
   const params = q ? `?q=${encodeURIComponent(q)}` : '';
   return apiFetch<ProyectoListItemDTO[]>(`/proyectos${params}`);
@@ -127,13 +131,19 @@ export async function getAdminReviewInbox(): Promise<{
     numeroEnvio: number;
     enviadaEn: string;
     idRevisor: number | null;
-    proyecto: { tituloProyecto: string; creadoPor: number };
+    proyecto: { tituloProyecto: string; creadoPor: number; creador: { nombre: string; apellido: string } };
   }>;
   cierresPendientes: Array<{
     idProyecto: number;
     tituloProyecto: string;
     creadoPor: number;
     fechaActualizacion: string | null;
+  }>;
+  correccionesEnviadas: Array<{
+    idProyecto: number;
+    tituloProyecto: string;
+    creador: { nombre: string; apellido: string };
+    revisiones: Array<{ idRevisionProyecto: number; numeroEnvio: number; revisadaEn: string | null }>;
   }>;
 }> {
   return apiFetch('/revisiones/admin/bandeja');

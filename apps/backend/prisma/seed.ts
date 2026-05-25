@@ -401,13 +401,15 @@ async function main() {
   });
   await prisma.revisionProyecto.upsert({
     where: { idRevisionProyecto: 2 },
-    update: {},
+    update: {
+      comentarioRevision: 'Información general:\nAgregar más detalle en los objetivos del proyecto, especificando metas medibles y cronograma.\n\nRoles y habilidades:\nEspecificar mejor las habilidades requeridas para cada rol y ajustar los cupos según la necesidad real.',
+    },
     create: {
       idRevisionProyecto: 2,
       idProyecto: pObservado.idProyecto,
       idRevisor: luis.idUsuario,
       estadoRevision: 'OBSERVADA',
-      comentarioRevision: 'Agregar más detalle en objetivos y roles.',
+      comentarioRevision: 'Información general:\nAgregar más detalle en los objetivos del proyecto, especificando metas medibles y cronograma.\n\nRoles y habilidades:\nEspecificar mejor las habilidades requeridas para cada rol y ajustar los cupos según la necesidad real.',
       numeroEnvio: 1,
       revisadaEn: new Date('2026-04-01'),
     },
@@ -961,6 +963,24 @@ async function main() {
     });
   }
 
+  // ─── Usuario administrador ─────────────────────────────
+  const adminUser = await prisma.usuario.upsert({
+    where: { correo: 'admin@uvg.edu.gt' },
+    update: {},
+    create: {
+      correo: 'admin@uvg.edu.gt',
+      contrasena: PASSWORD_HASH,
+      nombre: 'Admin',
+      apellido: 'UVG',
+    },
+  });
+
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: adminUser.idUsuario, idRolAcceso: rolAdmin.idRolAcceso } },
+    update: {},
+    create: { idUsuario: adminUser.idUsuario, idRolAcceso: rolAdmin.idRolAcceso },
+  });
+
   // ─── Configuración del sistema ──────────────────────────
   const configData = [
     { clave: 'max_horas_semana', valor: '40', descripcionParametro: 'Máximo de horas semanales permitidas' },
@@ -977,6 +997,293 @@ async function main() {
     });
   }
 
+  // ─── Datos adicionales para verificación de vistas de administrador ──────────
+
+  // Usuarios mentores (rol mentor para MentorContent en UserDetailSheet)
+  const mentorRosa = await prisma.usuario.upsert({
+    where: { correo: 'rosa.fuentes@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'rosa.fuentes@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Rosa', apellido: 'Fuentes' },
+  });
+  const mentorTomas = await prisma.usuario.upsert({
+    where: { correo: 'tomas.guerrero@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'tomas.guerrero@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Tomás', apellido: 'Guerrero' },
+  });
+  for (const u of [mentorRosa, mentorTomas]) {
+    await prisma.usuarioRolAcceso.upsert({
+      where: { idUsuario_idRolAcceso: { idUsuario: u.idUsuario, idRolAcceso: rolMentor.idRolAcceso } },
+      update: {},
+      create: { idUsuario: u.idUsuario, idRolAcceso: rolMentor.idRolAcceso },
+    });
+  }
+
+  // Usuarios BLOQUEADO (para probar filtro BLOQUEADO, botón "Desbloquear" en drawer, y stat del dashboard)
+  const bloqueadoEst = await prisma.usuario.upsert({
+    where: { correo: 'pedro.castillo@uvg.edu.gt' },
+    update: { estado: 'BLOQUEADO' as const },
+    create: { correo: 'pedro.castillo@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Pedro', apellido: 'Castillo', estado: 'BLOQUEADO' as const },
+  });
+  const bloqueadoLider2 = await prisma.usuario.upsert({
+    where: { correo: 'miguel.santos@uvg.edu.gt' },
+    update: { estado: 'BLOQUEADO' as const },
+    create: { correo: 'miguel.santos@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Miguel', apellido: 'Santos', estado: 'BLOQUEADO' as const },
+  });
+  const bloqueadoMentor = await prisma.usuario.upsert({
+    where: { correo: 'diana.ramirez@uvg.edu.gt' },
+    update: { estado: 'BLOQUEADO' as const },
+    create: { correo: 'diana.ramirez@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Diana', apellido: 'Ramírez', estado: 'BLOQUEADO' as const },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoEst.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: bloqueadoEst.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: bloqueadoEst.idUsuario },
+    update: {},
+    create: { idUsuario: bloqueadoEst.idUsuario, carne: '22001', idCarrera: computacion.idCarrera, semestre: 6, disponibilidadHorasSemana: 10 },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoLider2.idUsuario, idRolAcceso: rolLider.idRolAcceso } },
+    update: {},
+    create: { idUsuario: bloqueadoLider2.idUsuario, idRolAcceso: rolLider.idRolAcceso },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolMentor.idRolAcceso } },
+    update: {},
+    create: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolMentor.idRolAcceso },
+  });
+
+  // Usuarios INACTIVO (creados en 2026 → contarán en nuevosInactivos2026; botón "Activar" en drawer)
+  const inactivoEst = await prisma.usuario.upsert({
+    where: { correo: 'laura.garcia@uvg.edu.gt' },
+    update: { estado: 'INACTIVO' as const },
+    create: { correo: 'laura.garcia@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Laura', apellido: 'García', estado: 'INACTIVO' as const },
+  });
+  const inactivoCoord2 = await prisma.usuario.upsert({
+    where: { correo: 'daniel.vasquez@uvg.edu.gt' },
+    update: { estado: 'INACTIVO' as const },
+    create: { correo: 'daniel.vasquez@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Daniel', apellido: 'Vásquez', estado: 'INACTIVO' as const },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: inactivoEst.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: inactivoEst.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: inactivoEst.idUsuario },
+    update: {},
+    create: { idUsuario: inactivoEst.idUsuario, carne: '22002', idCarrera: industrial.idCarrera, semestre: 4, disponibilidadHorasSemana: 8 },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: inactivoCoord2.idUsuario, idRolAcceso: rolCoordinador.idRolAcceso } },
+    update: {},
+    create: { idUsuario: inactivoCoord2.idUsuario, idRolAcceso: rolCoordinador.idRolAcceso },
+  });
+
+  // Estudiantes en riesgo (semestre >= 7, sin horas de extensión o muy pocas → aparecen en el panel de riesgo)
+  const hectorMendez = await prisma.usuario.upsert({
+    where: { correo: 'hector.mendez@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'hector.mendez@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Héctor', apellido: 'Méndez' },
+  });
+  const valentinaSoto = await prisma.usuario.upsert({
+    where: { correo: 'valentina.soto@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'valentina.soto@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Valentina', apellido: 'Soto' },
+  });
+  const omarPerez = await prisma.usuario.upsert({
+    where: { correo: 'omar.perez@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'omar.perez@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Óscar', apellido: 'Pérez' },
+  });
+  const riesgoEstData = [
+    { user: hectorMendez, carne: '21001', idCarrera: computacion.idCarrera, semestre: 10, disponibilidadHorasSemana: 12, horasExtensionRequeridas: 40 },
+    { user: valentinaSoto, carne: '21002', idCarrera: biomedica.idCarrera, semestre: 8, disponibilidadHorasSemana: 10, horasExtensionRequeridas: 20 },
+    { user: omarPerez, carne: '21003', idCarrera: mecatronica.idCarrera, semestre: 9, disponibilidadHorasSemana: 8, horasExtensionRequeridas: 30 },
+  ];
+  for (const { user, carne, idCarrera, semestre, disponibilidadHorasSemana, horasExtensionRequeridas } of riesgoEstData) {
+    await prisma.perfilEstudiante.upsert({
+      where: { idUsuario: user.idUsuario },
+      update: {},
+      create: { idUsuario: user.idUsuario, carne, idCarrera, semestre, disponibilidadHorasSemana, horasExtensionRequeridas },
+    });
+    await prisma.usuarioRolAcceso.upsert({
+      where: { idUsuario_idRolAcceso: { idUsuario: user.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+      update: {},
+      create: { idUsuario: user.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+    });
+  }
+
+  // Proyectos adicionales: más EN_REVISION, un EN_SOLICITUD_CIERRE extra, y 2 CERRADOS en 2026
+  const pVoluntariado = await prisma.proyecto.upsert({
+    where: { idProyecto: 14 },
+    update: {
+      objetivosProyecto: 'Facilitar la gestión de oportunidades de voluntariado estudiantil, mejorar la comunicación entre estudiantes y organizaciones, y permitir el seguimiento de participación mediante una plataforma centralizada.',
+      contextoAcademico: 'Proyecto desarrollado como parte del curso de Ingeniería de Software en la Universidad del Valle de Guatemala.',
+      ubicacionProyecto: 'Universidad del Valle de Guatemala, Campus Central',
+      urlRecursoExterno: 'https://voluntariado.uvg.edu.gt',
+      modalidadProyecto: 'MIXTA',
+    },
+    create: {
+      idProyecto: 14,
+      tituloProyecto: 'Plataforma de Voluntariado Estudiantil',
+      descripcionProyecto: 'Sistema para conectar estudiantes con oportunidades de voluntariado en la comunidad',
+      objetivosProyecto: 'Facilitar la gestión de oportunidades de voluntariado estudiantil, mejorar la comunicación entre estudiantes y organizaciones, y permitir el seguimiento de participación mediante una plataforma centralizada.',
+      contextoAcademico: 'Proyecto desarrollado como parte del curso de Ingeniería de Software en la Universidad del Valle de Guatemala.',
+      ubicacionProyecto: 'Universidad del Valle de Guatemala, Campus Central',
+      urlRecursoExterno: 'https://voluntariado.uvg.edu.gt',
+      modalidadProyecto: 'MIXTA',
+      tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
+      estadoProyecto: 'EN_REVISION',
+      creadoPor: jose.idUsuario,
+      fechaInicio: new Date('2026-05-10'),
+      fechaFinEstimada: new Date('2026-11-10'),
+    },
+  });
+  const pBienestar = await prisma.proyecto.upsert({
+    where: { idProyecto: 15 },
+    update: {},
+    create: {
+      idProyecto: 15,
+      tituloProyecto: 'App de Bienestar Universitario',
+      descripcionProyecto: 'Aplicación para el seguimiento de bienestar estudiantil y salud mental',
+      tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+      estadoProyecto: 'EN_REVISION',
+      creadoPor: angelUser.idUsuario,
+      fechaInicio: new Date('2026-05-15'),
+      fechaFinEstimada: new Date('2026-12-15'),
+    },
+  });
+  await prisma.proyecto.upsert({
+    where: { idProyecto: 16 },
+    update: {},
+    create: {
+      idProyecto: 16,
+      tituloProyecto: 'Sistema de Intercambio Académico',
+      descripcionProyecto: 'Plataforma para gestionar intercambios académicos entre universidades aliadas',
+      tipoProyecto: 'ACADEMICO_HORAS_BECA',
+      estadoProyecto: 'EN_SOLICITUD_CIERRE',
+      creadoPor: carlos.idUsuario,
+      fechaInicio: new Date('2026-02-01'),
+      fechaFinEstimada: new Date('2026-05-01'),
+    },
+  });
+  const pFeriaCiencias = await prisma.proyecto.upsert({
+    where: { idProyecto: 17 },
+    update: {},
+    create: {
+      idProyecto: 17,
+      tituloProyecto: 'Feria de Ciencias UVG 2026',
+      descripcionProyecto: 'Organización y logística de la feria de ciencias universitaria anual',
+      tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
+      estadoProyecto: 'CERRADO',
+      creadoPor: maria.idUsuario,
+      fechaInicio: new Date('2026-01-15'),
+      fechaFinEstimada: new Date('2026-03-15'),
+    },
+  });
+  const pHackathon = await prisma.proyecto.upsert({
+    where: { idProyecto: 18 },
+    update: {},
+    create: {
+      idProyecto: 18,
+      tituloProyecto: 'Hackathon de Innovación Social',
+      descripcionProyecto: 'Competencia de desarrollo tecnológico con impacto social en la comunidad',
+      tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
+      estadoProyecto: 'CERRADO',
+      creadoPor: jose.idUsuario,
+      fechaInicio: new Date('2026-02-01'),
+      fechaFinEstimada: new Date('2026-04-01'),
+    },
+  });
+
+  // Rol en pFeriaCiencias para que Rosa (mentor) tenga un proyecto cerrado
+  const rolFeria = await prisma.rolProyecto.upsert({
+    where: { idRolProyecto: 16 },
+    update: {},
+    create: { idRolProyecto: 16, idProyecto: pFeriaCiencias.idProyecto, nombreRol: 'Mentor de Equipo', cupos: 2 },
+  });
+
+  // Revisiones para los nuevos proyectos EN_REVISION (aparecen en bandeja de Revisiones)
+  await prisma.revisionProyecto.upsert({
+    where: { idRevisionProyecto: 3 },
+    update: {},
+    create: { idRevisionProyecto: 3, idProyecto: pVoluntariado.idProyecto, estadoRevision: 'PENDIENTE', numeroEnvio: 1 },
+  });
+  await prisma.revisionProyecto.upsert({
+    where: { idRevisionProyecto: 4 },
+    update: {},
+    create: { idRevisionProyecto: 4, idProyecto: pBienestar.idProyecto, estadoRevision: 'PENDIENTE', numeroEnvio: 1 },
+  });
+
+  // Revisiones APROBADAS vinculadas a Luis como revisor (enriquece CoordinadorContent)
+  await prisma.revisionProyecto.upsert({
+    where: { idRevisionProyecto: 5 },
+    update: {},
+    create: {
+      idRevisionProyecto: 5,
+      idProyecto: pFeriaCiencias.idProyecto,
+      idRevisor: luis.idUsuario,
+      estadoRevision: 'APROBADA',
+      comentarioRevision: 'El proyecto cumple con todos los requisitos académicos y de extensión.',
+      numeroEnvio: 1,
+      revisadaEn: new Date('2026-03-20'),
+    },
+  });
+  await prisma.revisionProyecto.upsert({
+    where: { idRevisionProyecto: 6 },
+    update: {},
+    create: {
+      idRevisionProyecto: 6,
+      idProyecto: pHackathon.idProyecto,
+      idRevisor: luis.idUsuario,
+      estadoRevision: 'APROBADA',
+      comentarioRevision: 'Excelente impacto social demostrado durante el evento.',
+      numeroEnvio: 1,
+      revisadaEn: new Date('2026-04-10'),
+    },
+  });
+
+  // Participaciones de mentores (para MentorContent: proyectos activos y cerrados)
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 12 },
+    update: {},
+    create: { idParticipacion: 12, idUsuario: mentorRosa.idUsuario, idRolProyecto: rolInvestigador.idRolProyecto, estadoParticipacion: 'ACTIVO' },
+  });
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 13 },
+    update: {},
+    create: { idParticipacion: 13, idUsuario: mentorRosa.idUsuario, idRolProyecto: rolFeria.idRolProyecto, estadoParticipacion: 'ACTIVO' },
+  });
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 14 },
+    update: {},
+    create: { idParticipacion: 14, idUsuario: mentorTomas.idUsuario, idRolProyecto: rolEmbebido.idRolProyecto, estadoParticipacion: 'ACTIVO' },
+  });
+
+  // Participación y horas de Valentina en proyecto de extensión (barra de progreso parcial en drawer)
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 15 },
+    update: {},
+    create: { idParticipacion: 15, idUsuario: valentinaSoto.idUsuario, idRolProyecto: rolMobile.idRolProyecto, estadoParticipacion: 'ACTIVO' },
+  });
+  await prisma.horasParticipacion.upsert({
+    where: { idRegistroHoras: 7 },
+    update: {},
+    create: {
+      idRegistroHoras: 7,
+      idParticipacion: 15,
+      periodoInicio: new Date('2026-03-01'),
+      periodoFin: new Date('2026-03-31'),
+      horasReportadas: 5,
+      horasAprobadas: 5,
+      estadoHoras: 'APROBADA',
+      aprobadoPor: luis.idUsuario,
+    },
+  });
+
   // ─── Reset sequences ──────────────────────────────────
   const sequences = [
     { table: 'carrera', column: 'id_carrera' },
@@ -984,6 +1291,7 @@ async function main() {
     { table: 'organizacion', column: 'id_organizacion' },
     { table: 'proyecto', column: 'id_proyecto' },
     { table: 'rol_proyecto', column: 'id_rol_proyecto' },
+    { table: 'revision_proyecto', column: 'id_revision_proyecto' },
     { table: 'postulacion', column: 'id_postulacion' },
     { table: 'participacion_proyecto', column: 'id_participacion' },
     { table: 'hito', column: 'id_hito' },

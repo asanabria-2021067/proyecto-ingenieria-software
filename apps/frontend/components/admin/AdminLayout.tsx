@@ -2,53 +2,38 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut, Bell } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Users,
+  ClipboardList,
+  Bell,
+  User,
+  LogOut,
+  ShieldAlert,
+} from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { TokenRefreshManager } from '@/components/TokenRefreshManager';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { clearTokens } from '@/lib/utils/token';
 import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
-import OnboardingTour from '@/components/dashboard/OnboardingTour';
-import { ThemeToggle } from '@/components/theme-toggle';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/proyectos', label: 'Explorar Proyectos', icon: FolderOpen },
-  { href: '/dashboard/projects/mine', label: 'Mis Proyectos', icon: Briefcase },
-  { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
+const adminNavItems = [
+  { href: '/dashboard/admin', label: 'Panel Admin', icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
+  { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: ClipboardList },
   { href: '/dashboard/notificaciones', label: 'Notificaciones', icon: Bell },
   { href: '/dashboard/perfil', label: 'Perfil', icon: User },
 ];
 
-export default function DashboardLayout({
-  children,
-  allowAdmin = false,
-}: {
-  children: React.ReactNode;
-  allowAdmin?: boolean;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user, isLoading } = useCurrentUser();
-
-  useEffect(() => {
-    if (!allowAdmin && !isLoading && isAdminUser(user)) {
-      router.replace('/dashboard/admin');
-    }
-  }, [user, isLoading, router, allowAdmin]);
-
-  if (isLoading || (!allowAdmin && isAdminUser(user))) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
 
   const handleLogout = async () => {
     const result = await uvgSwal.fire({
@@ -60,42 +45,71 @@ export default function DashboardLayout({
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#006735',
     });
-
     if (!result.isConfirmed) return;
-
     clearTokens();
     queryClient.clear();
     router.replace('/login');
   };
 
+  if (isLoading) {
+    return (
+      <div className="h-screen bg-surface flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAdminUser(user)) {
+    return (
+      <div className="h-screen bg-surface flex flex-col items-center justify-center gap-4 text-center px-6">
+        <ShieldAlert className="w-12 h-12 text-error" />
+        <h2 className="font-headline text-2xl font-black text-on-surface">Acceso restringido</h2>
+        <p className="text-sm text-tertiary max-w-xs">
+          No tienes permisos para acceder a esta sección.
+        </p>
+        <Link
+          href="/dashboard"
+          className="rounded-xl bg-primary text-on-primary px-6 py-2.5 text-sm font-bold transition-colors hover:bg-primary/90"
+        >
+          Volver al Dashboard
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
-      <a href="#dashboard-main" className="skip-link">
-        Saltar al contenido principal
-      </a>
       <TokenRefreshManager />
-      
+
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden md:flex w-64 h-screen bg-surface-container-low border-r border-outline-variant flex-col shrink-0 overflow-y-auto">
-        <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
+      <aside
+        className="hidden md:flex w-64 h-screen flex-col shrink-0 overflow-y-auto"
+        style={{ backgroundColor: 'var(--admin-bg)', borderRight: '1px solid var(--admin-border)' }}
+      >
+        <div className="px-6 py-5 flex items-center gap-3" style={{ borderBottom: '1px solid var(--admin-border)' }}>
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
-          <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
+          <span className="font-headline font-extrabold text-xl" style={{ color: 'var(--admin-text)' }}>UVGenius</span>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map(({ href, label, icon: Icon, exact }) => {
+        <div className="px-3 pt-3 pb-1">
+          <span className="px-3 text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--admin-text-muted)' }}>
+            Administración
+          </span>
+        </div>
+
+        <nav className="flex-1 px-3 py-2 space-y-1">
+          {adminNavItems.map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? pathname === href : pathname.startsWith(href);
             return (
               <Link
                 key={href}
                 href={href}
-                id={`nav-item-${label.toLowerCase().replace(/\s+/g, '-')}`}
-                aria-current={active ? 'page' : undefined}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`}
+                style={
                   active
-                    ? 'bg-primary text-on-primary'
-                    : 'text-on-surface hover:bg-surface-container-high'
-                }`}
+                    ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
+                    : { color: 'var(--admin-text-dim)' }
+                }
               >
                 <Icon className="w-5 h-5 shrink-0" />
                 {label}
@@ -104,34 +118,38 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        <div className="px-3 py-4 border-t border-outline-variant space-y-3">
-          {user && (
-            <div className="flex items-center gap-3 px-3 py-2">
-              {user.fotoUrl ? (
-                <Image
-                  src={user.fotoUrl}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-full object-cover border border-outline-variant/30"
-                />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-primary-container flex items-center justify-center text-xs font-bold text-on-primary-container">
-                  {user.nombre[0]}{user.apellido[0]}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-on-surface truncate">
-                  {user.nombre} {user.apellido}
-                </p>
-                <p className="text-xs text-tertiary truncate">{user.correo}</p>
+        <div className="px-3 py-4 space-y-3" style={{ borderTop: '1px solid var(--admin-border)' }}>
+          <div className="flex items-center gap-3 px-3 py-2">
+            {user?.fotoUrl ? (
+              <Image
+                src={user.fotoUrl}
+                alt=""
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full object-cover"
+                style={{ border: '1px solid var(--admin-border)' }}
+              />
+            ) : (
+              <div
+                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{ backgroundColor: 'var(--admin-avatar-bg)', color: 'var(--admin-avatar-fg)' }}
+              >
+                {user ? `${user.nombre[0]}${user.apellido[0]}` : 'A'}
               </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" style={{ color: 'var(--admin-text)' }}>
+                {user ? `${user.nombre} ${user.apellido}` : 'Admin UVG'}
+              </p>
+              <p className="text-xs truncate" style={{ color: 'var(--admin-text-muted)' }}>
+                {user?.correo ?? 'admin@uvg.edu.gt'}
+              </p>
             </div>
-          )}
+          </div>
           <button
-            type="button"
             onClick={handleLogout}
-            className="flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-primary hover:text-on-primary w-full outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="admin-nav-inactive flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium w-full outline-none transition-all duration-200"
+            style={{ color: 'var(--admin-text-muted)' }}
           >
             <LogOut className="w-5 h-5 shrink-0" />
             Cerrar sesion
@@ -140,15 +158,10 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Area */}
-      <main
-        id="dashboard-main"
-        tabIndex={-1}
-        className="flex-1 flex flex-col overflow-hidden bg-surface focus:outline-none"
-      >
+      <main className="flex-1 flex flex-col overflow-hidden bg-surface">
         {/* Top Header Bar */}
         <header className="h-16 border-b border-outline-variant px-4 md:px-8 flex items-center justify-between shrink-0 bg-surface-container-low z-30">
           <div className="flex items-center gap-3">
-            {/* Mobile-only logo */}
             <div className="md:hidden flex items-center gap-2">
               <Image src={logo} alt="UVGENIUS" className="h-8 w-auto" />
               <span className="font-headline font-black text-base text-primary">UVGenius</span>
@@ -159,14 +172,9 @@ export default function DashboardLayout({
           </div>
           <div className="flex items-center gap-3">
             <NotificationsBell onlyIcon />
-            <div id="dashboard-theme-toggle">
-              <ThemeToggle />
-            </div>
-            {/* Mobile-only logout button */}
+            <ThemeToggle />
             <button
-              type="button"
               onClick={handleLogout}
-              aria-label="Cerrar sesion"
               className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl text-error hover:bg-error/10 transition-colors cursor-pointer"
               title="Cerrar sesión"
             >
@@ -181,17 +189,14 @@ export default function DashboardLayout({
         </div>
       </main>
 
-      {/* Bottom Navigation Bar - Mobile Only */}
+      {/* Bottom Navigation - Mobile Only */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2">
-        {navItems.map(({ href, label, icon: Icon, exact }) => {
+        {adminNavItems.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
-              id={`nav-item-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`}
-              aria-label={label}
-              aria-current={active ? 'page' : undefined}
               className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ${
                 active ? 'text-primary bg-primary/10' : 'text-outline hover:text-on-surface'
               }`}
@@ -202,17 +207,13 @@ export default function DashboardLayout({
           );
         })}
         <button
-          type="button"
           onClick={handleLogout}
-          aria-label="Cerrar sesion"
           className="flex flex-col items-center justify-center w-12 h-12 rounded-xl text-error hover:bg-error/10 transition-all duration-200 cursor-pointer"
           title="Cerrar sesión"
         >
           <LogOut className="w-6 h-6 shrink-0" />
         </button>
       </nav>
-
-      <OnboardingTour />
     </div>
   );
 }

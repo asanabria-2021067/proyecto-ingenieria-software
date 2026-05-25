@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { Search, MapPin, Plus, Trash2, Pencil } from 'lucide-react';
 import { AlertCircle, FolderPlus, MapPin, Plus, Search, SearchX, Trash2 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { getMyProjects, deleteProject } from '@/lib/services/projects';
@@ -315,13 +316,21 @@ export default function MyProjectsPage() {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </>
+                ) : proyecto.estadoProyecto === 'EN_REVISION' ? (
+                  <Link
+                    href={`/dashboard/projects/mine/${proyecto.idProyecto}`}
+                    className="flex-1 inline-flex items-center justify-center bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-surface-container-highest transition-all duration-200"
+                  >
+                    Ver mi solicitud
+                  </Link>
                 ) : proyecto.estadoProyecto === 'OBSERVADO' ? (
                   <>
                     <Link
-                      href={`/dashboard/projects/mine/form?id=${proyecto.idProyecto}`}
-                      className="flex-1 inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
+                      href={`/dashboard/projects/mine/${proyecto.idProyecto}?edit=true`}
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-amber-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-700 active:scale-95 transition-all duration-200"
                     >
-                      Editar y Reenviar
+                      <Pencil className="w-4 h-4" />
+                      Editar
                     </Link>
                     <button
                       type="button"
@@ -333,13 +342,6 @@ export default function MyProjectsPage() {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </>
-                ) : proyecto.estadoProyecto === 'EN_REVISION' ? (
-                  <button
-                    disabled
-                    className="flex-1 inline-flex items-center justify-center bg-surface-container-highest text-tertiary px-5 py-2.5 rounded-xl text-sm font-bold cursor-not-allowed opacity-70"
-                  >
-                    Espera de Retroalimentación
-                  </button>
                 ) : (
                   <Link
                     href={`/dashboard/projects/${proyecto.idProyecto}`}

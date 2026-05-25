@@ -33,11 +33,15 @@ export class UsersService {
           include: { cualidad: true },
         },
         experiencias: true,
+        rolesAcceso: {
+          include: { rolAcceso: true },
+        },
       },
     });
 
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    return user;
+    const roles = user.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil);
+    return { ...user, roles };
   }
 
   /**
