@@ -269,7 +269,21 @@ export class ProjectsService {
   async findOneOwner(id: number, userId: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
-      select: proyectoDetalleSelect,
+      select: {
+        ...proyectoDetalleSelect,
+        revisiones: {
+          select: {
+            idRevisionProyecto: true,
+            estadoRevision: true,
+            comentarioRevision: true,
+            numeroEnvio: true,
+            enviadaEn: true,
+            revisadaEn: true,
+          },
+          orderBy: { enviadaEn: 'desc' as const },
+          take: 1,
+        },
+      },
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);

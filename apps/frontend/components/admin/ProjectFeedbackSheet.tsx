@@ -1,19 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, SendHorizonal, MessageSquare } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getAdminProjectById, resolverRevision } from '@/lib/services/projects';
+import { getAdminProjectById, getProjectRevisions } from '@/lib/services/projects';
 import { TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
-import uvgSwal from '@/lib/swal';
 
-export interface ProjectReviewSheetProps {
+export interface ProjectFeedbackSheetProps {
   idProyecto: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onResolved: () => void;
 }
 
 const labelClass = 'block text-[10px] font-black uppercase tracking-widest text-tertiary mb-1.5';
@@ -44,57 +42,42 @@ function ReadonlyField({ label, value }: { label: string; value: string | null |
   );
 }
 
-function SectionComment({
-  sectionKey,
-  value,
-  onChange,
-}: {
-  sectionKey: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function SectionCommentReadonly({ comment }: { comment: string }) {
   return (
     <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
       <div className="flex items-center gap-2 mb-3">
         <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-        <label
-          htmlFor={`comment-${sectionKey}`}
-          className="text-[10px] font-black uppercase tracking-widest text-amber-600"
-        >
-          Comentarios del revisor
-        </label>
+        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+          Comentarios enviados al estudiante
+        </span>
       </div>
-      <textarea
-        id={`comment-${sectionKey}`}
-        rows={3}
-        placeholder="Escribe aquí los comentarios para el estudiante sobre esta sección..."
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all duration-200 resize-none"
-      />
+      <div className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
+        {comment.trim() || <span className="text-outline-variant italic">Sin comentarios para esta sección.</span>}
+      </div>
     </div>
   );
 }
 
-export function ProjectReviewSheet({
-  idProyecto,
-  open,
-  onOpenChange,
-  onResolved,
-}: ProjectReviewSheetProps) {
-  const queryClient = useQueryClient();
+function parseComments(raw: string | null | undefined): { general: string; roles: string } {
+  if (!raw) return { general: '', roles: '' };
+  const hasHeaders = raw.includes('Información general:') || raw.includes('Roles y habilidades:');
+  if (!hasHeaders) return { general: raw.trim(), roles: '' };
+  const generalMatch = raw.match(/Información general:\n([\s\S]*?)(?=\n\nRoles y habilidades:|$)/);
+  const rolesMatch = raw.match(/Roles y habilidades:\n([\s\S]*?)$/);
+  return {
+    general: generalMatch?.[1]?.trim() ?? '',
+    roles: rolesMatch?.[1]?.trim() ?? '',
+  };
+}
+
+export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: ProjectFeedbackSheetProps) {
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
-  const [comments, setComments] = useState({ general: '', roles: '' });
-  const [submitting, setSubmitting] = useState(false);
 
-  // Maneja la animación de entrada y salida
   useEffect(() => {
     if (open) {
       setVisible(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setAnimating(true));
-      });
+      requestAnimationFrame(() => requestAnimationFrame(() => setAnimating(true)));
     } else {
       setAnimating(false);
       const t = setTimeout(() => setVisible(false), 350);
@@ -102,83 +85,27 @@ export function ProjectReviewSheet({
     }
   }, [open]);
 
-  useEffect(() => {
-    if (open) setComments({ general: '', roles: '' });
-  }, [idProyecto, open]);
-
-  const { data: proyecto, isLoading } = useQuery({
+  const { data: proyecto, isLoading: loadingProyecto } = useQuery({
     queryKey: ['adminProjectDetail', idProyecto],
     queryFn: () => getAdminProjectById(idProyecto!),
     enabled: open && idProyecto !== null,
+    staleTime: 0,
   });
 
-  function buildComentario(): string | undefined {
-    const parts: string[] = [];
-    if (comments.general.trim()) {
-      parts.push(`Información general:\n${comments.general.trim()}`);
-    }
-    if (comments.roles.trim()) {
-      parts.push(`Roles y habilidades:\n${comments.roles.trim()}`);
-    }
-    return parts.length > 0 ? parts.join('\n\n') : undefined;
-  }
+  const { data: revisiones, isLoading: loadingRevisiones } = useQuery({
+    queryKey: ['projectRevisions', idProyecto],
+    queryFn: () => getProjectRevisions(idProyecto!),
+    enabled: open && idProyecto !== null,
+    staleTime: 0,
+  });
 
-  async function handleResolve(resultado: 'APROBADA' | 'OBSERVADA') {
-    if (!idProyecto) return;
+  const ultimaRevisionObservada = revisiones
+    ?.filter((r) => r.estadoRevision === 'OBSERVADA')
+    .sort((a, b) => (b.revisadaEn ?? '').localeCompare(a.revisadaEn ?? ''))
+    .at(0) ?? null;
 
-    if (resultado === 'OBSERVADA') {
-      const comentario = buildComentario();
-      if (!comentario) {
-        await uvgSwal.fire({
-          icon: 'warning',
-          title: 'Comentario requerido',
-          text: 'Debes escribir al menos un comentario en alguna sección antes de mandar correcciones.',
-          confirmButtonText: 'Entendido',
-          confirmButtonColor: '#b45309',
-        });
-        return;
-      }
-      const { isConfirmed } = await uvgSwal.fire({
-        icon: 'warning',
-        title: 'Mandar correcciones',
-        text: 'Se enviará una notificación al estudiante con los comentarios que has escrito.',
-        showCancelButton: true,
-        confirmButtonText: 'Confirmar y enviar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#b45309',
-      });
-      if (!isConfirmed) return;
-      setSubmitting(true);
-      try {
-        await resolverRevision(idProyecto, { resultado, comentario });
-        void queryClient.invalidateQueries({ queryKey: ['projectRevisions', idProyecto] });
-        onOpenChange(false);
-        onResolved();
-      } finally {
-        setSubmitting(false);
-      }
-    } else {
-      const { isConfirmed } = await uvgSwal.fire({
-        icon: 'success',
-        title: 'Aprobar proyecto',
-        text: '¿Confirmas que el proyecto cumple con los requisitos?',
-        showCancelButton: true,
-        confirmButtonText: 'Aprobar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#006735',
-      });
-      if (!isConfirmed) return;
-      setSubmitting(true);
-      try {
-        await resolverRevision(idProyecto, { resultado });
-        void queryClient.invalidateQueries({ queryKey: ['projectRevisions', idProyecto] });
-        onOpenChange(false);
-        onResolved();
-      } finally {
-        setSubmitting(false);
-      }
-    }
-  }
+  const comentarios = parseComments(ultimaRevisionObservada?.comentarioRevision);
+  const isLoading = loadingProyecto || loadingRevisiones;
 
   if (!visible) return null;
 
@@ -201,13 +128,20 @@ export function ProjectReviewSheet({
         </button>
         <div className="h-5 w-px bg-outline-variant/40" />
         <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-primary">
-            Administración · Revisiones
+          <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+            Administración · Retroalimentación enviada
           </p>
           <h1 className="font-headline text-lg font-black text-on-surface leading-tight">
-            {proyecto?.tituloProyecto ?? 'Revisión de proyecto'}
+            {proyecto?.tituloProyecto ?? 'Retroalimentación'}
           </h1>
         </div>
+        {ultimaRevisionObservada?.revisadaEn && (
+          <div className="ml-auto shrink-0">
+            <span className="text-xs text-tertiary">
+              Revisado el {formatDate(ultimaRevisionObservada.revisadaEn)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Body */}
@@ -252,11 +186,9 @@ export function ProjectReviewSheet({
                 </div>
                 <ReadonlyField label="URL recurso externo" value={proyecto.urlRecursoExterno} />
               </div>
-              <SectionComment
-                sectionKey="general"
-                value={comments.general}
-                onChange={(v) => setComments((c) => ({ ...c, general: v }))}
-              />
+              {(comentarios.general || !comentarios.roles) && (
+                <SectionCommentReadonly comment={comentarios.general} />
+              )}
             </section>
 
             {/* ── Sección 2: Roles y habilidades ── */}
@@ -317,11 +249,7 @@ export function ProjectReviewSheet({
                   ))}
                 </div>
               )}
-              <SectionComment
-                sectionKey="roles"
-                value={comments.roles}
-                onChange={(v) => setComments((c) => ({ ...c, roles: v }))}
-              />
+              <SectionCommentReadonly comment={comentarios.roles} />
             </section>
           </div>
         )}
@@ -329,22 +257,12 @@ export function ProjectReviewSheet({
 
       {/* Footer */}
       <div className="shrink-0 border-t border-outline-variant/30 bg-surface px-6 py-4">
-        <div className="max-w-3xl mx-auto flex gap-3">
+        <div className="max-w-3xl mx-auto">
           <button
-            disabled={submitting || !proyecto}
-            onClick={() => void handleResolve('APROBADA')}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => onOpenChange(false)}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container-highest"
           >
-            <CheckCircle2 className="h-4 w-4" />
-            Aprobar proyecto
-          </button>
-          <button
-            disabled={submitting || !proyecto}
-            onClick={() => void handleResolve('OBSERVADA')}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <SendHorizonal className="h-4 w-4" />
-            Mandar correcciones
+            Cerrar
           </button>
         </div>
       </div>

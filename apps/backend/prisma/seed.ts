@@ -401,13 +401,15 @@ async function main() {
   });
   await prisma.revisionProyecto.upsert({
     where: { idRevisionProyecto: 2 },
-    update: {},
+    update: {
+      comentarioRevision: 'Información general:\nAgregar más detalle en los objetivos del proyecto, especificando metas medibles y cronograma.\n\nRoles y habilidades:\nEspecificar mejor las habilidades requeridas para cada rol y ajustar los cupos según la necesidad real.',
+    },
     create: {
       idRevisionProyecto: 2,
       idProyecto: pObservado.idProyecto,
       idRevisor: luis.idUsuario,
       estadoRevision: 'OBSERVADA',
-      comentarioRevision: 'Agregar más detalle en objetivos y roles.',
+      comentarioRevision: 'Información general:\nAgregar más detalle en los objetivos del proyecto, especificando metas medibles y cronograma.\n\nRoles y habilidades:\nEspecificar mejor las habilidades requeridas para cada rol y ajustar los cupos según la necesidad real.',
       numeroEnvio: 1,
       revisadaEn: new Date('2026-04-01'),
     },

@@ -47,6 +47,11 @@ function NewProjectFormContent() {
 
   useEffect(() => {
     if (!proyectoExistente) return;
+    const editableStates = ['BORRADOR', 'OBSERVADO'];
+    if (!editableStates.includes(proyectoExistente.estadoProyecto)) {
+      router.replace(`/dashboard/projects/mine/${editId}`);
+      return;
+    }
     const p = proyectoExistente;
     setForm({
       tituloProyecto: p.tituloProyecto,
@@ -252,6 +257,20 @@ function NewProjectFormContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
             Cargando proyecto...
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const editableStates = ['BORRADOR', 'OBSERVADO'];
+  if (proyectoExistente && !editableStates.includes(proyectoExistente.estadoProyecto)) {
+    return (
+      <DashboardLayout>
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
+            Redirigiendo...
           </div>
         </div>
       </DashboardLayout>
