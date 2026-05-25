@@ -18,7 +18,7 @@ export class RevisionesService {
   async findAdminInbox(adminId: number) {
     await this._requireAdmin(adminId);
 
-    const [revisionesPendientes, cierresPendientes] = await Promise.all([
+    const [revisionesPendientes, cierresPendientes, correccionesEnviadas] = await Promise.all([
       this.prisma.revisionProyecto.findMany({
         where: { estadoRevision: 'PENDIENTE', proyecto: { estadoProyecto: EstadoProyecto.EN_REVISION } },
         select: {
@@ -27,7 +27,13 @@ export class RevisionesService {
           numeroEnvio: true,
           enviadaEn: true,
           idRevisor: true,
-          proyecto: { select: { tituloProyecto: true, creadoPor: true } },
+          proyecto: {
+            select: {
+              tituloProyecto: true,
+              creadoPor: true,
+              creador: { select: { nombre: true, apellido: true } },
+            },
+          },
         },
         orderBy: { enviadaEn: 'asc' },
       }),
@@ -41,9 +47,28 @@ export class RevisionesService {
         },
         orderBy: { fechaActualizacion: 'asc' },
       }),
+      this.prisma.proyecto.findMany({
+        where: { estadoProyecto: EstadoProyecto.OBSERVADO, eliminadoEn: null },
+        select: {
+          idProyecto: true,
+          tituloProyecto: true,
+          creador: { select: { nombre: true, apellido: true } },
+          revisiones: {
+            where: { estadoRevision: 'OBSERVADA' },
+            select: {
+              idRevisionProyecto: true,
+              numeroEnvio: true,
+              revisadaEn: true,
+            },
+            orderBy: { enviadaEn: 'desc' as const },
+            take: 1,
+          },
+        },
+        orderBy: { fechaActualizacion: 'desc' },
+      }),
     ]);
 
-    return { revisionesPendientes, cierresPendientes };
+    return { revisionesPendientes, cierresPendientes, correccionesEnviadas };
   }
 
   async findByProyecto(idProyecto: number, userId: number) {
