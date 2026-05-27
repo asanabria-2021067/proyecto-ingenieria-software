@@ -5,7 +5,8 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
-import logo from '@/public/Logo UVG-08.png';
+import logoLight from '@/public/logo.png';
+import logoDark from '@/public/Logo claro.png';
 
 const navLinks = [
   { label: 'El Problema', href: '#el-problema' },
@@ -48,7 +49,8 @@ export default function Navbar() {
           }`}
         >
           <div className="flex items-center gap-8">
-            <Image src={logo} alt="UVG Scholar" className="h-8 w-auto brightness-0 sm:h-9" />
+            <Image src={logoLight} alt="UVG Scholar" className="h-8 w-auto brightness-0 sm:h-9 dark:hidden" />
+            <Image src={logoDark} alt="UVG Scholar" className="h-8 w-auto sm:h-9 hidden dark:block" />
             <div className="hidden gap-6 md:flex">
               {navLinks.map((link) => (
                 <a
