@@ -101,7 +101,7 @@ export default function FeaturesGrid() {
                 customVariants={revealVariants}
                 className={`flex h-full flex-col justify-between space-y-6 rounded-[2rem] p-8 transition-all duration-300 ${
                   isPrimary
-                    ? "bg-primary text-on-primary shadow-xl hover:-translate-y-1 hover:shadow-2xl"
+                    ? "bg-primary text-on-primary shadow-xl hover:-translate-y-1 hover:shadow-2xl dark:bg-surface-container-lowest dark:text-on-surface dark:hover:shadow-xl"
                     : "bg-surface-container-lowest hover:-translate-y-1 hover:shadow-xl"
                 }`}
               >
@@ -109,19 +109,19 @@ export default function FeaturesGrid() {
                   <div
                     className={`flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 hover:scale-110 ${
                       isPrimary
-                        ? "bg-on-primary-container text-primary"
+                        ? "bg-on-primary-container text-primary dark:bg-surface-container-high dark:text-on-surface"
                         : "bg-surface-container-high text-on-surface"
                     }`}
                   >
                     <Icon className="h-7 w-7" />
                   </div>
                   <h3
-                    className={`font-headline text-2xl font-bold ${!isPrimary ? "text-on-surface" : ""}`}
+                    className={`font-headline text-2xl font-bold ${!isPrimary ? "text-on-surface" : "text-on-primary dark:text-on-surface"}`}
                   >
                     {feature.title}
                   </h3>
                   <p
-                    className={`leading-relaxed ${isPrimary ? "text-on-primary-container opacity-90" : "text-tertiary"}`}
+                    className={`leading-relaxed ${isPrimary ? "text-on-primary-container opacity-90 dark:text-tertiary dark:opacity-100" : "text-tertiary"}`}
                   >
                     {feature.description}
                   </p>

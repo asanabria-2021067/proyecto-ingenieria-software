@@ -153,7 +153,7 @@ export default function RegistroPage() {
   }
 
   const inputClass =
-    'w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
+    'w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container px-4 py-3 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
   const labelClass =
     'font-label text-xs font-bold uppercase tracking-widest text-tertiary';
 
@@ -274,7 +274,7 @@ export default function RegistroPage() {
                     }
                   }}
                   placeholder="usuario@uvg.edu.gt"
-                  className={`${inputClass} ${correo && apellido && carne ? 'bg-green-50' : ''}`}
+                  className={`${inputClass} ${correo && apellido && carne ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
                   readOnly={!!(apellido && carne && correo)}
                 />
                 {correo && apellido && carne && (
@@ -399,7 +399,7 @@ export default function RegistroPage() {
               <button
                 type="submit"
                 disabled={isPending}
-                className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary active:scale-[0.98] disabled:opacity-60"
+                className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60"
               >
                 {isPending ? 'Creando cuenta...' : 'Crear Cuenta'}
               </button>
