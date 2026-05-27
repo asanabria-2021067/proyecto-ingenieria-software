@@ -110,7 +110,8 @@ jobs:
             DB_NAME=uvg_collab
             DB_PORT=5432
             JWT_SECRET=${{ secrets.JWT_SECRET }}
-            DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/uvg_collab?schema=public
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            DIRECT_URL=${{ secrets.DIRECT_URL }}
             NEXT_PUBLIC_API_URL=/api
             NEXT_PUBLIC_API_PREFIX=/api
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
