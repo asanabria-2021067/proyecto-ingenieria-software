@@ -43,7 +43,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       showCancelButton: true,
       confirmButtonText: 'Si, cerrar sesion',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#006735',
     });
     if (!result.isConfirmed) return;
     clearTokens();

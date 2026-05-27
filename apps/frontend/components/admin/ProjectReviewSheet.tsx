@@ -148,7 +148,9 @@ export function ProjectReviewSheet({
           title: 'Comentario requerido',
           text: 'Debes escribir al menos un comentario en alguna sección antes de mandar correcciones.',
           confirmButtonText: 'Entendido',
-          confirmButtonColor: '#b45309',
+          customClass: {
+            confirmButton: 'rounded-xl bg-amber-600 px-5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-md',
+          },
         });
         return;
       }
@@ -159,7 +161,9 @@ export function ProjectReviewSheet({
         showCancelButton: true,
         confirmButtonText: 'Confirmar y enviar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#b45309',
+        customClass: {
+          confirmButton: 'rounded-xl bg-amber-600 px-5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-md',
+        },
       });
       if (!isConfirmed) return;
       setSubmitting(true);
@@ -179,7 +183,6 @@ export function ProjectReviewSheet({
         showCancelButton: true,
         confirmButtonText: 'Aprobar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#006735',
       });
       if (!isConfirmed) return;
       setSubmitting(true);

@@ -58,7 +58,6 @@ export default function DashboardLayout({
       showCancelButton: true,
       confirmButtonText: 'Si, cerrar sesion',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#006735',
     });
 
     if (!result.isConfirmed) return;
