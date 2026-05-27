@@ -37,14 +37,14 @@ function formatDate(date: string | null): string {
 
 function estadoBadgeStyle(estado: string): string {
   switch (estado.toUpperCase()) {
-    case 'PUBLICADO':   return 'bg-[#006735] text-white';
-    case 'EN_PROGRESO': return 'bg-[#416900] text-white';
-    case 'EN_REVISION': return 'bg-blue-500/10 text-blue-500 border border-blue-500/20';
-    case 'OBSERVADO':   return 'bg-amber-500/10 text-amber-500 border border-amber-500/20';
-    case 'EN_SOLICITUD_CIERRE': return 'bg-purple-500/10 text-purple-500 border border-purple-500/20';
+    case 'PUBLICADO':   return 'bg-primary text-on-primary';
+    case 'EN_PROGRESO': return 'bg-secondary text-on-secondary';
+    case 'EN_REVISION': return 'bg-blue-500/10 text-blue-500 border border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-300';
+    case 'OBSERVADO':   return 'bg-amber-500/10 text-amber-500 border border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300';
+    case 'EN_SOLICITUD_CIERRE': return 'bg-purple-500/10 text-purple-500 border border-purple-500/20 dark:bg-purple-500/20 dark:text-purple-300';
     case 'BORRADOR':    return 'bg-surface-container-high text-on-surface-variant border border-outline-variant/30';
     case 'CERRADO':     return 'bg-surface-container-highest text-tertiary border border-outline-variant/30';
-    case 'CANCELADO':   return 'bg-red-500/10 text-red-500 border border-red-500/20';
+    case 'CANCELADO':   return 'bg-red-500/10 text-red-500 border border-red-500/20 dark:bg-red-500/20 dark:text-red-300';
     default:            return 'bg-surface-container-high text-on-surface-variant';
   }
 }
@@ -121,7 +121,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             {proyecto.tituloProyecto}
           </h1>
         </div>
-        <Button className="shrink-0 bg-[#006735] hover:bg-[#005229] text-white rounded-xl px-6 h-12 font-bold transition-all shadow-sm">
+        <Button className="shrink-0 bg-primary hover:bg-primary/90 text-on-primary rounded-xl px-6 h-12 font-bold transition-all shadow-sm">
           ▶ Postularme
         </Button>
       </div>
@@ -170,7 +170,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 <h2 className="text-xs font-black uppercase tracking-widest text-tertiary font-headline">
                   Roles Disponibles
                 </h2>
-                <span className="text-xs text-[#006735] font-black uppercase tracking-wider">
+                <span className="text-xs text-primary font-black uppercase tracking-wider">
                   {totalCupos}{' '}
                   {totalCupos === 1 ? 'Vacante activa' : 'Vacantes activas'}
                 </span>
@@ -188,7 +188,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="shrink-0 rounded-lg border-[#006735] text-[#006735] hover:bg-green-50/10 text-xs font-bold transition-all self-start"
+                        className="shrink-0 rounded-lg border-primary text-primary hover:bg-primary/10 text-xs font-bold transition-all self-start"
                       >
                         Postularme a este rol
                       </Button>
@@ -244,7 +244,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             </h2>
             <div className="flex items-center gap-3">
               <Avatar className="size-11">
-                <AvatarFallback className="bg-primary/10 text-[#006735] font-black text-sm">
+                <AvatarFallback className="bg-primary/10 text-primary font-black text-sm">
                   {getInitials(proyecto.creador.nombre, proyecto.creador.apellido)}
                 </AvatarFallback>
               </Avatar>
@@ -272,7 +272,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-surface-container-low text-on-surface">
                   {organizacionPrincipal.organizacion.tipoOrganizacion}
                 </span>
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#006735] text-white">
+                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-primary text-on-primary">
                   {organizacionPrincipal.rolOrganizacion}
                 </span>
               </div>

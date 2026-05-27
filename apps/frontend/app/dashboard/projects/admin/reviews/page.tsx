@@ -48,7 +48,6 @@ export default function AdminReviewsInboxPage() {
       showCancelButton: true,
       confirmButtonText: 'Aprobar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#006735',
     });
     if (!isConfirmed) return;
     await resolverRevision(idProyecto, { resultado: 'APROBADA' });
@@ -65,7 +64,11 @@ export default function AdminReviewsInboxPage() {
       showCancelButton: true,
       confirmButtonText: action === 'APPROVE' ? 'Sí, aprobar' : 'Sí, rechazar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: action === 'APPROVE' ? '#006735' : '#dc2626',
+      ...(action === 'REJECT' && {
+        customClass: {
+          confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md',
+        },
+      }),
     });
     if (!isConfirmed) return;
     if (action === 'APPROVE') {
