@@ -171,7 +171,7 @@ export default function LoginPage() {
             </div>
 
             {/* Microsoft Login */}
-            <button className="flex w-full items-center justify-center gap-3 rounded-xl border border-surface-container-highest bg-white py-4 font-headline font-bold text-on-surface shadow-sm transition-all hover:bg-surface-container-low active:scale-[0.98]">
+            <button className="flex w-full items-center justify-center gap-3 rounded-xl border border-surface-container-highest bg-surface-container-lowest py-4 font-headline font-bold text-on-surface shadow-sm transition-all hover:bg-surface-container-low active:scale-[0.98]">
               <svg className="h-5 w-5" viewBox="0 0 21 21">
                 <rect x="1" y="1" width="9" height="9" fill="#f25022" />
                 <rect x="11" y="1" width="9" height="9" fill="#7fba00" />

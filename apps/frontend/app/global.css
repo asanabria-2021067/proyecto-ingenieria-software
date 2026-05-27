@@ -303,21 +303,44 @@ button:disabled {
 
 /* Popup container – force theme colors, strip the hardcoded white */
 .swal2-popup {
-  background: var(--color-surface-container-lowest) !important;
-  color: var(--color-on-surface) !important;
-  border: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent) !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25) !important;
+  background: var(--color-surface-container-lowest, #ffffff) !important;
+  background-color: var(--color-surface-container-lowest, #ffffff) !important;
+  color: var(--color-on-surface, #181c20) !important;
+  border: 1px solid color-mix(in srgb, var(--color-outline-variant, #bdcabd) 40%, transparent) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Title */
 .swal2-title {
-  color: var(--color-primary) !important;
+  color: var(--color-primary, #006735) !important;
 }
 
 /* Body text / html container */
 .swal2-html-container,
 .swal2-content {
-  color: var(--color-on-surface-variant) !important;
+  color: var(--color-on-surface-variant, #43474e) !important;
+}
+
+/* Dark mode overrides for SweetAlert2 */
+.dark .swal2-popup,
+[data-theme='dark'] .swal2-popup {
+  background: #080b0e !important;
+  background-color: #080b0e !important;
+  color: #eef1f7 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .swal2-title,
+[data-theme='dark'] .swal2-title {
+  color: #72dc93 !important;
+}
+
+.dark .swal2-html-container,
+.dark .swal2-content,
+[data-theme='dark'] .swal2-html-container,
+[data-theme='dark'] .swal2-content {
+  color: #c3c7cc !important;
 }
 
 /* Icon border and color adaption */
