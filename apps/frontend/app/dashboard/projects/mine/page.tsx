@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Search, MapPin, Plus, Trash2, Pencil } from 'lucide-react';
-import { AlertCircle, FolderPlus, MapPin, Plus, Search, SearchX, Trash2 } from 'lucide-react';
+import { Search, MapPin, Plus, Trash2, Pencil, AlertCircle, FolderPlus, SearchX } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { getMyProjects, deleteProject } from '@/lib/services/projects';
 import { TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
