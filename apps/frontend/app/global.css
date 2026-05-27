@@ -39,6 +39,7 @@
   --color-surface-container-highest: #dfe3e8;
   --color-surface-container-lowest: #ffffff;
   --color-surface-variant: #dfe3e8;
+  --color-on-surface-variant: #43474e;
 
   --color-outline: #6e7a6f;
   --color-outline-variant: #bdcabd;
@@ -96,6 +97,7 @@
   --color-surface-container-highest: #282d33;
   --color-surface-container-lowest: #080b0e;
   --color-surface-variant: #2b2f33;
+  --color-on-surface-variant: #c3c7cc;
 
   --color-outline: #8a948a;
   --color-outline-variant: #3a3f3a;
@@ -282,4 +284,67 @@ button:disabled {
   button:active:not(:disabled) {
     transform: none;
   }
+}
+
+/* ─────────────────────────────────────────────
+   SweetAlert2 – Adaptive Dark / Light Mode
+   ──────────────────────────────────────────── */
+
+.swal2-container {
+  z-index: 99999 !important;
+}
+
+/* Backdrop blur effect */
+.swal2-backdrop-show {
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Popup container – force theme colors, strip the hardcoded white */
+.swal2-popup {
+  background: var(--color-surface-container-lowest) !important;
+  color: var(--color-on-surface) !important;
+  border: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Title */
+.swal2-title {
+  color: var(--color-primary) !important;
+}
+
+/* Body text / html container */
+.swal2-html-container,
+.swal2-content {
+  color: var(--color-on-surface-variant) !important;
+}
+
+/* Icon border and color adaption */
+.swal2-icon.swal2-success .swal2-success-ring {
+  border-color: color-mix(in srgb, var(--color-primary) 25%, transparent) !important;
+}
+.swal2-icon.swal2-success [class^='swal2-success-line'] {
+  background-color: var(--color-primary) !important;
+}
+.swal2-icon.swal2-warning {
+  border-color: #f59e0b !important;
+  color: #f59e0b !important;
+}
+.swal2-icon.swal2-error {
+  border-color: var(--color-error) !important;
+  color: var(--color-error) !important;
+}
+.swal2-icon.swal2-question {
+  border-color: var(--color-outline) !important;
+  color: var(--color-on-surface-variant) !important;
+}
+.swal2-icon.swal2-info {
+  border-color: #3b82f6 !important;
+  color: #3b82f6 !important;
+}
+
+/* Progress loader (timer bar) */
+.swal2-timer-progress-bar {
+  background: var(--color-primary) !important;
 }
