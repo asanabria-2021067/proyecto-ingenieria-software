@@ -112,7 +112,7 @@ jobs:
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             DIRECT_URL=${{ secrets.DIRECT_URL }}
-            NEXT_PUBLIC_API_URL=/api
+            NEXT_PUBLIC_API_URL=
             NEXT_PUBLIC_API_PREFIX=/api
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}

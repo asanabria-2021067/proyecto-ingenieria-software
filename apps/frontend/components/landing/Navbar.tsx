@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
-import logoLight from '@/public/logo.png';
+import logoLight from '@/public/Logo UVG-08.png';
 import logoDark from '@/public/Logo claro.png';
 
 const navLinks = [
