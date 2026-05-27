@@ -263,6 +263,7 @@ button:disabled {
 .admin-nav-inactive:hover {
   background-color: var(--admin-hover-bg);
 }
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
