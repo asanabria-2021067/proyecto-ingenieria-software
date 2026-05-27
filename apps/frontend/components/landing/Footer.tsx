@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import logoLight from '@/public/logo.png';
+import logoLight from '@/public/Logo UVG-08.png';
 import logoDark from '@/public/Logo claro.png';
 
 const platformLinks = [
