@@ -3,10 +3,28 @@ include:
     env_file: .env
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: uvg-collab-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - uvg-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/asanabria-2021067/proyecto-ingenieria-software-backend:latest}
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
+    pull_policy: missing
     container_name: uvg-collab-backend
     profiles:
       - app
@@ -16,23 +34,26 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}}
+      - DIRECT_URL=${DIRECT_URL:-postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}}
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-me}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - uvg-network
 
   frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/asanabria-2021067/proyecto-ingenieria-software-frontend:latest}
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
-        - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-}
-        - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET:-}
+    pull_policy: missing
     container_name: uvg-collab-frontend
     profiles:
       - app
@@ -47,3 +68,6 @@ services:
       - backend
     networks:
       - uvg-network
+
+volumes:
+  redis-data:
