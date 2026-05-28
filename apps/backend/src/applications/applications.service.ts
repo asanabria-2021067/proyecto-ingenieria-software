@@ -4,8 +4,10 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ApplicationCreatedEvent } from '../notifications/events/application-created.event';
 import { EstadoProyecto, TipoNotificacion } from '@prisma/client';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
@@ -15,6 +17,7 @@ export class ApplicationsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async create(dto: CreatePostulacionDto) {
@@ -97,19 +100,15 @@ export class ApplicationsService {
       },
     });
 
-    // Notificar al líder del proyecto
-    await this.notificationsService.notifyUsers(
-      [rol.proyecto.creadoPor],
-      {
-        tipoNotificacion: 'NUEVA_POSTULACION',
-        tituloNotificacion: 'Nueva postulación recibida',
-        mensajeNotificacion: `${postulacion.postulante.nombre} ${postulacion.postulante.apellido} se postuló para el rol "${rol.nombreRol}" en tu proyecto "${rol.proyecto.tituloProyecto}".`,
-        datosJson: {
-          idPostulacion: postulacion.idPostulacion,
-          idProyecto: rol.proyecto.idProyecto,
-          idRolProyecto: dto.idRolProyecto,
-        },
-      },
+    // Emit event (event-driven)
+    this.eventEmitter.emit(
+      'application.created',
+      new ApplicationCreatedEvent(
+        postulacion.idPostulacion,
+        dto.idUsuarioPostulante,
+        rol.proyecto.idProyecto,
+        dto.idRolProyecto,
+      ),
     );
 
     return postulacion;

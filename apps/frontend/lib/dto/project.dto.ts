@@ -108,11 +108,41 @@ export interface ProyectoListItemDTO {
   descripcionProyecto: string | null;
 }
 
+export interface SnapshotRolDTO {
+  idRolProyecto: number;
+  nombreRol: string;
+  descripcionRolProyecto: string | null;
+  cupos: number;
+  horasSemanalesEstimadas: number | null;
+  carreraRequerida: { idCarrera: number; nombreCarrera: string; facultad: string } | null;
+  requisitos: {
+    idRequisitoHabilidad: number;
+    nivelMinimo: string;
+    obligatorio: boolean;
+    habilidad: { idHabilidad: number; nombreHabilidad: string; categoriaHabilidad: string };
+  }[];
+}
+
+export interface SnapshotProyectoDTO {
+  tituloProyecto: string;
+  descripcionProyecto: string | null;
+  objetivosProyecto: string | null;
+  tipoProyecto: string;
+  modalidadProyecto: string;
+  ubicacionProyecto: string | null;
+  contextoAcademico: string | null;
+  urlRecursoExterno: string | null;
+  fechaInicio: string | null;
+  fechaFinEstimada: string | null;
+  roles: SnapshotRolDTO[];
+}
+
 /** DTO de revisión — parte de la respuesta de GET /revisiones/proyectos/:id */
 export interface RevisionProyectoDTO {
   idRevisionProyecto: number;
   estadoRevision: 'PENDIENTE' | 'APROBADA' | 'OBSERVADA';
   comentarioRevision: string | null;
+  snapshotProyecto: SnapshotProyectoDTO | null;
   numeroEnvio: number;
   enviadaEn: string;
   revisadaEn: string | null;
@@ -164,6 +194,15 @@ export interface ResolverRevisionPayload {
   comentario?: string;
 }
 
+export interface UltimaRevisionDTO {
+  idRevisionProyecto: number;
+  estadoRevision: string;
+  comentarioRevision: string | null;
+  numeroEnvio: number;
+  enviadaEn: string;
+  revisadaEn: string | null;
+}
+
 /** DTO raíz — contrato completo de GET /proyectos/:id */
 export interface ProyectoDetalleDTO {
   idProyecto: number;
@@ -186,4 +225,5 @@ export interface ProyectoDetalleDTO {
   roles: RolProyectoDTO[];
   hitos: HitoDTO[];
   tareas?: TareaDTO[];
+  revisiones?: UltimaRevisionDTO[];
 }

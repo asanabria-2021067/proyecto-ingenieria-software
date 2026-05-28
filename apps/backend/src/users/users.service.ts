@@ -33,11 +33,15 @@ export class UsersService {
           include: { cualidad: true },
         },
         experiencias: true,
+        rolesAcceso: {
+          include: { rolAcceso: true },
+        },
       },
     });
 
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    return user;
+    const roles = user.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil);
+    return { ...user, roles };
   }
 
   /**
@@ -326,6 +330,23 @@ export class UsersService {
         rolDesempenado: dto.rolDesempenado,
         tipoExperiencia: dto.tipoExperiencia ?? TipoExperiencia.OTRO,
       },
+    });
+  }
+
+  async replaceExperiencias(userId: number, experiencias: CreateExperienciaDto[]) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.experienciaPrevia.deleteMany({ where: { idUsuario: userId } });
+      if (experiencias.length > 0) {
+        await tx.experienciaPrevia.createMany({
+          data: experiencias.map((e) => ({
+            idUsuario: userId,
+            tituloProyectoExperiencia: e.tituloProyectoExperiencia,
+            rolDesempenado: e.rolDesempenado,
+            tipoExperiencia: e.tipoExperiencia ?? TipoExperiencia.OTRO,
+          })),
+        });
+      }
+      return { count: experiencias.length };
     });
   }
 

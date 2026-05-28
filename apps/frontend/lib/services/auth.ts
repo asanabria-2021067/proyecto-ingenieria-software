@@ -7,6 +7,7 @@ export interface LoginPayload {
 
 export interface LoginResponse {
   accessToken: string;
+  refreshToken: string;
 }
 
 export interface RegisterPayload {
@@ -30,5 +31,26 @@ export async function register(payload: RegisterPayload): Promise<LoginResponse>
   return apiFetch<LoginResponse>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export async function forgotPassword(correo: string): Promise<{ mensaje: string }> {
+  return apiFetch<{ mensaje: string }>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ correo }),
+  });
+}
+
+export async function resetPassword(token: string, nuevaContrasena: string): Promise<{ mensaje: string }> {
+  return apiFetch<{ mensaje: string }>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, nuevaContrasena }),
+  });
+}
+
+export async function refreshAccessToken(refreshToken: string): Promise<LoginResponse> {
+  return apiFetch<LoginResponse>('/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken }),
   });
 }
