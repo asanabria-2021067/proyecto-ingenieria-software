@@ -27,14 +27,14 @@ import {
 } from '@/components/ui/select';
 
 const ESTADO_STYLES: Record<string, string> = {
-  PUBLICADO: 'bg-[#006735] text-white',
-  EN_PROGRESO: 'bg-[#416900] text-white',
-  BORRADOR: 'bg-gray-100 text-gray-600',
-  EN_REVISION: 'bg-blue-100 text-blue-700',
-  OBSERVADO: 'bg-amber-100 text-amber-700',
-  EN_SOLICITUD_CIERRE: 'bg-purple-100 text-purple-700',
-  CERRADO: 'bg-gray-200 text-gray-500',
-  CANCELADO: 'bg-red-100 text-red-700',
+  PUBLICADO: 'bg-primary text-on-primary dark:bg-primary dark:text-on-primary',
+  EN_PROGRESO: 'bg-secondary text-on-secondary dark:bg-secondary dark:text-on-secondary',
+  BORRADOR: 'bg-surface-container-high text-on-surface-variant dark:bg-surface-container-highest dark:text-on-surface-variant',
+  EN_REVISION: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  OBSERVADO: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  EN_SOLICITUD_CIERRE: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+  CERRADO: 'bg-surface-container-highest text-on-surface-variant dark:bg-surface-container-highest dark:text-on-surface-variant',
+  CANCELADO: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 };
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -67,7 +67,9 @@ export default function MyProjectsPage() {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#dc2626',
+      customClass: {
+        confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md',
+      },
     });
 
     if (result.isConfirmed) {
