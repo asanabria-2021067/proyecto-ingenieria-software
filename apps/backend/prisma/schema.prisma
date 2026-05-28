@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 
@@ -429,6 +430,7 @@ model RevisionProyecto {
   idRevisor          Int?                   @map("id_revisor")
   estadoRevision     EstadoRevisionProyecto @default(PENDIENTE) @map("estado_revision")
   comentarioRevision String?                @map("comentario_revision") @db.Text
+  snapshotProyecto   Json?                  @map("snapshot_proyecto")
   numeroEnvio        Int                    @map("numero_envio")
   enviadaEn          DateTime               @default(now()) @map("enviada_en")
   revisadaEn         DateTime?              @map("revisada_en")
@@ -514,6 +516,9 @@ model Postulacion {
   rolProyecto     RolProyecto             @relation(fields: [idRolProyecto], references: [idRolProyecto])
   participaciones ParticipacionProyecto[]
 
+  @@index([idUsuarioPostulante, idRolProyecto])
+  @@index([estadoPostulacion])
+  @@index([idRolProyecto, estadoPostulacion])
   @@map("postulacion")
 }
 
@@ -532,6 +537,8 @@ model ParticipacionProyecto {
   registrosHoras HorasParticipacion[]
   certificados   Certificado[]
 
+  @@index([idRolProyecto, estadoParticipacion])
+  @@index([idUsuario, estadoParticipacion])
   @@map("participacion_proyecto")
 }
 
@@ -665,6 +672,9 @@ model Notificacion {
 
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
 
+  @@index([idUsuario, leidaEn])
+  @@index([idUsuario, creadaEn])
+  @@index([tipoNotificacion])
   @@map("notificacion")
 }
 
