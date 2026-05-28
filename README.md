@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Estado-Produccion-green?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Corte-3%20de%203-blue?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Sprint-3%20Completado-success?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Sprint-4%20Completado-success?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Metodologia-Design%20Thinking%20%2B%20Scrum-purple?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Universidad-UVG-green?style=for-the-badge" />
 </p>
@@ -49,6 +49,7 @@ Plataforma para centralizar proyectos extracurriculares y de investigacion en UV
 - [x] Sprint 1 completado
 - [x] Sprint 2 completado
 - [x] Sprint 3 completado
+- [x] Sprint 4 completado
 
 ### Avance funcional implementado
 
@@ -65,6 +66,8 @@ Backend (NestJS + Prisma):
 - Sistema de auditoria (BitacoraAuditoria)
 - Cache con Redis para optimizacion de queries
 - Rate limiting y validacion global
+- Administracion (`/admin`): estadisticas de plataforma, gestion de usuarios, detalle de usuario
+- Snapshot de estado en revisiones de proyecto
 
 Frontend (Next.js):
 
@@ -72,12 +75,18 @@ Frontend (Next.js):
 - Login, registro (con auto-generacion de correo institucional) y recuperacion de contrasena
 - Dashboard general
 - Mis proyectos, proyectos publicados y detalle de proyecto
-- Flujo de postulacion por rol
+- Flujo de postulacion por rol con verificacion de estado activo
 - Mis postulaciones (con opcion de cancelar)
-- Perfil de usuario
-- Vista de revisiones para admin
+- Perfil de usuario y vista de perfil especifica para admin
+- Vista de revisiones para admin (por secciones, con feedback)
 - Notificaciones en tiempo real con WebSocket
 - Vista de equipo de proyecto
+- Panel de administracion: dashboard, gestion de usuarios, drawer de detalle, metricas
+- Historial de revisiones con snapshots e inbox de admin
+- Modo edicion inline con visibilidad de feedback en revisiones
+- Filtro de proyectos por organizacion
+- Dark mode completo (SweetAlert2, Microsoft login button)
+- SweetAlert2 configurado globalmente
 
 ---
 
@@ -125,7 +134,9 @@ proyecto-ingenieria-software
 ├─ Avances 2/
 ├─ Scrum/
 │  ├─ Sprint 1/
-│  └─ Sprint 2/
+│  ├─ Sprint 2/
+│  ├─ Sprint 3/
+│  └─ Sprint 4/
 ├─ docker-compose.yml
 ├─ docker-compose.dev.yml
 ├─ .env.example
@@ -316,21 +327,24 @@ Todos usan la misma contrasena: `Test1234!`
 | Documento colaborativo Sprint 2 | [SharePoint](https://uvggt-my.sharepoint.com/:w:/g/personal/cor24732_uvg_edu_gt/IQDXGK22EE8LQJGk14JsesC1Adyou9bIyMeo2zArJsTgB34?e=7EaqDO) |
 | Informe Sprint 3 | [Ver PDF](Scrum/Sprint%203/informe/Sprint%203%20Software.pdf) |
 | Documento colaborativo Sprint 3 | [SharePoint](https://uvggt-my.sharepoint.com/:w:/g/personal/cor24732_uvg_edu_gt/IQDXGK22EE8LQJGk14JsesC1Adyou9bIyMeo2zArJsTgB34?e=7EaqDO) |
+| Documento colaborativo Sprint 4 | [SharePoint](https://uvggt-my.sharepoint.com/:w:/g/personal/cor24732_uvg_edu_gt/IQAWeb72X0lWQrc8plgabvJcATBowOuqNXGhBFK1Up3c7X4?e=Uo8pkt) |
+| Documento Integrador | [SharePoint](https://uvggt-my.sharepoint.com/:w:/g/personal/cor24732_uvg_edu_gt/IQASzLTj192pQZTdhj_6kMggAWaP86cQI14ebOm3qI272sE?e=FgXHLa) |
 | LOGT Sprint 1 | [Ver carpeta](Scrum/Sprint%201/gestion_tiempo/) |
 | LOGT Sprint 2 | [Ver carpeta](Scrum/Sprint%202/gestion_tiempo/) |
 | LOGT Sprint 3 | [Ver carpeta](Scrum/Sprint%203/gestion_tiempo/) |
+| LOGT Sprint 4 | [Ver carpeta](Scrum/Sprint%204/gestion_tiempo/) |
 
 ---
 
-## Caracteristicas Avanzadas (Sprint 3)
+## Caracteristicas Avanzadas
 
-### Notificaciones en Tiempo Real
+### Notificaciones en Tiempo Real (Sprint 3)
 - WebSocket gateway con autenticacion JWT
 - Notificaciones instantaneas al crear postulaciones
 - Sistema de templates para mensajes consistentes
 - Soporte para multiples tipos de notificaciones
 
-### Optimizaciones de Performance
+### Optimizaciones de Performance (Sprint 3)
 - Indexes en base de datos para queries frecuentes
 - Cache con Redis (TTL 5-10 min)
 - Query optimization (eliminacion de N+1)
@@ -346,6 +360,25 @@ Todos usan la misma contrasena: `Test1234!`
 - Formato: `{3 letras apellido}{carnet}@uvg.edu.gt`
 - Generacion automatica al ingresar apellido + carnet
 - Visual feedback con indicador verde
+
+### Panel de Administracion (Sprint 4)
+- Dashboard con metricas de plataforma (usuarios, proyectos, postulaciones)
+- Gestion de usuarios con drawer de detalle
+- Vista de revision de proyectos por secciones con feedback granular
+- Historial de revisiones con snapshots de estado
+- Inbox de revisiones pendientes para admins
+- Perfil especifico para rol admin
+
+### CI/CD y Despliegue (Sprint 4)
+- GitHub Actions workflow para build y push de imagenes Docker
+- Deploy automatizado a Azure VM via SSH
+- Pipeline separado para backend y frontend
+
+### Mejoras UX (Sprint 4)
+- Dark mode completo: SweetAlert2, Microsoft login button, selects
+- Modo edicion inline con visibilidad de feedback en revisiones propias
+- Filtro de proyectos por organizacion
+- Verificacion de estado activo de postulacion al aplicar por rol
 
 ---
 
