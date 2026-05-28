@@ -11,7 +11,7 @@ export default function OrganizationsSection() {
   return (
     <section
       id="organizaciones"
-      className="min-h-[102svh] scroll-mt-32 bg-on-primary-fixed px-4 py-24 text-on-primary sm:px-6 md:min-h-[112svh] md:py-32 lg:px-8"
+      className="min-h-[102svh] scroll-mt-32 bg-on-primary-fixed dark:bg-[#00210d] px-4 py-24 text-on-primary dark:text-white sm:px-6 md:min-h-[112svh] md:py-32 lg:px-8"
     >
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-16 lg:flex-row">
         <div className="space-y-8 lg:w-1/2">
@@ -21,7 +21,7 @@ export default function OrganizationsSection() {
           <h2 className="font-headline text-4xl font-extrabold leading-tight md:text-5xl">
             Organizaciones: tu equipo, tus proyectos
           </h2>
-          <p className="text-lg leading-relaxed text-surface-variant opacity-80">
+          <p className="text-lg leading-relaxed text-surface-variant opacity-80 dark:text-slate-300">
             Creas una organizacion, agregas miembros y los proyectos que se creen dentro ya
             incluyen automaticamente a todo el equipo. Es ideal para asociaciones estudiantiles
             con un grupo fijo.
@@ -35,7 +35,7 @@ export default function OrganizationsSection() {
             ))}
           </ul>
           <div className="pt-4">
-            <button className="rounded-xl bg-secondary-fixed px-10 py-4 font-headline text-lg font-bold text-on-secondary-fixed shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:bg-secondary-fixed-dim hover:shadow-xl active:scale-95">
+            <button className="rounded-xl bg-secondary-fixed px-10 py-4 font-headline text-lg font-bold text-on-secondary-fixed dark:text-on-secondary shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:bg-secondary-fixed-dim hover:shadow-xl active:scale-95">
               Crear organizacion
             </button>
           </div>
