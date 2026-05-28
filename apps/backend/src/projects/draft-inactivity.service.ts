@@ -49,22 +49,28 @@ export class DraftInactivityService implements OnModuleInit {
               fechaActualizacion: now,
             },
           });
-          await this.notifications.notifyUsers([p.creadoPor], {
-            tipoNotificacion: 'PROYECTO_ACTUALIZADO',
-            tituloNotificacion: 'Proyecto cancelado por inactividad',
-            mensajeNotificacion: `Tu borrador "${p.tituloProyecto}" fue cancelado por inactividad.`,
-            datosJson: { idProyecto: p.idProyecto, razon: 'inactividad_21_dias' },
-          });
+          await this.notifications.notifyFromTemplate(
+            [p.creadoPor],
+            'PROYECTO_ACTUALIZADO',
+            {
+              projectTitle: p.tituloProyecto,
+              projectId: p.idProyecto,
+              reason: 'draft_inactivity_cancelled',
+            },
+          );
           continue;
         }
 
         if (ageDays >= 14 && ageDays < 15) {
-          await this.notifications.notifyUsers([p.creadoPor], {
-            tipoNotificacion: 'PROYECTO_ADVERTENCIA_INACTIVIDAD',
-            tituloNotificacion: 'Borrador inactivo',
-            mensajeNotificacion: `Tu borrador "${p.tituloProyecto}" lleva más de 14 días sin actividad.`,
-            datosJson: { idProyecto: p.idProyecto, diasInactividad: ageDays },
-          });
+          await this.notifications.notifyFromTemplate(
+            [p.creadoPor],
+            'PROYECTO_ADVERTENCIA_INACTIVIDAD',
+            {
+              projectTitle: p.tituloProyecto,
+              projectId: p.idProyecto,
+              diasInactividad: ageDays,
+            },
+          );
         }
       }
     } catch (error) {

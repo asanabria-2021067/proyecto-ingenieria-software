@@ -1,6 +1,28 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '/api';
 
+function getApiUrl(): string {
+  if (typeof window === 'undefined' || !API_URL) {
+    return API_URL;
+  }
+
+  try {
+    const configuredUrl = new URL(API_URL);
+    const isLocalApiHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(
+      configuredUrl.hostname,
+    );
+    const isLocalPageHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+    if (isLocalApiHost && !isLocalPageHost) {
+      return '';
+    }
+  } catch {
+    return API_URL;
+  }
+
+  return API_URL;
+}
+
 function joinUrl(base: string, prefix: string, path: string): string {
   const normalizedBase = base.replace(/\/$/, '');
   const normalizedPrefix = prefix.startsWith('/') ? prefix : `/${prefix}`;
@@ -14,7 +36,7 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(joinUrl(API_URL, API_PREFIX, path), {
+  const res = await fetch(joinUrl(getApiUrl(), API_PREFIX, path), {
     ...options,
     headers: {
       'Content-Type': 'application/json',

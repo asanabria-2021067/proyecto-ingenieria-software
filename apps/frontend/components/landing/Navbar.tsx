@@ -4,7 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
-import logo from '@/public/Logo UVG-08.png';
+import { ThemeToggle } from '@/components/theme-toggle';
+import logoLight from '@/public/Logo UVG-08.png';
+import logoDark from '@/public/Logo claro.png';
 
 const navLinks = [
   { label: 'El Problema', href: '#el-problema' },
@@ -47,7 +49,8 @@ export default function Navbar() {
           }`}
         >
           <div className="flex items-center gap-8">
-            <Image src={logo} alt="UVG Scholar" className="h-8 w-auto brightness-0 sm:h-9" />
+            <Image src={logoLight} alt="UVG Scholar" className="h-8 w-auto brightness-0 sm:h-9 dark:hidden" />
+            <Image src={logoDark} alt="UVG Scholar" className="h-8 w-auto sm:h-9 hidden dark:block" />
             <div className="hidden gap-6 md:flex">
               {navLinks.map((link) => (
                 <a
@@ -73,15 +76,19 @@ export default function Navbar() {
             >
               Registrarse
             </Link>
+            <ThemeToggle />
           </div>
-          <button
-            type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-on-surface md:hidden"
-            onClick={() => setMenuOpen((prev) => !prev)}
-            aria-label="Abrir menu"
-          >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex md:hidden items-center gap-2">
+            <ThemeToggle />
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-on-surface"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="Abrir menu"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
         {menuOpen && (
           <div className="mt-2 rounded-2xl border border-white/25 bg-white/15 p-4 shadow-lg backdrop-blur-xl md:hidden">
