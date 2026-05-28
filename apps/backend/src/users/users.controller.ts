@@ -91,6 +91,14 @@ export class UsersController {
     return this.usersService.addExperiencia(user.userId, dto);
   }
 
+  @Put('me/experiencias')
+  replaceExperiencias(
+    @CurrentUser() user: { userId: number },
+    @Body() dto: { experiencias: CreateExperienciaDto[] },
+  ) {
+    return this.usersService.replaceExperiencias(user.userId, dto.experiencias);
+  }
+
   @Get('me/dashboard')
   getDashboard(@CurrentUser() user: { userId: number }) {
     return this.usersService.getDashboard(user.userId);

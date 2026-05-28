@@ -1,13 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Search, MapPin, Plus } from 'lucide-react';
+import { AlertCircle, FolderPlus, MapPin, Pencil, Plus, Search, SearchX, Trash2 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { getMyProjects } from '@/lib/services/projects';
+import { getMyProjects, deleteProject } from '@/lib/services/projects';
 import { TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
+import uvgSwal from '@/lib/swal';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptySteps,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import {
   Select,
   SelectContent,
@@ -17,14 +27,14 @@ import {
 } from '@/components/ui/select';
 
 const ESTADO_STYLES: Record<string, string> = {
-  PUBLICADO: 'bg-[#006735] text-white',
-  EN_PROGRESO: 'bg-[#416900] text-white',
-  BORRADOR: 'bg-gray-100 text-gray-600',
-  EN_REVISION: 'bg-blue-100 text-blue-700',
-  OBSERVADO: 'bg-amber-100 text-amber-700',
-  EN_SOLICITUD_CIERRE: 'bg-purple-100 text-purple-700',
-  CERRADO: 'bg-gray-200 text-gray-500',
-  CANCELADO: 'bg-red-100 text-red-700',
+  PUBLICADO: 'bg-primary text-on-primary dark:bg-primary dark:text-on-primary',
+  EN_PROGRESO: 'bg-secondary text-on-secondary dark:bg-secondary dark:text-on-secondary',
+  BORRADOR: 'bg-surface-container-high text-on-surface-variant dark:bg-surface-container-highest dark:text-on-surface-variant',
+  EN_REVISION: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  OBSERVADO: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  EN_SOLICITUD_CIERRE: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+  CERRADO: 'bg-surface-container-highest text-on-surface-variant dark:bg-surface-container-highest dark:text-on-surface-variant',
+  CANCELADO: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 };
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -39,14 +49,49 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 export default function MyProjectsPage() {
+  const queryClient = useQueryClient();
   const [busqueda, setBusqueda] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
 
-  const { data: proyectos = [], isLoading, isError } = useQuery<MiProyectoListItemDTO[]>({
+  const { data: proyectos = [], isLoading, isError, refetch } = useQuery<MiProyectoListItemDTO[]>({
     queryKey: ['mis-proyectos'],
     queryFn: () => getMyProjects(),
   });
+
+  async function handleDelete(proyecto: MiProyectoListItemDTO) {
+    const result = await uvgSwal.fire({
+      icon: 'warning',
+      title: 'Eliminar proyecto',
+      html: `¿Estás seguro que deseas eliminar <strong>${proyecto.tituloProyecto}</strong>?<br/><br/>Esta acción no se puede deshacer.`,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md',
+      },
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await deleteProject(proyecto.idProyecto);
+        await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
+        await uvgSwal.fire({
+          icon: 'success',
+          title: 'Proyecto eliminado',
+          text: 'El proyecto ha sido eliminado correctamente',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } catch (err) {
+        uvgSwal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: err instanceof Error ? err.message : 'No se pudo eliminar el proyecto',
+        });
+      }
+    }
+  }
 
   const filtrados = proyectos.filter((p) => {
     const matchBusqueda =
@@ -57,6 +102,7 @@ export default function MyProjectsPage() {
     const matchEstado = !estadoFiltro || p.estadoProyecto === estadoFiltro;
     return matchBusqueda && matchTipo && matchEstado;
   });
+  const hasActiveFilters = Boolean(busqueda || tipoFiltro || estadoFiltro);
 
   return (
     <DashboardLayout>
@@ -84,6 +130,7 @@ export default function MyProjectsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-tertiary" />
             <input
               type="text"
+              aria-label="Buscar mis proyectos por titulo o descripcion"
               placeholder="Buscar proyectos..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
@@ -91,7 +138,10 @@ export default function MyProjectsPage() {
             />
           </div>
           <Select value={tipoFiltro || '__ALL__'} onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}>
-            <SelectTrigger className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+            <SelectTrigger
+              aria-label="Filtrar mis proyectos por tipo"
+              className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-9999">
@@ -103,7 +153,10 @@ export default function MyProjectsPage() {
           </Select>
 
           <Select value={estadoFiltro || '__ALL__'} onValueChange={(v) => setEstadoFiltro(v === '__ALL__' ? '' : v)}>
-            <SelectTrigger className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+            <SelectTrigger
+              aria-label="Filtrar mis proyectos por estado"
+              className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-9999">
@@ -116,31 +169,95 @@ export default function MyProjectsPage() {
         </div>
 
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">Cargando proyectos...</div>
+          <div className="text-center py-16 text-tertiary text-sm" role="status">Cargando proyectos...</div>
         )}
         {isError && (
-          <div className="text-center py-16 text-error text-sm">
-            No se pudieron cargar tus proyectos.
-          </div>
+          <Empty tone="danger" className="surface-enter" role="alert">
+            <EmptyMedia variant="icon">
+              <AlertCircle aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No se pudieron cargar tus proyectos</EmptyTitle>
+              <EmptyDescription>
+                Intenta nuevamente para revisar el estado de tus propuestas y borradores.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Reintentar
+              </button>
+            </EmptyContent>
+          </Empty>
         )}
 
         {!isLoading && !isError && proyectos.length === 0 && (
-          <div className="text-center py-16 text-tertiary text-sm">
-            No tienes aún proyectos propios.
-          </div>
+          <Empty className="surface-enter" aria-live="polite">
+            <EmptyMedia variant="icon">
+              <FolderPlus aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>Convierte una idea en proyecto</EmptyTitle>
+              <EmptyDescription>
+                Crea una propuesta, define roles y enviala a revision para que otros estudiantes puedan sumarse.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptySteps />
+            <EmptyContent>
+              <Link
+                href="/dashboard/projects/mine/form"
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Crear proyecto
+              </Link>
+              <Link
+                href="/dashboard/proyectos"
+                className="inline-flex items-center justify-center rounded-xl border border-outline-variant bg-surface-container-lowest px-5 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-container"
+              >
+                Explorar ideas
+              </Link>
+            </EmptyContent>
+          </Empty>
         )}
 
         {!isLoading && !isError && proyectos.length > 0 && filtrados.length === 0 && (
-          <div className="text-center py-16 text-tertiary text-sm">
-            No se encontraron proyectos con los filtros aplicados.
-          </div>
+          <Empty tone="muted" className="surface-enter" aria-live="polite">
+            <EmptyMedia variant="icon">
+              <SearchX aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No hay proyectos con esos filtros</EmptyTitle>
+              <EmptyDescription>
+                Limpia los filtros para volver a ver todos tus proyectos y continuar gestionandolos.
+              </EmptyDescription>
+            </EmptyHeader>
+            {hasActiveFilters && (
+              <EmptyContent>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBusqueda('');
+                    setTipoFiltro('');
+                    setEstadoFiltro('');
+                  }}
+                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                >
+                  Limpiar filtros
+                </button>
+              </EmptyContent>
+            )}
+          </Empty>
         )}
 
         <div className="grid gap-5 md:grid-cols-2">
-          {filtrados.map((proyecto) => (
+          {filtrados.map((proyecto, index) => (
             <div
               key={proyecto.idProyecto}
-              className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 flex flex-col gap-4 hover:shadow-md transition-all duration-200"
+              className="surface-enter interactive-lift bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 flex flex-col gap-4 hover:shadow-md focus-within:ring-2 focus-within:ring-primary/30"
+              style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
             >
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-headline font-bold text-on-surface text-lg leading-tight min-w-0">
@@ -181,28 +298,60 @@ export default function MyProjectsPage() {
                 </p>
               )}
 
-              {proyecto.estadoProyecto === 'BORRADOR' ? (
-                <Link
-                  href={`/dashboard/projects/mine/form?id=${proyecto.idProyecto}`}
-                  className="mt-auto inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
-                >
-                  Seguir editando Proyecto
-                </Link>
-              ) : proyecto.estadoProyecto === 'EN_REVISION' ? (
-                <button
-                  disabled
-                  className="mt-auto inline-flex items-center justify-center bg-surface-container-highest text-tertiary px-5 py-2.5 rounded-xl text-sm font-bold cursor-not-allowed opacity-70"
-                >
-                  Espera de Retroalimentación
-                </button>
-              ) : (
-                <Link
-                  href={`/dashboard/projects/${proyecto.idProyecto}`}
-                  className="mt-auto inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
-                >
-                  Ver Proyecto
-                </Link>
-              )}
+              <div className="mt-auto flex items-center gap-2">
+                {proyecto.estadoProyecto === 'BORRADOR' ? (
+                  <>
+                    <Link
+                      href={`/dashboard/projects/mine/form?id=${proyecto.idProyecto}`}
+                      className="flex-1 inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
+                    >
+                      Seguir editando Proyecto
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(proyecto)}
+                      aria-label={`Eliminar proyecto ${proyecto.tituloProyecto}`}
+                      className="inline-flex items-center justify-center bg-error text-on-error p-2.5 rounded-xl hover:bg-error/90 active:scale-95 transition-all duration-200"
+                      title="Eliminar proyecto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : proyecto.estadoProyecto === 'EN_REVISION' ? (
+                  <Link
+                    href={`/dashboard/projects/mine/${proyecto.idProyecto}`}
+                    className="flex-1 inline-flex items-center justify-center bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-surface-container-highest transition-all duration-200"
+                  >
+                    Ver mi solicitud
+                  </Link>
+                ) : proyecto.estadoProyecto === 'OBSERVADO' ? (
+                  <>
+                    <Link
+                      href={`/dashboard/projects/mine/${proyecto.idProyecto}?edit=true`}
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-amber-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-700 active:scale-95 transition-all duration-200"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      Editar
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(proyecto)}
+                      aria-label={`Eliminar proyecto ${proyecto.tituloProyecto}`}
+                      className="inline-flex items-center justify-center bg-error text-on-error p-2.5 rounded-xl hover:bg-error/90 active:scale-95 transition-all duration-200"
+                      title="Eliminar proyecto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    href={`/dashboard/projects/${proyecto.idProyecto}`}
+                    className="flex-1 inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
+                  >
+                    Ver Proyecto
+                  </Link>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Clock, BookOpen, ChevronRight } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
-import { Proyecto, TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
+import { Postulacion, Proyecto, TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 
 export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -16,8 +16,24 @@ export default function ProyectoDetallePage() {
     queryFn: () => apiFetch(`/proyectos/${id}`),
   });
 
+  const {
+    data: misPostulaciones = [],
+    isLoading: isLoadingPostulaciones,
+  } = useQuery<Postulacion[]>({
+    queryKey: ['mis-postulaciones'],
+    queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
+  });
+
+  const postulacionActiva =
+    proyecto &&
+    misPostulaciones.find(
+      (p) =>
+        p.rolProyecto.proyecto.idProyecto === proyecto.idProyecto &&
+        p.estadoPostulacion !== 'RECHAZADA',
+    );
+
   return (
-    <DashboardLayout>
+    <DashboardLayout allowAdmin>
       <div className="px-8 py-8 max-w-4xl mx-auto">
         <Link
           href="/dashboard/proyectos"
@@ -108,6 +124,34 @@ export default function ProyectoDetallePage() {
                 Roles Disponibles ({proyecto.roles.length})
               </h2>
 
+              {isLoadingPostulaciones && (
+                <div className="mb-4 text-xs text-tertiary">
+                  Verificando tus postulaciones activas...
+                </div>
+              )}
+
+              {!isLoadingPostulaciones && postulacionActiva && (
+                <div className="mb-4 bg-surface-container-low border border-outline-variant rounded-2xl p-4">
+                  <p className="text-sm font-semibold text-on-surface">
+                    Ya registraste una postulación para este proyecto.
+                  </p>
+                  <p className="text-xs text-tertiary mt-1">
+                    Rol: {postulacionActiva.rolProyecto.nombreRol} · Estado:{' '}
+                    {postulacionActiva.estadoPostulacion === 'PENDIENTE'
+                      ? 'Pendiente'
+                      : postulacionActiva.estadoPostulacion === 'ACEPTADA'
+                      ? 'Aceptada'
+                      : 'Rechazada'}
+                  </p>
+                  <Link
+                    href="/dashboard/mis-postulaciones"
+                    className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary/10 transition-colors mt-3"
+                  >
+                    Ver mi postulación
+                  </Link>
+                </div>
+              )}
+
               <div className="space-y-4">
                 {proyecto.roles.map((rol) => (
                   <div
@@ -161,13 +205,23 @@ export default function ProyectoDetallePage() {
                       </div>
                     )}
 
-                    <Link
-                      href={`/dashboard/proyectos/${id}/postular/${rol.idRolProyecto}`}
-                      className="inline-flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all"
-                    >
-                      Postularme a este Rol
-                      <ChevronRight className="w-4 h-4" />
-                    </Link>
+                    {postulacionActiva ? (
+                      <Link
+                        href="/dashboard/mis-postulaciones"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-on-surface border border-outline-variant hover:bg-surface-container transition-all"
+                      >
+                        Ver postulación activa
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/dashboard/proyectos/${id}/postular/${rol.idRolProyecto}`}
+                        className="inline-flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all"
+                      >
+                        Postularme a este Rol
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>
