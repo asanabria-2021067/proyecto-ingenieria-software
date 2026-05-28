@@ -3,7 +3,10 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
@@ -14,6 +17,9 @@ import {
 } from './dto/update-estado-proyecto.dto';
 import { EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+
+const FEATURED_CACHE_KEY = 'projects:featured';
+const FEATURED_CACHE_TTL = 300_000;
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
   EstadoProyecto.PUBLICADO,
@@ -41,7 +47,7 @@ const proyectoListSelect = {
   intereses: {
     select: { interes: { select: { nombreInteres: true } } },
   },
-  roles: { select: { idRolProyecto: true } },
+  _count: { select: { roles: true } },
 } as const;
 
 const proyectoDetalleSelect = {
@@ -147,22 +153,21 @@ export class ProjectsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  async findAll(filters: {
+  private _buildListConditions(filters: {
     q?: string;
     tipoProyecto?: string;
     modalidad?: string;
     organizacionId?: number;
     habilidadId?: number;
-  } = {}) {
+  }): Prisma.ProyectoWhereInput[] {
     const { q, tipoProyecto, modalidad, organizacionId, habilidadId } = filters;
-
     const andConditions: Prisma.ProyectoWhereInput[] = [
       { estadoProyecto: { in: ESTADOS_VISIBLES } },
       { eliminadoEn: null },
     ];
-
     if (q && q.trim().length > 0) {
       andConditions.push({ tituloProyecto: { contains: q.trim(), mode: 'insensitive' } });
     }
@@ -180,13 +185,55 @@ export class ProjectsService {
         roles: { some: { requisitos: { some: { idHabilidad: habilidadId } } } },
       });
     }
+    return andConditions;
+  }
 
+  async findAll(filters: {
+    q?: string;
+    tipoProyecto?: string;
+    modalidad?: string;
+    organizacionId?: number;
+    habilidadId?: number;
+  } = {}) {
+    const andConditions = this._buildListConditions(filters);
     return this.prisma.proyecto.findMany({
       where: { AND: andConditions },
       select: proyectoListSelect,
       orderBy: { fechaCreacion: 'desc' },
       take: 20,
     });
+  }
+
+  async findAllPaginated(filters: {
+    q?: string;
+    tipoProyecto?: string;
+    modalidad?: string;
+    organizacionId?: number;
+    habilidadId?: number;
+    page: number;
+    limit: number;
+  }) {
+    const { page, limit } = filters;
+    const skip = (page - 1) * limit;
+    const andConditions = this._buildListConditions(filters);
+
+    const [data, total] = await Promise.all([
+      this.prisma.proyecto.findMany({
+        where: { AND: andConditions },
+        select: proyectoListSelect,
+        orderBy: { fechaCreacion: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.proyecto.count({ where: { AND: andConditions } }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: number) {
@@ -204,10 +251,39 @@ export class ProjectsService {
     return proyecto;
   }
 
-  async findOneOwner(id: number, userId: number) {
+  async findOneAdmin(id: number, adminId: number) {
+    const isAdmin = await this.notifications.isAdmin(adminId);
+    if (!isAdmin) {
+      throw new ForbiddenException('Se requieren permisos de administrador');
+    }
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
       select: proyectoDetalleSelect,
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
+    }
+    return proyecto;
+  }
+
+  async findOneOwner(id: number, userId: number) {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: { idProyecto: id, eliminadoEn: null },
+      select: {
+        ...proyectoDetalleSelect,
+        revisiones: {
+          select: {
+            idRevisionProyecto: true,
+            estadoRevision: true,
+            comentarioRevision: true,
+            numeroEnvio: true,
+            enviadaEn: true,
+            revisadaEn: true,
+          },
+          orderBy: { enviadaEn: 'desc' as const },
+          take: 1,
+        },
+      },
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
@@ -296,63 +372,42 @@ export class ProjectsService {
   }
 
   async findTeam(id: number) {
-    const proyecto = await this.prisma.proyecto.findFirst({
-      where: { idProyecto: id, eliminadoEn: null },
-      select: { idProyecto: true },
-    });
-    if (!proyecto) {
-      throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
-    }
-
-    const participaciones = await this.prisma.participacionProyecto.findMany({
+    return this.prisma.participacionProyecto.findMany({
       where: {
         rolProyecto: { idProyecto: id },
         estadoParticipacion: 'ACTIVO',
       },
       select: {
         idParticipacion: true,
+        estadoParticipacion: true,
         fechaIngreso: true,
-        rolProyecto: {
-          select: {
-            idRolProyecto: true,
-            nombreRol: true,
-          },
-        },
         usuario: {
           select: {
             idUsuario: true,
             nombre: true,
             apellido: true,
             correo: true,
-            perfil: {
-              select: {
-                carrera: {
-                  select: {
-                    nombreCarrera: true,
-                  },
-                },
-              },
-            },
-            habilidades: {
-              select: {
-                habilidad: {
-                  select: {
-                    idHabilidad: true,
-                    nombreHabilidad: true,
-                  },
-                },
-              },
-            },
+            fotoUrl: true,
+          },
+        },
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
           },
         },
       },
-      orderBy: { fechaIngreso: 'asc' },
+      orderBy: {
+        fechaIngreso: 'asc',
+      },
     });
-
-    return participaciones;
   }
 
   async findFeatured() {
+    const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
+    if (cached) return cached;
+
     const proyectos = await this.prisma.proyecto.findMany({
       where: {
         estadoProyecto: EstadoProyecto.PUBLICADO,
@@ -372,7 +427,12 @@ export class ProjectsService {
       take: 6,
     });
 
+    await this.cacheManager.set(FEATURED_CACHE_KEY, proyectos, FEATURED_CACHE_TTL).catch(() => {});
     return proyectos;
+  }
+
+  private async _invalidateFeaturedCache(): Promise<void> {
+    await this.cacheManager.del(FEATURED_CACHE_KEY).catch(() => {});
   }
 
   async createFull(data: CreateProjectFullDto, creadoPor: number) {
@@ -418,13 +478,14 @@ export class ProjectsService {
       });
 
       if (accion === 'EN_REVISION') {
-        await this._crearRevisionPendiente(tx, proyecto.idProyecto, 1);
-        await this.notifications.notifyAdmins(
+        const snapshot = await this._buildProjectSnapshot(tx, proyecto.idProyecto);
+        await this._crearRevisionPendiente(tx, proyecto.idProyecto, 1, snapshot);
+        await this.notifications.notifyAdminsFromTemplate(
+          'PROYECTO_EN_REVISION',
           {
-            tipoNotificacion: 'PROYECTO_EN_REVISION',
-            tituloNotificacion: 'Proyecto enviado a revisión',
-            mensajeNotificacion: `El proyecto "${proyecto.tituloProyecto}" fue enviado a revisión.`,
-            datosJson: { idProyecto: proyecto.idProyecto, numeroEnvio: 1 },
+            projectTitle: proyecto.tituloProyecto,
+            projectId: proyecto.idProyecto,
+            numeroEnvio: 1,
           },
           tx,
         );
@@ -594,17 +655,18 @@ export class ProjectsService {
       where: { idProyecto: id },
     });
     return this.prisma.$transaction(async (tx) => {
+      const snapshot = await this._buildProjectSnapshot(tx, id);
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
-      await this._crearRevisionPendiente(tx, id, totalEnvios + 1);
-      await this.notifications.notifyAdmins(
+      await this._crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
+      await this.notifications.notifyAdminsFromTemplate(
+        'PROYECTO_EN_REVISION',
         {
-          tipoNotificacion: 'PROYECTO_EN_REVISION',
-          tituloNotificacion: 'Proyecto enviado a revisión',
-          mensajeNotificacion: `Se recibió un nuevo envío a revisión (round ${totalEnvios + 1}).`,
-          datosJson: { idProyecto: id, numeroEnvio: totalEnvios + 1 },
+          projectTitle: proyecto.tituloProyecto,
+          projectId: id,
+          numeroEnvio: totalEnvios + 1,
         },
         tx,
       );
@@ -623,17 +685,19 @@ export class ProjectsService {
       where: { idProyecto: id },
     });
     return this.prisma.$transaction(async (tx) => {
+      const snapshot = await this._buildProjectSnapshot(tx, id);
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
-      await this._crearRevisionPendiente(tx, id, totalEnvios + 1);
-      await this.notifications.notifyAdmins(
+      await this._crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
+      await this.notifications.notifyAdminsFromTemplate(
+        'PROYECTO_EN_REVISION',
         {
-          tipoNotificacion: 'PROYECTO_EN_REVISION',
-          tituloNotificacion: 'Proyecto reenviado a revisión',
-          mensajeNotificacion: `El proyecto ${id} fue reenviado a revisión (round ${totalEnvios + 1}).`,
-          datosJson: { idProyecto: id, numeroEnvio: totalEnvios + 1 },
+          projectTitle: proyecto.tituloProyecto,
+          projectId: id,
+          numeroEnvio: totalEnvios + 1,
+          isResubmission: true,
         },
         tx,
       );
@@ -657,12 +721,11 @@ export class ProjectsService {
         },
         select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
       });
-      await this.notifications.notifyAdmins(
+      await this.notifications.notifyAdminsFromTemplate(
+        'SOLICITUD_CIERRE_PROYECTO',
         {
-          tipoNotificacion: 'SOLICITUD_CIERRE_PROYECTO',
-          tituloNotificacion: 'Solicitud de cierre de proyecto',
-          mensajeNotificacion: `El líder solicitó cierre para "${actualizado.tituloProyecto}".`,
-          datosJson: { idProyecto: id },
+          projectTitle: actualizado.tituloProyecto,
+          projectId: id,
         },
         tx,
       );
@@ -713,13 +776,12 @@ export class ProjectsService {
       const destinatarios = Array.from(
         new Set([proyecto.creadoPor, ...participantes.map((p) => p.idUsuario)]),
       );
-      await this.notifications.notifyUsers(
+      await this.notifications.notifyFromTemplate(
         destinatarios,
+        'CIERRE_APROBADO',
         {
-          tipoNotificacion: 'CIERRE_APROBADO',
-          tituloNotificacion: 'Cierre de proyecto aprobado',
-          mensajeNotificacion: `El cierre administrativo de "${proyecto.tituloProyecto}" fue aprobado.`,
-          datosJson: { idProyecto: id },
+          projectTitle: proyecto.tituloProyecto,
+          projectId: id,
         },
         tx,
       );
@@ -747,13 +809,12 @@ export class ProjectsService {
           fechaActualizacion: new Date(),
         },
       });
-      await this.notifications.notifyUsers(
+      await this.notifications.notifyFromTemplate(
         [proyecto.creadoPor],
+        'CIERRE_RECHAZADO',
         {
-          tipoNotificacion: 'CIERRE_RECHAZADO',
-          tituloNotificacion: 'Cierre de proyecto rechazado',
-          mensajeNotificacion: `La solicitud de cierre de "${proyecto.tituloProyecto}" fue rechazada.`,
-          datosJson: { idProyecto: id },
+          projectTitle: proyecto.tituloProyecto,
+          projectId: id,
         },
         tx,
       );
@@ -773,6 +834,8 @@ export class ProjectsService {
         `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
       );
     }
+    const estadoAnterior = proyecto.estadoProyecto;
+
     const actualizado = await this.prisma.proyecto.update({
       where: { idProyecto: id },
       data: {
@@ -785,22 +848,59 @@ export class ProjectsService {
       select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
     });
 
-    // Notificar a miembros activos sobre cambios de estado relevantes
+    const templateData = {
+      projectTitle: actualizado.tituloProyecto,
+      projectId: actualizado.idProyecto,
+      oldStatus: estadoAnterior,
+      newStatus: actualizado.estadoProyecto,
+    } as const;
+
+    await this.notifications.notifyFromTemplate(
+      [proyecto.creadoPor],
+      'CAMBIO_ESTADO_PROYECTO',
+      templateData,
+    );
+
     if (
       nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
       nuevoEstado === EstadoProyectoCreador.EN_PROGRESO ||
       nuevoEstado === EstadoProyectoCreador.CERRADO
     ) {
-      await this.notifications.notifyProjectActiveParticipants(
-        id,
-        userId,
+      const participaciones = await this.prisma.participacionProyecto.findMany({
+        where: {
+          estadoParticipacion: 'ACTIVO',
+          idUsuario: { notIn: [userId, proyecto.creadoPor] },
+          rolProyecto: { idProyecto: id },
+        },
+        distinct: ['idUsuario'],
+        select: { idUsuario: true },
+      });
+      const destinatarios = participaciones.map((p) => p.idUsuario);
+      if (destinatarios.length) {
+        await this.notifications.notifyFromTemplate(
+          destinatarios,
+          'CAMBIO_ESTADO_PROYECTO',
+          templateData,
+        );
+      }
+    }
+
+    if (nuevoEstado === EstadoProyectoCreador.PUBLICADO) {
+      await this.notifications.notifyFromTemplate(
+        [proyecto.creadoPor],
+        'PROYECTO_PUBLICADO',
         {
-          tipoNotificacion: 'CAMBIO_ESTADO_PROYECTO',
-          tituloNotificacion: `Proyecto cambió a ${nuevoEstado}`,
-          mensajeNotificacion: `El proyecto "${actualizado.tituloProyecto}" cambió su estado a ${nuevoEstado}.`,
-          datosJson: { idProyecto: id, nuevoEstado },
+          projectTitle: actualizado.tituloProyecto,
+          projectId: actualizado.idProyecto,
         },
       );
+    }
+
+    if (
+      nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
+      estadoAnterior === EstadoProyecto.PUBLICADO
+    ) {
+      await this._invalidateFeaturedCache();
     }
 
     return actualizado;
@@ -809,7 +909,7 @@ export class ProjectsService {
   private async _requireOwner(idProyecto: number, userId: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
-      select: { idProyecto: true, estadoProyecto: true, creadoPor: true },
+      select: { idProyecto: true, estadoProyecto: true, creadoPor: true, tituloProyecto: true },
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
@@ -827,10 +927,7 @@ export class ProjectsService {
     }
   }
 
-  // ---------- POSTULACIONES DEL PROYECTO ----------
-
   async findPostulacionesByProject(idProyecto: number, userId: number) {
-    // Solo el creador del proyecto puede ver sus postulaciones recibidas
     await this._requireOwner(idProyecto, userId);
 
     return this.prisma.postulacion.findMany({
@@ -857,12 +954,79 @@ export class ProjectsService {
     });
   }
 
-  // -------------------------------------------------
+  async delete(id: number, userId: number) {
+    await this._requireOwner(id, userId);
+
+    const proyecto = await this.prisma.proyecto.findUnique({
+      where: { idProyecto: id },
+      select: { estadoProyecto: true },
+    });
+
+    if (!proyecto) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+
+    const estadosEliminables: EstadoProyecto[] = [
+      EstadoProyecto.BORRADOR,
+      EstadoProyecto.OBSERVADO,
+    ];
+    if (!estadosEliminables.includes(proyecto.estadoProyecto)) {
+      throw new BadRequestException('Solo se pueden eliminar proyectos en estado BORRADOR u OBSERVADO');
+    }
+
+    await this.prisma.proyecto.update({
+      where: { idProyecto: id },
+      data: { eliminadoEn: new Date() },
+    });
+
+    return { mensaje: 'Proyecto eliminado correctamente' };
+  }
+
+  private async _buildProjectSnapshot(tx: Prisma.TransactionClient, idProyecto: number) {
+    return tx.proyecto.findUnique({
+      where: { idProyecto },
+      select: {
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        objetivosProyecto: true,
+        tipoProyecto: true,
+        modalidadProyecto: true,
+        ubicacionProyecto: true,
+        contextoAcademico: true,
+        urlRecursoExterno: true,
+        fechaInicio: true,
+        fechaFinEstimada: true,
+        roles: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
+            cupos: true,
+            horasSemanalesEstimadas: true,
+            carreraRequerida: {
+              select: { idCarrera: true, nombreCarrera: true, facultad: true },
+            },
+            requisitos: {
+              select: {
+                idRequisitoHabilidad: true,
+                nivelMinimo: true,
+                obligatorio: true,
+                habilidad: {
+                  select: { idHabilidad: true, nombreHabilidad: true, categoriaHabilidad: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
 
   private async _crearRevisionPendiente(
     tx: Prisma.TransactionClient,
     idProyecto: number,
     numeroEnvio: number,
+    snapshot?: object | null,
   ) {
     const existente = await tx.revisionProyecto.findFirst({
       where: { idProyecto, estadoRevision: 'PENDIENTE' },
@@ -871,7 +1035,12 @@ export class ProjectsService {
       throw new BadRequestException('Ya existe una revisión pendiente para este proyecto');
     }
     return tx.revisionProyecto.create({
-      data: { idProyecto, numeroEnvio, estadoRevision: 'PENDIENTE' },
+      data: {
+        idProyecto,
+        numeroEnvio,
+        estadoRevision: 'PENDIENTE',
+        ...(snapshot ? { snapshotProyecto: snapshot as Prisma.InputJsonValue } : {}),
+      },
     });
   }
 }
