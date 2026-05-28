@@ -1,12 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import { Search, MapPin, Users } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { apiFetch } from '@/lib/api/client';
-import { ProyectoResumen, TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
 import {
   Select,
   SelectContent,
@@ -14,6 +8,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptySteps,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { apiFetch } from '@/lib/api/client';
+import { MODALIDAD_LABEL, ProyectoResumen, TIPO_LABEL } from '@/types';
+import { useQuery } from '@tanstack/react-query';
+import { AlertCircle, FolderOpen, MapPin, Search, SearchX, Users } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
+
+type OrganizacionFiltro = {
+  idOrganizacion: number;
+  nombreOrganizacion: string;
+};
+
+type ProyectoResumenConOrganizaciones = Omit<ProyectoResumen, 'organizaciones'> & {
+  organizaciones?: {
+    organizacion: Partial<OrganizacionFiltro>;
+  }[];
+  _count?: {
+    roles?: number;
+  };
+};
 
 const ESTADO_STYLES: Record<string, string> = {
   PUBLICADO: 'bg-[#006735] text-white',
@@ -29,23 +52,46 @@ const ESTADO_STYLES: Record<string, string> = {
 export default function ProyectosPage() {
   const [busqueda, setBusqueda] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
+  const [organizacionFiltro, setOrganizacionFiltro] = useState('');
 
-  const { data: proyectos = [], isLoading, isError } = useQuery<ProyectoResumen[]>({
-    queryKey: ['proyectos'],
-    queryFn: () => apiFetch('/proyectos'),
+  const {
+    data: proyectos = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<ProyectoResumenConOrganizaciones[]>({
+    queryKey: ['proyectos', organizacionFiltro],
+    queryFn: () =>
+      apiFetch(
+        organizacionFiltro
+          ? `/proyectos?organizacionId=${organizacionFiltro}`
+          : '/proyectos',
+      ),
+  });
+
+  const {
+    data: organizaciones = [],
+    isLoading: isLoadingOrganizaciones,
+    isError: isErrorOrganizaciones,
+  } = useQuery<OrganizacionFiltro[]>({
+    queryKey: ['organizaciones'],
+    queryFn: () => apiFetch('/organizaciones'),
   });
 
   const filtrados = proyectos.filter((p) => {
     const coincideBusqueda =
       !busqueda ||
       p.tituloProyecto.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.descripcionProyecto.toLowerCase().includes(busqueda.toLowerCase());
+      (p.descripcionProyecto ?? '').toLowerCase().includes(busqueda.toLowerCase());
+
     const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
+
     return coincideBusqueda && coincideTipo;
   });
+  const hasActiveFilters = Boolean(busqueda || tipoFiltro || organizacionFiltro);
 
   return (
-    <DashboardLayout>
+    <DashboardLayout allowAdmin>
       <div className="px-8 py-8 max-w-6xl mx-auto">
         <div className="mb-8">
           <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
@@ -61,47 +107,178 @@ export default function ProyectosPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-tertiary" />
             <input
               type="text"
+              aria-label="Buscar proyectos por titulo o descripcion"
               placeholder="Buscar proyectos..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <Select value={tipoFiltro || '__ALL__'} onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}>
-            <SelectTrigger className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+
+          <Select
+            value={tipoFiltro || '__ALL__'}
+            onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}
+          >
+            <SelectTrigger
+              aria-label="Filtrar proyectos por tipo"
+              className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30"
+            >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="z-9999">
-              <SelectItem value="__ALL__" className="focus:bg-primary focus:text-on-primary">Todos los tipos</SelectItem>
-              <SelectItem value="ACADEMICO_HORAS_BECA" className="focus:bg-primary focus:text-on-primary">Horas Beca</SelectItem>
-              <SelectItem value="ACADEMICO_EXPERIENCIA" className="focus:bg-primary focus:text-on-primary">Experiencia</SelectItem>
-              <SelectItem value="EXTRACURRICULAR_EXTENSION" className="focus:bg-primary focus:text-on-primary">Extensión</SelectItem>
+            <SelectContent className="z-50">
+              <SelectItem
+                value="__ALL__"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Todos los tipos
+              </SelectItem>
+              <SelectItem
+                value="ACADEMICO_HORAS_BECA"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Horas Beca
+              </SelectItem>
+              <SelectItem
+                value="ACADEMICO_EXPERIENCIA"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Experiencia
+              </SelectItem>
+              <SelectItem
+                value="EXTRACURRICULAR_EXTENSION"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Extensión
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={organizacionFiltro || '__ALL__'}
+            onValueChange={(v) =>
+              setOrganizacionFiltro(v === '__ALL__' ? '' : v)
+            }
+            disabled={isLoadingOrganizaciones || isErrorOrganizaciones}
+          >
+            <SelectTrigger
+              aria-label="Filtrar proyectos por organizacion"
+              className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30"
+            >
+              <SelectValue
+                placeholder={
+                  isLoadingOrganizaciones
+                    ? 'Cargando organizaciones...'
+                    : isErrorOrganizaciones
+                      ? 'Error al cargar organizaciones'
+                      : 'Todas las organizaciones'
+                }
+              />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              <SelectItem
+                value="__ALL__"
+                className="focus:bg-primary focus:text-on-primary"
+              >
+                Todas las organizaciones
+              </SelectItem>
+              {organizaciones.map((organizacion) => (
+                <SelectItem
+                  key={organizacion.idOrganizacion}
+                  value={String(organizacion.idOrganizacion)}
+                  className="focus:bg-primary focus:text-on-primary"
+                >
+                  {organizacion.nombreOrganizacion}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
-        {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">Cargando proyectos...</div>
-        )}
-        {isError && (
-          <div className="text-center py-16 text-error text-sm">
-            No se pudieron cargar los proyectos.
+        {isErrorOrganizaciones && (
+          <div className="mb-6 text-error text-sm">
+            No se pudieron cargar las organizaciones para filtrar.
           </div>
+        )}
+
+        {isLoading && (
+          <div className="text-center py-16 text-tertiary text-sm" role="status">
+            Cargando proyectos...
+          </div>
+        )}
+
+        {isError && (
+          <Empty tone="danger" className="surface-enter" role="alert">
+            <EmptyMedia variant="icon">
+              <AlertCircle aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No se pudieron cargar los proyectos</EmptyTitle>
+              <EmptyDescription>
+                Revisa tu conexion o intenta nuevamente para recuperar las oportunidades disponibles.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Reintentar
+              </button>
+            </EmptyContent>
+          </Empty>
         )}
 
         {!isLoading && !isError && filtrados.length === 0 && (
-          <div className="text-center py-16 text-tertiary text-sm">
-            No se encontraron proyectos con los filtros aplicados.
-          </div>
+          <Empty tone="muted" className="surface-enter" aria-live="polite">
+            <EmptyMedia variant="icon">
+              {hasActiveFilters ? (
+                <SearchX aria-hidden="true" className="h-7 w-7" />
+              ) : (
+                <FolderOpen aria-hidden="true" className="h-7 w-7" />
+              )}
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>
+                {hasActiveFilters
+                  ? 'No hay proyectos con esos filtros'
+                  : 'Aun no hay proyectos publicados'}
+              </EmptyTitle>
+              <EmptyDescription>
+                {hasActiveFilters
+                  ? 'Ajusta la busqueda o limpia los filtros para volver a explorar todas las oportunidades.'
+                  : 'Cuando una asociacion publique una oportunidad, aparecera aqui para que puedas postularte.'}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptySteps />
+            {hasActiveFilters && (
+              <EmptyContent>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBusqueda('');
+                    setTipoFiltro('');
+                    setOrganizacionFiltro('');
+                  }}
+                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                >
+                  Limpiar filtros
+                </button>
+              </EmptyContent>
+            )}
+          </Empty>
         )}
 
         <div className="grid gap-5 md:grid-cols-2">
-          {filtrados.map((proyecto) => {
-            const org = proyecto.organizaciones[0]?.organizacion.nombreOrganizacion;
+          {filtrados.map((proyecto, index) => {
+            const org = proyecto.organizaciones?.[0]?.organizacion.nombreOrganizacion;
+            const rolesCount = proyecto.roles?.length ?? proyecto._count?.roles ?? 0;
+
             return (
               <div
                 key={proyecto.idProyecto}
-                className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 flex flex-col gap-4 hover:shadow-md transition-shadow"
+                className="surface-enter interactive-lift bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 flex flex-col gap-4 hover:shadow-md focus-within:ring-2 focus-within:ring-primary/30"
+                style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="font-headline font-bold text-on-surface text-lg leading-tight">
@@ -113,7 +290,8 @@ export default function ProyectosPage() {
                     </span>
                     <span
                       className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold ${
-                        ESTADO_STYLES[proyecto.estadoProyecto] ?? 'bg-gray-100 text-gray-600'
+                        ESTADO_STYLES[proyecto.estadoProyecto] ??
+                        'bg-gray-100 text-gray-600'
                       }`}
                     >
                       {proyecto.estadoProyecto}
@@ -128,7 +306,7 @@ export default function ProyectosPage() {
                 </p>
 
                 <div className="flex flex-wrap gap-2">
-                  {proyecto.intereses.slice(0, 3).map(({ interes }) => (
+                  {(proyecto.intereses ?? []).slice(0, 3).map(({ interes }) => (
                     <span
                       key={interes.nombreInteres}
                       className="px-2 py-0.5 rounded-full bg-surface-container text-on-surface text-xs"
@@ -145,7 +323,9 @@ export default function ProyectosPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5" />
-                    {proyecto.roles.length} {proyecto.roles.length === 1 ? 'rol' : 'roles'}
+                    {(proyecto._count?.roles ?? proyecto.roles?.length ?? 0)}{' '}
+                    {(proyecto._count?.roles ?? proyecto.roles?.length ?? 0) === 1 ? 'rol' : 'roles'}
+                    {rolesCount} {rolesCount === 1 ? 'rol' : 'roles'}
                   </span>
                 </div>
 

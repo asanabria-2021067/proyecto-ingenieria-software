@@ -1,13 +1,21 @@
 'use client';
 
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Clock, CheckCircle, XCircle, ChevronRight, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, ChevronRight, ClipboardList, Clock, Trash2, XCircle } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { Postulacion, EstadoPostulacion } from '@/types';
 import uvgSwal from '@/lib/swal';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptySteps,
+  EmptyTitle,
+} from '@/components/ui/empty';
 
 const ESTADO_CONFIG: Record<
   EstadoPostulacion,
@@ -32,9 +40,8 @@ const ESTADO_CONFIG: Record<
 
 export default function MisPostulacionesPage() {
   const queryClient = useQueryClient();
-  const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
 
-  const { data: postulaciones = [], isLoading, isError } = useQuery<Postulacion[]>({
+  const { data: postulaciones = [], isLoading, isError, refetch } = useQuery<Postulacion[]>({
     queryKey: ['mis-postulaciones'],
     queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
     refetchOnMount: 'always',
@@ -51,7 +58,6 @@ export default function MisPostulacionesPage() {
         text: 'Tu postulación fue cancelada exitosamente',
         timer: 2000,
       });
-      setConfirmingDelete(null);
     },
     onError: (error: any) => {
       uvgSwal.fire({
@@ -92,37 +98,66 @@ export default function MisPostulacionesPage() {
         </div>
 
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">
+          <div className="text-center py-16 text-tertiary text-sm" role="status">
             Cargando tus postulaciones...
           </div>
         )}
         {isError && (
-          <div className="text-center py-16 text-error text-sm">
-            No se pudieron cargar tus postulaciones. Verifica que hayas iniciado sesión.
-          </div>
+          <Empty tone="danger" className="surface-enter" role="alert">
+            <EmptyMedia variant="icon">
+              <AlertCircle aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No se pudieron cargar tus postulaciones</EmptyTitle>
+              <EmptyDescription>
+                Verifica que tu sesion siga activa o intenta actualizar la lista.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Reintentar
+              </button>
+            </EmptyContent>
+          </Empty>
         )}
 
         {!isLoading && !isError && postulaciones.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-tertiary text-sm mb-4">Aún no tienes postulaciones enviadas.</p>
-            <Link
-              href="/dashboard/proyectos"
-              className="inline-flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:shadow-md transition-all"
-            >
-              Explorar Proyectos
-              <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <Empty className="surface-enter" aria-live="polite">
+            <EmptyMedia variant="icon">
+              <ClipboardList aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>Encuentra tu siguiente colaboracion</EmptyTitle>
+              <EmptyDescription>
+                Cuando envies una postulacion, aqui veras el rol, el estado y la respuesta del equipo.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptySteps />
+            <EmptyContent>
+              <Link
+                href="/dashboard/proyectos"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:shadow-md"
+              >
+                Explorar proyectos
+                <ChevronRight aria-hidden="true" className="w-4 h-4" />
+              </Link>
+            </EmptyContent>
+          </Empty>
         )}
 
         <div className="space-y-4">
-          {postulaciones.map((p) => {
+          {postulaciones.map((p, index) => {
             const config = ESTADO_CONFIG[p.estadoPostulacion];
             const Icon = config.icon;
             return (
               <div
                 key={p.idPostulacion}
-                className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6"
+                className="surface-enter interactive-lift bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 hover:shadow-md focus-within:ring-2 focus-within:ring-primary/30"
+                style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
               >
                 <div className="flex items-start justify-between gap-4 mb-2">
                   <div>
@@ -166,8 +201,10 @@ export default function MisPostulacionesPage() {
                   <div className="flex items-center gap-2">
                     {p.estadoPostulacion === 'PENDIENTE' && (
                       <button
+                        type="button"
                         onClick={() => handleCancelar(p.idPostulacion)}
                         disabled={deleteMutation.isPending}
+                        aria-label={`Cancelar postulacion a ${p.rolProyecto.nombreRol}`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error/10 text-error text-xs font-semibold hover:bg-error/20 transition-colors disabled:opacity-50"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

@@ -22,6 +22,11 @@ export interface Cualidad {
   nombreCualidad: string;
 }
 
+export interface Organizacion {
+  idOrganizacion: number;
+  nombreOrganizacion: string;
+}
+
 export function getCarreras(): Promise<Carrera[]> {
   return apiFetch<Carrera[]>('/carreras');
 }
@@ -57,4 +62,8 @@ export function createCualidad(nombre: string): Promise<Cualidad> {
     method: 'POST',
     body: JSON.stringify({ nombre }),
   });
+}
+
+export function getOrganizaciones(): Promise<Organizacion[]> {
+  return apiFetch<Organizacion[]>('/organizaciones');
 }
