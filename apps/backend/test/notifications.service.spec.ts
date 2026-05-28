@@ -62,6 +62,29 @@ describe('NotificationsService', () => {
     expect(prisma.notificacion.createMany).toHaveBeenCalled();
   });
 
+  it('notifyAdminsFromTemplate usa templates de proyecto', async () => {
+    const prisma = makePrisma();
+    prisma.usuarioRolAcceso.findMany.mockResolvedValue([{ idUsuario: 1 }]);
+    const service = new NotificationsService(prisma);
+
+    await service.notifyAdminsFromTemplate('PROYECTO_EN_REVISION', {
+      projectTitle: 'Proyecto X',
+      projectId: 10,
+      numeroEnvio: 1,
+    });
+
+    expect(prisma.notificacion.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          idUsuario: 1,
+          tipoNotificacion: 'PROYECTO_EN_REVISION',
+          tituloNotificacion: 'Proyecto enviado a revisión',
+        }),
+      ],
+      skipDuplicates: false,
+    });
+  });
+
   it('notifyProjectActiveParticipants excluye autor', async () => {
     const prisma = makePrisma();
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }]);

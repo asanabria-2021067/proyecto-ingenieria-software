@@ -39,6 +39,17 @@ export class CatalogsService {
     });
   }
 
+  findOrganizaciones() {
+    return this.prisma.organizacion.findMany({
+      where: { estadoOrganizacion: 'ACTIVA' },
+      select: {
+        idOrganizacion: true,
+        nombreOrganizacion: true,
+      },
+      orderBy: { nombreOrganizacion: 'asc' },
+    });
+  }
+
   async createHabilidad(dto: CreateCatalogItemDto) {
     const nombre = this.normalizeNombre(dto.nombre);
     const existing = await this.prisma.habilidad.findFirst({

@@ -32,6 +32,11 @@ export class CatalogsController {
     return this.catalogsService.findCualidades();
   }
 
+  @Get('organizaciones')
+  findOrganizaciones() {
+    return this.catalogsService.findOrganizaciones();
+  }
+
   @Post('habilidades')
   @UseGuards(JwtAuthGuard)
   createHabilidad(@Body() dto: CreateCatalogItemDto) {

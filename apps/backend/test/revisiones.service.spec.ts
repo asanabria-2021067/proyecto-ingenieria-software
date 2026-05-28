@@ -27,7 +27,10 @@ describe('RevisionesService', () => {
     const prisma = makePrisma();
     prisma.revisionProyecto.findMany.mockResolvedValue([{ idRevisionProyecto: 1 }]);
     prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: 2 }]);
-    const service = new RevisionesService(prisma, { isAdmin: vi.fn().mockResolvedValue(true) } as any);
+    const service = new RevisionesService(
+      prisma,
+      { isAdmin: vi.fn().mockResolvedValue(true), notifyFromTemplate: vi.fn() } as any,
+    );
     const result = await service.findAdminInbox(1);
     expect(result.revisionesPendientes).toHaveLength(1);
     expect(result.cierresPendientes).toHaveLength(1);
@@ -44,14 +47,22 @@ describe('RevisionesService', () => {
     const prisma = makePrisma();
     prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.EN_REVISION });
     prisma.revisionProyecto.findFirst.mockResolvedValue(null);
-    const service = new RevisionesService(prisma, { isAdmin: vi.fn().mockResolvedValue(true) } as any);
+    const notifications = {
+      isAdmin: vi.fn().mockResolvedValue(true),
+      notifyFromTemplate: vi.fn(),
+    } as any;
+    const service = new RevisionesService(prisma, notifications);
     await expect(service.reclamar(1, 7)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('resolver requiere que el mismo admin haya reclamado', async () => {
     const prisma = makePrisma();
     prisma.revisionProyecto.findFirst.mockResolvedValue({ idRevisionProyecto: 4, idRevisor: 8 });
-    const service = new RevisionesService(prisma, { isAdmin: vi.fn().mockResolvedValue(true) } as any);
+    const notifications = {
+      isAdmin: vi.fn().mockResolvedValue(true),
+      notifyFromTemplate: vi.fn(),
+    } as any;
+    const service = new RevisionesService(prisma, notifications);
     await expect(service.resolver(1, 7, { resultado: 'APROBADA' } as any)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -69,12 +80,22 @@ describe('RevisionesService', () => {
       notificacion: { create: vi.fn() },
     };
     prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
-    const service = new RevisionesService(prisma, { isAdmin: vi.fn().mockResolvedValue(true) } as any);
+    const notifications = {
+      isAdmin: vi.fn().mockResolvedValue(true),
+      notifyFromTemplate: vi.fn(),
+    } as any;
+    const service = new RevisionesService(prisma, notifications);
 
     const result = await service.resolver(1, 7, { resultado: 'APROBADA', comentario: '' } as any);
 
     expect(result.estadoProyecto).toBe(EstadoProyecto.PUBLICADO);
     expect(tx.proyecto.update).toHaveBeenCalled();
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith(
+      [2],
+      'PROYECTO_APROBADO',
+      expect.objectContaining({ projectId: 1, revisionId: 4 }),
+      tx,
+    );
   });
 
   it('reclamar falla con estado inválido', async () => {
