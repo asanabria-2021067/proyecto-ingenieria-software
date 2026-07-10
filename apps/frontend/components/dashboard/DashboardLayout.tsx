@@ -9,7 +9,9 @@ import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut } from '
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { TokenRefreshManager } from '@/components/TokenRefreshManager';
-import { clearTokens } from '@/lib/utils/token';
+import { clearTokens, getAccessToken } from '@/lib/utils/token';
+import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
+import { getNotificationLink } from '@/lib/services/notifications';
 import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
@@ -34,12 +36,40 @@ export default function DashboardLayout({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user, isLoading } = useCurrentUser();
+  const { latestNotification } = useRealtimeNotifications(getAccessToken());
 
   useEffect(() => {
     if (!allowAdmin && !isLoading && isAdminUser(user)) {
       router.replace('/dashboard/admin');
     }
   }, [user, isLoading, router, allowAdmin]);
+
+  useEffect(() => {
+    if (!latestNotification) return;
+
+    queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+    queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
+
+    const href = getNotificationLink(latestNotification);
+    uvgSwal.fire({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 6000,
+      timerProgressBar: true,
+      icon: 'info',
+      title: latestNotification.tituloNotificacion,
+      text: latestNotification.mensajeNotificacion,
+      didOpen: (popup) => {
+        if (!href) return;
+        popup.style.cursor = 'pointer';
+        popup.addEventListener('click', () => {
+          router.push(href);
+          uvgSwal.close();
+        });
+      },
+    });
+  }, [latestNotification, queryClient, router]);
 
   if (isLoading || (!allowAdmin && isAdminUser(user))) {
     return (
