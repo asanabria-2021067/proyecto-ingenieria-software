@@ -1,20 +1,24 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import {
-  Clock,
-  CheckCircle,
-  XCircle,
-  ChevronRight,
-  Loader2,
-} from 'lucide-react';
+import { AlertCircle, CheckCircle, ChevronRight, ClipboardList, Clock, Trash2, XCircle } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
+import { deletePostulacion } from '@/lib/services/applications';
 import { Postulacion, EstadoPostulacion } from '@/types';
+import uvgSwal from '@/lib/swal';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptySteps,
+  EmptyTitle,
+} from '@/components/ui/empty';
 
-const ESTADO_CONFIG: Record<
+const ESTADO_CONFIG: Record
   EstadoPostulacion,
   { label: string; icon: React.ElementType; className: string }
 > = {
@@ -37,66 +41,50 @@ const ESTADO_CONFIG: Record<
 
 export default function MisPostulacionesPage() {
   const queryClient = useQueryClient();
-  const [cancelingId, setCancelingId] = useState<number | null>(null);
-  const [notification, setNotification] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
 
-  const {
-    data: postulaciones = [],
-    isLoading,
-    isError,
-  } = useQuery<Postulacion[]>({
+  const { data: postulaciones = [], isLoading, isError, refetch } = useQuery<Postulacion[]>({
     queryKey: ['mis-postulaciones'],
     queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
-  async function handleCancelApplication(idPostulacion: number) {
-    const confirmed = window.confirm(
-      '¿Seguro que deseas cancelar esta postulación?',
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setCancelingId(idPostulacion);
-      setNotification(null);
-
-      const response = await fetch(`/api/postulaciones/${idPostulacion}`, {
-        method: 'DELETE',
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deletePostulacion(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] });
+      uvgSwal.fire({
+        icon: 'success',
+        title: 'Postulación cancelada',
+        text: 'Tu postulación fue cancelada exitosamente',
+        timer: 2000,
       });
-
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          result?.message || 'No se pudo cancelar la postulación',
-        );
-      }
-
-      setNotification({
-        type: 'success',
-        message: 'Postulación cancelada correctamente',
+    },
+    onError: (error: any) => {
+      uvgSwal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'No se pudo cancelar la postulación',
       });
+    },
+  });
 
-      queryClient.setQueryData<Postulacion[]>(
-        ['mis-postulaciones'],
-        (prev = []) =>
-          prev.filter((item) => item.idPostulacion !== idPostulacion),
-      );
-    } catch (error) {
-      setNotification({
-        type: 'error',
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Ocurrió un error al cancelar la postulación',
+  const handleCancelar = (id: number) => {
+    uvgSwal
+      .fire({
+        icon: 'warning',
+        title: '¿Cancelar postulación?',
+        text: 'Esta acción no se puede deshacer',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, cancelar',
+        cancelButtonText: 'No',
+      })
+      .then((result) => {
+        if (result.isConfirmed) {
+          deleteMutation.mutate(id);
+        }
       });
-    } finally {
-      setCancelingId(null);
-    }
-  }
+  };
 
   return (
     <DashboardLayout>
@@ -110,53 +98,67 @@ export default function MisPostulacionesPage() {
           </p>
         </div>
 
-        {notification && (
-          <div
-            className={`mb-4 rounded-xl border px-4 py-3 text-sm font-medium ${
-              notification.type === 'success'
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                : 'border-red-300 bg-red-50 text-red-800'
-            }`}
-          >
-            {notification.message}
-          </div>
-        )}
-
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">
+          <div className="text-center py-16 text-tertiary text-sm" role="status">
             Cargando tus postulaciones...
           </div>
         )}
-
         {isError && (
-          <div className="text-center py-16 text-error text-sm">
-            No se pudieron cargar tus postulaciones. Verifica que hayas iniciado sesión.
-          </div>
+          <Empty tone="danger" className="surface-enter" role="alert">
+            <EmptyMedia variant="icon">
+              <AlertCircle aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No se pudieron cargar tus postulaciones</EmptyTitle>
+              <EmptyDescription>
+                Verifica que tu sesion siga activa o intenta actualizar la lista.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Reintentar
+              </button>
+            </EmptyContent>
+          </Empty>
         )}
 
         {!isLoading && !isError && postulaciones.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-tertiary text-sm mb-4">Aún no tienes postulaciones enviadas.</p>
-            <Link
-              href="/dashboard/proyectos"
-              className="inline-flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:shadow-md transition-all"
-            >
-              Explorar Proyectos
-              <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <Empty className="surface-enter" aria-live="polite">
+            <EmptyMedia variant="icon">
+              <ClipboardList aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>Encuentra tu siguiente colaboracion</EmptyTitle>
+              <EmptyDescription>
+                Cuando envies una postulacion, aqui veras el rol, el estado y la respuesta del equipo.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptySteps />
+            <EmptyContent>
+              <Link
+                href="/dashboard/proyectos"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:shadow-md"
+              >
+                Explorar proyectos
+                <ChevronRight aria-hidden="true" className="w-4 h-4" />
+              </Link>
+            </EmptyContent>
+          </Empty>
         )}
 
         <div className="space-y-4">
-          {postulaciones.map((p) => {
+          {postulaciones.map((p, index) => {
             const config = ESTADO_CONFIG[p.estadoPostulacion];
             const Icon = config.icon;
-            const isCanceling = cancelingId === p.idPostulacion;
-
             return (
               <div
                 key={p.idPostulacion}
-                className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6"
+                className="surface-enter interactive-lift bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 hover:shadow-md focus-within:ring-2 focus-within:ring-primary/30"
+                style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
               >
                 <div className="flex items-start justify-between gap-4 mb-2">
                   <div>
@@ -188,7 +190,7 @@ export default function MisPostulacionesPage() {
                   </div>
                 )}
 
-                <div className="flex flex-col gap-3 border-t border-outline-variant/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-xs text-tertiary">
                     Enviada el{' '}
                     {new Date(p.fechaPostulacion).toLocaleDateString('es-GT', {
@@ -197,22 +199,19 @@ export default function MisPostulacionesPage() {
                       year: 'numeric',
                     })}
                   </span>
-
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
                     {p.estadoPostulacion === 'PENDIENTE' && (
                       <button
                         type="button"
-                        disabled={isCanceling}
-                        onClick={() => handleCancelApplication(p.idPostulacion)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                        onClick={() => handleCancelar(p.idPostulacion)}
+                        disabled={deleteMutation.isPending}
+                        aria-label={`Cancelar postulacion a ${p.rolProyecto.nombreRol}`}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error/10 text-error text-xs font-semibold hover:bg-error/20 transition-colors disabled:opacity-50"
                       >
-                        {isCanceling && (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        )}
-                        {isCanceling ? 'Cancelando...' : 'Cancelar'}
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Cancelar
                       </button>
                     )}
-
                     <Link
                       href={`/dashboard/proyectos/${p.rolProyecto.proyecto.idProyecto}`}
                       className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
