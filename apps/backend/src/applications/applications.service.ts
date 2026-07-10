@@ -20,15 +20,15 @@ export class ApplicationsService {
     private eventEmitter: EventEmitter2,
   ) {}
 
-  async create(dto: CreatePostulacionDto) {
+  async create(dto: CreatePostulacionDto, postulanteId: number) {
     // 1. Verificar que el usuario existe
     const usuario = await this.prisma.usuario.findUnique({
-      where: { idUsuario: dto.idUsuarioPostulante },
+      where: { idUsuario: postulanteId },
     });
 
     if (!usuario) {
       throw new NotFoundException(
-        `El usuario con id ${dto.idUsuarioPostulante} no existe`,
+        `El usuario con id ${postulanteId} no existe`,
       );
     }
 
@@ -70,7 +70,7 @@ export class ApplicationsService {
 
     const postulacionExistente = await this.prisma.postulacion.findFirst({
       where: {
-        idUsuarioPostulante: dto.idUsuarioPostulante,
+        idUsuarioPostulante: postulanteId,
         idRolProyecto: dto.idRolProyecto,
       },
     });
@@ -83,7 +83,7 @@ export class ApplicationsService {
 
     const postulacion = await this.prisma.postulacion.create({
       data: {
-        idUsuarioPostulante: dto.idUsuarioPostulante,
+        idUsuarioPostulante: postulanteId,
         idRolProyecto: dto.idRolProyecto,
         justificacion: dto.justificacion,
       },
@@ -105,7 +105,7 @@ export class ApplicationsService {
       'application.created',
       new ApplicationCreatedEvent(
         postulacion.idPostulacion,
-        dto.idUsuarioPostulante,
+        postulanteId,
         rol.proyecto.idProyecto,
         dto.idRolProyecto,
       ),

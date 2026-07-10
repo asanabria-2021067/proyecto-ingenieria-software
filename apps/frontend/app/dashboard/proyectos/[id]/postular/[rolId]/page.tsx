@@ -9,7 +9,7 @@ import { z } from 'zod';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { apiFetch, getUserIdFromToken } from '@/lib/api/client';
+import { apiFetch } from '@/lib/api/client';
 import { Postulacion, Proyecto } from '@/types';
 
 const schema = z.object({
@@ -61,12 +61,9 @@ export default function PostularPage() {
 
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
-      const userId = getUserIdFromToken();
-      if (!userId) throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
       return apiFetch('/postulaciones', {
         method: 'POST',
         body: JSON.stringify({
-          idUsuarioPostulante: userId,
           idRolProyecto: Number(rolId),
           justificacion: data.justificacion,
         }),
