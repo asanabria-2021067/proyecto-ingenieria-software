@@ -81,7 +81,7 @@ describe('Controllers and basic services', () => {
 
     const applicationsSvc = { create: vi.fn(), findAll: vi.fn(), findMine: vi.fn(), findOne: vi.fn(), updateEstado: vi.fn() };
     const applications = new ApplicationsController(applicationsSvc as any);
-    applications.create({} as any);
+    applications.create({} as any, { userId: 1 });
     applications.findAll();
     applications.findMine({ userId: 1 });
     applications.findOne(1);
