@@ -21,8 +21,11 @@ export class ApplicationsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  create(@Body() dto: CreatePostulacionDto) {
-    return this.applicationsService.create(dto);
+  create(
+    @Body() dto: CreatePostulacionDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.applicationsService.create(dto, user.userId);
   }
 
   @Get()

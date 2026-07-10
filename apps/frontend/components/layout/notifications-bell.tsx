@@ -10,6 +10,7 @@ import {
   useMarcarLeida,
   useMarcarTodasLeidas,
 } from '@/hooks/use-notifications';
+import { getNotificationLink } from '@/lib/services/notifications';
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -121,45 +122,66 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
             <ul className="divide-y divide-outline-variant/50">
               {notificaciones.map((n) => {
                 const isUnread = n.leidaEn === null;
-                return (
-                  <li
-                    key={n.idNotificacion}
-                    className={`px-4 py-3 transition-colors ${
-                      isUnread
-                        ? 'bg-primary/5 hover:bg-primary/10'
-                        : 'hover:bg-surface-container-low'
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      {isUnread && (
-                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                      )}
-                      <div className={`flex-1 min-w-0 ${!isUnread ? 'pl-4' : ''}`}>
-                        <p className={`text-sm ${isUnread ? 'font-semibold text-on-surface' : 'font-medium text-on-surface-variant'}`}>
-                          {n.tituloNotificacion}
+                const href = getNotificationLink(n);
+
+                const content = (
+                  <div className="flex items-start gap-2">
+                    {isUnread && (
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                    )}
+                    <div className={`flex-1 min-w-0 ${!isUnread ? 'pl-4' : ''}`}>
+                      <p className={`text-sm ${isUnread ? 'font-semibold text-on-surface' : 'font-medium text-on-surface-variant'}`}>
+                        {n.tituloNotificacion}
+                      </p>
+                      {n.mensajeNotificacion && (
+                        <p className="text-xs text-tertiary mt-0.5 line-clamp-2">
+                          {n.mensajeNotificacion}
                         </p>
-                        {n.mensajeNotificacion && (
-                          <p className="text-xs text-tertiary mt-0.5 line-clamp-2">
-                            {n.mensajeNotificacion}
-                          </p>
+                      )}
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-[10px] text-outline">
+                          {timeAgo(n.creadaEn)}
+                        </span>
+                        {isUnread && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              marcarLeida.mutate(n.idNotificacion);
+                            }}
+                            disabled={marcarLeida.isPending}
+                            className="text-[10px] font-semibold text-primary hover:underline disabled:opacity-50"
+                          >
+                            Marcar leída
+                          </button>
                         )}
-                        <div className="flex items-center justify-between mt-1.5">
-                          <span className="text-[10px] text-outline">
-                            {timeAgo(n.creadaEn)}
-                          </span>
-                          {isUnread && (
-                            <button
-                              type="button"
-                              onClick={() => marcarLeida.mutate(n.idNotificacion)}
-                              disabled={marcarLeida.isPending}
-                              className="text-[10px] font-semibold text-primary hover:underline disabled:opacity-50"
-                            >
-                              Marcar leída
-                            </button>
-                          )}
-                        </div>
                       </div>
                     </div>
+                  </div>
+                );
+
+                const itemClassName = `px-4 py-3 transition-colors ${
+                  isUnread
+                    ? 'bg-primary/5 hover:bg-primary/10'
+                    : 'hover:bg-surface-container-low'
+                }`;
+
+                return (
+                  <li key={n.idNotificacion} className={itemClassName}>
+                    {href ? (
+                      <Link
+                        href={href}
+                        onClick={() => {
+                          if (isUnread) marcarLeida.mutate(n.idNotificacion);
+                        }}
+                        className="block -mx-4 -my-3 px-4 py-3"
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      content
+                    )}
                   </li>
                 );
               })}
