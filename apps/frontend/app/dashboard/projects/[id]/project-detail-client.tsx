@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { HitosSection } from '@/components/projects/hitos-section';
+import { ProjectProgressBar } from '@/components/projects/project-progress-bar';
+import { useProjectAvance } from '@/hooks/use-project-avance';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 
@@ -75,6 +77,7 @@ function ProjectDetailSkeleton() {
 function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const totalCupos = proyecto.roles.reduce((sum, r) => sum + r.cupos, 0);
   const organizacionPrincipal = proyecto.organizaciones[0] ?? null;
+  const { data: avance, isSuccess: puedeVerAvance } = useProjectAvance(proyecto.idProyecto);
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 pb-20 md:pb-6">
@@ -120,6 +123,9 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           <h1 className="text-2xl md:text-3xl font-black text-on-surface leading-tight font-headline">
             {proyecto.tituloProyecto}
           </h1>
+          {puedeVerAvance && avance && (
+            <ProjectProgressBar avance={avance} className="max-w-md pt-1" />
+          )}
         </div>
         <Button className="shrink-0 bg-primary hover:bg-primary/90 text-on-primary rounded-xl px-6 h-12 font-bold transition-all shadow-sm">
           ▶ Postularme
