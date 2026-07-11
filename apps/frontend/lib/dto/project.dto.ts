@@ -96,6 +96,7 @@ export interface TareaDTO {
   estadoTarea: 'POR_HACER' | 'EN_PROGRESO' | 'EN_REVISION' | 'HECHO';
   prioridad: 'BAJA' | 'MEDIA' | 'ALTA';
   fechaLimite: string | null;
+  _count?: { comentarios: number };
 }
 
 /** DTO para items del listado — GET /proyectos y GET /proyectos?q= */

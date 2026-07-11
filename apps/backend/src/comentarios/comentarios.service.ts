@@ -63,10 +63,14 @@ export class ComentariosService {
     return comentario;
   }
 
+  private readonly autorSelect = {
+    select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
+  } as const;
+
   findByProyecto(idProyecto: number) {
     return this.prisma.comentario.findMany({
       where: { idProyecto, eliminadoEn: null },
-      include: { autor: { select: { idUsuario: true, nombre: true, apellido: true } } },
+      include: { autor: this.autorSelect },
       orderBy: { creadoEn: 'asc' },
     });
   }
@@ -74,15 +78,24 @@ export class ComentariosService {
   findByTarea(idTarea: number) {
     return this.prisma.comentario.findMany({
       where: { idTarea, eliminadoEn: null },
-      include: { autor: { select: { idUsuario: true, nombre: true, apellido: true } } },
+      include: { autor: this.autorSelect },
       orderBy: { creadoEn: 'asc' },
+    });
+  }
+
+  /** Igual que findByTarea pero con el comentario más reciente primero. */
+  findByTareaDesc(idTarea: number) {
+    return this.prisma.comentario.findMany({
+      where: { idTarea, eliminadoEn: null },
+      include: { autor: this.autorSelect },
+      orderBy: { creadoEn: 'desc' },
     });
   }
 
   findByHito(idHito: number) {
     return this.prisma.comentario.findMany({
       where: { idHito, eliminadoEn: null },
-      include: { autor: { select: { idUsuario: true, nombre: true, apellido: true } } },
+      include: { autor: this.autorSelect },
       orderBy: { creadoEn: 'asc' },
     });
   }
