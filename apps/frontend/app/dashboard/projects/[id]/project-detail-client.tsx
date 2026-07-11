@@ -230,6 +230,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           <HitosSection
             hitos={proyecto.hitos}
             tareas={proyecto.tareas ?? []}
+            idProyecto={proyecto.idProyecto}
           />
 
         </div>
