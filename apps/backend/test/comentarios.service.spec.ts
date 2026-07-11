@@ -47,6 +47,21 @@ describe('ComentariosService', () => {
     expect(prisma.comentario.findMany).toHaveBeenCalledTimes(3);
   });
 
+  it('findByTareaDesc ordena del más reciente al más viejo', async () => {
+    const prisma = makePrisma();
+    prisma.comentario.findMany.mockResolvedValue([]);
+    const service = new ComentariosService(prisma, {} as any);
+
+    await service.findByTareaDesc(7);
+
+    expect(prisma.comentario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { idTarea: 7, eliminadoEn: null },
+        orderBy: { creadoEn: 'desc' },
+      }),
+    );
+  });
+
   it('update falla si comentario no existe', async () => {
     const prisma = makePrisma();
     prisma.comentario.findUnique.mockResolvedValue(null);
