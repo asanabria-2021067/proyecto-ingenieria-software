@@ -143,6 +143,9 @@ const proyectoDetalleSelect = {
       estadoTarea: true,
       prioridad: true,
       fechaLimite: true,
+      _count: {
+        select: { comentarios: { where: { eliminadoEn: null } } },
+      },
     },
     orderBy: { idTarea: 'asc' as const },
   },
