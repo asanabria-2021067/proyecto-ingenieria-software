@@ -3,6 +3,7 @@ import type {
   ProyectoDetalleDTO,
   ProyectoListItemDTO,
   MiProyectoListItemDTO,
+  AvanceProyectoDTO,
   RevisionProyectoDTO,
   CreateProjectPayload,
   ResolverRevisionPayload,
@@ -10,6 +11,14 @@ import type {
 
 export async function getProjectById(id: number): Promise<ProyectoDetalleDTO> {
   return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}`);
+}
+
+/**
+ * % de avance del proyecto (hitos y tareas). El backend responde 403 si quien
+ * consulta no es el líder ni un participante activo del proyecto.
+ */
+export async function getProjectAvance(id: number): Promise<AvanceProyectoDTO> {
+  return apiFetch<AvanceProyectoDTO>(`/proyectos/${id}/avance`);
 }
 
 export async function getAdminProjectById(id: number): Promise<ProyectoDetalleDTO> {
