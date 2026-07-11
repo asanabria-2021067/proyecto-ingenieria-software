@@ -149,6 +149,33 @@ export interface RevisionProyectoDTO {
   revisor: { idUsuario: number; nombre: string; apellido: string } | null;
 }
 
+/** % de avance de una categoría (tareas u hitos) */
+export interface AvanceCategoriaDTO {
+  porcentaje: number;
+  total: number;
+}
+
+export interface AvanceTareasDTO extends AvanceCategoriaDTO {
+  porHacer: number;
+  enProgreso: number;
+  hecho: number;
+}
+
+export interface AvanceHitosDTO extends AvanceCategoriaDTO {
+  pendiente: number;
+  enProgreso: number;
+  completado: number;
+}
+
+/**
+ * % de avance del proyecto, desglosado por hitos y por tareas.
+ * Solo lo expone el backend al líder o a un participante activo — nunca es público.
+ */
+export interface AvanceProyectoDTO {
+  tareas: AvanceTareasDTO;
+  hitos: AvanceHitosDTO;
+}
+
 /** DTO para items del listado propio — GET /proyectos/mine */
 export interface MiProyectoListItemDTO extends ProyectoListItemDTO {
   fechaCreacion: string;
@@ -158,6 +185,7 @@ export interface MiProyectoListItemDTO extends ProyectoListItemDTO {
     RevisionProyectoDTO,
     'idRevisionProyecto' | 'estadoRevision' | 'comentarioRevision' | 'numeroEnvio' | 'enviadaEn' | 'revisadaEn'
   >[];
+  avanceProyecto: AvanceProyectoDTO;
 }
 
 /** Payload para crear un proyecto completo */

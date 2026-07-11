@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertCircle, FolderPlus, MapPin, Pencil, Plus, Search, SearchX, Trash2 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import { ProjectProgressBar } from '@/components/projects/project-progress-bar';
 import { getMyProjects, deleteProject } from '@/lib/services/projects';
 import { TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
@@ -298,7 +299,11 @@ export default function MyProjectsPage() {
                 </p>
               )}
 
-              <div className="mt-auto flex items-center gap-2">
+              {/* Barra de avance fijada justo encima del botón, para que un título
+                  largo no la desplace y siempre quede en la misma posición. */}
+              <div className="mt-auto flex flex-col gap-3">
+              <ProjectProgressBar avance={proyecto.avanceProyecto} compact />
+              <div className="flex items-center gap-2">
                 {proyecto.estadoProyecto === 'BORRADOR' ? (
                   <>
                     <Link
@@ -351,6 +356,7 @@ export default function MyProjectsPage() {
                     Ver Proyecto
                   </Link>
                 )}
+              </div>
               </div>
             </div>
           ))}
