@@ -31,6 +31,47 @@ const ESTADOS_EDITABLES: EstadoProyecto[] = [
   EstadoProyecto.OBSERVADO,
 ];
 
+function calcularAvanceTareas(tareas: { estadoTarea: string }[]) {
+  const total = tareas.length;
+  const hecho = tareas.filter((t) => t.estadoTarea === 'HECHO').length;
+  const porHacer = tareas.filter((t) => t.estadoTarea === 'POR_HACER').length;
+  const enProgreso = total - hecho - porHacer;
+
+  return {
+    porcentaje: total === 0 ? 0 : Math.round((hecho / total) * 100),
+    total,
+    porHacer,
+    enProgreso,
+    hecho,
+  };
+}
+
+function calcularAvanceHitos(hitos: { estadoHito: string }[]) {
+  const total = hitos.length;
+  const completado = hitos.filter((h) => h.estadoHito === 'COMPLETADO').length;
+  const pendiente = hitos.filter((h) => h.estadoHito === 'PENDIENTE').length;
+  const enProgreso = total - completado - pendiente;
+
+  return {
+    porcentaje: total === 0 ? 0 : Math.round((completado / total) * 100),
+    total,
+    pendiente,
+    enProgreso,
+    completado,
+  };
+}
+
+/** % de avance del proyecto, desglosado por hitos y por tareas. */
+function calcularAvanceProyecto(
+  tareas: { estadoTarea: string }[],
+  hitos: { estadoHito: string }[],
+) {
+  return {
+    tareas: calcularAvanceTareas(tareas),
+    hitos: calcularAvanceHitos(hitos),
+  };
+}
+
 const proyectoListSelect = {
   idProyecto: true,
   tituloProyecto: true,
@@ -294,6 +335,46 @@ export class ProjectsService {
     return proyecto;
   }
 
+  /**
+   * % de avance del proyecto (por hitos y por tareas). Solo visible para el
+   * líder del proyecto o un participante activo — nadie más puede consultarlo.
+   */
+  async getAvance(id: number, userId: number) {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: { idProyecto: id, eliminadoEn: null },
+      select: {
+        creadoPor: true,
+        tareas: { select: { estadoTarea: true } },
+        hitos: { select: { estadoHito: true } },
+      },
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
+    }
+
+    const esLider = proyecto.creadoPor === userId;
+    const esMiembro = esLider || (await this.esParticipanteActivo(id, userId));
+    if (!esMiembro) {
+      throw new ForbiddenException(
+        'Solo el líder o los miembros del proyecto pueden ver el avance',
+      );
+    }
+
+    return calcularAvanceProyecto(proyecto.tareas, proyecto.hitos);
+  }
+
+  private async esParticipanteActivo(idProyecto: number, userId: number): Promise<boolean> {
+    const participacion = await this.prisma.participacionProyecto.findFirst({
+      where: {
+        idUsuario: userId,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto },
+      },
+      select: { idParticipacion: true },
+    });
+    return !!participacion;
+  }
+
   async findMine(userId: number) {
     const proyectos = await this.prisma.proyecto.findMany({
       where: { creadoPor: userId, eliminadoEn: null },
@@ -312,6 +393,8 @@ export class ProjectsService {
             },
           },
         },
+        tareas: { select: { estadoTarea: true } },
+        hitos: { select: { estadoHito: true } },
         revisiones: {
           select: {
             idRevisionProyecto: true,
@@ -341,9 +424,12 @@ export class ProjectsService {
       return {
         ...proyecto,
         roles: proyecto.roles.map((rol) => ({ idRolProyecto: rol.idRolProyecto })),
+        tareas: undefined,
+        hitos: undefined,
         cantidadPostulaciones,
         rolesCubiertos,
         rolesTotales: proyecto.roles.length,
+        avanceProyecto: calcularAvanceProyecto(proyecto.tareas ?? [], proyecto.hitos ?? []),
       };
     });
   }

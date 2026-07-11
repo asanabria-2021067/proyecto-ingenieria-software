@@ -103,6 +103,15 @@ export class ProjectsController {
     return this.projectsService.findOneOwner(id, user.userId);
   }
 
+  @Get(':id/avance')
+  @UseGuards(JwtAuthGuard)
+  getAvance(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.getAvance(id, user.userId);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
