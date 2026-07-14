@@ -5,6 +5,7 @@ import {
   Put,
   Post,
   Body,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -17,6 +18,7 @@ import {
   ReplaceCualidadesDto,
   CreateExperienciaDto,
 } from './dto/update-profile.dto';
+import { GetMisTareasQueryDto } from './dto/get-mis-tareas-query.dto';
 
 @Controller('usuarios')
 @UseGuards(JwtAuthGuard)
@@ -102,5 +104,13 @@ export class UsersController {
   @Get('me/dashboard')
   getDashboard(@CurrentUser() user: { userId: number }) {
     return this.usersService.getDashboard(user.userId);
+  }
+
+  @Get('me/tareas')
+  getMisTareas(
+    @CurrentUser() user: { userId: number },
+    @Query() query: GetMisTareasQueryDto,
+  ) {
+    return this.usersService.getMisTareas(user.userId, query);
   }
 }
