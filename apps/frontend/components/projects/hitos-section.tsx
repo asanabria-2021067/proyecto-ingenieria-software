@@ -10,6 +10,8 @@ interface HitosSectionProps {
   hitos: Hito[];
   tareas: Tarea[];
   idProyecto: number;
+  /** Id de tarea a abrir automáticamente (acceso directo desde "Mis tareas") */
+  tareaInicialId?: number | null;
 }
 
 const HITO_ESTADO_STYLES: Record<string, string> = {
@@ -31,8 +33,11 @@ const TAREA_ESTADO_STYLES: Record<string, string> = {
   HECHO:       'bg-secondary-container text-on-secondary-container font-semibold',
 };
 
-export function HitosSection({ hitos, tareas, idProyecto }: HitosSectionProps) {
-  const [tareaSeleccionada, setTareaSeleccionada] = useState<Tarea | null>(null);
+export function HitosSection({ hitos, tareas, idProyecto, tareaInicialId }: HitosSectionProps) {
+  // si viene un id de tarea en la URL (acceso directo desde "Mis tareas"), abre su diálogo al montar
+  const [tareaSeleccionada, setTareaSeleccionada] = useState<Tarea | null>(
+    () => tareas.find((t) => t.idTarea === tareaInicialId) ?? null,
+  );
 
   if (hitos.length === 0) return null;
 
