@@ -72,6 +72,11 @@ export interface NotificationTemplateData {
     projectId: number;
     diasInactividad: number;
   };
+  SOLICITUD_RECUPERACION_CONTRASENA: {
+    userName: string;
+    carne: string;
+    solicitudId: number;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -150,6 +155,11 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Borrador inactivo',
     message: (data: NotificationTemplateData['PROYECTO_ADVERTENCIA_INACTIVIDAD']) =>
       `Tu borrador "${data.projectTitle}" lleva más de ${data.diasInactividad} días sin actividad.`,
+  },
+  SOLICITUD_RECUPERACION_CONTRASENA: {
+    title: 'Solicitud de recuperación de contraseña',
+    message: (data: NotificationTemplateData['SOLICITUD_RECUPERACION_CONTRASENA']) =>
+      `${data.userName} (carné ${data.carne}) solicitó recuperar su contraseña.`,
   },
 } as const;
 
