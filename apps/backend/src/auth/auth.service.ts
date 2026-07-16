@@ -130,6 +130,14 @@ export class AuthService {
       throw new BadRequestException('Token no válido para esta operación');
     }
 
+    const solicitud = await this.prisma.solicitudRecuperacion.findUnique({
+      where: { idSolicitud: payload.idSolicitud },
+    });
+
+    if (!solicitud || solicitud.tokenUtilizadoEn) {
+      throw new BadRequestException('Token inválido o ya utilizado');
+    }
+
     const usuario = await this.prisma.usuario.findUnique({
       where: { idUsuario: payload.sub },
     });
@@ -143,6 +151,11 @@ export class AuthService {
     await this.prisma.usuario.update({
       where: { idUsuario: usuario.idUsuario },
       data: { contrasena: contrasenaHash },
+    });
+
+    await this.prisma.solicitudRecuperacion.update({
+      where: { idSolicitud: solicitud.idSolicitud },
+      data: { tokenUtilizadoEn: new Date() },
     });
 
     return { mensaje: 'Contraseña actualizada exitosamente' };
