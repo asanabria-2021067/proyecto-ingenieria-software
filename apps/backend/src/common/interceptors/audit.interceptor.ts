@@ -36,7 +36,7 @@ export class AuditInterceptor implements NestInterceptor {
               detalleJson: {
                 method,
                 url,
-                body,
+                body: this.sanitizeResponse(body),
                 response: this.sanitizeResponse(data),
               },
               ipOrigen: ip || request.headers['x-forwarded-for'] || 'unknown',
@@ -73,7 +73,15 @@ export class AuditInterceptor implements NestInterceptor {
   private sanitizeResponse(data: any): any {
     if (!data) return null;
 
-    const sensitiveFields = ['contrasena', 'password', 'token', 'secret'];
+    const sensitiveFields = [
+      'contrasena',
+      'nuevaContrasena',
+      'password',
+      'token',
+      'resetToken',
+      'resetUrl',
+      'secret',
+    ];
 
     if (typeof data !== 'object') return data;
 
