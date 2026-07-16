@@ -8,7 +8,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-
 enum EstadoUsuario {
   ACTIVO
   INACTIVO
@@ -177,46 +176,53 @@ enum TipoNotificacion {
   COMENTARIO_HITO
   MENSAJE_REVISION
   PROYECTO_ADVERTENCIA_INACTIVIDAD
+  SOLICITUD_RECUPERACION_CONTRASENA
 }
 
+enum EstadoSolicitudRecuperacion {
+  PENDIENTE
+  ATENDIDA
+}
 
 model Usuario {
-  idUsuario         Int            @id @default(autoincrement()) @map("id_usuario")
-  correo            String         @unique @db.VarChar(255)
-  contrasena        String         @db.VarChar(255)
-  nombre            String         @db.VarChar(255)
-  apellido          String         @db.VarChar(255)
-  fotoUrl           String?        @map("foto_url") @db.VarChar(255)
-  estado            EstadoUsuario  @default(ACTIVO)
-  fechaCreacion     DateTime       @default(now()) @map("fecha_creacion")
-  fechaUltimaSesion DateTime?      @map("fecha_ultima_sesion")
+  idUsuario         Int           @id @default(autoincrement()) @map("id_usuario")
+  correo            String        @unique @db.VarChar(255)
+  contrasena        String        @db.VarChar(255)
+  nombre            String        @db.VarChar(255)
+  apellido          String        @db.VarChar(255)
+  fotoUrl           String?       @map("foto_url") @db.VarChar(255)
+  estado            EstadoUsuario @default(ACTIVO)
+  fechaCreacion     DateTime      @default(now()) @map("fecha_creacion")
+  fechaUltimaSesion DateTime?     @map("fecha_ultima_sesion")
 
-  telefonos                   UsuarioTelefono[]
-  perfil                      PerfilEstudiante?
-  habilidades                 UsuarioHabilidad[]
-  intereses                   UsuarioInteres[]
-  cualidades                  UsuarioCualidad[]
-  experiencias                ExperienciaPrevia[]
-  organizacionesCreadas       Organizacion[]
-  membresiasOrganizacion      UsuarioOrganizacion[]
-  proyectosCreados            Proyecto[]
-  postulaciones               Postulacion[]           @relation("Postulante")
-  postulacionesResueltas      Postulacion[]           @relation("PostulacionResolutor")
-  participaciones             ParticipacionProyecto[]
-  tareasCreadas               Tarea[]
-  tareasAsignadas             AsignacionTarea[]       @relation("TareaAsignada")
-  tareasQueAsigno             AsignacionTarea[]       @relation("TareaAsignador")
-  evidenciasCargadas          Evidencia[]
-  revisionesRealizadas        RevisionEvidencia[]
-  horasAprobadas              HorasParticipacion[]
-  certificadosEmitidos        Certificado[]
-  notificaciones              Notificacion[]
-  rolesAcceso                  UsuarioRolAcceso[]
-  auditorias                   BitacoraAuditoria[]
-  configuracionesActualizadas  ConfiguracionSistema[]
-  revisionesProyectoRealizadas RevisionProyecto[]               @relation("RevisionesProyectoRealizadas")
-  comentariosEscritos          Comentario[]
-  mensajesRevisionEnviados     MensajeRevisionProyecto[]        @relation("MensajesEnviados")
+  telefonos                        UsuarioTelefono[]
+  perfil                           PerfilEstudiante?
+  habilidades                      UsuarioHabilidad[]
+  intereses                        UsuarioInteres[]
+  cualidades                       UsuarioCualidad[]
+  experiencias                     ExperienciaPrevia[]
+  organizacionesCreadas            Organizacion[]
+  membresiasOrganizacion           UsuarioOrganizacion[]
+  proyectosCreados                 Proyecto[]
+  postulaciones                    Postulacion[]             @relation("Postulante")
+  postulacionesResueltas           Postulacion[]             @relation("PostulacionResolutor")
+  participaciones                  ParticipacionProyecto[]
+  tareasCreadas                    Tarea[]
+  tareasAsignadas                  AsignacionTarea[]         @relation("TareaAsignada")
+  tareasQueAsigno                  AsignacionTarea[]         @relation("TareaAsignador")
+  evidenciasCargadas               Evidencia[]
+  revisionesRealizadas             RevisionEvidencia[]
+  horasAprobadas                   HorasParticipacion[]
+  certificadosEmitidos             Certificado[]
+  notificaciones                   Notificacion[]
+  solicitudesRecuperacion          SolicitudRecuperacion[]   @relation("SolicitudRecuperacionUsuario")
+  solicitudesRecuperacionAtendidas SolicitudRecuperacion[]   @relation("SolicitudRecuperacionAdmin")
+  rolesAcceso                      UsuarioRolAcceso[]
+  auditorias                       BitacoraAuditoria[]
+  configuracionesActualizadas      ConfiguracionSistema[]
+  revisionesProyectoRealizadas     RevisionProyecto[]        @relation("RevisionesProyectoRealizadas")
+  comentariosEscritos              Comentario[]
+  mensajesRevisionEnviados         MensajeRevisionProyecto[] @relation("MensajesEnviados")
 
   @@map("usuario")
 }
@@ -370,9 +376,9 @@ model Organizacion {
   creadaPor               Int                @map("creada_por")
   fechaCreacion           DateTime           @default(now()) @map("fecha_creacion")
 
-  creador    Usuario                @relation(fields: [creadaPor], references: [idUsuario])
-  miembros   UsuarioOrganizacion[]
-  proyectos  ProyectoOrganizacion[]
+  creador   Usuario                @relation(fields: [creadaPor], references: [idUsuario])
+  miembros  UsuarioOrganizacion[]
+  proyectos ProyectoOrganizacion[]
 
   @@map("organizacion")
 }
@@ -393,32 +399,32 @@ model UsuarioOrganizacion {
 }
 
 model Proyecto {
-  idProyecto         Int               @id @default(autoincrement()) @map("id_proyecto")
-  tituloProyecto     String            @map("titulo_proyecto") @db.VarChar(200)
-  descripcionProyecto String           @map("descripcion_proyecto") @db.Text
-  objetivosProyecto  String?           @map("objetivos_proyecto") @db.Text
-  tipoProyecto       TipoProyecto      @map("tipo_proyecto")
-  estadoProyecto     EstadoProyecto    @default(BORRADOR) @map("estado_proyecto")
-  modalidadProyecto  ModalidadProyecto @default(MIXTA) @map("modalidad_proyecto")
-  ubicacionProyecto  String?           @map("ubicacion_proyecto") @db.VarChar(255)
-  contextoAcademico  String?           @map("contexto_academico") @db.VarChar(255)
-  urlRecursoExterno  String?           @map("url_recurso_externo") @db.VarChar(255)
-  fechaPublicacion   DateTime?         @map("fecha_publicacion") @db.Date
-  fechaInicio        DateTime?         @map("fecha_inicio") @db.Date
-  fechaFinEstimada   DateTime?         @map("fecha_fin_estimada") @db.Date
-  creadoPor          Int               @map("creado_por")
-  fechaCreacion      DateTime          @default(now()) @map("fecha_creacion")
-  fechaActualizacion DateTime?         @map("fecha_actualizacion")
-  eliminadoEn        DateTime?         @map("eliminado_en")
+  idProyecto          Int               @id @default(autoincrement()) @map("id_proyecto")
+  tituloProyecto      String            @map("titulo_proyecto") @db.VarChar(200)
+  descripcionProyecto String            @map("descripcion_proyecto") @db.Text
+  objetivosProyecto   String?           @map("objetivos_proyecto") @db.Text
+  tipoProyecto        TipoProyecto      @map("tipo_proyecto")
+  estadoProyecto      EstadoProyecto    @default(BORRADOR) @map("estado_proyecto")
+  modalidadProyecto   ModalidadProyecto @default(MIXTA) @map("modalidad_proyecto")
+  ubicacionProyecto   String?           @map("ubicacion_proyecto") @db.VarChar(255)
+  contextoAcademico   String?           @map("contexto_academico") @db.VarChar(255)
+  urlRecursoExterno   String?           @map("url_recurso_externo") @db.VarChar(255)
+  fechaPublicacion    DateTime?         @map("fecha_publicacion") @db.Date
+  fechaInicio         DateTime?         @map("fecha_inicio") @db.Date
+  fechaFinEstimada    DateTime?         @map("fecha_fin_estimada") @db.Date
+  creadoPor           Int               @map("creado_por")
+  fechaCreacion       DateTime          @default(now()) @map("fecha_creacion")
+  fechaActualizacion  DateTime?         @map("fecha_actualizacion")
+  eliminadoEn         DateTime?         @map("eliminado_en")
 
-  creador        Usuario                @relation(fields: [creadoPor], references: [idUsuario])
-  organizaciones ProyectoOrganizacion[]
-  intereses      ProyectoInteres[]
-  roles          RolProyecto[]
-  hitos          Hito[]
-  tareas         Tarea[]
-  revisiones     RevisionProyecto[]
-  comentarios    Comentario[]
+  creador          Usuario                   @relation(fields: [creadoPor], references: [idUsuario])
+  organizaciones   ProyectoOrganizacion[]
+  intereses        ProyectoInteres[]
+  roles            RolProyecto[]
+  hitos            Hito[]
+  tareas           Tarea[]
+  revisiones       RevisionProyecto[]
+  comentarios      Comentario[]
   mensajesRevision MensajeRevisionProyecto[]
 
   @@map("proyecto")
@@ -435,9 +441,9 @@ model RevisionProyecto {
   enviadaEn          DateTime               @default(now()) @map("enviada_en")
   revisadaEn         DateTime?              @map("revisada_en")
 
-  proyecto  Proyecto                    @relation(fields: [idProyecto], references: [idProyecto])
-  revisor   Usuario?                    @relation("RevisionesProyectoRealizadas", fields: [idRevisor], references: [idUsuario])
-  mensajes  MensajeRevisionProyecto[]
+  proyecto Proyecto                  @relation(fields: [idProyecto], references: [idProyecto])
+  revisor  Usuario?                  @relation("RevisionesProyectoRealizadas", fields: [idRevisor], references: [idUsuario])
+  mensajes MensajeRevisionProyecto[]
 
   @@map("revision_proyecto")
 }
@@ -469,13 +475,13 @@ model ProyectoInteres {
 }
 
 model RolProyecto {
-  idRolProyecto          Int     @id @default(autoincrement()) @map("id_rol_proyecto")
-  idProyecto             Int     @map("id_proyecto")
-  nombreRol              String  @map("nombre_rol") @db.VarChar(255)
-  descripcionRolProyecto String? @map("descripcion_rol_proyecto") @db.Text
-  idCarreraRequerida     Int?    @map("id_carrera_requerida")
-  cupos                  Int     @default(1)
-  horasSemanalesEstimadas Int?   @map("horas_semanales_estimadas")
+  idRolProyecto           Int     @id @default(autoincrement()) @map("id_rol_proyecto")
+  idProyecto              Int     @map("id_proyecto")
+  nombreRol               String  @map("nombre_rol") @db.VarChar(255)
+  descripcionRolProyecto  String? @map("descripcion_rol_proyecto") @db.Text
+  idCarreraRequerida      Int?    @map("id_carrera_requerida")
+  cupos                   Int     @default(1)
+  horasSemanalesEstimadas Int?    @map("horas_semanales_estimadas")
 
   proyecto         Proyecto                @relation(fields: [idProyecto], references: [idProyecto])
   carreraRequerida Carrera?                @relation(fields: [idCarreraRequerida], references: [idCarrera])
@@ -531,9 +537,9 @@ model ParticipacionProyecto {
   fechaIngreso        DateTime            @default(now()) @map("fecha_ingreso") @db.Date
   fechaSalida         DateTime?           @map("fecha_salida") @db.Date
 
-  usuario        Usuario            @relation(fields: [idUsuario], references: [idUsuario])
-  rolProyecto    RolProyecto        @relation(fields: [idRolProyecto], references: [idRolProyecto])
-  postulacion    Postulacion?       @relation(fields: [idPostulacion], references: [idPostulacion])
+  usuario        Usuario              @relation(fields: [idUsuario], references: [idUsuario])
+  rolProyecto    RolProyecto          @relation(fields: [idRolProyecto], references: [idRolProyecto])
+  postulacion    Postulacion?         @relation(fields: [idPostulacion], references: [idPostulacion])
   registrosHoras HorasParticipacion[]
   certificados   Certificado[]
 
@@ -678,6 +684,23 @@ model Notificacion {
   @@map("notificacion")
 }
 
+model SolicitudRecuperacion {
+  idSolicitud      Int                         @id @default(autoincrement()) @map("id_solicitud")
+  idUsuario        Int                         @map("id_usuario")
+  carneReferencia  String                      @map("carne_referencia") @db.VarChar(255)
+  correoReferencia String                      @map("correo_referencia") @db.VarChar(255)
+  estado           EstadoSolicitudRecuperacion @default(PENDIENTE)
+  creadaEn         DateTime                    @default(now()) @map("creada_en")
+  atendidaEn       DateTime?                   @map("atendida_en")
+  atendidaPor      Int?                        @map("atendida_por")
+
+  usuario Usuario  @relation("SolicitudRecuperacionUsuario", fields: [idUsuario], references: [idUsuario])
+  admin   Usuario? @relation("SolicitudRecuperacionAdmin", fields: [atendidaPor], references: [idUsuario])
+
+  @@index([estado])
+  @@map("solicitud_recuperacion")
+}
+
 model RolAcceso {
   idRolAcceso  Int     @id @default(autoincrement()) @map("id_rol_acceso")
   nombrePerfil String  @unique @map("nombre_perfil") @db.VarChar(255)
@@ -769,6 +792,7 @@ model Comentario {
 
   @@map("comentario")
 }
+
 model MensajeRevisionProyecto {
   idMensaje   Int       @id @default(autoincrement()) @map("id_mensaje")
   idProyecto  Int       @map("id_proyecto")
