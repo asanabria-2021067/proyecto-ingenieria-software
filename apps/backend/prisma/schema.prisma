@@ -693,6 +693,7 @@ model SolicitudRecuperacion {
   creadaEn         DateTime                    @default(now()) @map("creada_en")
   atendidaEn       DateTime?                   @map("atendida_en")
   atendidaPor      Int?                        @map("atendida_por")
+  tokenUtilizadoEn DateTime?                   @map("token_utilizado_en")
 
   usuario Usuario  @relation("SolicitudRecuperacionUsuario", fields: [idUsuario], references: [idUsuario])
   admin   Usuario? @relation("SolicitudRecuperacionAdmin", fields: [atendidaPor], references: [idUsuario])
