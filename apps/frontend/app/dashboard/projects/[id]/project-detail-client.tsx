@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -74,7 +75,13 @@ function ProjectDetailSkeleton() {
 }
 
 // ─── Vista principal ──────────────────────────────────────────────────────────
-function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
+function ProjectDetailView({
+  proyecto,
+  tareaInicialId,
+}: {
+  proyecto: ProyectoDetalleDTO;
+  tareaInicialId: number | null;
+}) {
   const totalCupos = proyecto.roles.reduce((sum, r) => sum + r.cupos, 0);
   const organizacionPrincipal = proyecto.organizaciones[0] ?? null;
   const { data: avance, isSuccess: puedeVerAvance } = useProjectAvance(proyecto.idProyecto);
@@ -237,6 +244,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             hitos={proyecto.hitos}
             tareas={proyecto.tareas ?? []}
             idProyecto={proyecto.idProyecto}
+            tareaInicialId={tareaInicialId}
           />
 
         </div>
@@ -331,6 +339,9 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 // ─── Entry point ──────────────────────────────────────────────────────────────
 export default function ProjectDetailClient({ id }: Props) {
   const { data: proyecto, isLoading, error } = useProjectDetail(id);
+  const searchParams = useSearchParams();
+  const tareaParam = searchParams.get('tarea');
+  const tareaInicialId = tareaParam ? Number(tareaParam) : null;
 
   if (isLoading) {
     return (
@@ -354,7 +365,7 @@ export default function ProjectDetailClient({ id }: Props) {
 
   return (
     <DashboardLayout>
-      <ProjectDetailView proyecto={proyecto} />
+      <ProjectDetailView proyecto={proyecto} tareaInicialId={tareaInicialId} />
     </DashboardLayout>
   );
 }

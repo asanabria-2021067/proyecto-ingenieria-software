@@ -5,6 +5,7 @@ import {
   UpdateProfileDto,
   CreateExperienciaDto,
 } from './dto/update-profile.dto';
+import { GetMisTareasQueryDto } from './dto/get-mis-tareas-query.dto';
 
 @Injectable()
 export class UsersService {
@@ -420,5 +421,36 @@ export class UsersService {
       proyectosActivos,
       postulacionesRecientes,
     };
+  }
+
+  /**
+   * Tareas asignadas al usuario en cualquier proyecto (vista "Mis tareas").
+   */
+  async getMisTareas(userId: number, filtros: GetMisTareasQueryDto) {
+    return this.prisma.tarea.findMany({
+      where: {
+        asignaciones: { some: { idUsuario: userId } },
+        ...(filtros.estado && { estadoTarea: filtros.estado }),
+      },
+      select: {
+        idTarea: true,
+        tituloTarea: true,
+        descripcionTarea: true,
+        estadoTarea: true,
+        prioridad: true,
+        fechaLimite: true,
+        idHito: true,
+        proyecto: {
+          select: {
+            idProyecto: true,
+            tituloProyecto: true,
+            estadoProyecto: true,
+          },
+        },
+      },
+      orderBy: {
+        fechaLimite: { sort: filtros.orden ?? 'asc', nulls: 'last' },
+      },
+    });
   }
 }
