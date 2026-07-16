@@ -235,3 +235,42 @@ export async function updateAdminUserStatus(
     body: JSON.stringify({ estado }),
   });
 }
+
+// ─── GET /admin/password-reset-requests ──────────────────────────────────────
+
+export type EstadoSolicitudRecuperacion = 'PENDIENTE' | 'ATENDIDA';
+
+export interface AdminSolicitudRecuperacion {
+  idSolicitud: number;
+  carneReferencia: string;
+  correoReferencia: string;
+  estado: EstadoSolicitudRecuperacion;
+  creadaEn: string;
+  usuario: {
+    idUsuario: number;
+    nombre: string;
+    apellido: string;
+    correo: string;
+  };
+}
+
+export async function listPasswordResetRequests(): Promise<AdminSolicitudRecuperacion[]> {
+  return apiFetch<AdminSolicitudRecuperacion[]>('/admin/password-reset-requests');
+}
+
+// ─── POST /admin/password-reset-requests/:id/generate-link ──────────────────
+
+export interface GeneratePasswordResetLinkResponse {
+  resetUrl: string;
+  resetToken: string;
+  expiraEn: string;
+}
+
+export async function generatePasswordResetLink(
+  idSolicitud: number | string,
+): Promise<GeneratePasswordResetLinkResponse> {
+  return apiFetch<GeneratePasswordResetLinkResponse>(
+    `/admin/password-reset-requests/${idSolicitud}/generate-link`,
+    { method: 'POST' },
+  );
+}
