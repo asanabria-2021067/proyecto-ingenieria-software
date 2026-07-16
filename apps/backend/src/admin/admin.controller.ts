@@ -5,6 +5,7 @@ import {
   Param,
   ParseIntPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -47,5 +48,18 @@ export class AdminController {
     @Body() dto: UpdateAdminUserStatusDto,
   ) {
     return this.adminService.updateUsuarioEstado(user.userId, id, dto.estado);
+  }
+
+  @Get('password-reset-requests')
+  getSolicitudesRecuperacion(@CurrentUser() user: { userId: number }) {
+    return this.adminService.getSolicitudesRecuperacionPendientes(user.userId);
+  }
+
+  @Post('password-reset-requests/:id/generate-link')
+  generarEnlaceRecuperacion(
+    @CurrentUser() user: { userId: number },
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.adminService.generarEnlaceRecuperacion(user.userId, id);
   }
 }
