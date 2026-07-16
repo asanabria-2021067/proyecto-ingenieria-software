@@ -34,10 +34,10 @@ export async function register(payload: RegisterPayload): Promise<LoginResponse>
   });
 }
 
-export async function forgotPassword(correo: string): Promise<{ mensaje: string }> {
+export async function forgotPassword(carne: string, correo: string): Promise<{ mensaje: string }> {
   return apiFetch<{ mensaje: string }>('/auth/forgot-password', {
     method: 'POST',
-    body: JSON.stringify({ correo }),
+    body: JSON.stringify({ carne, correo }),
   });
 }
 
