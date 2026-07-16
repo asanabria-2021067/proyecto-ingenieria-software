@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut, ListChecks } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { TokenRefreshManager } from '@/components/TokenRefreshManager';
@@ -21,6 +21,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/proyectos', label: 'Explorar Proyectos', icon: FolderOpen },
   { href: '/dashboard/projects/mine', label: 'Mis Proyectos', icon: Briefcase },
+  { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
   { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
   { href: '/dashboard/perfil', label: 'Perfil', icon: User },
 ];
