@@ -657,7 +657,12 @@ export class AdminService {
     }
 
     const resetToken = this.jwtService.sign(
-      { sub: solicitud.usuario.idUsuario, correo: solicitud.usuario.correo, tipo: 'reset' },
+      {
+        sub: solicitud.usuario.idUsuario,
+        correo: solicitud.usuario.correo,
+        tipo: 'reset',
+        idSolicitud: solicitud.idSolicitud,
+      },
       { expiresIn: '1h' },
     );
 
