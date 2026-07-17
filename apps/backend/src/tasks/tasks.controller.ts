@@ -6,12 +6,16 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { ComentariosService } from '../comentarios/comentarios.service';
 import { CreateTareaComentarioDto } from './dto/create-tarea-comentario.dto';
+import { CreateTareaDto } from './dto/create-tarea.dto';
+import { UpdateTareaDto } from './dto/update-tarea.dto';
+import { AssignTareaDto } from './dto/assign-tarea.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -23,18 +27,41 @@ export class TasksController {
   ) {}
 
   @Get()
-  findAll() {
-    return this.tasksService.findAll();
+  findAll(@Query('idProyecto') idProyecto?: string) {
+    return this.tasksService.findAll(idProyecto ? Number(idProyecto) : undefined);
+  }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.tasksService.findOne(id);
   }
 
   @Post()
-  create(@Body() data: any) {
-    return this.tasksService.create(data);
+  @UseGuards(JwtAuthGuard)
+  create(@Body() dto: CreateTareaDto, @CurrentUser() user: { userId: number }) {
+    return this.tasksService.create(dto, user.userId);
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
-    return this.tasksService.update(id, data);
+  @UseGuards(JwtAuthGuard)
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateTareaDto) {
+    return this.tasksService.update(id, dto);
+  }
+
+  @Post(':id/asignaciones')
+  @UseGuards(JwtAuthGuard)
+  assign(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AssignTareaDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.tasksService.assign(id, dto.idUsuario, user.userId);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.tasksService.remove(id);
   }
 
   @Get(':id/comentarios')
