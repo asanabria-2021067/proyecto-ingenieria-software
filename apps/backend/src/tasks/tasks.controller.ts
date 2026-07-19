@@ -39,8 +39,11 @@ export class TasksController {
 
   @Get(':id/comentarios')
   @UseGuards(JwtAuthGuard)
-  findComentarios(@Param('id', ParseIntPipe) id: number) {
-    return this.comentariosService.findByTareaDesc(id);
+  findComentarios(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.comentariosService.findByTareaDesc(id, user.userId);
   }
 
   @Post(':id/comentarios')

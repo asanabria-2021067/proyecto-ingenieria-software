@@ -67,7 +67,8 @@ export class ComentariosService {
     select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
   } as const;
 
-  findByProyecto(idProyecto: number) {
+  async findByProyecto(idProyecto: number, userId: number) {
+    await this.assertChannelAReadAllowed(idProyecto, userId);
     return this.prisma.comentario.findMany({
       where: { idProyecto, eliminadoEn: null },
       include: { autor: this.autorSelect },
@@ -75,7 +76,9 @@ export class ComentariosService {
     });
   }
 
-  findByTarea(idTarea: number) {
+  async findByTarea(idTarea: number, userId: number) {
+    const idProyecto = await this.getTareaProyectoOrThrow(idTarea);
+    await this.assertChannelAReadAllowed(idProyecto, userId);
     return this.prisma.comentario.findMany({
       where: { idTarea, eliminadoEn: null },
       include: { autor: this.autorSelect },
@@ -84,7 +87,9 @@ export class ComentariosService {
   }
 
   /** Igual que findByTarea pero con el comentario más reciente primero. */
-  findByTareaDesc(idTarea: number) {
+  async findByTareaDesc(idTarea: number, userId: number) {
+    const idProyecto = await this.getTareaProyectoOrThrow(idTarea);
+    await this.assertChannelAReadAllowed(idProyecto, userId);
     return this.prisma.comentario.findMany({
       where: { idTarea, eliminadoEn: null },
       include: { autor: this.autorSelect },
@@ -92,12 +97,54 @@ export class ComentariosService {
     });
   }
 
-  findByHito(idHito: number) {
+  async findByHito(idHito: number, userId: number) {
+    const hito = await this.prisma.hito.findUnique({
+      where: { idHito },
+      select: { idProyecto: true },
+    });
+    if (!hito) throw new NotFoundException('Hito no encontrado');
+    await this.assertChannelAReadAllowed(hito.idProyecto, userId);
     return this.prisma.comentario.findMany({
       where: { idHito, eliminadoEn: null },
       include: { autor: this.autorSelect },
       orderBy: { creadoEn: 'asc' },
     });
+  }
+
+  private async getTareaProyectoOrThrow(idTarea: number): Promise<number> {
+    const tarea = await this.prisma.tarea.findUnique({
+      where: { idTarea },
+      select: { idProyecto: true },
+    });
+    if (!tarea) throw new NotFoundException('Tarea no encontrada');
+    return tarea.idProyecto;
+  }
+
+  /**
+   * Lectura de comentarios permitida solo al líder real del proyecto o a un
+   * participante con participación activa. A diferencia de la escritura, no
+   * depende del estado del proyecto.
+   */
+  private async assertChannelAReadAllowed(idProyecto: number, userId: number) {
+    const proyecto = await this.prisma.proyecto.findUnique({
+      where: { idProyecto },
+      select: { creadoPor: true },
+    });
+    if (!proyecto) throw new NotFoundException('Proyecto no encontrado');
+
+    if (proyecto.creadoPor === userId) return;
+
+    const participa = await this.prisma.participacionProyecto.findFirst({
+      where: {
+        idUsuario: userId,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto },
+      },
+      select: { idParticipacion: true },
+    });
+    if (!participa) {
+      throw new ForbiddenException('No tienes acceso a los comentarios de este proyecto');
+    }
   }
 
   async update(idComentario: number, userId: number, dto: UpdateComentarioDto) {
