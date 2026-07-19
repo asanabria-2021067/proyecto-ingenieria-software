@@ -10,7 +10,7 @@ import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL,
+    origin: '*',
     credentials: true,
   },
   namespace: '/notifications',
