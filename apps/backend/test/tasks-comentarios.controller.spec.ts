@@ -13,10 +13,25 @@ describe('TasksController - comentarios de tarea', () => {
     return { controller, comentariosService };
   }
 
-  it('GET :id/comentarios delega en findByTareaDesc (más reciente primero)', () => {
+  it('GET :id/comentarios delega en findByTareaDesc propagando taskId y el userId autenticado', async () => {
     const { controller, comentariosService } = makeController();
-    controller.findComentarios(5);
-    expect(comentariosService.findByTareaDesc).toHaveBeenCalledWith(5);
+    comentariosService.findByTareaDesc.mockResolvedValue([{ idComentario: 1 }]);
+
+    const result = await controller.findComentarios(5, { userId: 3 });
+
+    expect(comentariosService.findByTareaDesc).toHaveBeenCalledWith(5, 3);
+    expect(comentariosService.findByTareaDesc).toHaveBeenCalledTimes(1);
+    expect(result).toEqual([{ idComentario: 1 }]);
+  });
+
+  it('GET :id/comentarios propaga un userId distinto en cada solicitud (no lo cachea)', async () => {
+    const { controller, comentariosService } = makeController();
+
+    await controller.findComentarios(5, { userId: 1 });
+    await controller.findComentarios(5, { userId: 2 });
+
+    expect(comentariosService.findByTareaDesc).toHaveBeenNthCalledWith(1, 5, 1);
+    expect(comentariosService.findByTareaDesc).toHaveBeenNthCalledWith(2, 5, 2);
   });
 
   it('POST :id/comentarios crea el comentario con el idTarea de la URL y el autor del JWT', () => {
