@@ -29,18 +29,27 @@ export class ComentariosController {
   }
 
   @Get('proyecto/:idProyecto')
-  findByProyecto(@Param('idProyecto', ParseIntPipe) idProyecto: number) {
-    return this.comentariosService.findByProyecto(idProyecto);
+  findByProyecto(
+    @Param('idProyecto', ParseIntPipe) idProyecto: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.comentariosService.findByProyecto(idProyecto, user.userId);
   }
 
   @Get('tarea/:idTarea')
-  findByTarea(@Param('idTarea', ParseIntPipe) idTarea: number) {
-    return this.comentariosService.findByTarea(idTarea);
+  findByTarea(
+    @Param('idTarea', ParseIntPipe) idTarea: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.comentariosService.findByTarea(idTarea, user.userId);
   }
 
   @Get('hito/:idHito')
-  findByHito(@Param('idHito', ParseIntPipe) idHito: number) {
-    return this.comentariosService.findByHito(idHito);
+  findByHito(
+    @Param('idHito', ParseIntPipe) idHito: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.comentariosService.findByHito(idHito, user.userId);
   }
 
   @Patch(':idComentario')
