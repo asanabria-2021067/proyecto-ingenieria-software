@@ -37,22 +37,27 @@ describe('ComentariosService', () => {
     expect(notifications.notifyProjectActiveParticipants).toHaveBeenCalled();
   });
 
-  it('findByProyecto/findByTarea/findByHito delegan', async () => {
+  it('findByProyecto/findByTarea/findByHito delegan en comentario.findMany tras autorizar al líder', async () => {
     const prisma = makePrisma();
+    prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: 1 });
+    prisma.tarea.findUnique.mockResolvedValue({ idProyecto: 1 });
+    prisma.hito.findUnique.mockResolvedValue({ idProyecto: 1 });
     prisma.comentario.findMany.mockResolvedValue([]);
     const service = new ComentariosService(prisma, {} as any);
-    await service.findByProyecto(1);
-    await service.findByTarea(1);
-    await service.findByHito(1);
+    await service.findByProyecto(1, 1);
+    await service.findByTarea(1, 1);
+    await service.findByHito(1, 1);
     expect(prisma.comentario.findMany).toHaveBeenCalledTimes(3);
   });
 
-  it('findByTareaDesc ordena del más reciente al más viejo', async () => {
+  it('findByTareaDesc ordena del más reciente al más viejo tras autorizar al líder', async () => {
     const prisma = makePrisma();
+    prisma.tarea.findUnique.mockResolvedValue({ idProyecto: 1 });
+    prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: 7 });
     prisma.comentario.findMany.mockResolvedValue([]);
     const service = new ComentariosService(prisma, {} as any);
 
-    await service.findByTareaDesc(7);
+    await service.findByTareaDesc(7, 7);
 
     expect(prisma.comentario.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
