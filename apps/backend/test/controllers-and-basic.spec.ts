@@ -14,7 +14,6 @@ import { UsersController } from '../src/users/users.controller';
 import { ValidationController } from '../src/validation/validation.controller';
 import { CatalogsService } from '../src/catalogs/catalogs.service';
 import { EvidenceService } from '../src/evidence/evidence.service';
-import { TasksService } from '../src/tasks/tasks.service';
 import { ValidationService } from '../src/validation/validation.service';
 
 describe('Controllers and basic services', () => {
@@ -133,11 +132,12 @@ describe('Controllers and basic services', () => {
     const result = await catalogs.findAll();
     expect(result.carreras[0].id).toBe('1');
 
-    const tasksService = new TasksService({} as any);
+    const tasksService = { findAll: vi.fn(), findOne: vi.fn() } as any;
     const tasks = new TasksController(tasksService);
-    expect(tasks.findAll()).toEqual({ message: 'Not implemented yet' });
-    expect(tasks.create({})).toEqual({ message: 'Not implemented yet' });
-    expect(tasks.update(1, {})).toEqual({ message: 'Not implemented yet' });
+    tasks.findAll(1, { userId: 9 });
+    expect(tasksService.findAll).toHaveBeenCalledWith(1, 9);
+    tasks.findOne(1, 5, { userId: 9 });
+    expect(tasksService.findOne).toHaveBeenCalledWith(1, 5, 9);
 
     const validationService = new ValidationService({} as any);
     const validation = new ValidationController(validationService);
