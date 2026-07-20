@@ -585,6 +585,9 @@ model Tarea {
   comentarios  Comentario[]
   etiquetas    TareaEtiqueta[]
 
+  @@index([idProyecto, eliminadoEn, estadoTarea])
+  @@index([idProyecto, idRolProyecto])
+  @@index([idHito])
   @@map("tarea")
 }
 
@@ -600,7 +603,7 @@ model AsignacionTarea {
   usuario   Usuario @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
   asignador Usuario @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
 
-  @@unique([idTarea, idUsuario])
+  @@index([idUsuario, desasignadaEn])
   @@map("asignacion_tarea")
 }
 
@@ -626,6 +629,7 @@ model TareaEtiqueta {
   etiqueta Etiqueta @relation(fields: [idEtiqueta], references: [idEtiqueta], onDelete: Cascade)
 
   @@id([idTarea, idEtiqueta])
+  @@index([idEtiqueta])
   @@map("tarea_etiqueta")
 }
 
