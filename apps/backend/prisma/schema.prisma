@@ -482,6 +482,7 @@ model RolProyecto {
   requisitos       RequisitoHabilidadRol[]
   postulaciones    Postulacion[]
   participaciones  ParticipacionProyecto[]
+  tareas           Tarea[]
 
   @@map("rol_proyecto")
 }
@@ -559,20 +560,24 @@ model Hito {
 }
 
 model Tarea {
-  idTarea          Int         @id @default(autoincrement()) @map("id_tarea")
-  idProyecto       Int         @map("id_proyecto")
-  idHito           Int?        @map("id_hito")
-  tituloTarea      String      @map("titulo_tarea") @db.VarChar(255)
-  descripcionTarea String?     @map("descripcion_tarea") @db.Text
-  estadoTarea      EstadoTarea @default(POR_HACER) @map("estado_tarea")
-  prioridad        Prioridad   @default(MEDIA)
-  creadaPor        Int         @map("creada_por")
-  fechaCreacion    DateTime    @default(now()) @map("fecha_creacion")
-  fechaLimite      DateTime?   @map("fecha_limite") @db.Date
-  actualizadaEn    DateTime?   @map("actualizada_en")
+  idTarea             Int         @id @default(autoincrement()) @map("id_tarea")
+  idProyecto          Int         @map("id_proyecto")
+  idHito              Int?        @map("id_hito")
+  idRolProyecto       Int?        @map("id_rol_proyecto")
+  tituloTarea         String      @map("titulo_tarea") @db.VarChar(255)
+  descripcionTarea    String?     @map("descripcion_tarea") @db.Text
+  estadoTarea         EstadoTarea @default(POR_HACER) @map("estado_tarea")
+  prioridad           Prioridad   @default(MEDIA)
+  tiempoEstimadoHoras Int?        @map("tiempo_estimado_horas")
+  creadaPor           Int         @map("creada_por")
+  fechaCreacion       DateTime    @default(now()) @map("fecha_creacion")
+  fechaLimite         DateTime?   @map("fecha_limite") @db.Date
+  actualizadaEn       DateTime?   @map("actualizada_en")
+  eliminadoEn         DateTime?   @map("eliminado_en")
 
   proyecto     Proyecto          @relation(fields: [idProyecto], references: [idProyecto])
   hito         Hito?             @relation(fields: [idHito], references: [idHito])
+  rolProyecto  RolProyecto?      @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
   creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario])
   asignaciones AsignacionTarea[]
   evidencias   Evidencia[]
@@ -582,11 +587,12 @@ model Tarea {
 }
 
 model AsignacionTarea {
-  idAsignacion    Int      @id @default(autoincrement()) @map("id_asignacion")
-  idTarea         Int      @map("id_tarea")
-  idUsuario       Int      @map("id_usuario")
-  fechaAsignacion DateTime @default(now()) @map("fecha_asignacion")
-  asignadoPor     Int      @map("asignado_por")
+  idAsignacion    Int       @id @default(autoincrement()) @map("id_asignacion")
+  idTarea         Int       @map("id_tarea")
+  idUsuario       Int       @map("id_usuario")
+  fechaAsignacion DateTime  @default(now()) @map("fecha_asignacion")
+  desasignadaEn   DateTime? @map("desasignada_en")
+  asignadoPor     Int       @map("asignado_por")
 
   tarea     Tarea   @relation(fields: [idTarea], references: [idTarea])
   usuario   Usuario @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
