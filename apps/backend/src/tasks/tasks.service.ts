@@ -10,8 +10,16 @@ export class TasksService {
   async findAll(idProyecto?: number) {
     return this.prisma.tarea.findMany({
       where: idProyecto ? { idProyecto } : undefined,
-      include: { asignaciones: true },
-      orderBy: { fechaCreacion: 'asc' },
+      include: {
+        asignaciones: {
+          include: {
+            usuario: {
+              select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
+            },
+          },
+        },
+      },
+      orderBy: [{ orden: 'asc' }, { fechaCreacion: 'asc' }],
     });
   }
 
@@ -54,6 +62,7 @@ export class TasksService {
         estadoTarea: dto.estadoTarea,
         prioridad: dto.prioridad,
         idHito: dto.idHito,
+        orden: dto.orden,
         actualizadaEn: new Date(),
       },
     });
