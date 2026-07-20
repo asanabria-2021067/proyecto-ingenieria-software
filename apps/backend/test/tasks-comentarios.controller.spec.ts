@@ -1,15 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TasksController } from '../src/tasks/tasks.controller';
+import { TareaComentariosController } from '../src/tasks/tarea-comentarios.controller';
 
-describe('TasksController - comentarios de tarea', () => {
+// Tarea 15: estos métodos se extrajeron de TasksController a
+// TareaComentariosController para conservar intactas las rutas
+// /tareas/:id/comentarios* cuando TasksController pasó a anidarse bajo
+// proyectos/:projectId/tareas. El comportamiento probado aquí no cambió.
+describe('TareaComentariosController - comentarios de tarea', () => {
   function makeController() {
-    const tasksService = { findAll: vi.fn(), create: vi.fn(), update: vi.fn() } as any;
     const comentariosService = {
       findByTareaDesc: vi.fn(),
       create: vi.fn(),
       remove: vi.fn(),
     } as any;
-    const controller = new TasksController(tasksService, comentariosService);
+    const controller = new TareaComentariosController(comentariosService);
     return { controller, comentariosService };
   }
 
