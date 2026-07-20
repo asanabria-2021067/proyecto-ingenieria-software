@@ -420,6 +420,7 @@ model Proyecto {
   revisiones     RevisionProyecto[]
   comentarios    Comentario[]
   mensajesRevision MensajeRevisionProyecto[]
+  etiquetas      Etiqueta[]
 
   @@map("proyecto")
 }
@@ -582,6 +583,7 @@ model Tarea {
   asignaciones AsignacionTarea[]
   evidencias   Evidencia[]
   comentarios  Comentario[]
+  etiquetas    TareaEtiqueta[]
 
   @@map("tarea")
 }
@@ -600,6 +602,31 @@ model AsignacionTarea {
 
   @@unique([idTarea, idUsuario])
   @@map("asignacion_tarea")
+}
+
+model Etiqueta {
+  idEtiqueta        Int    @id @default(autoincrement()) @map("id_etiqueta")
+  idProyecto        Int    @map("id_proyecto")
+  nombreEtiqueta    String @map("nombre_etiqueta") @db.VarChar(255)
+  nombreNormalizado String @map("nombre_normalizado") @db.VarChar(255)
+  color             String @db.VarChar(7)
+
+  proyecto Proyecto        @relation(fields: [idProyecto], references: [idProyecto])
+  tareas   TareaEtiqueta[]
+
+  @@unique([idProyecto, nombreNormalizado])
+  @@map("etiqueta")
+}
+
+model TareaEtiqueta {
+  idTarea    Int @map("id_tarea")
+  idEtiqueta Int @map("id_etiqueta")
+
+  tarea    Tarea    @relation(fields: [idTarea], references: [idTarea])
+  etiqueta Etiqueta @relation(fields: [idEtiqueta], references: [idEtiqueta], onDelete: Cascade)
+
+  @@id([idTarea, idEtiqueta])
+  @@map("tarea_etiqueta")
 }
 
 model Evidencia {
