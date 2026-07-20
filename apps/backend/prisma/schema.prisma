@@ -572,6 +572,7 @@ model Tarea {
   descripcionTarea String?     @map("descripcion_tarea") @db.Text
   estadoTarea      EstadoTarea @default(POR_HACER) @map("estado_tarea")
   prioridad        Prioridad   @default(MEDIA)
+  orden            Int         @default(0) @map("orden")
   creadaPor        Int         @map("creada_por")
   fechaCreacion    DateTime    @default(now()) @map("fecha_creacion")
   fechaLimite      DateTime?   @map("fecha_limite") @db.Date
