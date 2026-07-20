@@ -23,4 +23,8 @@ export class UpdateTareaDto {
   @IsOptional()
   @IsInt()
   idHito?: number;
+
+  @IsOptional()
+  @IsInt()
+  orden?: number;
 }

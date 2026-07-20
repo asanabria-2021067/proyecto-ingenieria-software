@@ -1,12 +1,12 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Clock, BookOpen, ChevronRight } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
-import { Postulacion, Proyecto, TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
+import { MODALIDAD_LABEL, NIVEL_LABEL, Postulacion, Proyecto, TIPO_LABEL } from '@/types';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, BookOpen, Calendar, ChevronRight, Clock, MapPin } from 'lucide-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 
 export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -42,6 +42,15 @@ export default function ProyectoDetallePage() {
           <ArrowLeft className="w-4 h-4" />
           Volver a proyectos
         </Link>
+
+        {proyecto && (
+          <Link
+            href={`/dashboard/proyectos/${id}/tablero`}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline mb-6"
+          >
+            Ver tablero de tareas
+          </Link>
+        )}
 
         {isLoading && (
           <div className="text-center py-16 text-tertiary text-sm">Cargando...</div>
