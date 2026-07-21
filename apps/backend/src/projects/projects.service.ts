@@ -347,7 +347,9 @@ export class ProjectsService {
       where: { idProyecto: id, eliminadoEn: null },
       select: {
         creadoPor: true,
-        tareas: { select: { estadoTarea: true } },
+        // eliminadoEn: null — las tareas con soft delete (Tarea 22) no deben
+        // contarse ni en el numerador ni en el denominador del avance.
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
         hitos: { select: { estadoHito: true } },
       },
     });
@@ -396,7 +398,9 @@ export class ProjectsService {
             },
           },
         },
-        tareas: { select: { estadoTarea: true } },
+        // eliminadoEn: null — misma exclusión que en getAvance: una tarea con
+        // soft delete no debe contarse en avanceProyecto.
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
         hitos: { select: { estadoHito: true } },
         revisiones: {
           select: {
