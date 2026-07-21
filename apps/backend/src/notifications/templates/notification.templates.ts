@@ -23,6 +23,17 @@ export interface NotificationTemplateData {
     taskId: number;
     projectId: number;
   };
+  // Reutiliza TipoNotificacion.TAREA_ACTUALIZADA (Tarea 25): no existe un
+  // valor de enum dedicado a "tarea desasignada" y esta tarea no puede
+  // agregar un enum Prisma ni una migración. TAREA_ACTUALIZADA ya existía
+  // en el schema sin ninguna plantilla asociada.
+  TAREA_ACTUALIZADA: {
+    taskTitle: string;
+    projectTitle: string;
+    unassignedBy: string;
+    taskId: number;
+    projectId: number;
+  };
   PROYECTO_EN_REVISION: {
     projectTitle: string;
     projectId: number;
@@ -92,6 +103,11 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Nueva tarea asignada',
     message: (data: NotificationTemplateData['TAREA_ASIGNADA']) =>
       `${data.assignedBy} te asignó la tarea "${data.taskTitle}" en el proyecto "${data.projectTitle}".`,
+  },
+  TAREA_ACTUALIZADA: {
+    title: 'Ya no estás asignado a esta tarea',
+    message: (data: NotificationTemplateData['TAREA_ACTUALIZADA']) =>
+      `${data.unassignedBy} te quitó la asignación de la tarea "${data.taskTitle}" en el proyecto "${data.projectTitle}".`,
   },
   PROYECTO_EN_REVISION: {
     title: (data: NotificationTemplateData['PROYECTO_EN_REVISION']) =>

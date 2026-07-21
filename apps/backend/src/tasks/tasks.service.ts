@@ -611,6 +611,68 @@ export class TasksService {
   }
 
   /**
+   * Cierra la asignación activa; exclusivo del líder (assertCanUnassignTask).
+   * No usa TasksRelationsService: no hay candidato nuevo que validar. La
+   * asignación activa se consulta de nuevo en cada llamada; sin fila activa
+   * es un no-op exitoso (204 idempotente). El cierre usa `updateMany` con
+   * idAsignacion+idTarea+idUsuario+desasignadaEn:null como filtro completo:
+   * si `count` da 0 (otra solicitud ya la cerró entre la lectura y la
+   * escritura), se trata igual que "sin asignación activa" — nunca se
+   * relanza, nunca se notifica dos veces. La notificación al usuario que
+   * dejó de estar asignado ocurre después de resolver la transacción
+   * (nunca dentro), y solo cuando esta llamada fue la que realmente cerró
+   * la fila (`cerrada: true`).
+   */
+  async unassign(projectId: number, taskId: number, actorUserId: number): Promise<void> {
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const tarea = await this.tasksAuthorization.assertCanUnassignTask(
+        projectId,
+        taskId,
+        actorUserId,
+        tx,
+      );
+
+      const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
+      if (!asignacionActiva) {
+        return { cerrada: false as const };
+      }
+
+      const desasignadaEn = new Date();
+      const closed = await tx.asignacionTarea.updateMany({
+        where: {
+          idAsignacion: asignacionActiva.idAsignacion,
+          idTarea: taskId,
+          idUsuario: asignacionActiva.idUsuario,
+          desasignadaEn: null,
+        },
+        data: { desasignadaEn },
+      });
+
+      if (closed.count === 0) {
+        return { cerrada: false as const };
+      }
+
+      return {
+        cerrada: true as const,
+        previousUserId: asignacionActiva.idUsuario,
+        taskId: tarea.idTarea,
+        projectId: tarea.idProyecto,
+        taskTitle: tarea.tituloTarea,
+      };
+    });
+
+    if (resultado.cerrada) {
+      await this._notifyUnassignment(
+        resultado.taskId,
+        resultado.projectId,
+        resultado.taskTitle,
+        actorUserId,
+        resultado.previousUserId,
+      );
+    }
+  }
+
+  /**
    * Notificación post-commit: un fallo aquí (almacenamiento, emisión o
    * incluso las lecturas auxiliares de nombre/título) nunca debe afectar
    * la respuesta de creación, que ya es exitosa. Se registra con Logger y
@@ -643,6 +705,49 @@ export class TasksService {
     } catch (error) {
       this.logger.error(
         `No se pudo notificar la asignación inicial de la tarea ${tarea.idTarea}`,
+        error as Error,
+      );
+    }
+  }
+
+  /**
+   * Notificación post-commit de la desasignación: mismo patrón que
+   * _notifyAssignment (auxiliares de actor/proyecto resueltas aquí, nunca
+   * dentro de la transacción de unassign; un fallo se registra con Logger
+   * y no se relanza — entrega "como máximo una vez", no un mecanismo de
+   * reintento). Solo se invoca cuando esta llamada cerró realmente la
+   * asignación, así que no hay riesgo de notificar dos veces ante
+   * solicitudes repetidas o una carrera con count: 0.
+   */
+  private async _notifyUnassignment(
+    taskId: number,
+    projectId: number,
+    taskTitle: string,
+    actorId: number,
+    previousUserId: number,
+  ): Promise<void> {
+    try {
+      const [actor, proyecto] = await Promise.all([
+        this.prisma.usuario.findUnique({
+          where: { idUsuario: actorId },
+          select: { nombre: true, apellido: true },
+        }),
+        this.prisma.proyecto.findUnique({
+          where: { idProyecto: projectId },
+          select: { tituloProyecto: true },
+        }),
+      ]);
+
+      await this.notifications.notifyFromTemplate([previousUserId], 'TAREA_ACTUALIZADA', {
+        taskTitle,
+        projectTitle: proyecto?.tituloProyecto ?? '',
+        unassignedBy: actor ? `${actor.nombre} ${actor.apellido}` : 'Alguien',
+        taskId,
+        projectId,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo notificar la desasignación de la tarea ${taskId}`,
         error as Error,
       );
     }
