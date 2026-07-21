@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
+import { AssignTaskDto } from './dto/assign-task.dto';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -521,6 +522,92 @@ export class TasksService {
         data: { eliminadoEn },
       });
     });
+  }
+
+  /**
+   * Asigna o reasigna la tarea; exclusivo del líder (assertCanAssignTask).
+   * El rol efectivo para validar al candidato viene siempre de la tarea ya
+   * validada por la autorización (`tarea.idRolProyecto`), nunca del DTO ni
+   * de una relectura aparte. La asignación activa se consulta de nuevo en
+   * cada llamada (nunca se confía en un resultado previo): si ya pertenece
+   * al candidato solicitado, la operación es idempotente y no escribe nada
+   * en AsignacionTarea; si pertenece a otra persona, se cierra esa fila
+   * (updateMany con idAsignacion+idTarea+desasignadaEn:null, para no tocar
+   * historial ni otras tareas) y se crea una fila nueva — nunca se
+   * reescribe el idUsuario de la fila anterior. Sin asignación activa,
+   * simplemente se crea la primera fila.
+   */
+  async assign(
+    projectId: number,
+    taskId: number,
+    actorUserId: number,
+    dto: AssignTaskDto,
+  ): Promise<TareaPublica> {
+    const row = await this.prisma.$transaction(async (tx) => {
+      const tarea = await this.tasksAuthorization.assertCanAssignTask(
+        projectId,
+        taskId,
+        actorUserId,
+        tx,
+      );
+
+      const rolEfectivo = tarea.idRolProyecto ?? null;
+      await this.tasksRelations.assertUserAssignableToProject(
+        projectId,
+        dto.idUsuario,
+        rolEfectivo,
+        tx,
+      );
+
+      const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
+
+      if (!asignacionActiva) {
+        await tx.asignacionTarea.create({
+          data: {
+            idTarea: taskId,
+            idUsuario: dto.idUsuario,
+            asignadoPor: actorUserId,
+            desasignadaEn: null,
+          },
+        });
+      } else if (asignacionActiva.idUsuario !== dto.idUsuario) {
+        const desasignadaEn = new Date();
+
+        await tx.asignacionTarea.updateMany({
+          where: {
+            idAsignacion: asignacionActiva.idAsignacion,
+            idTarea: taskId,
+            desasignadaEn: null,
+          },
+          data: { desasignadaEn },
+        });
+
+        await tx.asignacionTarea.create({
+          data: {
+            idTarea: taskId,
+            idUsuario: dto.idUsuario,
+            asignadoPor: actorUserId,
+            desasignadaEn: null,
+          },
+        });
+      }
+      // Si asignacionActiva.idUsuario === dto.idUsuario: idempotente, sin escrituras.
+
+      const filaFinal = await tx.tarea.findFirst({
+        where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
+        select: TASK_SELECT,
+      });
+
+      if (!filaFinal) {
+        throw new Error(
+          `No se pudo leer la tarea con id ${taskId} recién asignada dentro de la transacción`,
+        );
+      }
+
+      return filaFinal;
+    });
+
+    return mapTarea(row);
   }
 
   /**
