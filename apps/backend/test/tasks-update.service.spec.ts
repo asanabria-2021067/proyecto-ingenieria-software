@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TasksService } from '../src/tasks/tasks.service';
 
 function makeTx() {
@@ -576,6 +576,70 @@ describe('TasksService.update', () => {
 
       await service.update(5, 42, 1, { idRolProyecto: 6 } as any);
 
+      expect((tx as any).asignacionTarea).toBeUndefined();
+    });
+
+    it('el rechazo por incompatibilidad tiene status 400 exacto, nunca 409/ConflictException', async () => {
+      const { service } = makeService({
+        relations: makeRelations({
+          validateRelatedResources: vi.fn().mockResolvedValue({
+            hito: undefined,
+            rolProyecto: { idRolProyecto: 7, idProyecto: 5, nombreRol: 'QA' },
+            etiquetas: undefined,
+          }),
+          assertUserAssignableToProject: vi
+            .fn()
+            .mockRejectedValue(
+              new BadRequestException('El usuario no tiene una participación activa en el rol de la tarea'),
+            ),
+        }),
+        context: makeContext({
+          getActiveAssignment: vi.fn().mockResolvedValue({ idAsignacion: 1, idUsuario: 3, idTarea: 42 }),
+        }),
+      });
+
+      try {
+        await service.update(5, 42, 1, { idRolProyecto: 7 } as any);
+        throw new Error('no debía resolver');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(BadRequestException);
+        expect(e).not.toBeInstanceOf(ConflictException);
+        expect(e.getStatus()).toBe(400);
+        expect(e.getStatus()).not.toBe(409);
+      }
+    });
+
+    it('payload combinado (título + rol + etiquetas) con asignado incompatible: no ejecuta tarea.update ni etiquetas', async () => {
+      const { tx, service } = makeService({
+        relations: makeRelations({
+          validateRelatedResources: vi.fn().mockResolvedValue({
+            hito: undefined,
+            rolProyecto: { idRolProyecto: 7, idProyecto: 5, nombreRol: 'QA' },
+            etiquetas: [
+              { idEtiqueta: 2, idProyecto: 5, nombreEtiqueta: 'a', nombreNormalizado: 'a', color: '#111111' },
+              { idEtiqueta: 3, idProyecto: 5, nombreEtiqueta: 'b', nombreNormalizado: 'b', color: '#222222' },
+            ],
+          }),
+          assertUserAssignableToProject: vi
+            .fn()
+            .mockRejectedValue(new BadRequestException('incompatible')),
+        }),
+        context: makeContext({
+          getActiveAssignment: vi.fn().mockResolvedValue({ idAsignacion: 1, idUsuario: 3, idTarea: 42 }),
+        }),
+      });
+
+      await expect(
+        service.update(5, 42, 1, {
+          tituloTarea: 'Título que no debe persistir',
+          idRolProyecto: 7,
+          idsEtiquetas: [2, 3],
+        } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(tx.tarea.update).not.toHaveBeenCalled();
+      expect(tx.tareaEtiqueta.deleteMany).not.toHaveBeenCalled();
+      expect(tx.tareaEtiqueta.createMany).not.toHaveBeenCalled();
       expect((tx as any).asignacionTarea).toBeUndefined();
     });
   });
