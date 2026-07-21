@@ -91,4 +91,14 @@ export class TasksController {
   ) {
     return this.tasksService.assign(projectId, taskId, user.userId, dto);
   }
+
+  @Delete(':taskId/asignar')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unassign(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+  ): Promise<void> {
+    await this.tasksService.unassign(projectId, taskId, user.userId);
+  }
 }
