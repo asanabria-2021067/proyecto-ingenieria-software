@@ -41,13 +41,13 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
       expect(guards).toContain(JwtAuthGuard);
     });
 
-    it('agrega POST para creación (Tarea 18), pero aún no expone PATCH ni DELETE', () => {
+    it('agrega POST para creación (Tarea 18) y PATCH para edición (Tarea 19), pero aún no expone DELETE', () => {
       const source = readFileSync(
         join(__dirname, '../src/tasks/tasks.controller.ts'),
         'utf-8',
       );
       expect(source).toMatch(/@Post\(\)/);
-      expect(source).not.toMatch(/@Patch\(/);
+      expect(source).toMatch(/@Patch\(':taskId'\)/);
       expect(source).not.toMatch(/@Delete\(/);
     });
 
