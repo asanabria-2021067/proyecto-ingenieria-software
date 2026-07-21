@@ -15,6 +15,7 @@ import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
+import { AssignTaskDto } from './dto/assign-task.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -78,5 +79,16 @@ export class TasksController {
     @CurrentUser() user: { userId: number },
   ): Promise<void> {
     await this.tasksService.remove(projectId, taskId, user.userId);
+  }
+
+  @Post(':taskId/asignar')
+  @HttpCode(HttpStatus.OK)
+  assign(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: AssignTaskDto,
+  ) {
+    return this.tasksService.assign(projectId, taskId, user.userId, dto);
   }
 }
