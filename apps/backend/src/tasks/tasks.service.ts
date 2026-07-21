@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EstadoTarea, Prioridad, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
+import { TasksRelationsService } from './tasks-relations.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { CreateTaskDto } from './dto/create-task.dto';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -185,9 +188,13 @@ function compareTareas(a: TareaPublica, b: TareaPublica): number {
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     private prisma: PrismaService,
     private tasksAuthorization: TasksAuthorizationService,
+    private tasksRelations: TasksRelationsService,
+    private notifications: NotificationsService,
   ) {}
 
   async findAll(projectId: number, userId: number): Promise<TareaPublica[]> {
@@ -219,5 +226,133 @@ export class TasksService {
     }
 
     return mapTarea(row);
+  }
+
+  /**
+   * Crea la tarea, su asignación inicial (si se envió idUsuarioAsignado) y
+   * sus asociaciones de etiquetas de forma atómica dentro de una única
+   * transacción Prisma: autorización → relaciones → tarea → asignación →
+   * etiquetas → lectura final. Cualquier fallo en cualquiera de esos pasos
+   * revierte todas las escrituras (incluida la propia tarea) porque el
+   * callback de $transaction propaga la excepción sin capturarla. La
+   * notificación de asignación ocurre después de que la transacción se
+   * resuelve con éxito, nunca dentro de ella (sección 13 de la tarea).
+   */
+  async create(projectId: number, userId: number, dto: CreateTaskDto): Promise<TareaPublica> {
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.tasksAuthorization.assertCanCreateTask(projectId, userId, tx);
+
+      const recursos = await this.tasksRelations.validateCreateTaskRelations(projectId, dto, tx);
+
+      const tarea = await tx.tarea.create({
+        data: {
+          idProyecto: projectId,
+          creadaPor: userId,
+          tituloTarea: dto.tituloTarea,
+          // Conserva '' si se envió explícitamente; solo el omitido se
+          // convierte en null (no existe una convención distinta en el
+          // backend para "descripción vacía" vs. "sin descripción").
+          descripcionTarea: dto.descripcionTarea ?? null,
+          // fechaLimite es @db.Date: se ancla a medianoche UTC del mismo
+          // día calendario validado por el DTO, sin usar getters locales,
+          // igual que la lectura ya verificada en TasksService (Tarea 15).
+          fechaLimite: new Date(`${dto.fechaLimite}T00:00:00.000Z`),
+          prioridad: dto.prioridad,
+          // Estado inicial fijo: no existe todavía un contrato de API que
+          // permita elegirlo desde el cliente (Tarea 11), y el schema no
+          // define @default para fechaLimite ni para este flujo de
+          // creación explícita, así que se establece explícitamente con
+          // el enum real en vez de depender del @default(POR_HACER).
+          estadoTarea: EstadoTarea.POR_HACER,
+          tiempoEstimadoHoras: dto.tiempoEstimadoHoras ?? null,
+          idHito: recursos.hito?.idHito ?? null,
+          idRolProyecto: recursos.rolProyecto?.idRolProyecto ?? null,
+        },
+      });
+
+      if (dto.idUsuarioAsignado !== undefined) {
+        await tx.asignacionTarea.create({
+          data: {
+            idTarea: tarea.idTarea,
+            idUsuario: dto.idUsuarioAsignado,
+            asignadoPor: userId,
+            desasignadaEn: null,
+          },
+        });
+      }
+
+      if (recursos.etiquetas && recursos.etiquetas.length > 0) {
+        await tx.tareaEtiqueta.createMany({
+          data: recursos.etiquetas.map((etiqueta) => ({
+            idTarea: tarea.idTarea,
+            idEtiqueta: etiqueta.idEtiqueta,
+          })),
+        });
+      }
+
+      const filaFinal = await tx.tarea.findFirst({
+        where: { idTarea: tarea.idTarea, idProyecto: projectId, eliminadoEn: null },
+        select: TASK_SELECT,
+      });
+
+      if (!filaFinal) {
+        // Invariante interno: la tarea recién creada en esta misma
+        // transacción debería ser siempre legible. Si no lo es, algo está
+        // genuinamente mal en el servidor; se lanza un error no-HTTP para
+        // que se traduzca en 500 y, sobre todo, para que Prisma revierta
+        // toda la transacción.
+        throw new Error(
+          `No se pudo leer la tarea con id ${tarea.idTarea} recién creada dentro de la transacción`,
+        );
+      }
+
+      return filaFinal;
+    });
+
+    const tareaCreada = mapTarea(row);
+
+    if (dto.idUsuarioAsignado !== undefined) {
+      await this._notifyAssignment(tareaCreada, userId, dto.idUsuarioAsignado);
+    }
+
+    return tareaCreada;
+  }
+
+  /**
+   * Notificación post-commit: un fallo aquí (almacenamiento, emisión o
+   * incluso las lecturas auxiliares de nombre/título) nunca debe afectar
+   * la respuesta de creación, que ya es exitosa. Se registra con Logger y
+   * no se relanza; no se abre una segunda transacción ni se compensa nada.
+   */
+  private async _notifyAssignment(
+    tarea: TareaPublica,
+    actorId: number,
+    assignedUserId: number,
+  ): Promise<void> {
+    try {
+      const [actor, proyecto] = await Promise.all([
+        this.prisma.usuario.findUnique({
+          where: { idUsuario: actorId },
+          select: { nombre: true, apellido: true },
+        }),
+        this.prisma.proyecto.findUnique({
+          where: { idProyecto: tarea.idProyecto },
+          select: { tituloProyecto: true },
+        }),
+      ]);
+
+      await this.notifications.notifyFromTemplate([assignedUserId], 'TAREA_ASIGNADA', {
+        taskTitle: tarea.tituloTarea,
+        projectTitle: proyecto?.tituloProyecto ?? '',
+        assignedBy: actor ? `${actor.nombre} ${actor.apellido}` : 'Alguien',
+        taskId: tarea.idTarea,
+        projectId: tarea.idProyecto,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo notificar la asignación inicial de la tarea ${tarea.idTarea}`,
+        error as Error,
+      );
+    }
   }
 }
