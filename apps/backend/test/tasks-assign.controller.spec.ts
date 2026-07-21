@@ -117,9 +117,9 @@ describe('TasksController.assign (POST /proyectos/:projectId/tareas/:taskId/asig
     expect(new Set(posts).size).toBe(2);
   });
 
-  it('no implementa todavía un endpoint independiente de desasignación', () => {
+  it('la desasignación independiente (Tarea 25) usa DELETE en la misma ruta, no un endpoint distinto', () => {
     const source = readFileSync(join(__dirname, '../src/tasks/tasks.controller.ts'), 'utf-8');
-    expect(source).not.toMatch(/desasignar/i);
-    expect(source).not.toMatch(/unassign/i);
+    const deleteAsignarMatches = [...source.matchAll(/@Delete\('[^']*asignar'\)/g)];
+    expect(deleteAsignarMatches.length).toBe(1);
   });
 });
