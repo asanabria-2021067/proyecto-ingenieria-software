@@ -495,6 +495,35 @@ export class TasksService {
   }
 
   /**
+   * Soft delete: exclusivo del líder (assertCanDeleteTask). Un único
+   * timestamp (`eliminadoEn`) se usa tanto para marcar la tarea como para
+   * cerrar la asignación activa, de modo que ambas escrituras queden
+   * atadas al mismo instante lógico de eliminación y no a dos llamadas
+   * independientes a `new Date()`. `updateMany` sobre la asignación es
+   * intencional: funciona igual con 0 o 1 fila activa, sin necesitar una
+   * lectura previa, y el filtro `desasignadaEn: null` deja intactas las
+   * asignaciones históricas. No se borra físicamente nada; todo el
+   * historial (asignaciones, etiquetas, comentarios, evidencias) permanece.
+   */
+  async remove(projectId: number, taskId: number, userId: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.tasksAuthorization.assertCanDeleteTask(projectId, taskId, userId, tx);
+
+      const eliminadoEn = new Date();
+
+      await tx.asignacionTarea.updateMany({
+        where: { idTarea: taskId, desasignadaEn: null },
+        data: { desasignadaEn: eliminadoEn },
+      });
+
+      await tx.tarea.update({
+        where: { idTarea: taskId },
+        data: { eliminadoEn },
+      });
+    });
+  }
+
+  /**
    * Notificación post-commit: un fallo aquí (almacenamiento, emisión o
    * incluso las lecturas auxiliares de nombre/título) nunca debe afectar
    * la respuesta de creación, que ya es exitosa. Se registra con Logger y

@@ -217,8 +217,11 @@ export class ComentariosService {
       return proyecto;
     }
     if (dto.idTarea) {
-      const tarea = await this.prisma.tarea.findUnique({
-        where: { idTarea: dto.idTarea },
+      // findFirst (no findUnique) porque necesitamos combinar idTarea con
+      // eliminadoEn: null: una tarea con soft delete (Tarea 22) debe ser
+      // indistinguible de una inexistente también al crear comentarios.
+      const tarea = await this.prisma.tarea.findFirst({
+        where: { idTarea: dto.idTarea, eliminadoEn: null },
         select: { idProyecto: true },
       });
       if (!tarea) throw new NotFoundException('Tarea no encontrada');
