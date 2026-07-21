@@ -13,6 +13,7 @@ import {
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -56,5 +57,15 @@ export class TasksController {
     @Body() dto: UpdateTaskDto,
   ) {
     return this.tasksService.update(projectId, taskId, user.userId, dto);
+  }
+
+  @Patch(':taskId/estado')
+  updateEstado(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: UpdateTaskEstadoDto,
+  ) {
+    return this.tasksService.updateEstado(projectId, taskId, user.userId, dto);
   }
 }

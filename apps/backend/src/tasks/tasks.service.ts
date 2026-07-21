@@ -7,6 +7,7 @@ import { TasksRelationsService, RelatedResourcesInput } from './tasks-relations.
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -434,6 +435,47 @@ export class TasksService {
           });
         }
       }
+
+      const filaFinal = await tx.tarea.findFirst({
+        where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
+        select: TASK_SELECT,
+      });
+
+      if (!filaFinal) {
+        throw new Error(
+          `No se pudo leer la tarea con id ${taskId} recién actualizada dentro de la transacción`,
+        );
+      }
+
+      return filaFinal;
+    });
+
+    return mapTarea(row);
+  }
+
+  /**
+   * Cambia estadoTarea libremente entre los cuatro valores del enum, sin
+   * máquina de transiciones: el DTO ya valida que el valor pertenezca al
+   * enum real, así que cualquier combinación (incluido retroceder o repetir
+   * el estado actual) es una escritura válida. Autorización y escritura
+   * ocurren en la misma transacción: assertCanChangeTaskState (líder o
+   * asignado activo, consultado en cada llamada) → tarea.update del único
+   * campo → lectura final con el mismo TASK_SELECT/mapTarea que el resto de
+   * endpoints. No se toca asignación, etiquetas, hito ni rol.
+   */
+  async updateEstado(
+    projectId: number,
+    taskId: number,
+    userId: number,
+    dto: UpdateTaskEstadoDto,
+  ): Promise<TareaPublica> {
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.tasksAuthorization.assertCanChangeTaskState(projectId, taskId, userId, tx);
+
+      await tx.tarea.update({
+        where: { idTarea: taskId },
+        data: { estadoTarea: dto.estadoTarea },
+      });
 
       const filaFinal = await tx.tarea.findFirst({
         where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
