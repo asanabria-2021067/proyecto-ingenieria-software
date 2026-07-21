@@ -7,7 +7,7 @@ function makePrisma() {
   return {
     comentario: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     proyecto: { findUnique: vi.fn() },
-    tarea: { findUnique: vi.fn() },
+    tarea: { findUnique: vi.fn(), findFirst: vi.fn() },
     hito: { findUnique: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
   } as any;
@@ -19,6 +19,39 @@ describe('ComentariosService', () => {
     await expect(service.create(1, { idProyecto: 1, idTarea: 2, contenido: 'x' } as any)).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it('create con idTarea consulta la tarea con eliminadoEn: null (Tarea 22: soft delete de tareas)', async () => {
+    const prisma = makePrisma();
+    prisma.tarea.findFirst.mockResolvedValue({ idProyecto: 1 });
+    prisma.proyecto.findUnique.mockResolvedValueOnce({
+      estadoProyecto: EstadoProyecto.PUBLICADO,
+      creadoPor: 2,
+    });
+    prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    prisma.comentario.create.mockResolvedValue({ idComentario: 9 });
+    const service = new ComentariosService(prisma, { notifyProjectActiveParticipants: vi.fn() } as any);
+
+    await service.create(2, { idTarea: 7, contenido: 'Hola' } as any);
+
+    expect(prisma.tarea.findFirst).toHaveBeenCalledWith({
+      where: { idTarea: 7, eliminadoEn: null },
+      select: { idProyecto: true },
+    });
+    expect(prisma.tarea.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('create con idTarea de una tarea con soft delete: NotFoundException, no crea el comentario (Tarea 22)', async () => {
+    const prisma = makePrisma();
+    // findFirst con eliminadoEn: null no encuentra nada porque la tarea está eliminada lógicamente.
+    prisma.tarea.findFirst.mockResolvedValue(null);
+    const service = new ComentariosService(prisma, { notifyProjectActiveParticipants: vi.fn() } as any);
+
+    await expect(
+      service.create(2, { idTarea: 7, contenido: 'no debería crearse' } as any),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.comentario.create).not.toHaveBeenCalled();
   });
 
   it('create comenta proyecto y notifica', async () => {

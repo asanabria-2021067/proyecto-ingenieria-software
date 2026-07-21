@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -67,5 +68,15 @@ export class TasksController {
     @Body() dto: UpdateTaskEstadoDto,
   ) {
     return this.tasksService.updateEstado(projectId, taskId, user.userId, dto);
+  }
+
+  @Delete(':taskId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+  ): Promise<void> {
+    await this.tasksService.remove(projectId, taskId, user.userId);
   }
 }
