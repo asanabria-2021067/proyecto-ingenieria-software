@@ -1,10 +1,12 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EstadoTarea, Prioridad, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
-import { TasksRelationsService } from './tasks-relations.service';
+import { TasksContextService } from './tasks-context.service';
+import { TasksRelationsService, RelatedResourcesInput } from './tasks-relations.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -57,6 +59,23 @@ const TASK_SELECT = {
 } satisfies Prisma.TareaSelect;
 
 type TareaRow = Prisma.TareaGetPayload<{ select: typeof TASK_SELECT }>;
+
+/**
+ * Únicas claves relevantes para distinguir un PATCH vacío de uno con al
+ * menos un cambio real; deben coincidir exactamente con los campos
+ * declarados en UpdateTaskDto (forbidNonWhitelisted ya descarta cualquier
+ * otra clave antes de llegar al service).
+ */
+const UPDATE_TASK_FIELDS = [
+  'tituloTarea',
+  'descripcionTarea',
+  'fechaLimite',
+  'prioridad',
+  'tiempoEstimadoHoras',
+  'idHito',
+  'idRolProyecto',
+  'idsEtiquetas',
+] as const;
 
 interface UsuarioResumenPublico {
   idUsuario: number;
@@ -195,6 +214,7 @@ export class TasksService {
     private tasksAuthorization: TasksAuthorizationService,
     private tasksRelations: TasksRelationsService,
     private notifications: NotificationsService,
+    private tasksContext: TasksContextService,
   ) {}
 
   async findAll(projectId: number, userId: number): Promise<TareaPublica[]> {
@@ -316,6 +336,120 @@ export class TasksService {
     }
 
     return tareaCreada;
+  }
+
+  /**
+   * Edita título, descripción, prioridad, fecha límite, tiempo estimado,
+   * hito, rol de proyecto y el conjunto completo de etiquetas dentro de una
+   * única transacción: autorización → relaciones enviadas → compatibilidad
+   * del asignado activo (solo si cambia idRolProyecto) → tarea → etiquetas
+   * → lectura final. No toca AsignacionTarea. Un campo se distingue de
+   * "omitido" por presencia real de la clave en dto (hasOwnProperty), nunca
+   * por su valor: '' en descripcionTarea y null en idHito/idRolProyecto son
+   * envíos explícitos válidos que undefined-checks confundirían.
+   */
+  async update(
+    projectId: number,
+    taskId: number,
+    userId: number,
+    dto: UpdateTaskDto,
+  ): Promise<TareaPublica> {
+    const huboCampoEnviado = UPDATE_TASK_FIELDS.some((campo) =>
+      Object.prototype.hasOwnProperty.call(dto, campo),
+    );
+    if (!huboCampoEnviado) {
+      throw new BadRequestException('Debe enviar al menos un campo para actualizar la tarea');
+    }
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.tasksAuthorization.assertCanEditTask(projectId, taskId, userId, tx);
+
+      const relacionesInput: RelatedResourcesInput = {};
+      if (Object.prototype.hasOwnProperty.call(dto, 'idHito')) {
+        relacionesInput.idHito = dto.idHito;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'idRolProyecto')) {
+        relacionesInput.idRolProyecto = dto.idRolProyecto;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'idsEtiquetas')) {
+        relacionesInput.idsEtiquetas = dto.idsEtiquetas;
+      }
+
+      const recursos = await this.tasksRelations.validateRelatedResources(
+        projectId,
+        relacionesInput,
+        tx,
+      );
+
+      // El rol no se toca desde este endpoint, pero un cambio de rol no
+      // puede dejar a un asignado activo en un rol que ya no participa.
+      // Solo se consulta la asignación cuando idRolProyecto fue enviado.
+      if (Object.prototype.hasOwnProperty.call(dto, 'idRolProyecto')) {
+        const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
+        if (asignacionActiva) {
+          const rolEfectivo = recursos.rolProyecto?.idRolProyecto ?? null;
+          await this.tasksRelations.assertUserAssignableToProject(
+            projectId,
+            asignacionActiva.idUsuario,
+            rolEfectivo,
+            tx,
+          );
+        }
+      }
+
+      const data: Prisma.TareaUncheckedUpdateInput = {};
+      if (Object.prototype.hasOwnProperty.call(dto, 'tituloTarea')) {
+        data.tituloTarea = dto.tituloTarea;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'descripcionTarea')) {
+        data.descripcionTarea = dto.descripcionTarea;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'prioridad')) {
+        data.prioridad = dto.prioridad;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'tiempoEstimadoHoras')) {
+        data.tiempoEstimadoHoras = dto.tiempoEstimadoHoras;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'fechaLimite')) {
+        data.fechaLimite = new Date(`${dto.fechaLimite}T00:00:00.000Z`);
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'idHito')) {
+        data.idHito = recursos.hito?.idHito ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'idRolProyecto')) {
+        data.idRolProyecto = recursos.rolProyecto?.idRolProyecto ?? null;
+      }
+
+      await tx.tarea.update({ where: { idTarea: taskId }, data });
+
+      if (Object.prototype.hasOwnProperty.call(dto, 'idsEtiquetas')) {
+        await tx.tareaEtiqueta.deleteMany({ where: { idTarea: taskId } });
+
+        if (recursos.etiquetas && recursos.etiquetas.length > 0) {
+          await tx.tareaEtiqueta.createMany({
+            data: recursos.etiquetas.map((etiqueta) => ({
+              idTarea: taskId,
+              idEtiqueta: etiqueta.idEtiqueta,
+            })),
+          });
+        }
+      }
+
+      const filaFinal = await tx.tarea.findFirst({
+        where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
+        select: TASK_SELECT,
+      });
+
+      if (!filaFinal) {
+        throw new Error(
+          `No se pudo leer la tarea con id ${taskId} recién actualizada dentro de la transacción`,
+        );
+      }
+
+      return filaFinal;
+    });
+
+    return mapTarea(row);
   }
 
   /**
