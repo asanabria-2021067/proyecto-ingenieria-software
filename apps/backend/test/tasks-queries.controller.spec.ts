@@ -41,12 +41,12 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
       expect(guards).toContain(JwtAuthGuard);
     });
 
-    it('no existe ningún endpoint de escritura (POST/PATCH/DELETE) en TasksController', () => {
+    it('agrega POST para creación (Tarea 18), pero aún no expone PATCH ni DELETE', () => {
       const source = readFileSync(
         join(__dirname, '../src/tasks/tasks.controller.ts'),
         'utf-8',
       );
-      expect(source).not.toMatch(/@Post\(/);
+      expect(source).toMatch(/@Post\(\)/);
       expect(source).not.toMatch(/@Patch\(/);
       expect(source).not.toMatch(/@Delete\(/);
     });
@@ -62,18 +62,26 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
       expect(controllerDecorators).toEqual(["@Controller('proyectos/:projectId/tareas')"]);
     });
 
-    it('userId se obtiene exclusivamente de @CurrentUser(), sin @Body/@Query/header personalizado', () => {
+    it('userId se obtiene exclusivamente de @CurrentUser(), nunca del body/query/header/params', () => {
       const source = readFileSync(
         join(__dirname, '../src/tasks/tasks.controller.ts'),
         'utf-8',
       );
-      expect(source).not.toMatch(/@Body\(/);
+      // Desde la Tarea 18, @Body() existe únicamente para el DTO tipado de
+      // creación (CreateTaskDto) — nunca para leer userId/creadaPor/
+      // idProyecto directamente del payload del cliente.
       expect(source).not.toMatch(/@Query\(/);
       expect(source).not.toMatch(/@Headers\(/);
+      expect(source).toMatch(/@Body\(\)\s+dto:\s+CreateTaskDto/);
+      expect(source).not.toMatch(/@Body\('userId'/);
+      expect(source).not.toMatch(/@Body\('creadaPor'/);
+      expect(source).not.toMatch(/dto\.userId/);
+      expect(source).not.toMatch(/dto\.creadaPor/);
+      expect(source).not.toMatch(/dto\.idProyecto/);
       expect(source).toMatch(/@CurrentUser\(\)/);
       // Los únicos nombres de @Param declarados en todo el archivo deben ser
-      // projectId y taskId, nunca userId (findAll usa projectId; findOne
-      // usa projectId y taskId, por eso projectId aparece dos veces).
+      // projectId y taskId, nunca userId (findAll y create usan projectId;
+      // findOne usa projectId y taskId; por eso projectId aparece 3 veces).
       const paramNames = [...source.matchAll(/@Param\('([^']+)'/g)].map((m) => m[1]);
       expect([...new Set(paramNames)].sort()).toEqual(['projectId', 'taskId']);
     });
