@@ -41,14 +41,14 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
       expect(guards).toContain(JwtAuthGuard);
     });
 
-    it('agrega POST para creación (Tarea 18) y PATCH para edición (Tarea 19), pero aún no expone DELETE', () => {
+    it('agrega POST para creación (Tarea 18), PATCH para edición (Tarea 19/21) y DELETE (Tarea 22)', () => {
       const source = readFileSync(
         join(__dirname, '../src/tasks/tasks.controller.ts'),
         'utf-8',
       );
       expect(source).toMatch(/@Post\(\)/);
       expect(source).toMatch(/@Patch\(':taskId'\)/);
-      expect(source).not.toMatch(/@Delete\(/);
+      expect(source).toMatch(/@Delete\(':taskId'\)/);
     });
 
     it('no se declara ninguna ruta legado GET /tareas (raíz sin proyecto)', () => {

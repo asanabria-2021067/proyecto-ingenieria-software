@@ -89,9 +89,8 @@ describe('TasksController.updateEstado (PATCH /proyectos/:projectId/tareas/:task
     expect(source).not.toMatch(/:\s*any\b/);
   });
 
-  it('no implementa otras rutas de escritura además de creación, edición y estado', () => {
+  it('no implementa otras rutas PATCH además de edición y estado (DELETE se agregó en la Tarea 22)', () => {
     const source = readFileSync(join(__dirname, '../src/tasks/tasks.controller.ts'), 'utf-8');
-    expect(source).not.toMatch(/@Delete\(/);
     const patches = [...source.matchAll(/@Patch\('([^']*)'\)/g)].map((m) => m[1]);
     expect(patches.sort()).toEqual([':taskId', ':taskId/estado'].sort());
   });
