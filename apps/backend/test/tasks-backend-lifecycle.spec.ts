@@ -759,8 +759,11 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       await expectStatus(env.tasksService.remove(P.A, taskId, U.liderA), NotFoundException, 404);
 
       const totalComentariosAntes = env.state.comentarios.length;
+      // Tarea 28: la creación de comentarios de tarea se migró a la ruta
+      // anidada/contextualizada (createForTask); la genérica create() ya no
+      // acepta idTarea en absoluto.
       await expectStatus(
-        env.comentariosService.create(U.liderA, { idTarea: taskId, contenido: 'no debería crearse' } as any),
+        env.comentariosService.createForTask(P.A, taskId, U.liderA, 'no debería crearse'),
         NotFoundException,
         404,
       );
