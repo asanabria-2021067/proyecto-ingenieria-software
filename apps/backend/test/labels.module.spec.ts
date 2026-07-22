@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { AppModule } from '../src/app.module';
 import { LabelsModule } from '../src/labels/labels.module';
 import { LabelsController } from '../src/labels/labels.controller';
+import { TaskLabelsController } from '../src/labels/task-labels.controller';
 import { LabelsService } from '../src/labels/labels.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -24,10 +25,15 @@ const CONTROLLER_SOURCE = readFileSync(join(__dirname, '../src/labels/labels.con
  * cobertura de wiring que sigue vigente (controllers/providers/exports,
  * import único en AppModule, prefijo).
  */
-describe('LabelsModule (Tarea 31: estructura, wiring y persistencia)', () => {
+describe('LabelsModule (Tarea 32: estructura, wiring, persistencia y asociación tarea-etiqueta)', () => {
   it('registra LabelsController en controllers', () => {
     const controllers = Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, LabelsModule);
     expect(controllers).toContain(LabelsController);
+  });
+
+  it('registra TaskLabelsController en controllers (Tarea 32)', () => {
+    const controllers = Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, LabelsModule);
+    expect(controllers).toContain(TaskLabelsController);
   });
 
   it('registra LabelsService en providers', () => {
@@ -89,5 +95,31 @@ describe('LabelsController (Tarea 31: prefijo contextualizado y CRUD real)', () 
 
   it('inyecta LabelsService en su constructor', () => {
     expect(CONTROLLER_SOURCE).toMatch(/constructor\(private labelsService: LabelsService\)/);
+  });
+});
+
+describe('TaskLabelsController (Tarea 32: asociación tarea-etiqueta)', () => {
+  const TASK_LABELS_CONTROLLER_SOURCE = readFileSync(
+    join(__dirname, '../src/labels/task-labels.controller.ts'),
+    'utf-8',
+  );
+
+  it('usa el prefijo proyectos/:projectId/tareas/:taskId/etiquetas (distinto del de LabelsController)', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, TaskLabelsController)).toBe(
+      'proyectos/:projectId/tareas/:taskId/etiquetas',
+    );
+  });
+
+  it('expone exactamente attach y detach', () => {
+    const propios = Object.getOwnPropertyNames(TaskLabelsController.prototype).filter(
+      (name) => name !== 'constructor',
+    );
+    expect(propios.sort()).toEqual(['attach', 'detach']);
+  });
+
+  it('inyecta LabelsService en su constructor (reutiliza el mismo service, no crea uno propio)', () => {
+    expect(TASK_LABELS_CONTROLLER_SOURCE).toMatch(
+      /constructor\(private labelsService: LabelsService\)/,
+    );
   });
 });
