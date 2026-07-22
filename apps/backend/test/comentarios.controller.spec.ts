@@ -5,7 +5,6 @@ function makeService() {
   return {
     create: vi.fn(),
     findByProyecto: vi.fn(),
-    findByTarea: vi.fn(),
     findByHito: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
@@ -23,18 +22,6 @@ describe('ComentariosController - lectura', () => {
     expect(service.findByProyecto).toHaveBeenCalledWith(10, 7);
     expect(service.findByProyecto).toHaveBeenCalledTimes(1);
     expect(result).toEqual([{ idComentario: 1 }]);
-  });
-
-  it('findByTarea recibe el idTarea de la ruta, propaga exactamente user.userId y devuelve el resultado del servicio', async () => {
-    const service = makeService();
-    service.findByTarea.mockResolvedValue([{ idComentario: 2 }]);
-    const controller = new ComentariosController(service);
-
-    const result = await controller.findByTarea(20, { userId: 8 });
-
-    expect(service.findByTarea).toHaveBeenCalledWith(20, 8);
-    expect(service.findByTarea).toHaveBeenCalledTimes(1);
-    expect(result).toEqual([{ idComentario: 2 }]);
   });
 
   it('findByHito recibe el idHito de la ruta, propaga exactamente user.userId y devuelve el resultado del servicio', async () => {
@@ -63,9 +50,14 @@ describe('ComentariosController - lectura', () => {
   it('cuando el servicio rechaza por autorización, el controller propaga el rechazo sin transformarlo', async () => {
     const service = makeService();
     const forbidden = new Error('sin acceso');
-    service.findByTarea.mockRejectedValue(forbidden);
+    service.findByHito.mockRejectedValue(forbidden);
     const controller = new ComentariosController(service);
 
-    await expect(controller.findByTarea(20, { userId: 8 })).rejects.toBe(forbidden);
+    await expect(controller.findByHito(30, { userId: 8 })).rejects.toBe(forbidden);
+  });
+
+  it('Tarea 28.C: ya no existe un handler findByTarea en el controller genérico', () => {
+    const controller = new ComentariosController(makeService());
+    expect((controller as any).findByTarea).toBeUndefined();
   });
 });
