@@ -36,14 +36,6 @@ export class ComentariosController {
     return this.comentariosService.findByProyecto(idProyecto, user.userId);
   }
 
-  @Get('tarea/:idTarea')
-  findByTarea(
-    @Param('idTarea', ParseIntPipe) idTarea: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.comentariosService.findByTarea(idTarea, user.userId);
-  }
-
   @Get('hito/:idHito')
   findByHito(
     @Param('idHito', ParseIntPipe) idHito: number,

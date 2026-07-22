@@ -1,49 +1,62 @@
-import { Controller, Get, Post, Delete, Param, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { ComentariosService } from '../comentarios/comentarios.service';
 import { CreateTareaComentarioDto } from './dto/create-tarea-comentario.dto';
+import { UpdateComentarioDto } from '../comentarios/dto/update-comentario.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 /**
- * Extraído de TasksController (Tarea 15) para conservar exactamente las
- * rutas /tareas/:id/comentarios* sin cambios: TasksController pasó a estar
- * anidado bajo proyectos/:projectId/tareas, y mover estos métodos al mismo
- * controller habría cambiado su prefijo. Comportamiento, guards, params y
- * paths permanecen idénticos a los que tenía TasksController antes de esta
- * tarea.
+ * Tarea 28: migrado de `tareas/:id/comentarios*` (proyecto implícito) a
+ * rutas completamente anidadas y contextualizadas bajo
+ * `proyectos/:projectId/tareas/:taskId/comentarios`. Cada operación delega
+ * en los métodos contextualizados de ComentariosService
+ * (findByTareaEnProyecto/createForTask/updateForTask/removeForTask), que
+ * validan proyecto+tarea en base de datos antes de aplicar las mismas
+ * reglas de autorización que ya existían. El controller no valida nada por
+ * sí mismo ni consulta Prisma directamente.
  */
-@Controller('tareas')
+@Controller('proyectos/:projectId/tareas/:taskId/comentarios')
+@UseGuards(JwtAuthGuard)
 export class TareaComentariosController {
   constructor(private comentariosService: ComentariosService) {}
 
-  @Get(':id/comentarios')
-  @UseGuards(JwtAuthGuard)
+  @Get()
   findComentarios(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
     @CurrentUser() user: { userId: number },
   ) {
-    return this.comentariosService.findByTareaDesc(id, user.userId);
+    return this.comentariosService.findByTareaEnProyecto(projectId, taskId, user.userId);
   }
 
-  @Post(':id/comentarios')
-  @UseGuards(JwtAuthGuard)
+  @Post()
   createComentario(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
     @CurrentUser() user: { userId: number },
     @Body() dto: CreateTareaComentarioDto,
   ) {
-    return this.comentariosService.create(user.userId, {
-      idTarea: id,
-      contenido: dto.contenido,
-    });
+    return this.comentariosService.createForTask(projectId, taskId, user.userId, dto.contenido);
   }
 
-  @Delete(':id/comentarios/:idComentario')
-  @UseGuards(JwtAuthGuard)
+  @Patch(':commentId')
+  updateComentario(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: UpdateComentarioDto,
+  ) {
+    return this.comentariosService.updateForTask(projectId, taskId, commentId, user.userId, dto);
+  }
+
+  @Delete(':commentId')
   removeComentario(
-    @Param('idComentario', ParseIntPipe) idComentario: number,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
     @CurrentUser() user: { userId: number },
   ) {
-    return this.comentariosService.remove(idComentario, user.userId);
+    return this.comentariosService.removeForTask(projectId, taskId, commentId, user.userId);
   }
 }

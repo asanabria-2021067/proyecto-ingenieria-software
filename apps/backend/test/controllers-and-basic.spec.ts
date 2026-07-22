@@ -106,10 +106,9 @@ describe('Controllers and basic services', () => {
     revisiones.reclamar(1, { userId: 1 });
     revisiones.resolver(1, { userId: 1 }, {} as any);
 
-    const comentarios = new ComentariosController({ create: vi.fn(), findByProyecto: vi.fn(), findByTarea: vi.fn(), findByHito: vi.fn(), update: vi.fn(), remove: vi.fn() } as any);
+    const comentarios = new ComentariosController({ create: vi.fn(), findByProyecto: vi.fn(), findByHito: vi.fn(), update: vi.fn(), remove: vi.fn() } as any);
     comentarios.create({ userId: 1 }, {} as any);
     comentarios.findByProyecto(1, { userId: 1 });
-    comentarios.findByTarea(1, { userId: 1 });
     comentarios.findByHito(1, { userId: 1 });
     comentarios.update(1, { userId: 1 }, {} as any);
     comentarios.remove(1, { userId: 1 });

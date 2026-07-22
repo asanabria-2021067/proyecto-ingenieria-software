@@ -87,22 +87,21 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
     });
   });
 
-  describe('rutas de comentarios (no deben modificarse por esta tarea)', () => {
-    it('TareaComentariosController conserva el prefijo tareas', () => {
-      expect(Reflect.getMetadata(PATH_METADATA, TareaComentariosController)).toBe('tareas');
+  describe('rutas de comentarios (migradas a rutas anidadas por la Tarea 28)', () => {
+    it('TareaComentariosController quedó anidado bajo proyectos/:projectId/tareas/:taskId/comentarios', () => {
+      expect(Reflect.getMetadata(PATH_METADATA, TareaComentariosController)).toBe(
+        'proyectos/:projectId/tareas/:taskId/comentarios',
+      );
     });
 
-    it('conserva exactamente los 3 sub-paths de comentarios', () => {
+    it('expone los 4 sub-paths relativos esperados (list/create en la raíz, update/remove por :commentId)', () => {
       const paths = [
         Reflect.getMetadata(PATH_METADATA, TareaComentariosController.prototype.findComentarios),
         Reflect.getMetadata(PATH_METADATA, TareaComentariosController.prototype.createComentario),
+        Reflect.getMetadata(PATH_METADATA, TareaComentariosController.prototype.updateComentario),
         Reflect.getMetadata(PATH_METADATA, TareaComentariosController.prototype.removeComentario),
       ];
-      expect(paths).toEqual([
-        ':id/comentarios',
-        ':id/comentarios',
-        ':id/comentarios/:idComentario',
-      ]);
+      expect(paths).toEqual(['/', '/', ':commentId', ':commentId']);
     });
   });
 
