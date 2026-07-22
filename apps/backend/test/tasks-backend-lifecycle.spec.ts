@@ -931,6 +931,60 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       const activa = env.state.asignaciones.find((a) => a.idTarea === creada.idTarea && a.desasignadaEn === null);
       expect(activa).toBeUndefined(); // la desasignación permanece comprometida
     });
+
+    /**
+     * Tarea 29: secuencia real de destinatarios de comentarios de tarea a
+     * través del ciclo completo asignación → reasignación → desasignación,
+     * usando ComentariosService real contra el mismo estado transaccional
+     * que TasksService (ver test/helpers/tasks-lifecycle.fixture.ts). Cada
+     * paso llama a `createForTask` de nuevo, así que la consulta de
+     * asignación activa se resuelve en vivo, nunca desde una respuesta
+     * anterior.
+     */
+    it('comentarios de tarea: asignado activo → reasignación → desasignación → creador, sin reiniciar el servicio', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await env.tasksService.create(P.A, U.liderA, await parseCreate(baseCreatePayload()));
+      const taskId = creada.idTarea;
+      const commenter = U.a2;
+
+      // Asignación activa a A (U.a1).
+      await env.tasksService.assign(P.A, taskId, U.liderA, await parseAssign({ idUsuario: U.a1 }));
+      env.notifications.notifyUsers.mockClear();
+
+      // Comentario 1: C comenta, solo A es notificado.
+      await env.comentariosService.createForTask(P.A, taskId, commenter, 'primero');
+      expect(env.notifications.notifyUsers).toHaveBeenCalledTimes(1);
+      expect(env.notifications.notifyUsers).toHaveBeenCalledWith(
+        [U.a1],
+        expect.objectContaining({ tipoNotificacion: 'COMENTARIO_TAREA' }),
+      );
+      env.notifications.notifyUsers.mockClear();
+
+      // Reasignación en vivo a B (U.a3Diseno).
+      await env.tasksService.assign(P.A, taskId, U.liderA, await parseAssign({ idUsuario: U.a3Diseno }));
+
+      // Comentario 2: C comenta de nuevo; se consulta la BD otra vez y solo B es notificado (A ya no).
+      await env.comentariosService.createForTask(P.A, taskId, commenter, 'segundo');
+      expect(env.notifications.notifyUsers).toHaveBeenCalledTimes(1);
+      expect(env.notifications.notifyUsers).toHaveBeenCalledWith(
+        [U.a3Diseno],
+        expect.objectContaining({ tipoNotificacion: 'COMENTARIO_TAREA' }),
+      );
+      const segundoDestinatarios = env.notifications.notifyUsers.mock.calls[0][0];
+      expect(segundoDestinatarios).not.toContain(U.a1);
+      env.notifications.notifyUsers.mockClear();
+
+      // Desasignación de B.
+      await env.tasksService.unassign(P.A, taskId, U.liderA);
+
+      // Comentario 3: sin asignación activa, solo el creador (U.liderA) es notificado.
+      await env.comentariosService.createForTask(P.A, taskId, commenter, 'tercero');
+      expect(env.notifications.notifyUsers).toHaveBeenCalledTimes(1);
+      expect(env.notifications.notifyUsers).toHaveBeenCalledWith(
+        [U.liderA],
+        expect.objectContaining({ tipoNotificacion: 'COMENTARIO_TAREA' }),
+      );
+    });
   });
 
   // -------------------------------------------------------------------
