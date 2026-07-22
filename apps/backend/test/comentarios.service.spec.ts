@@ -10,6 +10,7 @@ function makePrisma() {
     tarea: { findUnique: vi.fn(), findFirst: vi.fn() },
     hito: { findUnique: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
+    asignacionTarea: { findFirst: vi.fn() },
   } as any;
 }
 
@@ -36,20 +37,21 @@ describe('ComentariosService', () => {
 
   it('createForTask consulta la tarea con eliminadoEn: null y proyecto.eliminadoEn: null (Tarea 28, reemplaza la validación que create() hacía para idTarea)', async () => {
     const prisma = makePrisma();
-    prisma.tarea.findFirst.mockResolvedValue({ idTarea: 7, idProyecto: 1 });
+    prisma.tarea.findFirst.mockResolvedValue({ idTarea: 7, idProyecto: 1, creadaPor: 2 });
     prisma.proyecto.findUnique.mockResolvedValueOnce({
       estadoProyecto: EstadoProyecto.PUBLICADO,
       creadoPor: 2,
     });
     prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    prisma.asignacionTarea.findFirst.mockResolvedValue(null);
     prisma.comentario.create.mockResolvedValue({ idComentario: 9 });
-    const service = new ComentariosService(prisma, { notifyProjectActiveParticipants: vi.fn() } as any);
+    const service = new ComentariosService(prisma, { notifyUsers: vi.fn() } as any);
 
     await service.createForTask(1, 7, 2, 'Hola');
 
     expect(prisma.tarea.findFirst).toHaveBeenCalledWith({
       where: { idTarea: 7, idProyecto: 1, eliminadoEn: null, proyecto: { eliminadoEn: null } },
-      select: { idTarea: true, idProyecto: true },
+      select: { idTarea: true, idProyecto: true, creadaPor: true },
     });
   });
 
@@ -58,7 +60,7 @@ describe('ComentariosService', () => {
     // findFirst con eliminadoEn: null no encuentra nada porque la tarea está eliminada lógicamente
     // o no pertenece al proyecto indicado.
     prisma.tarea.findFirst.mockResolvedValue(null);
-    const service = new ComentariosService(prisma, { notifyProjectActiveParticipants: vi.fn() } as any);
+    const service = new ComentariosService(prisma, { notifyUsers: vi.fn() } as any);
 
     await expect(
       service.createForTask(1, 7, 2, 'no debería crearse'),

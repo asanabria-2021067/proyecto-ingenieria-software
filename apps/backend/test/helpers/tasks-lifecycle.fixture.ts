@@ -720,7 +720,11 @@ export interface LifecycleEnv {
   tasksService: TasksService;
   projectsService: ProjectsService;
   comentariosService: ComentariosService;
-  notifications: { notifyFromTemplate: ReturnType<typeof vi.fn>; notifyProjectActiveParticipants: ReturnType<typeof vi.fn> };
+  notifications: {
+    notifyFromTemplate: ReturnType<typeof vi.fn>;
+    notifyProjectActiveParticipants: ReturnType<typeof vi.fn>;
+    notifyUsers: ReturnType<typeof vi.fn>;
+  };
 }
 
 /** Construye un entorno fresco (estado + fake db + servicios REALES) para un escenario de la suite integral. */
@@ -734,6 +738,7 @@ export function setupLifecycleEnv(): LifecycleEnv {
   const notifications = {
     notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
     notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
+    notifyUsers: vi.fn().mockResolvedValue(undefined),
   };
   const tasksService = new TasksService(
     db as any,
