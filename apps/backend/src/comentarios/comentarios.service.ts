@@ -46,13 +46,18 @@ export class ComentariosService {
   }
 
   /**
-   * Único punto de creación de comentarios de tarea (Tarea 28): valida
+   * Único punto de creación de comentarios de tarea (Tarea 28). Valida
    * proyecto+tarea en base de datos (`getTareaEnProyectoOrThrow`, con
    * `proyecto.eliminadoEn: null` incluido) antes de reutilizar la misma
    * regla de autorización de escritura (`assertChannelAWriteAllowed`) que
-   * ya usan los comentarios de proyecto e hito. No duplica la lógica de
-   * creación/notificación: delega en `persistAndNotify`, compartida con
-   * `create()`.
+   * ya usan los comentarios de proyecto e hito.
+   *
+   * Tarea 29: a diferencia de `create()` (proyecto/hito), NO delega en
+   * `persistAndNotify`/`notifyProjectActiveParticipants`. Los destinatarios
+   * de un comentario de tarea nunca son "todos los participantes activos
+   * del proyecto": son, como mucho, un único usuario (el asignado activo o,
+   * en su defecto, quien creó la tarea), resuelto en vivo por
+   * `getTaskCommentRecipientIds` en cada llamada.
    */
   async createForTask(
     projectId: number,
@@ -60,14 +65,61 @@ export class ComentariosService {
     userId: number,
     contenido: string,
   ) {
-    await this.getTareaEnProyectoOrThrow(projectId, taskId);
+    const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId);
     await this.assertChannelAWriteAllowed(projectId, userId);
 
-    return this.persistAndNotify(
-      userId,
-      projectId,
-      { idTarea: taskId, contenido },
-      TipoNotificacion.COMENTARIO_TAREA,
+    const comentario = await this.prisma.comentario.create({
+      data: {
+        idAutor: userId,
+        idTarea: taskId,
+        contenido: contenido.trim(),
+      },
+    });
+
+    const recipientIds = await this.getTaskCommentRecipientIds(taskId, tarea.creadaPor, userId);
+    await this.notifications.notifyUsers(recipientIds, {
+      tipoNotificacion: TipoNotificacion.COMENTARIO_TAREA,
+      tituloNotificacion: 'Nuevo comentario',
+      mensajeNotificacion: 'Se agregó un comentario nuevo en el proyecto.',
+      datosJson: {
+        idProyecto: projectId,
+        idComentario: comentario.idComentario,
+        idTarea: taskId,
+        idHito: null,
+      },
+    });
+
+    return comentario;
+  }
+
+  /**
+   * Tarea 29: destinatarios de un comentario de tarea, con prioridad
+   * estricta: (1) el usuario con asignación activa (`desasignadaEn: null`)
+   * es el único candidato principal; (2) si no hay asignación activa, el
+   * único candidato es `tarea.creadaPor`; (3) el autor del comentario se
+   * excluye; (4) el resultado se deduplica. Las asignaciones cerradas
+   * (históricas) nunca son candidatas, y no se consulta a los participantes
+   * del proyecto para este propósito. La asignación se consulta en base de
+   * datos en cada llamada (nunca cacheada), para reflejar reasignaciones y
+   * desasignaciones ocurridas entre comentarios consecutivos.
+   */
+  private async getTaskCommentRecipientIds(
+    taskId: number,
+    taskCreatorId: number,
+    authorUserId: number,
+  ): Promise<number[]> {
+    const activeAssignment = await this.prisma.asignacionTarea.findFirst({
+      where: {
+        idTarea: taskId,
+        desasignadaEn: null,
+      },
+      select: { idUsuario: true },
+    });
+
+    const primaryRecipientId = activeAssignment?.idUsuario ?? taskCreatorId;
+
+    return [...new Set([primaryRecipientId])].filter(
+      (recipientId) => recipientId !== authorUserId,
     );
   }
 
@@ -167,7 +219,7 @@ export class ComentariosService {
         eliminadoEn: null,
         proyecto: { eliminadoEn: null },
       },
-      select: { idTarea: true, idProyecto: true },
+      select: { idTarea: true, idProyecto: true, creadaPor: true },
     });
     if (!tarea) {
       throw new NotFoundException(`Tarea con id ${taskId} no encontrada en el proyecto ${projectId}`);

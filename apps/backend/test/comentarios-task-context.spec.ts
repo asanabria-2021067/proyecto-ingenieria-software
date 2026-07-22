@@ -17,11 +17,15 @@ function makePrisma() {
     proyecto: { findUnique: vi.fn() },
     tarea: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
+    asignacionTarea: { findFirst: vi.fn() },
   } as any;
 }
 
 function makeNotifications() {
-  return { notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined) } as any;
+  return {
+    notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
+    notifyUsers: vi.fn().mockResolvedValue(undefined),
+  } as any;
 }
 
 const PROJECT_ID = 5;
@@ -31,9 +35,10 @@ const PARTICIPANT_ID = 2;
 const EXTERNO_ID = 99;
 const COMMENT_ID = 9;
 const COMMENT_AUTHOR_ID = 2;
+const TASK_CREATOR_ID = 7;
 
 function tareaFila() {
-  return { idTarea: TASK_ID, idProyecto: PROJECT_ID };
+  return { idTarea: TASK_ID, idProyecto: PROJECT_ID, creadaPor: TASK_CREATOR_ID };
 }
 
 describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
@@ -55,7 +60,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
           eliminadoEn: null,
           proyecto: { eliminadoEn: null },
         },
-        select: { idTarea: true, idProyecto: true },
+        select: { idTarea: true, idProyecto: true, creadaPor: true },
       });
     });
 
@@ -128,11 +133,12 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
   });
 
   describe('creación (createForTask)', () => {
-    it('comentario válido: crea con el autor y la tarea correctos, y notifica', async () => {
+    it('comentario válido: crea con el autor y la tarea correctos, y notifica solo al asignado activo (Tarea 29)', async () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: 3 });
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
       const service = new ComentariosService(prisma, notifications);
@@ -142,14 +148,92 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       expect(prisma.comentario.create).toHaveBeenCalledWith({
         data: {
           idAutor: PARTICIPANT_ID,
-          idProyecto: undefined,
           idTarea: TASK_ID,
-          idHito: undefined,
           contenido: 'Hola equipo',
         },
       });
+      expect(prisma.asignacionTarea.findFirst).toHaveBeenCalledWith({
+        where: { idTarea: TASK_ID, desasignadaEn: null },
+        select: { idUsuario: true },
+      });
       expect(result.idComentario).toBe(COMMENT_ID);
-      expect(notifications.notifyProjectActiveParticipants).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+      expect(notifications.notifyUsers).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyUsers).toHaveBeenCalledWith([3], {
+        tipoNotificacion: 'COMENTARIO_TAREA',
+        tituloNotificacion: 'Nuevo comentario',
+        mensajeNotificacion: 'Se agregó un comentario nuevo en el proyecto.',
+        datosJson: {
+          idProyecto: PROJECT_ID,
+          idComentario: COMMENT_ID,
+          idTarea: TASK_ID,
+          idHito: null,
+        },
+      });
+    });
+
+    it('sin asignación activa: notifica únicamente a creadaPor, no a los participantes', async () => {
+      const prisma = makePrisma();
+      prisma.tarea.findFirst.mockResolvedValue(tareaFila());
+      prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.asignacionTarea.findFirst.mockResolvedValue(null);
+      prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
+      const notifications = makeNotifications();
+      const service = new ComentariosService(prisma, notifications);
+
+      await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
+
+      expect(notifications.notifyUsers).toHaveBeenCalledWith(
+        [TASK_CREATOR_ID],
+        expect.objectContaining({ tipoNotificacion: 'COMENTARIO_TAREA' }),
+      );
+    });
+
+    it('asignado activo igual al autor: sin destinatarios, no usa creadaPor como fallback', async () => {
+      const prisma = makePrisma();
+      prisma.tarea.findFirst.mockResolvedValue(tareaFila());
+      prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: PARTICIPANT_ID });
+      prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
+      const notifications = makeNotifications();
+      const service = new ComentariosService(prisma, notifications);
+
+      await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
+
+      expect(notifications.notifyUsers).toHaveBeenCalledWith([], expect.anything());
+    });
+
+    it('sin asignación y creadaPor igual al autor: sin destinatarios', async () => {
+      const prisma = makePrisma();
+      prisma.tarea.findFirst.mockResolvedValue({ idTarea: TASK_ID, idProyecto: PROJECT_ID, creadaPor: PARTICIPANT_ID });
+      prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.asignacionTarea.findFirst.mockResolvedValue(null);
+      prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
+      const notifications = makeNotifications();
+      const service = new ComentariosService(prisma, notifications);
+
+      await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
+
+      expect(notifications.notifyUsers).toHaveBeenCalledWith([], expect.anything());
+    });
+
+    it('no consulta participacionProyecto.findMany para resolver destinatarios de tarea (sin fan-out)', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany = vi.fn();
+      prisma.tarea.findFirst.mockResolvedValue(tareaFila());
+      prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: 3 });
+      prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
+      const notifications = makeNotifications();
+      const service = new ComentariosService(prisma, notifications);
+
+      await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
+
+      expect(prisma.participacionProyecto.findMany).not.toHaveBeenCalled();
     });
 
     it('los parámetros de la URL determinan idTarea; no existe un campo del body que pueda sustituirlos', async () => {
@@ -157,6 +241,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.asignacionTarea.findFirst.mockResolvedValue(null);
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const service = new ComentariosService(prisma, makeNotifications());
 
@@ -385,7 +470,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       expect(orden).toEqual(['contexto', 'comentario_en_tarea', 'autorizacion', 'escritura']);
     });
 
-    it('createForTask: proyecto/tarea → autorización → creación (sin escrituras antes de validar todo)', async () => {
+    it('createForTask: proyecto/tarea → autorización → creación → destinatarios → notificación (Tarea 29: nunca notifica antes de persistir)', async () => {
       const orden: string[] = [];
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockImplementation(async () => {
@@ -401,11 +486,19 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
         orden.push('creacion');
         return { idComentario: COMMENT_ID };
       });
-      const service = new ComentariosService(prisma, makeNotifications());
+      prisma.asignacionTarea.findFirst.mockImplementation(async () => {
+        orden.push('resolucion_destinatarios');
+        return null;
+      });
+      const notifications = makeNotifications();
+      notifications.notifyUsers.mockImplementation(async () => {
+        orden.push('notificacion');
+      });
+      const service = new ComentariosService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'x');
 
-      expect(orden).toEqual(['contexto', 'autorizacion', 'creacion']);
+      expect(orden).toEqual(['contexto', 'autorizacion', 'creacion', 'resolucion_destinatarios', 'notificacion']);
     });
   });
 });
