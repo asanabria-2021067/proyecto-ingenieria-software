@@ -133,6 +133,62 @@ export class LabelsService {
   }
 
   /**
+   * PUT /proyectos/:projectId/tareas/:taskId/etiquetas/:labelId. Exclusivo
+   * del líder. Toda la operación (validaciones incluidas) corre dentro de
+   * una única transacción interactiva, con el mismo `tx` en cada paso, para
+   * que proyecto/liderazgo/tarea/etiqueta se lean con la misma vista que la
+   * escritura final. Orden: proyecto válido → liderazgo → tarea activa en
+   * el proyecto → etiqueta en el proyecto → asociación. `upsert` sobre la
+   * clave compuesta real (`idTarea_idEtiqueta`) es la única protección
+   * necesaria contra duplicados, incluso con dos solicitudes concurrentes:
+   * nunca se usa `findFirst` seguido de `create`.
+   */
+  async attachToTask(
+    projectId: number,
+    taskId: number,
+    labelId: number,
+    actorUserId: number,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.assertProjectLeader(projectId, actorUserId, tx);
+      await this.getTaskInProjectOrThrow(projectId, taskId, tx);
+      await this.getLabelInProjectOrThrow(projectId, labelId, tx);
+
+      await tx.tareaEtiqueta.upsert({
+        where: { idTarea_idEtiqueta: { idTarea: taskId, idEtiqueta: labelId } },
+        update: {},
+        create: { idTarea: taskId, idEtiqueta: labelId },
+      });
+    });
+  }
+
+  /**
+   * DELETE /proyectos/:projectId/tareas/:taskId/etiquetas/:labelId.
+   * Exclusivo del líder; mismo orden de validación y misma transacción que
+   * `attachToTask`. `deleteMany` filtrado por ambas claves (idTarea +
+   * idEtiqueta) es idempotente por construcción: una asociación ausente
+   * produce `count: 0` sin lanzar, nunca `P2025` (a diferencia de `delete`
+   * sobre la PK compuesta). No usa `idEtiqueta` ni `idTarea` solos, para no
+   * afectar otras asociaciones de la misma tarea o de la misma etiqueta.
+   */
+  async detachFromTask(
+    projectId: number,
+    taskId: number,
+    labelId: number,
+    actorUserId: number,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.assertProjectLeader(projectId, actorUserId, tx);
+      await this.getTaskInProjectOrThrow(projectId, taskId, tx);
+      await this.getLabelInProjectOrThrow(projectId, labelId, tx);
+
+      await tx.tareaEtiqueta.deleteMany({
+        where: { idTarea: taskId, idEtiqueta: labelId },
+      });
+    });
+  }
+
+  /**
    * Traduce ÚNICAMENTE la violación reconocida del índice único compuesto
    * `Etiqueta(idProyecto, nombreNormalizado)` a 409; cualquier otro error
    * (otro P2002, P2003, P2025, errores de conexión, errores genéricos) se
@@ -235,6 +291,31 @@ export class LabelsService {
     if (!participacion) {
       throw new ForbiddenException('No tienes acceso a las etiquetas de este proyecto');
     }
+  }
+
+  /**
+   * Tarea 32: consulta única con idTarea + idProyecto + eliminadoEn: null
+   * (más `proyecto.eliminadoEn: null` como defensa adicional), reproduciendo
+   * el mismo contrato que `TasksContextService.getTaskInProjectOrThrow` sin
+   * importar TasksModule. `tx` es obligatorio: este helper solo se invoca
+   * dentro de la transacción interactiva de attachToTask/detachFromTask.
+   */
+  private async getTaskInProjectOrThrow(projectId: number, taskId: number, tx: TxClient) {
+    const tarea = await tx.tarea.findFirst({
+      where: {
+        idTarea: taskId,
+        idProyecto: projectId,
+        eliminadoEn: null,
+        proyecto: { eliminadoEn: null },
+      },
+      select: { idTarea: true },
+    });
+    if (!tarea) {
+      throw new NotFoundException(
+        `Tarea con id ${taskId} no encontrada en el proyecto ${projectId}`,
+      );
+    }
+    return tarea;
   }
 
   /**
