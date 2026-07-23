@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { Plus, Tags } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -22,6 +23,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { TaskCommentsDialog } from '@/components/projects/task-comments-dialog';
 import { TaskCard } from '@/components/projects/task-card';
+import { TaskFormDialog } from '@/components/projects/task-form-dialog';
+import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import {
   COLUMNAS_TABLERO,
   FILTRO_TODOS,
@@ -32,8 +35,21 @@ import {
 } from '@/components/projects/task-board.utils';
 import type { EstadoTarea, TareaPublicaDTO } from '@/lib/types/tasks';
 import type { useProjectTasks } from '@/hooks/use-project-tasks';
+import type { useProjectLabels } from '@/hooks/use-project-labels';
+import type { MiembroProyecto } from '@/hooks/use-project-members';
 
 type ProjectTasksHook = ReturnType<typeof useProjectTasks>;
+type ProjectLabelsHook = ReturnType<typeof useProjectLabels>;
+
+interface RolOpcion {
+  idRolProyecto: number;
+  nombreRol: string;
+}
+
+interface HitoOpcion {
+  idHito: number;
+  tituloHito: string;
+}
 
 interface TaskBoardProps {
   idProyecto: number;
@@ -45,6 +61,20 @@ interface TaskBoardProps {
   currentUserId: number | null;
   cambiarEstadoTarea: ProjectTasksHook['cambiarEstadoTarea'];
   eliminarTarea: ProjectTasksHook['eliminarTarea'];
+  crearTarea: ProjectTasksHook['crearTarea'];
+  editarTarea: ProjectTasksHook['editarTarea'];
+  asignarTarea: ProjectTasksHook['asignarTarea'];
+  desasignarTarea: ProjectTasksHook['desasignarTarea'];
+  roles: RolOpcion[];
+  milestones: HitoOpcion[];
+  members: MiembroProyecto[];
+  labels: ProjectLabelsHook['labels'];
+  labelsLoading: boolean;
+  labelsError: boolean;
+  onRetryLabels: () => void;
+  createLabel: ProjectLabelsHook['createLabel'];
+  updateLabel: ProjectLabelsHook['updateLabel'];
+  deleteLabel: ProjectLabelsHook['deleteLabel'];
 }
 
 function ColumnasSkeleton() {
@@ -74,11 +104,28 @@ export function TaskBoard({
   currentUserId,
   cambiarEstadoTarea,
   eliminarTarea,
+  crearTarea,
+  editarTarea,
+  asignarTarea,
+  desasignarTarea,
+  roles,
+  milestones,
+  members,
+  labels,
+  labelsLoading,
+  labelsError,
+  onRetryLabels,
+  createLabel,
+  updateLabel,
+  deleteLabel,
 }: TaskBoardProps) {
   const [filtroRol, setFiltroRol] = useState(FILTRO_TODOS);
   const [filtroHito, setFiltroHito] = useState(FILTRO_TODOS);
   const [tareaComentarios, setTareaComentarios] = useState<TareaPublicaDTO | null>(null);
   const [tareaEliminar, setTareaEliminar] = useState<TareaPublicaDTO | null>(null);
+  const [crearAbierto, setCrearAbierto] = useState(false);
+  const [tareaEditar, setTareaEditar] = useState<TareaPublicaDTO | null>(null);
+  const [etiquetasAbierto, setEtiquetasAbierto] = useState(false);
 
   const opcionesRol = useMemo(() => derivarOpcionesRol(tasks), [tasks]);
   const opcionesHito = useMemo(() => derivarOpcionesHito(tasks), [tasks]);
@@ -159,7 +206,7 @@ export function TaskBoard({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2">
           <Select value={filtroRol} onValueChange={setFiltroRol}>
             <SelectTrigger size="sm" aria-label="Filtrar por rol" className="text-xs">
               <SelectValue />
@@ -187,6 +234,30 @@ export function TaskBoard({
               ))}
             </SelectContent>
           </Select>
+
+          {isLeader && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEtiquetasAbierto(true)}
+                className="rounded-lg border-outline-variant text-xs font-bold gap-1.5"
+              >
+                <Tags className="size-3.5" aria-hidden="true" />
+                Gestionar etiquetas
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setCrearAbierto(true)}
+                className="rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold gap-1.5"
+              >
+                <Plus className="size-3.5" aria-hidden="true" />
+                Nueva tarea
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -248,6 +319,7 @@ export function TaskBoard({
                       tarea={tarea}
                       puedeCambiarEstado={puedeCambiarEstado}
                       puedeEliminar={isLeader}
+                      puedeEditar={isLeader}
                       estadoPending={estaMutandoEstado}
                       estadoError={
                         fallóEstado
@@ -258,6 +330,7 @@ export function TaskBoard({
                       onCambiarEstado={(nuevoEstado) => handleCambiarEstado(tarea, nuevoEstado)}
                       onAbrirComentarios={() => setTareaComentarios(tarea)}
                       onSolicitarEliminar={() => setTareaEliminar(tarea)}
+                      onEditar={() => setTareaEditar(tarea)}
                     />
                   );
                 })}
@@ -313,6 +386,44 @@ export function TaskBoard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CREAR / EDITAR: única instancia reutilizada en ambos modos */}
+      <TaskFormDialog
+        open={crearAbierto || tareaEditar !== null}
+        mode={tareaEditar !== null ? 'edit' : 'create'}
+        task={tareaEditar}
+        roles={roles}
+        milestones={milestones}
+        members={members}
+        labels={labels}
+        isLeader={isLeader}
+        crearTarea={crearTarea}
+        editarTarea={editarTarea}
+        asignarTarea={asignarTarea}
+        desasignarTarea={desasignarTarea}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCrearAbierto(false);
+            setTareaEditar(null);
+          }
+        }}
+        onRequestDelete={(tarea) => setTareaEliminar(tarea)}
+      />
+
+      {/* ETIQUETAS: única instancia, solo accesible para el líder */}
+      {isLeader && (
+        <ProjectLabelsDrawer
+          open={etiquetasAbierto}
+          onOpenChange={setEtiquetasAbierto}
+          labels={labels}
+          isLoading={labelsLoading}
+          isError={labelsError}
+          onRetry={onRetryLabels}
+          createLabel={createLabel}
+          updateLabel={updateLabel}
+          deleteLabel={deleteLabel}
+        />
+      )}
     </div>
   );
 }

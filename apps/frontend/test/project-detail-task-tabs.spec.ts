@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
@@ -25,13 +25,24 @@ vi.mock('../hooks/use-project-tasks', () => ({
   useProjectTasks: vi.fn(),
 }));
 
+vi.mock('../hooks/use-project-labels', () => ({
+  useProjectLabels: vi.fn(),
+}));
+
+vi.mock('../hooks/use-project-members', () => ({
+  useProjectMembers: vi.fn(),
+}));
+
 vi.mock('../hooks/use-current-user', () => ({
-  useCurrentUser: () => ({ data: { idUsuario: 1 } }),
+  useCurrentUser: vi.fn(),
 }));
 
 import ProjectDetailClient from '../app/dashboard/projects/[id]/project-detail-client';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useProjectTasks } from '../hooks/use-project-tasks';
+import { useProjectLabels } from '../hooks/use-project-labels';
+import { useProjectMembers } from '../hooks/use-project-members';
+import { useCurrentUser } from '../hooks/use-current-user';
 
 const proyectoFixture: ProyectoDetalleDTO = {
   idProyecto: 42,
@@ -114,6 +125,33 @@ function mockUseProjectTasks(overrides: Partial<ReturnType<typeof useProjectTask
   });
 }
 
+function mockUseProjectLabels(overrides: Record<string, unknown> = {}) {
+  (useProjectLabels as any).mockReturnValue({
+    labels: [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    createLabel: mutationStub(),
+    updateLabel: mutationStub(),
+    deleteLabel: mutationStub(),
+    ...overrides,
+  });
+}
+
+function mockUseProjectMembers(overrides: Record<string, unknown> = {}) {
+  (useProjectMembers as any).mockReturnValue({
+    members: [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    ...overrides,
+  });
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -125,7 +163,13 @@ function renderPage() {
   );
 }
 
-describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36 + Tarea 37: Kanban)', () => {
+describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36 + Tarea 37: Kanban + Tarea 38: formularios)', () => {
+  beforeEach(() => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    mockUseProjectLabels();
+    mockUseProjectMembers();
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -216,8 +260,31 @@ describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36 + Tarea 37: 
     }
     expect(screen.getByText('Tarea 1')).toBeInTheDocument();
     expect(screen.getByText('Tarea 2')).toBeInTheDocument();
-    // Controles diferidos a la Tarea 38: no deben existir todavía.
+  });
+
+  it('el líder ve "Nueva tarea" y "Gestionar etiquetas"; un tercero no', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    const { unmount } = renderPage();
+    expect(screen.getByRole('button', { name: /nueva tarea/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /gestionar etiquetas/i })).toBeInTheDocument();
+    unmount();
+
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    renderPage();
     expect(screen.queryByRole('button', { name: /nueva tarea/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /gestionar etiquetas/i })).not.toBeInTheDocument();
+  });
+
+  it('no realiza una segunda consulta de detalle del proyecto para roles/hitos', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    renderPage();
+
+    // useProjectDetail ya se mockeó como vi.fn(): una sola vez para toda la vista.
+    expect(useProjectDetail).toHaveBeenCalledTimes(1);
+    expect(useProjectDetail).toHaveBeenCalledWith(42);
   });
 });

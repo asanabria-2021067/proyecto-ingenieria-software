@@ -49,11 +49,13 @@ function renderCard(overrides: Partial<TaskCardProps> = {}) {
     tarea: tarea(),
     puedeCambiarEstado: false,
     puedeEliminar: false,
+    puedeEditar: false,
     estadoPending: false,
     estadoError: null,
     onCambiarEstado: vi.fn(),
     onAbrirComentarios: vi.fn(),
     onSolicitarEliminar: vi.fn(),
+    onEditar: vi.fn(),
     ...overrides,
   };
   const utils = render(createElement(TaskCard, props));
@@ -191,6 +193,33 @@ describe('TaskCard', () => {
     fireEvent.keyDown(trigger, { key: 'Enter' });
     expect(await screen.findByText('Ver comentarios')).toBeInTheDocument();
     expect(screen.queryByText('Eliminar tarea')).not.toBeInTheDocument();
+  });
+
+  it('el menú ofrece "Editar tarea" solo cuando puedeEditar es true (líder)', async () => {
+    renderCard({ puedeEditar: true, tarea: tarea({ tituloTarea: 'X' }) });
+    const trigger = screen.getByRole('button', { name: 'Acciones de "X"' });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    expect(await screen.findByText('Editar tarea')).toBeInTheDocument();
+  });
+
+  it('el menú no ofrece "Editar tarea" para un tercero (puedeEditar false)', async () => {
+    renderCard({ puedeEditar: false, tarea: tarea({ tituloTarea: 'X' }) });
+    const trigger = screen.getByRole('button', { name: 'Acciones de "X"' });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    expect(await screen.findByText('Ver comentarios')).toBeInTheDocument();
+    expect(screen.queryByText('Editar tarea')).not.toBeInTheDocument();
+  });
+
+  it('activar "Editar tarea" llama a onEditar con la tarea correcta', async () => {
+    const onEditar = vi.fn();
+    renderCard({ puedeEditar: true, tarea: tarea({ tituloTarea: 'X' }), onEditar });
+    const trigger = screen.getByRole('button', { name: 'Acciones de "X"' });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    fireEvent.click(await screen.findByText('Editar tarea'));
+    expect(onEditar).toHaveBeenCalledTimes(1);
   });
 
   it('muestra un error accesible (role="alert") cuando falla el cambio de estado', () => {

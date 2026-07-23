@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
 beforeAll(() => {
@@ -10,6 +10,13 @@ beforeAll(() => {
   }
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
+  }
+  if (typeof (globalThis as any).ResizeObserver === 'undefined') {
+    (globalThis as any).ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
   }
 });
 
@@ -69,6 +76,20 @@ function renderBoard(overrides: Record<string, unknown> = {}) {
     currentUserId: null as number | null,
     cambiarEstadoTarea: mutationStub(),
     eliminarTarea: mutationStub(),
+    crearTarea: mutationStub(),
+    editarTarea: mutationStub(),
+    asignarTarea: mutationStub(),
+    desasignarTarea: mutationStub(),
+    roles: [],
+    milestones: [],
+    members: [],
+    labels: [],
+    labelsLoading: false,
+    labelsError: false,
+    onRetryLabels: vi.fn(),
+    createLabel: mutationStub(),
+    updateLabel: mutationStub(),
+    deleteLabel: mutationStub(),
     ...overrides,
   };
   const utils = render(createElement(TaskBoard, props as any));
@@ -376,5 +397,81 @@ describe('TaskBoard', () => {
     });
 
     expect(screen.getByRole('combobox', { name: 'Cambiar estado de "Mía"' })).toBeInTheDocument();
+  });
+
+  it('el líder ve "Nueva tarea" y "Gestionar etiquetas"; un tercero no', () => {
+    const { unmount } = renderBoard({ isLeader: true });
+    expect(screen.getByRole('button', { name: /nueva tarea/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /gestionar etiquetas/i })).toBeInTheDocument();
+    unmount();
+
+    renderBoard({ isLeader: false });
+    expect(screen.queryByRole('button', { name: /nueva tarea/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /gestionar etiquetas/i })).not.toBeInTheDocument();
+  });
+
+  it('"Nueva tarea" abre TaskFormDialog en modo creación', () => {
+    renderBoard({ isLeader: true });
+    fireEvent.click(screen.getByRole('button', { name: /nueva tarea/i }));
+    expect(screen.getByText('Crear nueva tarea')).toBeInTheDocument();
+  });
+
+  it('crear tarea usa la mutation canónica, sin inserción local en la columna', () => {
+    const crearTarea = mutationStub();
+    renderBoard({ isLeader: true, crearTarea, tasks: [] });
+
+    fireEvent.click(screen.getByRole('button', { name: /nueva tarea/i }));
+    expect(screen.getByText('Crear nueva tarea')).toBeInTheDocument();
+    // No aparece ninguna tarjeta nueva sin que la mutation resuelva: no hay
+    // estado local duplicado que inserte la tarea de forma optimista.
+    expect(screen.getAllByText('Sin tareas')).toHaveLength(4);
+  });
+
+  it('"Editar tarea" desde el menú de la tarjeta abre TaskFormDialog con la tarea seleccionada', async () => {
+    renderBoard({
+      isLeader: true,
+      tasks: [tarea({ idTarea: 3, tituloTarea: 'Tarea a editar' })],
+    });
+
+    const trigger = screen.getByRole('button', { name: 'Acciones de "Tarea a editar"' });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    fireEvent.click(await screen.findByText('Editar tarea'));
+
+    expect(screen.getByText('Editar tarea')).toBeInTheDocument();
+    expect(screen.getByLabelText('Título')).toHaveValue('Tarea a editar');
+  });
+
+  it('"Gestionar etiquetas" abre el drawer de etiquetas', () => {
+    renderBoard({ isLeader: true, labels: [{ idEtiqueta: 1, nombreEtiqueta: 'Urgente', color: '#FF0000' }] });
+    fireEvent.click(screen.getByRole('button', { name: /gestionar etiquetas/i }));
+    expect(screen.getByText('Etiquetas del proyecto')).toBeInTheDocument();
+  });
+
+  it('"Eliminar tarea" desde el formulario de edición abre la misma confirmación única de TaskBoard', async () => {
+    const eliminarTarea = mutationStub();
+    renderBoard({
+      isLeader: true,
+      eliminarTarea,
+      tasks: [tarea({ idTarea: 3, tituloTarea: 'Tarea a borrar' })],
+    });
+
+    const trigger = screen.getByRole('button', { name: 'Acciones de "Tarea a borrar"' });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    fireEvent.click(await screen.findByText('Editar tarea'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea' }));
+
+    // El formulario se cierra y se delega en el único AlertDialog de
+    // eliminación ya existente desde la Tarea 37 — no aparece un segundo
+    // formulario ni una segunda implementación de confirmación.
+    expect(screen.queryByText('Editar tarea')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Esta acción eliminará la tarea "Tarea a borrar". Esta acción no se puede deshacer.'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await waitFor(() => expect(eliminarTarea.mutate).toHaveBeenCalledWith({ taskId: 3 }, expect.anything()));
   });
 });
