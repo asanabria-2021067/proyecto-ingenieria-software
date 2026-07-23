@@ -35,7 +35,11 @@ function makeRelations(overrides: Record<string, unknown> = {}) {
 }
 
 function makeNotifications() {
-  return { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) } as any;
+  return {
+    notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
+    notifyUsers: vi.fn().mockResolvedValue(undefined),
+    notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
+  } as any;
 }
 
 const BASE_DTO = {
@@ -296,7 +300,7 @@ describe('TasksService.create', () => {
       expect(relations.validateCreateTaskRelations).toHaveBeenCalledWith(5, DTO_COMPLETO, tx);
     });
 
-    it('la notificación ocurre después de resolver $transaction, no dentro de ella', async () => {
+    it('la notificación ocurre después de resolver $transaction, no dentro de ella (Tarea 34: tarea con rol y asignado -> solo notifyRoleMembers)', async () => {
       const orden: string[] = [];
       const { tx, prisma, service, notifications } = makeFullSetup();
       const originalTransaction = prisma.$transaction.getMockImplementation()!;
@@ -305,7 +309,11 @@ describe('TasksService.create', () => {
         orden.push('fin_transaction');
         return result;
       });
-      notifications.notifyFromTemplate.mockImplementation(async () => {
+      // DTO_COMPLETO tiene idRolProyecto e idUsuarioAsignado a la vez: por
+      // la prioridad de audiencia de la Tarea 34, el rol gana y la
+      // notificación pasa por notifyRoleMembers, nunca por
+      // notifyFromTemplate/_notifyAssignment.
+      notifications.notifyRoleMembers.mockImplementation(async () => {
         orden.push('notificacion');
       });
       tx.tarea.findFirst.mockImplementation(async () => {
@@ -321,6 +329,13 @@ describe('TasksService.create', () => {
       await service.create(5, 1, DTO_COMPLETO);
 
       expect(orden).toEqual(['lectura_final', 'fin_transaction', 'notificacion']);
+      expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
+      expect(notifications.notifyRoleMembers).toHaveBeenCalledWith(
+        5,
+        6,
+        1,
+        expect.objectContaining({ tipoNotificacion: 'TAREA_ACTUALIZADA' }),
+      );
     });
   });
 

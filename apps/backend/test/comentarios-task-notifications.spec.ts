@@ -325,4 +325,73 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       expect(prisma.asignacionTarea.findFirst).not.toHaveBeenCalled();
     });
   });
+
+  describe('regresión Tarea 34: la regla de comentarios es independiente del rol de la tarea', () => {
+    it('una tarea con idRolProyecto y asignado activo sigue notificando solo al asignado, nunca a los miembros del rol', async () => {
+      const prisma = makePrisma();
+      // La tarea SÍ tiene rol (a diferencia de tareaFila(), que no lo
+      // incluye); ComentariosService no selecciona ni consulta
+      // idRolProyecto en ningún punto de createForTask/getTareaEnProyectoOrThrow.
+      prisma.tarea.findFirst.mockResolvedValue({
+        idTarea: TASK_ID,
+        idProyecto: PROJECT_ID,
+        creadaPor: TASK_CREATOR_ID,
+      });
+      prisma.proyecto.findUnique.mockResolvedValue({
+        estadoProyecto: EstadoProyecto.PUBLICADO,
+        creadoPor: LEADER_ID,
+      });
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
+      prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: ASSIGNEE_A });
+      const notifications = {
+        ...makeNotifications(),
+        notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
+      };
+      const service = new ComentariosService(prisma, notifications);
+
+      await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
+
+      expect(notifications.notifyUsers).toHaveBeenCalledWith([ASSIGNEE_A], expect.anything());
+      expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+      // El `select` de getTareaEnProyectoOrThrow no cambia: nunca se pide
+      // idRolProyecto para resolver destinatarios de comentarios.
+      expect(prisma.tarea.findFirst).toHaveBeenCalledWith({
+        where: {
+          idTarea: TASK_ID,
+          idProyecto: PROJECT_ID,
+          eliminadoEn: null,
+          proyecto: { eliminadoEn: null },
+        },
+        select: { idTarea: true, idProyecto: true, creadaPor: true },
+      });
+    });
+
+    it('una tarea con rol pero sin asignación activa sigue usando creadaPor como fallback, nunca los miembros del rol', async () => {
+      const prisma = makePrisma();
+      prisma.tarea.findFirst.mockResolvedValue({
+        idTarea: TASK_ID,
+        idProyecto: PROJECT_ID,
+        creadaPor: TASK_CREATOR_ID,
+      });
+      prisma.proyecto.findUnique.mockResolvedValue({
+        estadoProyecto: EstadoProyecto.PUBLICADO,
+        creadoPor: LEADER_ID,
+      });
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
+      prisma.asignacionTarea.findFirst.mockResolvedValue(null);
+      const notifications = {
+        ...makeNotifications(),
+        notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
+      };
+      const service = new ComentariosService(prisma, notifications);
+
+      await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
+
+      expect(notifications.notifyUsers).toHaveBeenCalledWith([TASK_CREATOR_ID], expect.anything());
+      expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
+    });
+  });
 });
