@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AsignacionTarea, EstadoTarea, Prioridad, Prisma } from '@prisma/client';
+import { AsignacionTarea, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
 import { TasksContextService } from './tasks-context.service';
@@ -185,6 +185,24 @@ function mapTarea(row: TareaRow): TareaPublica {
   };
 }
 
+/**
+ * Tarea 34: plan de audiencia calculado a partir del estado comprometido
+ * (nunca de datos del body ni de una relectura ambigua). Prioridad fija:
+ * un rol asignado a la tarea siempre gana sobre el asignado activo; sin rol
+ * y sin asignado activo, no hay audiencia.
+ */
+type TaskNotificationAudience =
+  | { kind: 'role'; projectId: number; roleId: number }
+  | { kind: 'assignee'; userId: number }
+  | { kind: 'none' };
+
+interface TaskNotificationInput {
+  tipoNotificacion: TipoNotificacion;
+  tituloNotificacion: string;
+  mensajeNotificacion: string;
+  datosJson: Prisma.InputJsonValue;
+}
+
 const PRIORITY_ORDER: Record<Prioridad, number> = {
   ALTA: 0,
   MEDIA: 1,
@@ -339,7 +357,26 @@ export class TasksService {
 
     const tareaCreada = mapTarea(row);
 
-    if (dto.idUsuarioAsignado !== undefined) {
+    // Tarea 34: un rol siempre gana sobre el asignado inicial, incluso si
+    // ambos se enviaron en la creación — nunca se notifica a ambos.
+    // Reutiliza _notifyAssignment (ya excluye al actor) para la rama sin
+    // rol, exactamente el mismo comportamiento que ya tenía esta operación.
+    if (tareaCreada.idRolProyecto !== null) {
+      await this.notifyTaskAudience(
+        { kind: 'role', projectId: tareaCreada.idProyecto, roleId: tareaCreada.idRolProyecto },
+        userId,
+        {
+          tipoNotificacion: TipoNotificacion.TAREA_ACTUALIZADA,
+          tituloNotificacion: 'Nueva tarea en tu rol',
+          mensajeNotificacion: `Se creó la tarea "${tareaCreada.tituloTarea}" en tu rol del proyecto.`,
+          datosJson: {
+            projectId: tareaCreada.idProyecto,
+            taskId: tareaCreada.idTarea,
+            taskTitle: tareaCreada.tituloTarea,
+          },
+        },
+      );
+    } else if (dto.idUsuarioAsignado !== undefined) {
       await this._notifyAssignment(tareaCreada, userId, dto.idUsuarioAsignado);
     }
 
@@ -457,7 +494,32 @@ export class TasksService {
       return filaFinal;
     });
 
-    return mapTarea(row);
+    const tareaActualizada = mapTarea(row);
+
+    // Tarea 34: audiencia calculada del estado FINAL comprometido (nunca
+    // del rol/asignado anterior a la edición). update() nunca toca
+    // AsignacionTarea, así que asignacionActiva ya refleja exactamente lo
+    // que la tarea conservaba antes de esta edición.
+    await this.notifyTaskAudience(
+      this.resolveTaskNotificationAudience(
+        tareaActualizada.idRolProyecto,
+        tareaActualizada.idProyecto,
+        tareaActualizada.asignacionActiva?.idUsuario ?? null,
+      ),
+      userId,
+      {
+        tipoNotificacion: TipoNotificacion.TAREA_ACTUALIZADA,
+        tituloNotificacion: 'Tarea actualizada',
+        mensajeNotificacion: `La tarea "${tareaActualizada.tituloTarea}" fue actualizada.`,
+        datosJson: {
+          projectId: tareaActualizada.idProyecto,
+          taskId: tareaActualizada.idTarea,
+          taskTitle: tareaActualizada.tituloTarea,
+        },
+      },
+    );
+
+    return tareaActualizada;
   }
 
   /**
@@ -498,7 +560,33 @@ export class TasksService {
       return filaFinal;
     });
 
-    return mapTarea(row);
+    const tareaConEstado = mapTarea(row);
+
+    // Tarea 34: el método actualmente ESCRIBE siempre (no hay atajo de
+    // idempotencia para "mismo estado"; ver docstring de updateEstado), así
+    // que se notifica en cada invocación exitosa, sin introducir aquí una
+    // regla nueva de "sin cambios reales" que el método no tiene.
+    await this.notifyTaskAudience(
+      this.resolveTaskNotificationAudience(
+        tareaConEstado.idRolProyecto,
+        tareaConEstado.idProyecto,
+        tareaConEstado.asignacionActiva?.idUsuario ?? null,
+      ),
+      userId,
+      {
+        tipoNotificacion: TipoNotificacion.TAREA_ACTUALIZADA,
+        tituloNotificacion: 'Estado de tarea actualizado',
+        mensajeNotificacion: `La tarea "${tareaConEstado.tituloTarea}" cambió de estado a ${tareaConEstado.estadoTarea}.`,
+        datosJson: {
+          projectId: tareaConEstado.idProyecto,
+          taskId: tareaConEstado.idTarea,
+          taskTitle: tareaConEstado.tituloTarea,
+          estado: tareaConEstado.estadoTarea,
+        },
+      },
+    );
+
+    return tareaConEstado;
   }
 
   /**
@@ -511,10 +599,17 @@ export class TasksService {
    * lectura previa, y el filtro `desasignadaEn: null` deja intactas las
    * asignaciones históricas. No se borra físicamente nada; todo el
    * historial (asignaciones, etiquetas, comentarios, evidencias) permanece.
+   * Tarea 34: la audiencia (rol o asignado previo) se captura como snapshot
+   * DENTRO de la transacción, antes de cerrar la asignación — nunca se
+   * consulta la asignación después del cierre (ya estaría `desasignadaEn`
+   * no-null) ni se relee la tarea después del commit (ya estaría
+   * `eliminadoEn` no-null, invisible para cualquier helper que filtre por
+   * `eliminadoEn: null`).
    */
   async remove(projectId: number, taskId: number, userId: number): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      await this.tasksAuthorization.assertCanDeleteTask(projectId, taskId, userId, tx);
+    const snapshot = await this.prisma.$transaction(async (tx) => {
+      const tarea = await this.tasksAuthorization.assertCanDeleteTask(projectId, taskId, userId, tx);
+      const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
 
       const eliminadoEn = new Date();
 
@@ -527,7 +622,34 @@ export class TasksService {
         where: { idTarea: taskId },
         data: { eliminadoEn },
       });
+
+      return {
+        taskId: tarea.idTarea,
+        projectId: tarea.idProyecto,
+        taskTitle: tarea.tituloTarea,
+        idRolProyecto: tarea.idRolProyecto ?? null,
+        previousAssigneeId: asignacionActiva?.idUsuario ?? null,
+      };
     });
+
+    await this.notifyTaskAudience(
+      this.resolveTaskNotificationAudience(
+        snapshot.idRolProyecto,
+        snapshot.projectId,
+        snapshot.previousAssigneeId,
+      ),
+      userId,
+      {
+        tipoNotificacion: TipoNotificacion.TAREA_ACTUALIZADA,
+        tituloNotificacion: 'Tarea eliminada',
+        mensajeNotificacion: `La tarea "${snapshot.taskTitle}" fue eliminada.`,
+        datosJson: {
+          projectId: snapshot.projectId,
+          taskId: snapshot.taskId,
+          taskTitle: snapshot.taskTitle,
+        },
+      },
+    );
   }
 
   /**
@@ -541,7 +663,14 @@ export class TasksService {
    * (updateMany con idAsignacion+idTarea+desasignadaEn:null, para no tocar
    * historial ni otras tareas) y se crea una fila nueva — nunca se
    * reescribe el idUsuario de la fila anterior. Sin asignación activa,
-   * simplemente se crea la primera fila.
+   * simplemente se crea la primera fila. Tarea 34: la audiencia se resuelve
+   * después del commit y ÚNICAMENTE cuando esta llamada escribió realmente
+   * (`escribio`); la rama idempotente (mismo usuario ya asignado) no
+   * notifica. Con rol, se notifica a sus miembros activos tanto en la
+   * asignación inicial como en cualquier reasignación — nunca al asignado
+   * anterior ni, por separado, al nuevo. Sin rol, se reutiliza
+   * `_notifyAssignment` (ya excluye al actor), igual que en `create()`;
+   * el usuario anterior nunca es candidato.
    */
   async assign(
     projectId: number,
@@ -549,7 +678,7 @@ export class TasksService {
     actorUserId: number,
     dto: AssignTaskDto,
   ): Promise<TareaPublica> {
-    const row = await this.prisma.$transaction(async (tx) => {
+    const resultado = await this.prisma.$transaction(async (tx) => {
       const tarea = await this.tasksAuthorization.assertCanAssignTask(
         projectId,
         taskId,
@@ -566,6 +695,7 @@ export class TasksService {
       );
 
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
+      let escribio = false;
 
       if (!asignacionActiva) {
         await this.createActiveAssignment(tx, {
@@ -574,6 +704,7 @@ export class TasksService {
           asignadoPor: actorUserId,
           desasignadaEn: null,
         });
+        escribio = true;
       } else if (asignacionActiva.idUsuario !== dto.idUsuario) {
         const desasignadaEn = new Date();
 
@@ -592,6 +723,7 @@ export class TasksService {
           asignadoPor: actorUserId,
           desasignadaEn: null,
         });
+        escribio = true;
       }
       // Si asignacionActiva.idUsuario === dto.idUsuario: idempotente, sin escrituras.
 
@@ -606,10 +738,37 @@ export class TasksService {
         );
       }
 
-      return filaFinal;
+      return { fila: filaFinal, escribio };
     });
 
-    return mapTarea(row);
+    const tareaAsignada = mapTarea(resultado.fila);
+
+    if (resultado.escribio) {
+      if (tareaAsignada.idRolProyecto !== null) {
+        await this.notifyTaskAudience(
+          {
+            kind: 'role',
+            projectId: tareaAsignada.idProyecto,
+            roleId: tareaAsignada.idRolProyecto,
+          },
+          actorUserId,
+          {
+            tipoNotificacion: TipoNotificacion.TAREA_ASIGNADA,
+            tituloNotificacion: 'Tarea asignada',
+            mensajeNotificacion: `Se asignó la tarea "${tareaAsignada.tituloTarea}" dentro de tu rol.`,
+            datosJson: {
+              projectId: tareaAsignada.idProyecto,
+              taskId: tareaAsignada.idTarea,
+              taskTitle: tareaAsignada.tituloTarea,
+            },
+          },
+        );
+      } else {
+        await this._notifyAssignment(tareaAsignada, actorUserId, dto.idUsuario);
+      }
+    }
+
+    return tareaAsignada;
   }
 
   /**
@@ -731,16 +890,96 @@ export class TasksService {
   }
 
   /**
+   * Tarea 34: resuelve el plan de audiencia a partir del estado ya
+   * comprometido de la tarea (nunca del body ni de una relectura aparte).
+   * Un rol asignado siempre gana sobre el asignado activo, incluso cuando
+   * ambos existen; sin rol, el asignado activo (asociación con
+   * `desasignadaEn: null`, tal como ya la expone `TareaPublica.asignacionActiva`)
+   * es la única audiencia; sin rol ni asignado, no hay audiencia.
+   */
+  private resolveTaskNotificationAudience(
+    idRolProyecto: number | null,
+    idProyecto: number,
+    assigneeId: number | null,
+  ): TaskNotificationAudience {
+    // idRolProyecto/assigneeId son `number | null` por contrato (TareaPublica,
+    // fila Prisma real); la comparación explícita contra `undefined` es una
+    // defensa adicional para no tratar un mock de prueba incompleto (campo
+    // omitido) como si tuviera rol.
+    if (idRolProyecto !== null && idRolProyecto !== undefined) {
+      return { kind: 'role', projectId: idProyecto, roleId: idRolProyecto };
+    }
+    if (assigneeId !== null && assigneeId !== undefined) {
+      return { kind: 'assignee', userId: assigneeId };
+    }
+    return { kind: 'none' };
+  }
+
+  /**
+   * Tarea 34: único punto de emisión para las operaciones generales de
+   * gestión de tareas (creación con rol, edición, cambio de estado,
+   * asignación/reasignación con rol, soft delete). Recibe un plan ya
+   * comprometido (nunca abre transacciones ni consulta/modifica la tarea) y
+   * delega en `NotificationsService`: audiencia de rol → `notifyRoleMembers`
+   * (que ya resuelve participación activa, aislamiento por proyecto,
+   * exclusión del actor y deduplicación); audiencia de asignado → exclusión
+   * del actor y deduplicación explícitas antes de `notifyUsers`, con un
+   * único candidato. `kind: 'none'` no tiene efecto. Nunca llama al gateway
+   * directamente. Un fallo se registra con Logger (sin datos sensibles) y
+   * nunca se relanza: la mutación ya se comprometió antes de llegar aquí.
+   */
+  private async notifyTaskAudience(
+    audience: TaskNotificationAudience,
+    actorUserId: number,
+    input: TaskNotificationInput,
+  ): Promise<void> {
+    if (audience.kind === 'none') {
+      return;
+    }
+
+    try {
+      if (audience.kind === 'role') {
+        await this.notifications.notifyRoleMembers(
+          audience.projectId,
+          audience.roleId,
+          actorUserId,
+          input,
+        );
+        return;
+      }
+
+      const recipientIds = [...new Set([audience.userId])].filter(
+        (idUsuario) => idUsuario !== actorUserId,
+      );
+      if (recipientIds.length === 0) {
+        return;
+      }
+      await this.notifications.notifyUsers(recipientIds, input);
+    } catch (error) {
+      this.logger.error(
+        'No se pudo emitir la notificación de gestión de tarea',
+        error as Error,
+      );
+    }
+  }
+
+  /**
    * Notificación post-commit: un fallo aquí (almacenamiento, emisión o
    * incluso las lecturas auxiliares de nombre/título) nunca debe afectar
    * la respuesta de creación, que ya es exitosa. Se registra con Logger y
    * no se relanza; no se abre una segunda transacción ni se compensa nada.
+   * Tarea 34: excluye al actor (p. ej. el líder que se asigna a sí mismo al
+   * crear o asignar la tarea) antes de notificar — mismo contrato de
+   * exclusión que el resto de operaciones de gestión.
    */
   private async _notifyAssignment(
     tarea: TareaPublica,
     actorId: number,
     assignedUserId: number,
   ): Promise<void> {
+    if (assignedUserId === actorId) {
+      return;
+    }
     try {
       const [actor, proyecto] = await Promise.all([
         this.prisma.usuario.findUnique({
@@ -775,7 +1014,8 @@ export class TasksService {
    * y no se relanza — entrega "como máximo una vez", no un mecanismo de
    * reintento). Solo se invoca cuando esta llamada cerró realmente la
    * asignación, así que no hay riesgo de notificar dos veces ante
-   * solicitudes repetidas o una carrera con count: 0.
+   * solicitudes repetidas o una carrera con count: 0. Tarea 34: excluye al
+   * actor (líder que se desasigna a sí mismo) antes de notificar.
    */
   private async _notifyUnassignment(
     taskId: number,
@@ -784,6 +1024,9 @@ export class TasksService {
     actorId: number,
     previousUserId: number,
   ): Promise<void> {
+    if (previousUserId === actorId) {
+      return;
+    }
     try {
       const [actor, proyecto] = await Promise.all([
         this.prisma.usuario.findUnique({

@@ -724,6 +724,7 @@ export interface LifecycleEnv {
     notifyFromTemplate: ReturnType<typeof vi.fn>;
     notifyProjectActiveParticipants: ReturnType<typeof vi.fn>;
     notifyUsers: ReturnType<typeof vi.fn>;
+    notifyRoleMembers: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -739,6 +740,32 @@ export function setupLifecycleEnv(): LifecycleEnv {
     notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
     notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
     notifyUsers: vi.fn().mockResolvedValue(undefined),
+    /**
+     * Tarea 34: réplica mínima de NotificationsService.notifyRoleMembers
+     * (Tarea 33) contra el mismo `state` del fixture (participaciones +
+     * roles), no contra el `db` Prisma-fake: solo se necesita resolver
+     * "miembros activos de este rol en este proyecto" para las pruebas de
+     * integración de notificaciones de gestión de tareas, sin duplicar la
+     * semántica transaccional ni el resto del comportamiento Prisma
+     * simulado. Excluye al actor y deduplica, igual que el servicio real,
+     * y delega en el mismo `notifyUsers` mockeado (nunca persiste ni emite
+     * por su cuenta).
+     */
+    notifyRoleMembers: vi.fn(
+      async (projectId: number, roleId: number, actorUserId: number, input: any) => {
+        const activos = state.participaciones.filter((p) => {
+          if (p.idRolProyecto !== roleId) return false;
+          if (p.estadoParticipacion !== 'ACTIVO') return false;
+          const rol = state.roles.find((r) => r.idRolProyecto === p.idRolProyecto);
+          return !!rol && rol.idProyecto === projectId;
+        });
+        const recipientIds = [
+          ...new Set(activos.map((p) => p.idUsuario).filter((id) => id !== actorUserId)),
+        ];
+        if (recipientIds.length === 0) return;
+        await notifications.notifyUsers(recipientIds, input);
+      },
+    ),
   };
   const tasksService = new TasksService(
     db as any,

@@ -254,8 +254,13 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
         orden.push('transaccion_resuelta');
         return result;
       }) as typeof env.db.$transaction;
-      env.notifications.notifyFromTemplate.mockImplementation(async () => {
+      // Tarea 34: la tarea tiene rol e idUsuarioAsignado a la vez; el rol
+      // gana la prioridad de audiencia, así que la notificación pasa por
+      // notifyRoleMembers (nunca notifyFromTemplate/_notifyAssignment).
+      const notifyRoleMembersOriginal = env.notifications.notifyRoleMembers.getMockImplementation()!;
+      env.notifications.notifyRoleMembers.mockImplementation(async (...args: Parameters<typeof notifyRoleMembersOriginal>) => {
         orden.push('notificacion');
+        return notifyRoleMembersOriginal(...args);
       });
 
       const creada = await env.tasksService.create(P.A, U.liderA, dto);
@@ -268,6 +273,7 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       expect(env.state.tareaEtiquetas.filter((te) => te.idTarea === creada.idTarea)).toHaveLength(2);
       // La notificación ocurre después de que $transaction se resuelve, nunca dentro ni antes.
       expect(orden).toEqual(['transaccion_resuelta', 'notificacion']);
+      expect(env.notifications.notifyFromTemplate).not.toHaveBeenCalled();
     });
 
     it('B.2 candidato en rol incorrecto (A3 en Diseño): 400, la asignación anterior permanece sin cambios', async () => {
@@ -848,6 +854,11 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       const env = setupLifecycleEnv();
       const creada = await env.tasksService.create(P.A, U.liderA, await parseCreate(baseCreatePayload()));
       await env.tasksService.assign(P.A, creada.idTarea, U.liderA, await parseAssign({ idUsuario: U.a1 }));
+      // Tarea 34: assign() ahora notifica al nuevo asignado (sin rol); se
+      // limpia el espía para que la aserción final refleje únicamente lo
+      // que ocurre durante la carrera de desasignación, no la asignación
+      // de preparación.
+      env.notifications.notifyFromTemplate.mockClear();
 
       // Simula que otra solicitud ya cerró la asignación justo antes del
       // updateMany de esta llamada: fuerza el mismo resultado (count: 0)
@@ -897,6 +908,10 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       const env = setupLifecycleEnv();
       const creada = await env.tasksService.create(P.A, U.liderA, await parseCreate(baseCreatePayload()));
       await env.tasksService.assign(P.A, creada.idTarea, U.liderA, await parseAssign({ idUsuario: U.a1 }));
+      // Tarea 34: assign() ahora notifica al nuevo asignado (sin rol); se
+      // limpia el espía para aislar la aserción a la notificación
+      // específica de desasignación.
+      env.notifications.notifyFromTemplate.mockClear();
       await env.tasksService.unassign(P.A, creada.idTarea, U.liderA);
       expect(env.notifications.notifyFromTemplate).toHaveBeenCalledTimes(1);
       expect(env.notifications.notifyFromTemplate).toHaveBeenCalledWith([U.a1], 'TAREA_ACTUALIZADA', expect.any(Object));
