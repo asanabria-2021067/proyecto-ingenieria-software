@@ -51,7 +51,7 @@ export function TaskCommentsDialog({ tarea, idProyecto, open, onOpenChange }: Ta
 
   const { data: comentarios = [], isLoading } = useQuery<TareaComentario[]>({
     queryKey: ['tarea-comentarios', idTarea],
-    queryFn: () => getComentariosTarea(idTarea as number),
+    queryFn: () => getComentariosTarea(idProyecto, idTarea as number),
     enabled: open && idTarea !== null,
   });
 
@@ -61,7 +61,7 @@ export function TaskCommentsDialog({ tarea, idProyecto, open, onOpenChange }: Ta
   };
 
   const crearMutation = useMutation({
-    mutationFn: (texto: string) => crearComentarioTarea(idTarea as number, texto),
+    mutationFn: (texto: string) => crearComentarioTarea(idProyecto, idTarea as number, texto),
     onSuccess: () => {
       setContenido('');
       invalidate();
@@ -69,7 +69,8 @@ export function TaskCommentsDialog({ tarea, idProyecto, open, onOpenChange }: Ta
   });
 
   const eliminarMutation = useMutation({
-    mutationFn: (idComentario: number) => eliminarComentarioTarea(idTarea as number, idComentario),
+    mutationFn: (idComentario: number) =>
+      eliminarComentarioTarea(idProyecto, idTarea as number, idComentario),
     onSuccess: invalidate,
   });
 
