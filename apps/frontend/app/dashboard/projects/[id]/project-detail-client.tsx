@@ -20,6 +20,8 @@ import { TaskBoard } from '@/components/projects/task-board';
 import { ProjectProgressBar } from '@/components/projects/project-progress-bar';
 import { useProjectAvance } from '@/hooks/use-project-avance';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
+import { useProjectLabels } from '@/hooks/use-project-labels';
+import { useProjectMembers } from '@/hooks/use-project-members';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
@@ -89,7 +91,25 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     refetch: refetchTasks,
     cambiarEstadoTarea,
     eliminarTarea,
+    crearTarea,
+    editarTarea,
+    asignarTarea,
+    desasignarTarea,
   } = useProjectTasks(proyecto.idProyecto);
+  const {
+    labels,
+    isLoading: isLoadingLabels,
+    isError: isErrorLabels,
+    refetch: refetchLabels,
+    createLabel,
+    updateLabel,
+    deleteLabel,
+  } = useProjectLabels(proyecto.idProyecto);
+  // Único consumo del proyecto ya cargado: no se hace una segunda consulta
+  // de detalle del proyecto para roles/hitos (ya vienen en `proyecto`).
+  // Miembros/participaciones no forman parte de ProyectoDetalleDTO, así que
+  // se usa la única query canónica de equipo (`useProjectMembers`).
+  const { members } = useProjectMembers(proyecto.idProyecto);
   const { data: currentUser } = useCurrentUser();
   // Liderazgo determinado exclusivamente por Proyecto.creadoPor (expuesto en
   // el frontend como `proyecto.creador.idUsuario`) — nunca por nombre de rol.
@@ -279,6 +299,20 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   currentUserId={currentUser?.idUsuario ?? null}
                   cambiarEstadoTarea={cambiarEstadoTarea}
                   eliminarTarea={eliminarTarea}
+                  crearTarea={crearTarea}
+                  editarTarea={editarTarea}
+                  asignarTarea={asignarTarea}
+                  desasignarTarea={desasignarTarea}
+                  roles={proyecto.roles}
+                  milestones={proyecto.hitos}
+                  members={members}
+                  labels={labels}
+                  labelsLoading={isLoadingLabels}
+                  labelsError={isErrorLabels}
+                  onRetryLabels={() => refetchLabels()}
+                  createLabel={createLabel}
+                  updateLabel={updateLabel}
+                  deleteLabel={deleteLabel}
                 />
               </div>
             </TabsContent>

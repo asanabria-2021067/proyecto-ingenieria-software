@@ -16,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -55,22 +56,26 @@ export interface TaskCardProps {
   tarea: TareaPublicaDTO;
   puedeCambiarEstado: boolean;
   puedeEliminar: boolean;
+  puedeEditar: boolean;
   estadoPending: boolean;
   estadoError: string | null;
   onCambiarEstado: (nuevoEstado: EstadoTarea) => void;
   onAbrirComentarios: () => void;
   onSolicitarEliminar: () => void;
+  onEditar: () => void;
 }
 
 export function TaskCard({
   tarea,
   puedeCambiarEstado,
   puedeEliminar,
+  puedeEditar,
   estadoPending,
   estadoError,
   onCambiarEstado,
   onAbrirComentarios,
   onSolicitarEliminar,
+  onEditar,
 }: TaskCardProps) {
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
   const vencida = estaVencida(tarea);
@@ -96,13 +101,21 @@ export function TaskCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {puedeEditar && (
+              <DropdownMenuItem onSelect={onEditar}>
+                Editar tarea
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={onAbrirComentarios}>
               Ver comentarios
             </DropdownMenuItem>
             {puedeEliminar && (
-              <DropdownMenuItem variant="destructive" onSelect={onSolicitarEliminar}>
-                Eliminar tarea
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={onSolicitarEliminar}>
+                  Eliminar tarea
+                </DropdownMenuItem>
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
