@@ -20,6 +20,7 @@ import {
   getComentariosTarea,
   type TareaComentario,
 } from '@/lib/services/task-comments';
+import { projectTasksQueryKey, taskCommentsQueryKey } from '@/lib/query-keys/tasks';
 import type { TareaDTO } from '@/lib/dto/project.dto';
 
 interface TaskCommentsDialogProps {
@@ -48,16 +49,20 @@ export function TaskCommentsDialog({ tarea, idProyecto, open, onOpenChange }: Ta
   const [contenido, setContenido] = useState('');
 
   const idTarea = tarea?.idTarea ?? null;
+  // El proveedor de comentarios exige un `idTarea` numérico incluso mientras
+  // el diálogo está cerrado o sin tarea seleccionada; la query real solo se
+  // dispara con `enabled`, así que este placeholder nunca llega a `apiFetch`.
+  const comentariosKey = taskCommentsQueryKey(idProyecto, idTarea ?? 0);
 
   const { data: comentarios = [], isLoading } = useQuery<TareaComentario[]>({
-    queryKey: ['tarea-comentarios', idTarea],
+    queryKey: comentariosKey,
     queryFn: () => getComentariosTarea(idProyecto, idTarea as number),
     enabled: open && idTarea !== null,
   });
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['tarea-comentarios', idTarea] });
-    queryClient.invalidateQueries({ queryKey: ['project', idProyecto] });
+    queryClient.invalidateQueries({ queryKey: comentariosKey });
+    queryClient.invalidateQueries({ queryKey: projectTasksQueryKey(idProyecto) });
   };
 
   const crearMutation = useMutation({
