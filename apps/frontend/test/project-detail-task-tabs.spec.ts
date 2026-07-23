@@ -82,6 +82,18 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
   };
 }
 
+function mutationStub(overrides: Record<string, unknown> = {}) {
+  return {
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+    ...overrides,
+  };
+}
+
 function mockUseProjectTasks(overrides: Partial<ReturnType<typeof useProjectTasks>> = {}) {
   (useProjectTasks as any).mockReturnValue({
     tasks: [],
@@ -90,14 +102,14 @@ function mockUseProjectTasks(overrides: Partial<ReturnType<typeof useProjectTask
     isError: false,
     error: null,
     refetch: vi.fn(),
-    crearTarea: {},
-    editarTarea: {},
-    cambiarEstadoTarea: {},
-    asignarTarea: {},
-    desasignarTarea: {},
-    eliminarTarea: {},
-    asociarEtiqueta: {},
-    retirarEtiqueta: {},
+    crearTarea: mutationStub(),
+    editarTarea: mutationStub(),
+    cambiarEstadoTarea: mutationStub(),
+    asignarTarea: mutationStub(),
+    desasignarTarea: mutationStub(),
+    eliminarTarea: mutationStub(),
+    asociarEtiqueta: mutationStub(),
+    retirarEtiqueta: mutationStub(),
     ...overrides,
   });
 }
@@ -113,7 +125,7 @@ function renderPage() {
   );
 }
 
-describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36)', () => {
+describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36 + Tarea 37: Kanban)', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -139,6 +151,9 @@ describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36)', () => {
     renderPage();
 
     expect(useProjectTasks).toHaveBeenCalledWith(42);
+    // TaskBoard recibe `tasks` como prop y nunca llama useProjectTasks por
+    // su cuenta: una sola invocación para toda la vista (Tablero + Hitos).
+    expect(useProjectTasks).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('TAREA-DTO-EMBEBIDA')).not.toBeInTheDocument();
 
     // Radix Tabs cambia de valor en `onMouseDown` (no en `click`); sin
@@ -171,25 +186,37 @@ describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36)', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('Tablero maneja la colección vacía sin fingir un Kanban', () => {
+  it('Tablero muestra las cuatro columnas vacías cuando el proyecto no tiene tareas', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks({ tasks: [] });
 
     renderPage();
 
-    expect(screen.getByText('Aún no hay tareas registradas en este proyecto.')).toBeInTheDocument();
+    for (const titulo of ['Por hacer', 'En progreso', 'En revisión', 'Hecho']) {
+      expect(screen.getByRole('heading', { name: titulo })).toBeInTheDocument();
+    }
+    expect(screen.getAllByText('Sin tareas')).toHaveLength(4);
     expect(screen.queryByTestId('task-board-mount')).not.toBeInTheDocument();
   });
 
-  it('no renderiza columnas ni tarjetas Kanban', () => {
+  it('TaskBoard reemplaza el placeholder task-board-mount con el Kanban real de cuatro columnas', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
-    mockUseProjectTasks({ tasks: [tarea({ idTarea: 1 }), tarea({ idTarea: 2 })] });
+    mockUseProjectTasks({
+      tasks: [
+        tarea({ idTarea: 1, tituloTarea: 'Tarea 1', estadoTarea: 'POR_HACER' }),
+        tarea({ idTarea: 2, tituloTarea: 'Tarea 2', estadoTarea: 'HECHO' }),
+      ],
+    });
 
     renderPage();
 
-    for (const columna of ['Por hacer', 'En progreso', 'En revisión', 'Hecho']) {
-      expect(screen.queryByRole('columnheader', { name: columna })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('task-board-mount')).not.toBeInTheDocument();
+    for (const titulo of ['Por hacer', 'En progreso', 'En revisión', 'Hecho']) {
+      expect(screen.getByRole('heading', { name: titulo })).toBeInTheDocument();
     }
+    expect(screen.getByText('Tarea 1')).toBeInTheDocument();
+    expect(screen.getByText('Tarea 2')).toBeInTheDocument();
+    // Controles diferidos a la Tarea 38: no deben existir todavía.
     expect(screen.queryByRole('button', { name: /nueva tarea/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /gestionar etiquetas/i })).not.toBeInTheDocument();
   });
