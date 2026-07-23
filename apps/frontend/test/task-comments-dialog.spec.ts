@@ -17,8 +17,20 @@ vi.mock('../lib/services/task-comments', () => ({
 import { TaskCommentsDialog } from '../components/projects/task-comments-dialog';
 import { getComentariosTarea, crearComentarioTarea, eliminarComentarioTarea } from '../lib/services/task-comments';
 import { projectTasksQueryKey, taskCommentsQueryKey } from '../lib/query-keys/tasks';
+import type { TareaDTO } from '../lib/dto/project.dto';
 
-const tarea = { idTarea: 55, tituloTarea: 'Revisar PR' };
+// Defecto preexistente de la Tarea 36 (fixture incompleto para TareaDTO,
+// invisible en tiempo de ejecución pero detectado por `tsc --noEmit`):
+// corregido aquí como parte del baseline de typecheck de la Tarea 37.
+const tarea: TareaDTO = {
+  idTarea: 55,
+  idHito: null,
+  tituloTarea: 'Revisar PR',
+  descripcionTarea: null,
+  estadoTarea: 'POR_HACER',
+  prioridad: 'MEDIA',
+  fechaLimite: null,
+};
 
 function createWrapper() {
   const queryClient = new QueryClient({
