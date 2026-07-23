@@ -14,11 +14,14 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectProgressBar } from '@/components/projects/project-progress-bar';
 import { useProjectAvance } from '@/hooks/use-project-avance';
+import { useProjectTasks } from '@/hooks/use-project-tasks';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
+import type { TareaPublicaDTO } from '@/lib/types/tasks';
 
 interface Props {
   id: number;
@@ -73,11 +76,86 @@ function ProjectDetailSkeleton() {
   );
 }
 
+// ─── Panel estructural de Tablero ──────────────────────────────────────────────
+// La Tarea 37 reemplaza el contenido de esta región por TaskBoard (columnas,
+// tarjetas, filtros). Aquí solo se prepara el contenedor y sus estados.
+function TableroPanel({
+  tasks,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  tasks: TareaPublicaDTO[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-tertiary">
+          Tablero de tareas
+        </h2>
+        {!isLoading && !isError && (
+          <span className="text-xs text-tertiary">
+            {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}
+          </span>
+        )}
+      </div>
+
+      {isLoading && (
+        <div className="space-y-2">
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+        </div>
+      )}
+
+      {!isLoading && isError && (
+        <div className="text-center py-10 space-y-3">
+          <p className="text-red-600 font-medium text-sm">
+            No se pudieron cargar las tareas. Intenta nuevamente.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="rounded-lg border-primary text-primary hover:bg-primary/10 text-xs font-bold"
+          >
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {!isLoading && !isError && tasks.length === 0 && (
+        <p className="text-sm text-tertiary text-center py-10">
+          Aún no hay tareas registradas en este proyecto.
+        </p>
+      )}
+
+      {!isLoading && !isError && tasks.length > 0 && (
+        <div
+          data-testid="task-board-mount"
+          className="rounded-xl border border-dashed border-outline-variant/40 p-6 text-center text-sm text-tertiary"
+        >
+          {tasks.length} {tasks.length === 1 ? 'tarea registrada' : 'tareas registradas'} en este proyecto.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Vista principal ──────────────────────────────────────────────────────────
 function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const totalCupos = proyecto.roles.reduce((sum, r) => sum + r.cupos, 0);
   const organizacionPrincipal = proyecto.organizaciones[0] ?? null;
   const { data: avance, isSuccess: puedeVerAvance } = useProjectAvance(proyecto.idProyecto);
+  const {
+    tasks,
+    isLoading: isLoadingTasks,
+    isError: isErrorTasks,
+    refetch: refetchTasks,
+  } = useProjectTasks(proyecto.idProyecto);
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 pb-20 md:pb-6">
@@ -232,12 +310,42 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             </div>
           )}
 
-          {/* HITOS Y TAREAS */}
-          <HitosSection
-            hitos={proyecto.hitos}
-            tareas={proyecto.tareas ?? []}
-            idProyecto={proyecto.idProyecto}
-          />
+          {/* TABLERO E HITOS */}
+          <Tabs defaultValue="tablero">
+            <TabsList className="bg-surface-container-high">
+              <TabsTrigger
+                value="tablero"
+                className="text-tertiary data-[state=active]:bg-surface-container-lowest data-[state=active]:text-on-surface"
+              >
+                Tablero
+              </TabsTrigger>
+              <TabsTrigger
+                value="hitos"
+                className="text-tertiary data-[state=active]:bg-surface-container-lowest data-[state=active]:text-on-surface"
+              >
+                Hitos
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="tablero" className="mt-4">
+              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
+                <TableroPanel
+                  tasks={tasks}
+                  isLoading={isLoadingTasks}
+                  isError={isErrorTasks}
+                  onRetry={() => refetchTasks()}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="hitos" className="mt-4">
+              <HitosSection
+                hitos={proyecto.hitos}
+                tareas={tasks}
+                idProyecto={proyecto.idProyecto}
+              />
+            </TabsContent>
+          </Tabs>
 
         </div>
 
