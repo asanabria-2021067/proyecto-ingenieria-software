@@ -18,13 +18,19 @@ function makePrisma(tx = makeTx()) {
 
 function makeAuthorization(overrides: Record<string, unknown> = {}) {
   return {
-    assertCanDeleteTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: 5 }),
+    assertCanDeleteTask: vi
+      .fn()
+      .mockResolvedValue({ idTarea: 42, idProyecto: 5, idRolProyecto: null, tituloTarea: 'Tarea de prueba' }),
     ...overrides,
   } as any;
 }
 
 function makeNotifications() {
-  return { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) } as any;
+  return {
+    notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
+    notifyUsers: vi.fn().mockResolvedValue(undefined),
+    notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
+  } as any;
 }
 
 function makeService(opts: { prisma?: any; auth?: any; notifications?: any } = {}) {
@@ -33,7 +39,10 @@ function makeService(opts: { prisma?: any; auth?: any; notifications?: any } = {
   const auth = opts.auth ?? makeAuthorization();
   const relations = { validateRelatedResources: vi.fn(), assertUserAssignableToProject: vi.fn() } as any;
   const notifications = opts.notifications ?? makeNotifications();
-  const context = { getActiveAssignment: vi.fn() } as any;
+  // Tarea 34: remove() ahora consulta la asignación activa DENTRO de la
+  // transacción (antes de cerrarla) para poder notificar al asignado
+  // previo cuando la tarea no tiene rol; por defecto, sin asignación.
+  const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) } as any;
   const service = new TasksService(prisma, auth, relations, notifications, context);
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
@@ -250,14 +259,14 @@ describe('TasksService.remove', () => {
   });
 
   describe('orden transaccional', () => {
-    it('respeta: autorización → updateMany de asignación → update de tarea → fin de transacción', async () => {
+    it('respeta: autorización → snapshot de asignación → updateMany de asignación → update de tarea → fin de transacción → notificación', async () => {
       const orden: string[] = [];
       const tx = makeTx();
       const prisma = makePrisma(tx);
       const auth = {
         assertCanDeleteTask: vi.fn(async () => {
           orden.push('autorizacion');
-          return { idTarea: 42, idProyecto: 5 };
+          return { idTarea: 42, idProyecto: 5, idRolProyecto: null, tituloTarea: 'Tarea de prueba' };
         }),
       } as any;
       tx.asignacionTarea.updateMany.mockImplementation(async () => {
@@ -268,13 +277,32 @@ describe('TasksService.remove', () => {
       });
       const relations = {} as any;
       const notifications = makeNotifications();
-      const context = {} as any;
+      notifications.notifyUsers.mockImplementation(async () => {
+        orden.push('notificacion');
+      });
+      // Tarea 34: getActiveAssignment se consulta DENTRO de la transacción,
+      // antes de cerrar la asignación (snapshot previo al cierre); aquí
+      // devuelve un asignado activo para poder observar la notificación
+      // posterior al commit (audiencia sin rol -> asignado previo).
+      const context = {
+        getActiveAssignment: vi.fn(async () => {
+          orden.push('snapshot_asignacion');
+          return { idUsuario: 7 };
+        }),
+      } as any;
       const service = new TasksService(prisma, auth, relations, notifications, context);
 
       await service.remove(5, 42, 1);
       orden.push('fin_transaccion');
 
-      expect(orden).toEqual(['autorizacion', 'updateMany_asignacion', 'update_tarea', 'fin_transaccion']);
+      expect(orden).toEqual([
+        'autorizacion',
+        'snapshot_asignacion',
+        'updateMany_asignacion',
+        'update_tarea',
+        'notificacion',
+        'fin_transaccion',
+      ]);
     });
   });
 
