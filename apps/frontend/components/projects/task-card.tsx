@@ -1,11 +1,13 @@
 'use client';
 
+import { useDraggable } from '@dnd-kit/core';
 import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   Calendar,
   Flag,
+  GripVertical,
   MessageCircle,
   Minus,
   MoreVertical,
@@ -26,7 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
+import { taskDragId, type TaskDragData } from '@/components/projects/task-board-dnd';
 import {
   COLUMNAS_TABLERO,
   ESTADO_LABEL,
@@ -63,6 +67,11 @@ export interface TaskCardProps {
   onAbrirComentarios: () => void;
   onSolicitarEliminar: () => void;
   onEditar: () => void;
+  /** Resaltado temporal al llegar desde el enlace de una notificación. */
+  resaltada?: boolean;
+  /** Registro de refs por tarea para scroll/foco (notificación y post-drag). */
+  onRegistrarCardRef?: (idTarea: number, el: HTMLElement | null) => void;
+  onRegistrarHandleRef?: (idTarea: number, el: HTMLButtonElement | null) => void;
 }
 
 export function TaskCard({
@@ -76,15 +85,78 @@ export function TaskCard({
   onAbrirComentarios,
   onSolicitarEliminar,
   onEditar,
+  resaltada = false,
+  onRegistrarCardRef,
+  onRegistrarHandleRef,
 }: TaskCardProps) {
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
   const vencida = estaVencida(tarea);
   const asignado = tarea.asignacionActiva?.usuario ?? null;
 
+  // La tarjeta solo puede arrastrarse con el mismo permiso que habilita el
+  // Select de estado (líder o asignado activo) — nunca una regla distinta —
+  // y nunca mientras esta tarea ya tiene una mutation de estado en curso.
+  const puedeArrastrar = puedeCambiarEstado && !estadoPending;
+  const dragData: TaskDragData = {
+    type: 'task',
+    taskId: tarea.idTarea,
+    estadoOrigen: tarea.estadoTarea,
+    titulo: tarea.tituloTarea,
+  };
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({
+    id: taskDragId(tarea.idTarea),
+    data: dragData,
+    disabled: !puedeArrastrar,
+    attributes: {
+      roleDescription: 'tarea arrastrable',
+    },
+  });
+  const dragStyle = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+    : undefined;
+
   return (
-    <article className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 shadow-sm space-y-2">
+    <article
+      ref={(el) => {
+        setNodeRef(el);
+        onRegistrarCardRef?.(tarea.idTarea, el);
+      }}
+      style={dragStyle}
+      aria-busy={estadoPending}
+      aria-describedby={resaltada ? `tarea-resaltada-${tarea.idTarea}` : undefined}
+      className={`bg-surface-container-lowest border rounded-xl p-3 shadow-sm space-y-2 transition-colors ${
+        resaltada
+          ? 'border-primary ring-2 ring-primary/50 bg-primary/5'
+          : 'border-outline-variant/30'
+      } ${isDragging ? 'opacity-40' : ''}`}
+    >
+      {resaltada && (
+        <p id={`tarea-resaltada-${tarea.idTarea}`} className="sr-only">
+          Tarea indicada desde una notificación.
+        </p>
+      )}
       <div className="flex items-start justify-between gap-2">
-        <h4 className="text-sm font-semibold text-on-surface leading-snug line-clamp-2">
+        {puedeArrastrar && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                ref={(el) => {
+                  setActivatorNodeRef(el);
+                  onRegistrarHandleRef?.(tarea.idTarea, el);
+                }}
+                {...listeners}
+                {...attributes}
+                aria-label={`Mover "${tarea.tituloTarea}" entre estados`}
+                className="shrink-0 -ml-1 -mt-0.5 flex items-center justify-center size-7 rounded-md text-tertiary hover:text-on-surface hover:bg-surface-container-high cursor-grab active:cursor-grabbing touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <GripVertical className="size-4" aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Arrastrar para mover entre estados</TooltipContent>
+          </Tooltip>
+        )}
+        <h4 className="text-sm font-semibold text-on-surface leading-snug line-clamp-2 flex-1">
           {tarea.tituloTarea}
         </h4>
 

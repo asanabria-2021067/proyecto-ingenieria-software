@@ -250,4 +250,61 @@ describe('TaskCard', () => {
     expect(article).toBeInTheDocument();
     expect(article?.tagName).toBe('ARTICLE');
   });
+
+  describe('handle de arrastre (Tarea 39)', () => {
+    it('un usuario autorizado (puedeCambiarEstado) ve el handle con aria-label accesible', () => {
+      renderCard({ puedeCambiarEstado: true, tarea: tarea({ tituloTarea: 'Diseñar API' }) });
+      expect(
+        screen.getByRole('button', { name: 'Mover "Diseñar API" entre estados' }),
+      ).toBeInTheDocument();
+    });
+
+    it('un tercero sin permiso no ve ningún handle de arrastre', () => {
+      renderCard({ puedeCambiarEstado: false });
+      expect(screen.queryByRole('button', { name: /Mover .* entre estados/ })).not.toBeInTheDocument();
+    });
+
+    it('una tarea bloqueada por una mutation pendiente no muestra el handle', () => {
+      renderCard({ puedeCambiarEstado: true, estadoPending: true });
+      expect(screen.queryByRole('button', { name: /Mover .* entre estados/ })).not.toBeInTheDocument();
+    });
+
+    it('el handle no está anidado dentro de otro <button> ni contiene controles interactivos', () => {
+      const { container } = renderCard({ puedeCambiarEstado: true });
+      const handle = screen.getByRole('button', { name: /Mover .* entre estados/ });
+      expect(handle.closest('button')).toBe(handle);
+      expect(handle.querySelector('button, a, [role="menuitem"]')).toBeNull();
+      expect(container.querySelectorAll('button').length).toBeGreaterThan(0);
+    });
+
+    it('la tarjeta comunica aria-busy durante una mutation de estado pendiente', () => {
+      const { container } = renderCard({ puedeCambiarEstado: true, estadoPending: true });
+      expect(container.querySelector('article')).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('resaltada agrega una descripción accesible de notificación', () => {
+      const { container } = renderCard({ resaltada: true, tarea: tarea({ idTarea: 5 }) });
+      const article = container.querySelector('article')!;
+      expect(article).toHaveAttribute('aria-describedby', 'tarea-resaltada-5');
+      expect(screen.getByText('Tarea indicada desde una notificación.')).toBeInTheDocument();
+    });
+
+    it('sin resaltar no agrega aria-describedby', () => {
+      const { container } = renderCard({ resaltada: false });
+      expect(container.querySelector('article')).not.toHaveAttribute('aria-describedby');
+    });
+
+    it('registra la ref de la tarjeta y del handle mediante los callbacks provistos', () => {
+      const onRegistrarCardRef = vi.fn();
+      const onRegistrarHandleRef = vi.fn();
+      renderCard({
+        puedeCambiarEstado: true,
+        tarea: tarea({ idTarea: 9 }),
+        onRegistrarCardRef,
+        onRegistrarHandleRef,
+      });
+      expect(onRegistrarCardRef).toHaveBeenCalledWith(9, expect.any(HTMLElement));
+      expect(onRegistrarHandleRef).toHaveBeenCalledWith(9, expect.any(HTMLElement));
+    });
+  });
 });

@@ -1,6 +1,8 @@
 'use client';
 
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -87,6 +89,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const {
     tasks,
     isLoading: isLoadingTasks,
+    isFetching: isFetchingTasks,
     isError: isErrorTasks,
     refetch: refetchTasks,
     cambiarEstadoTarea,
@@ -96,6 +99,19 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     asignarTarea,
     desasignarTarea,
   } = useProjectTasks(proyecto.idProyecto);
+  // Contrato de URL de la Tarea 39 (enlaces desde notificaciones de tarea):
+  // `?tab=tablero&taskId=123`. No dispara una segunda consulta de tareas —
+  // solo selecciona la pestaña y se resuelve contra `tasks` ya cargada
+  // dentro de TaskBoard.
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const taskIdParam = searchParams.get('taskId');
+  const focusTaskId = useMemo(() => {
+    if (!taskIdParam || !/^\d+$/.test(taskIdParam)) return null;
+    const idTarea = Number(taskIdParam);
+    return Number.isInteger(idTarea) && idTarea > 0 ? idTarea : null;
+  }, [taskIdParam]);
+  const [activeTab, setActiveTab] = useState(tabParam === 'hitos' ? 'hitos' : 'tablero');
   const {
     labels,
     isLoading: isLoadingLabels,
@@ -271,7 +287,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           )}
 
           {/* TABLERO E HITOS */}
-          <Tabs defaultValue="tablero">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="bg-surface-container-high">
               <TabsTrigger
                 value="tablero"
@@ -293,10 +309,12 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   idProyecto={proyecto.idProyecto}
                   tasks={tasks}
                   isLoading={isLoadingTasks}
+                  isFetching={isFetchingTasks}
                   isError={isErrorTasks}
                   onRetry={() => refetchTasks()}
                   isLeader={isLeader}
                   currentUserId={currentUser?.idUsuario ?? null}
+                  focusTaskId={focusTaskId}
                   cambiarEstadoTarea={cambiarEstadoTarea}
                   eliminarTarea={eliminarTarea}
                   crearTarea={crearTarea}
@@ -441,7 +459,9 @@ export default function ProjectDetailClient({ id }: Props) {
 
   return (
     <DashboardLayout>
-      <ProjectDetailView proyecto={proyecto} />
+      <Suspense fallback={<ProjectDetailSkeleton />}>
+        <ProjectDetailView proyecto={proyecto} />
+      </Suspense>
     </DashboardLayout>
   );
 }

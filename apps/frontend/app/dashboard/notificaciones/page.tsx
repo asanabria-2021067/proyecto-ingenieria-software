@@ -23,6 +23,7 @@ import {
   getNotificationLink,
   type Notificacion,
 } from '@/lib/services/notifications';
+import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
@@ -177,7 +178,7 @@ export default function NotificacionesPage() {
               </h2>
               <div className="space-y-3">
                 {notifs.map((n) => {
-                  const href = getNotificationLink(n);
+                  const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
                   const cardClassName = `relative rounded-2xl border p-5 transition-all ${
                     n.leidaEn
                       ? 'bg-surface-container-lowest border-outline-variant'
