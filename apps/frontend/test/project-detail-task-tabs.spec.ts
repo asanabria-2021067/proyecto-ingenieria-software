@@ -37,6 +37,14 @@ vi.mock('../hooks/use-current-user', () => ({
   useCurrentUser: vi.fn(),
 }));
 
+// Tarea 39: ProjectDetailView ahora lee `tab`/`taskId` de la URL
+// (enlaces desde notificaciones de tarea). Fuera de un app router real
+// `useSearchParams()` devuelve null; se simula con parámetros vacíos para
+// no arrastrar el router completo en estas pruebas de integración.
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import ProjectDetailClient from '../app/dashboard/projects/[id]/project-detail-client';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useProjectTasks } from '../hooks/use-project-tasks';
