@@ -29,7 +29,8 @@ function isValidProjectId(idProyecto: number): boolean {
  * Kanban ni copia la respuesta a useState: `tasks` es directamente
  * `query.data ?? []`. Las ocho mutations ya conocen `idProyecto`; sus
  * argumentos nunca reciben otro projectId. Las invalidaciones ocurren
- * únicamente en `onSuccess` — sin actualización optimista (tarea 39).
+ * únicamente en `onSuccess`, salvo `cambiarEstadoTarea` (tarea 39: ver
+ * comentario junto a esa mutation).
  */
 export function useProjectTasks(idProyecto: number) {
   const queryClient = useQueryClient();
@@ -64,9 +65,37 @@ export function useProjectTasks(idProyecto: number) {
     },
   });
 
+  // Única mutation de cambio de estado, compartida por el Select de
+  // TaskCard y por el drag-and-drop (Tarea 39): ambos disparadores llaman a
+  // este mismo `.mutate`, así que nunca compiten con dos mutations
+  // distintas sobre la misma tarea. El optimismo vive aquí (no en un hook
+  // separado ni en TaskBoard) precisamente porque es el único punto que ya
+  // conocen ambos consumidores, evitando duplicar el endpoint o divergir en
+  // el snapshot/rollback.
   const cambiarEstadoTarea = useMutation({
     mutationFn: ({ taskId, input }: { taskId: number; input: UpdateTaskStateInput }) =>
       updateTaskEstado(idProyecto, taskId, input),
+    onMutate: async ({ taskId, input }) => {
+      await queryClient.cancelQueries({ queryKey: projectTasksQueryKey(idProyecto) });
+      const previousTasks = queryClient.getQueryData<TareaPublicaDTO[]>(
+        projectTasksQueryKey(idProyecto),
+      );
+      queryClient.setQueryData<TareaPublicaDTO[]>(projectTasksQueryKey(idProyecto), (tareas) =>
+        tareas?.map((tarea) =>
+          tarea.idTarea === taskId ? { ...tarea, estadoTarea: input.estadoTarea } : tarea,
+        ),
+      );
+      return { previousTasks };
+    },
+    onError: (_error, _variables, context) => {
+      // Sin snapshot (caché vacía en el momento del onMutate): no se
+      // inventa una tarea, se invalida para recuperar el estado real.
+      if (context?.previousTasks !== undefined) {
+        queryClient.setQueryData(projectTasksQueryKey(idProyecto), context.previousTasks);
+      } else {
+        invalidateTasks();
+      }
+    },
     onSuccess: () => {
       invalidateTasks();
       invalidateAvance();
