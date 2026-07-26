@@ -80,6 +80,9 @@ const proyectoListSelect = {
   estadoProyecto: true,
   modalidadProyecto: true,
   fechaPublicacion: true,
+  creador: {
+    select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
+  },
   organizaciones: {
     select: {
       organizacion: { select: { nombreOrganizacion: true } },
@@ -88,6 +91,9 @@ const proyectoListSelect = {
   intereses: {
     select: { interes: { select: { nombreInteres: true } } },
   },
+  // Solo `cupos` por rol: lo mínimo para que el listado calcule roles con
+  // disponibilidad real (cupos > 0) sin exponer requisitos/postulaciones.
+  roles: { select: { cupos: true } },
   _count: { select: { roles: true } },
 } as const;
 

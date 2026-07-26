@@ -6,7 +6,7 @@ import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequ
 import AdminLayout from '@/components/admin/AdminLayout';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
-import uvgSwal from '@/lib/swal';
+import uvgSwal, { swalCustomClass } from '@/lib/swal';
 import {
   approveProjectClosure,
   getAdminReviewInbox,
@@ -66,7 +66,8 @@ export default function AdminReviewsInboxPage() {
       cancelButtonText: 'Cancelar',
       ...(action === 'REJECT' && {
         customClass: {
-          confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md',
+          ...swalCustomClass,
+          confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md mx-4',
         },
       }),
     });
