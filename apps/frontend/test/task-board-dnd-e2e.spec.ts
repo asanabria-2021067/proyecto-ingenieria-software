@@ -58,6 +58,11 @@ vi.mock('../components/projects/task-comments-dialog', () => ({
   TaskCommentsDialog: () => null,
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { TaskBoard } from '../components/projects/task-board';
 
 function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {

@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import type { EstadoTarea, Prioridad, TareaPublicaDTO } from '@/lib/types/tasks';
 
 export interface ColumnaConfig {
@@ -24,10 +25,65 @@ export const ESTADO_LABEL: Record<EstadoTarea, string> = {
   HECHO: 'Hecho',
 };
 
+/**
+ * Estilos de estado centralizados (Sección 32: "Centraliza estilos de estado";
+ * no repetir estos valores en múltiples archivos). Cada entrada da el color del
+ * indicador circular, el fondo y el texto del encabezado de columna con la
+ * paleta pastel del workspace. Se incluyen variantes `dark:` translúcidas para
+ * no romper el modo oscuro global (Sección 24: "No cambies modo oscuro").
+ */
+export interface EstadoColumnaStyle {
+  headerBg: string;
+  headerText: string;
+  dot: string;
+}
+
+export const ESTADO_COLUMNA_STYLE: Record<EstadoTarea, EstadoColumnaStyle> = {
+  POR_HACER: {
+    headerBg: 'bg-[#E9EDF1] dark:bg-white/5',
+    headerText: 'text-[#59616C] dark:text-slate-300',
+    dot: 'bg-[#8A93A0]',
+  },
+  // En progreso = amarillo/ámbar y En revisión = azul, según la referencia
+  // (Sección 29). Antes estaban invertidos; el color vive únicamente aquí.
+  EN_PROGRESO: {
+    headerBg: 'bg-[#FFF1CC] dark:bg-amber-500/10',
+    headerText: 'text-[#8A6300] dark:text-amber-300',
+    dot: 'bg-[#D9A400]',
+  },
+  EN_REVISION: {
+    headerBg: 'bg-[#E6F0FF] dark:bg-blue-500/10',
+    headerText: 'text-[#2B63B8] dark:text-blue-300',
+    dot: 'bg-[#2B63B8]',
+  },
+  HECHO: {
+    headerBg: 'bg-[#E2F1DD] dark:bg-green-500/10',
+    headerText: 'text-[#286327] dark:text-green-300',
+    dot: 'bg-[#3E9B3A]',
+  },
+};
+
 export const PRIORIDAD_LABEL: Record<Prioridad, string> = {
   ALTA: 'Alta',
   MEDIA: 'Media',
   BAJA: 'Baja',
+};
+
+/**
+ * Icono + color de prioridad centralizados (Sección 39): la prioridad nunca
+ * se comunica solo por color — siempre acompaña icono y texto. Reutilizados
+ * por TaskCard y TaskDetailsSheet para no duplicar el mapa.
+ */
+export const PRIORIDAD_ICON: Record<Prioridad, typeof ArrowUp> = {
+  ALTA: ArrowUp,
+  MEDIA: Minus,
+  BAJA: ArrowDown,
+};
+
+export const PRIORIDAD_COLOR: Record<Prioridad, string> = {
+  ALTA: 'text-red-600 dark:text-red-400',
+  MEDIA: 'text-amber-600 dark:text-amber-400',
+  BAJA: 'text-blue-500 dark:text-blue-400',
 };
 
 const PRIORIDAD_ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
@@ -164,4 +220,79 @@ export function filtrarTareas(
   filtroHito: string,
 ): TareaPublicaDTO[] {
   return tareas.filter((t) => coincideFiltroRol(t, filtroRol) && coincideFiltroHito(t, filtroHito));
+}
+
+/**
+ * Estado visual compartido de una barra de progreso (Sección 16): un único
+ * contrato rojo → naranja → verde → verde UVG que se reutiliza en el
+ * progreso de tareas y en el de hitos, en vez de repetir condiciones. No
+ * guarda color en base de datos; solo deriva clases de Tailwind del %.
+ */
+export interface ProgressVisualState {
+  /** Fondo de la barra rellenada. */
+  bar: string;
+  /** Color del texto del porcentaje/label asociado. */
+  text: string;
+  /** Fondo del carril (track) sin rellenar. */
+  track: string;
+  /** true solo al 100% — permite mostrar un indicador de completado. */
+  complete: boolean;
+}
+
+export function getProgressVisualState(percent: number): ProgressVisualState {
+  const p = Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
+  if (p >= 100) {
+    return {
+      bar: 'bg-primary dark:bg-primary',
+      text: 'text-[#1B5E20] dark:text-green-300',
+      track: 'bg-[#E2F1DD] dark:bg-green-500/10',
+      complete: true,
+    };
+  }
+  if (p >= 67) {
+    return {
+      bar: 'bg-green-600 dark:bg-green-400',
+      text: 'text-green-700 dark:text-green-300',
+      track: 'bg-[#E2F1DD] dark:bg-green-500/10',
+      complete: false,
+    };
+  }
+  if (p >= 34) {
+    return {
+      bar: 'bg-orange-500 dark:bg-orange-400',
+      text: 'text-orange-700 dark:text-orange-300',
+      track: 'bg-[#FDE9D3] dark:bg-orange-500/10',
+      complete: false,
+    };
+  }
+  return {
+    bar: 'bg-red-500 dark:bg-red-400',
+    text: 'text-red-700 dark:text-red-300',
+    track: 'bg-[#FBE0E0] dark:bg-red-500/10',
+    complete: false,
+  };
+}
+
+/**
+ * Progreso de tareas derivado de las tareas ya cargadas (Sección 14) — nunca
+ * de `AvanceProyectoDTO`, que no expone el conteo de "En revisión". El
+ * porcentaje es HECHO / total (0 cuando no hay tareas, sin dividir por cero).
+ */
+export interface TaskProgressResumen {
+  total: number;
+  porcentaje: number;
+  conteos: Record<EstadoTarea, number>;
+}
+
+export function computeTaskProgress(tareas: TareaPublicaDTO[]): TaskProgressResumen {
+  const conteos: Record<EstadoTarea, number> = {
+    POR_HACER: 0,
+    EN_PROGRESO: 0,
+    EN_REVISION: 0,
+    HECHO: 0,
+  };
+  for (const t of tareas) conteos[t.estadoTarea] += 1;
+  const total = tareas.length;
+  const porcentaje = total === 0 ? 0 : Math.round((conteos.HECHO / total) * 100);
+  return { total, porcentaje, conteos };
 }

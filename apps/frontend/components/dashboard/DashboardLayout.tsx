@@ -98,14 +98,14 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="h-screen bg-surface flex overflow-hidden">
+    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-surface">
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
       </a>
       <TokenRefreshManager />
       
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden md:flex w-64 h-screen bg-surface-container-low border-r border-outline-variant flex-col shrink-0 overflow-y-auto">
+      <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-surface-container-low md:flex">
         <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
           <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
@@ -172,7 +172,7 @@ export default function DashboardLayout({
       <main
         id="dashboard-main"
         tabIndex={-1}
-        className="flex-1 flex flex-col overflow-hidden bg-surface focus:outline-none"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface focus:outline-none"
       >
         {/* Top Header Bar */}
         <header className="h-16 border-b border-outline-variant px-4 md:px-8 flex items-center justify-between shrink-0 bg-surface-container-low z-30">
@@ -205,7 +205,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Scrollable page body */}
-        <div className="flex-1 overflow-auto pb-20 md:pb-0">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain pb-20 md:pb-0">
           {children}
         </div>
       </main>

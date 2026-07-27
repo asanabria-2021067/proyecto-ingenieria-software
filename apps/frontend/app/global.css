@@ -246,8 +246,8 @@ html {
   [role='button'],
   [tabindex]:not([tabindex='-1'])
 ):focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-primary) 62%, transparent);
-  outline-offset: 3px;
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 62%, transparent);
+  outline-offset: 1px;
 }
 
 [data-radix-popper-content-wrapper] {
@@ -350,6 +350,34 @@ button:disabled {
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
   background: rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Toasts are lightweight feedback, not modal overlays. Keep them from
+   inheriting the global SweetAlert backdrop/blur that darkens the page. */
+.swal2-container.swal2-top,
+.swal2-container.swal2-top-start,
+.swal2-container.swal2-top-end,
+.swal2-container.swal2-center-start,
+.swal2-container.swal2-center-end,
+.swal2-container.swal2-bottom,
+.swal2-container.swal2-bottom-start,
+.swal2-container.swal2-bottom-end {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none !important;
+}
+
+.swal2-container.swal2-top .swal2-popup,
+.swal2-container.swal2-top-start .swal2-popup,
+.swal2-container.swal2-top-end .swal2-popup,
+.swal2-container.swal2-center-start .swal2-popup,
+.swal2-container.swal2-center-end .swal2-popup,
+.swal2-container.swal2-bottom .swal2-popup,
+.swal2-container.swal2-bottom-start .swal2-popup,
+.swal2-container.swal2-bottom-end .swal2-popup {
+  pointer-events: auto !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16) !important;
 }
 
 /* Popup container – force theme colors, strip the hardcoded white */

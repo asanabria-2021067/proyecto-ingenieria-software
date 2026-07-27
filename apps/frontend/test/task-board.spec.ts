@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
 beforeAll(() => {
@@ -25,6 +25,14 @@ beforeAll(() => {
 // QueryClient/useCurrentUser/red.
 vi.mock('../components/projects/task-comments-dialog', () => ({
   TaskCommentsDialog: () => null,
+}));
+
+// El detalle de tarea es ahora una ruta dedicada: el tablero navega hacia ella
+// con `router.push` en vez de abrir un Sheet. Se expone el spy para verificarlo.
+const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => routerMock,
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { TaskBoard } from '../components/projects/task-board';
@@ -97,7 +105,12 @@ function renderBoard(overrides: Record<string, unknown> = {}) {
 }
 
 describe('TaskBoard', () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    routerMock.push.mockClear();
+    routerMock.replace.mockClear();
+    routerMock.back.mockClear();
+  });
 
   it('renderiza exactamente cuatro columnas en el orden correcto', () => {
     renderBoard({ tasks: [tarea()] });
@@ -126,15 +139,17 @@ describe('TaskBoard', () => {
     expect(within(columnaHecho).getByText('1')).toBeInTheDocument();
   });
 
-  it('columna vacía muestra un estado compacto', () => {
+  it('columna vacía muestra el mensaje de estado vacío (Sección 46)', () => {
     renderBoard({ tasks: [tarea({ estadoTarea: 'POR_HACER' })] });
     const columnaHecho = screen.getByRole('heading', { name: 'Hecho' }).closest('section') as HTMLElement;
-    expect(within(columnaHecho).getByText('Sin tareas')).toBeInTheDocument();
+    expect(within(columnaHecho).getByText('No hay tareas en este estado.')).toBeInTheDocument();
   });
 
-  it('proyecto sin tareas muestra las cuatro columnas vacías', () => {
+  it('proyecto sin tareas muestra el estado vacío del tablero (Sección 47), no las columnas', () => {
     renderBoard({ tasks: [] });
-    expect(screen.getAllByText('Sin tareas')).toHaveLength(4);
+    // El tablero vacío reemplaza a las columnas por un mensaje dedicado.
+    expect(screen.getByText('Aún no hay tareas')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Por hacer' })).not.toBeInTheDocument();
     expect(screen.getByText('0 tareas')).toBeInTheDocument();
   });
 
@@ -282,7 +297,9 @@ describe('TaskBoard', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Entrega 2' }));
     expect(screen.queryByText('Tarea A')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    // Sin coincidencias hay dos accesos equivalentes a "Limpiar filtros" (la
+    // toolbar y el callout central); cualquiera restablece ambos filtros.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Limpiar filtros' })[0]);
     expect(screen.getByText('Tarea A')).toBeInTheDocument();
     expect(screen.getByText('Tarea B')).toBeInTheDocument();
   });
@@ -305,56 +322,39 @@ describe('TaskBoard', () => {
     expect(container.querySelectorAll('[draggable="true"]').length).toBe(0);
   });
 
-  it('el cambio de estado llama a la mutation con taskId y el enum correcto, sin projectId adicional', () => {
-    const mutate = vi.fn();
+  it('pulsar el título navega a la vista dedicada de la tarea, sin abrir un Sheet', () => {
     renderBoard({
+      idProyecto: 10,
       isLeader: true,
       tasks: [tarea({ idTarea: 7, tituloTarea: 'Mover', estadoTarea: 'POR_HACER' })],
-      cambiarEstadoTarea: mutationStub({ mutate }),
     });
 
-    const select = screen.getByRole('combobox', { name: 'Cambiar estado de "Mover"' });
-    fireEvent.keyDown(select, { key: 'Enter' });
-    fireEvent.click(screen.getByRole('option', { name: 'En progreso' }));
-
-    expect(mutate).toHaveBeenCalledWith({ taskId: 7, input: { estadoTarea: 'EN_PROGRESO' } });
+    // El detalle ya no es un Sheet lateral (Sección 8): la tarjeta navega a la
+    // ruta canónica. El cambio de estado ocurre en esa página dedicada.
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir detalles de "Mover"' }));
+    expect(routerMock.push).toHaveBeenCalledWith('/dashboard/projects/10/kanban/tasks/7');
+    expect(screen.queryByRole('combobox', { name: 'Cambiar estado de "Mover"' })).not.toBeInTheDocument();
   });
 
-  it('la eliminación requiere confirmación y llama a la mutation correcta', async () => {
-    const mutate = vi.fn();
+  it('pulsar el icono de comentarios navega a la vista dedicada con ?section=comments', () => {
+    renderBoard({
+      idProyecto: 10,
+      isLeader: true,
+      tasks: [tarea({ idTarea: 7, tituloTarea: 'Mover', estadoTarea: 'POR_HACER' })],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir comentarios de "Mover"' }));
+    expect(routerMock.push).toHaveBeenCalledWith(
+      '/dashboard/projects/10/kanban/tasks/7?section=comments',
+    );
+  });
+
+  it('la tarjeta del tablero ya no expone un menú de acciones (editar/eliminar viven en el detalle)', () => {
     renderBoard({
       isLeader: true,
       tasks: [tarea({ idTarea: 9, tituloTarea: 'Borrar' })],
-      eliminarTarea: mutationStub({ mutate }),
     });
-
-    const trigger = screen.getByRole('button', { name: 'Acciones de "Borrar"' });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    fireEvent.click(await screen.findByText('Eliminar tarea'));
-
-    expect(await screen.findByText(/esta acción eliminará la tarea "Borrar"/i)).toBeInTheDocument();
-    expect(mutate).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
-    expect(mutate).toHaveBeenCalledWith({ taskId: 9 }, expect.anything());
-  });
-
-  it('cancelar la eliminación no llama a la mutation', async () => {
-    const mutate = vi.fn();
-    renderBoard({
-      isLeader: true,
-      tasks: [tarea({ idTarea: 9, tituloTarea: 'Borrar' })],
-      eliminarTarea: mutationStub({ mutate }),
-    });
-
-    const trigger = screen.getByRole('button', { name: 'Acciones de "Borrar"' });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    fireEvent.click(await screen.findByText('Eliminar tarea'));
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-
-    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Acciones de "Borrar"' })).not.toBeInTheDocument();
   });
 
   it('un tercero sin permiso no ve el control de eliminar ni el selector de estado', () => {
@@ -378,8 +378,9 @@ describe('TaskBoard', () => {
     expect(screen.queryByRole('combobox', { name: /cambiar estado/i })).not.toBeInTheDocument();
   });
 
-  it('el asignado activo sí puede cambiar el estado', () => {
+  it('el asignado activo también navega a la vista dedicada al abrir su tarea', () => {
     renderBoard({
+      idProyecto: 10,
       isLeader: false,
       currentUserId: 5,
       tasks: [
@@ -396,7 +397,8 @@ describe('TaskBoard', () => {
       ],
     });
 
-    expect(screen.getByRole('combobox', { name: 'Cambiar estado de "Mía"' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir detalles de "Mía"' }));
+    expect(routerMock.push).toHaveBeenCalledWith('/dashboard/projects/10/kanban/tasks/1');
   });
 
   it('el líder ve "Nueva tarea" y "Gestionar etiquetas"; un tercero no', () => {
@@ -423,55 +425,14 @@ describe('TaskBoard', () => {
     fireEvent.click(screen.getByRole('button', { name: /nueva tarea/i }));
     expect(screen.getByText('Crear nueva tarea')).toBeInTheDocument();
     // No aparece ninguna tarjeta nueva sin que la mutation resuelva: no hay
-    // estado local duplicado que inserte la tarea de forma optimista.
-    expect(screen.getAllByText('Sin tareas')).toHaveLength(4);
-  });
-
-  it('"Editar tarea" desde el menú de la tarjeta abre TaskFormDialog con la tarea seleccionada', async () => {
-    renderBoard({
-      isLeader: true,
-      tasks: [tarea({ idTarea: 3, tituloTarea: 'Tarea a editar' })],
-    });
-
-    const trigger = screen.getByRole('button', { name: 'Acciones de "Tarea a editar"' });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    fireEvent.click(await screen.findByText('Editar tarea'));
-
-    expect(screen.getByText('Editar tarea')).toBeInTheDocument();
-    expect(screen.getByLabelText('Título')).toHaveValue('Tarea a editar');
+    // estado local duplicado que inserte la tarea de forma optimista (el
+    // tablero sigue mostrando su estado vacío).
+    expect(screen.getByText('Aún no hay tareas')).toBeInTheDocument();
   });
 
   it('"Gestionar etiquetas" abre el drawer de etiquetas', () => {
     renderBoard({ isLeader: true, labels: [{ idEtiqueta: 1, nombreEtiqueta: 'Urgente', color: '#FF0000' }] });
     fireEvent.click(screen.getByRole('button', { name: /gestionar etiquetas/i }));
     expect(screen.getByText('Etiquetas del proyecto')).toBeInTheDocument();
-  });
-
-  it('"Eliminar tarea" desde el formulario de edición abre la misma confirmación única de TaskBoard', async () => {
-    const eliminarTarea = mutationStub();
-    renderBoard({
-      isLeader: true,
-      eliminarTarea,
-      tasks: [tarea({ idTarea: 3, tituloTarea: 'Tarea a borrar' })],
-    });
-
-    const trigger = screen.getByRole('button', { name: 'Acciones de "Tarea a borrar"' });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    fireEvent.click(await screen.findByText('Editar tarea'));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea' }));
-
-    // El formulario se cierra y se delega en el único AlertDialog de
-    // eliminación ya existente desde la Tarea 37 — no aparece un segundo
-    // formulario ni una segunda implementación de confirmación.
-    expect(screen.queryByText('Editar tarea')).not.toBeInTheDocument();
-    expect(
-      screen.getByText('Esta acción eliminará la tarea "Tarea a borrar". Esta acción no se puede deshacer.'),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
-    await waitFor(() => expect(eliminarTarea.mutate).toHaveBeenCalledWith({ taskId: 3 }, expect.anything()));
   });
 });

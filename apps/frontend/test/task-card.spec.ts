@@ -5,9 +5,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TaskCard, type TaskCardProps } from '../components/projects/task-card';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
-// Radix Select/DropdownMenu dependen de APIs de puntero que jsdom no
-// implementa; se poliyfillan localmente (sin tocar vitest.config) siguiendo
-// el mismo patrón ya usado para Radix Tabs en la Tarea 36.
+// Radix DropdownMenu depende de APIs de puntero que jsdom no implementa; se
+// poliyfillan localmente (sin tocar vitest.config).
 beforeAll(() => {
   if (!Element.prototype.hasPointerCapture) {
     Element.prototype.hasPointerCapture = () => false;
@@ -51,8 +50,7 @@ function renderCard(overrides: Partial<TaskCardProps> = {}) {
     puedeEliminar: false,
     puedeEditar: false,
     estadoPending: false,
-    estadoError: null,
-    onCambiarEstado: vi.fn(),
+    onAbrirDetalles: vi.fn(),
     onAbrirComentarios: vi.fn(),
     onSolicitarEliminar: vi.fn(),
     onEditar: vi.fn(),
@@ -62,7 +60,7 @@ function renderCard(overrides: Partial<TaskCardProps> = {}) {
   return { ...utils, props };
 }
 
-describe('TaskCard', () => {
+describe('TaskCard (compacta, Secciones 33-46)', () => {
   afterEach(() => cleanup());
 
   it('muestra el título de la tarea', () => {
@@ -70,14 +68,9 @@ describe('TaskCard', () => {
     expect(screen.getByText('Configurar CI')).toBeInTheDocument();
   });
 
-  it('muestra la descripción cuando está presente', () => {
+  it('nunca muestra la descripción, aunque la tarea la tenga (Sección 34)', () => {
     renderCard({ tarea: tarea({ descripcionTarea: 'Detalle de la tarea' }) });
-    expect(screen.getByText('Detalle de la tarea')).toBeInTheDocument();
-  });
-
-  it('no muestra bloque de descripción cuando está ausente', () => {
-    const { container } = renderCard({ tarea: tarea({ descripcionTarea: null }) });
-    expect(container.querySelector('p.line-clamp-2')).not.toBeInTheDocument();
+    expect(screen.queryByText('Detalle de la tarea')).not.toBeInTheDocument();
   });
 
   it('muestra la prioridad con texto (Alta/Media/Baja)', () => {
@@ -90,27 +83,38 @@ describe('TaskCard', () => {
     expect(screen.getByText('Backend')).toBeInTheDocument();
   });
 
-  it('muestra múltiples etiquetas', () => {
+  it('no muestra "Sin rol" cuando la tarea no tiene rol (Sección 40)', () => {
+    renderCard({ tarea: tarea({ rolProyecto: null }) });
+    expect(screen.queryByText('Sin rol')).not.toBeInTheDocument();
+  });
+
+  it('muestra hasta dos etiquetas y resume el resto con "+N" (Sección 41)', () => {
     renderCard({
       tarea: tarea({
         etiquetas: [
           { idEtiqueta: 1, nombreEtiqueta: 'Urgente', nombreNormalizado: 'urgente', color: '#f00' },
           { idEtiqueta: 2, nombreEtiqueta: 'Backend', nombreNormalizado: 'backend', color: '#0f0' },
+          { idEtiqueta: 3, nombreEtiqueta: 'Docs', nombreNormalizado: 'docs', color: '#00f' },
+          { idEtiqueta: 4, nombreEtiqueta: 'QA', nombreNormalizado: 'qa', color: '#0ff' },
         ],
       }),
     });
     expect(screen.getByText('Urgente')).toBeInTheDocument();
     expect(screen.getByText('Backend')).toBeInTheDocument();
+    expect(screen.queryByText('Docs')).not.toBeInTheDocument();
+    expect(screen.getByText('+2')).toBeInTheDocument();
   });
 
-  it('muestra el hito con texto real', () => {
+  it('no muestra el nombre del hito en la tarjeta; solo un indicador con tooltip accesible (Sección 45)', () => {
     renderCard({ tarea: tarea({ hito: { idHito: 1, tituloHito: 'Entrega 1' } }) });
-    expect(screen.getByText('Hito · Entrega 1')).toBeInTheDocument();
+    expect(screen.queryByText('Hito · Entrega 1')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Hito: Entrega 1')).toBeInTheDocument();
   });
 
-  it('muestra "Sin hito" cuando no existe hito', () => {
+  it('no muestra "Sin hito" ni indicador de hito cuando no existe hito (Sección 45)', () => {
     renderCard({ tarea: tarea({ hito: null }) });
-    expect(screen.getByText('Sin hito')).toBeInTheDocument();
+    expect(screen.queryByText('Sin hito')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Hito:/)).not.toBeInTheDocument();
   });
 
   it('muestra el nombre del asignado activo', () => {
@@ -144,92 +148,46 @@ describe('TaskCard', () => {
 
   it('identifica una tarea vencida de forma accesible', () => {
     renderCard({ tarea: tarea({ fechaLimite: '2020-01-01', estadoTarea: 'EN_PROGRESO' }) });
-    expect(screen.getByText('Vencida')).toBeInTheDocument();
+    expect(screen.getByLabelText('Vencida')).toBeInTheDocument();
   });
 
   it('una tarea HECHO no se marca como vencida aunque su fecha ya pasó', () => {
     renderCard({ tarea: tarea({ fechaLimite: '2020-01-01', estadoTarea: 'HECHO' }) });
-    expect(screen.queryByText('Vencida')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Vencida')).not.toBeInTheDocument();
   });
 
-  it('muestra la cantidad de comentarios con nombre accesible', () => {
-    renderCard({ tarea: tarea({ tituloTarea: 'Mi tarea', cantidadComentarios: 3 }) });
-    expect(screen.getByRole('button', { name: 'Abrir 3 comentarios de "Mi tarea"' })).toBeInTheDocument();
-  });
-
-  it('abre el diálogo de comentarios al activar el control de comentarios', () => {
+  it('muestra la cantidad de comentarios y abre el detalle en Comentarios (Sección 44)', () => {
     const onAbrirComentarios = vi.fn();
-    renderCard({ tarea: tarea({ cantidadComentarios: 2 }), onAbrirComentarios });
-    fireEvent.click(screen.getByRole('button', { name: /abrir 2 comentarios/i }));
+    renderCard({ tarea: tarea({ tituloTarea: 'Mi tarea', cantidadComentarios: 3 }), onAbrirComentarios });
+    const boton = screen.getByRole('button', { name: 'Abrir comentarios de "Mi tarea"' });
+    expect(boton).toHaveTextContent('3');
+    fireEvent.click(boton);
     expect(onAbrirComentarios).toHaveBeenCalledTimes(1);
   });
 
-  it('muestra el selector de estado cuando el actor tiene permiso (líder o asignado)', () => {
-    renderCard({ puedeCambiarEstado: true, tarea: tarea({ tituloTarea: 'Revisar PR' }) });
-    expect(screen.getByRole('combobox', { name: 'Cambiar estado de "Revisar PR"' })).toBeInTheDocument();
+  it('al pulsar el título abre el detalle (Sección 46)', () => {
+    const onAbrirDetalles = vi.fn();
+    renderCard({ tarea: tarea({ tituloTarea: 'Revisar PR' }), onAbrirDetalles });
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir detalles de "Revisar PR"' }));
+    expect(onAbrirDetalles).toHaveBeenCalledTimes(1);
   });
 
-  it('no muestra el selector de estado para un tercero sin permiso', () => {
-    renderCard({ puedeCambiarEstado: false });
+  it('no muestra ningún selector de estado permanente en la tarjeta (Sección 48)', () => {
+    renderCard({ puedeCambiarEstado: true, tarea: tarea({ tituloTarea: 'Revisar PR' }) });
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
-  it('el menú de eliminar solo aparece cuando puedeEliminar es true', async () => {
-    renderCard({ puedeEliminar: true, tarea: tarea({ tituloTarea: 'X' }) });
-    const trigger = screen.getByRole('button', { name: 'Acciones de "X"' });
-    trigger.focus();
-    // Radix DropdownMenu abre en `onPointerDown`; jsdom no dispara pointer
-    // events reales con fireEvent.click, así que se activa por teclado
-    // (Enter), que es además la vía de acceso por teclado que exige la
-    // Tarea 37.
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    expect(await screen.findByText('Eliminar tarea')).toBeInTheDocument();
-  });
-
-  it('el menú no ofrece eliminar cuando puedeEliminar es false', async () => {
-    renderCard({ puedeEliminar: false, tarea: tarea({ tituloTarea: 'X' }) });
-    const trigger = screen.getByRole('button', { name: 'Acciones de "X"' });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    expect(await screen.findByText('Ver comentarios')).toBeInTheDocument();
-    expect(screen.queryByText('Eliminar tarea')).not.toBeInTheDocument();
-  });
-
-  it('el menú ofrece "Editar tarea" solo cuando puedeEditar es true (líder)', async () => {
-    renderCard({ puedeEditar: true, tarea: tarea({ tituloTarea: 'X' }) });
-    const trigger = screen.getByRole('button', { name: 'Acciones de "X"' });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    expect(await screen.findByText('Editar tarea')).toBeInTheDocument();
-  });
-
-  it('el menú no ofrece "Editar tarea" para un tercero (puedeEditar false)', async () => {
-    renderCard({ puedeEditar: false, tarea: tarea({ tituloTarea: 'X' }) });
-    const trigger = screen.getByRole('button', { name: 'Acciones de "X"' });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    expect(await screen.findByText('Ver comentarios')).toBeInTheDocument();
+  it('la tarjeta ya no tiene el menú de tres puntos: sin botón de acciones ni "Editar/Eliminar/Ver detalles"', () => {
+    // La edición, la eliminación y el detalle viven ahora en la vista dedicada
+    // de la tarea; la tarjeta solo enlaza al detalle (título) y a los comentarios.
+    renderCard({ puedeEditar: true, puedeEliminar: true, tarea: tarea({ tituloTarea: 'X' }) });
+    expect(screen.queryByRole('button', { name: 'Acciones de "X"' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Ver detalles')).not.toBeInTheDocument();
     expect(screen.queryByText('Editar tarea')).not.toBeInTheDocument();
-  });
-
-  it('activar "Editar tarea" llama a onEditar con la tarea correcta', async () => {
-    const onEditar = vi.fn();
-    renderCard({ puedeEditar: true, tarea: tarea({ tituloTarea: 'X' }), onEditar });
-    const trigger = screen.getByRole('button', { name: 'Acciones de "X"' });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    fireEvent.click(await screen.findByText('Editar tarea'));
-    expect(onEditar).toHaveBeenCalledTimes(1);
-  });
-
-  it('muestra un error accesible (role="alert") cuando falla el cambio de estado', () => {
-    renderCard({ puedeCambiarEstado: true, estadoError: 'No se pudo cambiar el estado.' });
-    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cambiar el estado.');
-  });
-
-  it('deshabilita el selector durante el estado pending', () => {
-    renderCard({ puedeCambiarEstado: true, estadoPending: true });
-    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.queryByText('Eliminar tarea')).not.toBeInTheDocument();
+    // Conserva el enlace al detalle y a comentarios.
+    expect(screen.getByRole('button', { name: 'Abrir detalles de "X"' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir comentarios de "X"' })).toBeInTheDocument();
   });
 
   it('ningún <button> contiene otro <button> (estructura no anidada)', () => {
