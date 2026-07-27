@@ -9,12 +9,12 @@ import { MensajesRevisionController } from '../src/mensajes-revision/mensajes-re
 import { NotificationsController } from '../src/notifications/notifications.controller';
 import { ProjectsController } from '../src/projects/projects.controller';
 import { RevisionesController } from '../src/revisiones/revisiones.controller';
-import { TasksController } from '../src/tasks/tasks.controller';
 import { UsersController } from '../src/users/users.controller';
 import { ValidationController } from '../src/validation/validation.controller';
 import { CatalogsService } from '../src/catalogs/catalogs.service';
 import { EvidenceService } from '../src/evidence/evidence.service';
 import { ValidationService } from '../src/validation/validation.service';
+import { TasksController } from '../src/tasks/tasks.controller';
 
 describe('Controllers and basic services', () => {
   it('AppController healthCheck', () => {
@@ -131,10 +131,16 @@ describe('Controllers and basic services', () => {
     const result = await catalogs.findAll();
     expect(result.carreras[0].id).toBe('1');
 
-    const tasksService = { findAll: vi.fn(), findOne: vi.fn() } as any;
+    const tasksService = {
+      findAll: vi.fn(),
+      findOne: vi.fn(),
+    } as any;
+
     const tasks = new TasksController(tasksService);
+
     tasks.findAll(1, { userId: 9 });
     expect(tasksService.findAll).toHaveBeenCalledWith(1, 9);
+
     tasks.findOne(1, 5, { userId: 9 });
     expect(tasksService.findOne).toHaveBeenCalledWith(1, 5, 9);
 

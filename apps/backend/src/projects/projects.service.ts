@@ -518,25 +518,26 @@ export class ProjectsService {
 
     const proyectos = await this.prisma.proyecto.findMany({
       where: {
-        estadoProyecto: EstadoProyecto.PUBLICADO,
+        estadoProyecto: { in: ESTADOS_VISIBLES },
         eliminadoEn: null,
       },
       select: {
         ...proyectoListSelect,
-        _count: {
-          select: { roles: { where: { postulaciones: { some: {} } } } },
-        },
+        roles: { select: { _count: { select: { postulaciones: true } } } },
       },
-      orderBy: {
-        roles: {
-          _count: 'desc',
-        },
-      },
-      take: 6,
     });
 
-    await this.cacheManager.set(FEATURED_CACHE_KEY, proyectos, FEATURED_CACHE_TTL).catch(() => {});
-    return proyectos;
+    const destacados = proyectos
+      .map(({ roles, ...p }) => ({
+        ...p,
+        totalPostulaciones: roles.reduce((sum, r) => sum + r._count.postulaciones, 0),
+      }))
+      .sort((a, b) => b.totalPostulaciones - a.totalPostulaciones)
+      .slice(0, 6)
+      .map(({ totalPostulaciones, ...p }) => p);
+
+    await this.cacheManager.set(FEATURED_CACHE_KEY, destacados, FEATURED_CACHE_TTL).catch(() => {});
+    return destacados;
   }
 
   private async _invalidateFeaturedCache(): Promise<void> {
