@@ -132,6 +132,6 @@ describe('Dashboard - seccion Proyectos Destacados', () => {
     await renderDashboard();
 
     const card = await screen.findByRole('link', { name: /Robotica UVG/i });
-    expect(card).toHaveAttribute('href', '/dashboard/proyectos/42');
+    expect(card).toHaveAttribute('href', '/dashboard/projects/42');
   });
 });

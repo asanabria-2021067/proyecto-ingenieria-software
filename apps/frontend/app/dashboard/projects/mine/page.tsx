@@ -3,13 +3,16 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertCircle, FolderPlus, MapPin, Pencil, Plus, Search, SearchX, Trash2 } from 'lucide-react';
+import { AlertCircle, FolderPlus, Plus, Search, SearchX } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { ProjectProgressBar } from '@/components/projects/project-progress-bar';
+import {
+  AvailableProjectCard,
+  AvailableProjectCardSkeleton,
+} from '@/components/projects/available-project-card';
 import { getMyProjects, deleteProject } from '@/lib/services/projects';
-import { TIPO_LABEL, MODALIDAD_LABEL } from '@/types';
+import { TIPO_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
-import uvgSwal from '@/lib/swal';
+import uvgSwal, { swalCustomClass } from '@/lib/swal';
 import {
   Empty,
   EmptyContent,
@@ -27,17 +30,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const ESTADO_STYLES: Record<string, string> = {
-  PUBLICADO: 'bg-primary text-on-primary dark:bg-primary dark:text-on-primary',
-  EN_PROGRESO: 'bg-secondary text-on-secondary dark:bg-secondary dark:text-on-secondary',
-  BORRADOR: 'bg-surface-container-high text-on-surface-variant dark:bg-surface-container-highest dark:text-on-surface-variant',
-  EN_REVISION: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  OBSERVADO: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  EN_SOLICITUD_CIERRE: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-  CERRADO: 'bg-surface-container-highest text-on-surface-variant dark:bg-surface-container-highest dark:text-on-surface-variant',
-  CANCELADO: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-};
-
 const ESTADO_LABEL: Record<string, string> = {
   BORRADOR: 'Borrador',
   EN_REVISION: 'En revisión',
@@ -48,6 +40,21 @@ const ESTADO_LABEL: Record<string, string> = {
   CERRADO: 'Cerrado',
   CANCELADO: 'Cancelado',
 };
+
+/** Orden predeterminado del listado: primero lo que necesita atención, al final lo cerrado. */
+const ESTADO_ORDEN: Record<string, number> = {
+  BORRADOR: 0,
+  EN_REVISION: 1,
+  OBSERVADO: 2,
+  PUBLICADO: 3,
+  EN_PROGRESO: 4,
+  EN_SOLICITUD_CIERRE: 5,
+  CERRADO: 6,
+  CANCELADO: 7,
+};
+
+const inputTriggerClass =
+  'h-11.5 rounded-lg border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30';
 
 export default function MyProjectsPage() {
   const queryClient = useQueryClient();
@@ -69,7 +76,8 @@ export default function MyProjectsPage() {
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md',
+        ...swalCustomClass,
+        confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md mx-4',
       },
     });
 
@@ -94,69 +102,79 @@ export default function MyProjectsPage() {
     }
   }
 
-  const filtrados = proyectos.filter((p) => {
-    const matchBusqueda =
-      !busqueda ||
-      p.tituloProyecto.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (p.descripcionProyecto ?? '').toLowerCase().includes(busqueda.toLowerCase());
-    const matchTipo   = !tipoFiltro   || p.tipoProyecto   === tipoFiltro;
-    const matchEstado = !estadoFiltro || p.estadoProyecto === estadoFiltro;
-    return matchBusqueda && matchTipo && matchEstado;
-  });
+  const filtrados = proyectos
+    .filter((p) => {
+      const matchBusqueda =
+        !busqueda ||
+        p.tituloProyecto.toLowerCase().includes(busqueda.toLowerCase()) ||
+        (p.descripcionProyecto ?? '').toLowerCase().includes(busqueda.toLowerCase());
+      const matchTipo   = !tipoFiltro   || p.tipoProyecto   === tipoFiltro;
+      const matchEstado = !estadoFiltro || p.estadoProyecto === estadoFiltro;
+      return matchBusqueda && matchTipo && matchEstado;
+    })
+    .sort((a, b) => (ESTADO_ORDEN[a.estadoProyecto] ?? 99) - (ESTADO_ORDEN[b.estadoProyecto] ?? 99));
   const hasActiveFilters = Boolean(busqueda || tipoFiltro || estadoFiltro);
+
+  const limpiarFiltros = () => {
+    setBusqueda('');
+    setTipoFiltro('');
+    setEstadoFiltro('');
+  };
 
   return (
     <DashboardLayout>
-      <div className="px-8 py-8 max-w-6xl mx-auto">
-        <div className="mb-8 flex items-start justify-between gap-4">
+      <div className="mx-auto max-w-7xl px-8 pt-7 pb-10">
+        <div className="mb-4.5 flex items-start justify-between gap-4">
           <div>
-            <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
+            <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">
               Mis Proyectos
             </h1>
-            <p className="text-tertiary text-sm">
+            <p className="mt-1 text-[14px] font-normal text-tertiary">
               Gestiona tus proyectos, revisa su estado y sigue desarrollando tus ideas.
             </p>
           </div>
           <Link
             href="/dashboard/projects/mine/form"
-            className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200 shrink-0"
+            className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition-colors hover:bg-primary/90"
           >
             <Plus className="w-4 h-4" />
             Nuevo Proyecto
           </Link>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        {/* Buscador y filtros */}
+        <div className="mb-4.5 flex flex-col gap-4 sm:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-tertiary" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
             <input
               type="text"
               aria-label="Buscar mis proyectos por titulo o descripcion"
               placeholder="Buscar proyectos..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
+              className="h-11.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest py-2.5 pl-10 pr-3.5 text-[14px] text-on-surface outline-none placeholder:text-outline focus:ring-2 focus:ring-primary"
             />
           </div>
+
           <Select value={tipoFiltro || '__ALL__'} onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}>
             <SelectTrigger
               aria-label="Filtrar mis proyectos por tipo"
-              className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30"
+              className={`w-full sm:w-50 py-2.5 h-auto ${inputTriggerClass}`}
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-9999">
               <SelectItem value="__ALL__" className="focus:bg-primary focus:text-on-primary">Todos los tipos</SelectItem>
-              <SelectItem value="ACADEMICO_HORAS_BECA" className="focus:bg-primary focus:text-on-primary">Horas Beca</SelectItem>
-              <SelectItem value="ACADEMICO_EXPERIENCIA" className="focus:bg-primary focus:text-on-primary">Experiencia</SelectItem>
-              <SelectItem value="EXTRACURRICULAR_EXTENSION" className="focus:bg-primary focus:text-on-primary">Extensión</SelectItem>
+              {Object.entries(TIPO_LABEL).map(([value, label]) => (
+                <SelectItem key={value} value={value} className="focus:bg-primary focus:text-on-primary">{label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
           <Select value={estadoFiltro || '__ALL__'} onValueChange={(v) => setEstadoFiltro(v === '__ALL__' ? '' : v)}>
             <SelectTrigger
               aria-label="Filtrar mis proyectos por estado"
-              className="py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30"
+              className={`w-full sm:w-60 py-2.5 h-auto ${inputTriggerClass}`}
             >
               <SelectValue />
             </SelectTrigger>
@@ -170,9 +188,14 @@ export default function MyProjectsPage() {
         </div>
 
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm" role="status">Cargando proyectos...</div>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2" role="status" aria-label="Cargando proyectos">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <AvailableProjectCardSkeleton key={i} />
+            ))}
+          </div>
         )}
-        {isError && (
+
+        {!isLoading && isError && (
           <Empty tone="danger" className="surface-enter" role="alert">
             <EmptyMedia variant="icon">
               <AlertCircle aria-hidden="true" className="h-7 w-7" />
@@ -201,7 +224,7 @@ export default function MyProjectsPage() {
               <FolderPlus aria-hidden="true" className="h-7 w-7" />
             </EmptyMedia>
             <EmptyHeader>
-              <EmptyTitle>Convierte una idea en proyecto</EmptyTitle>
+              <EmptyTitle>Aún no has creado proyectos.</EmptyTitle>
               <EmptyDescription>
                 Crea una propuesta, define roles y enviala a revision para que otros estudiantes puedan sumarse.
               </EmptyDescription>
@@ -212,7 +235,7 @@ export default function MyProjectsPage() {
                 href="/dashboard/projects/mine/form"
                 className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
               >
-                Crear proyecto
+                Crear nuevo proyecto
               </Link>
               <Link
                 href="/dashboard/proyectos"
@@ -230,20 +253,16 @@ export default function MyProjectsPage() {
               <SearchX aria-hidden="true" className="h-7 w-7" />
             </EmptyMedia>
             <EmptyHeader>
-              <EmptyTitle>No hay proyectos con esos filtros</EmptyTitle>
+              <EmptyTitle>Sin resultados</EmptyTitle>
               <EmptyDescription>
-                Limpia los filtros para volver a ver todos tus proyectos y continuar gestionandolos.
+                No encontramos proyectos que coincidan con los filtros seleccionados.
               </EmptyDescription>
             </EmptyHeader>
             {hasActiveFilters && (
               <EmptyContent>
                 <button
                   type="button"
-                  onClick={() => {
-                    setBusqueda('');
-                    setTipoFiltro('');
-                    setEstadoFiltro('');
-                  }}
+                  onClick={limpiarFiltros}
                   className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
                 >
                   Limpiar filtros
@@ -253,114 +272,18 @@ export default function MyProjectsPage() {
           </Empty>
         )}
 
-        <div className="grid gap-5 md:grid-cols-2">
-          {filtrados.map((proyecto, index) => (
-            <div
-              key={proyecto.idProyecto}
-              className="surface-enter interactive-lift bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 flex flex-col gap-4 hover:shadow-md focus-within:ring-2 focus-within:ring-primary/30"
-              style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="font-headline font-bold text-on-surface text-lg leading-tight min-w-0">
-                  {proyecto.tituloProyecto}
-                </h2>
-                <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0 max-w-[45%]">
-                  <span className="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-bold whitespace-nowrap">
-                    {TIPO_LABEL[proyecto.tipoProyecto as keyof typeof TIPO_LABEL] ?? proyecto.tipoProyecto}
-                  </span>
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                      ESTADO_STYLES[proyecto.estadoProyecto] ?? 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
-                    {ESTADO_LABEL[proyecto.estadoProyecto] ?? proyecto.estadoProyecto}
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-on-surface text-sm leading-relaxed line-clamp-2">
-                {proyecto.descripcionProyecto}
-              </p>
-
-              <div className="flex items-center gap-4 text-xs text-tertiary">
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" />
-                  {MODALIDAD_LABEL[proyecto.modalidadProyecto as keyof typeof MODALIDAD_LABEL] ?? proyecto.modalidadProyecto}
-                </span>
-              </div>
-
-              {proyecto.revisiones?.[0] && (
-                <p className="text-xs text-tertiary">
-                  Última revisión:{' '}
-                  <span className="font-medium text-on-surface">
-                    {proyecto.revisiones[0].estadoRevision}
-                  </span>{' '}
-                  · Envío #{proyecto.revisiones[0].numeroEnvio}
-                </p>
-              )}
-
-              {/* Barra de avance fijada justo encima del botón, para que un título
-                  largo no la desplace y siempre quede en la misma posición. */}
-              <div className="mt-auto flex flex-col gap-3">
-              <ProjectProgressBar avance={proyecto.avanceProyecto} compact />
-              <div className="flex items-center gap-2">
-                {proyecto.estadoProyecto === 'BORRADOR' ? (
-                  <>
-                    <Link
-                      href={`/dashboard/projects/mine/form?id=${proyecto.idProyecto}`}
-                      className="flex-1 inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
-                    >
-                      Seguir editando Proyecto
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(proyecto)}
-                      aria-label={`Eliminar proyecto ${proyecto.tituloProyecto}`}
-                      className="inline-flex items-center justify-center bg-error text-on-error p-2.5 rounded-xl hover:bg-error/90 active:scale-95 transition-all duration-200"
-                      title="Eliminar proyecto"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </>
-                ) : proyecto.estadoProyecto === 'EN_REVISION' ? (
-                  <Link
-                    href={`/dashboard/projects/mine/${proyecto.idProyecto}`}
-                    className="flex-1 inline-flex items-center justify-center bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-surface-container-highest transition-all duration-200"
-                  >
-                    Ver mi solicitud
-                  </Link>
-                ) : proyecto.estadoProyecto === 'OBSERVADO' ? (
-                  <>
-                    <Link
-                      href={`/dashboard/projects/mine/${proyecto.idProyecto}?edit=true`}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-amber-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-700 active:scale-95 transition-all duration-200"
-                    >
-                      <Pencil className="w-4 h-4" />
-                      Editar
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(proyecto)}
-                      aria-label={`Eliminar proyecto ${proyecto.tituloProyecto}`}
-                      className="inline-flex items-center justify-center bg-error text-on-error p-2.5 rounded-xl hover:bg-error/90 active:scale-95 transition-all duration-200"
-                      title="Eliminar proyecto"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    href={`/dashboard/projects/${proyecto.idProyecto}`}
-                    className="flex-1 inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all duration-200"
-                  >
-                    Ver Proyecto
-                  </Link>
-                )}
-              </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {!isLoading && !isError && filtrados.length > 0 && (
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+            {filtrados.map((proyecto) => (
+              <AvailableProjectCard
+                key={proyecto.idProyecto}
+                context="mine"
+                proyecto={proyecto}
+                onDelete={() => handleDelete(proyecto)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

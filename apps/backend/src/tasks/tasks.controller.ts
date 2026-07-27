@@ -1,94 +1,104 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
   Body,
-  Query,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
   ParseIntPipe,
+  Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
-import { ComentariosService } from '../comentarios/comentarios.service';
-import { CreateTareaComentarioDto } from './dto/create-tarea-comentario.dto';
-import { CreateTareaDto } from './dto/create-tarea.dto';
-import { UpdateTareaDto } from './dto/update-tarea.dto';
-import { AssignTareaDto } from './dto/assign-tarea.dto';
+import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
+import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
+import { AssignTaskDto } from './dto/assign-task.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
-@Controller('tareas')
+@Controller('proyectos/:projectId/tareas')
+@UseGuards(JwtAuthGuard)
 export class TasksController {
-  constructor(
-    private tasksService: TasksService,
-    private comentariosService: ComentariosService,
-  ) {}
+  constructor(private tasksService: TasksService) {}
 
   @Get()
-  findAll(@Query('idProyecto') idProyecto?: string) {
-    return this.tasksService.findAll(idProyecto ? Number(idProyecto) : undefined);
+  findAll(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.tasksService.findAll(projectId, user.userId);
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.tasksService.findOne(id);
+  @Get(':taskId')
+  findOne(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.tasksService.findOne(projectId, taskId, user.userId);
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  create(@Body() dto: CreateTareaDto, @CurrentUser() user: { userId: number }) {
-    return this.tasksService.create(dto, user.userId);
+  @HttpCode(HttpStatus.CREATED)
+  create(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: CreateTaskDto,
+  ) {
+    return this.tasksService.create(projectId, user.userId, dto);
   }
 
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard)
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateTareaDto) {
-    return this.tasksService.update(id, dto);
+  @Patch(':taskId')
+  update(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: UpdateTaskDto,
+  ) {
+    return this.tasksService.update(projectId, taskId, user.userId, dto);
   }
 
-  @Post(':id/asignaciones')
-  @UseGuards(JwtAuthGuard)
+  @Patch(':taskId/estado')
+  updateEstado(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: UpdateTaskEstadoDto,
+  ) {
+    return this.tasksService.updateEstado(projectId, taskId, user.userId, dto);
+  }
+
+  @Delete(':taskId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+  ): Promise<void> {
+    await this.tasksService.remove(projectId, taskId, user.userId);
+  }
+
+  @Post(':taskId/asignar')
+  @HttpCode(HttpStatus.OK)
   assign(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: AssignTareaDto,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
     @CurrentUser() user: { userId: number },
+    @Body() dto: AssignTaskDto,
   ) {
-    return this.tasksService.assign(id, dto.idUsuario, user.userId);
+    return this.tasksService.assign(projectId, taskId, user.userId, dto);
   }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.tasksService.remove(id);
-  }
-
-  @Get(':id/comentarios')
-  @UseGuards(JwtAuthGuard)
-  findComentarios(@Param('id', ParseIntPipe) id: number) {
-    return this.comentariosService.findByTareaDesc(id);
-  }
-
-  @Post(':id/comentarios')
-  @UseGuards(JwtAuthGuard)
-  createComentario(
-    @Param('id', ParseIntPipe) id: number,
+  @Delete(':taskId/asignar')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unassign(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
     @CurrentUser() user: { userId: number },
-    @Body() dto: CreateTareaComentarioDto,
-  ) {
-    return this.comentariosService.create(user.userId, {
-      idTarea: id,
-      contenido: dto.contenido,
-    });
-  }
-
-  @Delete(':id/comentarios/:idComentario')
-  @UseGuards(JwtAuthGuard)
-  removeComentario(
-    @Param('idComentario', ParseIntPipe) idComentario: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.comentariosService.remove(idComentario, user.userId);
+  ): Promise<void> {
+    await this.tasksService.unassign(projectId, taskId, user.userId);
   }
 }

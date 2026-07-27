@@ -157,7 +157,22 @@ describe('ProjectsService', () => {
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, estadoProyecto: EstadoProyecto.BORRADOR, creadoPor: 1 });
     prisma.revisionProyecto.count.mockResolvedValue(0);
     const tx = {
-      proyecto: { update: vi.fn() },
+      proyecto: {
+        findUnique: vi.fn().mockResolvedValue({
+          tituloProyecto: 'Proyecto',
+          descripcionProyecto: 'Descripcion',
+          objetivosProyecto: 'Objetivos',
+          tipoProyecto: 'ACADEMICO',
+          modalidadProyecto: 'PRESENCIAL',
+          ubicacionProyecto: null,
+          contextoAcademico: null,
+          urlRecursoExterno: null,
+          fechaInicio: null,
+          fechaFinEstimada: null,
+          roles: [],
+        }),
+        update: vi.fn(),
+      },
       revisionProyecto: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
     };
     prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
