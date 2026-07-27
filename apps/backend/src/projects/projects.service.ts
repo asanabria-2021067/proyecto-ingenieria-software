@@ -31,6 +31,15 @@ const ESTADOS_EDITABLES: EstadoProyecto[] = [
   EstadoProyecto.OBSERVADO,
 ];
 
+// Un proyecto ya publicado / en progreso admite edición PARCIAL: solo un
+// subconjunto seguro de campos, mediante una lista explícita (nunca el DTO
+// completo de creación). No cambia estado, revisión, postulaciones, roles,
+// organizaciones, participantes, tareas, hitos, comentarios ni notificaciones.
+const ESTADOS_EDITABLE_PARCIAL: EstadoProyecto[] = [
+  EstadoProyecto.PUBLICADO,
+  EstadoProyecto.EN_PROGRESO,
+];
+
 function calcularAvanceTareas(tareas: { estadoTarea: string }[]) {
   const total = tareas.length;
   const hecho = tareas.filter((t) => t.estadoTarea === 'HECHO').length;
@@ -80,6 +89,9 @@ const proyectoListSelect = {
   estadoProyecto: true,
   modalidadProyecto: true,
   fechaPublicacion: true,
+  creador: {
+    select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
+  },
   organizaciones: {
     select: {
       organizacion: { select: { nombreOrganizacion: true } },
@@ -88,6 +100,9 @@ const proyectoListSelect = {
   intereses: {
     select: { interes: { select: { nombreInteres: true } } },
   },
+  // Solo `cupos` por rol: lo mínimo para que el listado calcule roles con
+  // disponibilidad real (cupos > 0) sin exponer requisitos/postulaciones.
+  roles: { select: { cupos: true } },
   _count: { select: { roles: true } },
 } as const;
 
@@ -347,7 +362,9 @@ export class ProjectsService {
       where: { idProyecto: id, eliminadoEn: null },
       select: {
         creadoPor: true,
-        tareas: { select: { estadoTarea: true } },
+        // eliminadoEn: null — las tareas con soft delete (Tarea 22) no deben
+        // contarse ni en el numerador ni en el denominador del avance.
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
         hitos: { select: { estadoHito: true } },
       },
     });
@@ -396,7 +413,9 @@ export class ProjectsService {
             },
           },
         },
-        tareas: { select: { estadoTarea: true } },
+        // eliminadoEn: null — misma exclusión que en getAvance: una tarea con
+        // soft delete no debe contarse en avanceProyecto.
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
         hitos: { select: { estadoHito: true } },
         revisiones: {
           select: {
@@ -651,9 +670,17 @@ export class ProjectsService {
 
   async update(id: number, data: UpdateProjectDto, userId: number) {
     const proyecto = await this._requireOwner(id, userId);
+
+    // Edición parcial (proyecto ya publicado / en progreso): solo el
+    // subconjunto seguro de campos; conserva estado, roles, organizaciones,
+    // participantes, tareas, hitos, comentarios, notificaciones y revisiones.
+    if (ESTADOS_EDITABLE_PARCIAL.includes(proyecto.estadoProyecto)) {
+      return this._updateParcial(id, data);
+    }
+
     if (!ESTADOS_EDITABLES.includes(proyecto.estadoProyecto)) {
       throw new BadRequestException(
-        `Solo se puede editar un proyecto en estado ${ESTADOS_EDITABLES.join(' o ')}`,
+        `Solo se puede editar un proyecto en estado ${[...ESTADOS_EDITABLES, ...ESTADOS_EDITABLE_PARCIAL].join(', ')}`,
       );
     }
 
@@ -731,6 +758,48 @@ export class ProjectsService {
         where: { idProyecto: id },
         select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true, fechaActualizacion: true },
       });
+    });
+  }
+
+  /**
+   * Edición parcial de un proyecto PUBLICADO / EN_PROGRESO: lista blanca
+   * explícita de campos (título, descripción, objetivos, fecha final estimada,
+   * ubicación, contexto académico, URL de recurso). Cualquier campo bloqueado
+   * enviado manualmente (tipo, modalidad, fecha de inicio, organizaciones,
+   * roles) se rechaza con 400. No cambia el estado ni toca roles,
+   * organizaciones, participantes, tareas, hitos, comentarios, notificaciones
+   * ni revisiones.
+   */
+  private async _updateParcial(id: number, data: UpdateProjectDto) {
+    const bloqueados: string[] = [];
+    if (data.tipoProyecto !== undefined) bloqueados.push('tipo de proyecto');
+    if (data.modalidadProyecto !== undefined) bloqueados.push('modalidad');
+    if (data.fechaInicio !== undefined) bloqueados.push('fecha de inicio');
+    if (data.organizacionesIds !== undefined) bloqueados.push('organizaciones');
+    if (data.roles !== undefined) bloqueados.push('roles');
+    if (bloqueados.length > 0) {
+      throw new BadRequestException(
+        `En un proyecto publicado o en progreso no puedes editar: ${bloqueados.join(', ')}. Los roles se gestionan desde el panel de roles.`,
+      );
+    }
+
+    // Lista blanca explícita: nunca se aplica el DTO completo de creación.
+    const updateData: Prisma.ProyectoUpdateInput = { fechaActualizacion: new Date() };
+    if (data.tituloProyecto !== undefined) updateData.tituloProyecto = data.tituloProyecto;
+    if (data.descripcionProyecto !== undefined) updateData.descripcionProyecto = data.descripcionProyecto;
+    if (data.objetivosProyecto !== undefined) updateData.objetivosProyecto = data.objetivosProyecto;
+    if (data.ubicacionProyecto !== undefined) updateData.ubicacionProyecto = data.ubicacionProyecto;
+    if (data.contextoAcademico !== undefined) updateData.contextoAcademico = data.contextoAcademico;
+    if (data.urlRecursoExterno !== undefined) updateData.urlRecursoExterno = data.urlRecursoExterno;
+    if (data.fechaFinEstimada !== undefined) {
+      updateData.fechaFinEstimada = new Date(data.fechaFinEstimada);
+    }
+
+    await this.prisma.proyecto.update({ where: { idProyecto: id }, data: updateData });
+
+    return this.prisma.proyecto.findUnique({
+      where: { idProyecto: id },
+      select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true, fechaActualizacion: true },
     });
   }
 

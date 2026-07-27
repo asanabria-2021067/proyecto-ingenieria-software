@@ -23,6 +23,17 @@ export interface NotificationTemplateData {
     taskId: number;
     projectId: number;
   };
+  // Reutiliza TipoNotificacion.TAREA_ACTUALIZADA (Tarea 25): no existe un
+  // valor de enum dedicado a "tarea desasignada" y esta tarea no puede
+  // agregar un enum Prisma ni una migración. TAREA_ACTUALIZADA ya existía
+  // en el schema sin ninguna plantilla asociada.
+  TAREA_ACTUALIZADA: {
+    taskTitle: string;
+    projectTitle: string;
+    unassignedBy: string;
+    taskId: number;
+    projectId: number;
+  };
   PROYECTO_EN_REVISION: {
     projectTitle: string;
     projectId: number;
@@ -72,6 +83,36 @@ export interface NotificationTemplateData {
     projectId: number;
     diasInactividad: number;
   };
+  // Ampliación roles/participación (Sección 18A): un integrante dejó un rol.
+  // Se envía una notificación consolidada por destinatario (nunca una por
+  // tarea afectada). taskCount = tareas del rol que quedaron sin asignar.
+  ROL_ABANDONADO: {
+    userName: string;
+    roleName: string;
+    projectTitle: string;
+    projectId: number;
+    roleId: number;
+    taskCount: number;
+  };
+
+  // Sección 18B: el líder se auto-asignó a un rol. El actor (líder) siempre se
+  // excluye de los destinatarios, por lo que puede resultar en cero envíos.
+  ROL_ASIGNADO_LIDER: {
+    userName: string;
+    roleName: string;
+    projectTitle: string;
+    projectId: number;
+    roleId: number;
+  };
+
+  // Sección 18C: el líder modificó datos relevantes de un rol utilizado.
+  ROL_ACTUALIZADO: {
+    roleName: string;
+    projectTitle: string;
+    projectId: number;
+    roleId: number;
+  };
+
   SOLICITUD_RECUPERACION_CONTRASENA: {
     userName: string;
     carne: string;
@@ -97,6 +138,11 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Nueva tarea asignada',
     message: (data: NotificationTemplateData['TAREA_ASIGNADA']) =>
       `${data.assignedBy} te asignó la tarea "${data.taskTitle}" en el proyecto "${data.projectTitle}".`,
+  },
+  TAREA_ACTUALIZADA: {
+    title: 'Ya no estás asignado a esta tarea',
+    message: (data: NotificationTemplateData['TAREA_ACTUALIZADA']) =>
+      `${data.unassignedBy} te quitó la asignación de la tarea "${data.taskTitle}" en el proyecto "${data.projectTitle}".`,
   },
   PROYECTO_EN_REVISION: {
     title: (data: NotificationTemplateData['PROYECTO_EN_REVISION']) =>
@@ -156,9 +202,33 @@ export const NOTIFICATION_TEMPLATES = {
     message: (data: NotificationTemplateData['PROYECTO_ADVERTENCIA_INACTIVIDAD']) =>
       `Tu borrador "${data.projectTitle}" lleva más de ${data.diasInactividad} días sin actividad.`,
   },
+  ROL_ABANDONADO: {
+    title: 'Un integrante dejó un rol',
+    message: (data: NotificationTemplateData['ROL_ABANDONADO']) =>
+      data.taskCount > 0
+        ? `${data.userName} dejó el rol "${data.roleName}" en "${data.projectTitle}". ${data.taskCount} ${
+            data.taskCount === 1 ? 'tarea quedó' : 'tareas quedaron'
+          } sin asignar.`
+        : `${data.userName} dejó el rol "${data.roleName}" en "${data.projectTitle}".`,
+  },
+
+  ROL_ASIGNADO_LIDER: {
+    title: 'El líder se unió a un rol',
+    message: (data: NotificationTemplateData['ROL_ASIGNADO_LIDER']) =>
+      `${data.userName} se asignó al rol "${data.roleName}" en el proyecto "${data.projectTitle}".`,
+  },
+
+  ROL_ACTUALIZADO: {
+    title: 'Un rol fue actualizado',
+    message: (data: NotificationTemplateData['ROL_ACTUALIZADO']) =>
+      `El rol "${data.roleName}" del proyecto "${data.projectTitle}" fue actualizado.`,
+  },
+
   SOLICITUD_RECUPERACION_CONTRASENA: {
     title: 'Solicitud de recuperación de contraseña',
-    message: (data: NotificationTemplateData['SOLICITUD_RECUPERACION_CONTRASENA']) =>
+    message: (
+      data: NotificationTemplateData['SOLICITUD_RECUPERACION_CONTRASENA'],
+    ) =>
       `${data.userName} (carné ${data.carne}) solicitó recuperar su contraseña.`,
   },
 } as const;

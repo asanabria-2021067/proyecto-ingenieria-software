@@ -10,6 +10,12 @@ type Props = {
   form: FormData;
   update: (field: keyof Omit<FormData, 'roles'>, value: string) => void;
   errors: FieldErrors;
+  /**
+   * Edición parcial (proyecto PUBLICADO / EN_PROGRESO): oculta los campos que
+   * quedan bloqueados tras publicar (tipo, modalidad y fecha de inicio). Los
+   * roles se gestionan por separado y no se muestran aquí.
+   */
+  partial?: boolean;
 };
 
 const ErrMsg = ({ field, errors }: { field: string; errors: FieldErrors }) =>
@@ -17,7 +23,7 @@ const ErrMsg = ({ field, errors }: { field: string; errors: FieldErrors }) =>
 
 const hasError = (field: string, errors: FieldErrors) => !!errors[field];
 
-export function Step1({ form, update, errors }: Props) {
+export function Step1({ form, update, errors, partial = false }: Props) {
   return (
     <div className="space-y-5">
       <div>
@@ -43,36 +49,38 @@ export function Step1({ form, update, errors }: Props) {
         <ErrMsg field="descripcionProyecto" errors={errors} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className={labelClass}>Tipo <span className="text-error">*</span></label>
-          <Select value={form.tipoProyecto || '__NONE__'} onValueChange={(v) => update('tipoProyecto', v === '__NONE__' ? '' : v)}>
-            <SelectTrigger className={`h-auto py-3 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm focus-visible:ring-primary/20 ${hasError('tipoProyecto', errors) ? 'border-error' : ''}`}>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(TIPO_LABEL).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <ErrMsg field="tipoProyecto" errors={errors} />
+      {!partial && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Tipo <span className="text-error">*</span></label>
+            <Select value={form.tipoProyecto || '__NONE__'} onValueChange={(v) => update('tipoProyecto', v === '__NONE__' ? '' : v)}>
+              <SelectTrigger className={`h-auto py-3 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm focus-visible:ring-primary/20 ${hasError('tipoProyecto', errors) ? 'border-error' : ''}`}>
+                <SelectValue placeholder="Selecciona un tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(TIPO_LABEL).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ErrMsg field="tipoProyecto" errors={errors} />
+          </div>
+          <div>
+            <label className={labelClass}>Modalidad <span className="text-error">*</span></label>
+            <Select value={form.modalidadProyecto || '__NONE__'} onValueChange={(v) => update('modalidadProyecto', v === '__NONE__' ? '' : v)}>
+              <SelectTrigger className={`h-auto py-3 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm focus-visible:ring-primary/20 ${hasError('modalidadProyecto', errors) ? 'border-error' : ''}`}>
+                <SelectValue placeholder="Selecciona modalidad" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(MODALIDAD_LABEL).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ErrMsg field="modalidadProyecto" errors={errors} />
+          </div>
         </div>
-        <div>
-          <label className={labelClass}>Modalidad <span className="text-error">*</span></label>
-          <Select value={form.modalidadProyecto || '__NONE__'} onValueChange={(v) => update('modalidadProyecto', v === '__NONE__' ? '' : v)}>
-            <SelectTrigger className={`h-auto py-3 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm focus-visible:ring-primary/20 ${hasError('modalidadProyecto', errors) ? 'border-error' : ''}`}>
-              <SelectValue placeholder="Selecciona modalidad" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(MODALIDAD_LABEL).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <ErrMsg field="modalidadProyecto" errors={errors} />
-        </div>
-      </div>
+      )}
 
       <div>
         <label className={labelClass}>Objetivos</label>
@@ -90,11 +98,13 @@ export function Step1({ form, update, errors }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className={labelClass}>Fecha de inicio</label>
-          <input type="date" className={inputClass} value={form.fechaInicio} onChange={(e) => update('fechaInicio', e.target.value)} />
-        </div>
+      <div className={partial ? '' : 'grid grid-cols-2 gap-4'}>
+        {!partial && (
+          <div>
+            <label className={labelClass}>Fecha de inicio</label>
+            <input type="date" className={inputClass} value={form.fechaInicio} onChange={(e) => update('fechaInicio', e.target.value)} />
+          </div>
+        )}
         <div>
           <label className={labelClass}>Fecha fin estimada</label>
           <input

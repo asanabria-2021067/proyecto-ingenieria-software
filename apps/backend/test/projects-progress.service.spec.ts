@@ -1,0 +1,287 @@
+import { describe, expect, it, vi } from 'vitest';
+import { ProjectsService } from '../src/projects/projects.service';
+
+/**
+ * Tarea 23: las tareas con soft delete (Tarea 22, `eliminadoEn !== null`) no
+ * deben participar en el cálculo de avance. La fórmula real vive en
+ * `calcularAvanceTareas`/`calcularAvanceHitos` (funciones privadas del
+ * módulo, no exportadas): por eso estas pruebas nunca reimplementan la
+ * fórmula, solo llaman a los métodos públicos reales `getAvance` y
+ * `findMine` y verifican tanto la forma de la consulta Prisma como el
+ * resultado observable.
+ *
+ * `filtrarComoPrisma` simula la evaluación real de un WHERE de Prisma sobre
+ * la relación `tareas`: si el `where` recibido no es exactamente
+ * `{ eliminadoEn: null }`, se comporta como lo haría Prisma sin ese filtro
+ * (devuelve TODAS las filas, incluidas las eliminadas). Esto hace que una
+ * regresión real en el código (quitar el `where`) cambie el resultado
+ * observado por la prueba, no solo la aserción estructural aislada.
+ */
+interface TareaFixture {
+  estadoTarea: string;
+  eliminadoEn: Date | null;
+}
+
+function filtrarComoPrisma(tareas: TareaFixture[], whereArg: unknown) {
+  const esFiltroCorrecto =
+    !!whereArg &&
+    typeof whereArg === 'object' &&
+    (whereArg as Record<string, unknown>).eliminadoEn === null &&
+    Object.keys(whereArg as Record<string, unknown>).length === 1;
+
+  const filas = esFiltroCorrecto ? tareas.filter((t) => t.eliminadoEn === null) : tareas;
+  return filas.map((t) => ({ estadoTarea: t.estadoTarea }));
+}
+
+function makePrismaGetAvance(
+  tareasFixture: TareaFixture[],
+  hitosFixture: { estadoHito: string }[] = [],
+  creadoPor = 1,
+) {
+  const findFirst = vi.fn(async (args: any) => ({
+    creadoPor,
+    tareas: filtrarComoPrisma(tareasFixture, args?.select?.tareas?.where),
+    hitos: hitosFixture,
+  }));
+  return {
+    proyecto: { findFirst },
+    participacionProyecto: { findFirst: vi.fn().mockResolvedValue(null) },
+  } as any;
+}
+
+function makePrismaFindMine(tareasFixture: TareaFixture[], hitosFixture: { estadoHito: string }[] = []) {
+  const findMany = vi.fn(async (args: any) => [
+    {
+      roles: [],
+      tareas: filtrarComoPrisma(tareasFixture, args?.select?.tareas?.where),
+      hitos: hitosFixture,
+    },
+  ]);
+  return { proyecto: { findMany } } as any;
+}
+
+function makeService(prisma: any) {
+  return new ProjectsService(prisma, {} as any);
+}
+
+const LIDER_ID = 1;
+
+describe('ProjectsService — avance excluye tareas con soft delete (Tarea 23)', () => {
+  describe('getAvance: forma exacta de la consulta Prisma', () => {
+    it('la relación tareas se consulta con where: { eliminadoEn: null }', async () => {
+      const prisma = makePrismaGetAvance([]);
+      const service = makeService(prisma);
+
+      await service.getAvance(1, LIDER_ID);
+
+      const select = prisma.proyecto.findFirst.mock.calls[0][0].select;
+      expect(select.tareas).toEqual({
+        where: { eliminadoEn: null },
+        select: { estadoTarea: true },
+      });
+    });
+
+    it('no ejecuta ninguna consulta adicional (una sola llamada a findFirst)', async () => {
+      const prisma = makePrismaGetAvance([]);
+      const service = makeService(prisma);
+
+      await service.getAvance(1, LIDER_ID);
+
+      expect(prisma.proyecto.findFirst).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findMine: forma exacta de la consulta Prisma', () => {
+    it('la relación tareas se consulta con where: { eliminadoEn: null }', async () => {
+      const prisma = makePrismaFindMine([]);
+      const service = makeService(prisma);
+
+      await service.findMine(LIDER_ID);
+
+      const select = prisma.proyecto.findMany.mock.calls[0][0].select;
+      expect(select.tareas).toEqual({
+        where: { eliminadoEn: null },
+        select: { estadoTarea: true },
+      });
+    });
+
+    it('no ejecuta ninguna consulta adicional (una sola llamada a findMany)', async () => {
+      const prisma = makePrismaFindMine([]);
+      const service = makeService(prisma);
+
+      await service.findMine(LIDER_ID);
+
+      expect(prisma.proyecto.findMany).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('proyecto sin tareas', () => {
+    it('getAvance: 0 tareas → porcentaje 0 (comportamiento previo conservado)', async () => {
+      const prisma = makePrismaGetAvance([]);
+      const service = makeService(prisma);
+
+      const result = await service.getAvance(1, LIDER_ID);
+
+      expect(result.tareas).toEqual({ porcentaje: 0, total: 0, porHacer: 0, enProgreso: 0, hecho: 0 });
+    });
+  });
+
+  describe('tareas activas sin eliminadas', () => {
+    it('getAvance calcula igual que antes de esta tarea (2 activas, 1 hecha → 50%)', async () => {
+      const prisma = makePrismaGetAvance([
+        { estadoTarea: 'HECHO', eliminadoEn: null },
+        { estadoTarea: 'POR_HACER', eliminadoEn: null },
+      ]);
+      const service = makeService(prisma);
+
+      const result = await service.getAvance(1, LIDER_ID);
+
+      expect(result.tareas.porcentaje).toBe(50);
+      expect(result.tareas.total).toBe(2);
+    });
+  });
+
+  describe('tarea completada eliminada', () => {
+    it('una tarea eliminada HECHO no aumenta numerador ni denominador', async () => {
+      const prisma = makePrismaGetAvance([
+        { estadoTarea: 'POR_HACER', eliminadoEn: null },
+        { estadoTarea: 'HECHO', eliminadoEn: new Date('2026-01-01') }, // eliminada
+      ]);
+      const service = makeService(prisma);
+
+      const result = await service.getAvance(1, LIDER_ID);
+
+      // Correcto: solo cuenta la activa POR_HACER → 0/1 = 0%.
+      // Si la eliminada "hecha" se filtrara mal, el resultado subiría a 50%.
+      expect(result.tareas).toMatchObject({ total: 1, hecho: 0, porcentaje: 0 });
+    });
+  });
+
+  describe('tarea no completada eliminada', () => {
+    it('una tarea eliminada POR_HACER no aumenta el denominador ni reduce el porcentaje', async () => {
+      const prisma = makePrismaGetAvance([
+        { estadoTarea: 'HECHO', eliminadoEn: null },
+        { estadoTarea: 'POR_HACER', eliminadoEn: new Date('2026-01-01') }, // eliminada
+      ]);
+      const service = makeService(prisma);
+
+      const result = await service.getAvance(1, LIDER_ID);
+
+      // Correcto: solo cuenta la activa HECHO → 1/1 = 100%.
+      // Si la eliminada "por hacer" se filtrara mal, el resultado bajaría a 50%.
+      expect(result.tareas).toMatchObject({ total: 1, hecho: 1, porcentaje: 100 });
+    });
+  });
+
+  describe('mezcla de tareas activas y eliminadas', () => {
+    it('el resultado se calcula únicamente con las tareas activas', async () => {
+      const prisma = makePrismaGetAvance([
+        { estadoTarea: 'HECHO', eliminadoEn: null },
+        { estadoTarea: 'HECHO', eliminadoEn: null },
+        { estadoTarea: 'POR_HACER', eliminadoEn: null },
+        { estadoTarea: 'HECHO', eliminadoEn: new Date('2026-01-01') }, // eliminada, no debe contarse
+        { estadoTarea: 'POR_HACER', eliminadoEn: new Date('2026-01-01') }, // eliminada, no debe contarse
+      ]);
+      const service = makeService(prisma);
+
+      const result = await service.getAvance(1, LIDER_ID);
+
+      // Correcto (solo las 3 activas): 2 hechas / 3 total = 67%.
+      // Si el filtro fallara (las 5 contaran): 3 hechas / 5 total = 60% — distinto, detectable.
+      expect(result.tareas).toMatchObject({ total: 3, hecho: 2, porcentaje: 67 });
+    });
+  });
+
+  describe('todas las tareas eliminadas', () => {
+    it('equivale exactamente a un proyecto sin tareas activas (0%)', async () => {
+      const prisma = makePrismaGetAvance([
+        { estadoTarea: 'HECHO', eliminadoEn: new Date('2026-01-01') },
+        { estadoTarea: 'POR_HACER', eliminadoEn: new Date('2026-01-01') },
+      ]);
+      const service = makeService(prisma);
+
+      const result = await service.getAvance(1, LIDER_ID);
+
+      expect(result.tareas).toEqual({ porcentaje: 0, total: 0, porHacer: 0, enProgreso: 0, hecho: 0 });
+    });
+  });
+
+  describe('una tarea activa que luego pasa a eliminada', () => {
+    it('el segundo cálculo deja de considerarla inmediatamente, sin caché ni estado obsoleto', async () => {
+      const tareasCompartidas: TareaFixture[] = [{ estadoTarea: 'HECHO', eliminadoEn: null }];
+      const prisma = makePrismaGetAvance(tareasCompartidas);
+      const service = makeService(prisma);
+
+      const antes = await service.getAvance(1, LIDER_ID);
+      expect(antes.tareas).toMatchObject({ total: 1, hecho: 1, porcentaje: 100 });
+
+      // Se marca eliminada la misma tarea (mutación directa del fixture que el
+      // mock de Prisma lee en cada llamada — no hay caché de por medio).
+      tareasCompartidas[0].eliminadoEn = new Date('2026-02-01');
+
+      const despues = await service.getAvance(1, LIDER_ID);
+      expect(despues.tareas).toEqual({ porcentaje: 0, total: 0, porHacer: 0, enProgreso: 0, hecho: 0 });
+    });
+  });
+
+  describe('fórmula y redondeo sin cambios', () => {
+    it('conserva Math.round: 1/3 → 33% (no 33.33, no trunca hacia abajo distinto)', async () => {
+      const prisma = makePrismaGetAvance([
+        { estadoTarea: 'HECHO', eliminadoEn: null },
+        { estadoTarea: 'POR_HACER', eliminadoEn: null },
+        { estadoTarea: 'EN_PROGRESO', eliminadoEn: null },
+        { estadoTarea: 'HECHO', eliminadoEn: new Date('2026-01-01') }, // eliminada: no debe alterar el redondeo
+      ]);
+      const service = makeService(prisma);
+
+      const result = await service.getAvance(1, LIDER_ID);
+
+      expect(result.tareas.porcentaje).toBe(33);
+    });
+  });
+
+  describe('contrato público sin cambios', () => {
+    it('getAvance conserva exactamente las mismas claves que antes de esta tarea', async () => {
+      const prisma = makePrismaGetAvance(
+        [{ estadoTarea: 'HECHO', eliminadoEn: null }],
+        [{ estadoHito: 'COMPLETADO' }],
+      );
+      const service = makeService(prisma);
+
+      const result = await service.getAvance(1, LIDER_ID);
+
+      expect(Object.keys(result).sort()).toEqual(['hitos', 'tareas'].sort());
+      expect(Object.keys(result.tareas).sort()).toEqual(
+        ['porcentaje', 'total', 'porHacer', 'enProgreso', 'hecho'].sort(),
+      );
+      expect(Object.keys(result.hitos).sort()).toEqual(
+        ['porcentaje', 'total', 'pendiente', 'enProgreso', 'completado'].sort(),
+      );
+    });
+
+    it('findMine sigue exponiendo avanceProyecto con la misma forma', async () => {
+      const prisma = makePrismaFindMine([{ estadoTarea: 'HECHO', eliminadoEn: null }]);
+      const service = makeService(prisma);
+
+      const [result] = await service.findMine(LIDER_ID);
+
+      expect(Object.keys(result.avanceProyecto).sort()).toEqual(['hitos', 'tareas'].sort());
+      expect(result.avanceProyecto.tareas.porcentaje).toBe(100);
+    });
+  });
+
+  describe('más de un consumidor: getAvance y findMine excluyen igual', () => {
+    it('ambos métodos excluyen las tareas eliminadas de forma consistente con el mismo dataset', async () => {
+      const dataset: TareaFixture[] = [
+        { estadoTarea: 'HECHO', eliminadoEn: null },
+        { estadoTarea: 'HECHO', eliminadoEn: new Date('2026-01-01') },
+      ];
+
+      const resultGetAvance = await makeService(makePrismaGetAvance(dataset)).getAvance(1, LIDER_ID);
+      const [resultFindMine] = await makeService(makePrismaFindMine(dataset)).findMine(LIDER_ID);
+
+      expect(resultGetAvance.tareas).toMatchObject({ total: 1, hecho: 1, porcentaje: 100 });
+      expect(resultFindMine.avanceProyecto.tareas).toMatchObject({ total: 1, hecho: 1, porcentaje: 100 });
+    });
+  });
+});
