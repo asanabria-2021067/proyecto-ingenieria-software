@@ -5,11 +5,22 @@ import Image from 'next/image';
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { LayoutDashboard, FolderOpen, Briefcase, FileText, User, LogOut } from 'lucide-react';
+import {
+  LayoutDashboard,
+  FolderOpen,
+  Briefcase,
+  FileText,
+  Bell,
+  User,
+  LogOut,
+  ListChecks,
+} from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { TokenRefreshManager } from '@/components/TokenRefreshManager';
-import { clearTokens } from '@/lib/utils/token';
+import { clearTokens, getAccessToken } from '@/lib/utils/token';
+import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
+import { getNotificationLink } from '@/lib/services/notifications';
 import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
@@ -19,7 +30,9 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/proyectos', label: 'Explorar Proyectos', icon: FolderOpen },
   { href: '/dashboard/projects/mine', label: 'Mis Proyectos', icon: Briefcase },
+  { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
   { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
+  { href: '/dashboard/notificaciones', label: 'Notificaciones', icon: Bell },
   { href: '/dashboard/perfil', label: 'Perfil', icon: User },
 ];
 
@@ -34,12 +47,40 @@ export default function DashboardLayout({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user, isLoading } = useCurrentUser();
+  const { latestNotification } = useRealtimeNotifications(getAccessToken());
 
   useEffect(() => {
     if (!allowAdmin && !isLoading && isAdminUser(user)) {
       router.replace('/dashboard/admin');
     }
   }, [user, isLoading, router, allowAdmin]);
+
+  useEffect(() => {
+    if (!latestNotification) return;
+
+    queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+    queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
+
+    const href = getNotificationLink(latestNotification);
+    uvgSwal.fire({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 6000,
+      timerProgressBar: true,
+      icon: 'info',
+      title: latestNotification.tituloNotificacion,
+      text: latestNotification.mensajeNotificacion,
+      didOpen: (popup) => {
+        if (!href) return;
+        popup.style.cursor = 'pointer';
+        popup.addEventListener('click', () => {
+          router.push(href);
+          uvgSwal.close();
+        });
+      },
+    });
+  }, [latestNotification, queryClient, router]);
 
   if (isLoading || (!allowAdmin && isAdminUser(user))) {
     return (
@@ -67,14 +108,14 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="h-screen bg-surface flex overflow-hidden">
+    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-surface">
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
       </a>
       <TokenRefreshManager />
       
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden md:flex w-64 h-screen bg-surface-container-low border-r border-outline-variant flex-col shrink-0 overflow-y-auto">
+      <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-surface-container-low md:flex">
         <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
           <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
@@ -141,7 +182,7 @@ export default function DashboardLayout({
       <main
         id="dashboard-main"
         tabIndex={-1}
-        className="flex-1 flex flex-col overflow-hidden bg-surface focus:outline-none"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface focus:outline-none"
       >
         {/* Top Header Bar */}
         <header className="h-16 border-b border-outline-variant px-4 md:px-8 flex items-center justify-between shrink-0 bg-surface-container-low z-30">
@@ -174,7 +215,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Scrollable page body */}
-        <div className="flex-1 overflow-auto pb-20 md:pb-0">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain pb-20 md:pb-0">
           {children}
         </div>
       </main>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AlertCircle, CheckCircle, ChevronRight, ClipboardList, Clock, Trash2, XCircle } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
+import { deletePostulacion } from '@/lib/services/applications';
 import { Postulacion, EstadoPostulacion } from '@/types';
 import uvgSwal from '@/lib/swal';
 import {
@@ -49,7 +50,7 @@ export default function MisPostulacionesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiFetch(`/postulaciones/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: number) => deletePostulacion(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] });
       uvgSwal.fire({
