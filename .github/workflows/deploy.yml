@@ -125,7 +125,16 @@ jobs:
 
             docker compose --profile app down
 
-            docker compose --profile app pull
+            n=0
+            until docker compose --profile app pull; do
+              n=$((n+1))
+              if [ "$n" -ge 5 ]; then
+                echo "Image pull failed after 5 attempts"
+                exit 1
+              fi
+              echo "Pull failed (attempt $n/5), retrying in 15s..."
+              sleep 15
+            done
             docker compose --profile app up -d --remove-orphans
 
             echo "Waiting for backend to be healthy..."
