@@ -1,6 +1,17 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/*
+ * `next-themes` (app/providers.tsx) usa attribute="class": el tema activo es
+ * la clase `.dark` en <html>, controlada por el toggle, no la preferencia
+ * del sistema operativo. Tailwind v4 por defecto liga `dark:` a
+ * `@media (prefers-color-scheme: dark)`, que es una señal distinta — sin
+ * este `@custom-variant`, cualquier utilidad `dark:` queda gobernada por el
+ * SO en vez de por el toggle de la app (se nota cuando el SO está en oscuro
+ * pero el usuario eligió claro dentro de la app, o viceversa).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-sparkles-color: var(--sparkles-color);
   --color-gradient-color: var(--gradient-color);
@@ -139,6 +150,46 @@ html {
   }
 }
 
+:root {
+  --blink-gray-bg: #e9edf1;
+  --blink-gray-text: #59616c;
+  --blink-gold-bg: #f6e7b0;
+  --blink-gold-text: #775700;
+}
+
+.dark {
+  --blink-gray-bg: #262b30;
+  --blink-gray-text: #c3c7cc;
+  --blink-gold-bg: #453405;
+  --blink-gold-text: #ffd873;
+}
+
+@keyframes blink-gold-gray {
+  0%,
+  100% {
+    background-color: var(--blink-gray-bg);
+    color: var(--blink-gray-text);
+  }
+  50% {
+    background-color: var(--blink-gold-bg);
+    color: var(--blink-gold-text);
+  }
+}
+
+.blink-gold-gray {
+  animation: blink-gold-gray 2.8s ease-in-out infinite;
+}
+
+/* "En solicitud de cierre" queda dorado estático (sin parpadeo) cuando el
+   usuario prefiere menos movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  .blink-gold-gray {
+    animation: none;
+    background-color: var(--blink-gold-bg);
+    color: var(--blink-gold-text);
+  }
+}
+
 .surface-enter {
   animation: surface-enter 0.38s var(--ease-out-quint) both;
 }
@@ -195,8 +246,8 @@ html {
   [role='button'],
   [tabindex]:not([tabindex='-1'])
 ):focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-primary) 62%, transparent);
-  outline-offset: 3px;
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 62%, transparent);
+  outline-offset: 1px;
 }
 
 [data-radix-popper-content-wrapper] {
@@ -299,6 +350,34 @@ button:disabled {
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
   background: rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Toasts are lightweight feedback, not modal overlays. Keep them from
+   inheriting the global SweetAlert backdrop/blur that darkens the page. */
+.swal2-container.swal2-top,
+.swal2-container.swal2-top-start,
+.swal2-container.swal2-top-end,
+.swal2-container.swal2-center-start,
+.swal2-container.swal2-center-end,
+.swal2-container.swal2-bottom,
+.swal2-container.swal2-bottom-start,
+.swal2-container.swal2-bottom-end {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none !important;
+}
+
+.swal2-container.swal2-top .swal2-popup,
+.swal2-container.swal2-top-start .swal2-popup,
+.swal2-container.swal2-top-end .swal2-popup,
+.swal2-container.swal2-center-start .swal2-popup,
+.swal2-container.swal2-center-end .swal2-popup,
+.swal2-container.swal2-bottom .swal2-popup,
+.swal2-container.swal2-bottom-start .swal2-popup,
+.swal2-container.swal2-bottom-end .swal2-popup {
+  pointer-events: auto !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16) !important;
 }
 
 /* Popup container – force theme colors, strip the hardcoded white */

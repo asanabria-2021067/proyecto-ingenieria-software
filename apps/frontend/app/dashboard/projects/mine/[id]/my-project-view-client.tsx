@@ -208,6 +208,17 @@ export default function MyProjectViewClient({ id }: Props) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
+  // Origen de la navegación: si venimos del detalle del proyecto
+  // (/dashboard/projects/[id] → "Revisiones previas") llega `returnTo` con esa
+  // ruta y el botón "Volver" regresa ahí. Sin el parámetro se conserva el flujo
+  // admin-estudiante (desde la lista) que vuelve a "Mis Proyectos". Solo se
+  // acepta una ruta interna del dashboard para evitar redirecciones abiertas.
+  const returnToParam = searchParams.get('returnTo');
+  const volverHref =
+    returnToParam && returnToParam.startsWith('/dashboard/')
+      ? returnToParam
+      : '/dashboard/projects/mine';
+
   const [isEditing, setIsEditing] = useState(searchParams.get('edit') === 'true');
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -435,7 +446,7 @@ export default function MyProjectViewClient({ id }: Props) {
         ) : (
           <>
             <Link
-              href="/dashboard/projects/mine"
+              href={volverHref}
               className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
             >
               <ArrowLeft className="h-4 w-4" />
