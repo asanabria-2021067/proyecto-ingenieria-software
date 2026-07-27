@@ -20,7 +20,7 @@ describe('AuthService', () => {
 
     const result = await service.login({ correo: 'a@uvg.edu', contrasena: '123456' });
 
-    expect(result).toEqual({ accessToken: 'jwt-token' });
+    expect(result).toEqual({ accessToken: 'jwt-token', refreshToken: 'jwt-token' });
   });
 
   it('login falla si usuario no existe', async () => {
@@ -59,7 +59,7 @@ describe('AuthService', () => {
       semestre: 4,
     });
 
-    expect(result).toEqual({ accessToken: 'token-register' });
+    expect(result).toEqual({ accessToken: 'token-register', refreshToken: 'token-register' });
     expect(tx.usuario.create).toHaveBeenCalled();
     expect(tx.perfilEstudiante.create).toHaveBeenCalled();
   });
