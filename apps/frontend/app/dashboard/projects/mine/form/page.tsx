@@ -17,6 +17,13 @@ import {
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from './types';
 
+// Estados con edición completa (asistente de 3 pasos) vs. edición PARCIAL
+// (subconjunto seguro: proyecto ya publicado / en progreso). El resto no es
+// editable desde este formulario.
+const FULL_EDIT_STATES = ['BORRADOR', 'OBSERVADO'];
+const PARTIAL_EDIT_STATES = ['PUBLICADO', 'EN_PROGRESO'];
+const ALLOWED_EDIT_STATES = [...FULL_EDIT_STATES, ...PARTIAL_EDIT_STATES];
+
 function NewProjectFormContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -28,6 +35,7 @@ function NewProjectFormContent() {
   const [saving, setSaving] = useState(false);
   const [triedStep1, setTriedStep1] = useState(false);
   const [triedStep2, setTriedStep2] = useState(false);
+  const [triedParcial, setTriedParcial] = useState(false);
 
   const [form, setForm] = useState<FormData>({
     tituloProyecto: '', descripcionProyecto: '', tipoProyecto: '',
@@ -45,10 +53,14 @@ function NewProjectFormContent() {
     enabled: editId !== null,
   });
 
+  const esEdicionParcial =
+    editId !== null &&
+    proyectoExistente != null &&
+    PARTIAL_EDIT_STATES.includes(proyectoExistente.estadoProyecto);
+
   useEffect(() => {
     if (!proyectoExistente) return;
-    const editableStates = ['BORRADOR', 'OBSERVADO'];
-    if (!editableStates.includes(proyectoExistente.estadoProyecto)) {
+    if (!ALLOWED_EDIT_STATES.includes(proyectoExistente.estadoProyecto)) {
       router.replace(`/dashboard/projects/mine/${editId}`);
       return;
     }
@@ -246,6 +258,50 @@ function NewProjectFormContent() {
     }
   };
 
+  // ── Edición parcial (subconjunto seguro para proyecto publicado/en progreso) ──
+  // Solo campos permitidos; nunca tipo/modalidad/fecha inicio/organizaciones/roles.
+  const buildPartialPayload = () => ({
+    tituloProyecto: form.tituloProyecto,
+    descripcionProyecto: form.descripcionProyecto,
+    objetivosProyecto: form.objetivosProyecto || undefined,
+    ubicacionProyecto: form.ubicacionProyecto || undefined,
+    contextoAcademico: form.contextoAcademico || undefined,
+    urlRecursoExterno: form.urlRecursoExterno || undefined,
+    fechaFinEstimada: form.fechaFinEstimada || undefined,
+  });
+
+  const partialErrors: FieldErrors = {};
+  if (triedParcial) {
+    if (form.tituloProyecto.trim() === '') partialErrors.tituloProyecto = 'El título es obligatorio.';
+    if (form.descripcionProyecto.trim() === '') partialErrors.descripcionProyecto = 'La descripción es obligatoria.';
+  }
+
+  const submitParcial = async () => {
+    setTriedParcial(true);
+    if (form.tituloProyecto.trim() === '' || form.descripcionProyecto.trim() === '' || editId === null) return;
+
+    setSaving(true);
+    try {
+      await updateProject(editId, buildPartialPayload());
+      // Invalida detalle administrativo (['project']), Mis Proyectos y la vista
+      // owner; el workspace comparte ['project', id] para su encabezado.
+      await queryClient.invalidateQueries({ queryKey: ['project', editId] });
+      await queryClient.invalidateQueries({ queryKey: ['proyecto-owner', editId] });
+      await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
+      await uvgSwal.fire({ icon: 'success', title: 'Información actualizada', text: 'Los cambios se guardaron correctamente.', timer: 1600, showConfirmButton: false });
+      router.push(`/dashboard/projects/${editId}`);
+    } catch (err: unknown) {
+      // Conserva el formulario abierto y sus valores; muestra el error real.
+      uvgSwal.fire({
+        icon: 'error',
+        title: 'No se pudo guardar',
+        html: `<p class="text-sm whitespace-pre-line">${parseApiErrors(err)}</p>`,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const animClass = direction === 'forward'
     ? 'animate-in fade-in-0 slide-in-from-right-4 duration-200'
     : 'animate-in fade-in-0 slide-in-from-left-4 duration-200';
@@ -263,14 +319,56 @@ function NewProjectFormContent() {
     );
   }
 
-  const editableStates = ['BORRADOR', 'OBSERVADO'];
-  if (proyectoExistente && !editableStates.includes(proyectoExistente.estadoProyecto)) {
+  if (proyectoExistente && !ALLOWED_EDIT_STATES.includes(proyectoExistente.estadoProyecto)) {
     return (
       <DashboardLayout>
         <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
             Redirigiendo...
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ── Edición PARCIAL (proyecto publicado / en progreso): solo el subconjunto
+  // seguro de campos. No usa el asistente de pasos ni toca roles. ─────────────
+  if (esEdicionParcial) {
+    return (
+      <DashboardLayout>
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-8">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-2xl">
+            <div className="px-8 pb-4 pt-8">
+              <h1 className="font-headline text-xl font-extrabold text-on-surface">Editar información</h1>
+              <p className="mt-0.5 text-sm text-tertiary">
+                Este proyecto está {proyectoExistente!.estadoProyecto === 'PUBLICADO' ? 'publicado' : 'en progreso'}: solo puedes editar la información general.
+                El tipo, la modalidad, la fecha de inicio y los roles no se modifican aquí.
+              </p>
+            </div>
+
+            <div className="px-8 pb-6">
+              <Step1 form={form} update={updateForm} errors={partialErrors} partial />
+            </div>
+
+            <div className="flex items-center justify-between border-t border-outline-variant px-8 py-5">
+              <button
+                onClick={() => router.push(`/dashboard/projects/${editId}`)}
+                disabled={saving}
+                className="flex items-center gap-2 rounded-xl border-2 border-error bg-transparent px-5 py-2.5 text-sm font-bold text-error transition-all duration-200 hover:bg-error/10 disabled:opacity-50"
+              >
+                <X className="h-4 w-4 text-error" />
+                Cancelar
+              </button>
+              <button
+                onClick={submitParcial}
+                disabled={saving}
+                className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all duration-200 hover:bg-primary/90 disabled:opacity-60"
+              >
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </div>
           </div>
         </div>
       </DashboardLayout>

@@ -10,6 +10,18 @@ import {
 
 type TxClient = Prisma.TransactionClient;
 
+/**
+ * Forma real ya usada (sin nombre propio) por `notifyUsers`/`notifyAdmins`/
+ * `notifyProjectActiveParticipants`; nombrada aquí únicamente para tipar
+ * `notifyRoleMembers` sin repetirla ni cambiar la firma de esos métodos.
+ */
+interface NotificationInput {
+  tipoNotificacion: Prisma.NotificacionCreateManyInput['tipoNotificacion'];
+  tituloNotificacion: string;
+  mensajeNotificacion?: string;
+  datosJson?: Prisma.InputJsonValue;
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -204,5 +216,59 @@ export class NotificationsService {
       payload,
       tx,
     );
+  }
+
+  /**
+   * Tarea 33: destinatarios = miembros con participación ACTIVA en un rol
+   * concreto de un proyecto concreto (nunca miembros de otro rol o de otro
+   * proyecto), excluyendo al actor y deduplicados por `idUsuario`. A
+   * diferencia de `notifyProjectActiveParticipants` (participantes de
+   * cualquier rol del proyecto), este helper contextualiza también por
+   * `roleId` — semánticas distintas, sin reescribir ese método.
+   *
+   * `RolProyecto` no tiene soft delete en el schema actual, así que no se
+   * filtra por ese lado; `Proyecto.eliminadoEn` sí existe, por lo que se
+   * excluyen roles de un proyecto ya eliminado.
+   *
+   * La exclusión del actor y la deduplicación ocurren en memoria (no vía
+   * `distinct`/`idUsuario: { not }` de Prisma) para no depender de que el
+   * resultado de `findMany` ya venga sin duplicados. Con cero destinatarios
+   * tras filtrar, resuelve sin llamar a `notifyUsers` (cero filas, cero
+   * emisiones). Delega una única vez en `notifyUsers`: no duplica
+   * persistencia, emisión por gateway ni manejo de errores.
+   */
+  async notifyRoleMembers(
+    projectId: number,
+    roleId: number,
+    actorUserId: number,
+    input: NotificationInput,
+    tx?: TxClient,
+  ): Promise<void> {
+    const db = tx ?? this.prisma;
+    const participaciones = await db.participacionProyecto.findMany({
+      where: {
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: {
+          idRolProyecto: roleId,
+          idProyecto: projectId,
+          proyecto: { eliminadoEn: null },
+        },
+      },
+      select: { idUsuario: true },
+    });
+
+    const recipientIds = [
+      ...new Set(
+        participaciones
+          .map((participacion) => participacion.idUsuario)
+          .filter((idUsuario) => idUsuario !== actorUserId),
+      ),
+    ];
+
+    if (recipientIds.length === 0) {
+      return;
+    }
+
+    await this.notifyUsers(recipientIds, input, tx);
   }
 }

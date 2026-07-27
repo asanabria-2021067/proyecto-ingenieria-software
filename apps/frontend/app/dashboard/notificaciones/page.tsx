@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Bell, BellOff, Check, CheckCheck } from 'lucide-react';
+import Link from 'next/link';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
@@ -19,8 +20,10 @@ import {
   getNotificaciones,
   marcarLeida,
   marcarTodasLeidas,
+  getNotificationLink,
   type Notificacion,
 } from '@/lib/services/notifications';
+import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
@@ -174,15 +177,15 @@ export default function NotificacionesPage() {
                 {fecha}
               </h2>
               <div className="space-y-3">
-                {notifs.map((n) => (
-                  <div
-                    key={n.idNotificacion}
-                    className={`relative rounded-2xl border p-5 transition-all ${
-                      n.leidaEn
-                        ? 'bg-surface-container-lowest border-outline-variant'
-                        : 'bg-primary-container/10 border-primary/30 shadow-sm'
-                    }`}
-                  >
+                {notifs.map((n) => {
+                  const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
+                  const cardClassName = `relative rounded-2xl border p-5 transition-all ${
+                    n.leidaEn
+                      ? 'bg-surface-container-lowest border-outline-variant'
+                      : 'bg-primary-container/10 border-primary/30 shadow-sm'
+                  } ${href ? 'cursor-pointer hover:shadow-md' : ''}`;
+
+                  const card = (
                     <div className="flex items-start gap-4">
                       <div
                         className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
@@ -212,7 +215,11 @@ export default function NotificacionesPage() {
                       {!n.leidaEn && (
                         <button
                           type="button"
-                          onClick={() => markOneMutation.mutate(n.idNotificacion)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            markOneMutation.mutate(n.idNotificacion);
+                          }}
                           disabled={markOneMutation.isPending}
                           aria-label={`Marcar como leida la notificacion ${n.tituloNotificacion}`}
                           className="shrink-0 p-2 rounded-lg hover:bg-surface-container transition-colors disabled:opacity-50"
@@ -222,8 +229,29 @@ export default function NotificacionesPage() {
                         </button>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+
+                  if (href) {
+                    return (
+                      <Link
+                        key={n.idNotificacion}
+                        href={href}
+                        onClick={() => {
+                          if (!n.leidaEn) markOneMutation.mutate(n.idNotificacion);
+                        }}
+                        className={`block ${cardClassName}`}
+                      >
+                        {card}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <div key={n.idNotificacion} className={cardClassName}>
+                      {card}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}

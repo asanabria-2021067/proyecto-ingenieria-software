@@ -12,6 +12,7 @@ import {
   User,
   LogOut,
   ShieldAlert,
+  KeyRound,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
@@ -24,6 +25,7 @@ import logo from '@/public/logo.png';
 const adminNavItems = [
   { href: '/dashboard/admin', label: 'Panel Admin', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
+  { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
   { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: ClipboardList },
   { href: '/dashboard/notificaciones', label: 'Notificaciones', icon: Bell },
   { href: '/dashboard/perfil', label: 'Perfil', icon: User },

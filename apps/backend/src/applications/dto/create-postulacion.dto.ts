@@ -3,10 +3,6 @@ import { IsInt, IsPositive, IsString, IsNotEmpty, MinLength, MaxLength } from 'c
 export class CreatePostulacionDto {
   @IsInt()
   @IsPositive()
-  idUsuarioPostulante!: number;
-
-  @IsInt()
-  @IsPositive()
   idRolProyecto!: number;
 
   @IsString()
