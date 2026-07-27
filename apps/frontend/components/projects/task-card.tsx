@@ -3,54 +3,26 @@
 import { useDraggable } from '@dnd-kit/core';
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   Calendar,
   Flag,
   GripVertical,
   MessageCircle,
-  Minus,
-  MoreVertical,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { taskDragId, type TaskDragData } from '@/components/projects/task-board-dnd';
 import {
-  COLUMNAS_TABLERO,
-  ESTADO_LABEL,
+  PRIORIDAD_COLOR,
+  PRIORIDAD_ICON,
   PRIORIDAD_LABEL,
   estaVencida,
   formatearFechaLimite,
 } from '@/components/projects/task-board.utils';
-import type { EstadoTarea, TareaPublicaDTO } from '@/lib/types/tasks';
+import type { TareaPublicaDTO } from '@/lib/types/tasks';
 
-const PRIORIDAD_ICON: Record<TareaPublicaDTO['prioridad'], typeof ArrowUp> = {
-  ALTA: ArrowUp,
-  MEDIA: Minus,
-  BAJA: ArrowDown,
-};
-
-const PRIORIDAD_COLOR: Record<TareaPublicaDTO['prioridad'], string> = {
-  ALTA: 'text-red-600 dark:text-red-400',
-  MEDIA: 'text-amber-600 dark:text-amber-400',
-  BAJA: 'text-blue-500 dark:text-blue-400',
-};
+/** Cuántas etiquetas se muestran en la tarjeta antes de resumir el resto en "+N". */
+const MAX_ETIQUETAS_VISIBLES = 2;
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -58,15 +30,19 @@ function getInitials(nombre: string, apellido: string): string {
 
 export interface TaskCardProps {
   tarea: TareaPublicaDTO;
+  /** Habilita el handle de arrastre (líder o asignado activo). */
   puedeCambiarEstado: boolean;
-  puedeEliminar: boolean;
-  puedeEditar: boolean;
+  puedeEliminar?: boolean;
+  puedeEditar?: boolean;
   estadoPending: boolean;
-  estadoError: string | null;
-  onCambiarEstado: (nuevoEstado: EstadoTarea) => void;
+  /** Navega a la vista dedicada de la tarea (sección Detalles). */
+  onAbrirDetalles: () => void;
+  /** Navega a la vista dedicada de la tarea enfocando los comentarios. */
   onAbrirComentarios: () => void;
-  onSolicitarEliminar: () => void;
-  onEditar: () => void;
+  /** @deprecated La edición y eliminación viven ahora en la vista dedicada. */
+  onSolicitarEliminar?: () => void;
+  /** @deprecated La edición y eliminación viven ahora en la vista dedicada. */
+  onEditar?: () => void;
   /** Resaltado temporal al llegar desde el enlace de una notificación. */
   resaltada?: boolean;
   /** Registro de refs por tarea para scroll/foco (notificación y post-drag). */
@@ -77,14 +53,9 @@ export interface TaskCardProps {
 export function TaskCard({
   tarea,
   puedeCambiarEstado,
-  puedeEliminar,
-  puedeEditar,
   estadoPending,
-  estadoError,
-  onCambiarEstado,
+  onAbrirDetalles,
   onAbrirComentarios,
-  onSolicitarEliminar,
-  onEditar,
   resaltada = false,
   onRegistrarCardRef,
   onRegistrarHandleRef,
@@ -93,8 +64,11 @@ export function TaskCard({
   const vencida = estaVencida(tarea);
   const asignado = tarea.asignacionActiva?.usuario ?? null;
 
+  const etiquetasVisibles = tarea.etiquetas.slice(0, MAX_ETIQUETAS_VISIBLES);
+  const etiquetasRestantes = tarea.etiquetas.slice(MAX_ETIQUETAS_VISIBLES);
+
   // La tarjeta solo puede arrastrarse con el mismo permiso que habilita el
-  // Select de estado (líder o asignado activo) — nunca una regla distinta —
+  // cambio de estado (líder o asignado activo) — nunca una regla distinta —
   // y nunca mientras esta tarea ya tiene una mutation de estado en curso.
   const puedeArrastrar = puedeCambiarEstado && !estadoPending;
   const dragData: TaskDragData = {
@@ -124,9 +98,9 @@ export function TaskCard({
       style={dragStyle}
       aria-busy={estadoPending}
       aria-describedby={resaltada ? `tarea-resaltada-${tarea.idTarea}` : undefined}
-      className={`bg-surface-container-lowest border rounded-xl p-3 shadow-sm space-y-2 transition-colors ${
+      className={`space-y-2 rounded-lg border bg-surface-container-lowest p-3 shadow-sm transition-colors hover:border-outline-variant/60 ${
         resaltada
-          ? 'border-primary ring-2 ring-primary/50 bg-primary/5'
+          ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
           : 'border-outline-variant/30'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
@@ -135,7 +109,9 @@ export function TaskCard({
           Tarea indicada desde una notificación.
         </p>
       )}
-      <div className="flex items-start justify-between gap-2">
+
+      {/* Fila superior: handle + título + menú (Sección 36) */}
+      <div className="flex items-start gap-1.5">
         {puedeArrastrar && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -148,7 +124,7 @@ export function TaskCard({
                 {...listeners}
                 {...attributes}
                 aria-label={`Mover "${tarea.tituloTarea}" entre estados`}
-                className="shrink-0 -ml-1 -mt-0.5 flex items-center justify-center size-7 rounded-md text-tertiary hover:text-on-surface hover:bg-surface-container-high cursor-grab active:cursor-grabbing touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="-ml-1 -mt-0.5 flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-tertiary hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:cursor-grabbing"
               >
                 <GripVertical className="size-4" aria-hidden="true" />
               </button>
@@ -156,145 +132,98 @@ export function TaskCard({
             <TooltipContent>Arrastrar para mover entre estados</TooltipContent>
           </Tooltip>
         )}
-        <h4 className="text-sm font-semibold text-on-surface leading-snug line-clamp-2 flex-1">
-          {tarea.tituloTarea}
-        </h4>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Acciones de "${tarea.tituloTarea}"`}
-              className="shrink-0 -mt-1 -mr-1 text-tertiary hover:text-on-surface"
-            >
-              <MoreVertical className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {puedeEditar && (
-              <DropdownMenuItem onSelect={onEditar}>
-                Editar tarea
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onSelect={onAbrirComentarios}>
-              Ver comentarios
-            </DropdownMenuItem>
-            {puedeEliminar && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onSelect={onSolicitarEliminar}>
-                  Eliminar tarea
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <h4 className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onAbrirDetalles}
+            title={tarea.tituloTarea}
+            aria-label={`Abrir detalles de "${tarea.tituloTarea}"`}
+            className="line-clamp-2 w-full text-left text-sm font-semibold leading-snug text-on-surface hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+          >
+            {tarea.tituloTarea}
+          </button>
+        </h4>
       </div>
 
-      {tarea.descripcionTarea && (
-        <p className="text-xs text-on-surface-variant leading-relaxed line-clamp-2">
-          {tarea.descripcionTarea}
-        </p>
-      )}
-
+      {/* Segunda fila: prioridad + rol (Sección 39-40) */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
         <span className={`inline-flex items-center gap-1 font-semibold ${PRIORIDAD_COLOR[tarea.prioridad]}`}>
           <PrioridadIcon className="size-3.5" aria-hidden="true" />
           {PRIORIDAD_LABEL[tarea.prioridad]}
         </span>
-
         {tarea.rolProyecto && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container text-on-secondary-container font-medium">
+          <span className="inline-flex max-w-40 items-center truncate rounded-md bg-secondary-container px-2 py-0.5 font-medium text-on-secondary-container">
             {tarea.rolProyecto.nombreRol}
           </span>
         )}
       </div>
 
+      {/* Tercera fila: hasta dos etiquetas + "+N" (Sección 41) */}
       {tarea.etiquetas.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {tarea.etiquetas.map((etiqueta) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {etiquetasVisibles.map((etiqueta) => (
             <TaskLabelChip key={etiqueta.idEtiqueta} etiqueta={etiqueta} />
           ))}
+          {etiquetasRestantes.length > 0 && (
+            <span
+              title={etiquetasRestantes.map((e) => e.nombreEtiqueta).join(', ')}
+              className="inline-flex items-center rounded-md bg-surface-container-high px-1.5 py-0.5 text-[11px] font-semibold text-on-surface-variant"
+            >
+              +{etiquetasRestantes.length}
+            </span>
+          )}
         </div>
       )}
 
-      <div className="flex items-center gap-1.5 text-xs text-tertiary">
-        <Flag className="size-3.5 shrink-0" aria-hidden="true" />
-        <span className="truncate">
-          {tarea.hito ? `Hito · ${tarea.hito.tituloHito}` : 'Sin hito'}
+      {/* Footer: asignado · fecha · comentarios · hito (Sección 36) */}
+      <div className="flex items-center gap-2 text-xs text-tertiary">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Avatar className="size-6 shrink-0">
+            {asignado?.fotoUrl && <AvatarImage src={asignado.fotoUrl} alt="" />}
+            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+              {asignado ? getInitials(asignado.nombre, asignado.apellido) : '—'}
+            </AvatarFallback>
+          </Avatar>
+          <span className="truncate text-on-surface-variant">
+            {asignado ? `${asignado.nombre} ${asignado.apellido}` : 'Sin asignar'}
+          </span>
         </span>
-      </div>
 
-      <div className="flex items-center gap-2">
-        <Avatar className="size-6">
-          {asignado?.fotoUrl && <AvatarImage src={asignado.fotoUrl} alt="" />}
-          <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
-            {asignado ? getInitials(asignado.nombre, asignado.apellido) : '—'}
-          </AvatarFallback>
-        </Avatar>
-        <span className="text-xs text-on-surface-variant truncate">
-          {asignado ? `${asignado.nombre} ${asignado.apellido}` : 'Sin asignar'}
-        </span>
-      </div>
+        <span className="ml-auto flex shrink-0 items-center gap-2.5">
+          <span
+            className={`inline-flex items-center gap-1 ${vencida ? 'font-semibold text-red-600 dark:text-red-400' : 'text-tertiary'}`}
+          >
+            {vencida && <AlertTriangle className="size-3.5" aria-label="Vencida" />}
+            <Calendar className="size-3.5 shrink-0" aria-hidden="true" />
+            {tarea.fechaLimite ? formatearFechaLimite(tarea.fechaLimite) : 'Sin fecha'}
+          </span>
 
-      <div className="flex items-center gap-3 text-xs">
-        <span
-          className={`inline-flex items-center gap-1 ${vencida ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-tertiary'}`}
-        >
-          <Calendar className="size-3.5 shrink-0" aria-hidden="true" />
-          {tarea.fechaLimite ? formatearFechaLimite(tarea.fechaLimite) : 'Sin fecha'}
-          {vencida && (
-            <span className="inline-flex items-center gap-0.5">
-              <AlertTriangle className="size-3.5" aria-hidden="true" />
-              Vencida
-            </span>
+          <button
+            type="button"
+            onClick={onAbrirComentarios}
+            aria-label={`Abrir comentarios de "${tarea.tituloTarea}"`}
+            className="inline-flex items-center gap-1 text-tertiary transition-colors hover:text-on-surface"
+          >
+            <MessageCircle className="size-3.5" aria-hidden="true" />
+            {tarea.cantidadComentarios}
+          </button>
+
+          {tarea.hito && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="inline-flex items-center text-tertiary"
+                  aria-label={`Hito: ${tarea.hito.tituloHito}`}
+                >
+                  <Flag className="size-3.5" aria-hidden="true" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Hito: {tarea.hito.tituloHito}</TooltipContent>
+            </Tooltip>
           )}
         </span>
-
-        <button
-          type="button"
-          onClick={onAbrirComentarios}
-          aria-label={`Abrir ${tarea.cantidadComentarios} comentarios de "${tarea.tituloTarea}"`}
-          className="inline-flex items-center gap-1 text-tertiary hover:text-on-surface transition-colors ml-auto"
-        >
-          <MessageCircle className="size-3.5" aria-hidden="true" />
-          {tarea.cantidadComentarios}
-        </button>
       </div>
-
-      {puedeCambiarEstado && (
-        <Select
-          value={tarea.estadoTarea}
-          disabled={estadoPending}
-          onValueChange={(valor) => {
-            if (valor === tarea.estadoTarea) return;
-            onCambiarEstado(valor as EstadoTarea);
-          }}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label={`Cambiar estado de "${tarea.tituloTarea}"`}
-            className="w-full text-xs"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {COLUMNAS_TABLERO.map((columna) => (
-              <SelectItem key={columna.estado} value={columna.estado}>
-                {ESTADO_LABEL[columna.estado]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {estadoError && (
-        <p role="alert" className="text-[11px] text-red-600 dark:text-red-400">
-          {estadoError}
-        </p>
-      )}
     </article>
   );
 }

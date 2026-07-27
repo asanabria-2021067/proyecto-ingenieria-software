@@ -6,46 +6,32 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
-// DashboardLayout es chrome (sidebar/topbar/websocket) ajeno al objeto
-// principal de esta prueba (la integración Tablero/Hitos); se stubea como
-// passthrough para no arrastrar next/navigation, sockets ni next/image.
+// El tablero y los hitos viven ahora en el workspace Kanban (Sección 19),
+// separados de la vista de detalle. Estas pruebas — antes en
+// project-detail-task-tabs.spec.ts — verifican esa integración sobre
+// KanbanWorkspaceClient, que consume las mismas queries canónicas.
+
 vi.mock('../components/dashboard/DashboardLayout', () => ({
   default: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }));
 
-vi.mock('../hooks/use-project-detail', () => ({
-  useProjectDetail: vi.fn(),
-}));
-
+vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('../hooks/use-project-avance', () => ({
   useProjectAvance: () => ({ data: undefined, isSuccess: false }),
 }));
+vi.mock('../hooks/use-project-tasks', () => ({ useProjectTasks: vi.fn() }));
+vi.mock('../hooks/use-project-labels', () => ({ useProjectLabels: vi.fn() }));
+vi.mock('../hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 
-vi.mock('../hooks/use-project-tasks', () => ({
-  useProjectTasks: vi.fn(),
-}));
-
-vi.mock('../hooks/use-project-labels', () => ({
-  useProjectLabels: vi.fn(),
-}));
-
-vi.mock('../hooks/use-project-members', () => ({
-  useProjectMembers: vi.fn(),
-}));
-
-vi.mock('../hooks/use-current-user', () => ({
-  useCurrentUser: vi.fn(),
-}));
-
-// Tarea 39: ProjectDetailView ahora lee `tab`/`taskId` de la URL
-// (enlaces desde notificaciones de tarea). Fuera de un app router real
-// `useSearchParams()` devuelve null; se simula con parámetros vacíos para
-// no arrastrar el router completo en estas pruebas de integración.
+// Fuera de un app router real `useSearchParams()` devuelve null; se simula con
+// parámetros vacíos para no arrastrar el router completo.
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 
-import ProjectDetailClient from '../app/dashboard/projects/[id]/project-detail-client';
+import KanbanWorkspaceClient from '../app/dashboard/projects/[id]/kanban/kanban-workspace-client';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useProjectTasks } from '../hooks/use-project-tasks';
 import { useProjectLabels } from '../hooks/use-project-labels';
@@ -72,8 +58,8 @@ const proyectoFixture: ProyectoDetalleDTO = {
   intereses: [],
   roles: [],
   hitos: [],
-  // Deliberadamente distinto de lo que expone useProjectTasks, para
-  // demostrar que la vista ya no usa proyecto.tareas.
+  // Deliberadamente distinto de useProjectTasks: demuestra que el workspace no
+  // usa proyecto.tareas.
   tareas: [{ idTarea: 999, idHito: null, tituloTarea: 'TAREA-DTO-EMBEBIDA', descripcionTarea: null, estadoTarea: 'POR_HACER', prioridad: 'MEDIA', fechaLimite: null }],
 };
 
@@ -160,18 +146,18 @@ function mockUseProjectMembers(overrides: Record<string, unknown> = {}) {
   });
 }
 
-function renderPage() {
+function renderWorkspace() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(ProjectDetailClient, { id: 42 }),
+      createElement(KanbanWorkspaceClient, { id: 42 }),
     ),
   );
 }
 
-describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36 + Tarea 37: Kanban + Tarea 38: formularios)', () => {
+describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
   beforeEach(() => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
     mockUseProjectLabels();
@@ -183,75 +169,88 @@ describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36 + Tarea 37: 
     vi.clearAllMocks();
   });
 
-  it('muestra las pestañas Tablero e Hitos y conserva el encabezado principal', () => {
+  it('muestra las pestañas Tablero e Hitos, el título y el encabezado del workspace', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks();
 
-    renderPage();
+    renderWorkspace();
 
     expect(screen.getByRole('tab', { name: 'Tablero' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Hitos' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Proyecto de prueba' })).toBeInTheDocument();
-    expect(screen.getByText('Responsable')).toBeInTheDocument();
-    expect(screen.getByText('Ana Lopez')).toBeInTheDocument();
+    expect(screen.getByText('Workspace del proyecto')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/42',
+    );
   });
 
-  it('llama useProjectTasks con el idProyecto numérico y no con proyecto.tareas', () => {
+  it('el breadcrumb enlaza a Mis proyectos y al detalle real; muestra estado/tipo/modalidad', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    renderWorkspace();
+
+    expect(screen.getByRole('link', { name: 'Mis proyectos' })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/mine',
+    );
+    expect(screen.getByRole('link', { name: 'Proyecto de prueba' })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/42',
+    );
+    // Badges reales del proyecto con etiqueta humana (Sección 12).
+    expect(screen.getByText('En progreso')).toBeInTheDocument();
+    expect(screen.getByText('INVESTIGACION')).toBeInTheDocument();
+    expect(screen.getByText('HIBRIDO')).toBeInTheDocument();
+  });
+
+  it('llama useProjectTasks con el idProyecto numérico y no usa proyecto.tareas', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks({ tasks: [tarea({ idTarea: 1, tituloTarea: 'Tarea del hook canónico' })] });
 
-    renderPage();
+    renderWorkspace();
 
     expect(useProjectTasks).toHaveBeenCalledWith(42);
-    // TaskBoard recibe `tasks` como prop y nunca llama useProjectTasks por
-    // su cuenta: una sola invocación para toda la vista (Tablero + Hitos).
     expect(useProjectTasks).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('TAREA-DTO-EMBEBIDA')).not.toBeInTheDocument();
 
-    // Radix Tabs cambia de valor en `onMouseDown` (no en `click`); sin
-    // `@testing-library/user-event` instalado, se dispara ese evento
-    // directamente para no instalar dependencias nuevas.
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
-    // Sin hitos cargados, HitosSection solo muestra "Tareas sin hito" con la
-    // tarea proveniente de useProjectTasks, nunca la de proyecto.tareas.
     expect(screen.getByText('Tarea del hook canónico')).toBeInTheDocument();
   });
 
-  it('Tablero muestra el loading mientras useProjectTasks está cargando', () => {
+  it('el Tablero muestra el loading mientras useProjectTasks está cargando', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks({ isLoading: true });
 
-    const { container } = renderPage();
+    const { container } = renderWorkspace();
 
     expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
   });
 
-  it('Tablero muestra error con acción de reintentar que llama a refetch', () => {
+  it('el Tablero muestra error con acción de reintentar que llama a refetch', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     const refetch = vi.fn();
     mockUseProjectTasks({ isError: true, error: new Error('fallo'), refetch });
 
-    renderPage();
+    renderWorkspace();
 
     expect(screen.getByText(/no se pudieron cargar las tareas/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /reintentar/i }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('Tablero muestra las cuatro columnas vacías cuando el proyecto no tiene tareas', () => {
+  it('proyecto sin tareas muestra el estado vacío del tablero (Sección 47)', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks({ tasks: [] });
 
-    renderPage();
+    renderWorkspace();
 
-    for (const titulo of ['Por hacer', 'En progreso', 'En revisión', 'Hecho']) {
-      expect(screen.getByRole('heading', { name: titulo })).toBeInTheDocument();
-    }
-    expect(screen.getAllByText('Sin tareas')).toHaveLength(4);
-    expect(screen.queryByTestId('task-board-mount')).not.toBeInTheDocument();
+    expect(screen.getByText('Aún no hay tareas')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Por hacer' })).not.toBeInTheDocument();
   });
 
-  it('TaskBoard reemplaza el placeholder task-board-mount con el Kanban real de cuatro columnas', () => {
+  it('con tareas renderiza las cuatro columnas del Kanban', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks({
       tasks: [
@@ -260,9 +259,8 @@ describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36 + Tarea 37: 
       ],
     });
 
-    renderPage();
+    renderWorkspace();
 
-    expect(screen.queryByTestId('task-board-mount')).not.toBeInTheDocument();
     for (const titulo of ['Por hacer', 'En progreso', 'En revisión', 'Hecho']) {
       expect(screen.getByRole('heading', { name: titulo })).toBeInTheDocument();
     }
@@ -274,24 +272,70 @@ describe('ProjectDetailClient — pestañas Tablero/Hitos (Tarea 36 + Tarea 37: 
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks();
 
-    const { unmount } = renderPage();
+    const { unmount } = renderWorkspace();
     expect(screen.getByRole('button', { name: /nueva tarea/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /gestionar etiquetas/i })).toBeInTheDocument();
     unmount();
 
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
-    renderPage();
+    renderWorkspace();
     expect(screen.queryByRole('button', { name: /nueva tarea/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /gestionar etiquetas/i })).not.toBeInTheDocument();
   });
 
-  it('no realiza una segunda consulta de detalle del proyecto para roles/hitos', () => {
+  it('muestra un chip por cada rol activo del usuario (varios badges, Sección 28)', () => {
+    const proyectoConRoles = {
+      ...proyectoFixture,
+      roles: [
+        { idRolProyecto: 1, nombreRol: 'Frontend', cupos: 2, descripcionRolProyecto: null, requisitos: [] },
+        { idRolProyecto: 2, nombreRol: 'Documentación', cupos: 2, descripcionRolProyecto: null, requisitos: [] },
+      ],
+    };
+    (useProjectDetail as any).mockReturnValue({ data: proyectoConRoles, isLoading: false, error: null });
+    mockUseProjectTasks();
+    // El usuario 1 participa en ambos roles (dos filas de participación).
+    (useProjectMembers as any).mockReturnValue({
+      members: [
+        { idUsuario: 1, idRolProyecto: 1, nombre: 'Ana', apellido: 'Uno', correo: 'a@x.com', fotoUrl: null },
+        { idUsuario: 1, idRolProyecto: 2, nombre: 'Ana', apellido: 'Uno', correo: 'a@x.com', fotoUrl: null },
+      ],
+    });
+
+    renderWorkspace();
+
+    expect(screen.getByText('Frontend')).toBeInTheDocument();
+    expect(screen.getByText('Documentación')).toBeInTheDocument();
+  });
+
+  it('el encabezado muestra el progreso de tareas con leyenda de cuatro estados, incluida En revisión (Sección 14)', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks({
+      tasks: [
+        tarea({ idTarea: 1, estadoTarea: 'POR_HACER' }),
+        tarea({ idTarea: 2, estadoTarea: 'EN_PROGRESO' }),
+        tarea({ idTarea: 3, estadoTarea: 'EN_REVISION' }),
+        tarea({ idTarea: 4, estadoTarea: 'HECHO' }),
+      ],
+    });
+
+    renderWorkspace();
+
+    expect(screen.getByText('Progreso de tareas')).toBeInTheDocument();
+    expect(screen.getByText('25%')).toBeInTheDocument();
+    expect(screen.getByText('1 de 4 tareas completadas')).toBeInTheDocument();
+    // "En revisión" aparece tanto en el encabezado de columna como en la
+    // leyenda del progreso: la leyenda ya no lo omite (Sección 14).
+    expect(screen.getAllByText(/En revisión/).length).toBeGreaterThanOrEqual(2);
+    // Sin avance del backend, no se muestra el bloque de hitos.
+    expect(screen.queryByText('Progreso de hitos')).not.toBeInTheDocument();
+  });
+
+  it('usa una sola consulta de detalle del proyecto para el encabezado, roles e hitos', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks();
 
-    renderPage();
+    renderWorkspace();
 
-    // useProjectDetail ya se mockeó como vi.fn(): una sola vez para toda la vista.
     expect(useProjectDetail).toHaveBeenCalledTimes(1);
     expect(useProjectDetail).toHaveBeenCalledWith(42);
   });

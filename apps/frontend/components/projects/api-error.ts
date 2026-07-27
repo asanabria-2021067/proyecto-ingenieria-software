@@ -4,7 +4,7 @@
  * diferenciado para el usuario, sin destruir ni mutar el objeto original.
  */
 
-export type ApiErrorScope = 'task' | 'label' | 'assignment';
+export type ApiErrorScope = 'task' | 'label' | 'assignment' | 'role';
 
 interface EnrichedError {
   statusCode?: number;
@@ -18,6 +18,11 @@ export function getApiErrorMessage(error: unknown, scope: ApiErrorScope = 'task'
 
   switch (statusCode) {
     case 400:
+      // Las reglas de negocio de roles (cupo lleno, último rol, rol utilizado…)
+      // devuelven un mensaje funcional específico que conviene mostrar tal cual.
+      if (scope === 'role') {
+        return backendMessage || 'Revisa los datos ingresados y las relaciones seleccionadas.';
+      }
       return 'Revisa los datos ingresados y las relaciones seleccionadas.';
     case 403:
       return 'No tienes permisos para realizar esta acción.';
