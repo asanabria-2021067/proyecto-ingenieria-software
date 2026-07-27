@@ -38,11 +38,13 @@ vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 // Estado mutable expuesto vía vi.hoisted: cada prueba fija los query params
 // que "llegan" desde el enlace de una notificación antes de renderizar.
 const searchParamsState = vi.hoisted(() => ({ current: new URLSearchParams() }));
+const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
 vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsState.current,
+  useRouter: () => routerMock,
 }));
 
-import ProjectDetailClient from '../app/dashboard/projects/[id]/project-detail-client';
+import KanbanWorkspaceClient from '../app/dashboard/projects/[id]/kanban/kanban-workspace-client';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useProjectTasks } from '../hooks/use-project-tasks';
 import { useProjectLabels } from '../hooks/use-project-labels';
@@ -134,12 +136,12 @@ function renderPage() {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(ProjectDetailClient, { id: 42 }),
+      createElement(KanbanWorkspaceClient, { id: 42 }),
     ),
   );
 }
 
-describe('ProjectDetailClient — navegación desde notificaciones de tarea (Tarea 39)', () => {
+describe('KanbanWorkspaceClient — navegación desde notificaciones de tarea (Sección 18/20)', () => {
   beforeEach(() => {
     searchParamsState.current = new URLSearchParams();
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
@@ -159,6 +161,8 @@ describe('ProjectDetailClient — navegación desde notificaciones de tarea (Tar
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    routerMock.replace.mockClear();
+    routerMock.push.mockClear();
   });
 
   it('sin query params, la pestaña Tablero está activa por defecto', () => {
@@ -182,31 +186,40 @@ describe('ProjectDetailClient — navegación desde notificaciones de tarea (Tar
     expect(screen.getByRole('tab', { name: 'Hitos' })).toHaveAttribute('data-state', 'active');
   });
 
-  it('?taskId=<id> resalta la tarea indicada dentro del tablero', async () => {
+  it('la URL antigua ?taskId=<id> redirige a la ruta canónica /kanban/tasks/<id> (Sección 7)', () => {
     searchParamsState.current = new URLSearchParams('tab=tablero&taskId=7');
     mockUseProjectTasks({
       tasks: [tarea({ idTarea: 7, tituloTarea: 'Tarea enlazada', estadoTarea: 'EN_REVISION' })],
     });
     renderPage();
 
-    expect(await screen.findByText('Tarea indicada desde una notificación.')).toBeInTheDocument();
+    expect(routerMock.replace).toHaveBeenCalledWith('/dashboard/projects/42/kanban/tasks/7');
   });
 
-  it('?taskId=<id inexistente> muestra el mensaje de tarea no disponible sin romper la página', () => {
+  it('la URL antigua con indicación de comentarios redirige con ?section=comments', () => {
+    searchParamsState.current = new URLSearchParams('taskId=7&section=comments');
+    mockUseProjectTasks({ tasks: [tarea({ idTarea: 7 })] });
+    renderPage();
+
+    expect(routerMock.replace).toHaveBeenCalledWith(
+      '/dashboard/projects/42/kanban/tasks/7?section=comments',
+    );
+  });
+
+  it('redirige aunque el taskId no exista (la página dedicada resuelve el 404)', () => {
     searchParamsState.current = new URLSearchParams('taskId=555');
     mockUseProjectTasks({ tasks: [tarea({ idTarea: 1 })] });
     renderPage();
 
-    expect(screen.getByText('La tarea indicada ya no está disponible.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Proyecto de prueba' })).toBeInTheDocument();
+    expect(routerMock.replace).toHaveBeenCalledWith('/dashboard/projects/42/kanban/tasks/555');
   });
 
-  it('un taskId con formato inválido se ignora (no rompe ni muestra el mensaje de ausencia)', () => {
+  it('un taskId con formato inválido se ignora (no redirige)', () => {
     searchParamsState.current = new URLSearchParams('taskId=no-numerico');
     mockUseProjectTasks({ tasks: [tarea({ idTarea: 1 })] });
     renderPage();
 
-    expect(screen.queryByText('La tarea indicada ya no está disponible.')).not.toBeInTheDocument();
+    expect(routerMock.replace).not.toHaveBeenCalled();
   });
 
   it('no dispara una segunda consulta de tareas al resolver taskId', () => {

@@ -11,7 +11,7 @@ describe('resolveTaskNotificationLink', () => {
         tipoNotificacion: 'TAREA_ASIGNADA',
         datosJson: { projectId: 12, taskId: 34 },
       }),
-    ).toBe('/dashboard/projects/12?tab=tablero&taskId=34');
+    ).toBe('/dashboard/projects/12/kanban/tasks/34');
   });
 
   it('resuelve TAREA_ACTUALIZADA igual que TAREA_ASIGNADA', () => {
@@ -20,7 +20,7 @@ describe('resolveTaskNotificationLink', () => {
         tipoNotificacion: 'TAREA_ACTUALIZADA',
         datosJson: { projectId: 5, taskId: 9 },
       }),
-    ).toBe('/dashboard/projects/5?tab=tablero&taskId=9');
+    ).toBe('/dashboard/projects/5/kanban/tasks/9');
   });
 
   it('acepta idProyecto/idTarea como convención alternativa', () => {
@@ -29,16 +29,25 @@ describe('resolveTaskNotificationLink', () => {
         tipoNotificacion: 'TAREA_ASIGNADA',
         datosJson: { idProyecto: 7, idTarea: 2 },
       }),
-    ).toBe('/dashboard/projects/7?tab=tablero&taskId=2');
+    ).toBe('/dashboard/projects/7/kanban/tasks/2');
   });
 
-  it('sin taskId construye el enlace solo con projectId (abre el tablero sin enfocar tarea)', () => {
+  it('sin taskId construye el enlace solo con projectId (abre el workspace sin enfocar tarea)', () => {
     expect(
       resolveTaskNotificationLink({
         tipoNotificacion: 'TAREA_ASIGNADA',
         datosJson: { projectId: 12 },
       }),
-    ).toBe('/dashboard/projects/12?tab=tablero');
+    ).toBe('/dashboard/projects/12/kanban');
+  });
+
+  it('resuelve ROL_ABANDONADO al workspace Kanban (sin taskId, consolidada)', () => {
+    expect(
+      resolveTaskNotificationLink({
+        tipoNotificacion: 'ROL_ABANDONADO',
+        datosJson: { projectId: 42, roleId: 3, taskCount: 2 },
+      }),
+    ).toBe('/dashboard/projects/42/kanban');
   });
 
   it('sin projectId no resuelve enlace (no se puede navegar sin proyecto)', () => {
@@ -117,7 +126,9 @@ describe('NotificationsBell — enlaces de notificaciones de tarea', () => {
         tituloNotificacion: 'Nueva tarea asignada',
         mensajeNotificacion: null,
         datosJson: { projectId: 12, taskId: 34 },
-        creadaEn: '2026-01-01T00:00:00.000Z',
+        // Fecha reciente: el panel (`filtrarRecientes`) solo lista las
+        // notificaciones de los últimos 2 días.
+        creadaEn: new Date().toISOString(),
         leidaEn: null,
       },
     ]);
@@ -126,7 +137,7 @@ describe('NotificationsBell — enlaces de notificaciones de tarea', () => {
     fireEvent.click(screen.getByRole('button', { name: /Notificaciones/ }));
 
     const enlace = screen.getByRole('link', { name: /Nueva tarea asignada/ });
-    expect(enlace).toHaveAttribute('href', '/dashboard/projects/12?tab=tablero&taskId=34');
+    expect(enlace).toHaveAttribute('href', '/dashboard/projects/12/kanban/tasks/34');
   });
 
   it('una notificación de tarea sin projectId no se renderiza como enlace', () => {
@@ -137,7 +148,7 @@ describe('NotificationsBell — enlaces de notificaciones de tarea', () => {
         tituloNotificacion: 'Ya no estás asignado',
         mensajeNotificacion: null,
         datosJson: {},
-        creadaEn: '2026-01-01T00:00:00.000Z',
+        creadaEn: new Date().toISOString(),
         leidaEn: null,
       },
     ]);

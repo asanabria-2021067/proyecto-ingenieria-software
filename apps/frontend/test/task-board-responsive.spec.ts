@@ -27,6 +27,12 @@ vi.mock('../components/projects/task-comments-dialog', () => ({
   TaskCommentsDialog: () => null,
 }));
 
+const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => routerMock,
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { TaskBoard } from '../components/projects/task-board';
 
 /** Simula `(max-width: 767px)`: sin este mock, `window.matchMedia` no
@@ -200,12 +206,12 @@ describe('TaskBoard — responsive (Tarea 39)', () => {
     expect(screen.queryByText('Sincronizando…')).not.toBeInTheDocument();
   });
 
-  it('proyecto sin tareas muestra un mensaje general además de las columnas vacías', () => {
+  it('proyecto sin tareas muestra el estado vacío del tablero (Sección 47)', () => {
     renderBoard({ tasks: [] });
-    expect(screen.getByText('Este proyecto todavía no tiene tareas.')).toBeInTheDocument();
+    expect(screen.getByText('Aún no hay tareas')).toBeInTheDocument();
   });
 
-  it('focusTaskId resalta la tarjeta y, en móvil, selecciona automáticamente su columna', async () => {
+  it('focusTaskId resalta la tarea y, en móvil, selecciona su columna (Sección 63)', async () => {
     mockMatchMedia(true);
     renderBoard({
       focusTaskId: 2,
@@ -215,8 +221,10 @@ describe('TaskBoard — responsive (Tarea 39)', () => {
       ],
     });
 
-    expect(await screen.findByText('Tarea B')).toBeInTheDocument();
-    expect(screen.getByText('Tarea indicada desde una notificación.')).toBeInTheDocument();
+    // El detalle ya no es un Sheet: la tarea indicada solo se resalta y, en
+    // móvil, se alinea la columna activa con su estado. El detalle completo vive
+    // en su ruta dedicada.
+    expect(await screen.findByText('Tarea indicada desde una notificación.')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /En revisión/ })).toHaveAttribute('aria-selected', 'true');
   });
 

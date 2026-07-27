@@ -83,6 +83,33 @@ export interface NotificationTemplateData {
     projectId: number;
     diasInactividad: number;
   };
+  // Ampliación roles/participación (Sección 18A): un integrante dejó un rol.
+  // Se envía una notificación consolidada por destinatario (nunca una por
+  // tarea afectada). taskCount = tareas del rol que quedaron sin asignar.
+  ROL_ABANDONADO: {
+    userName: string;
+    roleName: string;
+    projectTitle: string;
+    projectId: number;
+    roleId: number;
+    taskCount: number;
+  };
+  // Sección 18B: el líder se auto-asignó a un rol. El actor (líder) siempre se
+  // excluye de los destinatarios, por lo que puede resultar en cero envíos.
+  ROL_ASIGNADO_LIDER: {
+    userName: string;
+    roleName: string;
+    projectTitle: string;
+    projectId: number;
+    roleId: number;
+  };
+  // Sección 18C: el líder modificó datos relevantes de un rol utilizado.
+  ROL_ACTUALIZADO: {
+    roleName: string;
+    projectTitle: string;
+    projectId: number;
+    roleId: number;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -166,6 +193,23 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Borrador inactivo',
     message: (data: NotificationTemplateData['PROYECTO_ADVERTENCIA_INACTIVIDAD']) =>
       `Tu borrador "${data.projectTitle}" lleva más de ${data.diasInactividad} días sin actividad.`,
+  },
+  ROL_ABANDONADO: {
+    title: 'Un integrante dejó un rol',
+    message: (data: NotificationTemplateData['ROL_ABANDONADO']) =>
+      data.taskCount > 0
+        ? `${data.userName} dejó el rol "${data.roleName}" en "${data.projectTitle}". ${data.taskCount} ${data.taskCount === 1 ? 'tarea quedó' : 'tareas quedaron'} sin asignar.`
+        : `${data.userName} dejó el rol "${data.roleName}" en "${data.projectTitle}".`,
+  },
+  ROL_ASIGNADO_LIDER: {
+    title: 'El líder se unió a un rol',
+    message: (data: NotificationTemplateData['ROL_ASIGNADO_LIDER']) =>
+      `${data.userName} se asignó al rol "${data.roleName}" en el proyecto "${data.projectTitle}".`,
+  },
+  ROL_ACTUALIZADO: {
+    title: 'Un rol fue actualizado',
+    message: (data: NotificationTemplateData['ROL_ACTUALIZADO']) =>
+      `El rol "${data.roleName}" del proyecto "${data.projectTitle}" fue actualizado.`,
   },
 } as const;
 

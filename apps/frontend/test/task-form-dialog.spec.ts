@@ -1,7 +1,15 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+vi.mock('@/lib/swal', () => ({
+  default: {
+    fire: vi.fn(),
+  },
+}));
+
+import uvgSwal from '@/lib/swal';
 import { TaskFormDialog } from '../components/projects/task-form-dialog';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 import type { MiembroProyecto } from '../hooks/use-project-members';
@@ -23,6 +31,11 @@ beforeAll(() => {
     };
   }
 });
+
+function cleanupDialog() {
+  cleanup();
+  vi.mocked(uvgSwal.fire).mockClear();
+}
 
 function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
   return {
@@ -98,17 +111,25 @@ function renderDialog(overrides: Record<string, unknown> = {}) {
 }
 
 async function llenarTitulo(texto: string) {
-  const input = screen.getByLabelText('Título');
+  const input = screen.getByLabelText('Título de la tarea', { exact: false });
   fireEvent.change(input, { target: { value: texto } });
 }
 
 async function llenarFecha(fecha: string) {
-  const input = screen.getByLabelText('Fecha límite');
+  const input = screen.getByLabelText('Fecha límite', { exact: false });
   fireEvent.change(input, { target: { value: fecha } });
 }
 
+/** Abre el multiselect de etiquetas, alterna una opción por nombre y lo cierra. */
+async function alternarEtiqueta(nombre: RegExp) {
+  fireEvent.click(screen.getByRole('button', { name: 'Seleccionar etiquetas' }));
+  fireEvent.click(await screen.findByRole('option', { name: nombre }));
+  // Cierra el popover (segundo click en el disparador) para no interferir con el submit.
+  fireEvent.click(screen.getByRole('button', { name: 'Seleccionar etiquetas' }));
+}
+
 describe('TaskFormDialog — reutilización', () => {
-  afterEach(() => cleanup());
+  afterEach(() => cleanupDialog());
 
   it('el mismo componente muestra el título "Crear nueva tarea" en modo creación', () => {
     renderDialog({ mode: 'create', task: null });
@@ -119,26 +140,44 @@ describe('TaskFormDialog — reutilización', () => {
   it('el mismo componente muestra el título "Editar tarea" en modo edición', () => {
     renderDialog({ mode: 'edit', task: tarea({ tituloTarea: 'Mi tarea' }) });
     expect(screen.getByText('Editar tarea')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios de la tarea' })).toBeInTheDocument();
   });
 
   it('no existen dos formularios: los mismos campos aparecen en ambos modos', () => {
     const { unmount } = renderDialog({ mode: 'create', task: null });
-    expect(screen.getByLabelText('Título')).toBeInTheDocument();
+    expect(screen.getByLabelText('Título de la tarea', { exact: false })).toBeInTheDocument();
     unmount();
 
     renderDialog({ mode: 'edit', task: tarea() });
-    expect(screen.getByLabelText('Título')).toBeInTheDocument();
+    expect(screen.getByLabelText('Título de la tarea', { exact: false })).toBeInTheDocument();
+  });
+
+  it('muestra las tres secciones numeradas en ambos modos', () => {
+    const { unmount } = renderDialog({ mode: 'create', task: null });
+    expect(screen.getByText('Información básica')).toBeInTheDocument();
+    expect(screen.getByText('Organización')).toBeInTheDocument();
+    expect(screen.getByText('Etiquetas')).toBeInTheDocument();
+    unmount();
+
+    renderDialog({ mode: 'edit', task: tarea() });
+    expect(screen.getByText('Información básica')).toBeInTheDocument();
+    expect(screen.getByText('Organización')).toBeInTheDocument();
+    expect(screen.getByText('Etiquetas')).toBeInTheDocument();
+  });
+
+  it('no existe un selector de estado dentro del formulario', () => {
+    renderDialog({ mode: 'edit', task: tarea() });
+    expect(screen.queryByLabelText(/estado/i)).not.toBeInTheDocument();
   });
 });
 
 describe('TaskFormDialog — creación', () => {
-  afterEach(() => cleanup());
+  afterEach(() => cleanupDialog());
 
   it('valores iniciales vacíos en creación', () => {
     renderDialog({ mode: 'create', task: null });
-    expect(screen.getByLabelText('Título')).toHaveValue('');
-    expect(screen.getByRole('combobox', { name: 'Prioridad' })).toHaveTextContent('Media');
+    expect(screen.getByLabelText('Título de la tarea', { exact: false })).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Seleccionar prioridad' })).toHaveTextContent('Media');
   });
 
   it('submit exacto: crearTarea recibe el payload construido, sin projectId', async () => {
@@ -158,6 +197,13 @@ describe('TaskFormDialog — creación', () => {
       prioridad: 'MEDIA',
     });
     expect(payload.idProyecto).toBeUndefined();
+    expect(uvgSwal.fire).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toast: true,
+        icon: 'success',
+        title: 'Tarea creada',
+      }),
+    );
   });
 
   it('incluye asignado inicial cuando se seleccionó uno', async () => {
@@ -167,7 +213,7 @@ describe('TaskFormDialog — creación', () => {
     await llenarTitulo('Con asignado');
     await llenarFecha('2027-01-01');
 
-    const selectAsignado = screen.getByRole('combobox', { name: 'Asignado' });
+    const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
     fireEvent.keyDown(selectAsignado, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: /Ana Lopez/i }));
 
@@ -176,17 +222,57 @@ describe('TaskFormDialog — creación', () => {
     expect(crearTarea.mutateAsync.mock.calls[0][0].idUsuarioAsignado).toBe(5);
   });
 
+  it('deduplica por idUsuario en el selector de asignado para una tarea sin rol (Sección 7)', async () => {
+    renderDialog({
+      mode: 'create',
+      task: null,
+      members: [
+        miembro({ idUsuario: 5, idRolProyecto: 1, nombre: 'Ana', apellido: 'Lopez' }),
+        // Mismo usuario en un segundo rol: no debe duplicarse en el selector.
+        miembro({ idUsuario: 5, idRolProyecto: 2, nombre: 'Ana', apellido: 'Lopez' }),
+        miembro({ idUsuario: 9, idRolProyecto: 2, nombre: 'Beto', apellido: 'Ruiz' }),
+      ],
+    });
+
+    const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
+    fireEvent.keyDown(selectAsignado, { key: 'Enter' });
+
+    expect(await screen.findAllByRole('option', { name: /Ana Lopez/i })).toHaveLength(1);
+  });
+
+  it('solo los participantes activos son candidatos: un usuario ausente de members (líder sin rol) no aparece', async () => {
+    renderDialog({
+      mode: 'create',
+      task: null,
+      members: [miembro({ idUsuario: 5, idRolProyecto: 1, nombre: 'Ana', apellido: 'Lopez' })],
+    });
+
+    const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
+    fireEvent.keyDown(selectAsignado, { key: 'Enter' });
+
+    expect(await screen.findByRole('option', { name: /Ana Lopez/i })).toBeInTheDocument();
+    // El líder sin participación no está en `members`, por lo que no es candidato.
+    expect(screen.queryByRole('option', { name: /Lía Der/i })).not.toBeInTheDocument();
+  });
+
   it('incluye etiquetas seleccionadas', async () => {
     const crearTarea = mutationStub();
     renderDialog({ mode: 'create', task: null, crearTarea });
 
     await llenarTitulo('Con etiqueta');
     await llenarFecha('2027-01-01');
-    fireEvent.click(screen.getByLabelText('Urgente', { exact: false }) ?? screen.getByText('Urgente'));
+    await alternarEtiqueta(/Urgente/i);
 
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
     await waitFor(() => expect(crearTarea.mutateAsync).toHaveBeenCalledTimes(1));
     expect(crearTarea.mutateAsync.mock.calls[0][0].idsEtiquetas).toEqual([1]);
+  });
+
+  it('el selector de etiquetas no es una lista permanente de checkboxes', () => {
+    renderDialog({ mode: 'create', task: null });
+    // Sección 27/28: el control compacto reemplaza la cuadrícula de checkboxes.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Seleccionar etiquetas' })).toBeInTheDocument();
   });
 
   it('cierra el diálogo solo tras éxito', async () => {
@@ -218,15 +304,15 @@ describe('TaskFormDialog — creación', () => {
 });
 
 describe('TaskFormDialog — edición', () => {
-  afterEach(() => cleanup());
+  afterEach(() => cleanupDialog());
 
   it('precarga los valores públicos de la tarea', () => {
     const original = tarea({ tituloTarea: 'Tarea existente', descripcionTarea: 'Detalle', prioridad: 'ALTA' });
     renderDialog({ mode: 'edit', task: original });
 
-    expect(screen.getByLabelText('Título')).toHaveValue('Tarea existente');
+    expect(screen.getByLabelText('Título de la tarea', { exact: false })).toHaveValue('Tarea existente');
     expect(screen.getByLabelText('Descripción')).toHaveValue('Detalle');
-    expect(screen.getByRole('combobox', { name: 'Prioridad' })).toHaveTextContent('Alta');
+    expect(screen.getByRole('combobox', { name: 'Seleccionar prioridad' })).toHaveTextContent('Alta');
   });
 
   it('payload exacto: solo el campo cambiado viaja al PATCH', async () => {
@@ -236,13 +322,20 @@ describe('TaskFormDialog — edición', () => {
     renderDialog({ mode: 'edit', task: original, editarTarea, onOpenChange });
 
     await llenarTitulo('Modificado');
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
 
     await waitFor(() => expect(editarTarea.mutateAsync).toHaveBeenCalledTimes(1));
     expect(editarTarea.mutateAsync).toHaveBeenCalledWith({
       taskId: original.idTarea,
       input: { tituloTarea: 'Modificado' },
     });
+    expect(uvgSwal.fire).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toast: true,
+        icon: 'success',
+        title: 'Cambios guardados',
+      }),
+    );
   });
 
   it('campos no tocados quedan omitidos del payload', async () => {
@@ -251,7 +344,7 @@ describe('TaskFormDialog — edición', () => {
     renderDialog({ mode: 'edit', task: original, editarTarea });
 
     await llenarTitulo('Otro título');
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
 
     await waitFor(() => expect(editarTarea.mutateAsync).toHaveBeenCalledTimes(1));
     const { input } = editarTarea.mutateAsync.mock.calls[0][0];
@@ -265,7 +358,7 @@ describe('TaskFormDialog — edición', () => {
     renderDialog({ mode: 'edit', task: original, editarTarea });
 
     await llenarTitulo('Vieja actualizada');
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
 
     await waitFor(() => expect(editarTarea.mutateAsync).toHaveBeenCalledTimes(1));
     const { input } = editarTarea.mutateAsync.mock.calls[0][0];
@@ -289,7 +382,7 @@ describe('TaskFormDialog — edición', () => {
     renderDialog({ mode: 'edit', task: original, editarTarea, asignarTarea, desasignarTarea });
 
     await llenarTitulo('Otro título');
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
 
     await waitFor(() => expect(editarTarea.mutateAsync).toHaveBeenCalledTimes(1));
     expect(asignarTarea.mutateAsync).not.toHaveBeenCalled();
@@ -301,11 +394,11 @@ describe('TaskFormDialog — edición', () => {
     const asignarTarea = mutationStub();
     renderDialog({ mode: 'edit', task: original, asignarTarea });
 
-    const selectAsignado = screen.getByRole('combobox', { name: 'Asignado' });
+    const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
     fireEvent.keyDown(selectAsignado, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: /Ana Lopez/i }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
     await waitFor(() =>
       expect(asignarTarea.mutateAsync).toHaveBeenCalledWith({
         taskId: original.idTarea,
@@ -328,11 +421,11 @@ describe('TaskFormDialog — edición', () => {
     const desasignarTarea = mutationStub();
     renderDialog({ mode: 'edit', task: original, asignarTarea, desasignarTarea });
 
-    const selectAsignado = screen.getByRole('combobox', { name: 'Asignado' });
+    const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
     fireEvent.keyDown(selectAsignado, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: /Beto Ruiz/i }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
     await waitFor(() =>
       expect(asignarTarea.mutateAsync).toHaveBeenCalledWith({ taskId: original.idTarea, input: { idUsuario: 9 } }),
     );
@@ -351,11 +444,11 @@ describe('TaskFormDialog — edición', () => {
     const desasignarTarea = mutationStub();
     renderDialog({ mode: 'edit', task: original, desasignarTarea });
 
-    const selectAsignado = screen.getByRole('combobox', { name: 'Asignado' });
+    const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
     fireEvent.keyDown(selectAsignado, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: 'Sin asignar' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
     await waitFor(() =>
       expect(desasignarTarea.mutateAsync).toHaveBeenCalledWith({ taskId: original.idTarea }),
     );
@@ -369,11 +462,11 @@ describe('TaskFormDialog — edición', () => {
     const onOpenChange = vi.fn();
     renderDialog({ mode: 'edit', task: original, asignarTarea, onOpenChange });
 
-    const selectAsignado = screen.getByRole('combobox', { name: 'Asignado' });
+    const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
     fireEvent.keyDown(selectAsignado, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: /Ana Lopez/i }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'La asignación cambió mientras realizabas la operación',
@@ -389,7 +482,7 @@ describe('TaskFormDialog — edición', () => {
     const onOpenChange = vi.fn();
     renderDialog({ mode: 'edit', task: original, editarTarea, asignarTarea, desasignarTarea, onOpenChange });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(editarTarea.mutateAsync).not.toHaveBeenCalled();
@@ -399,7 +492,7 @@ describe('TaskFormDialog — edición', () => {
 });
 
 describe('TaskFormDialog — cascada rol → usuario', () => {
-  afterEach(() => cleanup());
+  afterEach(() => cleanupDialog());
 
   it('cambiar de rol limpia el asignado incompatible y muestra un aviso accesible', async () => {
     const original = tarea({
@@ -413,19 +506,19 @@ describe('TaskFormDialog — cascada rol → usuario', () => {
     });
     renderDialog({ mode: 'edit', task: original });
 
-    expect(screen.getByRole('combobox', { name: 'Asignado' })).toHaveTextContent(/Ana Lopez/i);
+    expect(screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' })).toHaveTextContent(/Ana Lopez/i);
 
-    const selectRol = screen.getByRole('combobox', { name: 'Rol' });
+    const selectRol = screen.getByRole('combobox', { name: 'Seleccionar rol del proyecto' });
     fireEvent.keyDown(selectRol, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: 'Frontend' }));
 
-    expect(screen.getByRole('combobox', { name: 'Asignado' })).toHaveTextContent('Sin asignar');
+    expect(screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' })).toHaveTextContent('Sin asignar');
     expect(screen.getByRole('status')).toHaveTextContent(/se limpió el usuario asignado/i);
   });
 });
 
 describe('TaskFormDialog — eliminar desde edición', () => {
-  afterEach(() => cleanup());
+  afterEach(() => cleanupDialog());
 
   it('el botón Eliminar tarea delega en onRequestDelete sin ejecutar la eliminación directamente', () => {
     const onRequestDelete = vi.fn();
@@ -442,5 +535,75 @@ describe('TaskFormDialog — eliminar desde edición', () => {
   it('el botón Eliminar tarea no aparece para un no-líder', () => {
     renderDialog({ mode: 'edit', task: tarea(), isLeader: false, onRequestDelete: vi.fn() });
     expect(screen.queryByRole('button', { name: 'Eliminar tarea' })).not.toBeInTheDocument();
+  });
+
+  it('en creación no se muestran acciones destructivas (ni Eliminar ni Desasignar)', () => {
+    renderDialog({ mode: 'create', task: null });
+    expect(screen.queryByRole('button', { name: 'Eliminar tarea' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Desasignar tarea' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeInTheDocument();
+  });
+});
+
+describe('TaskFormDialog — gestionar etiquetas', () => {
+  afterEach(() => cleanupDialog());
+
+  it('el botón "Gestionar etiquetas" invoca onManageLabels y NO cierra el diálogo (conserva el borrador)', async () => {
+    const onManageLabels = vi.fn();
+    const onOpenChange = vi.fn();
+    renderDialog({ mode: 'create', task: null, onManageLabels, onOpenChange });
+
+    await llenarTitulo('Borrador vivo');
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar etiquetas del proyecto' }));
+
+    expect(onManageLabels).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    // El borrador permanece: el título escrito sigue presente.
+    expect(screen.getByLabelText('Título de la tarea', { exact: false })).toHaveValue('Borrador vivo');
+  });
+
+  it('sin onManageLabels no se muestra el botón "Gestionar etiquetas"', () => {
+    renderDialog({ mode: 'create', task: null });
+    expect(screen.queryByRole('button', { name: 'Gestionar etiquetas del proyecto' })).not.toBeInTheDocument();
+  });
+});
+
+describe('TaskFormDialog — desasignar desde el pie', () => {
+  afterEach(() => cleanupDialog());
+
+  const asignada = () =>
+    tarea({
+      asignacionActiva: {
+        idAsignacion: 1,
+        idUsuario: 5,
+        fechaAsignacion: '2026-01-01T00:00:00.000Z',
+        usuario: { idUsuario: 5, nombre: 'Ana', apellido: 'Lopez', fotoUrl: null },
+      },
+    });
+
+  it('aparece solo con asignación activa y desaparece tras usarlo', () => {
+    renderDialog({ mode: 'edit', task: asignada(), isLeader: true });
+    const boton = screen.getByRole('button', { name: 'Desasignar tarea' });
+    fireEvent.click(boton);
+    expect(screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' })).toHaveTextContent('Sin asignar');
+    expect(screen.queryByRole('button', { name: 'Desasignar tarea' })).not.toBeInTheDocument();
+  });
+
+  it('no aparece cuando la tarea ya está sin asignar', () => {
+    renderDialog({ mode: 'edit', task: tarea({ asignacionActiva: null }), isLeader: true });
+    expect(screen.queryByRole('button', { name: 'Desasignar tarea' })).not.toBeInTheDocument();
+  });
+
+  it('al guardar tras desasignar se llama a desasignarTarea', async () => {
+    const desasignarTarea = mutationStub();
+    renderDialog({ mode: 'edit', task: asignada(), isLeader: true, desasignarTarea });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desasignar tarea' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la tarea' }));
+
+    await waitFor(() =>
+      expect(desasignarTarea.mutateAsync).toHaveBeenCalledWith({ taskId: 1 }),
+    );
   });
 });

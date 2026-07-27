@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   DndContext,
   DragOverlay,
@@ -43,7 +44,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { TaskCommentsDialog } from '@/components/projects/task-comments-dialog';
 import { TaskCard } from '@/components/projects/task-card';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
@@ -62,6 +62,7 @@ import {
 } from '@/components/projects/task-board-dnd';
 import {
   COLUMNAS_TABLERO,
+  ESTADO_COLUMNA_STYLE,
   FILTRO_TODOS,
   derivarOpcionesHito,
   derivarOpcionesRol,
@@ -114,9 +115,16 @@ interface TaskBoardProps {
   deleteLabel: ProjectLabelsHook['deleteLabel'];
   /** Tarea a enfocar/resaltar al llegar desde una notificación (Tarea 39). */
   focusTaskId?: number | null;
+  filtroRolExterno?: string;
+  filtroHitoExterno?: string;
+  onFiltroRolChange?: (value: string) => void;
+  onFiltroHitoChange?: (value: string) => void;
+  mostrarToolbar?: boolean;
 }
 
 const MOBILE_BREAKPOINT = 768;
+const CONTROL_CLASS =
+  'h-10 min-h-10 rounded-md border-outline-variant px-3 text-xs font-semibold shadow-sm';
 
 /**
  * Hook local y defensivo (no el `useIsMobile` compartido de `hooks/use-mobile`):
@@ -141,17 +149,19 @@ function useTableroEsMovil(): boolean {
 function ColumnasSkeleton() {
   return (
     <>
-      <div className="hidden md:flex gap-4 overflow-x-auto -mx-1 px-1">
-        {COLUMNAS_TABLERO.map((columna) => (
-          <div
-            key={columna.estado}
-            className="w-72 shrink-0 bg-surface-container-high rounded-xl p-3 space-y-2"
-          >
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-20 w-full rounded-lg" />
-            <Skeleton className="h-20 w-full rounded-lg" />
-          </div>
-        ))}
+      <div className="hidden overflow-x-auto md:block">
+        <div className="grid min-w-[1120px] grid-cols-4 gap-4 xl:min-w-0">
+          {COLUMNAS_TABLERO.map((columna) => (
+            <div
+              key={columna.estado}
+              className="min-w-0 space-y-2 rounded-xl bg-surface-container-high p-3"
+            >
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+            </div>
+          ))}
+        </div>
       </div>
       <div className="flex md:hidden flex-col gap-3">
         <div className="flex gap-2 overflow-x-auto">
@@ -173,38 +183,64 @@ interface KanbanColumnProps {
   titulo: string;
   tareasColumna: TareaPublicaDTO[];
   renderCard: (tarea: TareaPublicaDTO) => ReactNode;
+  hayFiltrosActivos: boolean;
 }
 
-function KanbanColumn({ estado, titulo, tareasColumna, renderCard }: KanbanColumnProps) {
+function KanbanColumn({
+  estado,
+  titulo,
+  tareasColumna,
+  renderCard,
+  hayFiltrosActivos,
+}: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: columnDropId(estado),
     data: { type: 'column', estado } satisfies ColumnDropData,
   });
+  const estilo = ESTADO_COLUMNA_STYLE[estado];
 
   return (
     <section
       ref={setNodeRef}
       aria-labelledby={`columna-${estado}-heading`}
       data-column-estado={estado}
-      className={`w-72 shrink-0 rounded-xl p-3 space-y-2 border-2 transition-colors ${
-        isOver ? 'border-primary bg-primary/5' : 'border-transparent bg-surface-container-high'
+      className={`flex min-h-0 min-w-0 flex-col gap-2.5 rounded-xl border p-3 transition-colors ${
+        isOver
+          ? 'border-primary bg-primary/5'
+          : 'border-outline-variant/40 bg-surface-container-low'
       }`}
     >
-      <div className="flex items-center justify-between px-1">
+      {/* Encabezado: indicador circular + nombre + contador (Sección 33) */}
+      <div
+        className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 ${estilo.headerBg}`}
+      >
         <h3
           id={`columna-${estado}-heading`}
-          className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant"
+          className={`flex items-center gap-2 text-[13px] font-bold ${estilo.headerText}`}
         >
+          <span className={`inline-block size-2 rounded-full ${estilo.dot}`} aria-hidden="true" />
           {titulo}
         </h3>
-        <span className="text-xs text-tertiary">{tareasColumna.length}</span>
+        <span
+          className={`inline-flex min-h-[22px] min-w-[22px] items-center justify-center rounded-full bg-surface-container-highest px-1.5 text-xs font-semibold ${estilo.headerText}`}
+        >
+          {tareasColumna.length}
+        </span>
       </div>
 
-      <div className="space-y-2">
-        {tareasColumna.length === 0 && (
-          <p className="text-xs text-tertiary text-center py-6">Sin tareas</p>
+      <div className="flex flex-1 flex-col gap-2.5 pr-1">
+        {tareasColumna.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-8 text-center">
+            <span className={`inline-block size-2.5 rounded-full ${estilo.dot} opacity-40`} aria-hidden="true" />
+            <p className="text-xs text-tertiary">
+              {hayFiltrosActivos
+                ? 'Los filtros actuales no muestran tareas en esta columna.'
+                : 'No hay tareas en este estado.'}
+            </p>
+          </div>
+        ) : (
+          tareasColumna.map(renderCard)
         )}
-        {tareasColumna.map(renderCard)}
       </div>
     </section>
   );
@@ -236,10 +272,22 @@ export function TaskBoard({
   updateLabel,
   deleteLabel,
   focusTaskId = null,
+  filtroRolExterno,
+  filtroHitoExterno,
+  onFiltroRolChange,
+  onFiltroHitoChange,
+  mostrarToolbar = true,
 }: TaskBoardProps) {
-  const [filtroRol, setFiltroRol] = useState(FILTRO_TODOS);
-  const [filtroHito, setFiltroHito] = useState(FILTRO_TODOS);
-  const [tareaComentarios, setTareaComentarios] = useState<TareaPublicaDTO | null>(null);
+  const [filtroRolInterno, setFiltroRolInterno] = useState(FILTRO_TODOS);
+  const [filtroHitoInterno, setFiltroHitoInterno] = useState(FILTRO_TODOS);
+  const filtroRol = filtroRolExterno ?? filtroRolInterno;
+  const filtroHito = filtroHitoExterno ?? filtroHitoInterno;
+  const setFiltroRol = onFiltroRolChange ?? setFiltroRolInterno;
+  const setFiltroHito = onFiltroHitoChange ?? setFiltroHitoInterno;
+  // El detalle de la tarea ya no es un Sheet lateral: es una página dedicada
+  // (/dashboard/projects/:id/kanban/tasks/:taskId). El tablero solo navega hacia
+  // ella (Sección 8).
+  const router = useRouter();
   const [tareaEliminar, setTareaEliminar] = useState<TareaPublicaDTO | null>(null);
   const [crearAbierto, setCrearAbierto] = useState(false);
   const [tareaEditar, setTareaEditar] = useState<TareaPublicaDTO | null>(null);
@@ -281,8 +329,12 @@ export function TaskBoard({
   const esAsignadoActivo = (tarea: TareaPublicaDTO) =>
     currentUserId !== null && tarea.asignacionActiva?.idUsuario === currentUserId;
 
-  const handleCambiarEstado = (tarea: TareaPublicaDTO, nuevoEstado: EstadoTarea) => {
-    cambiarEstadoTarea.mutate({ taskId: tarea.idTarea, input: { estadoTarea: nuevoEstado } });
+  // Navegación a la vista dedicada de la tarea (Sección 8-9). El cuerpo de la
+  // tarjeta abre Detalles; el icono de comentarios abre la misma ruta con
+  // `?section=comments`.
+  const abrirDetalle = (tarea: TareaPublicaDTO, tab: 'detalles' | 'comentarios') => {
+    const base = `/dashboard/projects/${idProyecto}/kanban/tasks/${tarea.idTarea}`;
+    router.push(tab === 'comentarios' ? `${base}?section=comments` : base);
   };
 
   const handleConfirmarEliminar = () => {
@@ -302,11 +354,11 @@ export function TaskBoard({
     if (!encontrada) return;
     // setState diferido fuera del cuerpo síncrono del efecto (regla
     // react-hooks/set-state-in-effect): esta rama solo corre una vez, al
-    // resolver la tarea indicada por la notificación.
+    // resolver la tarea indicada. En móvil alinea la columna activa para que la
+    // tarjeta resaltada sea visible; el detalle completo vive ahora en su propia
+    // ruta, no en un Sheet.
     requestAnimationFrame(() => {
       setMobileSelectedState(encontrada.estadoTarea);
-      cardRefs.current.get(focusTaskId)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      handleRefs.current.get(focusTaskId)?.focus();
     });
   }, [focusTaskId, tasks, isLoading, isError]);
 
@@ -320,8 +372,6 @@ export function TaskBoard({
   function renderTaskCard(tarea: TareaPublicaDTO) {
     const puedeCambiarEstado = isLeader || esAsignadoActivo(tarea);
     const bloqueada = estaBloqueadaPorMutation(tarea.idTarea) || estaBloqueadaPorDrag(tarea.idTarea);
-    const falloEstado =
-      cambiarEstadoTarea.isError && cambiarEstadoTarea.variables?.taskId === tarea.idTarea;
 
     return (
       <TaskCard
@@ -331,9 +381,8 @@ export function TaskBoard({
         puedeEliminar={isLeader}
         puedeEditar={isLeader}
         estadoPending={bloqueada}
-        estadoError={falloEstado ? getApiErrorMessage(cambiarEstadoTarea.error, 'task') : null}
-        onCambiarEstado={(nuevoEstado) => handleCambiarEstado(tarea, nuevoEstado)}
-        onAbrirComentarios={() => setTareaComentarios(tarea)}
+        onAbrirDetalles={() => abrirDetalle(tarea, 'detalles')}
+        onAbrirComentarios={() => abrirDetalle(tarea, 'comentarios')}
         onSolicitarEliminar={() => setTareaEliminar(tarea)}
         onEditar={() => setTareaEditar(tarea)}
         resaltada={focusTaskId === tarea.idTarea}
@@ -398,7 +447,7 @@ export function TaskBoard({
           id={`filtro-rol-${idSufijo}`}
           size="sm"
           aria-label="Filtrar por rol"
-          className="text-xs w-full"
+          className={`${CONTROL_CLASS} w-full justify-between bg-surface-container-lowest md:w-44`}
         >
           <SelectValue />
         </SelectTrigger>
@@ -421,7 +470,7 @@ export function TaskBoard({
           id={`filtro-hito-${idSufijo}`}
           size="sm"
           aria-label="Filtrar por hito"
-          className="text-xs w-full"
+          className={`${CONTROL_CLASS} w-full justify-between bg-surface-container-lowest md:w-44`}
         >
           <SelectValue />
         </SelectTrigger>
@@ -486,14 +535,15 @@ export function TaskBoard({
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <div className="space-y-4">
-        {/* ENCABEZADO */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-tertiary">
+      <div className="min-h-0 space-y-4">
+        {/* TOOLBAR (Sección 20-26) */}
+        {mostrarToolbar && (
+        <div className="flex flex-col gap-3 pb-1 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
               Tablero de tareas
             </h2>
-            <span className="text-xs text-tertiary">
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
               {tareasFiltradas.length} {tareasFiltradas.length === 1 ? 'tarea' : 'tareas'}
             </span>
             {isFetching && (
@@ -504,11 +554,22 @@ export function TaskBoard({
             )}
           </div>
 
-          <div className="flex items-center flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             {/* Filtros de escritorio: siempre visibles en md+ */}
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden flex-wrap items-center gap-2 md:flex">
               {renderFiltroRol('escritorio')}
               {renderFiltroHito('escritorio')}
+              {hayFiltrosActivos && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={limpiarFiltros}
+                  className={`${CONTROL_CLASS} border border-transparent text-tertiary hover:text-on-surface`}
+                >
+                  Limpiar filtros
+                </Button>
+              )}
             </div>
 
             {/* Filtros móviles: agrupados en un panel "Filtros" */}
@@ -519,7 +580,7 @@ export function TaskBoard({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="rounded-lg border-outline-variant text-xs font-bold gap-1.5 min-h-11"
+                    className={`${CONTROL_CLASS} gap-1.5`}
                   >
                     <Filter className="size-3.5" aria-hidden="true" />
                     Filtros
@@ -554,7 +615,7 @@ export function TaskBoard({
                       variant="outline"
                       size="sm"
                       onClick={limpiarFiltros}
-                      className="w-full rounded-lg border-primary text-primary hover:bg-primary/10 text-xs font-bold min-h-11"
+                      className={`${CONTROL_CLASS} w-full border-primary text-primary hover:bg-primary/10`}
                     >
                       Limpiar filtros
                     </Button>
@@ -570,7 +631,7 @@ export function TaskBoard({
                   variant="outline"
                   size="sm"
                   onClick={() => setEtiquetasAbierto(true)}
-                  className="rounded-lg border-outline-variant text-xs font-bold gap-1.5 min-h-11"
+                  className={`${CONTROL_CLASS} w-full gap-1.5 bg-surface-container-lowest sm:w-auto md:min-w-40`}
                 >
                   <Tags className="size-3.5" aria-hidden="true" />
                   Gestionar etiquetas
@@ -579,7 +640,7 @@ export function TaskBoard({
                   type="button"
                   size="sm"
                   onClick={() => setCrearAbierto(true)}
-                  className="rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold gap-1.5 min-h-11"
+                  className={`${CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
                 >
                   <Plus className="size-3.5" aria-hidden="true" />
                   Nueva tarea
@@ -588,6 +649,7 @@ export function TaskBoard({
             )}
           </div>
         </div>
+        )}
 
         {tareaEnfocadaAusente && (
           <div
@@ -599,9 +661,17 @@ export function TaskBoard({
         )}
 
         {tasks.length === 0 && (
-          <p role="status" className="text-xs text-tertiary">
-            Este proyecto todavía no tiene tareas.
-          </p>
+          <div
+            role="status"
+            className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant/50 bg-surface-container-low px-6 py-14 text-center"
+          >
+            <h3 className="text-base font-bold text-on-surface">Aún no hay tareas</h3>
+            <p className="max-w-md text-sm text-on-surface-variant">
+              {isLeader
+                ? 'Crea la primera tarea con “Nueva tarea” para comenzar a organizar el trabajo del proyecto.'
+                : 'Cuando el líder cree tareas, aparecerán aquí para organizar el trabajo del proyecto.'}
+            </p>
+          </div>
         )}
 
         {sinCoincidencias && (
@@ -613,45 +683,58 @@ export function TaskBoard({
               variant="outline"
               size="sm"
               onClick={limpiarFiltros}
-              className="rounded-lg border-primary text-primary hover:bg-primary/10 text-xs font-bold min-h-11"
+              className={`${CONTROL_CLASS} border-primary text-primary hover:bg-primary/10`}
             >
               Limpiar filtros
             </Button>
           </div>
         )}
 
-        {esMovil ? (
-          <div className="space-y-3">
-            <MobileTaskStatusNav
-              tareas={tareasFiltradas}
-              estadoSeleccionado={mobileSelectedState}
-              onSeleccionarEstado={setMobileSelectedState}
-            />
-            <div className="space-y-2">
-              {tareasColumnaMovil.length === 0 && (
-                <p className="text-xs text-tertiary text-center py-6">Sin tareas</p>
-              )}
-              {tareasColumnaMovil.map(renderTaskCard)}
+        {tasks.length > 0 &&
+          (esMovil ? (
+            <div className="space-y-3">
+              <MobileTaskStatusNav
+                tareas={tareasFiltradas}
+                estadoSeleccionado={mobileSelectedState}
+                onSeleccionarEstado={setMobileSelectedState}
+              />
+              <div className="space-y-2.5">
+                {tareasColumnaMovil.length === 0 ? (
+                  <p className="py-8 text-center text-xs text-tertiary">
+                    {hayFiltrosActivos
+                      ? 'Los filtros actuales no muestran tareas en esta columna.'
+                      : 'No hay tareas en este estado.'}
+                  </p>
+                ) : (
+                  tareasColumnaMovil.map(renderTaskCard)
+                )}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex gap-4 overflow-x-auto -mx-1 px-1">
-            {COLUMNAS_TABLERO.map((columna) => {
-              const tareasColumna = ordenarTareas(
-                tareasFiltradas.filter((t) => t.estadoTarea === columna.estado),
-              );
-              return (
-                <KanbanColumn
-                  key={columna.estado}
-                  estado={columna.estado}
-                  titulo={columna.titulo}
-                  tareasColumna={tareasColumna}
-                  renderCard={renderTaskCard}
-                />
-              );
-            })}
-          </div>
-        )}
+          ) : (
+            <div className="-mx-1 overflow-x-auto px-1 pb-2">
+              {/* Altura natural (como Hitos): las columnas crecen con su contenido
+                  y es la página la que hace scroll (la sidebar queda fija por el
+                  layout). `min-h` da un piso de ~4 tarjetas por columna. No se usa
+                  una altura ligada al viewport para no reservar franja en blanco. */}
+              <div className="grid min-h-105 min-w-280 grid-cols-4 gap-4 xl:min-w-0">
+                {COLUMNAS_TABLERO.map((columna) => {
+                  const tareasColumna = ordenarTareas(
+                    tareasFiltradas.filter((t) => t.estadoTarea === columna.estado),
+                  );
+                  return (
+                    <KanbanColumn
+                      key={columna.estado}
+                      estado={columna.estado}
+                      titulo={columna.titulo}
+                      tareasColumna={tareasColumna}
+                      renderCard={renderTaskCard}
+                      hayFiltrosActivos={hayFiltrosActivos}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
 
         <DragOverlay dropAnimation={null} style={{ pointerEvents: 'none' }}>
           {activeDrag ? (
@@ -664,16 +747,6 @@ export function TaskBoard({
         <div aria-live="assertive" role="status" className="sr-only">
           {dndAnnouncement ?? ''}
         </div>
-
-        {/* COMENTARIOS: instancia única controlada por la tarea seleccionada */}
-        <TaskCommentsDialog
-          tarea={tareaComentarios}
-          idProyecto={idProyecto}
-          open={tareaComentarios !== null}
-          onOpenChange={(open) => {
-            if (!open) setTareaComentarios(null);
-          }}
-        />
 
         {/* ELIMINACIÓN: confirmación única controlada por la tarea seleccionada */}
         <AlertDialog
@@ -733,6 +806,7 @@ export function TaskBoard({
             }
           }}
           onRequestDelete={(tarea) => setTareaEliminar(tarea)}
+          onManageLabels={isLeader ? () => setEtiquetasAbierto(true) : undefined}
         />
 
         {/* ETIQUETAS: única instancia, solo accesible para el líder */}

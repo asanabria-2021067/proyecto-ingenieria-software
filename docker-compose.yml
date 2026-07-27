@@ -34,8 +34,8 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}}
-      - DIRECT_URL=${DIRECT_URL:-postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}}
+      - DATABASE_URL=${DOCKER_DATABASE_URL:-postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}?schema=public}
+      - DIRECT_URL=${DOCKER_DIRECT_URL:-postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}?schema=public}
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-me}
       - REDIS_HOST=redis
