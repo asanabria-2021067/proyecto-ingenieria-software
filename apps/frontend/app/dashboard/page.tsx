@@ -12,6 +12,8 @@ import {
   Calendar,
   ClipboardList,
   FolderOpen,
+  Building2,
+  Users,
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
@@ -23,10 +25,18 @@ import {
   EmptySteps,
   EmptyTitle,
 } from '@/components/ui/empty';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
+import type { ProyectoResumen } from '@/types';
 import { apiFetch } from '@/lib/api/client';
 import {
   estadoBadgeLabel,
@@ -103,7 +113,7 @@ export default function DashboardPage() {
     },
   });
 
-  const { data: featured = [], isLoading: featuredLoading } = useQuery<ProyectoListItemDTO[]>({
+  const { data: featured = [], isLoading: featuredLoading } = useQuery<ProyectoResumen[]>({
     queryKey: ['dashboard-featured'],
     queryFn: () => apiFetch('/proyectos/destacados'),
   });
@@ -292,7 +302,8 @@ export default function DashboardPage() {
                           {p.modalidadProyecto}
                         </div>
                         <Link
-                          href={`/dashboard/proyectos/${p.idProyecto}`}
+                          href={`/dashboard/projects/${p.idProyecto}`}
+                          aria-label={`Ver ${p.tituloProyecto}`}
                           className="rounded-xl bg-surface-container-high px-6 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
                         >
                           Ver
@@ -353,7 +364,8 @@ export default function DashboardPage() {
                         {p.modalidadProyecto}
                       </div>
                       <Link
-                        href={`/dashboard/proyectos/${p.idProyecto}`}
+                        href={`/dashboard/projects/${p.idProyecto}`}
+                        aria-label={`Ver ${p.tituloProyecto}`}
                         className="rounded-xl bg-surface-container-high px-6 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
                       >
                         Ver

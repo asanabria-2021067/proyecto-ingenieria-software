@@ -94,6 +94,7 @@ export interface NotificationTemplateData {
     roleId: number;
     taskCount: number;
   };
+
   // Sección 18B: el líder se auto-asignó a un rol. El actor (líder) siempre se
   // excluye de los destinatarios, por lo que puede resultar en cero envíos.
   ROL_ASIGNADO_LIDER: {
@@ -103,12 +104,19 @@ export interface NotificationTemplateData {
     projectId: number;
     roleId: number;
   };
+
   // Sección 18C: el líder modificó datos relevantes de un rol utilizado.
   ROL_ACTUALIZADO: {
     roleName: string;
     projectTitle: string;
     projectId: number;
     roleId: number;
+  };
+
+  SOLICITUD_RECUPERACION_CONTRASENA: {
+    userName: string;
+    carne: string;
+    solicitudId: number;
   };
 }
 
@@ -198,18 +206,30 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Un integrante dejó un rol',
     message: (data: NotificationTemplateData['ROL_ABANDONADO']) =>
       data.taskCount > 0
-        ? `${data.userName} dejó el rol "${data.roleName}" en "${data.projectTitle}". ${data.taskCount} ${data.taskCount === 1 ? 'tarea quedó' : 'tareas quedaron'} sin asignar.`
+        ? `${data.userName} dejó el rol "${data.roleName}" en "${data.projectTitle}". ${data.taskCount} ${
+            data.taskCount === 1 ? 'tarea quedó' : 'tareas quedaron'
+          } sin asignar.`
         : `${data.userName} dejó el rol "${data.roleName}" en "${data.projectTitle}".`,
   },
+
   ROL_ASIGNADO_LIDER: {
     title: 'El líder se unió a un rol',
     message: (data: NotificationTemplateData['ROL_ASIGNADO_LIDER']) =>
       `${data.userName} se asignó al rol "${data.roleName}" en el proyecto "${data.projectTitle}".`,
   },
+
   ROL_ACTUALIZADO: {
     title: 'Un rol fue actualizado',
     message: (data: NotificationTemplateData['ROL_ACTUALIZADO']) =>
       `El rol "${data.roleName}" del proyecto "${data.projectTitle}" fue actualizado.`,
+  },
+
+  SOLICITUD_RECUPERACION_CONTRASENA: {
+    title: 'Solicitud de recuperación de contraseña',
+    message: (
+      data: NotificationTemplateData['SOLICITUD_RECUPERACION_CONTRASENA'],
+    ) =>
+      `${data.userName} (carné ${data.carne}) solicitó recuperar su contraseña.`,
   },
 } as const;
 
