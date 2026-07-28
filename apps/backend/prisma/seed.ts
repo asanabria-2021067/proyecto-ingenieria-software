@@ -1412,30 +1412,40 @@ async function main() {
     update: {},
     create: { idUsuario: camila.idUsuario, carne: '25021', idCarrera: computacion.idCarrera, semestre: 6, disponibilidadHorasSemana: 10 },
   });
-  const postCamila = await prisma.postulacion.upsert({
-    where: { idPostulacion: 12 },
-    update: {},
-    create: {
-      idPostulacion: 12,
-      idUsuarioPostulante: camila.idUsuario,
-      idRolProyecto: rolFullstack.idRolProyecto,
-      justificacion: 'Tengo experiencia con NestJS y React, me interesa el Portal de Empleo.',
-      estadoPostulacion: 'ACEPTADA',
-      resueltaPor: carlos.idUsuario,
-      fechaResolucion: new Date(),
-    },
+  // Postulacion/ParticipacionProyecto no tienen llave natural única en el
+  // schema (solo índices), así que se buscan por (usuario, rol) antes de
+  // crear — mismo criterio que ensureRol/ensureRevision en
+  // seed-vernel-states.ts: este script no asume ser la única fuente de la
+  // fila, así que nunca fija un id explícito para estas dos tablas.
+  const postCamilaExistente = await prisma.postulacion.findFirst({
+    where: { idUsuarioPostulante: camila.idUsuario, idRolProyecto: rolFullstack.idRolProyecto },
   });
-  await prisma.participacionProyecto.upsert({
-    where: { idParticipacion: 16 },
-    update: {},
-    create: {
-      idParticipacion: 16,
-      idUsuario: camila.idUsuario,
-      idRolProyecto: rolFullstack.idRolProyecto,
-      idPostulacion: postCamila.idPostulacion,
-      estadoParticipacion: 'ACTIVO',
-    },
+  const postCamila =
+    postCamilaExistente ??
+    (await prisma.postulacion.create({
+      data: {
+        idUsuarioPostulante: camila.idUsuario,
+        idRolProyecto: rolFullstack.idRolProyecto,
+        justificacion: 'Tengo experiencia con NestJS y React, me interesa el Portal de Empleo.',
+        estadoPostulacion: 'ACEPTADA',
+        resueltaPor: carlos.idUsuario,
+        fechaResolucion: new Date(),
+      },
+    }));
+
+  const participacionCamilaExistente = await prisma.participacionProyecto.findFirst({
+    where: { idUsuario: camila.idUsuario, idRolProyecto: rolFullstack.idRolProyecto },
   });
+  if (!participacionCamilaExistente) {
+    await prisma.participacionProyecto.create({
+      data: {
+        idUsuario: camila.idUsuario,
+        idRolProyecto: rolFullstack.idRolProyecto,
+        idPostulacion: postCamila.idPostulacion,
+        estadoParticipacion: 'ACTIVO',
+      },
+    });
+  }
 
   // ─── Reset sequences ──────────────────────────────────
   const sequences = [
