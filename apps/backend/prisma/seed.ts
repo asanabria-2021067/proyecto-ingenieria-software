@@ -1377,6 +1377,66 @@ async function main() {
     },
   });
 
+  // ─── Usuarios adicionales ───────────────────────────────
+  // Fernando: estudiante "de a pie", sin roles ni proyectos — solo existe.
+  const fernando = await prisma.usuario.upsert({
+    where: { correo: 'fernando.castaneda@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'fernando.castaneda@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Fernando', apellido: 'Castañeda' },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: fernando.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: fernando.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: fernando.idUsuario },
+    update: {},
+    create: { idUsuario: fernando.idUsuario, carne: '25020', idCarrera: quimica.idCarrera, semestre: 2, disponibilidadHorasSemana: 6 },
+  });
+
+  // Camila: activa en el rol Fullstack del Portal de Empleo UVG (proyecto de
+  // carlos.mendoza), vía la misma cadena postulación → participación que el resto.
+  const camila = await prisma.usuario.upsert({
+    where: { correo: 'camila.rodriguez@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'camila.rodriguez@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Camila', apellido: 'Rodríguez' },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: camila.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: camila.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: camila.idUsuario },
+    update: {},
+    create: { idUsuario: camila.idUsuario, carne: '25021', idCarrera: computacion.idCarrera, semestre: 6, disponibilidadHorasSemana: 10 },
+  });
+  const postCamila = await prisma.postulacion.upsert({
+    where: { idPostulacion: 12 },
+    update: {},
+    create: {
+      idPostulacion: 12,
+      idUsuarioPostulante: camila.idUsuario,
+      idRolProyecto: rolFullstack.idRolProyecto,
+      justificacion: 'Tengo experiencia con NestJS y React, me interesa el Portal de Empleo.',
+      estadoPostulacion: 'ACEPTADA',
+      resueltaPor: carlos.idUsuario,
+      fechaResolucion: new Date(),
+    },
+  });
+  await prisma.participacionProyecto.upsert({
+    where: { idParticipacion: 16 },
+    update: {},
+    create: {
+      idParticipacion: 16,
+      idUsuario: camila.idUsuario,
+      idRolProyecto: rolFullstack.idRolProyecto,
+      idPostulacion: postCamila.idPostulacion,
+      estadoParticipacion: 'ACTIVO',
+    },
+  });
+
   // ─── Reset sequences ──────────────────────────────────
   const sequences = [
     { table: 'carrera', column: 'id_carrera' },
