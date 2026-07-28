@@ -248,6 +248,7 @@ export interface ProyectoDetalleDTO {
   fechaInicio: string | null;
   fechaFinEstimada: string | null;
   fechaCreacion: string;
+  fechaActualizacion?: string | null;
   creador: CreadorDTO;
   organizaciones: ProyectoOrganizacionDTO[];
   intereses: ProyectoInteresDTO[];

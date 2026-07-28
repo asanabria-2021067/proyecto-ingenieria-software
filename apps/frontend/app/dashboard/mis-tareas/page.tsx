@@ -127,7 +127,7 @@ export default function MisTareasPage() {
 
   return (
     <DashboardLayout>
-      <div className="px-8 py-8 max-w-4xl mx-auto">
+      <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
