@@ -121,6 +121,7 @@ const proyectoDetalleSelect = {
   fechaInicio: true,
   fechaFinEstimada: true,
   fechaCreacion: true,
+  fechaActualizacion: true,
   creadoPor: true,
   creador: {
     select: { idUsuario: true, nombre: true, apellido: true, correo: true },
