@@ -123,7 +123,7 @@ export default function MyProjectsPage() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-7xl px-8 pt-7 pb-10">
+      <div className="mx-auto max-w-[1400px] px-8 pt-7 pb-10">
         <div className="mb-4.5 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">

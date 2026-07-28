@@ -349,7 +349,7 @@ export default function EditarPerfilPage() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-4xl px-4 md:px-8 py-8 pb-24">
+      <div className="mx-auto max-w-[1400px] px-4 md:px-8 py-8 pb-24">
         {/* Header bar */}
         <div className="mb-8">
           <button

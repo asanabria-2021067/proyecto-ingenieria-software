@@ -94,7 +94,7 @@ export default function ProyectoDetallePage() {
 
   return (
     <DashboardLayout allowAdmin>
-      <div className="mx-auto max-w-[1320px] px-7 pt-6 pb-12">
+      <div className="mx-auto max-w-[1400px] px-7 pt-6 pb-12">
         {/* Breadcrumb */}
         <nav aria-label="Ruta de navegación" className="mb-4.5 flex items-center gap-2 text-[13px]">
           <Link

@@ -104,7 +104,7 @@ export default function PerfilPage() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-7xl px-8 py-8">
+      <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="mb-6 flex items-center justify-end">
           <button
             onClick={() => router.push('/dashboard/perfil/editar')}

@@ -93,7 +93,7 @@ export default function NotificacionesPage() {
 
   return (
     <Layout>
-      <div className="px-8 py-8 max-w-4xl mx-auto">
+      <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="flex items-start justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2">

@@ -84,7 +84,7 @@ export default function ProyectosPage() {
 
   return (
     <DashboardLayout allowAdmin>
-      <div className="mx-auto max-w-7xl px-8 pt-7 pb-10">
+      <div className="mx-auto max-w-[1400px] px-8 pt-7 pb-10">
         {/* Encabezado */}
         <div className="mb-4.5">
           <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">
