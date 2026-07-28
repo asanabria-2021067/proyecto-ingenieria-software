@@ -1378,6 +1378,38 @@ async function main() {
   });
 
   // ─── Usuarios adicionales ───────────────────────────────
+  // Vernel: cuenta real de equipo (igual que san24725/Angel arriba). Se crea
+  // aquí porque seed-vernel-states.ts y seed-tutoring-workspace-demo.ts la
+  // dan por existente (findUniqueOrThrow / abort si falta) — sin este bloque
+  // ninguno de los dos puede correr contra una base recién sembrada.
+  const vernelUser = await prisma.usuario.upsert({
+    where: { correo: 'vernel@uvg.edu.gt' },
+    update: {},
+    create: {
+      correo: 'vernel@uvg.edu.gt',
+      contrasena: TEST_PASSWORD,
+      nombre: 'Vernel',
+      apellido: 'Hernández',
+    },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: vernelUser.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: vernelUser.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: vernelUser.idUsuario },
+    update: {},
+    create: {
+      idUsuario: vernelUser.idUsuario,
+      carne: '24584',
+      idCarrera: computacion.idCarrera,
+      semestre: 6,
+      disponibilidadHorasSemana: 10,
+      biografia: 'Estudiante de Ingeniería en Ciencias de la Computación',
+    },
+  });
+
   // Fernando: estudiante "de a pie", sin roles ni proyectos — solo existe.
   const fernando = await prisma.usuario.upsert({
     where: { correo: 'fernando.castaneda@uvg.edu.gt' },
