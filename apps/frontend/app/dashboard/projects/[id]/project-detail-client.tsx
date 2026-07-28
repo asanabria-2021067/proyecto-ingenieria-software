@@ -3,7 +3,9 @@
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   ArrowRight,
   Building2,
   Calendar,
@@ -15,6 +17,7 @@ import {
   Settings2,
   Tag,
   Users,
+  XCircle,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -43,6 +46,8 @@ import { MODALIDAD_LABEL } from '@/types';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { approveProjectClosure, rejectProjectClosure } from '@/lib/services/projects';
+import uvgSwal, { swalCustomClass } from '@/lib/swal';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 
@@ -87,13 +92,59 @@ function ProjectDetailSkeleton() {
 }
 
 // ─── Vista principal ──────────────────────────────────────────────────────────
+const TAB_BASE =
+  'relative flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-1 text-[13px] font-bold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
+const TAB_ACTIVE = `${TAB_BASE} border-primary text-on-surface`;
+const TAB_INACTIVE = `${TAB_BASE} border-transparent text-tertiary hover:border-outline-variant hover:text-on-surface`;
+
 function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const idProyecto = proyecto.idProyecto;
   const organizacionPrincipal = proyecto.organizaciones[0] ?? null;
   const { members } = useProjectMembers(idProyecto);
   const { data: currentUser } = useCurrentUser();
+  // Duplicado deliberado de isAdminUser(): las pruebas de esta página mockean
+  // '@/hooks/use-current-user' devolviendo solo `useCurrentUser`, así que no
+  // podemos depender de otro export de ese módulo aquí.
+  const isAdmin = (currentUser?.roles ?? []).some((r) => r.toLowerCase() === 'administrador');
+  const queryClient = useQueryClient();
   // Liderazgo determinado exclusivamente por Proyecto.creadoPor.
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
+
+  const enSolicitudCierre = proyecto.estadoProyecto === 'EN_SOLICITUD_CIERRE';
+  const [resolviendoCierre, setResolviendoCierre] = useState(false);
+
+  const resolverCierre = async (accion: 'APROBAR' | 'RECHAZAR') => {
+    const { isConfirmed } = await uvgSwal.fire({
+      icon: accion === 'APROBAR' ? 'question' : 'warning',
+      title: accion === 'APROBAR' ? '¿Aprobar cierre?' : '¿Rechazar cierre?',
+      text:
+        accion === 'APROBAR'
+          ? 'El proyecto será marcado como cerrado.'
+          : 'El proyecto volverá al estado En progreso.',
+      showCancelButton: true,
+      confirmButtonText: accion === 'APROBAR' ? 'Sí, aprobar' : 'Sí, rechazar',
+      cancelButtonText: 'Cancelar',
+      ...(accion === 'RECHAZAR' && {
+        customClass: {
+          ...swalCustomClass,
+          confirmButton:
+            'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md mx-4',
+        },
+      }),
+    });
+    if (!isConfirmed) return;
+    setResolviendoCierre(true);
+    try {
+      if (accion === 'APROBAR') {
+        await approveProjectClosure(idProyecto);
+      } else {
+        await rejectProjectClosure(idProyecto);
+      }
+      await queryClient.invalidateQueries({ queryKey: ['project', idProyecto] });
+    } finally {
+      setResolviendoCierre(false);
+    }
+  };
 
   // Compatibilidad de navegación (Sección 20): URLs antiguas ?tab= → workspace.
   const router = useRouter();
@@ -178,6 +229,87 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
         </BreadcrumbList>
       </Breadcrumb>
 
+      {/* Aviso de solicitud de cierre pendiente: visible para el líder (informativo)
+          y para el administrador (con acciones de aprobar/rechazar). */}
+      {enSolicitudCierre && (
+        <div
+          role="status"
+          className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-400/25"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-bold text-on-surface">Solicitud de cierre pendiente</p>
+              <p className="text-xs leading-relaxed text-on-surface-variant">
+                {isAdmin && !isLeader
+                  ? 'El responsable solicitó cerrar este proyecto. Aprueba o rechaza la solicitud.'
+                  : 'Enviaste la solicitud de cierre. Un administrador debe aprobarla para finalizar el proyecto.'}
+                {proyecto.fechaActualizacion && ` Actualizado el ${formatDate(proyecto.fechaActualizacion)}.`}
+              </p>
+            </div>
+          </div>
+          {isAdmin && !isLeader && (
+            <div className="flex shrink-0 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={resolviendoCierre}
+                onClick={() => resolverCierre('RECHAZAR')}
+                className="gap-1.5 rounded-md border-error/40 text-xs font-bold text-error hover:bg-error/10"
+              >
+                <XCircle className="size-3.5" aria-hidden="true" />
+                Rechazar
+              </Button>
+              <Button
+                size="sm"
+                disabled={resolviendoCierre}
+                onClick={() => resolverCierre('APROBAR')}
+                className="gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
+              >
+                <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                Aprobar cierre
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Barra de navegación estilo Jira: "Resumen" es la página actual (siempre
+          activa); el resto son los mismos enlaces/acciones de antes, solo con
+          apariencia de tab en vez de botones sueltos. */}
+      {(isLeader || puedeVerKanban) && (
+        <div className="mb-5 flex items-center gap-5 overflow-x-auto border-b border-outline-variant/50">
+          <span className={TAB_ACTIVE} aria-current="page">
+            Resumen
+          </span>
+          {isLeader && (
+            <Link
+              href={`/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`}
+              className={TAB_INACTIVE}
+            >
+              <History className="size-3.5" aria-hidden="true" />
+              Revisiones previas
+            </Link>
+          )}
+          {isLeader && (
+            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Editar información
+            </Link>
+          )}
+          {isLeader && (
+            <button type="button" onClick={abrirGestionRoles} className={TAB_INACTIVE}>
+              <Settings2 className="size-3.5" aria-hidden="true" />
+              Editar roles
+            </button>
+          )}
+          <Link href={kanbanBase} className={TAB_INACTIVE}>
+            Ver Kanban
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+      )}
+
       {/* Grilla 2×2: la fila 1 (tarjeta principal · Responsable) usa items-stretch
           para que ambas tarjetas queden a la misma altura, sin el escalón; la
           fila 2 lleva el resto (objetivos/roles · detalles/resumen sticky). */}
@@ -242,63 +374,10 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 )}
               </div>
 
-              {/* Acciones del líder (Sección 13) */}
-              {isLeader ? (
-                <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 rounded-md border-outline-variant text-xs font-bold text-on-surface"
-                  >
-                    <Link href={`/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`}>
-                      <History className="size-3.5" aria-hidden="true" />
-                      Revisiones previas
-                    </Link>
-                  </Button>
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 rounded-md border-outline-variant text-xs font-bold text-on-surface"
-                  >
-                    <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`}>
-                      <Pencil className="size-3.5" aria-hidden="true" />
-                      Editar información
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={abrirGestionRoles}
-                    className="gap-1.5 rounded-md border-outline-variant text-xs font-bold text-on-surface"
-                  >
-                    <Settings2 className="size-3.5" aria-hidden="true" />
-                    Editar roles
-                  </Button>
-                  <Button
-                    asChild
-                    size="sm"
-                    className="gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
-                  >
-                    <Link href={kanbanBase}>
-                      Ver Kanban
-                      <ArrowRight className="size-3.5" aria-hidden="true" />
-                    </Link>
-                  </Button>
-                </div>
-              ) : puedeVerKanban ? (
-                <Button
-                  asChild
-                  size="sm"
-                  className="shrink-0 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
-                >
-                  <Link href={kanbanBase}>
-                    Ver Kanban
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
-                  </Link>
-                </Button>
-              ) : (
+              {/* Para líder/participante estas acciones ahora viven en la barra de
+                  tabs debajo del breadcrumb; aquí solo queda la única acción de
+                  quien todavía no participa. */}
+              {!isLeader && !puedeVerKanban && (
                 <Button className="shrink-0 rounded-md bg-primary px-5 text-sm font-bold text-on-primary hover:bg-primary/90">
                   Postularme
                 </Button>
