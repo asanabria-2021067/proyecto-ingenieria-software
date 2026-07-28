@@ -10,15 +10,15 @@ import {
   FolderOpen,
   Briefcase,
   FileText,
-  Bell,
-  User,
-  LogOut,
   ListChecks,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
+import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
+import { UserMenu } from '@/components/dashboard/UserMenu';
+import { SidebarNav, flattenNavEntries, type NavEntry } from '@/components/dashboard/SidebarNav';
 import { TokenRefreshManager } from '@/components/TokenRefreshManager';
-import { clearTokens, getAccessToken } from '@/lib/utils/token';
+import { getAccessToken } from '@/lib/utils/token';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import uvgSwal from '@/lib/swal';
@@ -26,15 +26,29 @@ import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
 import { ThemeToggle } from '@/components/theme-toggle';
 
-const navItems = [
+const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/proyectos', label: 'Explorar Proyectos', icon: FolderOpen },
-  { href: '/dashboard/projects/mine', label: 'Mis Proyectos', icon: Briefcase },
-  { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
-  { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
-  { href: '/dashboard/notificaciones', label: 'Notificaciones', icon: Bell },
-  { href: '/dashboard/perfil', label: 'Perfil', icon: User },
+  {
+    type: 'group',
+    label: 'Proyectos',
+    icon: Briefcase,
+    items: [
+      { href: '/dashboard/proyectos', label: 'Explorar Proyectos', icon: FolderOpen },
+      { href: '/dashboard/projects/mine', label: 'Mis Proyectos', icon: Briefcase },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'Mi trabajo',
+    icon: ListChecks,
+    items: [
+      { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
+      { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
+    ],
+  },
 ];
+
+const navItemsMobile = flattenNavEntries(navEntries);
 
 export default function DashboardLayout({
   children,
@@ -48,6 +62,7 @@ export default function DashboardLayout({
   const queryClient = useQueryClient();
   const { data: user, isLoading } = useCurrentUser();
   const { latestNotification } = useRealtimeNotifications(getAccessToken());
+  const handleLogout = useLogout();
 
   useEffect(() => {
     if (!allowAdmin && !isLoading && isAdminUser(user)) {
@@ -90,23 +105,6 @@ export default function DashboardLayout({
     );
   }
 
-  const handleLogout = async () => {
-    const result = await uvgSwal.fire({
-      icon: 'question',
-      title: 'Cerrar sesion',
-      text: 'Tu sesion actual se cerrara en este dispositivo.',
-      showCancelButton: true,
-      confirmButtonText: 'Si, cerrar sesion',
-      cancelButtonText: 'Cancelar',
-    });
-
-    if (!result.isConfirmed) return;
-
-    clearTokens();
-    queryClient.clear();
-    router.replace('/login');
-  };
-
   return (
     <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-surface">
       <a href="#dashboard-main" className="skip-link">
@@ -121,60 +119,10 @@ export default function DashboardLayout({
           <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map(({ href, label, icon: Icon, exact }) => {
-            const active = exact ? pathname === href : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                id={`nav-item-${label.toLowerCase().replace(/\s+/g, '-')}`}
-                aria-current={active ? 'page' : undefined}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
-                  active
-                    ? 'bg-primary text-on-primary'
-                    : 'text-on-surface hover:bg-surface-container-high'
-                }`}
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+        <SidebarNav entries={navEntries} />
 
-        <div className="px-3 py-4 border-t border-outline-variant space-y-3">
-          {user && (
-            <div className="flex items-center gap-3 px-3 py-2">
-              {user.fotoUrl ? (
-                <Image
-                  src={user.fotoUrl}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-full object-cover border border-outline-variant/30"
-                />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-primary-container flex items-center justify-center text-xs font-bold text-on-primary-container">
-                  {user.nombre[0]}{user.apellido[0]}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-on-surface truncate">
-                  {user.nombre} {user.apellido}
-                </p>
-                <p className="text-xs text-tertiary truncate">{user.correo}</p>
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-tertiary hover:bg-primary hover:text-on-primary w-full outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30"
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            Cerrar sesion
-          </button>
+        <div className="px-3 py-4 border-t border-outline-variant">
+          <UserMenu user={user} onLogout={handleLogout} variant="sidebar" />
         </div>
       </aside>
 
@@ -201,16 +149,6 @@ export default function DashboardLayout({
             <div id="dashboard-theme-toggle">
               <ThemeToggle />
             </div>
-            {/* Mobile-only logout button */}
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Cerrar sesion"
-              className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl text-error hover:bg-error/10 transition-colors cursor-pointer"
-              title="Cerrar sesión"
-            >
-              <LogOut className="w-5 h-5 shrink-0" />
-            </button>
           </div>
         </header>
 
@@ -222,7 +160,7 @@ export default function DashboardLayout({
 
       {/* Bottom Navigation Bar - Mobile Only */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2">
-        {navItems.map(({ href, label, icon: Icon, exact }) => {
+        {navItemsMobile.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -240,15 +178,7 @@ export default function DashboardLayout({
             </Link>
           );
         })}
-        <button
-          type="button"
-          onClick={handleLogout}
-          aria-label="Cerrar sesion"
-          className="flex flex-col items-center justify-center w-12 h-12 rounded-xl text-error hover:bg-error/10 transition-all duration-200 cursor-pointer"
-          title="Cerrar sesión"
-        >
-          <LogOut className="w-6 h-6 shrink-0" />
-        </button>
+        <UserMenu user={user} onLogout={handleLogout} variant="compact" />
       </nav>
 
       <OnboardingTour />

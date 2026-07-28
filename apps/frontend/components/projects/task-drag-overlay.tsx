@@ -16,7 +16,7 @@ export function TaskDragOverlayCard({ titulo, estadoOrigen }: TaskDragOverlayCar
   return (
     <div
       aria-hidden="true"
-      className="w-72 bg-surface-container-lowest border border-primary/50 rounded-xl p-3 shadow-lg pointer-events-none"
+      className="w-72 rotate-2 scale-105 rounded-xl border border-primary/50 bg-surface-container-lowest p-3 shadow-2xl ring-1 ring-primary/20 pointer-events-none"
     >
       <div className="flex items-start gap-2">
         <GripVertical className="size-4 text-tertiary shrink-0 mt-0.5" aria-hidden="true" />

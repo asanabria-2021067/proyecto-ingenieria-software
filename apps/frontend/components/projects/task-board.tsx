@@ -204,9 +204,9 @@ function KanbanColumn({
       ref={setNodeRef}
       aria-labelledby={`columna-${estado}-heading`}
       data-column-estado={estado}
-      className={`flex min-h-0 min-w-0 flex-col gap-2.5 rounded-xl border p-3 transition-colors ${
+      className={`flex min-h-0 min-w-0 flex-col gap-2.5 rounded-xl border p-3 transition-all duration-150 ${
         isOver
-          ? 'border-primary bg-primary/5'
+          ? 'border-primary bg-primary/5 ring-2 ring-inset ring-primary/25'
           : 'border-outline-variant/40 bg-surface-container-low'
       }`}
     >
@@ -240,6 +240,14 @@ function KanbanColumn({
           </div>
         ) : (
           tareasColumna.map(renderCard)
+        )}
+        {isOver && (
+          <div
+            aria-hidden="true"
+            className="rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 py-3 text-center text-[11px] font-semibold text-primary"
+          >
+            Soltar aquí
+          </div>
         )}
       </div>
     </section>

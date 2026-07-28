@@ -96,7 +96,7 @@ export default function PostulacionesProyectoPage() {
 
   return (
     <DashboardLayout>
-      <div className="px-8 py-8 max-w-4xl mx-auto">
+      <div className="mx-auto max-w-[1400px] px-8 py-8">
         <Link
           href={`/dashboard/proyectos/${id}`}
           className="inline-flex items-center gap-1.5 text-sm text-tertiary hover:text-primary mb-6 transition-colors"
