@@ -3,12 +3,12 @@
 import { useMemo, useState } from 'react';
 import { Check, ChevronDown, Info, Loader2, Pencil, Trash2, X } from 'lucide-react';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -463,25 +463,22 @@ export function ProjectLabelsDrawer({
 
   return (
     <>
-      <Sheet
+      <Dialog
         open={open}
         onOpenChange={(next) => {
           if (!next) resetTransientState();
           onOpenChange(next);
         }}
       >
-        <SheetContent
-          side="right"
-          className="w-[96vw] max-w-[480px] gap-0 border-outline-variant bg-surface-container-lowest p-0 shadow-lg sm:w-[75vw] sm:max-w-[480px] md:w-[62vw] lg:w-[480px]"
-        >
-          <SheetHeader className="sticky top-0 z-10 border-b border-outline-variant/35 bg-surface-container-lowest px-5 pb-4 pt-5 sm:px-6">
-            <SheetTitle className="pr-10 text-xl font-bold text-on-surface">
+        <DialogContent className="flex max-h-[85vh] w-[96vw] max-w-[560px] flex-col gap-0 border-outline-variant bg-surface-container-lowest p-0 shadow-lg">
+          <DialogHeader className="border-b border-outline-variant/35 px-5 pb-4 pt-5 text-left sm:px-6">
+            <DialogTitle className="pr-10 text-xl font-bold text-on-surface">
               Etiquetas del proyecto
-            </SheetTitle>
-            <SheetDescription className="max-w-[360px] text-sm leading-5 text-on-surface-variant">
+            </DialogTitle>
+            <DialogDescription className="max-w-[420px] text-sm leading-5 text-on-surface-variant">
               Organiza y clasifica las tareas del proyecto mediante etiquetas.
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
             <CreateLabelForm
@@ -566,8 +563,8 @@ export function ProjectLabelsDrawer({
               </p>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={labelToDelete !== null}

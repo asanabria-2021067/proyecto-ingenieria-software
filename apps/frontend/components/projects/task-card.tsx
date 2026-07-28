@@ -98,7 +98,7 @@ export function TaskCard({
       style={dragStyle}
       aria-busy={estadoPending}
       aria-describedby={resaltada ? `tarea-resaltada-${tarea.idTarea}` : undefined}
-      className={`space-y-2 rounded-lg border bg-surface-container-lowest p-3 shadow-sm transition-colors hover:border-outline-variant/60 ${
+      className={`space-y-2 rounded-lg border bg-surface-container-lowest p-3 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
         resaltada
           ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
           : 'border-outline-variant/30'
