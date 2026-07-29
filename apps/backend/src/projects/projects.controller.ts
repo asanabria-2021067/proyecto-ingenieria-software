@@ -17,6 +17,7 @@ import { ProjectsService } from './projects.service';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateEstadoProyectoDto } from './dto/update-estado-proyecto.dto';
+import { CreateHitoDto } from './dto/create-hito.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -101,6 +102,15 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.findOneOwner(id, user.userId);
+  }
+
+  @Get(':id/avance')
+  @UseGuards(JwtAuthGuard)
+  getAvance(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.getAvance(id, user.userId);
   }
 
   @Post()
@@ -194,6 +204,17 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.rejectClosure(id, user.userId);
+  }
+
+  @Post(':id/hitos')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  createHito(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: CreateHitoDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.createHito(id, user.userId, data);
   }
 
   // ---------- POSTULACIONES DEL PROYECTO ----------

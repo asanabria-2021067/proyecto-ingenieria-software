@@ -15,17 +15,19 @@ describe('AuthService', () => {
     } as any;
     const jwtService = { sign: vi.fn().mockReturnValue('jwt-token') } as any;
     (bcrypt.compare as any).mockResolvedValue(true);
-    const service = new AuthService(prisma, jwtService);
+    const notificationsService = { notifyAdminsFromTemplate: vi.fn() } as any;
+    const service = new AuthService(prisma, jwtService, notificationsService);
 
     const result = await service.login({ correo: 'a@uvg.edu', contrasena: '123456' });
 
-    expect(result).toEqual({ accessToken: 'jwt-token' });
+    expect(result).toEqual({ accessToken: 'jwt-token', refreshToken: 'jwt-token' });
   });
 
   it('login falla si usuario no existe', async () => {
     const service = new AuthService(
       { usuario: { findUnique: vi.fn().mockResolvedValue(null) } } as any,
       { sign: vi.fn() } as any,
+      { notifyAdminsFromTemplate: vi.fn() } as any,
     );
 
     await expect(service.login({ correo: 'x@x.com', contrasena: 'x' })).rejects.toBeInstanceOf(
@@ -44,7 +46,8 @@ describe('AuthService', () => {
     } as any;
     const jwtService = { sign: vi.fn().mockReturnValue('token-register') } as any;
     (bcrypt.hash as any).mockResolvedValue('hashed');
-    const service = new AuthService(prisma, jwtService);
+    const notificationsService = { notifyAdminsFromTemplate: vi.fn() } as any;
+    const service = new AuthService(prisma, jwtService, notificationsService);
 
     const result = await service.register({
       correo: 'n@uvg.edu',
@@ -56,7 +59,7 @@ describe('AuthService', () => {
       semestre: 4,
     });
 
-    expect(result).toEqual({ accessToken: 'token-register' });
+    expect(result).toEqual({ accessToken: 'token-register', refreshToken: 'token-register' });
     expect(tx.usuario.create).toHaveBeenCalled();
     expect(tx.perfilEstudiante.create).toHaveBeenCalled();
   });
@@ -65,6 +68,7 @@ describe('AuthService', () => {
     const service = new AuthService(
       { usuario: { findUnique: vi.fn().mockResolvedValue({ idUsuario: 1 }) } } as any,
       { sign: vi.fn() } as any,
+      { notifyAdminsFromTemplate: vi.fn() } as any,
     );
 
     await expect(
