@@ -15,7 +15,6 @@ import {
   Briefcase, 
   Globe 
 } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { 
   getProfileBootstrap, 
@@ -338,17 +337,14 @@ export default function EditarPerfilPage() {
 
   if (userLoading || loadingBootstrap) {
     return (
-      <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           <p className="text-sm font-semibold text-tertiary">Cargando editor de perfil...</p>
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
       <div className="mx-auto max-w-[1400px] px-4 md:px-8 py-8 pb-24">
         {/* Header bar */}
         <div className="mb-8">
@@ -915,6 +911,5 @@ export default function EditarPerfilPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

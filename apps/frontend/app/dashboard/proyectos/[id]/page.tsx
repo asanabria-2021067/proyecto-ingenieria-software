@@ -18,7 +18,6 @@ import {
   MapPin,
   Users,
 } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { Postulacion, Proyecto, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import {
@@ -93,7 +92,6 @@ export default function ProyectoDetallePage() {
   const ModalidadIcon = proyecto ? (MODALIDAD_ICON[proyecto.modalidadProyecto] ?? MapPin) : MapPin;
 
   return (
-    <DashboardLayout allowAdmin>
       <div className="mx-auto max-w-[1400px] px-7 pt-6 pb-12">
         {/* Breadcrumb */}
         <nav aria-label="Ruta de navegación" className="mb-4.5 flex items-center gap-2 text-[13px]">
@@ -408,7 +406,6 @@ export default function ProyectoDetallePage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }
 

@@ -13,7 +13,6 @@ import {
   Activity,
 } from 'lucide-react';
 import Link from 'next/link';
-import AdminLayout from '@/components/admin/AdminLayout';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   getAdminStats,
@@ -146,7 +145,6 @@ function ActionCard({
 
 function AdminStatsSkeleton() {
   return (
-    <AdminLayout>
       <div className="px-4 pb-12 pt-8 md:px-8">
         <section className="mb-10">
           <Skeleton className="mb-2 h-3 w-28 rounded" />
@@ -184,7 +182,6 @@ function AdminStatsSkeleton() {
           <Skeleton className="h-64 rounded-xl" />
         </div>
       </div>
-    </AdminLayout>
   );
 }
 
@@ -310,7 +307,6 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
 
 function AdminPanelContent({ stats }: { stats: AdminStats }) {
   return (
-    <AdminLayout>
       <div className="px-4 pb-12 pt-8 md:px-8">
         {/* Header */}
         <section className="mb-10">
@@ -439,7 +435,6 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
           </div>
         </section>
       </div>
-    </AdminLayout>
   );
 }
 
@@ -459,7 +454,6 @@ export default function AdminPanelPage() {
 
   if (isError || !stats) {
     return (
-      <AdminLayout>
         <div className="px-4 pt-8 md:px-8">
           <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-8 text-center">
             <AlertCircle className="mx-auto mb-3 h-8 w-8 text-error" />
@@ -468,7 +462,6 @@ export default function AdminPanelPage() {
             </p>
           </div>
         </div>
-      </AdminLayout>
     );
   }
 

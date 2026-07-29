@@ -19,7 +19,6 @@ import {
   UserPlus,
   Workflow,
 } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -644,17 +643,12 @@ export default function TaskDetailClient({ idProyecto, idTarea }: Props) {
   const cargando = idsValidos && (proyectoLoading || tasksLoading) && (!tarea || !proyecto);
 
   if (cargando) {
-    return (
-      <DashboardLayout>
-        <TaskDetailSkeleton />
-      </DashboardLayout>
-    );
+    return <TaskDetailSkeleton />;
   }
 
   // Error de carga (Sección 58): la red falló; se permite reintentar.
   if (idsValidos && (proyectoError || tasksError) && (!proyecto || !tarea)) {
     return (
-      <DashboardLayout>
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
           <h1 className="text-lg font-bold text-on-surface">
             No fue posible cargar la información de la tarea.
@@ -675,7 +669,6 @@ export default function TaskDetailClient({ idProyecto, idTarea }: Props) {
             </Button>
           </div>
         </div>
-      </DashboardLayout>
     );
   }
 
@@ -683,7 +676,6 @@ export default function TaskDetailClient({ idProyecto, idTarea }: Props) {
   // tareas es por proyecto, así que una tarea ajena simplemente no aparece.
   if (!proyecto || !tarea) {
     return (
-      <DashboardLayout>
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
           <h1 className="text-lg font-bold text-on-surface">Tarea no encontrada</h1>
           <p className="mt-2 text-sm text-on-surface-variant">
@@ -695,13 +687,8 @@ export default function TaskDetailClient({ idProyecto, idTarea }: Props) {
             </Button>
           </div>
         </div>
-      </DashboardLayout>
     );
   }
 
-  return (
-    <DashboardLayout>
-      <TaskDetailView proyecto={proyecto} tarea={tarea} idProyecto={idProyecto} />
-    </DashboardLayout>
-  );
+  return <TaskDetailView proyecto={proyecto} tarea={tarea} idProyecto={idProyecto} />;
 }

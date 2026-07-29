@@ -4,7 +4,6 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, Users, Briefcase } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 
 interface Colaborador {
@@ -42,7 +41,6 @@ export default function EquipoProyectoPage() {
   });
 
   return (
-    <DashboardLayout>
       <div className="mx-auto max-w-[1400px] px-8 py-8">
         <Link
           href={`/dashboard/proyectos/${id}`}
@@ -146,6 +144,5 @@ export default function EquipoProyectoPage() {
           ))}
         </div>
       </div>
-    </DashboardLayout>
   );
 }
