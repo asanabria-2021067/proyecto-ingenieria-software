@@ -26,7 +26,11 @@ const SHARED_ROLE_ROUTES = new Set(['/dashboard/perfil', '/dashboard/notificacio
 // Rutas donde tanto estudiantes como administradores usan el shell de
 // estudiante (DashboardLayout allowAdmin).
 function isAllowAdminRoute(pathname: string) {
-  return pathname === '/dashboard/proyectos' || /^\/dashboard\/proyectos\/[^/]+$/.test(pathname);
+  return (
+    pathname === '/dashboard/proyectos' ||
+    /^\/dashboard\/proyectos\/[^/]+$/.test(pathname) ||
+    /^\/dashboard\/projects\/\d+$/.test(pathname)
+  );
 }
 
 export default function DashboardRootLayout({ children }: { children: React.ReactNode }) {
