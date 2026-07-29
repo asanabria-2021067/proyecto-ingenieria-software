@@ -9,7 +9,7 @@ import { TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
 import type { RevisionProyectoDTO } from '@/lib/dto/project.dto';
 import { RevisionHistoryPanel } from './RevisionHistoryPanel';
-import uvgSwal from '@/lib/swal';
+import uvgSwal, { swalCustomClass } from '@/lib/swal';
 
 export interface ProjectReviewSheetProps {
   idProyecto: number | null;
@@ -148,7 +148,10 @@ export function ProjectReviewSheet({
           title: 'Comentario requerido',
           text: 'Debes escribir al menos un comentario en alguna sección antes de mandar correcciones.',
           confirmButtonText: 'Entendido',
-          confirmButtonColor: '#b45309',
+          customClass: {
+            ...swalCustomClass,
+            confirmButton: 'rounded-xl bg-amber-600 px-5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-md mx-4',
+          },
         });
         return;
       }
@@ -159,7 +162,10 @@ export function ProjectReviewSheet({
         showCancelButton: true,
         confirmButtonText: 'Confirmar y enviar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#b45309',
+        customClass: {
+          ...swalCustomClass,
+          confirmButton: 'rounded-xl bg-amber-600 px-5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-md mx-4',
+        },
       });
       if (!isConfirmed) return;
       setSubmitting(true);
@@ -179,7 +185,6 @@ export function ProjectReviewSheet({
         showCancelButton: true,
         confirmButtonText: 'Aprobar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#006735',
       });
       if (!isConfirmed) return;
       setSubmitting(true);

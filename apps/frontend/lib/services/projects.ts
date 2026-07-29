@@ -3,13 +3,24 @@ import type {
   ProyectoDetalleDTO,
   ProyectoListItemDTO,
   MiProyectoListItemDTO,
+  AvanceProyectoDTO,
   RevisionProyectoDTO,
   CreateProjectPayload,
+  CreateHitoPayload,
+  HitoDTO,
   ResolverRevisionPayload,
 } from '@/lib/dto/project.dto';
 
 export async function getProjectById(id: number): Promise<ProyectoDetalleDTO> {
   return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}`);
+}
+
+/**
+ * % de avance del proyecto (hitos y tareas). El backend responde 403 si quien
+ * consulta no es el líder ni un participante activo del proyecto.
+ */
+export async function getProjectAvance(id: number): Promise<AvanceProyectoDTO> {
+  return apiFetch<AvanceProyectoDTO>(`/proyectos/${id}/avance`);
 }
 
 export async function getAdminProjectById(id: number): Promise<ProyectoDetalleDTO> {
@@ -151,4 +162,11 @@ export async function getAdminReviewInbox(): Promise<{
 
 export async function deleteProject(id: number): Promise<{ mensaje: string }> {
   return apiFetch(`/proyectos/${id}`, { method: 'DELETE' });
+}
+
+export async function createHito(idProyecto: number, payload: CreateHitoPayload): Promise<HitoDTO> {
+  return apiFetch<HitoDTO>(`/proyectos/${idProyecto}/hitos`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

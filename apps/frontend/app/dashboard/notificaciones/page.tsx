@@ -2,9 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Bell, BellOff, Check, CheckCheck } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import AdminLayout from '@/components/admin/AdminLayout';
-import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
+import Link from 'next/link';
 import uvgSwal from '@/lib/swal';
 import {
   Empty,
@@ -19,12 +17,13 @@ import {
   getNotificaciones,
   marcarLeida,
   marcarTodasLeidas,
+  getNotificationLink,
   type Notificacion,
 } from '@/lib/services/notifications';
+import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
-  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
 
   const { data: notificaciones = [], isLoading, isError, refetch } = useQuery<Notificacion[]>({
     queryKey: ['notificaciones'],
@@ -78,19 +77,8 @@ export default function NotificacionesPage() {
   const grouped = groupByDate(notificaciones);
   const unreadCount = notificaciones.filter((n) => !n.leidaEn).length;
 
-  if (userLoading) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  const Layout = isAdminUser(currentUser) ? AdminLayout : DashboardLayout;
-
   return (
-    <Layout>
-      <div className="px-8 py-8 max-w-4xl mx-auto">
+      <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="flex items-start justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -174,15 +162,15 @@ export default function NotificacionesPage() {
                 {fecha}
               </h2>
               <div className="space-y-3">
-                {notifs.map((n) => (
-                  <div
-                    key={n.idNotificacion}
-                    className={`relative rounded-2xl border p-5 transition-all ${
-                      n.leidaEn
-                        ? 'bg-surface-container-lowest border-outline-variant'
-                        : 'bg-primary-container/10 border-primary/30 shadow-sm'
-                    }`}
-                  >
+                {notifs.map((n) => {
+                  const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
+                  const cardClassName = `relative rounded-2xl border p-5 transition-all ${
+                    n.leidaEn
+                      ? 'bg-surface-container-lowest border-outline-variant'
+                      : 'bg-primary-container/10 border-primary/30 shadow-sm'
+                  } ${href ? 'cursor-pointer hover:shadow-md' : ''}`;
+
+                  const card = (
                     <div className="flex items-start gap-4">
                       <div
                         className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
@@ -212,7 +200,11 @@ export default function NotificacionesPage() {
                       {!n.leidaEn && (
                         <button
                           type="button"
-                          onClick={() => markOneMutation.mutate(n.idNotificacion)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            markOneMutation.mutate(n.idNotificacion);
+                          }}
                           disabled={markOneMutation.isPending}
                           aria-label={`Marcar como leida la notificacion ${n.tituloNotificacion}`}
                           className="shrink-0 p-2 rounded-lg hover:bg-surface-container transition-colors disabled:opacity-50"
@@ -222,13 +214,33 @@ export default function NotificacionesPage() {
                         </button>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+
+                  if (href) {
+                    return (
+                      <Link
+                        key={n.idNotificacion}
+                        href={href}
+                        onClick={() => {
+                          if (!n.leidaEn) markOneMutation.mutate(n.idNotificacion);
+                        }}
+                        className={`block ${cardClassName}`}
+                      >
+                        {card}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <div key={n.idNotificacion} className={cardClassName}>
+                      {card}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
       </div>
-    </Layout>
   );
 }

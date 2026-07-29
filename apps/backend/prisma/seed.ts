@@ -546,20 +546,113 @@ async function main() {
   ]);
 
   // ─── Asignaciones de tarea ──────────────────────────────
+  // La Tarea 7 retiró @@unique([idTarea, idUsuario]) de AsignacionTarea para
+  // permitir reasignar al mismo usuario tras una desasignación, por lo que el
+  // seed ya no puede usar ese par como llave de upsert; se fija idAsignacion.
   const asignData = [
-    { idTarea: tareas[0].idTarea, idUsuario: maria.idUsuario, asignadoPor: carlos.idUsuario },
-    { idTarea: tareas[1].idTarea, idUsuario: jose.idUsuario, asignadoPor: carlos.idUsuario },
-    { idTarea: tareas[2].idTarea, idUsuario: jose.idUsuario, asignadoPor: carlos.idUsuario },
-    { idTarea: tareas[3].idTarea, idUsuario: maria.idUsuario, asignadoPor: maria.idUsuario },
-    { idTarea: tareas[4].idTarea, idUsuario: sofia.idUsuario, asignadoPor: luis.idUsuario },
-    { idTarea: tareas[5].idTarea, idUsuario: luis.idUsuario, asignadoPor: carlos.idUsuario },
-    { idTarea: tareas[6].idTarea, idUsuario: luis.idUsuario, asignadoPor: carlos.idUsuario },
+    { idAsignacion: 1, idTarea: tareas[0].idTarea, idUsuario: maria.idUsuario, asignadoPor: carlos.idUsuario },
+    { idAsignacion: 2, idTarea: tareas[1].idTarea, idUsuario: jose.idUsuario, asignadoPor: carlos.idUsuario },
+    { idAsignacion: 3, idTarea: tareas[2].idTarea, idUsuario: jose.idUsuario, asignadoPor: carlos.idUsuario },
+    { idAsignacion: 4, idTarea: tareas[3].idTarea, idUsuario: maria.idUsuario, asignadoPor: maria.idUsuario },
+    { idAsignacion: 5, idTarea: tareas[4].idTarea, idUsuario: sofia.idUsuario, asignadoPor: luis.idUsuario },
+    { idAsignacion: 6, idTarea: tareas[5].idTarea, idUsuario: luis.idUsuario, asignadoPor: carlos.idUsuario },
+    { idAsignacion: 7, idTarea: tareas[6].idTarea, idUsuario: luis.idUsuario, asignadoPor: carlos.idUsuario },
   ];
   for (const a of asignData) {
     await prisma.asignacionTarea.upsert({
-      where: { idTarea_idUsuario: { idTarea: a.idTarea, idUsuario: a.idUsuario } },
+      where: { idAsignacion: a.idAsignacion },
       update: {},
       create: a,
+    });
+  }
+
+  // ─── Tareas adicionales: rol, EN_REVISION, BAJA y estimación opcional ───
+  const tareaBusquedaOptimizada = await prisma.tarea.upsert({
+    where: { idTarea: 8 },
+    update: {},
+    create: {
+      idTarea: 8,
+      idProyecto: pEmpleo.idProyecto,
+      idHito: hitos[5].idHito,
+      idRolProyecto: rolFullstack.idRolProyecto,
+      tituloTarea: 'Optimizar consultas de búsqueda de empleos',
+      estadoTarea: 'EN_REVISION',
+      prioridad: 'ALTA',
+      tiempoEstimadoHoras: 8,
+      creadaPor: carlos.idUsuario,
+    },
+  });
+  // Queda deliberadamente sin hito, sin rol, sin asignación y sin etiquetas
+  // (escenario "vacío" del conjunto de tareas).
+  await prisma.tarea.upsert({
+    where: { idTarea: 9 },
+    update: {},
+    create: {
+      idTarea: 9,
+      idProyecto: pEmpleo.idProyecto,
+      tituloTarea: 'Escribir documentación de la API pública',
+      estadoTarea: 'POR_HACER',
+      prioridad: 'BAJA',
+      creadaPor: carlos.idUsuario,
+    },
+  });
+  const tareaDespliegue = await prisma.tarea.upsert({
+    where: { idTarea: 10 },
+    update: {},
+    create: {
+      idTarea: 10,
+      idProyecto: pEmpleo.idProyecto,
+      idRolProyecto: rolFullstack.idRolProyecto,
+      tituloTarea: 'Configurar despliegue en producción',
+      estadoTarea: 'EN_PROGRESO',
+      prioridad: 'MEDIA',
+      tiempoEstimadoHoras: 20,
+      creadaPor: luis.idUsuario,
+    },
+  });
+  // Historial de tareaBusquedaOptimizada: dos asignaciones cerradas —incluida
+  // una reasignación a luis, el mismo usuario que la abrió— y una única fila
+  // activa, coherente con el índice parcial asignacion_tarea_activa_unique.
+  const historialAsignData = [
+    { idAsignacion: 8, idTarea: tareaBusquedaOptimizada.idTarea, idUsuario: luis.idUsuario, asignadoPor: carlos.idUsuario, fechaAsignacion: new Date('2026-05-01'), desasignadaEn: new Date('2026-05-10') },
+    { idAsignacion: 9, idTarea: tareaBusquedaOptimizada.idTarea, idUsuario: maria.idUsuario, asignadoPor: carlos.idUsuario, fechaAsignacion: new Date('2026-05-10'), desasignadaEn: new Date('2026-05-18') },
+    { idAsignacion: 10, idTarea: tareaBusquedaOptimizada.idTarea, idUsuario: luis.idUsuario, asignadoPor: carlos.idUsuario, fechaAsignacion: new Date('2026-05-18'), desasignadaEn: null },
+    { idAsignacion: 11, idTarea: tareaDespliegue.idTarea, idUsuario: luis.idUsuario, asignadoPor: carlos.idUsuario, fechaAsignacion: new Date('2026-05-20'), desasignadaEn: null },
+  ];
+  for (const a of historialAsignData) {
+    await prisma.asignacionTarea.upsert({
+      where: { idAsignacion: a.idAsignacion },
+      update: {},
+      create: a,
+    });
+  }
+
+  // ─── Etiquetas ──────────────────────────────────────────
+  const etiquetaData = [
+    { idEtiqueta: 1, idProyecto: pEmpleo.idProyecto, nombreEtiqueta: 'frontend', nombreNormalizado: 'frontend', color: '#3B82F6' },
+    { idEtiqueta: 2, idProyecto: pEmpleo.idProyecto, nombreEtiqueta: 'backend', nombreNormalizado: 'backend', color: '#10B981' },
+    { idEtiqueta: 3, idProyecto: pEmpleo.idProyecto, nombreEtiqueta: 'urgente', nombreNormalizado: 'urgente', color: '#EF4444' },
+  ];
+  const etiquetas = [];
+  for (const et of etiquetaData) {
+    const e = await prisma.etiqueta.upsert({ where: { idEtiqueta: et.idEtiqueta }, update: {}, create: et });
+    etiquetas.push(e);
+  }
+  const [, etiquetaBackend, etiquetaUrgente] = etiquetas;
+
+  // ─── Tarea ↔ Etiqueta ───────────────────────────────────
+  // tareaBusquedaOptimizada recibe 2 etiquetas; "backend" queda asociada a
+  // 2 tareas distintas; tareaDocumentacionApi no recibe ninguna.
+  const teData = [
+    { idTarea: tareaBusquedaOptimizada.idTarea, idEtiqueta: etiquetaBackend.idEtiqueta },
+    { idTarea: tareaBusquedaOptimizada.idTarea, idEtiqueta: etiquetaUrgente.idEtiqueta },
+    { idTarea: tareaDespliegue.idTarea, idEtiqueta: etiquetaBackend.idEtiqueta },
+  ];
+  for (const te of teData) {
+    await prisma.tareaEtiqueta.upsert({
+      where: { idTarea_idEtiqueta: te },
+      update: {},
+      create: te,
     });
   }
 
@@ -1284,6 +1377,108 @@ async function main() {
     },
   });
 
+  // ─── Usuarios adicionales ───────────────────────────────
+  // Vernel: cuenta real de equipo (igual que san24725/Angel arriba). Se crea
+  // aquí porque seed-vernel-states.ts y seed-tutoring-workspace-demo.ts la
+  // dan por existente (findUniqueOrThrow / abort si falta) — sin este bloque
+  // ninguno de los dos puede correr contra una base recién sembrada.
+  const vernelUser = await prisma.usuario.upsert({
+    where: { correo: 'vernel@uvg.edu.gt' },
+    update: {},
+    create: {
+      correo: 'vernel@uvg.edu.gt',
+      contrasena: TEST_PASSWORD,
+      nombre: 'Vernel',
+      apellido: 'Hernández',
+    },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: vernelUser.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: vernelUser.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: vernelUser.idUsuario },
+    update: {},
+    create: {
+      idUsuario: vernelUser.idUsuario,
+      carne: '24584',
+      idCarrera: computacion.idCarrera,
+      semestre: 6,
+      disponibilidadHorasSemana: 10,
+      biografia: 'Estudiante de Ingeniería en Ciencias de la Computación',
+    },
+  });
+
+  // Fernando: estudiante "de a pie", sin roles ni proyectos — solo existe.
+  const fernando = await prisma.usuario.upsert({
+    where: { correo: 'fernando.castaneda@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'fernando.castaneda@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Fernando', apellido: 'Castañeda' },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: fernando.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: fernando.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: fernando.idUsuario },
+    update: {},
+    create: { idUsuario: fernando.idUsuario, carne: '25020', idCarrera: quimica.idCarrera, semestre: 2, disponibilidadHorasSemana: 6 },
+  });
+
+  // Camila: activa en el rol Fullstack del Portal de Empleo UVG (proyecto de
+  // carlos.mendoza), vía la misma cadena postulación → participación que el resto.
+  const camila = await prisma.usuario.upsert({
+    where: { correo: 'camila.rodriguez@uvg.edu.gt' },
+    update: {},
+    create: { correo: 'camila.rodriguez@uvg.edu.gt', contrasena: PASSWORD_HASH, nombre: 'Camila', apellido: 'Rodríguez' },
+  });
+  await prisma.usuarioRolAcceso.upsert({
+    where: { idUsuario_idRolAcceso: { idUsuario: camila.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
+    update: {},
+    create: { idUsuario: camila.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.perfilEstudiante.upsert({
+    where: { idUsuario: camila.idUsuario },
+    update: {},
+    create: { idUsuario: camila.idUsuario, carne: '25021', idCarrera: computacion.idCarrera, semestre: 6, disponibilidadHorasSemana: 10 },
+  });
+  // Postulacion/ParticipacionProyecto no tienen llave natural única en el
+  // schema (solo índices), así que se buscan por (usuario, rol) antes de
+  // crear — mismo criterio que ensureRol/ensureRevision en
+  // seed-vernel-states.ts: este script no asume ser la única fuente de la
+  // fila, así que nunca fija un id explícito para estas dos tablas.
+  const postCamilaExistente = await prisma.postulacion.findFirst({
+    where: { idUsuarioPostulante: camila.idUsuario, idRolProyecto: rolFullstack.idRolProyecto },
+  });
+  const postCamila =
+    postCamilaExistente ??
+    (await prisma.postulacion.create({
+      data: {
+        idUsuarioPostulante: camila.idUsuario,
+        idRolProyecto: rolFullstack.idRolProyecto,
+        justificacion: 'Tengo experiencia con NestJS y React, me interesa el Portal de Empleo.',
+        estadoPostulacion: 'ACEPTADA',
+        resueltaPor: carlos.idUsuario,
+        fechaResolucion: new Date(),
+      },
+    }));
+
+  const participacionCamilaExistente = await prisma.participacionProyecto.findFirst({
+    where: { idUsuario: camila.idUsuario, idRolProyecto: rolFullstack.idRolProyecto },
+  });
+  if (!participacionCamilaExistente) {
+    await prisma.participacionProyecto.create({
+      data: {
+        idUsuario: camila.idUsuario,
+        idRolProyecto: rolFullstack.idRolProyecto,
+        idPostulacion: postCamila.idPostulacion,
+        estadoParticipacion: 'ACTIVO',
+      },
+    });
+  }
+
   // ─── Reset sequences ──────────────────────────────────
   const sequences = [
     { table: 'carrera', column: 'id_carrera' },
@@ -1296,6 +1491,8 @@ async function main() {
     { table: 'participacion_proyecto', column: 'id_participacion' },
     { table: 'hito', column: 'id_hito' },
     { table: 'tarea', column: 'id_tarea' },
+    { table: 'asignacion_tarea', column: 'id_asignacion' },
+    { table: 'etiqueta', column: 'id_etiqueta' },
     { table: 'evidencia', column: 'id_evidencia' },
     { table: 'revision_evidencia', column: 'id_revision' },
     { table: 'horas_participacion', column: 'id_registro_horas' },

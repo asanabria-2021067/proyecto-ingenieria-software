@@ -56,10 +56,17 @@ const registerSchema = z
     path: ['confirmar'],
   });
 
+// toma las primeras 3 letras del apellido + el carnet tal cual
+function generarCorreoSugerido(apellido: string, carne: string): string {
+  const primerasTresLetras = apellido.trim().substring(0, 3).toLowerCase();
+  return `${primerasTresLetras}${carne.trim()}@uvg.edu.gt`;
+}
+
 export default function RegistroPage() {
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [correo, setCorreo] = useState('');
+  const [correoEditadoManualmente, setCorreoEditadoManualmente] = useState(false);
   const [contrasena, setContrasena] = useState('');
   const [confirmar, setConfirmar] = useState('');
   const [carne, setCarne] = useState('');
@@ -102,16 +109,11 @@ export default function RegistroPage() {
   }, []);
 
   useEffect(() => {
-    if (apellido && carne) {
-      const apellidoTrimmed = apellido.trim();
-      const carneTrimmed = carne.trim();
-      if (apellidoTrimmed && carneTrimmed) {
-        const firstThreeLetters = apellidoTrimmed.substring(0, 3).toLowerCase();
-        const generatedEmail = `${firstThreeLetters}${carneTrimmed}@uvg.edu.gt`;
-        setCorreo(generatedEmail);
-      }
+    if (correoEditadoManualmente) return;
+    if (apellido.trim() && carne.trim()) {
+      setCorreo(generarCorreoSugerido(apellido, carne));
     }
-  }, [apellido, carne]);
+  }, [apellido, carne, correoEditadoManualmente]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -153,7 +155,7 @@ export default function RegistroPage() {
   }
 
   const inputClass =
-    'w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
+    'w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container px-4 py-3 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
   const labelClass =
     'font-label text-xs font-bold uppercase tracking-widest text-tertiary';
 
@@ -268,18 +270,19 @@ export default function RegistroPage() {
                   required
                   value={correo}
                   onChange={(e) => {
-                    setCorreo(e.target.value);
+                    const value = e.target.value;
+                    setCorreo(value);
+                    setCorreoEditadoManualmente(value !== '');
                     if (errores.correo) {
                       setErrores((prev) => ({ ...prev, correo: undefined }));
                     }
                   }}
                   placeholder="usuario@uvg.edu.gt"
-                  className={`${inputClass} ${correo && apellido && carne ? 'bg-green-50' : ''}`}
-                  readOnly={!!(apellido && carne && correo)}
+                  className={`${inputClass} ${!correoEditadoManualmente && correo ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
                 />
-                {correo && apellido && carne && (
+                {!correoEditadoManualmente && correo && (
                   <p className="text-xs text-green-600">
-                    ✓ Correo generado automáticamente
+                    ✓ Correo generado automáticamente. Puedes editarlo si lo necesitas.
                   </p>
                 )}
                 {errores.correo && <p className="text-xs text-error">{errores.correo}</p>}
@@ -399,7 +402,7 @@ export default function RegistroPage() {
               <button
                 type="submit"
                 disabled={isPending}
-                className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary active:scale-[0.98] disabled:opacity-60"
+                className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60"
               >
                 {isPending ? 'Creando cuenta...' : 'Crear Cuenta'}
               </button>
