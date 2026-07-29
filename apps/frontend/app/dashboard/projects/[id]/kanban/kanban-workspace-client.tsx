@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, Tags } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
+import { useProjectMilestones } from '@/hooks/use-project-milestones';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectAvance } from '@/hooks/use-project-avance';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -24,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskBoard } from '@/components/projects/task-board';
 import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
+import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
 import {
   Select,
@@ -191,6 +193,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const [filtroHito, setFiltroHito] = useState(FILTRO_TODOS);
   const [crearAbierto, setCrearAbierto] = useState(false);
   const [etiquetasAbierto, setEtiquetasAbierto] = useState(false);
+  const [crearHitoAbierto, setCrearHitoAbierto] = useState(false);
 
   const { data: currentUser } = useCurrentUser();
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
@@ -219,6 +222,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     deleteLabel,
   } = useProjectLabels(idProyecto);
   const { members } = useProjectMembers(idProyecto);
+  const { crearHito } = useProjectMilestones(idProyecto);
   const opcionesRol = useMemo(() => derivarOpcionesRol(tasks), [tasks]);
   const opcionesHito = useMemo(() => derivarOpcionesHito(tasks), [tasks]);
   const hayFiltrosActivos = filtroRol !== FILTRO_TODOS || filtroHito !== FILTRO_TODOS;
@@ -412,6 +416,18 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               )}
 
+              {isLeader && activeTab === 'hitos' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setCrearHitoAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Agregar hito
+                </Button>
+              )}
+
               {isLeader && (
                 <>
                   <Button
@@ -517,6 +533,13 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           onOpenChange={setCrearAbierto}
           onManageLabels={isLeader ? () => setEtiquetasAbierto(true) : undefined}
         />
+        {isLeader && (
+          <CreateMilestoneDialog
+            open={crearHitoAbierto}
+            onOpenChange={setCrearHitoAbierto}
+            crearHito={crearHito}
+          />
+        )}
         {isLeader && (
           <ProjectLabelsDrawer
             open={etiquetasAbierto}
