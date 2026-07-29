@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertCircle, FolderPlus, Plus, Search, SearchX } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
@@ -122,7 +121,6 @@ export default function MyProjectsPage() {
   };
 
   return (
-    <DashboardLayout>
       <div className="mx-auto max-w-[1400px] px-8 pt-7 pb-10">
         <div className="mb-4.5 flex items-start justify-between gap-4">
           <div>
@@ -285,6 +283,5 @@ export default function MyProjectsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }
