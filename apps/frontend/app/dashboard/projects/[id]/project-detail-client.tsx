@@ -339,7 +339,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               {/* Para líder/participante estas acciones ahora viven en la barra de
                   tabs debajo del breadcrumb; aquí solo queda la única acción de
                   quien todavía no participa. */}
-              {!isLeader && !puedeVerKanban && (
+              {!isLeader && !puedeVerKanban && !isAdmin && (
                 <Button className="shrink-0 rounded-md bg-primary px-5 text-sm font-bold text-on-primary hover:bg-primary/90">
                   Postularme
                 </Button>

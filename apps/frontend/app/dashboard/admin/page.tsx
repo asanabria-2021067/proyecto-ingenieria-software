@@ -225,7 +225,7 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
                 {item.estadoProyecto}
               </span>
               <Link
-                href={`/dashboard/proyectos/${item.idProyecto}`}
+                href={`/dashboard/projects/${item.idProyecto}`}
                 className="shrink-0 rounded-xl bg-surface-container-high px-4 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
               >
                 Ver proyecto
