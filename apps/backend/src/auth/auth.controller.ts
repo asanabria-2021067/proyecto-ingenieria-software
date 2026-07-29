@@ -22,7 +22,7 @@ export class AuthController {
 
   @Post('forgot-password')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto.correo);
+    return this.authService.forgotPassword(dto.carne, dto.correo);
   }
 
   @Post('reset-password')

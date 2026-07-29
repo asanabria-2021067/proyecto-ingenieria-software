@@ -8,9 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { apiFetch, getUserIdFromToken } from '@/lib/api/client';
-import { Proyecto } from '@/types';
+import { apiFetch } from '@/lib/api/client';
+import { Postulacion, Proyecto } from '@/types';
 
 const schema = z.object({
   justificacion: z
@@ -35,6 +34,22 @@ export default function PostularPage() {
   const rol = proyecto?.roles.find((r) => r.idRolProyecto === Number(rolId));
 
   const {
+    data: misPostulaciones = [],
+    isLoading: isLoadingPostulaciones,
+  } = useQuery<Postulacion[]>({
+    queryKey: ['mis-postulaciones'],
+    queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
+  });
+
+  const postulacionActiva =
+    proyecto &&
+    misPostulaciones.find(
+      (p) =>
+        p.rolProyecto.proyecto.idProyecto === proyecto.idProyecto &&
+        p.estadoPostulacion !== 'RECHAZADA',
+    );
+
+  const {
     register,
     handleSubmit,
     control,
@@ -45,12 +60,9 @@ export default function PostularPage() {
 
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
-      const userId = getUserIdFromToken();
-      if (!userId) throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
       return apiFetch('/postulaciones', {
         method: 'POST',
         body: JSON.stringify({
-          idUsuarioPostulante: userId,
           idRolProyecto: Number(rolId),
           justificacion: data.justificacion,
         }),
@@ -72,7 +84,6 @@ export default function PostularPage() {
 
   if (mutation.isSuccess) {
     return (
-      <DashboardLayout>
         <div className="flex items-center justify-center min-h-[80vh] px-8">
           <div className="text-center max-w-md">
             <CheckCircle className="w-16 h-16 text-primary mx-auto mb-4" />
@@ -91,12 +102,10 @@ export default function PostularPage() {
             </Link>
           </div>
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
       <div className="px-8 py-8 max-w-2xl mx-auto">
         <Link
           href={`/dashboard/proyectos/${id}`}
@@ -139,63 +148,93 @@ export default function PostularPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-on-surface mb-1.5">
-                  Justificación <span className="text-error">*</span>
-                </label>
-                <p className="text-xs text-tertiary mb-2">
-                  Explica por qué eres un buen candidato para este rol, tus experiencias relevantes
-                  y motivación.
-                </p>
-                <textarea
-                  {...register('justificacion')}
-                  rows={8}
-                  placeholder="Escribe tu justificación aquí..."
-                  className={`w-full px-4 py-3 rounded-xl border text-on-surface text-sm leading-relaxed outline-none resize-none transition-colors ${
-                    errors.justificacion
-                      ? 'border-error bg-error-container/10 focus:ring-2 focus:ring-error'
-                      : 'border-outline-variant bg-surface-container-lowest focus:ring-2 focus:ring-primary'
-                  }`}
-                />
-                <div className="flex items-start justify-between mt-1.5">
-                  {errors.justificacion ? (
-                    <p className="text-xs text-error">{errors.justificacion.message}</p>
-                  ) : (
-                    <span />
-                  )}
-                  <span className="text-xs text-tertiary ml-auto">
-                    {justificacion?.length ?? 0} / 1000
-                  </span>
-                </div>
+            {isLoadingPostulaciones ? (
+              <div className="text-center py-12 text-tertiary text-sm">
+                Validando tus postulaciones existentes...
               </div>
-
-              {mutation.isError && (
-                <div className="flex items-start gap-2 bg-error-container text-error rounded-xl px-4 py-3 text-sm">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  {errorMsg}
+            ) : postulacionActiva ? (
+              <div className="space-y-4 bg-surface-container-low border border-outline-variant rounded-2xl p-6">
+                <div className="flex items-start gap-3 text-primary">
+                  <AlertCircle className="w-5 h-5 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-sm text-on-surface">
+                      Ya enviaste una postulación para este proyecto.
+                    </p>
+                    <p className="text-xs text-tertiary mt-1">
+                      Rol: {postulacionActiva.rolProyecto.nombreRol} · Estado:{' '}
+                      {postulacionActiva.estadoPostulacion === 'PENDIENTE'
+                        ? 'Pendiente'
+                        : postulacionActiva.estadoPostulacion === 'ACEPTADA'
+                        ? 'Aceptada'
+                        : 'Rechazada'}
+                    </p>
+                  </div>
                 </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
                 <Link
-                  href={`/dashboard/proyectos/${id}`}
-                  className="flex-1 text-center px-5 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container transition-colors"
+                  href="/dashboard/mis-postulaciones"
+                  className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-primary border border-primary/40 hover:bg-primary/10 transition-colors"
                 >
-                  Cancelar
+                  Ver mi postulación
                 </Link>
-                <button
-                  type="submit"
-                  disabled={mutation.isPending}
-                  className="flex-1 bg-primary text-on-primary px-5 py-3 rounded-xl text-sm font-bold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-60 disabled:scale-100 disabled:shadow-none"
-                >
-                  {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
-                </button>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-on-surface mb-1.5">
+                    Justificación <span className="text-error">*</span>
+                  </label>
+                  <p className="text-xs text-tertiary mb-2">
+                    Explica por qué eres un buen candidato para este rol, tus experiencias relevantes
+                    y motivación.
+                  </p>
+                  <textarea
+                    {...register('justificacion')}
+                    rows={8}
+                    placeholder="Escribe tu justificación aquí..."
+                    className={`w-full px-4 py-3 rounded-xl border text-on-surface text-sm leading-relaxed outline-none resize-none transition-colors ${
+                      errors.justificacion
+                        ? 'border-error bg-error-container/10 focus:ring-2 focus:ring-error'
+                        : 'border-outline-variant bg-surface-container-lowest focus:ring-2 focus:ring-primary'
+                    }`}
+                  />
+                  <div className="flex items-start justify-between mt-1.5">
+                    {errors.justificacion ? (
+                      <p className="text-xs text-error">{errors.justificacion.message}</p>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="text-xs text-tertiary ml-auto">
+                      {justificacion?.length ?? 0} / 1000
+                    </span>
+                  </div>
+                </div>
+
+                {mutation.isError && (
+                  <div className="flex items-start gap-2 bg-error-container text-error rounded-xl px-4 py-3 text-sm">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    {errorMsg}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <Link
+                    href={`/dashboard/proyectos/${id}`}
+                    className="flex-1 text-center px-5 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container transition-colors"
+                  >
+                    Cancelar
+                  </Link>
+                  <button
+                    type="submit"
+                    disabled={mutation.isPending}
+                    className="flex-1 bg-primary text-on-primary px-5 py-3 rounded-xl text-sm font-bold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-60 disabled:scale-100 disabled:shadow-none"
+                  >
+                    {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
+                  </button>
+                </div>
+              </form>
+            )}
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }
