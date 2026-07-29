@@ -35,7 +35,7 @@ vi.mock('next/navigation', () => ({
 
 import NewProjectFormPage from '../app/dashboard/projects/mine/form/page';
 
-function proyectoPublicado() {
+function proyectoPublicado(roles: unknown[] = []) {
   return {
     idProyecto: 28,
     estadoProyecto: 'PUBLICADO',
@@ -49,7 +49,7 @@ function proyectoPublicado() {
     urlRecursoExterno: '',
     fechaInicio: '2026-02-01',
     fechaFinEstimada: '2026-06-01',
-    roles: [],
+    roles,
   };
 }
 
@@ -102,5 +102,37 @@ describe('Formulario de edición — modo parcial (proyecto PUBLICADO)', () => {
     expect(payload).not.toHaveProperty('fechaInicio');
     expect(payload).not.toHaveProperty('roles');
     expect(payload).not.toHaveProperty('organizacionesIds');
+  });
+
+  it('no truena al cargar un proyecto PUBLICADO con roles reales cuando crypto.randomUUID no está disponible (despliegue por HTTP)', async () => {
+    // En producción vía HTTP plano (sin TLS) `crypto.randomUUID` es `undefined`;
+    // un proyecto PUBLICADO real siempre trae roles (Step2 exige roles.length > 0
+    // para publicar), así que el efecto que puebla el formulario SÍ recorre roles
+    // y disparaba el TypeError reportado por el usuario.
+    vi.stubGlobal('crypto', {});
+    getMyProjectByIdMock.mockResolvedValue(
+      proyectoPublicado([
+        {
+          idRolProyecto: 1,
+          nombreRol: 'Desarrollador Backend',
+          descripcionRolProyecto: 'Rol de backend',
+          cupos: 2,
+          horasSemanalesEstimadas: 10,
+          carreraRequerida: { idCarrera: 1, nombreCarrera: 'Ingeniería', facultad: 'Ingeniería' },
+          requisitos: [
+            {
+              idRequisitoHabilidad: 1,
+              nivelMinimo: 'INTERMEDIO',
+              obligatorio: true,
+              habilidad: { idHabilidad: 1, nombreHabilidad: 'Node.js', categoriaHabilidad: 'Backend' },
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(() => renderForm()).not.toThrow();
+    await screen.findByRole('heading', { name: 'Editar información' });
+    expect(screen.getByText('Título del proyecto')).toBeInTheDocument();
   });
 });
