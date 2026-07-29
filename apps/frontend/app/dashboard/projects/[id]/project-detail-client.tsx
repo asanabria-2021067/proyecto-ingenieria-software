@@ -274,45 +274,8 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
         </div>
       )}
 
-      {/* Barra de navegación estilo Jira: "Resumen" es la página actual (siempre
-          activa); el resto son los mismos enlaces/acciones de antes, solo con
-          apariencia de tab en vez de botones sueltos. */}
-      {(isLeader || puedeVerKanban) && (
-        <div className="mb-5 flex items-center gap-5 overflow-x-auto border-b border-outline-variant/50">
-          <span className={TAB_ACTIVE} aria-current="page">
-            Resumen
-          </span>
-          {isLeader && (
-            <Link
-              href={`/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`}
-              className={TAB_INACTIVE}
-            >
-              <History className="size-3.5" aria-hidden="true" />
-              Revisiones previas
-            </Link>
-          )}
-          {isLeader && (
-            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
-              <Pencil className="size-3.5" aria-hidden="true" />
-              Editar información
-            </Link>
-          )}
-          {isLeader && (
-            <button type="button" onClick={abrirGestionRoles} className={TAB_INACTIVE}>
-              <Settings2 className="size-3.5" aria-hidden="true" />
-              Editar roles
-            </button>
-          )}
-          <Link href={kanbanBase} className={TAB_INACTIVE}>
-            Ver Kanban
-            <ArrowRight className="size-3.5" aria-hidden="true" />
-          </Link>
-        </div>
-      )}
-
-      {/* Grilla 2×2: la fila 1 (tarjeta principal · Responsable) usa items-stretch
-          para que ambas tarjetas queden a la misma altura, sin el escalón; la
-          fila 2 lleva el resto (objetivos/roles · detalles/resumen sticky). */}
+      {/* Fila 1: tarjeta principal · Responsable, con items-stretch para que
+          ambas tarjetas queden a la misma altura, sin el escalón. */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
         {/* FILA 1 · COL 1 — Tarjeta principal (Sección 9-13) */}
         <div className={`${CARD} min-w-0`}>
@@ -405,7 +368,46 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             </div>
           </div>
         </div>
+      </div>
 
+      {/* Barra de navegación estilo Jira: "Resumen" es la página actual (siempre
+          activa); el resto son los mismos enlaces/acciones de antes, solo con
+          apariencia de tab en vez de botones sueltos. */}
+      {(isLeader || puedeVerKanban) && (
+        <div className="my-5 flex items-center gap-5 overflow-x-auto border-b border-outline-variant/50">
+          <span className={TAB_ACTIVE} aria-current="page">
+            Resumen
+          </span>
+          {isLeader && (
+            <Link
+              href={`/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`}
+              className={TAB_INACTIVE}
+            >
+              <History className="size-3.5" aria-hidden="true" />
+              Revisiones previas
+            </Link>
+          )}
+          {isLeader && (
+            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Editar información
+            </Link>
+          )}
+          {isLeader && (
+            <button type="button" onClick={abrirGestionRoles} className={TAB_INACTIVE}>
+              <Settings2 className="size-3.5" aria-hidden="true" />
+              Editar roles
+            </button>
+          )}
+          <Link href={kanbanBase} className={TAB_INACTIVE}>
+            Tablero
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+      )}
+
+      {/* Fila 2: objetivos/roles · detalles/resumen sticky. */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
         {/* FILA 2 · COL 1 — Objetivos + Roles */}
         <div className="min-w-0 space-y-5">
           {/* OBJETIVOS (Sección 16) */}

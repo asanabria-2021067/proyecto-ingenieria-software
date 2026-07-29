@@ -137,7 +137,7 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
     // La opción de editar fecha final ya no vive aquí (irá dentro del formulario
     // de editar información).
     expect(screen.queryByRole('button', { name: /editar fecha final/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /ver kanban/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /tablero/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/42/kanban',
     );
