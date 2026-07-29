@@ -3,7 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, ChevronRight, ClipboardList, Clock, Trash2, XCircle } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { deletePostulacion } from '@/lib/services/applications';
 import { Postulacion, EstadoPostulacion } from '@/types';
@@ -87,7 +86,6 @@ export default function MisPostulacionesPage() {
   };
 
   return (
-    <DashboardLayout>
       <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="mb-8">
           <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
@@ -226,6 +224,5 @@ export default function MisPostulacionesPage() {
           })}
         </div>
       </div>
-    </DashboardLayout>
   );
 }
