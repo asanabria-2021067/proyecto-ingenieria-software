@@ -56,10 +56,17 @@ const registerSchema = z
     path: ['confirmar'],
   });
 
+// toma las primeras 3 letras del apellido + el carnet tal cual
+function generarCorreoSugerido(apellido: string, carne: string): string {
+  const primerasTresLetras = apellido.trim().substring(0, 3).toLowerCase();
+  return `${primerasTresLetras}${carne.trim()}@uvg.edu.gt`;
+}
+
 export default function RegistroPage() {
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [correo, setCorreo] = useState('');
+  const [correoEditadoManualmente, setCorreoEditadoManualmente] = useState(false);
   const [contrasena, setContrasena] = useState('');
   const [confirmar, setConfirmar] = useState('');
   const [carne, setCarne] = useState('');
@@ -102,16 +109,11 @@ export default function RegistroPage() {
   }, []);
 
   useEffect(() => {
-    if (apellido && carne) {
-      const apellidoTrimmed = apellido.trim();
-      const carneTrimmed = carne.trim();
-      if (apellidoTrimmed && carneTrimmed) {
-        const firstThreeLetters = apellidoTrimmed.substring(0, 3).toLowerCase();
-        const generatedEmail = `${firstThreeLetters}${carneTrimmed}@uvg.edu.gt`;
-        setCorreo(generatedEmail);
-      }
+    if (correoEditadoManualmente) return;
+    if (apellido.trim() && carne.trim()) {
+      setCorreo(generarCorreoSugerido(apellido, carne));
     }
-  }, [apellido, carne]);
+  }, [apellido, carne, correoEditadoManualmente]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -268,18 +270,19 @@ export default function RegistroPage() {
                   required
                   value={correo}
                   onChange={(e) => {
-                    setCorreo(e.target.value);
+                    const value = e.target.value;
+                    setCorreo(value);
+                    setCorreoEditadoManualmente(value !== '');
                     if (errores.correo) {
                       setErrores((prev) => ({ ...prev, correo: undefined }));
                     }
                   }}
                   placeholder="usuario@uvg.edu.gt"
-                  className={`${inputClass} ${correo && apellido && carne ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
-                  readOnly={!!(apellido && carne && correo)}
+                  className={`${inputClass} ${!correoEditadoManualmente && correo ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
                 />
-                {correo && apellido && carne && (
+                {!correoEditadoManualmente && correo && (
                   <p className="text-xs text-green-600">
-                    ✓ Correo generado automáticamente
+                    ✓ Correo generado automáticamente. Puedes editarlo si lo necesitas.
                   </p>
                 )}
                 {errores.correo && <p className="text-xs text-error">{errores.correo}</p>}

@@ -28,3 +28,28 @@ export function marcarTodasLeidas(): Promise<{ actualizadas: number }> {
     method: 'PATCH',
   });
 }
+
+/**
+ * Resuelve a qué vista debe navegar el usuario al hacer clic en una notificación,
+ * según su tipo. Devuelve null si el tipo no tiene una vista de destino definida.
+ */
+export function getNotificationLink(n: {
+  tipoNotificacion: string;
+  datosJson?: Record<string, unknown> | null;
+}): string | null {
+  const datos = n.datosJson as Record<string, unknown> | null;
+  if (!datos) return null;
+
+  switch (n.tipoNotificacion) {
+    case 'NUEVA_POSTULACION':
+      return typeof datos.projectId !== 'undefined'
+        ? `/dashboard/proyectos/${datos.projectId}/postulaciones`
+        : null;
+    case 'POSTULACION_RESUELTA':
+      return '/dashboard/mis-postulaciones';
+    case 'SOLICITUD_RECUPERACION_CONTRASENA':
+      return '/dashboard/admin/solicitudes-recuperacion';
+    default:
+      return null;
+  }
+}

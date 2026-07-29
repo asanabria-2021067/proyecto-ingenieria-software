@@ -76,4 +76,3 @@ describe('frontend services wrappers', () => {
     expect((apiFetch as any).mock.calls.length).toBe(15);
   });
 });
-También en los botones de Guardar cambios, cancelar y cerrar en la vista de estudiante en http://localhost:3000/dashboard/projects/mine/30?edit=true.
