@@ -122,3 +122,26 @@ export type PostulacionRecibida = {
     nombreRol: string;
   };
 };
+
+// --- Tablero Kanban (T-93 / T-94) ---
+export type EstadoTarea = 'POR_HACER' | 'EN_PROGRESO' | 'EN_REVISION' | 'HECHO';
+export type PrioridadTarea = 'BAJA' | 'MEDIA' | 'ALTA';
+
+export type UsuarioAsignado = {
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  fotoUrl: string | null;
+};
+
+export type Tarea = {
+  idTarea: number;
+  idProyecto: number;
+  tituloTarea: string;
+  descripcionTarea: string | null;
+  estadoTarea: EstadoTarea;
+  prioridad: PrioridadTarea;
+  fechaLimite: string | null;
+  orden: number;
+  asignaciones: { usuario: UsuarioAsignado }[];
+};
