@@ -6,7 +6,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 
 // La vista de detalle administrativa ya NO contiene el tablero (Sección 19):
-// ofrece "Ver Kanban" al líder/participante y redirige las URLs antiguas
+// ofrece "Tablero" al líder/participante y redirige las URLs antiguas
 // `?tab=` al workspace (Sección 20).
 
 vi.mock('../components/dashboard/DashboardLayout', () => ({
@@ -89,33 +89,33 @@ describe('ProjectDetailClient — vista administrativa (Sección 19/21)', () => 
     expect(screen.queryByRole('heading', { name: 'Por hacer' })).not.toBeInTheDocument();
   });
 
-  it('el líder ve "Ver Kanban" que enlaza directamente al workspace (sin selector de rol)', () => {
+  it('el líder ve "Tablero" que enlaza directamente al workspace (sin selector de rol)', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
     renderPage();
 
-    const enlaces = screen.getAllByRole('link', { name: /ver kanban/i });
+    const enlaces = screen.getAllByRole('link', { name: /tablero/i });
     expect(enlaces.length).toBeGreaterThan(0);
     expect(enlaces[0]).toHaveAttribute('href', '/dashboard/projects/42/kanban');
     expect(screen.queryByText(/necesitas un rol/i)).not.toBeInTheDocument();
   });
 
-  it('un participante activo (no líder) también ve "Ver Kanban"', () => {
+  it('un participante activo (no líder) también ve "Tablero"', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 7 } });
     mockMembers([{ idUsuario: 7, idRolProyecto: 3 }]);
     renderPage();
 
-    expect(screen.getAllByRole('link', { name: /ver kanban/i })[0]).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: /tablero/i })[0]).toHaveAttribute(
       'href',
       '/dashboard/projects/42/kanban',
     );
   });
 
-  it('un externo (ni líder ni participante) ve "Postularme", no "Ver Kanban"', () => {
+  it('un externo (ni líder ni participante) ve "Postularme", no "Tablero"', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
     mockMembers([]);
     renderPage();
 
-    expect(screen.queryByRole('link', { name: /ver kanban/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /tablero/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /postularme/i })).toBeInTheDocument();
   });
 
