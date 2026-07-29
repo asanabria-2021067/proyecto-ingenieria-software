@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, MessageSquare, Pencil, X, Plus, Send, Save, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -19,7 +18,7 @@ import type { Carrera, Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
 import {
   step1Schema, rolSchema, formSchema, zodToFieldErrors,
-  newRol, newRequisito,
+  newRol, newRequisito, safeId,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from '../form/types';
 
@@ -208,6 +207,17 @@ export default function MyProjectViewClient({ id }: Props) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
+  // Origen de la navegación: si venimos del detalle del proyecto
+  // (/dashboard/projects/[id] → "Revisiones previas") llega `returnTo` con esa
+  // ruta y el botón "Volver" regresa ahí. Sin el parámetro se conserva el flujo
+  // admin-estudiante (desde la lista) que vuelve a "Mis Proyectos". Solo se
+  // acepta una ruta interna del dashboard para evitar redirecciones abiertas.
+  const returnToParam = searchParams.get('returnTo');
+  const volverHref =
+    returnToParam && returnToParam.startsWith('/dashboard/')
+      ? returnToParam
+      : '/dashboard/projects/mine';
+
   const [isEditing, setIsEditing] = useState(searchParams.get('edit') === 'true');
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -265,14 +275,14 @@ export default function MyProjectViewClient({ id }: Props) {
       fechaInicio: proyecto.fechaInicio ? proyecto.fechaInicio.split('T')[0] : '',
       fechaFinEstimada: proyecto.fechaFinEstimada ? proyecto.fechaFinEstimada.split('T')[0] : '',
       roles: proyecto.roles.map((r) => ({
-        id: crypto.randomUUID(),
+        id: safeId(),
         nombreRol: r.nombreRol,
         descripcionRolProyecto: r.descripcionRolProyecto ?? '',
         idCarreraRequerida: r.carreraRequerida?.idCarrera ?? null,
         cupos: r.cupos,
         horasSemanalesEstimadas: r.horasSemanalesEstimadas ?? '',
         requisitos: r.requisitos.map((req) => ({
-          id: crypto.randomUUID(),
+          id: safeId(),
           idHabilidad: req.habilidad?.idHabilidad ?? null,
           nivelMinimo: req.nivelMinimo as NivelHabilidad,
           obligatorio: req.obligatorio,
@@ -410,7 +420,7 @@ export default function MyProjectViewClient({ id }: Props) {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <DashboardLayout>
+    <>
       {/* Header */}
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         {isEditing ? (
@@ -435,7 +445,7 @@ export default function MyProjectViewClient({ id }: Props) {
         ) : (
           <>
             <Link
-              href="/dashboard/projects/mine"
+              href={volverHref}
               className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -984,6 +994,6 @@ export default function MyProjectViewClient({ id }: Props) {
           </div>
         );
       })()}
-    </DashboardLayout>
+    </>
   );
 }
