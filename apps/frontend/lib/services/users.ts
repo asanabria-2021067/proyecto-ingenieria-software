@@ -168,3 +168,31 @@ export interface ProfileBootstrap {
 export function getProfileBootstrap(): Promise<ProfileBootstrap> {
   return apiFetch<ProfileBootstrap>('/usuarios/me/perfil/bootstrap');
 }
+
+/** Tarea asignada al usuario, con los datos del proyecto al que pertenece */
+export interface MiTareaDTO {
+  idTarea: number;
+  tituloTarea: string;
+  descripcionTarea: string | null;
+  estadoTarea: 'POR_HACER' | 'EN_PROGRESO' | 'EN_REVISION' | 'HECHO';
+  prioridad: 'BAJA' | 'MEDIA' | 'ALTA';
+  fechaLimite: string | null;
+  idHito: number | null;
+  proyecto: {
+    idProyecto: number;
+    tituloProyecto: string;
+    estadoProyecto: string;
+  };
+}
+
+/** Tareas asignadas al usuario en todos sus proyectos — GET /usuarios/me/tareas */
+export function getMisTareas(opts: {
+  estado?: string;
+  orden?: 'asc' | 'desc';
+} = {}): Promise<MiTareaDTO[]> {
+  const params = new URLSearchParams();
+  if (opts.estado) params.set('estado', opts.estado);
+  if (opts.orden) params.set('orden', opts.orden);
+  const query = params.toString();
+  return apiFetch<MiTareaDTO[]>(`/usuarios/me/tareas${query ? `?${query}` : ''}`);
+}

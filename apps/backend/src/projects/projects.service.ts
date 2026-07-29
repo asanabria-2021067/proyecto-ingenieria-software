@@ -11,11 +11,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { CreateHitoDto } from './dto/create-hito.dto';
 import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
+import { EstadoHito, EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const FEATURED_CACHE_KEY = 'projects:featured';
@@ -31,6 +32,66 @@ const ESTADOS_EDITABLES: EstadoProyecto[] = [
   EstadoProyecto.OBSERVADO,
 ];
 
+// Un proyecto ya publicado / en progreso admite edición PARCIAL: solo un
+// subconjunto seguro de campos, mediante una lista explícita (nunca el DTO
+// completo de creación). No cambia estado, revisión, postulaciones, roles,
+// organizaciones, participantes, tareas, hitos, comentarios ni notificaciones.
+const ESTADOS_EDITABLE_PARCIAL: EstadoProyecto[] = [
+  EstadoProyecto.PUBLICADO,
+  EstadoProyecto.EN_PROGRESO,
+];
+
+function calcularAvanceTareas(tareas: { estadoTarea: string }[]) {
+  const total = tareas.length;
+  const hecho = tareas.filter((t) => t.estadoTarea === 'HECHO').length;
+  const porHacer = tareas.filter((t) => t.estadoTarea === 'POR_HACER').length;
+  const enProgreso = total - hecho - porHacer;
+
+  return {
+    porcentaje: total === 0 ? 0 : Math.round((hecho / total) * 100),
+    total,
+    porHacer,
+    enProgreso,
+    hecho,
+  };
+}
+
+function calcularAvanceHitos(hitos: { estadoHito: string }[]) {
+  const total = hitos.length;
+  const completado = hitos.filter((h) => h.estadoHito === 'COMPLETADO').length;
+  const pendiente = hitos.filter((h) => h.estadoHito === 'PENDIENTE').length;
+  const enProgreso = total - completado - pendiente;
+
+  return {
+    porcentaje: total === 0 ? 0 : Math.round((completado / total) * 100),
+    total,
+    pendiente,
+    enProgreso,
+    completado,
+  };
+}
+
+/**
+ * Hito.fechaLimite es @db.Date: se lee/escribe igual que Tarea.fechaLimite
+ * en TasksService (mismo comportamiento verificado de Prisma con columnas
+ * @db.Date), anclando siempre a medianoche UTC del día calendario y
+ * extrayendo con toISOString() para no depender de la zona horaria del proceso.
+ */
+function toDateOnly(value: Date | null): string | null {
+  return value ? value.toISOString().slice(0, 10) : null;
+}
+
+/** % de avance del proyecto, desglosado por hitos y por tareas. */
+function calcularAvanceProyecto(
+  tareas: { estadoTarea: string }[],
+  hitos: { estadoHito: string }[],
+) {
+  return {
+    tareas: calcularAvanceTareas(tareas),
+    hitos: calcularAvanceHitos(hitos),
+  };
+}
+
 const proyectoListSelect = {
   idProyecto: true,
   tituloProyecto: true,
@@ -39,6 +100,9 @@ const proyectoListSelect = {
   estadoProyecto: true,
   modalidadProyecto: true,
   fechaPublicacion: true,
+  creador: {
+    select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
+  },
   organizaciones: {
     select: {
       organizacion: { select: { nombreOrganizacion: true } },
@@ -47,6 +111,9 @@ const proyectoListSelect = {
   intereses: {
     select: { interes: { select: { nombreInteres: true } } },
   },
+  // Solo `cupos` por rol: lo mínimo para que el listado calcule roles con
+  // disponibilidad real (cupos > 0) sin exponer requisitos/postulaciones.
+  roles: { select: { cupos: true } },
   _count: { select: { roles: true } },
 } as const;
 
@@ -65,6 +132,7 @@ const proyectoDetalleSelect = {
   fechaInicio: true,
   fechaFinEstimada: true,
   fechaCreacion: true,
+  fechaActualizacion: true,
   creadoPor: true,
   creador: {
     select: { idUsuario: true, nombre: true, apellido: true, correo: true },
@@ -143,6 +211,9 @@ const proyectoDetalleSelect = {
       estadoTarea: true,
       prioridad: true,
       fechaLimite: true,
+      _count: {
+        select: { comentarios: { where: { eliminadoEn: null } } },
+      },
     },
     orderBy: { idTarea: 'asc' as const },
   },
@@ -294,6 +365,48 @@ export class ProjectsService {
     return proyecto;
   }
 
+  /**
+   * % de avance del proyecto (por hitos y por tareas). Solo visible para el
+   * líder del proyecto o un participante activo — nadie más puede consultarlo.
+   */
+  async getAvance(id: number, userId: number) {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: { idProyecto: id, eliminadoEn: null },
+      select: {
+        creadoPor: true,
+        // eliminadoEn: null — las tareas con soft delete (Tarea 22) no deben
+        // contarse ni en el numerador ni en el denominador del avance.
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
+        hitos: { select: { estadoHito: true } },
+      },
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
+    }
+
+    const esLider = proyecto.creadoPor === userId;
+    const esMiembro = esLider || (await this.esParticipanteActivo(id, userId));
+    if (!esMiembro) {
+      throw new ForbiddenException(
+        'Solo el líder o los miembros del proyecto pueden ver el avance',
+      );
+    }
+
+    return calcularAvanceProyecto(proyecto.tareas, proyecto.hitos);
+  }
+
+  private async esParticipanteActivo(idProyecto: number, userId: number): Promise<boolean> {
+    const participacion = await this.prisma.participacionProyecto.findFirst({
+      where: {
+        idUsuario: userId,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto },
+      },
+      select: { idParticipacion: true },
+    });
+    return !!participacion;
+  }
+
   async findMine(userId: number) {
     const proyectos = await this.prisma.proyecto.findMany({
       where: { creadoPor: userId, eliminadoEn: null },
@@ -312,6 +425,10 @@ export class ProjectsService {
             },
           },
         },
+        // eliminadoEn: null — misma exclusión que en getAvance: una tarea con
+        // soft delete no debe contarse en avanceProyecto.
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
+        hitos: { select: { estadoHito: true } },
         revisiones: {
           select: {
             idRevisionProyecto: true,
@@ -341,9 +458,12 @@ export class ProjectsService {
       return {
         ...proyecto,
         roles: proyecto.roles.map((rol) => ({ idRolProyecto: rol.idRolProyecto })),
+        tareas: undefined,
+        hitos: undefined,
         cantidadPostulaciones,
         rolesCubiertos,
         rolesTotales: proyecto.roles.length,
+        avanceProyecto: calcularAvanceProyecto(proyecto.tareas ?? [], proyecto.hitos ?? []),
       };
     });
   }
@@ -410,25 +530,26 @@ export class ProjectsService {
 
     const proyectos = await this.prisma.proyecto.findMany({
       where: {
-        estadoProyecto: EstadoProyecto.PUBLICADO,
+        estadoProyecto: { in: ESTADOS_VISIBLES },
         eliminadoEn: null,
       },
       select: {
         ...proyectoListSelect,
-        _count: {
-          select: { roles: { where: { postulaciones: { some: {} } } } },
-        },
+        roles: { select: { _count: { select: { postulaciones: true } } } },
       },
-      orderBy: {
-        roles: {
-          _count: 'desc',
-        },
-      },
-      take: 6,
     });
 
-    await this.cacheManager.set(FEATURED_CACHE_KEY, proyectos, FEATURED_CACHE_TTL).catch(() => {});
-    return proyectos;
+    const destacados = proyectos
+      .map(({ roles, ...p }) => ({
+        ...p,
+        totalPostulaciones: roles.reduce((sum, r) => sum + r._count.postulaciones, 0),
+      }))
+      .sort((a, b) => b.totalPostulaciones - a.totalPostulaciones)
+      .slice(0, 6)
+      .map(({ totalPostulaciones, ...p }) => p);
+
+    await this.cacheManager.set(FEATURED_CACHE_KEY, destacados, FEATURED_CACHE_TTL).catch(() => {});
+    return destacados;
   }
 
   private async _invalidateFeaturedCache(): Promise<void> {
@@ -561,9 +682,17 @@ export class ProjectsService {
 
   async update(id: number, data: UpdateProjectDto, userId: number) {
     const proyecto = await this._requireOwner(id, userId);
+
+    // Edición parcial (proyecto ya publicado / en progreso): solo el
+    // subconjunto seguro de campos; conserva estado, roles, organizaciones,
+    // participantes, tareas, hitos, comentarios, notificaciones y revisiones.
+    if (ESTADOS_EDITABLE_PARCIAL.includes(proyecto.estadoProyecto)) {
+      return this._updateParcial(id, data);
+    }
+
     if (!ESTADOS_EDITABLES.includes(proyecto.estadoProyecto)) {
       throw new BadRequestException(
-        `Solo se puede editar un proyecto en estado ${ESTADOS_EDITABLES.join(' o ')}`,
+        `Solo se puede editar un proyecto en estado ${[...ESTADOS_EDITABLES, ...ESTADOS_EDITABLE_PARCIAL].join(', ')}`,
       );
     }
 
@@ -641,6 +770,48 @@ export class ProjectsService {
         where: { idProyecto: id },
         select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true, fechaActualizacion: true },
       });
+    });
+  }
+
+  /**
+   * Edición parcial de un proyecto PUBLICADO / EN_PROGRESO: lista blanca
+   * explícita de campos (título, descripción, objetivos, fecha final estimada,
+   * ubicación, contexto académico, URL de recurso). Cualquier campo bloqueado
+   * enviado manualmente (tipo, modalidad, fecha de inicio, organizaciones,
+   * roles) se rechaza con 400. No cambia el estado ni toca roles,
+   * organizaciones, participantes, tareas, hitos, comentarios, notificaciones
+   * ni revisiones.
+   */
+  private async _updateParcial(id: number, data: UpdateProjectDto) {
+    const bloqueados: string[] = [];
+    if (data.tipoProyecto !== undefined) bloqueados.push('tipo de proyecto');
+    if (data.modalidadProyecto !== undefined) bloqueados.push('modalidad');
+    if (data.fechaInicio !== undefined) bloqueados.push('fecha de inicio');
+    if (data.organizacionesIds !== undefined) bloqueados.push('organizaciones');
+    if (data.roles !== undefined) bloqueados.push('roles');
+    if (bloqueados.length > 0) {
+      throw new BadRequestException(
+        `En un proyecto publicado o en progreso no puedes editar: ${bloqueados.join(', ')}. Los roles se gestionan desde el panel de roles.`,
+      );
+    }
+
+    // Lista blanca explícita: nunca se aplica el DTO completo de creación.
+    const updateData: Prisma.ProyectoUpdateInput = { fechaActualizacion: new Date() };
+    if (data.tituloProyecto !== undefined) updateData.tituloProyecto = data.tituloProyecto;
+    if (data.descripcionProyecto !== undefined) updateData.descripcionProyecto = data.descripcionProyecto;
+    if (data.objetivosProyecto !== undefined) updateData.objetivosProyecto = data.objetivosProyecto;
+    if (data.ubicacionProyecto !== undefined) updateData.ubicacionProyecto = data.ubicacionProyecto;
+    if (data.contextoAcademico !== undefined) updateData.contextoAcademico = data.contextoAcademico;
+    if (data.urlRecursoExterno !== undefined) updateData.urlRecursoExterno = data.urlRecursoExterno;
+    if (data.fechaFinEstimada !== undefined) {
+      updateData.fechaFinEstimada = new Date(data.fechaFinEstimada);
+    }
+
+    await this.prisma.proyecto.update({ where: { idProyecto: id }, data: updateData });
+
+    return this.prisma.proyecto.findUnique({
+      where: { idProyecto: id },
+      select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true, fechaActualizacion: true },
     });
   }
 
@@ -952,6 +1123,48 @@ export class ProjectsService {
       },
       orderBy: { fechaPostulacion: 'desc' },
     });
+  }
+
+  /**
+   * Crea un hito; exclusivo del líder del proyecto (mismo chequeo que el
+   * resto de mutaciones sobre el proyecto: _requireOwner). estadoHito se fija
+   * siempre en PENDIENTE (no es configurable desde el cliente) y `orden` se
+   * calcula server-side dentro de la misma transacción como
+   * (máximo orden existente para el proyecto) + 1, para no depender de un
+   * valor enviado por el cliente que podría colisionar con hitos existentes.
+   */
+  async createHito(idProyecto: number, userId: number, dto: CreateHitoDto) {
+    await this._requireOwner(idProyecto, userId);
+
+    const hito = await this.prisma.$transaction(async (tx) => {
+      const ultimo = await tx.hito.findFirst({
+        where: { idProyecto },
+        orderBy: { orden: 'desc' },
+        select: { orden: true },
+      });
+      const nuevoOrden = (ultimo?.orden ?? 0) + 1;
+
+      return tx.hito.create({
+        data: {
+          idProyecto,
+          tituloHito: dto.tituloHito,
+          descripcionHito: dto.descripcionHito ?? null,
+          fechaLimite: dto.fechaLimite ? new Date(`${dto.fechaLimite}T00:00:00.000Z`) : null,
+          estadoHito: EstadoHito.PENDIENTE,
+          orden: nuevoOrden,
+        },
+        select: {
+          idHito: true,
+          tituloHito: true,
+          descripcionHito: true,
+          fechaLimite: true,
+          estadoHito: true,
+          orden: true,
+        },
+      });
+    });
+
+    return { ...hito, fechaLimite: toDateOnly(hito.fechaLimite) };
   }
 
   async delete(id: number, userId: number) {
