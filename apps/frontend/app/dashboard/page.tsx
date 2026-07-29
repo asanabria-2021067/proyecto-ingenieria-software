@@ -15,7 +15,6 @@ import {
   Building2,
   Users,
 } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
 import {
   Empty,
@@ -61,33 +60,31 @@ function DashboardSkeleton() {
   const highlightColor = isDark ? '#444' : '#f5f5f5';
 
   return (
-    <DashboardLayout>
-      <SkeletonTheme baseColor={baseColor} highlightColor={highlightColor}>
-        <div className="px-8 pb-12 pt-8">
-          <section className="mb-12">
-            <Skeleton width={150} height={16} className="mb-2" />
-            <Skeleton width={300} height={48} />
-            <Skeleton width={500} height={20} className="mt-2" />
-          </section>
+    <SkeletonTheme baseColor={baseColor} highlightColor={highlightColor}>
+      <div className="px-8 pb-12 pt-8">
+        <section className="mb-12">
+          <Skeleton width={150} height={16} className="mb-2" />
+          <Skeleton width={300} height={48} />
+          <Skeleton width={500} height={20} className="mt-2" />
+        </section>
 
-          <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-            <Skeleton height={192} borderRadius={12} />
-            <Skeleton height={192} borderRadius={12} />
-            <Skeleton height={192} borderRadius={12} />
-          </div>
+        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <Skeleton height={192} borderRadius={12} />
+          <Skeleton height={192} borderRadius={12} />
+          <Skeleton height={192} borderRadius={12} />
+        </div>
 
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <Skeleton width={200} height={32} className="mb-8" />
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                 <Skeleton height={200} borderRadius={12} />
-                 <Skeleton height={200} borderRadius={12} />
-              </div>
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <Skeleton width={200} height={32} className="mb-8" />
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+               <Skeleton height={200} borderRadius={12} />
+               <Skeleton height={200} borderRadius={12} />
             </div>
           </div>
         </div>
-      </SkeletonTheme>
-    </DashboardLayout>
+      </div>
+    </SkeletonTheme>
   );
 }
 
@@ -143,7 +140,7 @@ export default function DashboardPage() {
     : 0;
 
   return (
-    <DashboardLayout>
+    <>
       <CompleteProfileDialog
         open={showWizard}
         onComplete={async () => {
@@ -522,6 +519,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

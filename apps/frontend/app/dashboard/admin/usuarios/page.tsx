@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import AdminLayout from '@/components/admin/AdminLayout';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
@@ -245,7 +244,7 @@ export default function AdminUsuariosPage() {
   );
 
   return (
-    <AdminLayout>
+    <>
       <div className="px-4 pb-12 pt-8 md:px-8">
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -561,6 +560,6 @@ export default function AdminUsuariosPage() {
           queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
         }}
       />
-    </AdminLayout>
+    </>
   );
 }

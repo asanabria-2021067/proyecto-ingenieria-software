@@ -3,9 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Bell, BellOff, Check, CheckCheck } from 'lucide-react';
 import Link from 'next/link';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import AdminLayout from '@/components/admin/AdminLayout';
-import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import uvgSwal from '@/lib/swal';
 import {
   Empty,
@@ -27,7 +24,6 @@ import { resolveTaskNotificationLink } from '@/components/notifications/task-not
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
-  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
 
   const { data: notificaciones = [], isLoading, isError, refetch } = useQuery<Notificacion[]>({
     queryKey: ['notificaciones'],
@@ -81,18 +77,7 @@ export default function NotificacionesPage() {
   const grouped = groupByDate(notificaciones);
   const unreadCount = notificaciones.filter((n) => !n.leidaEn).length;
 
-  if (userLoading) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  const Layout = isAdminUser(currentUser) ? AdminLayout : DashboardLayout;
-
   return (
-    <Layout>
       <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="flex items-start justify-between mb-8">
           <div>
@@ -257,6 +242,5 @@ export default function NotificacionesPage() {
           ))}
         </div>
       </div>
-    </Layout>
   );
 }
