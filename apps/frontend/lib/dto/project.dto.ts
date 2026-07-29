@@ -217,6 +217,13 @@ export interface CreateProjectPayload {
   accion: 'BORRADOR' | 'EN_REVISION';
 }
 
+/** Payload para crear un hito — POST /proyectos/:id/hitos */
+export interface CreateHitoPayload {
+  tituloHito: string;
+  descripcionHito?: string;
+  fechaLimite?: string;
+}
+
 /** Payload para resolver una revisión (admin) */
 export interface ResolverRevisionPayload {
   resultado: 'APROBADA' | 'OBSERVADA';
