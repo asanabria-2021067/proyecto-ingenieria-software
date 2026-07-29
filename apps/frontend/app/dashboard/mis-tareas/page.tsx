@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ClipboardList,
 } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import {
   Select,
   SelectContent,
@@ -126,7 +125,6 @@ export default function MisTareasPage() {
   }, [tareas]);
 
   return (
-    <DashboardLayout>
       <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -272,6 +270,5 @@ export default function MisTareasPage() {
           ))}
         </div>
       </div>
-    </DashboardLayout>
   );
 }

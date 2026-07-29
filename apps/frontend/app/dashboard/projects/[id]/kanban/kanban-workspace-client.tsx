@@ -48,7 +48,6 @@ import {
   derivarOpcionesRol,
   getProgressVisualState,
 } from '@/components/projects/task-board.utils';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { MODALIDAD_LABEL } from '@/types';
 import type { AvanceProyectoDTO, ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import type { TareaPublicaDTO } from '@/lib/types/tasks';
@@ -563,31 +562,23 @@ export default function KanbanWorkspaceClient({ id }: Props) {
   const { data: proyecto, isLoading, error } = useProjectDetail(id);
 
   if (isLoading) {
-    return (
-      <DashboardLayout>
-        <WorkspaceSkeleton />
-      </DashboardLayout>
-    );
+    return <WorkspaceSkeleton />;
   }
 
   if (error || !proyecto) {
     return (
-      <DashboardLayout>
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
           <p className="font-medium text-red-600">No se pudo cargar el proyecto. Intenta nuevamente.</p>
           <Button asChild variant="outline" size="sm" className="mt-4">
             <Link href="/dashboard/proyectos">Volver a mis proyectos</Link>
           </Button>
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
       <Suspense fallback={<WorkspaceSkeleton />}>
         <KanbanWorkspaceView proyecto={proyecto} />
       </Suspense>
-    </DashboardLayout>
   );
 }

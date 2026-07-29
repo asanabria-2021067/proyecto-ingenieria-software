@@ -1,6 +1,5 @@
 'use client';
 
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import {
   Select,
   SelectContent,
@@ -83,7 +82,6 @@ export default function ProyectosPage() {
   };
 
   return (
-    <DashboardLayout allowAdmin>
       <div className="mx-auto max-w-[1400px] px-8 pt-7 pb-10">
         {/* Encabezado */}
         <div className="mb-4.5">
@@ -242,6 +240,5 @@ export default function ProyectosPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

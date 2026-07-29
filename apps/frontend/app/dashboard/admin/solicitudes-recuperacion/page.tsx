@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, AlertCircle, Copy, Link2 } from 'lucide-react';
-import AdminLayout from '@/components/admin/AdminLayout';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -119,7 +118,6 @@ export default function AdminSolicitudesRecuperacionPage() {
   );
 
   return (
-    <AdminLayout>
       <div className="px-4 pb-12 pt-8 md:px-8">
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -268,6 +266,5 @@ export default function AdminSolicitudesRecuperacionPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
   );
 }
