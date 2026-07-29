@@ -11,11 +11,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { CreateHitoDto } from './dto/create-hito.dto';
 import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
+import { EstadoHito, EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const FEATURED_CACHE_KEY = 'projects:featured';
@@ -68,6 +69,16 @@ function calcularAvanceHitos(hitos: { estadoHito: string }[]) {
     enProgreso,
     completado,
   };
+}
+
+/**
+ * Hito.fechaLimite es @db.Date: se lee/escribe igual que Tarea.fechaLimite
+ * en TasksService (mismo comportamiento verificado de Prisma con columnas
+ * @db.Date), anclando siempre a medianoche UTC del día calendario y
+ * extrayendo con toISOString() para no depender de la zona horaria del proceso.
+ */
+function toDateOnly(value: Date | null): string | null {
+  return value ? value.toISOString().slice(0, 10) : null;
 }
 
 /** % de avance del proyecto, desglosado por hitos y por tareas. */
@@ -1112,6 +1123,48 @@ export class ProjectsService {
       },
       orderBy: { fechaPostulacion: 'desc' },
     });
+  }
+
+  /**
+   * Crea un hito; exclusivo del líder del proyecto (mismo chequeo que el
+   * resto de mutaciones sobre el proyecto: _requireOwner). estadoHito se fija
+   * siempre en PENDIENTE (no es configurable desde el cliente) y `orden` se
+   * calcula server-side dentro de la misma transacción como
+   * (máximo orden existente para el proyecto) + 1, para no depender de un
+   * valor enviado por el cliente que podría colisionar con hitos existentes.
+   */
+  async createHito(idProyecto: number, userId: number, dto: CreateHitoDto) {
+    await this._requireOwner(idProyecto, userId);
+
+    const hito = await this.prisma.$transaction(async (tx) => {
+      const ultimo = await tx.hito.findFirst({
+        where: { idProyecto },
+        orderBy: { orden: 'desc' },
+        select: { orden: true },
+      });
+      const nuevoOrden = (ultimo?.orden ?? 0) + 1;
+
+      return tx.hito.create({
+        data: {
+          idProyecto,
+          tituloHito: dto.tituloHito,
+          descripcionHito: dto.descripcionHito ?? null,
+          fechaLimite: dto.fechaLimite ? new Date(`${dto.fechaLimite}T00:00:00.000Z`) : null,
+          estadoHito: EstadoHito.PENDIENTE,
+          orden: nuevoOrden,
+        },
+        select: {
+          idHito: true,
+          tituloHito: true,
+          descripcionHito: true,
+          fechaLimite: true,
+          estadoHito: true,
+          orden: true,
+        },
+      });
+    });
+
+    return { ...hito, fechaLimite: toDateOnly(hito.fechaLimite) };
   }
 
   async delete(id: number, userId: number) {

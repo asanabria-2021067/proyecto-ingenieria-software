@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
@@ -21,6 +21,7 @@ vi.mock('../hooks/use-project-avance', () => ({
 }));
 vi.mock('../hooks/use-project-tasks', () => ({ useProjectTasks: vi.fn() }));
 vi.mock('../hooks/use-project-labels', () => ({ useProjectLabels: vi.fn() }));
+vi.mock('../hooks/use-project-milestones', () => ({ useProjectMilestones: vi.fn() }));
 vi.mock('../hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 
@@ -35,6 +36,7 @@ import KanbanWorkspaceClient from '../app/dashboard/projects/[id]/kanban/kanban-
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useProjectTasks } from '../hooks/use-project-tasks';
 import { useProjectLabels } from '../hooks/use-project-labels';
+import { useProjectMilestones } from '../hooks/use-project-milestones';
 import { useProjectMembers } from '../hooks/use-project-members';
 import { useCurrentUser } from '../hooks/use-current-user';
 
@@ -134,6 +136,13 @@ function mockUseProjectLabels(overrides: Record<string, unknown> = {}) {
   });
 }
 
+function mockUseProjectMilestones(overrides: Record<string, unknown> = {}) {
+  (useProjectMilestones as any).mockReturnValue({
+    crearHito: mutationStub(),
+    ...overrides,
+  });
+}
+
 function mockUseProjectMembers(overrides: Record<string, unknown> = {}) {
   (useProjectMembers as any).mockReturnValue({
     members: [],
@@ -161,6 +170,7 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
   beforeEach(() => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
     mockUseProjectLabels();
+    mockUseProjectMilestones();
     mockUseProjectMembers();
   });
 
@@ -328,6 +338,53 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     expect(screen.getAllByText(/En revisión/).length).toBeGreaterThanOrEqual(2);
     // Sin avance del backend, no se muestra el bloque de hitos.
     expect(screen.queryByText('Progreso de hitos')).not.toBeInTheDocument();
+  });
+
+  it('el líder ve "Agregar hito" en la pestaña Hitos; un tercero no', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    const { unmount } = renderWorkspace();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
+    expect(screen.getByRole('button', { name: /agregar hito/i })).toBeInTheDocument();
+    unmount();
+
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    renderWorkspace();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
+    expect(screen.queryByRole('button', { name: /agregar hito/i })).not.toBeInTheDocument();
+  });
+
+  it('"Agregar hito" no se muestra en la pestaña Tablero', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    renderWorkspace();
+
+    expect(screen.queryByRole('button', { name: /agregar hito/i })).not.toBeInTheDocument();
+  });
+
+  it('enviar el formulario de "Agregar hito" llama a la mutación con el payload correcto y cierra el diálogo', async () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+    const crearHito = mutationStub({ mutateAsync: vi.fn().mockResolvedValue({ idHito: 1 }) });
+    mockUseProjectMilestones({ crearHito });
+
+    renderWorkspace();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
+    fireEvent.click(screen.getByRole('button', { name: /agregar hito/i }));
+
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Entrega de MVP' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear hito' }));
+
+    await waitFor(() =>
+      expect(crearHito.mutateAsync).toHaveBeenCalledWith({
+        tituloHito: 'Entrega de MVP',
+        descripcionHito: undefined,
+        fechaLimite: undefined,
+      }),
+    );
+    await waitFor(() => expect(screen.queryByLabelText('Título')).not.toBeInTheDocument());
   });
 
   it('usa una sola consulta de detalle del proyecto para el encabezado, roles e hitos', () => {
