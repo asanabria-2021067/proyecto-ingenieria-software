@@ -13,7 +13,7 @@ import { Step1 } from './Step1';
 import { Step2 } from './Step2';
 import { Step3 } from './Step3';
 import {
-  STEPS, newRol, newRequisito, step1Schema, rolSchema, formSchema, zodToFieldErrors,
+  STEPS, newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, zodToFieldErrors,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from './types';
 
@@ -77,14 +77,14 @@ function NewProjectFormContent() {
       fechaInicio: p.fechaInicio ? p.fechaInicio.split('T')[0] : '',
       fechaFinEstimada: p.fechaFinEstimada ? p.fechaFinEstimada.split('T')[0] : '',
       roles: p.roles.map((r) => ({
-        id: crypto.randomUUID(),
+        id: safeId(),
         nombreRol: r.nombreRol,
         descripcionRolProyecto: r.descripcionRolProyecto ?? '',
         idCarreraRequerida: r.carreraRequerida?.idCarrera ?? null,
         cupos: r.cupos,
         horasSemanalesEstimadas: r.horasSemanalesEstimadas ?? '',
         requisitos: r.requisitos.map((req) => ({
-          id: crypto.randomUUID(),
+          id: safeId(),
           idHabilidad: req.habilidad?.idHabilidad ?? null,
           nivelMinimo: req.nivelMinimo as NivelHabilidad,
           obligatorio: req.obligatorio,
