@@ -4,7 +4,6 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { createProject, updateProject, getMyProjectById, submitProjectForReview } from '@/lib/services/projects';
 import { getCarreras, getHabilidades, type Carrera, type Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
@@ -308,27 +307,27 @@ function NewProjectFormContent() {
 
   if (loadingExistente) {
     return (
-      <DashboardLayout>
+      <>
         <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
             Cargando proyecto...
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (proyectoExistente && !ALLOWED_EDIT_STATES.includes(proyectoExistente.estadoProyecto)) {
     return (
-      <DashboardLayout>
+      <>
         <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
             Redirigiendo...
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
@@ -336,7 +335,7 @@ function NewProjectFormContent() {
   // seguro de campos. No usa el asistente de pasos ni toca roles. ─────────────
   if (esEdicionParcial) {
     return (
-      <DashboardLayout>
+      <>
         <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-8">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-2xl">
@@ -371,12 +370,12 @@ function NewProjectFormContent() {
             </div>
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       {/* Scrim */}
       <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
 
@@ -453,7 +452,7 @@ function NewProjectFormContent() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }
 
@@ -461,14 +460,14 @@ export default function NewProjectFormPage() {
   return (
     <Suspense
       fallback={
-        <DashboardLayout>
+        <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
               Cargando formulario...
             </div>
           </div>
-        </DashboardLayout>
+        </>
       }
     >
       <NewProjectFormContent />

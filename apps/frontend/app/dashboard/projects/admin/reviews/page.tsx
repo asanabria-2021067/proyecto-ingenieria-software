@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequest, XCircle, CheckCheck, MessageSquareWarning } from 'lucide-react';
-import AdminLayout from '@/components/admin/AdminLayout';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
@@ -84,7 +83,7 @@ export default function AdminReviewsInboxPage() {
     (inbox?.revisionesPendientes.length ?? 0) + (inbox?.cierresPendientes.length ?? 0) + (inbox?.correccionesEnviadas.length ?? 0);
 
   return (
-    <AdminLayout>
+    <>
       <div className="px-4 pb-12 pt-8 md:px-8">
         {/* Header */}
         <section className="mb-10 flex items-start justify-between">
@@ -330,6 +329,6 @@ export default function AdminReviewsInboxPage() {
         open={feedbackSheet.open}
         onOpenChange={(open) => setFeedbackSheet((s) => ({ ...s, open }))}
       />
-    </AdminLayout>
+    </>
   );
 }
