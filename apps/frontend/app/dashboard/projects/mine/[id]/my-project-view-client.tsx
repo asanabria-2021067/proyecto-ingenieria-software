@@ -19,7 +19,7 @@ import type { Carrera, Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
 import {
   step1Schema, rolSchema, formSchema, zodToFieldErrors,
-  newRol, newRequisito,
+  newRol, newRequisito, safeId,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from '../form/types';
 
@@ -276,14 +276,14 @@ export default function MyProjectViewClient({ id }: Props) {
       fechaInicio: proyecto.fechaInicio ? proyecto.fechaInicio.split('T')[0] : '',
       fechaFinEstimada: proyecto.fechaFinEstimada ? proyecto.fechaFinEstimada.split('T')[0] : '',
       roles: proyecto.roles.map((r) => ({
-        id: crypto.randomUUID(),
+        id: safeId(),
         nombreRol: r.nombreRol,
         descripcionRolProyecto: r.descripcionRolProyecto ?? '',
         idCarreraRequerida: r.carreraRequerida?.idCarrera ?? null,
         cupos: r.cupos,
         horasSemanalesEstimadas: r.horasSemanalesEstimadas ?? '',
         requisitos: r.requisitos.map((req) => ({
-          id: crypto.randomUUID(),
+          id: safeId(),
           idHabilidad: req.habilidad?.idHabilidad ?? null,
           nivelMinimo: req.nivelMinimo as NivelHabilidad,
           obligatorio: req.obligatorio,
