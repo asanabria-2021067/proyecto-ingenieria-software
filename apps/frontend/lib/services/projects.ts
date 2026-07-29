@@ -6,6 +6,8 @@ import type {
   AvanceProyectoDTO,
   RevisionProyectoDTO,
   CreateProjectPayload,
+  CreateHitoPayload,
+  HitoDTO,
   ResolverRevisionPayload,
 } from '@/lib/dto/project.dto';
 
@@ -160,4 +162,11 @@ export async function getAdminReviewInbox(): Promise<{
 
 export async function deleteProject(id: number): Promise<{ mensaje: string }> {
   return apiFetch(`/proyectos/${id}`, { method: 'DELETE' });
+}
+
+export async function createHito(idProyecto: number, payload: CreateHitoPayload): Promise<HitoDTO> {
+  return apiFetch<HitoDTO>(`/proyectos/${idProyecto}/hitos`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
