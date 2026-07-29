@@ -11,6 +11,13 @@ describe('form helpers', () => {
     expect(req.id).toBe('uuid-1');
   });
 
+  it('newRol/newRequisito no truenan cuando crypto.randomUUID no existe (HTTP sin TLS)', () => {
+    vi.stubGlobal('crypto', {});
+    expect(() => newRol()).not.toThrow();
+    expect(() => newRequisito()).not.toThrow();
+    expect(typeof newRol().id).toBe('string');
+  });
+
   it('step1Schema detecta fechas inválidas', () => {
     const result = step1Schema.safeParse({
       tituloProyecto: 'Proyecto test',

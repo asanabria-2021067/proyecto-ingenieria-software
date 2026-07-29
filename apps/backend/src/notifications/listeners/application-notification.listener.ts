@@ -33,6 +33,10 @@ export class ApplicationNotificationListener {
 
     if (!application || !project) return;
 
+    // El líder puede ser el propio postulante (ej. se postula a su propio proyecto);
+    // en ese caso no se genera notificación.
+    if (project.creadoPor === application.idUsuarioPostulante) return;
+
     await this.notificationsService.notifyFromTemplate(
       [project.creadoPor],
       'NUEVA_POSTULACION',

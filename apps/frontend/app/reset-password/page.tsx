@@ -135,7 +135,7 @@ function ResetPasswordForm() {
                       value={nuevaContrasena}
                       onChange={(e) => setNuevaContrasena(e.target.value)}
                       placeholder="Mínimo 8 caracteres"
-                      className="w-full rounded-xl border border-surface-container-highest bg-white pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -152,7 +152,7 @@ function ResetPasswordForm() {
                       value={confirmar}
                       onChange={(e) => setConfirmar(e.target.value)}
                       placeholder="Repite tu contraseña"
-                      className="w-full rounded-xl border border-surface-container-highest bg-white pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -160,7 +160,7 @@ function ResetPasswordForm() {
                 <button
                   type="submit"
                   disabled={enviando}
-                  className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary active:scale-[0.98] disabled:opacity-60"
+                  className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60"
                 >
                   {enviando ? 'Restableciendo...' : 'Restablecer contraseña'}
                 </button>

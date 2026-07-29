@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Mail, IdCard, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { apiFetch } from '@/lib/api/client';
+import { forgotPassword } from '@/lib/services/auth';
 import uvgSwal from '@/lib/swal';
 
 import logo from '@/public/logo.png';
 import img from '@/public/login-foto.jpg';
 
 export default function RecuperarContrasenaPage() {
+  const [carne, setCarne] = useState('');
   const [correo, setCorreo] = useState('');
   const [enviado, setEnviado] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -20,28 +21,13 @@ export default function RecuperarContrasenaPage() {
     setEnviando(true);
 
     try {
-      const response = await apiFetch('/auth/forgot-password', {
-        method: 'POST',
-        body: JSON.stringify({ correo }),
-      });
-
+      await forgotPassword(carne, correo);
       setEnviado(true);
-
-      // Desarrollo: mostrar token si está disponible
-      if ((response as any).resetToken) {
-        const token = (response as any).resetToken;
-        console.log('Reset token (SOLO DESARROLLO):', token);
-        uvgSwal.fire({
-          icon: 'info',
-          title: 'Token generado (desarrollo)',
-          html: `<p>En producción se enviaría por email.</p><p>Por ahora usa este enlace:</p><p><a href="/reset-password?token=${token}" style="color: #0066cc; text-decoration: underline;">/reset-password?token=${token}</a></p>`,
-        });
-      }
     } catch (error: any) {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'No se pudo enviar el correo de recuperación',
+        text: error.message || 'No se pudo registrar la solicitud de recuperación',
       });
     } finally {
       setEnviando(false);
@@ -91,12 +77,30 @@ export default function RecuperarContrasenaPage() {
                 Recuperar contrasena
               </h1>
               <p className="mt-2 text-base text-tertiary">
-                Ingresa tu correo institucional y te enviaremos un enlace para restablecer tu contrasena
+                Ingresa tu carné y tu correo institucional. Un administrador revisará tu
+                solicitud y te enviará el enlace de recuperación manualmente.
               </p>
             </div>
 
             {!enviado ? (
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="font-label text-xs font-bold uppercase tracking-widest text-tertiary">
+                    Carné
+                  </label>
+                  <div className="relative">
+                    <IdCard className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-outline-variant" />
+                    <input
+                      type="text"
+                      required
+                      value={carne}
+                      onChange={(e) => setCarne(e.target.value)}
+                      placeholder="21000"
+                      className="w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="font-label text-xs font-bold uppercase tracking-widest text-tertiary">
                     Correo Institucional
@@ -109,7 +113,7 @@ export default function RecuperarContrasenaPage() {
                       value={correo}
                       onChange={(e) => setCorreo(e.target.value)}
                       placeholder="usuario@uvg.edu.gt"
-                      className="w-full rounded-xl border border-surface-container-highest bg-white pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -117,33 +121,30 @@ export default function RecuperarContrasenaPage() {
                 <button
                   type="submit"
                   disabled={enviando}
-                  className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary active:scale-[0.98] disabled:opacity-60"
+                  className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60"
                 >
-                  {enviando ? 'Enviando...' : 'Enviar enlace de recuperacion'}
+                  {enviando ? 'Enviando...' : 'Enviar solicitud de recuperacion'}
                 </button>
               </form>
             ) : (
               <div className="rounded-2xl border border-primary/20 bg-primary/5 p-8 text-center">
                 <CheckCircle className="mx-auto mb-4 h-12 w-12 text-primary" />
                 <h2 className="font-headline text-xl font-bold text-on-surface mb-2">
-                  Correo enviado
+                  Solicitud registrada
                 </h2>
                 <p className="text-sm text-tertiary mb-6">
-                  Si existe una cuenta asociada a{' '}
-                  <span className="font-bold text-on-surface">{correo}</span>, recibiras un
-                  enlace para restablecer tu contrasena en los proximos minutos.
-                </p>
-                <p className="text-xs text-tertiary mb-6">
-                  Revisa tu bandeja de entrada y la carpeta de spam.
+                  Si tus datos son correctos, un administrador revisará tu solicitud y te
+                  hará llegar el enlace de recuperación por correo.
                 </p>
                 <button
                   onClick={() => {
                     setEnviado(false);
+                    setCarne('');
                     setCorreo('');
                   }}
                   className="text-sm font-bold text-primary hover:underline"
                 >
-                  Enviar a otro correo
+                  Enviar otra solicitud
                 </button>
               </div>
             )}

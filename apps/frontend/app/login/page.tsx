@@ -111,7 +111,7 @@ export default function LoginPage() {
                     }
                   }}
                   placeholder="usuario@uvg.edu.gt"
-                  className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container px-4 py-4 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   aria-invalid={errores.correo ? 'true' : 'false'}
                 />
                 {errores.correo && (
@@ -143,7 +143,7 @@ export default function LoginPage() {
                     }
                   }}
                   placeholder="Minimo 8 caracteres"
-                  className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-4 font-body text-on-surface shadow-sm placeholder:text-outline-variant transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container px-4 py-4 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   aria-invalid={errores.contrasena ? 'true' : 'false'}
                 />
                 {errores.contrasena && (
@@ -155,7 +155,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isPending}
-                className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary active:scale-[0.98] disabled:opacity-60"
+                className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60"
               >
                 {isPending ? 'Iniciando sesion...' : 'Iniciar Sesion'}
               </button>
@@ -171,7 +171,7 @@ export default function LoginPage() {
             </div>
 
             {/* Microsoft Login */}
-            <button className="flex w-full items-center justify-center gap-3 rounded-xl border border-surface-container-highest bg-white py-4 font-headline font-bold text-on-surface shadow-sm transition-all hover:bg-surface-container-low active:scale-[0.98]">
+            <button className="flex w-full items-center justify-center gap-3 rounded-xl border border-surface-container-highest bg-surface-container-lowest py-4 font-headline font-bold text-on-surface shadow-sm transition-all hover:bg-surface-container-low active:scale-[0.98]">
               <svg className="h-5 w-5" viewBox="0 0 21 21">
                 <rect x="1" y="1" width="9" height="9" fill="#f25022" />
                 <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
