@@ -27,7 +27,6 @@ export interface Postulacion {
 }
 
 export interface CreatePostulacionPayload {
-  idUsuarioPostulante: number;
   idRolProyecto: number;
   justificacion: string;
 }

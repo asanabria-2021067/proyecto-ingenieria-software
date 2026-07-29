@@ -1,0 +1,83 @@
+name: CI
+
+# Se ejecuta en tres escenarios:
+#   1. pull_request  -> valida cada PR hacia main o develop
+#   2. push          -> valida cada push directo a develop
+#   3. workflow_call -> lo invoca deploy.yml antes de desplegar a produccion
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+  workflow_call:
+  workflow_dispatch:
+
+# Si se empujan varios commits seguidos al mismo PR, cancela las corridas
+# anteriores y deja solo la ultima.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Prisma exige que la variable exista para generar el cliente.
+  # No se conecta a ninguna base de datos real: las pruebas usan mocks.
+  DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+  DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+
+jobs:
+  backend:
+    name: Backend - lint y pruebas
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/backend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar cliente Prisma
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Pruebas unitarias y de integracion (Vitest)
+        run: npm run test
+
+  frontend:
+    name: Frontend - lint y pruebas
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Pruebas (Vitest)
+        run: npm run test

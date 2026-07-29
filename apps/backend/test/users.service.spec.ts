@@ -30,9 +30,9 @@ function prismaMock() {
 describe('UsersService', () => {
   it('getMe retorna usuario', async () => {
     const prisma = prismaMock();
-    prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 1 });
+    prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 1, rolesAcceso: [] });
     const service = new UsersService(prisma);
-    await expect(service.getMe(1)).resolves.toEqual({ idUsuario: 1 });
+    await expect(service.getMe(1)).resolves.toEqual({ idUsuario: 1, rolesAcceso: [], roles: [] });
   });
 
   it('getMe falla si no existe', async () => {
