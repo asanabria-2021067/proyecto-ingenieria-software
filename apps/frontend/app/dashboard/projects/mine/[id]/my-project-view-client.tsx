@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, MessageSquare, Pencil, X, Plus, Send, Save, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -421,7 +420,7 @@ export default function MyProjectViewClient({ id }: Props) {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <DashboardLayout>
+    <>
       {/* Header */}
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         {isEditing ? (
@@ -995,6 +994,6 @@ export default function MyProjectViewClient({ id }: Props) {
           </div>
         );
       })()}
-    </DashboardLayout>
+    </>
   );
 }
