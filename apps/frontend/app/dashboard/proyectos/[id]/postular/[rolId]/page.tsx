@@ -8,8 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { apiFetch, getUserIdFromToken } from '@/lib/api/client';
+import { apiFetch } from '@/lib/api/client';
 import { Postulacion, Proyecto } from '@/types';
 
 const schema = z.object({
@@ -61,12 +60,9 @@ export default function PostularPage() {
 
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
-      const userId = getUserIdFromToken();
-      if (!userId) throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
       return apiFetch('/postulaciones', {
         method: 'POST',
         body: JSON.stringify({
-          idUsuarioPostulante: userId,
           idRolProyecto: Number(rolId),
           justificacion: data.justificacion,
         }),
@@ -88,7 +84,6 @@ export default function PostularPage() {
 
   if (mutation.isSuccess) {
     return (
-      <DashboardLayout>
         <div className="flex items-center justify-center min-h-[80vh] px-8">
           <div className="text-center max-w-md">
             <CheckCircle className="w-16 h-16 text-primary mx-auto mb-4" />
@@ -107,12 +102,10 @@ export default function PostularPage() {
             </Link>
           </div>
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
       <div className="px-8 py-8 max-w-2xl mx-auto">
         <Link
           href={`/dashboard/proyectos/${id}`}
@@ -243,6 +236,5 @@ export default function PostularPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }
