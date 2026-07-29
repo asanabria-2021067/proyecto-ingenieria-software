@@ -18,7 +18,7 @@ function makePrisma() {
       findFirst: vi.fn(),
       create: vi.fn(),
     },
-    participacionProyecto: { updateMany: vi.fn(), findMany: vi.fn() },
+    participacionProyecto: { updateMany: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
     postulacion: { updateMany: vi.fn(), findMany: vi.fn() },
     rolProyecto: { findMany: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     requisitoHabilidadRol: { deleteMany: vi.fn(), createMany: vi.fn() },
@@ -68,6 +68,52 @@ describe('ProjectsService', () => {
     await expect(service.findOneOwner(1, 1)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('getAvance falla cuando el proyecto no existe', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(null);
+    const service = new ProjectsService(prisma, {} as any);
+    await expect(service.getAvance(999, 1)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('getAvance permite al líder ver el avance', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({
+      creadoPor: 1,
+      tareas: [{ estadoTarea: 'HECHO' }, { estadoTarea: 'POR_HACER' }],
+      hitos: [{ estadoHito: 'COMPLETADO' }],
+    });
+    const service = new ProjectsService(prisma, {} as any);
+    const result = await service.getAvance(1, 1);
+    expect(result.tareas.porcentaje).toBe(50);
+    expect(result.hitos.porcentaje).toBe(100);
+  });
+
+  it('getAvance permite a un participante activo ver el avance', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({
+      creadoPor: 9,
+      tareas: [],
+      hitos: [],
+    });
+    prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    const service = new ProjectsService(prisma, {} as any);
+    const result = await service.getAvance(1, 2);
+    expect(result.tareas.porcentaje).toBe(0);
+    expect(prisma.participacionProyecto.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ idUsuario: 2, estadoParticipacion: 'ACTIVO' }),
+      }),
+    );
+  });
+
+  it('getAvance rechaza a quien no es líder ni participante', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ creadoPor: 9, tareas: [], hitos: [] });
+    prisma.participacionProyecto.findFirst.mockResolvedValue(null);
+    const service = new ProjectsService(prisma, {} as any);
+    await expect(service.getAvance(1, 2)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('findMine calcula agregados de roles', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findMany.mockResolvedValue([
@@ -84,12 +130,49 @@ describe('ProjectsService', () => {
     expect(result[0].rolesCubiertos).toBe(1);
   });
 
+  it('findMine calcula el avance por hitos y tareas, y no falla sin ninguno de los dos', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([
+      {
+        roles: [],
+        tareas: [{ estadoTarea: 'HECHO' }, { estadoTarea: 'POR_HACER' }],
+        hitos: [{ estadoHito: 'COMPLETADO' }, { estadoHito: 'PENDIENTE' }],
+      },
+      { roles: [] },
+    ]);
+    const service = new ProjectsService(prisma, {} as any);
+    const result = await service.findMine(1);
+    expect(result[0].avanceProyecto).toEqual({
+      tareas: { porcentaje: 50, total: 2, porHacer: 1, enProgreso: 0, hecho: 1 },
+      hitos: { porcentaje: 50, total: 2, pendiente: 1, enProgreso: 0, completado: 1 },
+    });
+    expect(result[1].avanceProyecto).toEqual({
+      tareas: { porcentaje: 0, total: 0, porHacer: 0, enProgreso: 0, hecho: 0 },
+      hitos: { porcentaje: 0, total: 0, pendiente: 0, enProgreso: 0, completado: 0 },
+    });
+  });
+
   it('submitForReview cambia estado y notifica', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, estadoProyecto: EstadoProyecto.BORRADOR, creadoPor: 1 });
     prisma.revisionProyecto.count.mockResolvedValue(0);
     const tx = {
-      proyecto: { update: vi.fn() },
+      proyecto: {
+        findUnique: vi.fn().mockResolvedValue({
+          tituloProyecto: 'Proyecto',
+          descripcionProyecto: 'Descripcion',
+          objetivosProyecto: 'Objetivos',
+          tipoProyecto: 'ACADEMICO',
+          modalidadProyecto: 'PRESENCIAL',
+          ubicacionProyecto: null,
+          contextoAcademico: null,
+          urlRecursoExterno: null,
+          fechaInicio: null,
+          fechaFinEstimada: null,
+          roles: [],
+        }),
+        update: vi.fn(),
+      },
       revisionProyecto: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
     };
     prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));

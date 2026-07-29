@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import ProjectDetailClient from './project-detail-client';
 
 interface Props {
@@ -6,5 +7,9 @@ interface Props {
 
 export default async function ProjectDetailPage({ params }: Props) {
   const { id } = await params;
-  return <ProjectDetailClient id={Number(id)} />;
+  return (
+    <Suspense>
+      <ProjectDetailClient id={Number(id)} />
+    </Suspense>
+  );
 }
