@@ -48,7 +48,6 @@ import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { approveProjectClosure, rejectProjectClosure } from '@/lib/services/projects';
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 
 interface Props {
@@ -624,18 +623,13 @@ export default function ProjectDetailClient({ id }: Props) {
   const { data: proyecto, isLoading, error, refetch } = useProjectDetail(id);
 
   if (isLoading) {
-    return (
-      <DashboardLayout>
-        <ProjectDetailSkeleton />
-      </DashboardLayout>
-    );
+    return <ProjectDetailSkeleton />;
   }
 
   if (error || !proyecto) {
     const status = (error as { statusCode?: number } | null)?.statusCode;
     const noEncontrado = status === 404;
     return (
-      <DashboardLayout>
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
           <h2 className="text-lg font-bold text-on-surface">
             {noEncontrado ? 'Proyecto no encontrado' : 'No fue posible cargar la información del proyecto.'}
@@ -656,15 +650,12 @@ export default function ProjectDetailClient({ id }: Props) {
             </Button>
           </div>
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
       <Suspense fallback={<ProjectDetailSkeleton />}>
         <ProjectDetailView proyecto={proyecto} />
       </Suspense>
-    </DashboardLayout>
   );
 }

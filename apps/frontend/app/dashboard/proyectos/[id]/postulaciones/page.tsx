@@ -5,7 +5,6 @@ import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, Clock, CheckCircle, XCircle, User } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { EstadoPostulacion, PostulacionRecibida } from '@/types';
 
@@ -95,7 +94,7 @@ export default function PostulacionesProyectoPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="mx-auto max-w-[1400px] px-8 py-8">
         <Link
           href={`/dashboard/proyectos/${id}`}
@@ -287,6 +286,6 @@ export default function PostulacionesProyectoPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }
