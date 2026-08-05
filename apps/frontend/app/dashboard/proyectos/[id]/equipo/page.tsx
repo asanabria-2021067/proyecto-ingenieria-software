@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, Users, Briefcase } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
+import { projectMembersQueryKey } from '@/lib/query-keys/members';
 
 interface Colaborador {
   idParticipacionProyecto: number;
@@ -44,9 +45,10 @@ interface Colaborador {
 
 export default function EquipoProyectoPage() {
   const { id } = useParams<{ id: string }>();
+  const idProyecto = Number(id);
 
   const { data: equipo = [], isLoading, isError } = useQuery<Colaborador[]>({
-    queryKey: ['proyecto-equipo', id],
+    queryKey: projectMembersQueryKey(idProyecto),
     queryFn: () => apiFetch(`/proyectos/${id}/equipo`),
   });
 
