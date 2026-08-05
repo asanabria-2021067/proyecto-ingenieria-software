@@ -524,6 +524,56 @@ export class ProjectsService {
     });
   }
 
+  /**
+   * A diferencia de `findTeam`, no filtra por `estadoParticipacion` (para
+   * mostrar el estado real de cada integrante) y suma las horas aprobadas
+   * de cada participación. Endpoint separado para no cambiar el
+   * comportamiento de `/equipo`, que ya asume solo participantes ACTIVO.
+   */
+  async findMembers(id: number) {
+    const participaciones = await this.prisma.participacionProyecto.findMany({
+      where: {
+        rolProyecto: { idProyecto: id },
+      },
+      select: {
+        idParticipacion: true,
+        estadoParticipacion: true,
+        fechaIngreso: true,
+        usuario: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+            fotoUrl: true,
+          },
+        },
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
+          },
+        },
+        registrosHoras: {
+          where: { estadoHoras: 'APROBADA' },
+          select: { horasAprobadas: true },
+        },
+      },
+      orderBy: {
+        fechaIngreso: 'asc',
+      },
+    });
+
+    return participaciones.map(({ registrosHoras, ...participacion }) => ({
+      ...participacion,
+      horasRegistradas: registrosHoras.reduce(
+        (total, r) => total + Number(r.horasAprobadas ?? 0),
+        0,
+      ),
+    }));
+  }
+
   async findFeatured() {
     const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
     if (cached) return cached;
