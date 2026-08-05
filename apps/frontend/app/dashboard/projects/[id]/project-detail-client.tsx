@@ -9,7 +9,6 @@ import {
   Building2,
   Calendar,
   CalendarCheck2,
-  CheckCircle2,
   History,
   Pencil,
   Plus,
@@ -26,6 +25,7 @@ import {
 } from '@/components/projects/project-roles-sheet';
 import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
 import { ProjectClosureSection } from '@/components/projects/detail/project-closure-section';
+import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
@@ -246,26 +246,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
         {/* FILA 2 · COL 1 — Objetivos + Roles */}
         <div className="min-w-0 space-y-5">
-          {/* OBJETIVOS (Sección 16) */}
-          <div className={CARD}>
-            <h2 className="mb-3 font-headline text-xs font-black uppercase tracking-widest text-tertiary">
-              Objetivos del proyecto
-            </h2>
-            {objetivos.length === 0 ? (
-              <p className="text-sm text-tertiary">
-                No se han registrado objetivos para este proyecto.
-              </p>
-            ) : (
-              <ul className="space-y-2.5">
-                {objetivos.map((obj, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="text-[13px] leading-relaxed text-on-surface-variant">{obj}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <ProjectObjectivesSection objetivos={objetivos} />
 
           {/* ROLES (Sección 17-20) */}
           {isLeader ? (
