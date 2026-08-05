@@ -21,6 +21,11 @@ import {
   newRol, newRequisito, safeId,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from '../form/types';
+import {
+  ProjectGeneralInfoSection,
+  ReadonlyField,
+  SectionCommentReadonly,
+} from '@/components/projects/detail/project-general-info-section';
 
 interface Props { id: number; }
 
@@ -33,41 +38,6 @@ function formatDate(iso: string | null | undefined): string {
   try {
     return new Intl.DateTimeFormat('es-GT', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
   } catch { return iso; }
-}
-
-function ReadonlyField({ label, value }: { label: string; value: string | null | undefined }) {
-  const display = value == null || value === '' ? '—' : value;
-  const isEmpty = display === '—';
-  return (
-    <div>
-      <label className={labelClass}>{label}</label>
-      <div className={`w-full rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap min-h-11 ${
-        isEmpty
-          ? 'border-outline-variant/20 bg-surface-container-lowest text-tertiary italic'
-          : 'border-outline-variant/30 bg-surface-container-low/60 text-on-surface'
-      }`}>
-        {display}
-      </div>
-    </div>
-  );
-}
-
-function SectionCommentReadonly({ comment }: { comment?: string }) {
-  return (
-    <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-          Comentarios del revisor
-        </span>
-      </div>
-      <div className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
-        {comment?.trim() || (
-          <span className="text-outline-variant italic">Sin comentarios aún.</span>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function ViewSkeleton() {
@@ -128,30 +98,20 @@ function ProjectReadOnlyView({
         </div>
       )}
 
-      <section>
-        <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
-          Información general
-        </h2>
-        <div className="space-y-4">
-          <ReadonlyField label="Título del proyecto" value={proyecto.tituloProyecto} />
-          <ReadonlyField label="Descripción" value={proyecto.descripcionProyecto} />
-          <div className="grid grid-cols-2 gap-4">
-            <ReadonlyField label="Tipo" value={TIPO_LABEL[proyecto.tipoProyecto as TipoProyecto] ?? proyecto.tipoProyecto} />
-            <ReadonlyField label="Modalidad" value={MODALIDAD_LABEL[proyecto.modalidadProyecto as ModalidadProyecto] ?? proyecto.modalidadProyecto} />
-          </div>
-          <ReadonlyField label="Objetivos" value={proyecto.objetivosProyecto} />
-          <div className="grid grid-cols-2 gap-4">
-            <ReadonlyField label="Contexto académico" value={proyecto.contextoAcademico} />
-            <ReadonlyField label="Ubicación" value={proyecto.ubicacionProyecto} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <ReadonlyField label="Fecha de inicio" value={formatDate(proyecto.fechaInicio)} />
-            <ReadonlyField label="Fecha fin estimada" value={formatDate(proyecto.fechaFinEstimada)} />
-          </div>
-          <ReadonlyField label="URL recurso externo" value={proyecto.urlRecursoExterno} />
-        </div>
-        {esObservado && <SectionCommentReadonly comment={comentarios.general} />}
-      </section>
+      <ProjectGeneralInfoSection
+        tituloProyecto={proyecto.tituloProyecto}
+        descripcionProyecto={proyecto.descripcionProyecto}
+        tipoProyecto={proyecto.tipoProyecto}
+        modalidadProyecto={proyecto.modalidadProyecto}
+        objetivosProyecto={proyecto.objetivosProyecto}
+        contextoAcademico={proyecto.contextoAcademico}
+        ubicacionProyecto={proyecto.ubicacionProyecto}
+        fechaInicio={proyecto.fechaInicio}
+        fechaFinEstimada={proyecto.fechaFinEstimada}
+        urlRecursoExterno={proyecto.urlRecursoExterno}
+        mostrarComentario={esObservado}
+        comentario={comentarios.general}
+      />
 
       <section>
         <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
