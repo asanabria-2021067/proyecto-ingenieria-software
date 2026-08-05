@@ -1,9 +1,10 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Users, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowDown, ArrowUp, ArrowUpDown, Users, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -16,6 +17,7 @@ import {
 import {
   useProjectMembersAdmin,
   type EstadoParticipacion,
+  type MiembroAdminDTO,
 } from '@/hooks/use-project-members-admin';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import type { TareaPublicaDTO } from '@/lib/types/tasks';
@@ -64,6 +66,75 @@ function countActiveTasksByUser(tasks: TareaPublicaDTO[]): Map<number, number> {
   return counts;
 }
 
+type SortKey = 'nombre' | 'rol' | 'estado' | 'tareasActivas' | 'horas';
+type SortDirection = 'asc' | 'desc';
+
+interface SortState {
+  key: SortKey;
+  direction: SortDirection;
+}
+
+const ESTADO_ORDEN: Record<EstadoParticipacion, number> = {
+  ACTIVO: 0,
+  RETIRADO: 1,
+  COMPLETADO: 2,
+};
+
+function compareMembers(
+  a: MiembroAdminDTO,
+  b: MiembroAdminDTO,
+  activeTasksByUser: Map<number, number>,
+  key: SortKey,
+): number {
+  switch (key) {
+    case 'nombre':
+      return `${a.usuario.nombre} ${a.usuario.apellido}`.localeCompare(
+        `${b.usuario.nombre} ${b.usuario.apellido}`,
+      );
+    case 'rol':
+      return a.rolProyecto.nombreRol.localeCompare(b.rolProyecto.nombreRol);
+    case 'estado':
+      return ESTADO_ORDEN[a.estadoParticipacion] - ESTADO_ORDEN[b.estadoParticipacion];
+    case 'tareasActivas':
+      return (
+        (activeTasksByUser.get(a.usuario.idUsuario) ?? 0) -
+        (activeTasksByUser.get(b.usuario.idUsuario) ?? 0)
+      );
+    case 'horas':
+      return a.horasRegistradas - b.horasRegistradas;
+    default:
+      return 0;
+  }
+}
+
+function SortableHead({
+  label,
+  sortKey,
+  sort,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortState;
+  onSort: (key: SortKey) => void;
+}) {
+  const isActive = sort.key === sortKey;
+  const Icon = isActive ? (sort.direction === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+
+  return (
+    <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 hover:text-on-surface transition-colors"
+      >
+        {label}
+        <Icon className={`h-3 w-3 ${isActive ? 'text-primary' : 'text-tertiary/60'}`} />
+      </button>
+    </TableHead>
+  );
+}
+
 const COLUMN_COUNT = 5;
 
 function SkeletonRows() {
@@ -106,6 +177,23 @@ export default function MiembrosProyectoPage() {
   const isError = membersError || tasksError;
   const activeTasksByUser = countActiveTasksByUser(tasks);
 
+  const [sort, setSort] = useState<SortState>({ key: 'nombre', direction: 'asc' });
+
+  const handleSort = (key: SortKey) => {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
+  const sortedMembers = useMemo(() => {
+    const sorted = [...members].sort((a, b) =>
+      compareMembers(a, b, activeTasksByUser, sort.key),
+    );
+    return sort.direction === 'asc' ? sorted : sorted.reverse();
+  }, [members, activeTasksByUser, sort]);
+
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
       <Link
@@ -132,21 +220,16 @@ export default function MiembrosProyectoPage() {
         <Table>
           <TableHeader>
             <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-              <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                Integrante
-              </TableHead>
-              <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                Rol
-              </TableHead>
-              <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                Estado
-              </TableHead>
-              <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                Tareas activas
-              </TableHead>
-              <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                Horas registradas
-              </TableHead>
+              <SortableHead label="Integrante" sortKey="nombre" sort={sort} onSort={handleSort} />
+              <SortableHead label="Rol" sortKey="rol" sort={sort} onSort={handleSort} />
+              <SortableHead label="Estado" sortKey="estado" sort={sort} onSort={handleSort} />
+              <SortableHead
+                label="Tareas activas"
+                sortKey="tareasActivas"
+                sort={sort}
+                onSort={handleSort}
+              />
+              <SortableHead label="Horas registradas" sortKey="horas" sort={sort} onSort={handleSort} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -177,7 +260,7 @@ export default function MiembrosProyectoPage() {
 
             {!isLoading &&
               !isError &&
-              members.map((miembro) => (
+              sortedMembers.map((miembro) => (
                 <TableRow
                   key={miembro.idParticipacion}
                   className="border-outline-variant/40 hover:bg-surface-container-low transition-colors"
