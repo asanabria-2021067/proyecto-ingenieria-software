@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle,
   ArrowRight,
   Building2,
   Calendar,
@@ -16,7 +15,6 @@ import {
   Plus,
   Settings2,
   Users,
-  XCircle,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +25,7 @@ import {
   type RolesSheetIntent,
 } from '@/components/projects/project-roles-sheet';
 import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
+import { ProjectClosureSection } from '@/components/projects/detail/project-closure-section';
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
@@ -196,49 +195,14 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 pb-12 pt-6 md:px-8">
       <ProjectSummarySection proyecto={proyecto} isLeader={isLeader} isAdmin={isAdmin} puedeVerKanban={puedeVerKanban}>
-        {/* Aviso de solicitud de cierre pendiente: visible para el líder (informativo)
-            y para el administrador (con acciones de aprobar/rechazar). */}
         {enSolicitudCierre && (
-          <div
-            role="status"
-            className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-400/25"
-          >
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-              <div>
-                <p className="text-sm font-bold text-on-surface">Solicitud de cierre pendiente</p>
-                <p className="text-xs leading-relaxed text-on-surface-variant">
-                  {isAdmin && !isLeader
-                    ? 'El responsable solicitó cerrar este proyecto. Aprueba o rechaza la solicitud.'
-                    : 'Enviaste la solicitud de cierre. Un administrador debe aprobarla para finalizar el proyecto.'}
-                  {proyecto.fechaActualizacion && ` Actualizado el ${formatDate(proyecto.fechaActualizacion)}.`}
-                </p>
-              </div>
-            </div>
-            {isAdmin && !isLeader && (
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={resolviendoCierre}
-                  onClick={() => resolverCierre('RECHAZAR')}
-                  className="gap-1.5 rounded-md border-error/40 text-xs font-bold text-error hover:bg-error/10"
-                >
-                  <XCircle className="size-3.5" aria-hidden="true" />
-                  Rechazar
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={resolviendoCierre}
-                  onClick={() => resolverCierre('APROBAR')}
-                  className="gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
-                >
-                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  Aprobar cierre
-                </Button>
-              </div>
-            )}
-          </div>
+          <ProjectClosureSection
+            proyecto={proyecto}
+            isLeader={isLeader}
+            isAdmin={isAdmin}
+            resolviendoCierre={resolviendoCierre}
+            resolverCierre={resolverCierre}
+          />
         )}
       </ProjectSummarySection>
 
