@@ -1,18 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  ArrowRight,
-  Building2,
-  Calendar,
-  CalendarCheck2,
-  History,
-  Pencil,
-  Settings2,
-} from 'lucide-react';
+import { ArrowRight, History, Pencil, Settings2 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -21,12 +13,7 @@ import { ProjectSummarySection } from '@/components/projects/detail/project-summ
 import { ProjectClosureSection } from '@/components/projects/detail/project-closure-section';
 import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
 import { ProjectRoleManagementSection } from '@/components/projects/detail/project-role-management-section';
-import {
-  estadoBadgeLabel,
-  estadoBadgeStyle,
-  tipoBadgeLabel,
-} from '@/components/projects/available-project-card';
-import { MODALIDAD_LABEL } from '@/types';
+import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -39,15 +26,6 @@ interface Props {
 }
 
 const MIS_PROYECTOS_HREF = '/dashboard/projects/mine';
-
-function formatDate(date: string | null): string {
-  if (!date) return 'Por definir';
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return 'No disponible.';
-  return d.toLocaleDateString('es-GT', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-const CARD ='rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
 
 // ─── Skeleton de carga ────────────────────────────────────────────────────────
 function ProjectDetailSkeleton() {
@@ -78,7 +56,6 @@ const TAB_INACTIVE = `${TAB_BASE} border-transparent text-tertiary hover:border-
 
 function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const idProyecto = proyecto.idProyecto;
-  const organizacionPrincipal = proyecto.organizaciones[0] ?? null;
   const { members } = useProjectMembers(idProyecto);
   const { data: currentUser } = useCurrentUser();
   // Duplicado deliberado de isAdminUser(): las pruebas de esta página mockean
@@ -260,96 +237,15 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           />
         </div>
 
-        {/* FILA 2 · COL 2 — Detalles + Resumen (Sección 21-24), sticky */}
-        <div className="space-y-4 lg:sticky lg:top-22.5">
-          {/* Detalles del proyecto */}
-          <div className={CARD}>
-            <h2 className="mb-4 font-headline text-xs font-black uppercase tracking-widest text-tertiary">
-              Detalles del proyecto
-            </h2>
-            <dl className="space-y-3.5 text-sm">
-              <DetalleFila label="Estado">
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
-                  {estadoBadgeLabel(proyecto.estadoProyecto)}
-                </span>
-              </DetalleFila>
-              <DetalleFila label="Tipo de proyecto">{tipoBadgeLabel(proyecto.tipoProyecto)}</DetalleFila>
-              <DetalleFila label="Modalidad">
-                {MODALIDAD_LABEL[proyecto.modalidadProyecto as keyof typeof MODALIDAD_LABEL] ?? proyecto.modalidadProyecto}
-              </DetalleFila>
-              {organizacionPrincipal && (
-                <DetalleFila label="Organización">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Building2 className="size-3.5 text-outline" aria-hidden="true" />
-                    {organizacionPrincipal.organizacion.nombreOrganizacion}
-                  </span>
-                </DetalleFila>
-              )}
-              <DetalleFila label="Fecha de inicio">
-                <span className="inline-flex items-center gap-1.5">
-                  <Calendar className="size-3.5 text-outline" aria-hidden="true" />
-                  {formatDate(proyecto.fechaInicio)}
-                </span>
-              </DetalleFila>
-              <DetalleFila label="Fecha final estimada">
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarCheck2 className="size-3.5 text-outline" aria-hidden="true" />
-                  {formatDate(proyecto.fechaFinEstimada)}
-                </span>
-              </DetalleFila>
-            </dl>
-          </div>
-
-          {/* Resumen del equipo (Sección 24) — solo con datos enriquecidos del líder */}
-          {isLeader && (
-            <div className={CARD}>
-              <h2 className="mb-4 font-headline text-xs font-black uppercase tracking-widest text-tertiary">
-                Resumen del equipo
-              </h2>
-              <div className="space-y-3.5 text-sm">
-                <div>
-                  <p className="mb-1 text-xs text-tertiary">Mis roles</p>
-                  {misRoles.length === 0 ? (
-                    <p className="text-sm font-medium text-on-surface-variant">No asignado</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {misRoles.map((r) => (
-                        <span
-                          key={r.idRolProyecto}
-                          className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
-                        >
-                          {r.nombreRol}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <ResumenFila label="Participantes confirmados" value={participantesConfirmados} />
-                <ResumenFila label="Roles disponibles" value={rolesDisponiblesCount} />
-                <ResumenFila label="Cupos totales" value={cuposTotales} />
-              </div>
-            </div>
-          )}
-        </div>
+        <ProjectDetailsSection
+          proyecto={proyecto}
+          isLeader={isLeader}
+          misRoles={misRoles}
+          participantesConfirmados={participantesConfirmados}
+          rolesDisponiblesCount={rolesDisponiblesCount}
+          cuposTotales={cuposTotales}
+        />
       </div>
-    </div>
-  );
-}
-
-function DetalleFila({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-xs text-tertiary">{label}</dt>
-      <dd className="text-right text-sm font-medium text-on-surface">{children}</dd>
-    </div>
-  );
-}
-
-function ResumenFila({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-tertiary">{label}</span>
-      <span className="text-sm font-bold text-on-surface">{value}</span>
     </div>
   );
 }
