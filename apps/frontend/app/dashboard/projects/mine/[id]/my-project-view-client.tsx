@@ -23,7 +23,6 @@ import {
 } from '../form/types';
 import {
   ProjectGeneralInfoSection,
-  ReadonlyField,
   SectionCommentReadonly,
 } from '@/components/projects/detail/project-general-info-section';
 import { ProjectRolesSkillsSection } from '@/components/projects/detail/project-roles-skills-section';
@@ -767,40 +766,21 @@ export default function MyProjectViewClient({ id }: Props) {
 
                 {/* Sección 1: Información general */}
                 {snap && (
-                  <section>
-                    <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
-                      Información general
-                    </h2>
-                    <div className="space-y-4">
-                      <ReadonlyField label="Título del proyecto" value={snap.tituloProyecto} />
-                      <ReadonlyField label="Descripción" value={snap.descripcionProyecto} />
-                      <div className="grid grid-cols-2 gap-4">
-                        <ReadonlyField label="Tipo" value={TIPO_LABEL[snap.tipoProyecto as TipoProyecto] ?? snap.tipoProyecto} />
-                        <ReadonlyField label="Modalidad" value={MODALIDAD_LABEL[snap.modalidadProyecto as ModalidadProyecto] ?? snap.modalidadProyecto} />
-                      </div>
-                      <ReadonlyField label="Objetivos" value={snap.objetivosProyecto} />
-                      <div className="grid grid-cols-2 gap-4">
-                        <ReadonlyField label="Contexto académico" value={snap.contextoAcademico} />
-                        <ReadonlyField label="Ubicación" value={snap.ubicacionProyecto} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <ReadonlyField label="Fecha de inicio" value={formatDate(snap.fechaInicio)} />
-                        <ReadonlyField label="Fecha fin estimada" value={formatDate(snap.fechaFinEstimada)} />
-                      </div>
-                      <ReadonlyField label="URL recurso externo" value={snap.urlRecursoExterno} />
-                    </div>
-                    {c.general && (
-                      <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-                            Comentarios del revisor
-                          </span>
-                        </div>
-                        <p className="text-sm text-on-surface whitespace-pre-wrap">{c.general}</p>
-                      </div>
-                    )}
-                  </section>
+                  <ProjectGeneralInfoSection
+                    tituloProyecto={snap.tituloProyecto}
+                    descripcionProyecto={snap.descripcionProyecto}
+                    tipoProyecto={snap.tipoProyecto}
+                    modalidadProyecto={snap.modalidadProyecto}
+                    objetivosProyecto={snap.objetivosProyecto}
+                    contextoAcademico={snap.contextoAcademico}
+                    ubicacionProyecto={snap.ubicacionProyecto}
+                    fechaInicio={snap.fechaInicio}
+                    fechaFinEstimada={snap.fechaFinEstimada}
+                    urlRecursoExterno={snap.urlRecursoExterno}
+                    mostrarComentario={Boolean(c.general)}
+                    comentario={c.general}
+                    commentVariant="plain"
+                  />
                 )}
 
                 {/* Comentarios generales cuando no hay snapshot */}
@@ -823,57 +803,12 @@ export default function MyProjectViewClient({ id }: Props) {
 
                 {/* Sección 2: Roles y habilidades */}
                 {snap && (
-                  <section>
-                    <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
-                      Roles y habilidades
-                    </h2>
-                    {snap.roles.length === 0 ? (
-                      <p className="text-sm text-tertiary italic">Sin roles definidos.</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {snap.roles.map((rol, i) => (
-                          <div key={rol.idRolProyecto} className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Rol {i + 1}</p>
-                            <div className="grid grid-cols-2 gap-4">
-                              <ReadonlyField label="Nombre del rol" value={rol.nombreRol} />
-                              <ReadonlyField label="Cupos" value={String(rol.cupos)} />
-                            </div>
-                            {rol.descripcionRolProyecto && <ReadonlyField label="Descripción del rol" value={rol.descripcionRolProyecto} />}
-                            <div className="grid grid-cols-2 gap-4">
-                              {rol.carreraRequerida && <ReadonlyField label="Carrera requerida" value={rol.carreraRequerida.nombreCarrera} />}
-                              {rol.horasSemanalesEstimadas != null && <ReadonlyField label="Horas semanales" value={String(rol.horasSemanalesEstimadas)} />}
-                            </div>
-                            {rol.requisitos.length > 0 && (
-                              <div>
-                                <label className={labelClass}>Habilidades requeridas</label>
-                                <div className="flex flex-wrap gap-2 mt-1">
-                                  {rol.requisitos.map((req) => (
-                                    <span key={req.idRequisitoHabilidad} className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-high px-3 py-1.5 text-xs font-medium text-on-surface">
-                                      {req.habilidad.nombreHabilidad}
-                                      <span className="text-tertiary">·</span>
-                                      <span className="text-tertiary">{NIVEL_LABEL[req.nivelMinimo as NivelHabilidad] ?? req.nivelMinimo}</span>
-                                      {req.obligatorio && <span className="text-error font-bold ml-0.5">*</span>}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {c.roles && (
-                      <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-                            Comentarios del revisor
-                          </span>
-                        </div>
-                        <p className="text-sm text-on-surface whitespace-pre-wrap">{c.roles}</p>
-                      </div>
-                    )}
-                  </section>
+                  <ProjectRolesSkillsSection
+                    roles={snap.roles}
+                    mostrarComentario={Boolean(c.roles)}
+                    comentario={c.roles}
+                    commentVariant="plain"
+                  />
                 )}
 
                 {/* Comentarios de roles cuando no hay snapshot */}

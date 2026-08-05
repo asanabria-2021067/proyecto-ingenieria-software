@@ -25,12 +25,15 @@ interface ProjectRolesSkillsSectionProps {
   roles: RolItem[];
   mostrarComentario: boolean;
   comentario?: string;
+  /** Variante visual del comentario ('field' por defecto, igual que T10/T11). */
+  commentVariant?: 'field' | 'plain';
 }
 
 export function ProjectRolesSkillsSection({
   roles,
   mostrarComentario,
   comentario,
+  commentVariant = 'field',
 }: ProjectRolesSkillsSectionProps) {
   return (
     <section>
@@ -74,7 +77,7 @@ export function ProjectRolesSkillsSection({
           ))}
         </div>
       )}
-      {mostrarComentario && <SectionCommentReadonly comment={comentario} />}
+      {mostrarComentario && <SectionCommentReadonly comment={comentario} variant={commentVariant} />}
     </section>
   );
 }

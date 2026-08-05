@@ -28,7 +28,14 @@ export function ReadonlyField({ label, value }: { label: string; value: string |
   );
 }
 
-export function SectionCommentReadonly({ comment }: { comment?: string }) {
+export function SectionCommentReadonly({
+  comment,
+  variant = 'field',
+}: {
+  comment?: string;
+  /** 'field' (default, T10/T11): caja interior con fallback. 'plain' (histórico/snapshot): texto plano equivalente al markup previo a T12, sin caja interior. */
+  variant?: 'field' | 'plain';
+}) {
   return (
     <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
       <div className="flex items-center gap-2 mb-3">
@@ -37,11 +44,15 @@ export function SectionCommentReadonly({ comment }: { comment?: string }) {
           Comentarios del revisor
         </span>
       </div>
-      <div className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
-        {comment?.trim() || (
-          <span className="text-outline-variant italic">Sin comentarios aún.</span>
-        )}
-      </div>
+      {variant === 'plain' ? (
+        <p className="text-sm text-on-surface whitespace-pre-wrap">{comment}</p>
+      ) : (
+        <div className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
+          {comment?.trim() || (
+            <span className="text-outline-variant italic">Sin comentarios aún.</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -59,6 +70,8 @@ interface ProjectGeneralInfoSectionProps {
   urlRecursoExterno: string | null;
   mostrarComentario: boolean;
   comentario?: string;
+  /** Variante visual del comentario ('field' por defecto, igual que T10/T11). */
+  commentVariant?: 'field' | 'plain';
 }
 
 export function ProjectGeneralInfoSection({
@@ -74,6 +87,7 @@ export function ProjectGeneralInfoSection({
   urlRecursoExterno,
   mostrarComentario,
   comentario,
+  commentVariant = 'field',
 }: ProjectGeneralInfoSectionProps) {
   return (
     <section>
@@ -98,7 +112,7 @@ export function ProjectGeneralInfoSection({
         </div>
         <ReadonlyField label="URL recurso externo" value={urlRecursoExterno} />
       </div>
-      {mostrarComentario && <SectionCommentReadonly comment={comentario} />}
+      {mostrarComentario && <SectionCommentReadonly comment={comentario} variant={commentVariant} />}
     </section>
   );
 }
