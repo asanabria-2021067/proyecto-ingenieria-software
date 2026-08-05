@@ -4,7 +4,18 @@ import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, ArrowDown, ArrowUp, ArrowUpDown, Users, AlertCircle } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Users,
+  UserCheck,
+  ListChecks,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -135,6 +146,33 @@ function SortableHead({
   );
 }
 
+/** Mismo estilo de tarjeta que CardShell en proyectos/[id]/page.tsx. */
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  isLoading,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="rounded-[10px] border border-[#D3DDD3] dark:border-outline-variant bg-white dark:bg-surface-container-lowest shadow-[0_1px_4px_rgba(24,28,32,0.05)] p-4">
+      <div className="flex items-center gap-2 mb-2 text-tertiary">
+        <Icon className="h-4 w-4" />
+        <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-8 w-14 rounded bg-surface-container-high" />
+      ) : (
+        <p className="font-headline text-2xl font-extrabold text-on-surface">{value}</p>
+      )}
+    </div>
+  );
+}
+
 const COLUMN_COUNT = 5;
 
 function SkeletonRows() {
@@ -194,6 +232,11 @@ export default function MiembrosProyectoPage() {
     return sort.direction === 'asc' ? sorted : sorted.reverse();
   }, [members, activeTasksByUser, sort]);
 
+  const integrantesActivos = members.filter((m) => m.estadoParticipacion === 'ACTIVO').length;
+  const tareasAbiertas = tasks.filter((t) => t.estadoTarea !== 'HECHO').length;
+  const tareasCompletadas = tasks.filter((t) => t.estadoTarea === 'HECHO').length;
+  const horasAcumuladas = members.reduce((total, m) => total + m.horasRegistradas, 0);
+
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
       <Link
@@ -214,6 +257,33 @@ export default function MiembrosProyectoPage() {
         <p className="text-tertiary text-sm">
           Integrantes del proyecto, su rol y su estado de participación
         </p>
+      </div>
+
+      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <MetricCard
+          icon={UserCheck}
+          label="Integrantes activos"
+          value={String(integrantesActivos)}
+          isLoading={isLoading}
+        />
+        <MetricCard
+          icon={ListChecks}
+          label="Tareas abiertas"
+          value={String(tareasAbiertas)}
+          isLoading={isLoading}
+        />
+        <MetricCard
+          icon={CheckCircle2}
+          label="Tareas completadas"
+          value={String(tareasCompletadas)}
+          isLoading={isLoading}
+        />
+        <MetricCard
+          icon={Clock}
+          label="Horas acumuladas"
+          value={formatHoras(horasAcumuladas)}
+          isLoading={isLoading}
+        />
       </div>
 
       <div className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
