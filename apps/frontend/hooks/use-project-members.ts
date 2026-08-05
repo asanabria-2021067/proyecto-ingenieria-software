@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api/client';
+import { projectMembersQueryKey } from '@/lib/query-keys/members';
 
 /**
  * `apps/frontend/lib/services/` está protegido en esta tarea (Tarea 38,
@@ -50,12 +51,7 @@ function isValidProjectId(idProyecto: number): boolean {
   return Number.isInteger(idProyecto) && idProyecto > 0;
 }
 
-/**
- * Misma query key que ya usa `equipo/page.tsx` (`['proyecto-equipo', id]`),
- * reutilizada intencionalmente para compartir caché con esa página en vez
- * de introducir una clave equivalente distinta.
- */
-export const projectMembersQueryKey = (idProyecto: number) => ['proyecto-equipo', idProyecto] as const;
+export { projectMembersQueryKey };
 
 /**
  * `findTeam` ya filtra por `estadoParticipacion: 'ACTIVO'` en el backend:
