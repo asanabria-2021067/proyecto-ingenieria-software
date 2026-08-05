@@ -15,32 +15,22 @@ import {
   Pencil,
   Plus,
   Settings2,
-  Tag,
   Users,
   XCircle,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { RoleAdminCard } from '@/components/projects/role-admin-card';
 import {
   ProjectRolesSheet,
   type RolesSheetIntent,
 } from '@/components/projects/project-roles-sheet';
+import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
   tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { MODALIDAD_LABEL } from '@/types';
 import { useProjectMembers } from '@/hooks/use-project-members';
@@ -55,10 +45,6 @@ interface Props {
 }
 
 const MIS_PROYECTOS_HREF = '/dashboard/projects/mine';
-
-function getInitials(nombre: string, apellido: string): string {
-  return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
-}
 
 function formatDate(date: string | null): string {
   if (!date) return 'Por definir';
@@ -209,165 +195,52 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 pb-12 pt-6 md:px-8">
-      {/* BREADCRUMB (Sección 8) */}
-      <Breadcrumb className="mb-5">
-        <BreadcrumbList className="text-[13px]">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={MIS_PROYECTOS_HREF} className="text-tertiary transition-colors hover:text-on-surface">
-                Mis proyectos
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="max-w-xs truncate font-medium text-on-surface">
-              {proyecto.tituloProyecto}
-            </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      {/* Aviso de solicitud de cierre pendiente: visible para el líder (informativo)
-          y para el administrador (con acciones de aprobar/rechazar). */}
-      {enSolicitudCierre && (
-        <div
-          role="status"
-          className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-400/25"
-        >
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-            <div>
-              <p className="text-sm font-bold text-on-surface">Solicitud de cierre pendiente</p>
-              <p className="text-xs leading-relaxed text-on-surface-variant">
-                {isAdmin && !isLeader
-                  ? 'El responsable solicitó cerrar este proyecto. Aprueba o rechaza la solicitud.'
-                  : 'Enviaste la solicitud de cierre. Un administrador debe aprobarla para finalizar el proyecto.'}
-                {proyecto.fechaActualizacion && ` Actualizado el ${formatDate(proyecto.fechaActualizacion)}.`}
-              </p>
-            </div>
-          </div>
-          {isAdmin && !isLeader && (
-            <div className="flex shrink-0 gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={resolviendoCierre}
-                onClick={() => resolverCierre('RECHAZAR')}
-                className="gap-1.5 rounded-md border-error/40 text-xs font-bold text-error hover:bg-error/10"
-              >
-                <XCircle className="size-3.5" aria-hidden="true" />
-                Rechazar
-              </Button>
-              <Button
-                size="sm"
-                disabled={resolviendoCierre}
-                onClick={() => resolverCierre('APROBAR')}
-                className="gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
-              >
-                <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                Aprobar cierre
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Fila 1: tarjeta principal · Responsable, con items-stretch para que
-          ambas tarjetas queden a la misma altura, sin el escalón. */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
-        {/* FILA 1 · COL 1 — Tarjeta principal (Sección 9-13) */}
-        <div className={`${CARD} min-w-0`}>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 space-y-3">
-                {/* Badges (Sección 10) */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {isLeader && (
-                    <span className="inline-flex items-center rounded-full bg-primary px-3 py-1 text-xs font-semibold text-on-primary">
-                      Líder del proyecto
-                    </span>
-                  )}
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
-                    {estadoBadgeLabel(proyecto.estadoProyecto)}
-                  </span>
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${tipoBadgeStyle(proyecto.tipoProyecto)}`}>
-                    {tipoBadgeLabel(proyecto.tipoProyecto)}
-                  </span>
-                  <span className="inline-flex items-center rounded-full border border-outline-variant px-3 py-1 text-xs font-medium text-on-surface-variant">
-                    {MODALIDAD_LABEL[proyecto.modalidadProyecto as keyof typeof MODALIDAD_LABEL] ?? proyecto.modalidadProyecto}
-                  </span>
-                </div>
-
-                {/* Título + descripción (Sección 11) */}
-                <h1 className="font-headline text-2xl font-black leading-tight text-on-surface md:text-[28px]">
-                  {proyecto.tituloProyecto}
-                </h1>
-                <p className="max-w-2xl text-sm leading-relaxed text-on-surface-variant">
-                  {proyecto.descripcionProyecto || 'Sin descripción disponible.'}
+      <ProjectSummarySection proyecto={proyecto} isLeader={isLeader} isAdmin={isAdmin} puedeVerKanban={puedeVerKanban}>
+        {/* Aviso de solicitud de cierre pendiente: visible para el líder (informativo)
+            y para el administrador (con acciones de aprobar/rechazar). */}
+        {enSolicitudCierre && (
+          <div
+            role="status"
+            className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-400/25"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-bold text-on-surface">Solicitud de cierre pendiente</p>
+                <p className="text-xs leading-relaxed text-on-surface-variant">
+                  {isAdmin && !isLeader
+                    ? 'El responsable solicitó cerrar este proyecto. Aprueba o rechaza la solicitud.'
+                    : 'Enviaste la solicitud de cierre. Un administrador debe aprobarla para finalizar el proyecto.'}
+                  {proyecto.fechaActualizacion && ` Actualizado el ${formatDate(proyecto.fechaActualizacion)}.`}
                 </p>
-
-                {/* Etiquetas temáticas reales (Sección 11) */}
-                {proyecto.intereses.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {proyecto.intereses.map((pi) => (
-                      <span
-                        key={pi.idProyectoInteres}
-                        className="inline-flex items-center gap-1 rounded-md bg-surface-container-high px-2 py-0.5 text-xs font-medium text-on-surface-variant"
-                      >
-                        <Tag className="size-3" aria-hidden="true" />
-                        {pi.interes.nombreInteres}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Resumen del responsable en el encabezado (Sección 12) */}
-                {isLeader && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <Avatar className="size-8">
-                      <AvatarFallback className="bg-primary/10 text-xs font-black text-primary">
-                        {getInitials(proyecto.creador.nombre, proyecto.creador.apellido)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs text-on-surface-variant">
-                      Eres el responsable del proyecto
-                    </span>
-                  </div>
-                )}
               </div>
-
-              {/* Para líder/participante estas acciones ahora viven en la barra de
-                  tabs debajo del breadcrumb; aquí solo queda la única acción de
-                  quien todavía no participa. */}
-              {!isLeader && !puedeVerKanban && !isAdmin && (
-                <Button className="shrink-0 rounded-md bg-primary px-5 text-sm font-bold text-on-primary hover:bg-primary/90">
-                  Postularme
+            </div>
+            {isAdmin && !isLeader && (
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={resolviendoCierre}
+                  onClick={() => resolverCierre('RECHAZAR')}
+                  className="gap-1.5 rounded-md border-error/40 text-xs font-bold text-error hover:bg-error/10"
+                >
+                  <XCircle className="size-3.5" aria-hidden="true" />
+                  Rechazar
                 </Button>
-              )}
-            </div>
+                <Button
+                  size="sm"
+                  disabled={resolviendoCierre}
+                  onClick={() => resolverCierre('APROBAR')}
+                  className="gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
+                >
+                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                  Aprobar cierre
+                </Button>
+              </div>
+            )}
           </div>
-
-        {/* FILA 1 · COL 2 — Responsable del proyecto (se estira a la altura de la
-            tarjeta principal, alineando ambos bordes inferiores) */}
-        <div className={`${CARD} flex flex-col`}>
-          <h2 className="mb-4 font-headline text-xs font-black uppercase tracking-widest text-tertiary">
-            Responsable del proyecto
-          </h2>
-          <div className="flex items-center gap-3">
-            <Avatar className="size-12">
-              <AvatarFallback className="bg-primary/10 text-sm font-black text-primary">
-                {getInitials(proyecto.creador.nombre, proyecto.creador.apellido)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-on-surface">
-                {proyecto.creador.nombre} {proyecto.creador.apellido}
-              </p>
-              <p className="truncate text-xs text-on-surface-variant">{proyecto.creador.correo}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+        )}
+      </ProjectSummarySection>
 
       {/* Barra de navegación estilo Jira: "Resumen" es la página actual (siempre
           activa); el resto son los mismos enlaces/acciones de antes, solo con
