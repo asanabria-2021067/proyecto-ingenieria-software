@@ -193,6 +193,17 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
     expect(filaValor('Cupos totales')).toBe('5');
   });
 
+  it('"Editar roles" abre el Sheet en modo listado con los roles reales', () => {
+    mockRoles([rol({ idRolProyecto: 1, nombreRol: 'Frontend' })]);
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /editar roles/i }));
+
+    expect(screen.getByRole('heading', { name: 'Gestionar roles' })).toBeInTheDocument();
+    expect(screen.getByText('Roles existentes')).toBeInTheDocument();
+    expect(screen.getAllByTestId('role-list-card')).toHaveLength(1);
+  });
+
   it('"Agregar rol" abre el Sheet en modo creación', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /agregar rol/i }));
