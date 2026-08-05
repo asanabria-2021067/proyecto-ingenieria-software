@@ -533,6 +533,7 @@ model Postulacion {
   @@map("postulacion")
 }
 
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una participación ACTIVO por (idUsuario, idRolProyecto), vía índice único parcial `participacion_proyecto_activa_unique` (migración `20260726000100_enforce_one_active_participation`).
 model ParticipacionProyecto {
   idParticipacion     Int                 @id @default(autoincrement()) @map("id_participacion")
   idUsuario           Int                 @map("id_usuario")
@@ -601,6 +602,7 @@ model Tarea {
   @@map("tarea")
 }
 
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una asignación activa (desasignadaEn IS NULL) por idTarea, vía índice único parcial `asignacion_tarea_activa_unique` (migración `20260720190329_enforce_one_active_task_assignment`).
 model AsignacionTarea {
   idAsignacion    Int       @id @default(autoincrement()) @map("id_asignacion")
   idTarea         Int       @map("id_tarea")
