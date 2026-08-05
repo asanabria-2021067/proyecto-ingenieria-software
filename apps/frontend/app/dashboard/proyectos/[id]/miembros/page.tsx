@@ -17,6 +17,8 @@ import {
   useProjectMembersAdmin,
   type EstadoParticipacion,
 } from '@/hooks/use-project-members-admin';
+import { useProjectTasks } from '@/hooks/use-project-tasks';
+import type { TareaPublicaDTO } from '@/lib/types/tasks';
 
 const ESTADO_PARTICIPACION_CONFIG: Record<
   EstadoParticipacion,
@@ -51,7 +53,18 @@ function formatHoras(horas: number): string {
   return `${horas.toFixed(1)} h`;
 }
 
-const COLUMN_COUNT = 4;
+/** Tareas activas por usuario = asignadas y no HECHO. */
+function countActiveTasksByUser(tasks: TareaPublicaDTO[]): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const tarea of tasks) {
+    if (tarea.estadoTarea === 'HECHO' || !tarea.asignacionActiva) continue;
+    const idUsuario = tarea.asignacionActiva.idUsuario;
+    counts.set(idUsuario, (counts.get(idUsuario) ?? 0) + 1);
+  }
+  return counts;
+}
+
+const COLUMN_COUNT = 5;
 
 function SkeletonRows() {
   return (
@@ -73,6 +86,9 @@ function SkeletonRows() {
           <TableCell className="px-4 py-3">
             <Skeleton className="h-4 w-16 rounded bg-surface-container-high" />
           </TableCell>
+          <TableCell className="px-4 py-3">
+            <Skeleton className="h-4 w-10 rounded bg-surface-container-high" />
+          </TableCell>
         </TableRow>
       ))}
     </>
@@ -82,7 +98,13 @@ function SkeletonRows() {
 export default function MiembrosProyectoPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
-  const { members, isLoading, isError } = useProjectMembersAdmin(idProyecto);
+  const { members, isLoading: membersLoading, isError: membersError } =
+    useProjectMembersAdmin(idProyecto);
+  const { tasks, isLoading: tasksLoading, isError: tasksError } = useProjectTasks(idProyecto);
+
+  const isLoading = membersLoading || tasksLoading;
+  const isError = membersError || tasksError;
+  const activeTasksByUser = countActiveTasksByUser(tasks);
 
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
@@ -118,6 +140,9 @@ export default function MiembrosProyectoPage() {
               </TableHead>
               <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
                 Estado
+              </TableHead>
+              <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+                Tareas activas
               </TableHead>
               <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
                 Horas registradas
@@ -188,6 +213,12 @@ export default function MiembrosProyectoPage() {
 
                   <TableCell className="px-4 py-3">
                     <EstadoParticipacionBadge estado={miembro.estadoParticipacion} />
+                  </TableCell>
+
+                  <TableCell className="px-4 py-3">
+                    <span className="text-sm text-on-surface">
+                      {activeTasksByUser.get(miembro.usuario.idUsuario) ?? 0}
+                    </span>
                   </TableCell>
 
                   <TableCell className="px-4 py-3">
