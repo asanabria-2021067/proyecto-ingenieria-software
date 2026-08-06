@@ -415,6 +415,7 @@ model Proyecto {
   fechaPublicacion    DateTime?         @map("fecha_publicacion") @db.Date
   fechaInicio         DateTime?         @map("fecha_inicio") @db.Date
   fechaFinEstimada    DateTime?         @map("fecha_fin_estimada") @db.Date
+  /// Fuente de verdad del líder del proyecto. No existe una `ParticipacionProyecto` equivalente para el líder: no asumirla ni inventarla.
   creadoPor           Int               @map("creado_por")
   fechaCreacion       DateTime          @default(now()) @map("fecha_creacion")
   fechaActualizacion  DateTime?         @map("fecha_actualizacion")
@@ -511,6 +512,7 @@ model RequisitoHabilidadRol {
   @@map("requisito_habilidad_rol")
 }
 
+/// Representa la solicitud/postulación para ocupar un rol del proyecto. Sprint 6 (T-117/T-118) debe reutilizar este concepto: no crear un `SolicitudRol` paralelo.
 model Postulacion {
   idPostulacion        Int               @id @default(autoincrement()) @map("id_postulacion")
   idUsuarioPostulante  Int               @map("id_usuario_postulante")
@@ -534,6 +536,7 @@ model Postulacion {
 }
 
 /// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una participación ACTIVO por (idUsuario, idRolProyecto), vía índice único parcial `participacion_proyecto_activa_unique` (migración `20260726000100_enforce_one_active_participation`).
+/// Representa la participación de un usuario en UN rol del proyecto; no representa por sí sola la identidad person-centric del integrante (un usuario puede tener varias filas, una por rol).
 model ParticipacionProyecto {
   idParticipacion     Int                 @id @default(autoincrement()) @map("id_participacion")
   idUsuario           Int                 @map("id_usuario")
@@ -603,6 +606,7 @@ model Tarea {
 }
 
 /// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una asignación activa (desasignadaEn IS NULL) por idTarea, vía índice único parcial `asignacion_tarea_activa_unique` (migración `20260720190329_enforce_one_active_task_assignment`).
+/// Fuente de verdad de asignaciones de tareas: asignación vigente = `desasignadaEn == null`. El soft-delete de la tarea vive en `Tarea.eliminadoEn`, NO aquí.
 model AsignacionTarea {
   idAsignacion    Int       @id @default(autoincrement()) @map("id_asignacion")
   idTarea         Int       @map("id_tarea")
@@ -676,6 +680,7 @@ model RevisionEvidencia {
   @@map("revision_evidencia")
 }
 
+/// Fuente de verdad de horas de una participación. Para horas reconocidas/agregadas se usa `horasAprobadas` únicamente cuando `estadoHoras = APROBADA`, siguiendo el patrón ya usado por el resto del código.
 model HorasParticipacion {
   idRegistroHoras Int         @id @default(autoincrement()) @map("id_registro_horas")
   idParticipacion Int         @map("id_participacion")
