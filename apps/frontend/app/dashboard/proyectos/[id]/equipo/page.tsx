@@ -1,10 +1,21 @@
 'use client';
 
+/**
+ * LEGACY — NO EXTENDER.
+ * Esta vista permanece temporalmente por compatibilidad y será reemplazada
+ * por HU-123. No debe recibir nuevas funcionalidades. Los contratos
+ * modernos de miembro/query key ya no deben declararse ni extenderse
+ * localmente aquí; para nuevos desarrollos utilizar:
+ * - @/lib/dto/member.dto
+ * - @/lib/query-keys/members
+ */
+
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, Users, Briefcase } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
+import { projectMembersQueryKey } from '@/lib/query-keys/members';
 
 interface Colaborador {
   idParticipacionProyecto: number;
@@ -34,9 +45,10 @@ interface Colaborador {
 
 export default function EquipoProyectoPage() {
   const { id } = useParams<{ id: string }>();
+  const idProyecto = Number(id);
 
   const { data: equipo = [], isLoading, isError } = useQuery<Colaborador[]>({
-    queryKey: ['proyecto-equipo', id],
+    queryKey: projectMembersQueryKey(idProyecto),
     queryFn: () => apiFetch(`/proyectos/${id}/equipo`),
   });
 
