@@ -234,6 +234,7 @@ function TaskFormDialogContent({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <TaskFormFields
+            mode={mode}
             roles={roles}
             milestones={milestones}
             members={members}
