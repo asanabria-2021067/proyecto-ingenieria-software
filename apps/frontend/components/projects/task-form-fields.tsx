@@ -41,6 +41,8 @@ interface HitoOpcion {
 }
 
 export interface TaskFormFieldsProps {
+  /** Controla si se muestra "Horas reales" (Sección 32-bis): solo en edición, nunca al crear. */
+  mode: 'create' | 'edit';
   roles: RolOpcion[];
   milestones: HitoOpcion[];
   members: MiembroProyecto[];
@@ -113,7 +115,7 @@ function LabelsControl({
   );
 }
 
-export function TaskFormFields({ roles, milestones, members, labels, onManageLabels }: TaskFormFieldsProps) {
+export function TaskFormFields({ mode, roles, milestones, members, labels, onManageLabels }: TaskFormFieldsProps) {
   const { control, watch, getValues, setValue } = useFormContext<TaskFormValues>();
   const rolSeleccionado = watch('idRolProyecto');
   const [cascadaMensaje, setCascadaMensaje] = useState<string | null>(null);
@@ -271,6 +273,34 @@ export function TaskFormFields({ roles, milestones, members, labels, onManageLab
                 </FormItem>
               )}
             />
+
+            {mode === 'edit' && (
+              <FormField
+                control={control}
+                name="horasReales"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Horas reales</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={1000}
+                        step={0.5}
+                        placeholder="Opcional"
+                        className="h-10"
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Horas realmente dedicadas, para justificar reconocimiento.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
         </div>
       </section>
