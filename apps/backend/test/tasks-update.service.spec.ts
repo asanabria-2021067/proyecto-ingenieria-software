@@ -61,6 +61,7 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    horasReales: null,
     hito: null,
     rolProyecto: null,
     asignaciones: [],
@@ -155,6 +156,27 @@ describe('TasksService.update', () => {
         where: { idTarea: 42 },
         data: { tiempoEstimadoHoras: 12 },
       });
+    });
+
+    it('actualiza horasReales de forma independiente', async () => {
+      const { tx, service } = makeService();
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ horasReales: { toNumber: () => 7.5 } }));
+
+      await service.update(5, 42, 1, { horasReales: 7.5 } as any);
+
+      expect(tx.tarea.update).toHaveBeenCalledWith({
+        where: { idTarea: 42 },
+        data: { horasReales: 7.5 },
+      });
+    });
+
+    it('horasReales omitido no aparece en data', async () => {
+      const { tx, service } = makeService();
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+
+      await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+
+      expect(tx.tarea.update.mock.calls[0][0].data).not.toHaveProperty('horasReales');
     });
 
     it('varios campos escalares enviados juntos producen exactamente esas claves en data', async () => {
@@ -898,6 +920,7 @@ describe('TasksService.update', () => {
           'fechaLimite',
           'actualizadaEn',
           'tiempoEstimadoHoras',
+          'horasReales',
           'asignacionActiva',
           'rolProyecto',
           'hito',
