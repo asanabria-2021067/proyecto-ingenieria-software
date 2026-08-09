@@ -21,8 +21,6 @@ import {
   UserRound,
   XCircle,
 } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import AdminLayout from '@/components/admin/AdminLayout';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
@@ -77,7 +75,6 @@ export default function PerfilPage() {
   const [adminDetail, setAdminDetail] = useState<AdminUserDetail | null>(null);
 
   const isAdmin = !isLoading && isAdminUser(user);
-  const Layout = isAdmin ? AdminLayout : DashboardLayout;
 
   useEffect(() => {
     if (!isLoading && !isAdmin) getDashboardStats().then(setStats).catch(() => {});
@@ -103,8 +100,7 @@ export default function PerfilPage() {
   }
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-7xl px-8 py-8">
+      <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="mb-6 flex items-center justify-end">
           <button
             onClick={() => router.push('/dashboard/perfil/editar')}
@@ -567,6 +563,5 @@ export default function PerfilPage() {
           </div>
         </div>
       </div>
-    </Layout>
   );
 }

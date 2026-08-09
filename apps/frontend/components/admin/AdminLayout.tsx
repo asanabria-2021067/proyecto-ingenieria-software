@@ -2,53 +2,43 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
   ClipboardList,
-  Bell,
-  User,
-  LogOut,
   ShieldAlert,
+  KeyRound,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
+import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
+import { UserMenu } from '@/components/dashboard/UserMenu';
+import { SidebarNav, flattenNavEntries, type NavEntry } from '@/components/dashboard/SidebarNav';
 import { TokenRefreshManager } from '@/components/TokenRefreshManager';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { clearTokens } from '@/lib/utils/token';
-import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 
-const adminNavItems = [
+const adminNavEntries: NavEntry[] = [
   { href: '/dashboard/admin', label: 'Panel Admin', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
+  {
+    type: 'group',
+    label: 'Administración',
+    icon: Users,
+    items: [
+      { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
+      { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
+    ],
+  },
   { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: ClipboardList },
-  { href: '/dashboard/notificaciones', label: 'Notificaciones', icon: Bell },
-  { href: '/dashboard/perfil', label: 'Perfil', icon: User },
 ];
+
+const adminNavItemsMobile = flattenNavEntries(adminNavEntries);
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const { data: user, isLoading } = useCurrentUser();
-
-  const handleLogout = async () => {
-    const result = await uvgSwal.fire({
-      icon: 'question',
-      title: 'Cerrar sesion',
-      text: 'Tu sesion actual se cerrara en este dispositivo.',
-      showCancelButton: true,
-      confirmButtonText: 'Si, cerrar sesion',
-      cancelButtonText: 'Cancelar',
-    });
-    if (!result.isConfirmed) return;
-    clearTokens();
-    queryClient.clear();
-    router.replace('/login');
-  };
+  const handleLogout = useLogout();
 
   if (isLoading) {
     return (
@@ -96,63 +86,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </span>
         </div>
 
-        <nav className="flex-1 px-3 py-2 space-y-1">
-          {adminNavItems.map(({ href, label, icon: Icon, exact }) => {
-            const active = exact ? pathname === href : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`}
-                style={
-                  active
-                    ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
-                    : { color: 'var(--admin-text-dim)' }
-                }
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+        <SidebarNav entries={adminNavEntries} theme="admin" />
 
-        <div className="px-3 py-4 space-y-3" style={{ borderTop: '1px solid var(--admin-border)' }}>
-          <div className="flex items-center gap-3 px-3 py-2">
-            {user?.fotoUrl ? (
-              <Image
-                src={user.fotoUrl}
-                alt=""
-                width={32}
-                height={32}
-                className="h-8 w-8 rounded-full object-cover"
-                style={{ border: '1px solid var(--admin-border)' }}
-              />
-            ) : (
-              <div
-                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold"
-                style={{ backgroundColor: 'var(--admin-avatar-bg)', color: 'var(--admin-avatar-fg)' }}
-              >
-                {user ? `${user.nombre[0]}${user.apellido[0]}` : 'A'}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate" style={{ color: 'var(--admin-text)' }}>
-                {user ? `${user.nombre} ${user.apellido}` : 'Admin UVG'}
-              </p>
-              <p className="text-xs truncate" style={{ color: 'var(--admin-text-muted)' }}>
-                {user?.correo ?? 'admin@uvg.edu.gt'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="admin-nav-inactive flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium w-full outline-none transition-all duration-200"
-            style={{ color: 'var(--admin-text-muted)' }}
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            Cerrar sesion
-          </button>
+        <div className="px-3 py-4" style={{ borderTop: '1px solid var(--admin-border)' }}>
+          <UserMenu user={user} onLogout={handleLogout} variant="sidebar" theme="admin" />
         </div>
       </aside>
 
@@ -172,13 +109,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-3">
             <NotificationsBell onlyIcon />
             <ThemeToggle />
-            <button
-              onClick={handleLogout}
-              className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl text-error hover:bg-error/10 transition-colors cursor-pointer"
-              title="Cerrar sesión"
-            >
-              <LogOut className="w-5 h-5 shrink-0" />
-            </button>
           </div>
         </header>
 
@@ -190,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Bottom Navigation - Mobile Only */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2">
-        {adminNavItems.map(({ href, label, icon: Icon, exact }) => {
+        {adminNavItemsMobile.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -205,13 +135,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
           );
         })}
-        <button
-          onClick={handleLogout}
-          className="flex flex-col items-center justify-center w-12 h-12 rounded-xl text-error hover:bg-error/10 transition-all duration-200 cursor-pointer"
-          title="Cerrar sesión"
-        >
-          <LogOut className="w-6 h-6 shrink-0" />
-        </button>
+        <UserMenu user={user} onLogout={handleLogout} variant="compact" theme="admin" />
       </nav>
     </div>
   );

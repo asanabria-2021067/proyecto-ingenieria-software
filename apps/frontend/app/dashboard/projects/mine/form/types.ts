@@ -105,9 +105,20 @@ export const inputClass =
 export const labelClass =
   'block text-xs font-black uppercase tracking-widest text-tertiary mb-1.5';
 
+// `crypto.randomUUID()` solo existe en contextos seguros (HTTPS/localhost);
+// en despliegues servidos por HTTP plano (ej. IP sin TLS) es `undefined` y
+// lanza un TypeError. Estos IDs son solo claves locales de React, así que un
+// fallback simple es suficiente cuando la API no está disponible.
+export function safeId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function newRol(): RolFormItem {
   return {
-    id: crypto.randomUUID(),
+    id: safeId(),
     nombreRol: '',
     descripcionRolProyecto: '',
     idCarreraRequerida: null,
@@ -118,5 +129,5 @@ export function newRol(): RolFormItem {
 }
 
 export function newRequisito(): RequisitoFormItem {
-  return { id: crypto.randomUUID(), idHabilidad: null, nivelMinimo: '', obligatorio: false };
+  return { id: safeId(), idHabilidad: null, nivelMinimo: '', obligatorio: false };
 }
