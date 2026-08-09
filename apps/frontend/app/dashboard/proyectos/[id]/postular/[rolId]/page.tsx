@@ -8,7 +8,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
 import { Postulacion, Proyecto } from '@/types';
 
@@ -85,7 +84,6 @@ export default function PostularPage() {
 
   if (mutation.isSuccess) {
     return (
-      <DashboardLayout>
         <div className="flex items-center justify-center min-h-[80vh] px-8">
           <div className="text-center max-w-md">
             <CheckCircle className="w-16 h-16 text-primary mx-auto mb-4" />
@@ -104,12 +102,10 @@ export default function PostularPage() {
             </Link>
           </div>
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
       <div className="px-8 py-8 max-w-2xl mx-auto">
         <Link
           href={`/dashboard/proyectos/${id}`}
@@ -240,6 +236,5 @@ export default function PostularPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }

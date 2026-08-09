@@ -4,11 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import {
   EstadoHoras,
   EstadoParticipacion,
   EstadoPostulacion,
   EstadoProyecto,
+  EstadoSolicitudRecuperacion,
   EstadoUsuario,
   Prisma,
   TipoProyecto,
@@ -18,7 +20,10 @@ import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
   // ─── Guards ──────────────────────────────────────────────────────────────────
 
@@ -601,5 +606,78 @@ export class AdminService {
       roles: updated.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil),
       fechaCreacion: updated.fechaCreacion.toISOString(),
     };
+  }
+
+  // ─── Solicitudes de recuperación de contraseña (T-100) ────────────────────────
+
+  async getSolicitudesRecuperacionPendientes(callerId: number) {
+    await this.requireAdmin(callerId);
+
+    const solicitudes = await this.prisma.solicitudRecuperacion.findMany({
+      where: { estado: EstadoSolicitudRecuperacion.PENDIENTE },
+      orderBy: { creadaEn: 'desc' },
+      select: {
+        idSolicitud: true,
+        carneReferencia: true,
+        correoReferencia: true,
+        estado: true,
+        creadaEn: true,
+        usuario: {
+          select: { idUsuario: true, nombre: true, apellido: true, correo: true },
+        },
+      },
+    });
+
+    return solicitudes.map((s) => ({
+      idSolicitud: s.idSolicitud,
+      carneReferencia: s.carneReferencia,
+      correoReferencia: s.correoReferencia,
+      estado: s.estado,
+      creadaEn: s.creadaEn.toISOString(),
+      usuario: s.usuario,
+    }));
+  }
+
+  async generarEnlaceRecuperacion(callerId: number, idSolicitud: number) {
+    await this.requireAdmin(callerId);
+
+    const solicitud = await this.prisma.solicitudRecuperacion.findUnique({
+      where: { idSolicitud },
+      include: {
+        usuario: { select: { idUsuario: true, correo: true } },
+      },
+    });
+
+    if (!solicitud) {
+      throw new NotFoundException(`Solicitud ${idSolicitud} no encontrada`);
+    }
+
+    if (solicitud.estado === EstadoSolicitudRecuperacion.ATENDIDA) {
+      throw new BadRequestException('La solicitud ya fue atendida');
+    }
+
+    const resetToken = this.jwtService.sign(
+      {
+        sub: solicitud.usuario.idUsuario,
+        correo: solicitud.usuario.correo,
+        tipo: 'reset',
+        idSolicitud: solicitud.idSolicitud,
+      },
+      { expiresIn: '1h' },
+    );
+
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '') || 'https://uvgenius.com';
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+    await this.prisma.solicitudRecuperacion.update({
+      where: { idSolicitud },
+      data: {
+        estado: EstadoSolicitudRecuperacion.ATENDIDA,
+        atendidaEn: new Date(),
+        atendidaPor: callerId,
+      },
+    });
+
+    return { resetUrl, resetToken, expiraEn: '1h' };
   }
 }
