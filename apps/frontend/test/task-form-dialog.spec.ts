@@ -52,6 +52,7 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     fechaLimite: '2026-01-01',
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    horasReales: null,
     asignacionActiva: null,
     rolProyecto: null,
     hito: null,
