@@ -32,6 +32,7 @@ function baseRow(overrides: Record<string, unknown> = {}) {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    horasReales: null,
     hito: null,
     rolProyecto: null,
     asignaciones: [],
@@ -200,6 +201,7 @@ describe('TasksService', () => {
           'fechaLimite',
           'actualizadaEn',
           'tiempoEstimadoHoras',
+          'horasReales',
           'asignacionActiva',
           'rolProyecto',
           'hito',
@@ -547,6 +549,7 @@ describe('TasksService', () => {
         fechaLimite: '2026-08-15',
         actualizadaEn: new Date('2026-07-01T00:00:00.000Z'),
         tiempoEstimadoHoras: 8,
+        horasReales: null,
         asignacionActiva: {
           idAsignacion: 7,
           idUsuario: 3,

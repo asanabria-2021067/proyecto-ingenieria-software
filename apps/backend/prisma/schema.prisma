@@ -584,6 +584,8 @@ model Tarea {
   prioridad           Prioridad   @default(MEDIA)
   orden               Int         @default(0) @map("orden")
   tiempoEstimadoHoras Int?        @map("tiempo_estimado_horas")
+  /// Horas reales trabajadas en la tarea, reportadas manualmente por el líder al editarla (PATCH /tareas/:taskId). Distinta de `tiempoEstimadoHoras` (estimado) y de `HorasParticipacion` (horas por participación/periodo, no por tarea).
+  horasReales         Decimal?    @map("horas_reales") @db.Decimal(6, 2)
   creadaPor           Int         @map("creada_por")
   fechaCreacion       DateTime    @default(now()) @map("fecha_creacion")
   fechaLimite         DateTime?   @map("fecha_limite") @db.Date
