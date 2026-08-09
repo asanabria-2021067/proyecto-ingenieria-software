@@ -13,7 +13,7 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, Users, Briefcase } from 'lucide-react';
+import { ArrowLeft, Users, Briefcase, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { projectMembersQueryKey } from '@/lib/query-keys/members';
 
@@ -147,10 +147,17 @@ export default function EquipoProyectoPage() {
                 </div>
               )}
 
-              <div className="mt-4 pt-4 border-t border-outline-variant">
+              <div className="mt-4 pt-4 border-t border-outline-variant flex items-center justify-between gap-3">
                 <p className="text-xs text-tertiary">
                   Desde: {new Date(participacion.fechaInicio).toLocaleDateString('es-GT')}
                 </p>
+                <Link
+                  href={`/dashboard/proyectos/${id}/equipo/${participacion.usuario.idUsuario}`}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline shrink-0"
+                >
+                  Ver detalle
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
             </div>
           ))}
