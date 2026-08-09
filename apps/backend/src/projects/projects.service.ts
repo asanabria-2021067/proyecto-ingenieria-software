@@ -524,6 +524,110 @@ export class ProjectsService {
     });
   }
 
+  /**
+   * Mismo motivo documentado en tasks.service.ts#toDateOnly: las columnas
+   * @db.Date se leen como Date a medianoche UTC del día calendario
+   * almacenado, y toISOString() es la única extracción segura (los getters
+   * locales pueden desplazar el día según la zona horaria del proceso).
+   */
+  private toDateOnly(value: Date | null): string | null {
+    return value ? value.toISOString().slice(0, 10) : null;
+  }
+
+  /**
+   * Detalle de un integrante dentro de un proyecto: participación(es),
+   * historial completo de tareas con asignación (activa o pasada) y horas
+   * por tarea. Exclusivo del líder (_requireOwner, igual que el resto de
+   * lecturas administrativas del proyecto) — "guard de membresía y
+   * liderazgo": liderazgo de quien consulta, membresía de idUsuario.
+   */
+  async findTeamMemberDetail(idProyecto: number, idUsuario: number, userId: number) {
+    await this._requireOwner(idProyecto, userId);
+
+    // Todas las participaciones del usuario en el proyecto (activas e
+    // históricas), no solo la ACTIVO: el detalle debe reflejar también a
+    // quien ya se retiró. El usuario viaja embebido en la misma consulta
+    // para no necesitar una segunda ida a la base de datos.
+    const participaciones = await this.prisma.participacionProyecto.findMany({
+      where: { idUsuario, rolProyecto: { idProyecto } },
+      select: {
+        idParticipacion: true,
+        estadoParticipacion: true,
+        fechaIngreso: true,
+        fechaSalida: true,
+        rolProyecto: { select: { idRolProyecto: true, nombreRol: true } },
+        usuario: {
+          select: { idUsuario: true, nombre: true, apellido: true, correo: true, fotoUrl: true },
+        },
+      },
+      orderBy: { fechaIngreso: 'desc' },
+    });
+
+    if (participaciones.length === 0) {
+      throw new NotFoundException(
+        `El usuario con id ${idUsuario} no es integrante del proyecto ${idProyecto}`,
+      );
+    }
+
+    // Historial de tareas: cualquier tarea del proyecto donde el usuario
+    // tuvo alguna vez una AsignacionTarea (activa o cerrada), no solo la
+    // asignación vigente. Se trae únicamente su asignación más reciente
+    // (take: 1) para exponer fechaAsignacion/desasignadaEn de esa relación,
+    // sin arrastrar el historial completo de reasignaciones de la tarea.
+    const tareas = await this.prisma.tarea.findMany({
+      where: {
+        idProyecto,
+        eliminadoEn: null,
+        asignaciones: { some: { idUsuario } },
+      },
+      select: {
+        idTarea: true,
+        tituloTarea: true,
+        estadoTarea: true,
+        prioridad: true,
+        fechaCreacion: true,
+        fechaLimite: true,
+        actualizadaEn: true,
+        tiempoEstimadoHoras: true,
+        horasReales: true,
+        asignaciones: {
+          where: { idUsuario },
+          orderBy: { fechaAsignacion: 'desc' },
+          take: 1,
+          select: { fechaAsignacion: true, desasignadaEn: true },
+        },
+      },
+      orderBy: { fechaCreacion: 'desc' },
+    });
+
+    return {
+      usuario: participaciones[0].usuario,
+      participaciones: participaciones.map((p) => ({
+        idParticipacion: p.idParticipacion,
+        estadoParticipacion: p.estadoParticipacion,
+        fechaIngreso: this.toDateOnly(p.fechaIngreso),
+        fechaSalida: this.toDateOnly(p.fechaSalida),
+        rolProyecto: p.rolProyecto,
+      })),
+      tareas: tareas.map((t) => {
+        const asignacion = t.asignaciones[0];
+        return {
+          idTarea: t.idTarea,
+          tituloTarea: t.tituloTarea,
+          estadoTarea: t.estadoTarea,
+          prioridad: t.prioridad,
+          fechaCreacion: t.fechaCreacion,
+          fechaLimite: this.toDateOnly(t.fechaLimite),
+          actualizadaEn: t.actualizadaEn,
+          tiempoEstimadoHoras: t.tiempoEstimadoHoras,
+          horasReales: t.horasReales === null ? null : t.horasReales.toNumber(),
+          fechaAsignacion: asignacion.fechaAsignacion,
+          desasignadaEn: asignacion.desasignadaEn,
+        };
+      }),
+    };
+  }
+
   async findFeatured() {
     const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
     if (cached) return cached;
