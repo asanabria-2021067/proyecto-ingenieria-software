@@ -161,9 +161,22 @@ describe('HU-14: recuperacion de contrasena via notificacion al admin', () => {
     expect(solicitud.correoReferencia).toBe(CORREO_INSTITUCIONAL);
     expect(solicitud.estado).toBe('PENDIENTE');
 
-    const { resetUrl, resetToken } = await adminService.generarEnlaceRecuperacion(ADMIN_ID, solicitud.idSolicitud);
+    const antesDeGenerar = Date.now();
+    const { resetUrl, resetToken, expiraEn } = await adminService.generarEnlaceRecuperacion(
+      ADMIN_ID,
+      solicitud.idSolicitud,
+    );
     expect(resetUrl).toContain('reset-password?token=');
     expect(typeof resetToken).toBe('string');
+
+    // Bug de producción (HU-14): expiraEn era el string literal '1h', que no
+    // le decía al admin CUÁNDO expira realmente el enlace. Debe ser un
+    // timestamp ISO ~1h después de la generación (mismo TTL que el JWT).
+    const expiraEnMs = new Date(expiraEn).getTime();
+    expect(Number.isNaN(expiraEnMs)).toBe(false);
+    const minutosHastaExpirar = (expiraEnMs - antesDeGenerar) / 60_000;
+    expect(minutosHastaExpirar).toBeGreaterThan(58);
+    expect(minutosHastaExpirar).toBeLessThanOrEqual(61);
 
     const pendientesDespues = await adminService.getSolicitudesRecuperacionPendientes(ADMIN_ID);
     expect(pendientesDespues).toHaveLength(0);
