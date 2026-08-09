@@ -23,10 +23,7 @@ export interface NotificationTemplateData {
     taskId: number;
     projectId: number;
   };
-  // Reutiliza TipoNotificacion.TAREA_ACTUALIZADA (Tarea 25): no existe un
-  // valor de enum dedicado a "tarea desasignada" y esta tarea no puede
-  // agregar un enum Prisma ni una migración. TAREA_ACTUALIZADA ya existía
-  // en el schema sin ninguna plantilla asociada.
+
   TAREA_ACTUALIZADA: {
     taskTitle: string;
     projectTitle: string;
@@ -95,8 +92,7 @@ export interface NotificationTemplateData {
     taskCount: number;
   };
 
-  // Sección 18B: el líder se auto-asignó a un rol. El actor (líder) siempre se
-  // excluye de los destinatarios, por lo que puede resultar en cero envíos.
+
   ROL_ASIGNADO_LIDER: {
     userName: string;
     roleName: string;
@@ -117,6 +113,14 @@ export interface NotificationTemplateData {
     userName: string;
     carne: string;
     solicitudId: number;
+  };
+
+
+  HORAS_VALIDADAS: {
+    projectTitle: string;
+    projectId: number;
+    horasReconocidas: number;
+    fueAjustado: boolean;
   };
 }
 
@@ -230,6 +234,14 @@ export const NOTIFICATION_TEMPLATES = {
       data: NotificationTemplateData['SOLICITUD_RECUPERACION_CONTRASENA'],
     ) =>
       `${data.userName} (carné ${data.carne}) solicitó recuperar su contraseña.`,
+  },
+
+  HORAS_VALIDADAS: {
+    title: 'Se validaron tus horas',
+    message: (data: NotificationTemplateData['HORAS_VALIDADAS']) =>
+      data.fueAjustado
+        ? `Se cerró tu participación en "${data.projectTitle}" con ${data.horasReconocidas} horas reconocidas (con ajuste justificado).`
+        : `Se cerró tu participación en "${data.projectTitle}" con ${data.horasReconocidas} horas reconocidas.`,
   },
 } as const;
 

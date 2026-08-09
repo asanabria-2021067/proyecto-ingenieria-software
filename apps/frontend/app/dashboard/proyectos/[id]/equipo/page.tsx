@@ -1,25 +1,17 @@
 'use client';
 
-/**
- * LEGACY — NO EXTENDER.
- * Esta vista permanece temporalmente por compatibilidad y será reemplazada
- * por HU-123. No debe recibir nuevas funcionalidades. Los contratos
- * modernos de miembro/query key ya no deben declararse ni extenderse
- * localmente aquí; para nuevos desarrollos utilizar:
- * - @/lib/dto/member.dto
- * - @/lib/query-keys/members
- */
-
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import { ArrowLeft, Users, Briefcase } from 'lucide-react';
+import { CerrarParticipacionDialog } from '@/components/projects/cerrar-participacion-dialog';
 import { apiFetch } from '@/lib/api/client';
-import { projectMembersQueryKey } from '@/lib/query-keys/members';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, Briefcase, LogOut, Users } from 'lucide-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useState } from 'react';
 
 interface Colaborador {
-  idParticipacionProyecto: number;
-  fechaInicio: string;
+  idParticipacion: number;
+  estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
+  fechaIngreso: string;
   rolProyecto: {
     idRolProyecto: number;
     nombreRol: string;
@@ -47,10 +39,16 @@ export default function EquipoProyectoPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
 
-  const { data: equipo = [], isLoading, isError } = useQuery<Colaborador[]>({
-    queryKey: projectMembersQueryKey(idProyecto),
+  const [participacionACerrar, setParticipacionACerrar] = useState<{
+    id: number;
+    nombre: string;
+  } | null>(null);
+
+const { data: equipo = [], isLoading, isError } = useQuery<Colaborador[]>({
+    queryKey: ['proyecto-equipo', idProyecto],
     queryFn: () => apiFetch(`/proyectos/${id}/equipo`),
   });
+  
 
   return (
       <div className="mx-auto max-w-[1400px] px-8 py-8">
@@ -97,7 +95,7 @@ export default function EquipoProyectoPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {equipo.map((participacion) => (
             <div
-              key={participacion.idParticipacionProyecto}
+              key={participacion.idParticipacion}
               className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-3">
@@ -147,14 +145,37 @@ export default function EquipoProyectoPage() {
                 </div>
               )}
 
-              <div className="mt-4 pt-4 border-t border-outline-variant">
+              <div className="mt-4 pt-4 border-t border-outline-variant flex items-center justify-between gap-2">
                 <p className="text-xs text-tertiary">
-                  Desde: {new Date(participacion.fechaInicio).toLocaleDateString('es-GT')}
+                  Desde: {new Date(participacion.fechaIngreso).toLocaleDateString('es-GT')}
                 </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setParticipacionACerrar({
+                      id: participacion.idParticipacion,
+                      nombre: `${participacion.usuario.nombre} ${participacion.usuario.apellido}`,
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-error/10 text-error text-xs font-semibold hover:bg-error/20 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Cerrar participación
+                </button>
               </div>
             </div>
           ))}
         </div>
+
+        {participacionACerrar && (
+          <CerrarParticipacionDialog
+            open={!!participacionACerrar}
+            onOpenChange={(open) => !open && setParticipacionACerrar(null)}
+            idProyecto={idProyecto}
+            idParticipacion={participacionACerrar.id}
+            nombreCompleto={participacionACerrar.nombre}
+          />
+        )}
       </div>
   );
 }

@@ -22,6 +22,7 @@ import { MensajesRevisionModule } from './mensajes-revision/mensajes-revision.mo
 import { AdminModule } from './admin/admin.module';
 import { LabelsModule } from './labels/labels.module';
 import { RolesModule } from './roles/roles.module';
+import { HorasModule } from './horas/horas.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { RolesModule } from './roles/roles.module';
     AdminModule,
     LabelsModule,
     RolesModule,
+    HorasModule,
   ],
   controllers: [AppController],
   providers: [
