@@ -94,6 +94,7 @@ export interface TareaRow {
   estadoTarea: string;
   prioridad: string;
   tiempoEstimadoHoras: number | null;
+  horasReales: number | null;
   creadaPor: number;
   fechaCreacion: Date;
   fechaLimite: Date | null;
@@ -315,6 +316,11 @@ function buildTareaSelectShape(row: TareaRow, state: FixtureState) {
     fechaLimite: row.fechaLimite,
     actualizadaEn: row.actualizadaEn,
     tiempoEstimadoHoras: row.tiempoEstimadoHoras,
+    // `?? null` defensivo: las filas creadas vía el flujo real de creación
+    // (que no envía horasReales, campo agregado después) no tienen esta
+    // clave; mapTarea real exige null explícito (nunca undefined) para
+    // evitar llamar .toNumber() sobre undefined.
+    horasReales: row.horasReales ?? null,
     hito: hito ? { idHito: hito.idHito, tituloHito: hito.tituloHito } : null,
     rolProyecto: rol ? { idRolProyecto: rol.idRolProyecto, nombreRol: rol.nombreRol } : null,
     asignaciones: asignacionesActivas,
