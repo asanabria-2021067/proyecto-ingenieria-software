@@ -56,11 +56,39 @@ function calcularAvanceTareas(tareas: { estadoTarea: string }[]) {
   };
 }
 
-function calcularAvanceHitos(hitos: { estadoHito: string }[]) {
+/**
+ * El estado de un hito NUNCA se lee de `Hito.estadoHito`: esa columna se fija
+ * en PENDIENTE al crear el hito (createHito) y ningún flujo la vuelve a
+ * escribir, así que quedaba congelada aunque se completaran todas sus tareas
+ * (bug de cálculo de la barra de progreso de hitos). El estado real se deriva
+ * de las tareas asociadas (`tarea.idHito`), con el mismo criterio que ya usa
+ * el frontend en `calcularStats` (hitos-section.tsx): % = hechas/total de sus
+ * tareas; COMPLETADO al 100% con al menos una tarea, EN_PROGRESO si %>0,
+ * PENDIENTE en otro caso (incluye hitos sin tareas asociadas).
+ */
+function calcularAvanceHitos(
+  hitos: { idHito: number }[],
+  tareas: { idHito: number | null; estadoTarea: string }[],
+) {
   const total = hitos.length;
-  const completado = hitos.filter((h) => h.estadoHito === 'COMPLETADO').length;
-  const pendiente = hitos.filter((h) => h.estadoHito === 'PENDIENTE').length;
-  const enProgreso = total - completado - pendiente;
+  let completado = 0;
+  let pendiente = 0;
+  let enProgreso = 0;
+
+  for (const hito of hitos) {
+    const tareasHito = tareas.filter((t) => t.idHito === hito.idHito);
+    const totalTareas = tareasHito.length;
+    const hechoTareas = tareasHito.filter((t) => t.estadoTarea === 'HECHO').length;
+    const porcentajeHito = totalTareas === 0 ? 0 : Math.round((hechoTareas / totalTareas) * 100);
+
+    if (porcentajeHito === 100 && totalTareas > 0) {
+      completado += 1;
+    } else if (porcentajeHito > 0) {
+      enProgreso += 1;
+    } else {
+      pendiente += 1;
+    }
+  }
 
   return {
     porcentaje: total === 0 ? 0 : Math.round((completado / total) * 100),
@@ -83,12 +111,12 @@ function toDateOnly(value: Date | null): string | null {
 
 /** % de avance del proyecto, desglosado por hitos y por tareas. */
 function calcularAvanceProyecto(
-  tareas: { estadoTarea: string }[],
-  hitos: { estadoHito: string }[],
+  tareas: { estadoTarea: string; idHito: number | null }[],
+  hitos: { idHito: number }[],
 ) {
   return {
     tareas: calcularAvanceTareas(tareas),
-    hitos: calcularAvanceHitos(hitos),
+    hitos: calcularAvanceHitos(hitos, tareas),
   };
 }
 
@@ -376,8 +404,8 @@ export class ProjectsService {
         creadoPor: true,
         // eliminadoEn: null — las tareas con soft delete (Tarea 22) no deben
         // contarse ni en el numerador ni en el denominador del avance.
-        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
-        hitos: { select: { estadoHito: true } },
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true, idHito: true } },
+        hitos: { select: { idHito: true } },
       },
     });
     if (!proyecto) {
@@ -427,8 +455,8 @@ export class ProjectsService {
         },
         // eliminadoEn: null — misma exclusión que en getAvance: una tarea con
         // soft delete no debe contarse en avanceProyecto.
-        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
-        hitos: { select: { estadoHito: true } },
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true, idHito: true } },
+        hitos: { select: { idHito: true } },
         revisiones: {
           select: {
             idRevisionProyecto: true,
