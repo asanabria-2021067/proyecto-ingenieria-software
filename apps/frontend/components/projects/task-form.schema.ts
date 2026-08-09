@@ -58,6 +58,7 @@ export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = ne
       }),
       fechaLimite: z.string().regex(DATE_FORMAT, 'Selecciona una fecha límite válida.'),
       tiempoEstimadoHoras: z.string(),
+      horasReales: z.string(),
       idRolProyecto: z.string().min(1),
       idUsuarioAsignado: z.string().min(1),
       idHito: z.string().min(1),
@@ -80,6 +81,18 @@ export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = ne
             code: z.ZodIssueCode.custom,
             path: ['tiempoEstimadoHoras'],
             message: 'El tiempo estimado debe ser un número entero entre 1 y 1000.',
+          });
+        }
+      }
+
+      if (values.horasReales !== '') {
+        const n = Number(values.horasReales);
+        const decimales = values.horasReales.split('.')[1]?.length ?? 0;
+        if (!Number.isFinite(n) || n < 0 || n > 1000 || decimales > 2) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['horasReales'],
+            message: 'Las horas reales deben ser un número entre 0 y 1000, con hasta 2 decimales.',
           });
         }
       }
@@ -121,6 +134,7 @@ export function defaultTaskFormValues(tarea: TareaPublicaDTO | null): TaskFormVa
       prioridad: 'MEDIA',
       fechaLimite: '',
       tiempoEstimadoHoras: '',
+      horasReales: '',
       idRolProyecto: SIN_ROL,
       idUsuarioAsignado: SIN_ASIGNAR,
       idHito: SIN_HITO,
@@ -134,6 +148,7 @@ export function defaultTaskFormValues(tarea: TareaPublicaDTO | null): TaskFormVa
     prioridad: tarea.prioridad,
     fechaLimite: tarea.fechaLimite ?? '',
     tiempoEstimadoHoras: tarea.tiempoEstimadoHoras === null ? '' : String(tarea.tiempoEstimadoHoras),
+    horasReales: tarea.horasReales === null ? '' : String(tarea.horasReales),
     idRolProyecto: tarea.idRolProyecto === null ? SIN_ROL : String(tarea.idRolProyecto),
     // Precarga el asignado activo; las asignaciones históricas nunca llegan
     // aquí (mapTarea ya filtra `desasignadaEn: null` en el backend).
@@ -194,6 +209,11 @@ export function buildUpdatePayload(original: TareaPublicaDTO, values: TaskFormVa
   if (values.tiempoEstimadoHoras !== '') {
     const tiempoNuevo = Number(values.tiempoEstimadoHoras);
     if (tiempoNuevo !== original.tiempoEstimadoHoras) input.tiempoEstimadoHoras = tiempoNuevo;
+  }
+
+  if (values.horasReales !== '') {
+    const horasNuevas = Number(values.horasReales);
+    if (horasNuevas !== original.horasReales) input.horasReales = horasNuevas;
   }
 
   const hitoNuevo = values.idHito === SIN_HITO ? null : Number(values.idHito);
