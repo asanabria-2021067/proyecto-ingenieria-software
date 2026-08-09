@@ -37,6 +37,7 @@ const TASK_SELECT = {
   fechaLimite: true,
   actualizadaEn: true,
   tiempoEstimadoHoras: true,
+  horasReales: true,
   hito: {
     select: { idHito: true, tituloHito: true },
   },
@@ -80,6 +81,7 @@ const UPDATE_TASK_FIELDS = [
   'fechaLimite',
   'prioridad',
   'tiempoEstimadoHoras',
+  'horasReales',
   'idHito',
   'idRolProyecto',
   'idsEtiquetas',
@@ -130,6 +132,7 @@ export interface TareaPublica {
   fechaLimite: string | null;
   actualizadaEn: Date | null;
   tiempoEstimadoHoras: number | null;
+  horasReales: number | null;
   asignacionActiva: AsignacionActivaPublica | null;
   rolProyecto: RolProyectoResumenPublico | null;
   hito: HitoResumenPublico | null;
@@ -170,6 +173,10 @@ function mapTarea(row: TareaRow): TareaPublica {
     fechaLimite: toDateOnly(row.fechaLimite),
     actualizadaEn: row.actualizadaEn,
     tiempoEstimadoHoras: row.tiempoEstimadoHoras,
+    // Prisma expone las columnas @db.Decimal como Prisma.Decimal, no como
+    // number: se convierte explícitamente para que el contrato público siga
+    // siendo un number | null simple, igual que tiempoEstimadoHoras.
+    horasReales: row.horasReales === null ? null : row.horasReales.toNumber(),
     asignacionActiva: asignacion
       ? {
           idAsignacion: asignacion.idAsignacion,
@@ -454,6 +461,9 @@ export class TasksService {
       }
       if (Object.prototype.hasOwnProperty.call(dto, 'tiempoEstimadoHoras')) {
         data.tiempoEstimadoHoras = dto.tiempoEstimadoHoras;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'horasReales')) {
+        data.horasReales = dto.horasReales;
       }
       if (Object.prototype.hasOwnProperty.call(dto, 'fechaLimite')) {
         data.fechaLimite = new Date(`${dto.fechaLimite}T00:00:00.000Z`);
