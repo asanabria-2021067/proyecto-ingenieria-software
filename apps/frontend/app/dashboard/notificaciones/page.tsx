@@ -3,9 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Bell, BellOff, Check, CheckCheck } from 'lucide-react';
 import Link from 'next/link';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import AdminLayout from '@/components/admin/AdminLayout';
-import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import uvgSwal from '@/lib/swal';
 import {
   Empty,
@@ -23,10 +20,10 @@ import {
   getNotificationLink,
   type Notificacion,
 } from '@/lib/services/notifications';
+import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
-  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
 
   const { data: notificaciones = [], isLoading, isError, refetch } = useQuery<Notificacion[]>({
     queryKey: ['notificaciones'],
@@ -80,19 +77,8 @@ export default function NotificacionesPage() {
   const grouped = groupByDate(notificaciones);
   const unreadCount = notificaciones.filter((n) => !n.leidaEn).length;
 
-  if (userLoading) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  const Layout = isAdminUser(currentUser) ? AdminLayout : DashboardLayout;
-
   return (
-    <Layout>
-      <div className="px-8 py-8 max-w-4xl mx-auto">
+      <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="flex items-start justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -177,7 +163,7 @@ export default function NotificacionesPage() {
               </h2>
               <div className="space-y-3">
                 {notifs.map((n) => {
-                  const href = getNotificationLink(n);
+                  const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
                   const cardClassName = `relative rounded-2xl border p-5 transition-all ${
                     n.leidaEn
                       ? 'bg-surface-container-lowest border-outline-variant'
@@ -256,6 +242,5 @@ export default function NotificacionesPage() {
           ))}
         </div>
       </div>
-    </Layout>
   );
 }

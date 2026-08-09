@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "tarea" ADD COLUMN "orden" INTEGER NOT NULL DEFAULT 0;

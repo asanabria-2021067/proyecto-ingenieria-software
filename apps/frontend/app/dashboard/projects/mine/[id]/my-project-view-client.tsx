@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, MessageSquare, Pencil, X, Plus, Send, Save, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -19,9 +18,14 @@ import type { Carrera, Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
 import {
   step1Schema, rolSchema, formSchema, zodToFieldErrors,
-  newRol, newRequisito,
+  newRol, newRequisito, safeId,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from '../form/types';
+import {
+  ProjectGeneralInfoSection,
+  SectionCommentReadonly,
+} from '@/components/projects/detail/project-general-info-section';
+import { ProjectRolesSkillsSection } from '@/components/projects/detail/project-roles-skills-section';
 
 interface Props { id: number; }
 
@@ -34,41 +38,6 @@ function formatDate(iso: string | null | undefined): string {
   try {
     return new Intl.DateTimeFormat('es-GT', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
   } catch { return iso; }
-}
-
-function ReadonlyField({ label, value }: { label: string; value: string | null | undefined }) {
-  const display = value == null || value === '' ? '—' : value;
-  const isEmpty = display === '—';
-  return (
-    <div>
-      <label className={labelClass}>{label}</label>
-      <div className={`w-full rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap min-h-11 ${
-        isEmpty
-          ? 'border-outline-variant/20 bg-surface-container-lowest text-tertiary italic'
-          : 'border-outline-variant/30 bg-surface-container-low/60 text-on-surface'
-      }`}>
-        {display}
-      </div>
-    </div>
-  );
-}
-
-function SectionCommentReadonly({ comment }: { comment?: string }) {
-  return (
-    <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-          Comentarios del revisor
-        </span>
-      </div>
-      <div className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
-        {comment?.trim() || (
-          <span className="text-outline-variant italic">Sin comentarios aún.</span>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function ViewSkeleton() {
@@ -129,74 +98,26 @@ function ProjectReadOnlyView({
         </div>
       )}
 
-      <section>
-        <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
-          Información general
-        </h2>
-        <div className="space-y-4">
-          <ReadonlyField label="Título del proyecto" value={proyecto.tituloProyecto} />
-          <ReadonlyField label="Descripción" value={proyecto.descripcionProyecto} />
-          <div className="grid grid-cols-2 gap-4">
-            <ReadonlyField label="Tipo" value={TIPO_LABEL[proyecto.tipoProyecto as TipoProyecto] ?? proyecto.tipoProyecto} />
-            <ReadonlyField label="Modalidad" value={MODALIDAD_LABEL[proyecto.modalidadProyecto as ModalidadProyecto] ?? proyecto.modalidadProyecto} />
-          </div>
-          <ReadonlyField label="Objetivos" value={proyecto.objetivosProyecto} />
-          <div className="grid grid-cols-2 gap-4">
-            <ReadonlyField label="Contexto académico" value={proyecto.contextoAcademico} />
-            <ReadonlyField label="Ubicación" value={proyecto.ubicacionProyecto} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <ReadonlyField label="Fecha de inicio" value={formatDate(proyecto.fechaInicio)} />
-            <ReadonlyField label="Fecha fin estimada" value={formatDate(proyecto.fechaFinEstimada)} />
-          </div>
-          <ReadonlyField label="URL recurso externo" value={proyecto.urlRecursoExterno} />
-        </div>
-        {esObservado && <SectionCommentReadonly comment={comentarios.general} />}
-      </section>
+      <ProjectGeneralInfoSection
+        tituloProyecto={proyecto.tituloProyecto}
+        descripcionProyecto={proyecto.descripcionProyecto}
+        tipoProyecto={proyecto.tipoProyecto}
+        modalidadProyecto={proyecto.modalidadProyecto}
+        objetivosProyecto={proyecto.objetivosProyecto}
+        contextoAcademico={proyecto.contextoAcademico}
+        ubicacionProyecto={proyecto.ubicacionProyecto}
+        fechaInicio={proyecto.fechaInicio}
+        fechaFinEstimada={proyecto.fechaFinEstimada}
+        urlRecursoExterno={proyecto.urlRecursoExterno}
+        mostrarComentario={esObservado}
+        comentario={comentarios.general}
+      />
 
-      <section>
-        <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
-          Roles y habilidades
-        </h2>
-        {proyecto.roles.length === 0 ? (
-          <p className="text-sm text-tertiary italic">Sin roles definidos.</p>
-        ) : (
-          <div className="space-y-4">
-            {proyecto.roles.map((rol, i) => (
-              <div key={rol.idRolProyecto} className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Rol {i + 1}</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <ReadonlyField label="Nombre del rol" value={rol.nombreRol} />
-                  <ReadonlyField label="Cupos" value={String(rol.cupos)} />
-                </div>
-                {rol.descripcionRolProyecto && (
-                  <ReadonlyField label="Descripción del rol" value={rol.descripcionRolProyecto} />
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  {rol.carreraRequerida && <ReadonlyField label="Carrera requerida" value={rol.carreraRequerida.nombreCarrera} />}
-                  {rol.horasSemanalesEstimadas != null && <ReadonlyField label="Horas semanales" value={String(rol.horasSemanalesEstimadas)} />}
-                </div>
-                {rol.requisitos.length > 0 && (
-                  <div>
-                    <label className={labelClass}>Habilidades requeridas</label>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {rol.requisitos.map((req) => (
-                        <span key={req.idRequisitoHabilidad} className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-high px-3 py-1.5 text-xs font-medium text-on-surface">
-                          {req.habilidad.nombreHabilidad}
-                          <span className="text-tertiary">·</span>
-                          <span className="text-tertiary">{NIVEL_LABEL[req.nivelMinimo as NivelHabilidad] ?? req.nivelMinimo}</span>
-                          {req.obligatorio && <span className="text-error font-bold ml-0.5">*</span>}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        {esObservado && <SectionCommentReadonly comment={comentarios.roles} />}
-      </section>
+      <ProjectRolesSkillsSection
+        roles={proyecto.roles}
+        mostrarComentario={esObservado}
+        comentario={comentarios.roles}
+      />
     </div>
   );
 }
@@ -207,6 +128,17 @@ export default function MyProjectViewClient({ id }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+
+  // Origen de la navegación: si venimos del detalle del proyecto
+  // (/dashboard/projects/[id] → "Revisiones previas") llega `returnTo` con esa
+  // ruta y el botón "Volver" regresa ahí. Sin el parámetro se conserva el flujo
+  // admin-estudiante (desde la lista) que vuelve a "Mis Proyectos". Solo se
+  // acepta una ruta interna del dashboard para evitar redirecciones abiertas.
+  const returnToParam = searchParams.get('returnTo');
+  const volverHref =
+    returnToParam && returnToParam.startsWith('/dashboard/')
+      ? returnToParam
+      : '/dashboard/projects/mine';
 
   const [isEditing, setIsEditing] = useState(searchParams.get('edit') === 'true');
   const [saving, setSaving] = useState(false);
@@ -265,14 +197,14 @@ export default function MyProjectViewClient({ id }: Props) {
       fechaInicio: proyecto.fechaInicio ? proyecto.fechaInicio.split('T')[0] : '',
       fechaFinEstimada: proyecto.fechaFinEstimada ? proyecto.fechaFinEstimada.split('T')[0] : '',
       roles: proyecto.roles.map((r) => ({
-        id: crypto.randomUUID(),
+        id: safeId(),
         nombreRol: r.nombreRol,
         descripcionRolProyecto: r.descripcionRolProyecto ?? '',
         idCarreraRequerida: r.carreraRequerida?.idCarrera ?? null,
         cupos: r.cupos,
         horasSemanalesEstimadas: r.horasSemanalesEstimadas ?? '',
         requisitos: r.requisitos.map((req) => ({
-          id: crypto.randomUUID(),
+          id: safeId(),
           idHabilidad: req.habilidad?.idHabilidad ?? null,
           nivelMinimo: req.nivelMinimo as NivelHabilidad,
           obligatorio: req.obligatorio,
@@ -410,7 +342,7 @@ export default function MyProjectViewClient({ id }: Props) {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <DashboardLayout>
+    <>
       {/* Header */}
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         {isEditing ? (
@@ -435,7 +367,7 @@ export default function MyProjectViewClient({ id }: Props) {
         ) : (
           <>
             <Link
-              href="/dashboard/projects/mine"
+              href={volverHref}
               className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -834,40 +766,21 @@ export default function MyProjectViewClient({ id }: Props) {
 
                 {/* Sección 1: Información general */}
                 {snap && (
-                  <section>
-                    <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
-                      Información general
-                    </h2>
-                    <div className="space-y-4">
-                      <ReadonlyField label="Título del proyecto" value={snap.tituloProyecto} />
-                      <ReadonlyField label="Descripción" value={snap.descripcionProyecto} />
-                      <div className="grid grid-cols-2 gap-4">
-                        <ReadonlyField label="Tipo" value={TIPO_LABEL[snap.tipoProyecto as TipoProyecto] ?? snap.tipoProyecto} />
-                        <ReadonlyField label="Modalidad" value={MODALIDAD_LABEL[snap.modalidadProyecto as ModalidadProyecto] ?? snap.modalidadProyecto} />
-                      </div>
-                      <ReadonlyField label="Objetivos" value={snap.objetivosProyecto} />
-                      <div className="grid grid-cols-2 gap-4">
-                        <ReadonlyField label="Contexto académico" value={snap.contextoAcademico} />
-                        <ReadonlyField label="Ubicación" value={snap.ubicacionProyecto} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <ReadonlyField label="Fecha de inicio" value={formatDate(snap.fechaInicio)} />
-                        <ReadonlyField label="Fecha fin estimada" value={formatDate(snap.fechaFinEstimada)} />
-                      </div>
-                      <ReadonlyField label="URL recurso externo" value={snap.urlRecursoExterno} />
-                    </div>
-                    {c.general && (
-                      <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-                            Comentarios del revisor
-                          </span>
-                        </div>
-                        <p className="text-sm text-on-surface whitespace-pre-wrap">{c.general}</p>
-                      </div>
-                    )}
-                  </section>
+                  <ProjectGeneralInfoSection
+                    tituloProyecto={snap.tituloProyecto}
+                    descripcionProyecto={snap.descripcionProyecto}
+                    tipoProyecto={snap.tipoProyecto}
+                    modalidadProyecto={snap.modalidadProyecto}
+                    objetivosProyecto={snap.objetivosProyecto}
+                    contextoAcademico={snap.contextoAcademico}
+                    ubicacionProyecto={snap.ubicacionProyecto}
+                    fechaInicio={snap.fechaInicio}
+                    fechaFinEstimada={snap.fechaFinEstimada}
+                    urlRecursoExterno={snap.urlRecursoExterno}
+                    mostrarComentario={Boolean(c.general)}
+                    comentario={c.general}
+                    commentVariant="plain"
+                  />
                 )}
 
                 {/* Comentarios generales cuando no hay snapshot */}
@@ -890,57 +803,12 @@ export default function MyProjectViewClient({ id }: Props) {
 
                 {/* Sección 2: Roles y habilidades */}
                 {snap && (
-                  <section>
-                    <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
-                      Roles y habilidades
-                    </h2>
-                    {snap.roles.length === 0 ? (
-                      <p className="text-sm text-tertiary italic">Sin roles definidos.</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {snap.roles.map((rol, i) => (
-                          <div key={rol.idRolProyecto} className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Rol {i + 1}</p>
-                            <div className="grid grid-cols-2 gap-4">
-                              <ReadonlyField label="Nombre del rol" value={rol.nombreRol} />
-                              <ReadonlyField label="Cupos" value={String(rol.cupos)} />
-                            </div>
-                            {rol.descripcionRolProyecto && <ReadonlyField label="Descripción del rol" value={rol.descripcionRolProyecto} />}
-                            <div className="grid grid-cols-2 gap-4">
-                              {rol.carreraRequerida && <ReadonlyField label="Carrera requerida" value={rol.carreraRequerida.nombreCarrera} />}
-                              {rol.horasSemanalesEstimadas != null && <ReadonlyField label="Horas semanales" value={String(rol.horasSemanalesEstimadas)} />}
-                            </div>
-                            {rol.requisitos.length > 0 && (
-                              <div>
-                                <label className={labelClass}>Habilidades requeridas</label>
-                                <div className="flex flex-wrap gap-2 mt-1">
-                                  {rol.requisitos.map((req) => (
-                                    <span key={req.idRequisitoHabilidad} className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-high px-3 py-1.5 text-xs font-medium text-on-surface">
-                                      {req.habilidad.nombreHabilidad}
-                                      <span className="text-tertiary">·</span>
-                                      <span className="text-tertiary">{NIVEL_LABEL[req.nivelMinimo as NivelHabilidad] ?? req.nivelMinimo}</span>
-                                      {req.obligatorio && <span className="text-error font-bold ml-0.5">*</span>}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {c.roles && (
-                      <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-                            Comentarios del revisor
-                          </span>
-                        </div>
-                        <p className="text-sm text-on-surface whitespace-pre-wrap">{c.roles}</p>
-                      </div>
-                    )}
-                  </section>
+                  <ProjectRolesSkillsSection
+                    roles={snap.roles}
+                    mostrarComentario={Boolean(c.roles)}
+                    comentario={c.roles}
+                    commentVariant="plain"
+                  />
                 )}
 
                 {/* Comentarios de roles cuando no hay snapshot */}
@@ -984,6 +852,6 @@ export default function MyProjectViewClient({ id }: Props) {
           </div>
         );
       })()}
-    </DashboardLayout>
+    </>
   );
 }
