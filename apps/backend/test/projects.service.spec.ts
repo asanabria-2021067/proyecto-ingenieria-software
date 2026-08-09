@@ -79,8 +79,11 @@ describe('ProjectsService', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({
       creadoPor: 1,
-      tareas: [{ estadoTarea: 'HECHO' }, { estadoTarea: 'POR_HACER' }],
-      hitos: [{ estadoHito: 'COMPLETADO' }],
+      // El estado de un hito se deriva de sus tareas (idHito), no de un campo
+      // estadoHito estático: la tarea HECHO pertenece al único hito, que
+      // queda 100% completo; la POR_HACER no pertenece a ningún hito.
+      tareas: [{ estadoTarea: 'HECHO', idHito: 1 }, { estadoTarea: 'POR_HACER', idHito: null }],
+      hitos: [{ idHito: 1 }],
     });
     const service = new ProjectsService(prisma, {} as any);
     const result = await service.getAvance(1, 1);
@@ -135,8 +138,10 @@ describe('ProjectsService', () => {
     prisma.proyecto.findMany.mockResolvedValue([
       {
         roles: [],
-        tareas: [{ estadoTarea: 'HECHO' }, { estadoTarea: 'POR_HACER' }],
-        hitos: [{ estadoHito: 'COMPLETADO' }, { estadoHito: 'PENDIENTE' }],
+        // Hito 1 (idHito 1) queda 100% completo (su única tarea está HECHO);
+        // hito 2 (idHito 2) queda pendiente (su única tarea sigue POR_HACER).
+        tareas: [{ estadoTarea: 'HECHO', idHito: 1 }, { estadoTarea: 'POR_HACER', idHito: 2 }],
+        hitos: [{ idHito: 1 }, { idHito: 2 }],
       },
       { roles: [] },
     ]);
