@@ -96,6 +96,7 @@ export interface TareaDTO {
   estadoTarea: 'POR_HACER' | 'EN_PROGRESO' | 'EN_REVISION' | 'HECHO';
   prioridad: 'BAJA' | 'MEDIA' | 'ALTA';
   fechaLimite: string | null;
+  _count?: { comentarios: number };
 }
 
 /** DTO para items del listado — GET /proyectos y GET /proyectos?q= */
@@ -216,6 +217,13 @@ export interface CreateProjectPayload {
   accion: 'BORRADOR' | 'EN_REVISION';
 }
 
+/** Payload para crear un hito — POST /proyectos/:id/hitos */
+export interface CreateHitoPayload {
+  tituloHito: string;
+  descripcionHito?: string;
+  fechaLimite?: string;
+}
+
 /** Payload para resolver una revisión (admin) */
 export interface ResolverRevisionPayload {
   resultado: 'APROBADA' | 'OBSERVADA';
@@ -247,6 +255,7 @@ export interface ProyectoDetalleDTO {
   fechaInicio: string | null;
   fechaFinEstimada: string | null;
   fechaCreacion: string;
+  fechaActualizacion?: string | null;
   creador: CreadorDTO;
   organizaciones: ProyectoOrganizacionDTO[];
   intereses: ProyectoInteresDTO[];

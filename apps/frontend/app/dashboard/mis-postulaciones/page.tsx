@@ -3,8 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, ChevronRight, ClipboardList, Clock, Trash2, XCircle } from 'lucide-react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { apiFetch } from '@/lib/api/client';
+import { deletePostulacion } from '@/lib/services/applications';
 import { Postulacion, EstadoPostulacion } from '@/types';
 import uvgSwal from '@/lib/swal';
 import {
@@ -49,7 +49,7 @@ export default function MisPostulacionesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiFetch(`/postulaciones/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: number) => deletePostulacion(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] });
       uvgSwal.fire({
@@ -86,8 +86,7 @@ export default function MisPostulacionesPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="px-8 py-8 max-w-4xl mx-auto">
+      <div className="mx-auto max-w-[1400px] px-8 py-8">
         <div className="mb-8">
           <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
             Mis Postulaciones
@@ -225,6 +224,5 @@ export default function MisPostulacionesPage() {
           })}
         </div>
       </div>
-    </DashboardLayout>
   );
 }

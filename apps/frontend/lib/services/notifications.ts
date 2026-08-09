@@ -47,6 +47,8 @@ export function getNotificationLink(n: {
         : null;
     case 'POSTULACION_RESUELTA':
       return '/dashboard/mis-postulaciones';
+    case 'SOLICITUD_RECUPERACION_CONTRASENA':
+      return '/dashboard/admin/solicitudes-recuperacion';
     default:
       return null;
   }

@@ -1,72 +1,47 @@
 'use client';
 
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, MapPin, Users } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { ArrowRight, History, Pencil, Settings2 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { HitosSection } from '@/components/projects/hitos-section';
-import { ProjectProgressBar } from '@/components/projects/project-progress-bar';
-import { useProjectAvance } from '@/hooks/use-project-avance';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import { type RolesSheetIntent } from '@/components/projects/project-roles-sheet';
+import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
+import { ProjectClosureSection } from '@/components/projects/detail/project-closure-section';
+import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
+import { ProjectRoleManagementSection } from '@/components/projects/detail/project-role-management-section';
+import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
+import { useProjectMembers } from '@/hooks/use-project-members';
+import { useProjectRoles } from '@/hooks/use-project-roles';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { approveProjectClosure, rejectProjectClosure } from '@/lib/services/projects';
+import uvgSwal, { swalCustomClass } from '@/lib/swal';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 
 interface Props {
   id: number;
 }
 
-function getInitials(nombre: string, apellido: string): string {
-  return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
-}
-
-function formatDate(date: string | null): string {
-  if (!date) return 'Por definir';
-  return new Date(date).toLocaleDateString('es-GT', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function estadoBadgeStyle(estado: string): string {
-  switch (estado.toUpperCase()) {
-    case 'PUBLICADO':   return 'bg-primary text-on-primary';
-    case 'EN_PROGRESO': return 'bg-secondary text-on-secondary';
-    case 'EN_REVISION': return 'bg-blue-500/10 text-blue-500 border border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-300';
-    case 'OBSERVADO':   return 'bg-amber-500/10 text-amber-500 border border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300';
-    case 'EN_SOLICITUD_CIERRE': return 'bg-purple-500/10 text-purple-500 border border-purple-500/20 dark:bg-purple-500/20 dark:text-purple-300';
-    case 'BORRADOR':    return 'bg-surface-container-high text-on-surface-variant border border-outline-variant/30';
-    case 'CERRADO':     return 'bg-surface-container-highest text-tertiary border border-outline-variant/30';
-    case 'CANCELADO':   return 'bg-red-500/10 text-red-500 border border-red-500/20 dark:bg-red-500/20 dark:text-red-300';
-    default:            return 'bg-surface-container-high text-on-surface-variant';
-  }
-}
+const MIS_PROYECTOS_HREF = '/dashboard/projects/mine';
 
 // ─── Skeleton de carga ────────────────────────────────────────────────────────
 function ProjectDetailSkeleton() {
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-      <Skeleton className="h-5 w-56" />
-      <Skeleton className="h-28 w-full rounded-2xl" />
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="flex-1 space-y-5">
-          <Skeleton className="h-40 w-full rounded-2xl" />
-          <Skeleton className="h-28 w-full rounded-2xl" />
-          <Skeleton className="h-56 w-full rounded-2xl" />
+    <div className="mx-auto w-full max-w-[1400px] px-6 py-6 pb-12">
+      <Skeleton className="mb-5 h-4 w-56" />
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        <div className="w-full space-y-5 lg:flex-1">
+          <Skeleton className="h-44 w-full rounded-xl" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
-        <div className="w-full lg:w-72 space-y-4">
-          <Skeleton className="h-24 w-full rounded-2xl" />
-          <Skeleton className="h-24 w-full rounded-2xl" />
-          <Skeleton className="h-40 w-full rounded-2xl" />
+        <div className="w-full space-y-4 lg:w-80">
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-56 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
         </div>
       </div>
     </div>
@@ -74,254 +49,202 @@ function ProjectDetailSkeleton() {
 }
 
 // ─── Vista principal ──────────────────────────────────────────────────────────
+const TAB_BASE =
+  'relative flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-1 text-[13px] font-bold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
+const TAB_ACTIVE = `${TAB_BASE} border-primary text-on-surface`;
+const TAB_INACTIVE = `${TAB_BASE} border-transparent text-tertiary hover:border-outline-variant hover:text-on-surface`;
+
 function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
-  const totalCupos = proyecto.roles.reduce((sum, r) => sum + r.cupos, 0);
-  const organizacionPrincipal = proyecto.organizaciones[0] ?? null;
-  const { data: avance, isSuccess: puedeVerAvance } = useProjectAvance(proyecto.idProyecto);
+  const idProyecto = proyecto.idProyecto;
+  const { members } = useProjectMembers(idProyecto);
+  const { data: currentUser } = useCurrentUser();
+  // Duplicado deliberado de isAdminUser(): las pruebas de esta página mockean
+  // '@/hooks/use-current-user' devolviendo solo `useCurrentUser`, así que no
+  // podemos depender de otro export de ese módulo aquí.
+  const isAdmin = (currentUser?.roles ?? []).some((r) => r.toLowerCase() === 'administrador');
+  const queryClient = useQueryClient();
+  // Liderazgo determinado exclusivamente por Proyecto.creadoPor.
+  const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
+
+  const enSolicitudCierre = proyecto.estadoProyecto === 'EN_SOLICITUD_CIERRE';
+  const [resolviendoCierre, setResolviendoCierre] = useState(false);
+
+  const resolverCierre = async (accion: 'APROBAR' | 'RECHAZAR') => {
+    const { isConfirmed } = await uvgSwal.fire({
+      icon: accion === 'APROBAR' ? 'question' : 'warning',
+      title: accion === 'APROBAR' ? '¿Aprobar cierre?' : '¿Rechazar cierre?',
+      text:
+        accion === 'APROBAR'
+          ? 'El proyecto será marcado como cerrado.'
+          : 'El proyecto volverá al estado En progreso.',
+      showCancelButton: true,
+      confirmButtonText: accion === 'APROBAR' ? 'Sí, aprobar' : 'Sí, rechazar',
+      cancelButtonText: 'Cancelar',
+      ...(accion === 'RECHAZAR' && {
+        customClass: {
+          ...swalCustomClass,
+          confirmButton:
+            'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md mx-4',
+        },
+      }),
+    });
+    if (!isConfirmed) return;
+    setResolviendoCierre(true);
+    try {
+      if (accion === 'APROBAR') {
+        await approveProjectClosure(idProyecto);
+      } else {
+        await rejectProjectClosure(idProyecto);
+      }
+      await queryClient.invalidateQueries({ queryKey: ['project', idProyecto] });
+    } finally {
+      setResolviendoCierre(false);
+    }
+  };
+
+  // Compatibilidad de navegación (Sección 20): URLs antiguas ?tab= → workspace.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const taskIdParam = searchParams.get('taskId');
+  const kanbanBase = `/dashboard/projects/${idProyecto}/kanban`;
+  const kanbanHref = useMemo(
+    () =>
+      taskIdParam && /^\d+$/.test(taskIdParam) ? `${kanbanBase}?taskId=${taskIdParam}` : kanbanBase,
+    [kanbanBase, taskIdParam],
+  );
+  const debeRedirigir = tabParam === 'tablero' || tabParam === 'hitos';
+  useEffect(() => {
+    if (debeRedirigir) router.replace(kanbanHref);
+  }, [debeRedirigir, kanbanHref, router]);
+
+  const esParticipante =
+    currentUser != null && members.some((m) => m.idUsuario === currentUser.idUsuario);
+  const puedeVerKanban = isLeader || esParticipante;
+
+  // Roles enriquecidos (stats + isMine/canLeave) solo para el líder.
+  const {
+    roles: rolesAdmin,
+    crearRol,
+    editarRol,
+    eliminarRol,
+    asignarmeRol,
+    salirDeRol,
+  } = useProjectRoles(idProyecto, { enabled: isLeader });
+
+  const [rolesSheetAbierto, setRolesSheetAbierto] = useState(false);
+  const [rolesSheetIntent, setRolesSheetIntent] = useState<RolesSheetIntent>({ kind: 'list' });
+
+  const abrirGestionRoles = () => {
+    setRolesSheetIntent({ kind: 'list' });
+    setRolesSheetAbierto(true);
+  };
+  const abrirCrearRol = () => {
+    setRolesSheetIntent({ kind: 'create' });
+    setRolesSheetAbierto(true);
+  };
+  const abrirEditarRol = (role: (typeof rolesAdmin)[number]) => {
+    setRolesSheetIntent({ kind: 'edit', role });
+    setRolesSheetAbierto(true);
+  };
+
+  // Resumen del equipo (Sección 24), todo derivado de datos reales.
+  const participantesConfirmados = new Set(members.map((m) => m.idUsuario)).size;
+  const cuposTotales = rolesAdmin.reduce((sum, r) => sum + r.cupos, 0);
+  const rolesDisponiblesCount = rolesAdmin.filter((r) => r.cuposDisponibles > 0).length;
+  const misRoles = rolesAdmin.filter((r) => r.isMine);
+
+  // Objetivos: texto real, separado por líneas (Sección 16).
+  const objetivos = (proyecto.objetivosProyecto ?? '')
+    .split('\n')
+    .map((s) => s.replace(/^[-*•]\s*/, '').trim())
+    .filter(Boolean);
+
+  if (debeRedirigir) {
+    return <ProjectDetailSkeleton />;
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 pb-20 md:pb-6">
-
-      {/* BREADCRUMB */}
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link
-                href="/dashboard/proyectos"
-                className="text-tertiary hover:text-on-surface text-sm transition-colors"
-              >
-                Proyectos
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="text-on-surface text-sm font-medium truncate max-w-xs">
-              {proyecto.tituloProyecto}
-            </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      {/* PROJECT HEADER */}
-      <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 md:p-8 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-sm">
-        <div className="space-y-3 min-w-0">
-          <div className="flex flex-wrap gap-2">
-            <span
-              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}
-            >
-              {proyecto.estadoProyecto}
-            </span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-surface-container-high text-on-surface-variant border border-outline-variant/10">
-              {proyecto.tipoProyecto}
-            </span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border border-outline-variant text-on-surface-variant">
-              {proyecto.modalidadProyecto}
-            </span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black text-on-surface leading-tight font-headline">
-            {proyecto.tituloProyecto}
-          </h1>
-          {puedeVerAvance && avance && (
-            <ProjectProgressBar avance={avance} className="max-w-md pt-1" />
-          )}
-        </div>
-        <Button className="shrink-0 bg-primary hover:bg-primary/90 text-on-primary rounded-xl px-6 h-12 font-bold transition-all shadow-sm">
-          ▶ Postularme
-        </Button>
-      </div>
-
-      {/* MAIN LAYOUT */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-
-        {/* LEFT COLUMN */}
-        <div className="w-full lg:flex-1 min-w-0 space-y-6">
-
-          {/* DESCRIPCIÓN */}
-          {proyecto.descripcionProyecto && (
-            <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-xs font-black uppercase tracking-widest text-tertiary mb-3 font-headline">
-                Descripción del Proyecto
-              </h2>
-              <p className="text-on-surface-variant leading-relaxed text-sm">
-                {proyecto.descripcionProyecto}
-              </p>
-            </div>
-          )}
-
-          {/* ÁREAS DE INTERÉS */}
-          {proyecto.intereses.length > 0 && (
-            <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-xs font-black uppercase tracking-widest text-tertiary mb-3 font-headline">
-                Áreas de Interés
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {proyecto.intereses.map((pi) => (
-                  <span
-                    key={pi.idProyectoInteres}
-                    className="px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface-variant text-sm font-medium"
-                  >
-                    {pi.interes.nombreInteres}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ROLES DISPONIBLES */}
-          {proyecto.roles.length > 0 && (
-            <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
-                <h2 className="text-xs font-black uppercase tracking-widest text-tertiary font-headline">
-                  Roles Disponibles
-                </h2>
-                <span className="text-xs text-primary font-black uppercase tracking-wider">
-                  {totalCupos}{' '}
-                  {totalCupos === 1 ? 'Vacante activa' : 'Vacantes activas'}
-                </span>
-              </div>
-              <div className="space-y-6">
-                {proyecto.roles.map((rol) => (
-                  <div
-                    key={rol.idRolProyecto}
-                    className="border-l-4 border-primary pl-5 py-0.5"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
-                      <h3 className="font-black text-on-surface text-sm font-headline">
-                        {rol.nombreRol}
-                      </h3>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 rounded-lg border-primary text-primary hover:bg-primary/10 text-xs font-bold transition-all self-start"
-                      >
-                        Postularme a este rol
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-tertiary mb-3">
-                      <Users className="size-3.5" />
-                      {rol.cupos}{' '}
-                      {rol.cupos === 1 ? 'cupo disponible' : 'cupos disponibles'}
-                    </div>
-                    {rol.descripcionRolProyecto && (
-                      <p className="text-xs text-on-surface-variant mb-3 leading-relaxed">
-                        {rol.descripcionRolProyecto}
-                      </p>
-                    )}
-                    {rol.requisitos.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {rol.requisitos.map((req) => (
-                          <div
-                            key={req.idRequisitoHabilidad}
-                            className="flex items-center gap-1.5"
-                          >
-                            <span className="px-2.5 py-1 rounded-lg bg-surface-container-low text-on-surface text-xs font-medium">
-                              {req.habilidad.nombreHabilidad}
-                            </span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container-high text-tertiary">
-                              {req.nivelMinimo}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* HITOS Y TAREAS */}
-          <HitosSection
-            hitos={proyecto.hitos}
-            tareas={proyecto.tareas ?? []}
+    <div className="mx-auto w-full max-w-[1400px] px-6 pb-12 pt-6 md:px-8">
+      <ProjectSummarySection proyecto={proyecto} isLeader={isLeader} isAdmin={isAdmin} puedeVerKanban={puedeVerKanban}>
+        {enSolicitudCierre && (
+          <ProjectClosureSection
+            proyecto={proyecto}
+            isLeader={isLeader}
+            isAdmin={isAdmin}
+            resolviendoCierre={resolviendoCierre}
+            resolverCierre={resolverCierre}
           />
+        )}
+      </ProjectSummarySection>
 
-        </div>
-
-        {/* RIGHT COLUMN */}
-        <div className="w-full lg:w-72 flex-shrink-0 space-y-6">
-
-          {/* RESPONSABLE */}
-          <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
-            <h2 className="text-xs font-black uppercase tracking-widest text-tertiary mb-4 font-headline">
-              Responsable
-            </h2>
-            <div className="flex items-center gap-3">
-              <Avatar className="size-11">
-                <AvatarFallback className="bg-primary/10 text-primary font-black text-sm">
-                  {getInitials(proyecto.creador.nombre, proyecto.creador.apellido)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="font-bold text-on-surface text-sm truncate">
-                  {proyecto.creador.nombre} {proyecto.creador.apellido}
-                </p>
-                <p className="text-xs text-on-surface-variant truncate">
-                  {proyecto.creador.correo}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* ORGANIZACIÓN */}
-          {organizacionPrincipal && (
-            <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-xs font-black uppercase tracking-widest text-tertiary mb-4 font-headline">
-                Organización
-              </h2>
-              <p className="font-bold text-on-surface text-sm mb-3">
-                {organizacionPrincipal.organizacion.nombreOrganizacion}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-surface-container-low text-on-surface">
-                  {organizacionPrincipal.organizacion.tipoOrganizacion}
-                </span>
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-primary text-on-primary">
-                  {organizacionPrincipal.rolOrganizacion}
-                </span>
-              </div>
-            </div>
+      {/* Barra de navegación estilo Jira: "Resumen" es la página actual (siempre
+          activa); el resto son los mismos enlaces/acciones de antes, solo con
+          apariencia de tab en vez de botones sueltos. */}
+      {(isLeader || puedeVerKanban) && (
+        <div className="my-5 flex items-center gap-5 overflow-x-auto border-b border-outline-variant/50">
+          <span className={TAB_ACTIVE} aria-current="page">
+            Resumen
+          </span>
+          {isLeader && (
+            <Link
+              href={`/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`}
+              className={TAB_INACTIVE}
+            >
+              <History className="size-3.5" aria-hidden="true" />
+              Revisiones previas
+            </Link>
           )}
-
-          {/* DETALLES DEL PROYECTO */}
-          <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
-            <h2 className="text-xs font-black uppercase tracking-widest text-tertiary mb-4 font-headline">
-              Detalles del Proyecto
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <Calendar className="size-4 text-outline mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-tertiary uppercase tracking-wide">Fecha de Inicio</p>
-                  <p className="text-sm text-on-surface font-medium">
-                    {formatDate(proyecto.fechaInicio)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Calendar className="size-4 text-outline mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-tertiary uppercase tracking-wide">Fin Estimado</p>
-                  <p className="text-sm text-on-surface font-medium">
-                    {formatDate(proyecto.fechaFinEstimada)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="size-4 text-outline mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-tertiary uppercase tracking-wide">Modalidad</p>
-                  <p className="text-sm text-on-surface font-medium">
-                    {proyecto.modalidadProyecto}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
+          {isLeader && (
+            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Editar información
+            </Link>
+          )}
+          {isLeader && (
+            <button type="button" onClick={abrirGestionRoles} className={TAB_INACTIVE}>
+              <Settings2 className="size-3.5" aria-hidden="true" />
+              Editar roles
+            </button>
+          )}
+          <Link href={kanbanBase} className={TAB_INACTIVE}>
+            Tablero
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
         </div>
+      )}
+
+      {/* Fila 2: objetivos/roles · detalles/resumen sticky. */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
+        {/* FILA 2 · COL 1 — Objetivos + Roles */}
+        <div className="min-w-0 space-y-5">
+          <ProjectObjectivesSection objetivos={objetivos} />
+
+          <ProjectRoleManagementSection
+            isLeader={isLeader}
+            proyecto={proyecto}
+            rolesAdmin={rolesAdmin}
+            asignarmeRol={asignarmeRol}
+            salirDeRol={salirDeRol}
+            crearRol={crearRol}
+            editarRol={editarRol}
+            eliminarRol={eliminarRol}
+            abrirCrearRol={abrirCrearRol}
+            abrirEditarRol={abrirEditarRol}
+            rolesSheetAbierto={rolesSheetAbierto}
+            setRolesSheetAbierto={setRolesSheetAbierto}
+            rolesSheetIntent={rolesSheetIntent}
+          />
+        </div>
+
+        <ProjectDetailsSection
+          proyecto={proyecto}
+          isLeader={isLeader}
+          misRoles={misRoles}
+          participantesConfirmados={participantesConfirmados}
+          rolesDisponiblesCount={rolesDisponiblesCount}
+          cuposTotales={cuposTotales}
+        />
       </div>
     </div>
   );
@@ -329,31 +252,42 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 export default function ProjectDetailClient({ id }: Props) {
-  const { data: proyecto, isLoading, error } = useProjectDetail(id);
+  const { data: proyecto, isLoading, error, refetch } = useProjectDetail(id);
 
   if (isLoading) {
-    return (
-      <DashboardLayout>
-        <ProjectDetailSkeleton />
-      </DashboardLayout>
-    );
+    return <ProjectDetailSkeleton />;
   }
 
   if (error || !proyecto) {
+    const status = (error as { statusCode?: number } | null)?.statusCode;
+    const noEncontrado = status === 404;
     return (
-      <DashboardLayout>
-        <div className="max-w-7xl mx-auto px-6 py-16 text-center">
-          <p className="text-red-600 font-medium">
-            No se pudo cargar el proyecto. Intenta nuevamente.
+        <div className="mx-auto max-w-2xl px-6 py-16 text-center">
+          <h2 className="text-lg font-bold text-on-surface">
+            {noEncontrado ? 'Proyecto no encontrado' : 'No fue posible cargar la información del proyecto.'}
+          </h2>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            {noEncontrado
+              ? 'El proyecto que buscas no existe o ya no está disponible.'
+              : 'Ocurrió un problema al cargar el proyecto.'}
           </p>
+          <div className="mt-5 flex justify-center gap-2">
+            {!noEncontrado && (
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Reintentar
+              </Button>
+            )}
+            <Button asChild size="sm" className="bg-primary text-on-primary hover:bg-primary/90">
+              <Link href={MIS_PROYECTOS_HREF}>Volver a Mis Proyectos</Link>
+            </Button>
+          </div>
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
-      <ProjectDetailView proyecto={proyecto} />
-    </DashboardLayout>
+      <Suspense fallback={<ProjectDetailSkeleton />}>
+        <ProjectDetailView proyecto={proyecto} />
+      </Suspense>
   );
 }
