@@ -13,13 +13,13 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, Users, Briefcase } from 'lucide-react';
+import { ArrowLeft, Users, Briefcase, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { projectMembersQueryKey } from '@/lib/query-keys/members';
 
 interface Colaborador {
-  idParticipacionProyecto: number;
-  fechaInicio: string;
+  idParticipacion: number;
+  fechaIngreso: string;
   rolProyecto: {
     idRolProyecto: number;
     nombreRol: string;
@@ -29,12 +29,15 @@ interface Colaborador {
     nombre: string;
     apellido: string;
     correo: string;
-    perfil: {
+    // El backend real (ProjectsService.findTeam) no selecciona perfil ni
+    // habilidades — ambos llegan undefined, nunca null. Opcionales para
+    // reflejar la forma real de la respuesta.
+    perfil?: {
       carrera: {
         nombreCarrera: string;
       } | null;
     } | null;
-    habilidades: Array<{
+    habilidades?: Array<{
       habilidad: {
         idHabilidad: number;
         nombreHabilidad: string;
@@ -97,7 +100,7 @@ export default function EquipoProyectoPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {equipo.map((participacion) => (
             <div
-              key={participacion.idParticipacionProyecto}
+              key={participacion.idParticipacion}
               className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-3">
@@ -129,13 +132,13 @@ export default function EquipoProyectoPage() {
                 </div>
               )}
 
-              {participacion.usuario.habilidades.length > 0 && (
+              {(participacion.usuario.habilidades?.length ?? 0) > 0 && (
                 <div>
                   <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1.5">
                     Habilidades
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {participacion.usuario.habilidades.map((h) => (
+                    {participacion.usuario.habilidades?.map((h) => (
                       <span
                         key={h.habilidad.idHabilidad}
                         className="px-2 py-0.5 rounded-full bg-secondary-container/30 text-secondary text-xs"
@@ -147,10 +150,17 @@ export default function EquipoProyectoPage() {
                 </div>
               )}
 
-              <div className="mt-4 pt-4 border-t border-outline-variant">
+              <div className="mt-4 pt-4 border-t border-outline-variant flex items-center justify-between gap-3">
                 <p className="text-xs text-tertiary">
-                  Desde: {new Date(participacion.fechaInicio).toLocaleDateString('es-GT')}
+                  Desde: {new Date(participacion.fechaIngreso).toLocaleDateString('es-GT')}
                 </p>
+                <Link
+                  href={`/dashboard/proyectos/${id}/equipo/${participacion.usuario.idUsuario}`}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline shrink-0"
+                >
+                  Ver detalle
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
             </div>
           ))}
