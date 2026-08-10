@@ -124,7 +124,6 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
-    horasReales: null,
     hito: null,
     rolProyecto: null,
     asignaciones: [],
