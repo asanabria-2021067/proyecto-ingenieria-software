@@ -50,7 +50,6 @@ interface Fixture {
     fechaLimite: Date | null;
     actualizadaEn: Date | null;
     tiempoEstimadoHoras: number | null;
-    horasReales: number | null;
     eliminadoEn: null;
   }[];
   asignaciones: {
@@ -93,7 +92,6 @@ function baseFixture(): Fixture {
         fechaLimite: null,
         actualizadaEn: null,
         tiempoEstimadoHoras: null,
-        horasReales: null,
         eliminadoEn: null,
       },
     ],
@@ -143,7 +141,6 @@ function buildTaskSelectShape(row: Fixture['tareas'][number], state: Fixture) {
     fechaLimite: row.fechaLimite,
     actualizadaEn: row.actualizadaEn,
     tiempoEstimadoHoras: row.tiempoEstimadoHoras,
-    horasReales: row.horasReales ?? null,
     hito: null,
     rolProyecto: rol ? { idRolProyecto: rol.idRolProyecto, nombreRol: rol.nombreRol } : null,
     asignaciones: asignacionesActivas,
