@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, AlertCircle, Copy, Link2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,10 +33,28 @@ function formatFecha(dateStr: string): string {
   }
 }
 
+/**
+ * Vigencia real del token (Sección HU-14: bug de producción — antes se
+ * mostraba un texto fijo "Válido por 1 hora" sin relación con el `expiraEn`
+ * que ya devolvía el backend). Si el token ya expiró se avisa explícitamente
+ * en vez de mostrar una hora pasada sin contexto.
+ */
+function formatVigencia(expiraEn: string): string {
+  const expiraEnMs = new Date(expiraEn).getTime();
+  if (Number.isNaN(expiraEnMs)) return 'Vigencia desconocida';
+  if (expiraEnMs <= Date.now()) return 'Este enlace ya expiró';
+  const hora = new Intl.DateTimeFormat('es-GT', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(expiraEnMs));
+  return `Válido hasta las ${hora}`;
+}
+
 interface GeneratedLink {
   idSolicitud: number;
   usuario: AdminSolicitudRecuperacion['usuario'];
   resetUrl: string;
+  expiraEn: string;
 }
 
 function SkeletonRows() {
@@ -65,27 +83,84 @@ function SkeletonRows() {
   );
 }
 
-async function copyToClipboard(text: string) {
+/**
+ * Fallback manual (Sección HU-14: bug de producción — en contexto no seguro,
+ * ej. HTTP sin TLS, `navigator.clipboard` ni siquiera existe, así que el
+ * `try/catch` original solo mostraba un error genérico sin copiar nada).
+ * `document.execCommand('copy')` sigue funcionando en esos contextos porque
+ * no depende de la Clipboard API async.
+ */
+function copyWithExecCommand(text: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+  let successful = false;
   try {
-    await navigator.clipboard.writeText(text);
+    successful = document.execCommand('copy');
+  } catch {
+    successful = false;
+  }
+  document.body.removeChild(textarea);
+  return successful;
+}
+
+/**
+ * Copia con confirmación visible. Si la Clipboard API no está disponible o
+ * falla (contexto no seguro), intenta `execCommand('copy')`; si eso también
+ * falla, selecciona el texto del input visible para que el admin lo copie
+ * manualmente con Ctrl+C, en vez de dejarlo sin ninguna vía de copiar.
+ */
+async function copyToClipboard(text: string, inputEl?: HTMLInputElement | null) {
+  const clipboardApiDisponible =
+    typeof navigator !== 'undefined' &&
+    !!navigator.clipboard &&
+    typeof navigator.clipboard.writeText === 'function';
+
+  if (clipboardApiDisponible) {
+    try {
+      await navigator.clipboard.writeText(text);
+      uvgSwal.fire({
+        icon: 'success',
+        title: 'Enlace copiado',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      return;
+    } catch {
+      // Contexto no seguro o permiso denegado: cae al fallback manual.
+    }
+  }
+
+  if (copyWithExecCommand(text)) {
     uvgSwal.fire({
       icon: 'success',
       title: 'Enlace copiado',
       timer: 1500,
       showConfirmButton: false,
     });
-  } catch {
-    uvgSwal.fire({
-      icon: 'error',
-      title: 'No se pudo copiar el enlace',
-      text: 'Selecciona el texto manualmente y copialo.',
-    });
+    return;
   }
+
+  inputEl?.focus();
+  inputEl?.select();
+  uvgSwal.fire({
+    icon: 'warning',
+    title: 'Copia manual requerida',
+    text: 'El texto quedó seleccionado: presiona Ctrl+C (o Cmd+C) para copiarlo.',
+  });
 }
 
 export default function AdminSolicitudesRecuperacionPage() {
   const queryClient = useQueryClient();
   const [generated, setGenerated] = useState<GeneratedLink[]>([]);
+  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['adminPasswordResetRequests'],
@@ -98,7 +173,7 @@ export default function AdminSolicitudesRecuperacionPage() {
       const solicitud = data?.find((s) => s.idSolicitud === idSolicitud);
       if (solicitud) {
         setGenerated((prev) => [
-          { idSolicitud, usuario: solicitud.usuario, resetUrl: result.resetUrl },
+          { idSolicitud, usuario: solicitud.usuario, resetUrl: result.resetUrl, expiraEn: result.expiraEn },
           ...prev,
         ]);
       }
@@ -246,11 +321,14 @@ export default function AdminSolicitudesRecuperacionPage() {
                       type="text"
                       readOnly
                       value={g.resetUrl}
+                      ref={(el) => {
+                        inputRefs.current[g.idSolicitud] = el;
+                      }}
                       onFocus={(e) => e.target.select()}
                       className="w-full flex-1 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs text-on-surface outline-none"
                     />
                     <button
-                      onClick={() => copyToClipboard(g.resetUrl)}
+                      onClick={() => copyToClipboard(g.resetUrl, inputRefs.current[g.idSolicitud])}
                       className="flex shrink-0 items-center gap-1.5 rounded-lg bg-surface-container-high px-3 py-2 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
                     >
                       <Copy className="h-3.5 w-3.5" />
@@ -258,7 +336,7 @@ export default function AdminSolicitudesRecuperacionPage() {
                     </button>
                   </div>
                   <p className="mt-2 text-[11px] text-tertiary">
-                    Válido por 1 hora. Envíalo manualmente al correo institucional del usuario.
+                    {formatVigencia(g.expiraEn)}. Envíalo manualmente al correo institucional del usuario.
                   </p>
                 </div>
               ))}
