@@ -182,7 +182,6 @@ describe('useProjectTasks', () => {
       fechaLimite: null,
       actualizadaEn: null,
       tiempoEstimadoHoras: null,
-      horasReales: null,
       asignacionActiva: null,
       rolProyecto: null,
       hito: null,
