@@ -571,13 +571,13 @@ export class ProjectsService {
 
     // Historial de tareas: cualquier tarea del proyecto donde el usuario
     // tuvo alguna vez una AsignacionTarea (activa o cerrada), no solo la
-    // asignación vigente. Se trae únicamente su asignación más reciente
-    // (take: 1) para exponer fechaAsignacion/desasignadaEn/horasReales de
-    // ESE tramo concreto — nunca un total agregado de la tarea: si la tarea
-    // fue reasignada, cada usuario que la tuvo tiene su propia fila de
-    // AsignacionTarea con su propio horasReales, y este detalle solo debe
-    // mostrar el tramo de idUsuario, no el de otros usuarios que también
-    // trabajaron la misma tarea en otro momento.
+    // asignación vigente. Se traen TODOS sus tramos sobre esa tarea (sin
+    // take: 1): el mismo usuario puede haber sido desasignado y reasignado a
+    // la misma tarea más de una vez, y cada tramo tiene su propio
+    // horasReales — nunca un total agregado de la tarea entre usuarios
+    // distintos (cada usuario sigue viendo únicamente sus propios tramos,
+    // no los de otros usuarios que también trabajaron la misma tarea en
+    // otro momento).
     const tareas = await this.prisma.tarea.findMany({
       where: {
         idProyecto,
@@ -596,7 +596,6 @@ export class ProjectsService {
         asignaciones: {
           where: { idUsuario },
           orderBy: { fechaAsignacion: 'desc' },
-          take: 1,
           select: { fechaAsignacion: true, desasignadaEn: true, horasReales: true },
         },
       },
@@ -613,7 +612,25 @@ export class ProjectsService {
         rolProyecto: p.rolProyecto,
       })),
       tareas: tareas.map((t) => {
-        const asignacion = t.asignaciones[0];
+        // Más reciente primero (orderBy: fechaAsignacion desc ya aplicado en
+        // la consulta): fechaAsignacion/desasignadaEn mostradas son las del
+        // tramo vigente o, si no hay uno vigente, el último cerrado.
+        const asignacionMasReciente = t.asignaciones[0];
+
+        // horasReales es la SUMA de TODOS los tramos de idUsuario sobre esta
+        // tarea (puede haber sido desasignado y reasignado más de una vez),
+        // nunca solo el del tramo más reciente — de lo contrario se pierden
+        // silenciosamente las horas de tramos anteriores. null únicamente
+        // cuando ningún tramo reportó horas; un tramo sin horas no descarta
+        // las horas sí reportadas en otro tramo.
+        const horasPorTramo = t.asignaciones
+          .map((a) => a.horasReales)
+          .filter((h): h is NonNullable<typeof h> => h !== null);
+        const horasReales =
+          horasPorTramo.length === 0
+            ? null
+            : horasPorTramo.reduce((total, h) => total + h.toNumber(), 0);
+
         return {
           idTarea: t.idTarea,
           tituloTarea: t.tituloTarea,
@@ -623,14 +640,9 @@ export class ProjectsService {
           fechaLimite: this.toDateOnly(t.fechaLimite),
           actualizadaEn: t.actualizadaEn,
           tiempoEstimadoHoras: t.tiempoEstimadoHoras,
-          // Horas reales del TRAMO de asignación de este usuario, no un
-          // total de la tarea: una tarea reasignada tiene una fila de
-          // AsignacionTarea (y por lo tanto un horasReales) por usuario que
-          // la tuvo, así que cada integrante ve únicamente lo que trabajó en
-          // su propio tramo.
-          horasReales: asignacion.horasReales === null ? null : asignacion.horasReales.toNumber(),
-          fechaAsignacion: asignacion.fechaAsignacion,
-          desasignadaEn: asignacion.desasignadaEn,
+          horasReales,
+          fechaAsignacion: asignacionMasReciente.fechaAsignacion,
+          desasignadaEn: asignacionMasReciente.desasignadaEn,
         };
       }),
     };
