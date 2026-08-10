@@ -572,8 +572,12 @@ export class ProjectsService {
     // Historial de tareas: cualquier tarea del proyecto donde el usuario
     // tuvo alguna vez una AsignacionTarea (activa o cerrada), no solo la
     // asignación vigente. Se trae únicamente su asignación más reciente
-    // (take: 1) para exponer fechaAsignacion/desasignadaEn de esa relación,
-    // sin arrastrar el historial completo de reasignaciones de la tarea.
+    // (take: 1) para exponer fechaAsignacion/desasignadaEn/horasReales de
+    // ESE tramo concreto — nunca un total agregado de la tarea: si la tarea
+    // fue reasignada, cada usuario que la tuvo tiene su propia fila de
+    // AsignacionTarea con su propio horasReales, y este detalle solo debe
+    // mostrar el tramo de idUsuario, no el de otros usuarios que también
+    // trabajaron la misma tarea en otro momento.
     const tareas = await this.prisma.tarea.findMany({
       where: {
         idProyecto,
@@ -589,12 +593,11 @@ export class ProjectsService {
         fechaLimite: true,
         actualizadaEn: true,
         tiempoEstimadoHoras: true,
-        horasReales: true,
         asignaciones: {
           where: { idUsuario },
           orderBy: { fechaAsignacion: 'desc' },
           take: 1,
-          select: { fechaAsignacion: true, desasignadaEn: true },
+          select: { fechaAsignacion: true, desasignadaEn: true, horasReales: true },
         },
       },
       orderBy: { fechaCreacion: 'desc' },
@@ -620,7 +623,12 @@ export class ProjectsService {
           fechaLimite: this.toDateOnly(t.fechaLimite),
           actualizadaEn: t.actualizadaEn,
           tiempoEstimadoHoras: t.tiempoEstimadoHoras,
-          horasReales: t.horasReales === null ? null : t.horasReales.toNumber(),
+          // Horas reales del TRAMO de asignación de este usuario, no un
+          // total de la tarea: una tarea reasignada tiene una fila de
+          // AsignacionTarea (y por lo tanto un horasReales) por usuario que
+          // la tuvo, así que cada integrante ve únicamente lo que trabajó en
+          // su propio tramo.
+          horasReales: asignacion.horasReales === null ? null : asignacion.horasReales.toNumber(),
           fechaAsignacion: asignacion.fechaAsignacion,
           desasignadaEn: asignacion.desasignadaEn,
         };
