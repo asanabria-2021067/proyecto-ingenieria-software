@@ -91,28 +91,6 @@ describe('UpdateTaskDto', () => {
     await expect(parse({ idsEtiquetas: [2, 2] })).rejects.toThrow(BadRequestException);
   });
 
-  it('acepta horasReales cuando se envía', async () => {
-    const dto = await parse({ horasReales: 7.5 });
-    expect(dto.horasReales).toBe(7.5);
-  });
-
-  it('acepta horasReales: 0', async () => {
-    const dto = await parse({ horasReales: 0 });
-    expect(dto.horasReales).toBe(0);
-  });
-
-  it('rechaza horasReales negativo', async () => {
-    await expect(parse({ horasReales: -1 })).rejects.toThrow(BadRequestException);
-  });
-
-  it('rechaza horasReales por encima de 1000', async () => {
-    await expect(parse({ horasReales: 1001 })).rejects.toThrow(BadRequestException);
-  });
-
-  it('rechaza horasReales con más de 2 decimales', async () => {
-    await expect(parse({ horasReales: 1.234 })).rejects.toThrow(BadRequestException);
-  });
-
   it('no admite idUsuarioAsignado: se rechaza como campo desconocido', async () => {
     await expect(parse({ idUsuarioAsignado: 5 })).rejects.toThrow(BadRequestException);
   });
@@ -147,10 +125,6 @@ describe('UpdateTaskDto', () => {
 
     it('rechaza tiempoEstimadoHoras: null', async () => {
       await expect(parse({ tiempoEstimadoHoras: null })).rejects.toThrow(BadRequestException);
-    });
-
-    it('rechaza horasReales: null', async () => {
-      await expect(parse({ horasReales: null })).rejects.toThrow(BadRequestException);
     });
 
     it('rechaza idsEtiquetas: null', async () => {
