@@ -228,6 +228,15 @@ export class ProjectsController {
     return this.projectsService.findPostulacionesByProject(id, user.userId);
   }
 
+  @Get(':id/postulaciones/pendientes')
+  @UseGuards(JwtAuthGuard)
+  findPostulacionesPendientesPorRol(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.findPostulacionesPendientesPorRol(id, user.userId);
+  }
+
   // -------------------------------------------------
 
   @Delete(':id')
