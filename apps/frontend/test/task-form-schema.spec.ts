@@ -35,7 +35,6 @@ function valores(overrides: Partial<TaskFormValues> = {}): TaskFormValues {
     prioridad: 'MEDIA',
     fechaLimite: '2026-07-01',
     tiempoEstimadoHoras: '',
-    horasReales: '',
     idRolProyecto: SIN_ROL,
     idUsuarioAsignado: SIN_ASIGNAR,
     idHito: SIN_HITO,
@@ -59,7 +58,6 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     fechaLimite: '2026-07-01',
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
-    horasReales: null,
     asignacionActiva: null,
     rolProyecto: null,
     hito: null,
@@ -171,30 +169,6 @@ describe('buildTaskFormSchema — validación', () => {
 
   it('rechaza tiempo estimado por encima de 1000', () => {
     expect(schema().safeParse(valores({ tiempoEstimadoHoras: '1001' })).success).toBe(false);
-  });
-
-  it('acepta horas reales dentro de rango con decimales', () => {
-    expect(schema().safeParse(valores({ horasReales: '7.5' })).success).toBe(true);
-  });
-
-  it('acepta horas reales vacío (omitido)', () => {
-    expect(schema().safeParse(valores({ horasReales: '' })).success).toBe(true);
-  });
-
-  it('acepta horas reales en 0', () => {
-    expect(schema().safeParse(valores({ horasReales: '0' })).success).toBe(true);
-  });
-
-  it('rechaza horas reales negativo', () => {
-    expect(schema().safeParse(valores({ horasReales: '-1' })).success).toBe(false);
-  });
-
-  it('rechaza horas reales con más de 2 decimales', () => {
-    expect(schema().safeParse(valores({ horasReales: '1.234' })).success).toBe(false);
-  });
-
-  it('rechaza horas reales por encima de 1000', () => {
-    expect(schema().safeParse(valores({ horasReales: '1001' })).success).toBe(false);
   });
 
   it('acepta un rol válido (sin restringir por miembros)', () => {
@@ -371,24 +345,6 @@ describe('buildUpdatePayload — payload por diferencia', () => {
     const original = tarea({ tiempoEstimadoHoras: 8 });
     const payload = buildUpdatePayload(original, { ...defaultTaskFormValues(original), tiempoEstimadoHoras: '' });
     expect(payload).not.toHaveProperty('tiempoEstimadoHoras');
-  });
-
-  it('incluye horasReales cuando cambia', () => {
-    const original = tarea({ horasReales: null });
-    const payload = buildUpdatePayload(original, { ...defaultTaskFormValues(original), horasReales: '7.5' });
-    expect(payload.horasReales).toBe(7.5);
-  });
-
-  it('omite horasReales cuando no cambió', () => {
-    const original = tarea({ horasReales: 7.5 });
-    const payload = buildUpdatePayload(original, defaultTaskFormValues(original));
-    expect(payload).not.toHaveProperty('horasReales');
-  });
-
-  it('no envía horasReales como null al vaciarse (misma limitación que tiempoEstimadoHoras)', () => {
-    const original = tarea({ horasReales: 7.5 });
-    const payload = buildUpdatePayload(original, { ...defaultTaskFormValues(original), horasReales: '' });
-    expect(payload).not.toHaveProperty('horasReales');
   });
 });
 
