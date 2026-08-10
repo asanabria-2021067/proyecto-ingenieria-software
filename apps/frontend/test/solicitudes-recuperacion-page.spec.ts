@@ -93,6 +93,24 @@ describe('AdminSolicitudesRecuperacionPage', () => {
     delete (navigator as any).clipboard;
   });
 
+  it('Clipboard API disponible pero writeText() rechaza (permiso denegado): cae a execCommand y aun así confirma la copia', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('Permission denied'));
+    Object.assign(navigator, { clipboard: { writeText } });
+    const execCommand = vi.fn().mockReturnValue(true);
+    document.execCommand = execCommand;
+
+    const copiarBtn = await generarEnlace();
+    fireEvent.click(copiarBtn);
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://uvgenius.com/reset-password?token=abc123'));
+    await waitFor(() => expect(execCommand).toHaveBeenCalledWith('copy'));
+    expect(uvgSwal.fire).toHaveBeenCalledWith(
+      expect.objectContaining({ icon: 'success', title: 'Enlace copiado' }),
+    );
+
+    delete (navigator as any).clipboard;
+  });
+
   it('contexto no seguro: sin Clipboard API, usa execCommand y aun así confirma la copia', async () => {
     delete (navigator as any).clipboard;
     const execCommand = vi.fn().mockReturnValue(true);
