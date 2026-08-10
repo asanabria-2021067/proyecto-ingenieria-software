@@ -4,7 +4,6 @@ import {
   IsArray,
   IsEnum,
   IsInt,
-  IsNumber,
   IsString,
   Max,
   MaxLength,
@@ -57,16 +56,6 @@ export class UpdateTaskDto {
   @Min(1)
   @Max(1000)
   tiempoEstimadoHoras?: number;
-
-  // Horas reales trabajadas, reportadas manualmente por el líder (no admite
-  // `null`: al igual que tiempoEstimadoHoras, este endpoint no ofrece forma
-  // de retirar el valor una vez enviado). Hasta 2 decimales, igual que la
-  // columna @db.Decimal(6, 2).
-  @ValidateIf((_object, value) => value !== undefined)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(1000)
-  horasReales?: number;
 
   // `null` retira la relación; `undefined` (campo omitido) la conserva;
   // cualquier otro valor debe validarse como entero positivo.
