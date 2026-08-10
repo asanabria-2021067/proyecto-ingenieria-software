@@ -1,6 +1,6 @@
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from '../src/auth/auth.service';
 import { AdminService } from '../src/admin/admin.service';
@@ -161,9 +161,22 @@ describe('HU-14: recuperacion de contrasena via notificacion al admin', () => {
     expect(solicitud.correoReferencia).toBe(CORREO_INSTITUCIONAL);
     expect(solicitud.estado).toBe('PENDIENTE');
 
-    const { resetUrl, resetToken } = await adminService.generarEnlaceRecuperacion(ADMIN_ID, solicitud.idSolicitud);
+    const antesDeGenerar = Date.now();
+    const { resetUrl, resetToken, expiraEn } = await adminService.generarEnlaceRecuperacion(
+      ADMIN_ID,
+      solicitud.idSolicitud,
+    );
     expect(resetUrl).toContain('reset-password?token=');
     expect(typeof resetToken).toBe('string');
+
+    // Bug de producción (HU-14): expiraEn era el string literal '1h', que no
+    // le decía al admin CUÁNDO expira realmente el enlace. Debe ser un
+    // timestamp ISO ~1h después de la generación (mismo TTL que el JWT).
+    const expiraEnMs = new Date(expiraEn).getTime();
+    expect(Number.isNaN(expiraEnMs)).toBe(false);
+    const minutosHastaExpirar = (expiraEnMs - antesDeGenerar) / 60_000;
+    expect(minutosHastaExpirar).toBeGreaterThan(58);
+    expect(minutosHastaExpirar).toBeLessThanOrEqual(61);
 
     const pendientesDespues = await adminService.getSolicitudesRecuperacionPendientes(ADMIN_ID);
     expect(pendientesDespues).toHaveLength(0);
@@ -173,6 +186,37 @@ describe('HU-14: recuperacion de contrasena via notificacion al admin', () => {
 
     const usuarioActualizado = await fake.prisma.usuario.findUnique({ where: { idUsuario: STUDENT_ID } });
     expect(await bcrypt.compare('NuevaClave123', usuarioActualizado.contrasena)).toBe(true);
+  });
+
+  it('expiraEn se deriva exactamente del claim exp del resetToken firmado, no de un TTL calculado por separado', async () => {
+    const solicitud = await fake.prisma.solicitudRecuperacion.create({
+      data: { idUsuario: STUDENT_ID, carneReferencia: CARNE, correoReferencia: CORREO_INSTITUCIONAL },
+    });
+
+    // Se congela el reloj en un instante con milisegundos != 0: el claim
+    // `exp` de un JWT siempre trunca a segundos completos (jsonwebtoken
+    // calcula iat = Math.floor(Date.now()/1000)), mientras que un cálculo
+    // independiente tipo `Date.now() + TTL_MS` conserva los milisegundos.
+    // Si expiraEn todavía viniera de esa segunda fuente, este test lo
+    // detecta de forma determinista (no depende de que el reloj real caiga
+    // justo en un segundo exacto).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.437Z'));
+
+    let expiraEn: string;
+    let resetToken: string;
+    try {
+      ({ expiraEn, resetToken } = await adminService.generarEnlaceRecuperacion(
+        ADMIN_ID,
+        solicitud.idSolicitud,
+      ));
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const decoded = jwtService.decode(resetToken) as { exp: number };
+    const expiraEnEsperado = new Date(decoded.exp * 1000).toISOString();
+    expect(expiraEn).toBe(expiraEnEsperado);
   });
 
   it('rechaza un token expirado', async () => {
