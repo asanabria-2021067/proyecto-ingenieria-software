@@ -524,6 +524,130 @@ export class ProjectsService {
     });
   }
 
+  /**
+   * Mismo motivo documentado en tasks.service.ts#toDateOnly: las columnas
+   * @db.Date se leen como Date a medianoche UTC del día calendario
+   * almacenado, y toISOString() es la única extracción segura (los getters
+   * locales pueden desplazar el día según la zona horaria del proceso).
+   */
+  private toDateOnly(value: Date | null): string | null {
+    return value ? value.toISOString().slice(0, 10) : null;
+  }
+
+  /**
+   * Detalle de un integrante dentro de un proyecto: participación(es),
+   * historial completo de tareas con asignación (activa o pasada) y horas
+   * por tarea. Exclusivo del líder (_requireOwner, igual que el resto de
+   * lecturas administrativas del proyecto) — "guard de membresía y
+   * liderazgo": liderazgo de quien consulta, membresía de idUsuario.
+   */
+  async findTeamMemberDetail(idProyecto: number, idUsuario: number, userId: number) {
+    await this._requireOwner(idProyecto, userId);
+
+    // Todas las participaciones del usuario en el proyecto (activas e
+    // históricas), no solo la ACTIVO: el detalle debe reflejar también a
+    // quien ya se retiró. El usuario viaja embebido en la misma consulta
+    // para no necesitar una segunda ida a la base de datos.
+    const participaciones = await this.prisma.participacionProyecto.findMany({
+      where: { idUsuario, rolProyecto: { idProyecto } },
+      select: {
+        idParticipacion: true,
+        estadoParticipacion: true,
+        fechaIngreso: true,
+        fechaSalida: true,
+        rolProyecto: { select: { idRolProyecto: true, nombreRol: true } },
+        usuario: {
+          select: { idUsuario: true, nombre: true, apellido: true, correo: true, fotoUrl: true },
+        },
+      },
+      orderBy: { fechaIngreso: 'desc' },
+    });
+
+    if (participaciones.length === 0) {
+      throw new NotFoundException(
+        `El usuario con id ${idUsuario} no es integrante del proyecto ${idProyecto}`,
+      );
+    }
+
+    // Historial de tareas: cualquier tarea del proyecto donde el usuario
+    // tuvo alguna vez una AsignacionTarea (activa o cerrada), no solo la
+    // asignación vigente. Se traen TODOS sus tramos sobre esa tarea (sin
+    // take: 1): el mismo usuario puede haber sido desasignado y reasignado a
+    // la misma tarea más de una vez, y cada tramo tiene su propio
+    // horasReales — nunca un total agregado de la tarea entre usuarios
+    // distintos (cada usuario sigue viendo únicamente sus propios tramos,
+    // no los de otros usuarios que también trabajaron la misma tarea en
+    // otro momento).
+    const tareas = await this.prisma.tarea.findMany({
+      where: {
+        idProyecto,
+        eliminadoEn: null,
+        asignaciones: { some: { idUsuario } },
+      },
+      select: {
+        idTarea: true,
+        tituloTarea: true,
+        estadoTarea: true,
+        prioridad: true,
+        fechaCreacion: true,
+        fechaLimite: true,
+        actualizadaEn: true,
+        tiempoEstimadoHoras: true,
+        asignaciones: {
+          where: { idUsuario },
+          orderBy: { fechaAsignacion: 'desc' },
+          select: { fechaAsignacion: true, desasignadaEn: true, horasReales: true },
+        },
+      },
+      orderBy: { fechaCreacion: 'desc' },
+    });
+
+    return {
+      usuario: participaciones[0].usuario,
+      participaciones: participaciones.map((p) => ({
+        idParticipacion: p.idParticipacion,
+        estadoParticipacion: p.estadoParticipacion,
+        fechaIngreso: this.toDateOnly(p.fechaIngreso),
+        fechaSalida: this.toDateOnly(p.fechaSalida),
+        rolProyecto: p.rolProyecto,
+      })),
+      tareas: tareas.map((t) => {
+        // Más reciente primero (orderBy: fechaAsignacion desc ya aplicado en
+        // la consulta): fechaAsignacion/desasignadaEn mostradas son las del
+        // tramo vigente o, si no hay uno vigente, el último cerrado.
+        const asignacionMasReciente = t.asignaciones[0];
+
+        // horasReales es la SUMA de TODOS los tramos de idUsuario sobre esta
+        // tarea (puede haber sido desasignado y reasignado más de una vez),
+        // nunca solo el del tramo más reciente — de lo contrario se pierden
+        // silenciosamente las horas de tramos anteriores. null únicamente
+        // cuando ningún tramo reportó horas; un tramo sin horas no descarta
+        // las horas sí reportadas en otro tramo.
+        const horasPorTramo = t.asignaciones
+          .map((a) => a.horasReales)
+          .filter((h): h is NonNullable<typeof h> => h !== null);
+        const horasReales =
+          horasPorTramo.length === 0
+            ? null
+            : horasPorTramo.reduce((total, h) => total + h.toNumber(), 0);
+
+        return {
+          idTarea: t.idTarea,
+          tituloTarea: t.tituloTarea,
+          estadoTarea: t.estadoTarea,
+          prioridad: t.prioridad,
+          fechaCreacion: t.fechaCreacion,
+          fechaLimite: this.toDateOnly(t.fechaLimite),
+          actualizadaEn: t.actualizadaEn,
+          tiempoEstimadoHoras: t.tiempoEstimadoHoras,
+          horasReales,
+          fechaAsignacion: asignacionMasReciente.fechaAsignacion,
+          desasignadaEn: asignacionMasReciente.desasignadaEn,
+        };
+      }),
+    };
+  }
+
   async findFeatured() {
     const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
     if (cached) return cached;
