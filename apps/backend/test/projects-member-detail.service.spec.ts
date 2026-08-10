@@ -324,4 +324,60 @@ describe('ProjectsService.findTeamMemberDetail', () => {
     // exclusivamente su propio tramo.
     expect(detalleA.tareas[0].horasReales).not.toBe(detalleB.tareas[0].horasReales);
   });
+
+  it('el mismo usuario reasignado varias veces a la misma tarea suma las horas de todos sus tramos, sin perder el más antiguo', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      {
+        idParticipacion: 10,
+        estadoParticipacion: 'ACTIVO',
+        fechaIngreso: new Date('2026-01-01T00:00:00.000Z'),
+        fechaSalida: null,
+        rolProyecto: { idRolProyecto: 5, nombreRol: 'Desarrollador' },
+        usuario: USUARIO,
+      },
+    ]);
+
+    // Usuario 2 fue asignado, desasignado y luego reasignado a la MISMA
+    // tarea: dos filas de AsignacionTarea para (idUsuario, idTarea), cada
+    // una con sus propias horas. orderBy fechaAsignacion desc ya aplicado
+    // en el select real, así que el tramo más reciente va primero — el
+    // resultado no debe depender de ese orden para la suma.
+    prisma.tarea.findMany.mockResolvedValue([
+      {
+        idTarea: 100,
+        tituloTarea: 'Tarea X',
+        estadoTarea: 'HECHO',
+        prioridad: 'MEDIA',
+        fechaCreacion: new Date('2026-01-01T00:00:00.000Z'),
+        fechaLimite: null,
+        actualizadaEn: null,
+        tiempoEstimadoHoras: null,
+        asignaciones: [
+          {
+            // Tramo más reciente (reasignación).
+            fechaAsignacion: new Date('2026-02-01T00:00:00.000Z'),
+            desasignadaEn: null,
+            horasReales: { toNumber: () => 1.5 },
+          },
+          {
+            // Tramo original, ya cerrado.
+            fechaAsignacion: new Date('2026-01-01T00:00:00.000Z'),
+            desasignadaEn: new Date('2026-01-15T00:00:00.000Z'),
+            horasReales: { toNumber: () => 2 },
+          },
+        ],
+      },
+    ]);
+    const service = makeService(prisma);
+
+    const detalle = await service.findTeamMemberDetail(1, 2, 1);
+
+    expect(detalle.tareas).toHaveLength(1);
+    expect(detalle.tareas[0].horasReales).toBe(3.5);
+    // Las fechas mostradas corresponden al tramo vigente (el más reciente),
+    // no al cerrado: la suma de horas no debe alterar esa semántica.
+    expect(detalle.tareas[0].desasignadaEn).toBeNull();
+  });
 });
