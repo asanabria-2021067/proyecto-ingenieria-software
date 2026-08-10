@@ -584,8 +584,6 @@ model Tarea {
   prioridad           Prioridad   @default(MEDIA)
   orden               Int         @default(0) @map("orden")
   tiempoEstimadoHoras Int?        @map("tiempo_estimado_horas")
-  /// Horas reales trabajadas en la tarea, reportadas manualmente por el líder al editarla (PATCH /tareas/:taskId). Distinta de `tiempoEstimadoHoras` (estimado) y de `HorasParticipacion` (horas por participación/periodo, no por tarea).
-  horasReales         Decimal?    @map("horas_reales") @db.Decimal(6, 2)
   creadaPor           Int         @map("creada_por")
   fechaCreacion       DateTime    @default(now()) @map("fecha_creacion")
   fechaLimite         DateTime?   @map("fecha_limite") @db.Date
@@ -616,6 +614,8 @@ model AsignacionTarea {
   fechaAsignacion DateTime  @default(now()) @map("fecha_asignacion")
   desasignadaEn   DateTime? @map("desasignada_en")
   asignadoPor     Int       @map("asignado_por")
+  /// Horas realmente trabajadas por idUsuario durante ESTE tramo concreto de asignación (nunca el total de la tarea): una tarea reasignada tiene una fila de AsignacionTarea por tramo, y cada una lleva sus propias horas. Reportado manualmente por el líder al editar la tarea. Fuente granular que HU-126 (HorasParticipacion.horasCalculadas) consumirá después; no confundir con esa capa de agregación/aprobación, que este PR no implementa.
+  horasReales     Decimal?  @map("horas_reales") @db.Decimal(6, 2)
 
   tarea     Tarea   @relation(fields: [idTarea], references: [idTarea])
   usuario   Usuario @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
