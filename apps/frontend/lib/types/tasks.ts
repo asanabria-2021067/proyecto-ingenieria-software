@@ -59,7 +59,6 @@ export interface TareaPublicaDTO {
   fechaLimite: string | null;
   actualizadaEn: string | null;
   tiempoEstimadoHoras: number | null;
-  horasReales: number | null;
   asignacionActiva: AsignacionActivaTareaDTO | null;
   rolProyecto: RolProyectoResumenTarea | null;
   hito: HitoResumenTarea | null;
@@ -87,7 +86,6 @@ export interface UpdateTaskInput {
   fechaLimite?: string;
   prioridad?: Prioridad;
   tiempoEstimadoHoras?: number;
-  horasReales?: number;
   idHito?: number | null;
   idRolProyecto?: number | null;
   idsEtiquetas?: number[];
