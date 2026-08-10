@@ -1126,6 +1126,34 @@ export class ProjectsService {
   }
 
   /**
+   * Postulaciones pendientes del proyecto, agrupadas por rol, para la
+   * sección de solicitudes de la vista de miembros. Reutiliza
+   * findPostulacionesByProject (HU-08: mismo chequeo de ownership, misma
+   * consulta con include de postulante/rolProyecto) en vez de duplicar la
+   * consulta a Prisma; aquí solo se filtra por PENDIENTE y se agrupa en
+   * memoria. Un rol sin ninguna postulación pendiente no aparece en el
+   * resultado.
+   */
+  async findPostulacionesPendientesPorRol(idProyecto: number, userId: number) {
+    const postulaciones = await this.findPostulacionesByProject(idProyecto, userId);
+    const pendientes = postulaciones.filter((p) => p.estadoPostulacion === 'PENDIENTE');
+
+    const grupos = new Map<
+      number,
+      { idRolProyecto: number; nombreRol: string; postulaciones: typeof pendientes }
+    >();
+    for (const postulacion of pendientes) {
+      const { idRolProyecto, nombreRol } = postulacion.rolProyecto;
+      if (!grupos.has(idRolProyecto)) {
+        grupos.set(idRolProyecto, { idRolProyecto, nombreRol, postulaciones: [] });
+      }
+      grupos.get(idRolProyecto)!.postulaciones.push(postulacion);
+    }
+
+    return [...grupos.values()];
+  }
+
+  /**
    * Crea un hito; exclusivo del líder del proyecto (mismo chequeo que el
    * resto de mutaciones sobre el proyecto: _requireOwner). estadoHito se fija
    * siempre en PENDIENTE (no es configurable desde el cliente) y `orden` se
