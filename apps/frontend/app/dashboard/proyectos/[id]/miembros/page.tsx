@@ -3,8 +3,19 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Users } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  ArrowUpDown,
+  CheckCircle2,
+  Clock,
+  ListTodo,
+  Users,
+} from 'lucide-react';
 import { useProjectTeam } from '@/hooks/use-project-team';
+import { useProjectAvance } from '@/hooks/use-project-avance';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -25,6 +36,7 @@ import {
 } from '@/components/ui/empty';
 import { ESTADO_PARTICIPACION_STYLE } from '@/components/projects/member-status.utils';
 import { ordenarEquipo, type MiembroSortKey, type SortDirection } from '@/components/projects/member-sort.utils';
+import { contarIntegrantesActivos, sumarHorasAcumuladas } from '@/components/projects/team-metrics.utils';
 import type { ParticipacionActivaDTO } from '@/lib/dto/member.dto';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
@@ -105,6 +117,34 @@ function SortableHeader({
   );
 }
 
+function MetricTile({
+  icon: Icon,
+  label,
+  value,
+  isLoading,
+}: {
+  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  label: string;
+  value: string;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 flex items-center gap-3">
+      <div className="flex items-center justify-center size-11 rounded-xl bg-primary/10 shrink-0">
+        <Icon aria-hidden className="w-5 h-5 text-primary" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-bold text-tertiary uppercase tracking-wide">{label}</p>
+        {isLoading ? (
+          <Skeleton className="h-7 w-12 rounded mt-1 bg-surface-container-high" />
+        ) : (
+          <p className="text-2xl font-headline font-extrabold text-on-surface">{value}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MiembroRow({ miembro }: { miembro: ParticipacionActivaDTO }) {
   const estilo = ESTADO_PARTICIPACION_STYLE[miembro.estadoParticipacion];
 
@@ -148,6 +188,15 @@ export default function MiembrosProyectoPage() {
   const idProyecto = Number(id);
 
   const { equipo, isLoading, isError, refetch } = useProjectTeam(idProyecto);
+  const { data: avance, isLoading: isLoadingAvance } = useProjectAvance(idProyecto);
+
+  const integrantesActivos = contarIntegrantesActivos(equipo);
+  const horasAcumuladas = sumarHorasAcumuladas(equipo);
+  // avance es undefined mientras carga o si el backend respondió 403 (quien
+  // consulta no es líder ni participante activo) — en ambos casos se
+  // muestra 0, no un error visible (mismo criterio que useProjectAvance).
+  const tareasAbiertas = avance ? avance.tareas.total - avance.tareas.hecho : 0;
+  const tareasCompletadas = avance?.tareas.hecho ?? 0;
 
   const [sortKey, setSortKey] = useState<MiembroSortKey>('nombre');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -184,6 +233,33 @@ export default function MiembrosProyectoPage() {
         <p className="text-tertiary text-sm">
           Integrantes activos del proyecto, su rol y su carga de trabajo actual.
         </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4">
+        <MetricTile
+          icon={Users}
+          label="Integrantes activos"
+          value={String(integrantesActivos)}
+          isLoading={isLoading}
+        />
+        <MetricTile
+          icon={ListTodo}
+          label="Tareas abiertas"
+          value={String(tareasAbiertas)}
+          isLoading={isLoadingAvance}
+        />
+        <MetricTile
+          icon={CheckCircle2}
+          label="Tareas completadas"
+          value={String(tareasCompletadas)}
+          isLoading={isLoadingAvance}
+        />
+        <MetricTile
+          icon={Clock}
+          label="Horas acumuladas"
+          value={`${formatHoras(horasAcumuladas)} h`}
+          isLoading={isLoading}
+        />
       </div>
 
       {isError ? (
