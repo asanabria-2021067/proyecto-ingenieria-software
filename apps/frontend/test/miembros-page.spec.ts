@@ -1,17 +1,20 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ParticipacionActivaDTO } from '../lib/dto/member.dto';
+import type { AvanceProyectoDTO } from '../lib/dto/project.dto';
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '42' }),
 }));
 
 vi.mock('../hooks/use-project-team', () => ({ useProjectTeam: vi.fn() }));
+vi.mock('../hooks/use-project-avance', () => ({ useProjectAvance: vi.fn() }));
 
 import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';
 import { useProjectTeam } from '../hooks/use-project-team';
+import { useProjectAvance } from '../hooks/use-project-avance';
 
 function miembro(overrides: Partial<ParticipacionActivaDTO> = {}): ParticipacionActivaDTO {
   return {
@@ -38,9 +41,23 @@ function mockHook(overrides: Partial<ReturnType<typeof useProjectTeam>> = {}) {
   });
 }
 
+function mockAvance(overrides: { data?: AvanceProyectoDTO; isLoading?: boolean; isError?: boolean } = {}) {
+  (useProjectAvance as any).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+    ...overrides,
+  });
+}
+
 function renderPage() {
   return render(createElement(MiembrosProyectoPage));
 }
+
+beforeEach(() => {
+  mockAvance();
+});
 
 afterEach(() => {
   cleanup();
@@ -100,26 +117,104 @@ describe('MiembrosProyectoPage — tabla con datos', () => {
         }),
       ],
     });
-    renderPage();
+    const { container } = renderPage();
+    const filas = container.querySelectorAll('tbody tr');
 
-    expect(screen.getByText('Carlos Mendoza')).toBeInTheDocument();
-    expect(screen.getByText('Backend')).toBeInTheDocument();
-    expect(screen.getByText('8 h')).toBeInTheDocument();
+    // Orden por defecto: nombre ascendente — Ana antes que Carlos.
+    expect(within(filas[0] as HTMLElement).getByText('Ana Lopez')).toBeInTheDocument();
+    expect(within(filas[0] as HTMLElement).getByText('QA')).toBeInTheDocument();
+    expect(within(filas[0] as HTMLElement).getByText('0 h')).toBeInTheDocument();
 
-    expect(screen.getByText('Ana Lopez')).toBeInTheDocument();
-    expect(screen.getByText('QA')).toBeInTheDocument();
-    expect(screen.getByText('0 h')).toBeInTheDocument();
+    expect(within(filas[1] as HTMLElement).getByText('Carlos Mendoza')).toBeInTheDocument();
+    expect(within(filas[1] as HTMLElement).getByText('Backend')).toBeInTheDocument();
+    expect(within(filas[1] as HTMLElement).getByText('8 h')).toBeInTheDocument();
 
     // Badge de estado de participación (findTeam solo devuelve integrantes ACTIVO).
     expect(screen.getAllByText('Activo')).toHaveLength(2);
   });
 
-  it('un proyecto sin integrantes de todas formas no rompe: 0 tareas y 0 horas se muestran, no null/undefined', () => {
+  it('un integrante con 0 tareas y 0 horas se muestra tal cual en su fila, no null/undefined', () => {
     mockHook({ equipo: [miembro({ tareasActivas: 0, horasRegistradas: 0 })] });
+    const { container } = renderPage();
+
+    const fila = container.querySelector('tbody tr');
+    expect(fila?.textContent).toContain('0');
+    expect(fila?.textContent).toContain('0 h');
+  });
+});
+
+describe('MiembrosProyectoPage — métricas de cabecera', () => {
+  function valorDeMetrica(labelText: string): string | null {
+    const label = screen.getByText(labelText);
+    return label.nextElementSibling?.textContent ?? null;
+  }
+
+  it('integrantes activos cuenta usuarios únicos, no filas (un usuario con 2 roles no se duplica)', () => {
+    mockHook({
+      equipo: [
+        miembro({
+          idParticipacion: 20,
+          usuario: { idUsuario: 100, nombre: 'Elena', apellido: 'Ruiz', correo: 'e@uvg.edu.gt', fotoUrl: null },
+          rolProyecto: { idRolProyecto: 1, nombreRol: 'Backend', descripcionRolProyecto: null },
+          horasRegistradas: 15,
+        }),
+        miembro({
+          idParticipacion: 21,
+          usuario: { idUsuario: 100, nombre: 'Elena', apellido: 'Ruiz', correo: 'e@uvg.edu.gt', fotoUrl: null },
+          rolProyecto: { idRolProyecto: 2, nombreRol: 'QA', descripcionRolProyecto: null },
+          horasRegistradas: 15,
+        }),
+        miembro({
+          idParticipacion: 22,
+          usuario: { idUsuario: 200, nombre: 'Marco', apellido: 'Diaz', correo: 'm@uvg.edu.gt', fotoUrl: null },
+          horasRegistradas: 5,
+        }),
+      ],
+    });
     renderPage();
 
-    expect(screen.getByText('0')).toBeInTheDocument();
-    expect(screen.getByText('0 h')).toBeInTheDocument();
+    expect(valorDeMetrica('Integrantes activos')).toBe('2');
+    expect(valorDeMetrica('Horas acumuladas')).toBe('20 h');
+  });
+
+  it('tareas abiertas y completadas vienen de useProjectAvance, no de la tabla de equipo', () => {
+    mockHook({ equipo: [] });
+    mockAvance({
+      data: {
+        tareas: { total: 10, hecho: 4, porHacer: 3, enProgreso: 3, porcentaje: 40 },
+        hitos: { total: 0, pendiente: 0, enProgreso: 0, completado: 0, porcentaje: 0 },
+      },
+    });
+    renderPage();
+
+    expect(valorDeMetrica('Tareas abiertas')).toBe('6');
+    expect(valorDeMetrica('Tareas completadas')).toBe('4');
+  });
+
+  it('sin datos de avance (403 o carga) las métricas de tareas muestran 0, no un error visible', () => {
+    mockHook({ equipo: [] });
+    mockAvance({ data: undefined, isError: true });
+    renderPage();
+
+    expect(valorDeMetrica('Tareas abiertas')).toBe('0');
+    expect(valorDeMetrica('Tareas completadas')).toBe('0');
+    expect(screen.queryByText('No fue posible cargar los integrantes.')).not.toBeInTheDocument();
+  });
+
+  it('un proyecto sin integrantes muestra 0 integrantes activos y 0 horas acumuladas, sin errores', () => {
+    mockHook({ equipo: [] });
+    renderPage();
+
+    expect(valorDeMetrica('Integrantes activos')).toBe('0');
+    expect(valorDeMetrica('Horas acumuladas')).toBe('0 h');
+    expect(screen.getByText('Aún no hay integrantes en este proyecto.')).toBeInTheDocument();
+  });
+
+  it('mientras useProjectTeam carga, las métricas que dependen del equipo muestran skeleton', () => {
+    mockHook({ isLoading: true });
+    const { container } = renderPage();
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
   });
 });
 
