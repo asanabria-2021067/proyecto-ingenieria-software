@@ -1,8 +1,9 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ArrowLeft, Users } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Users } from 'lucide-react';
 import { useProjectTeam } from '@/hooks/use-project-team';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,7 +24,16 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { ESTADO_PARTICIPACION_STYLE } from '@/components/projects/member-status.utils';
+import { ordenarEquipo, type MiembroSortKey, type SortDirection } from '@/components/projects/member-sort.utils';
 import type { ParticipacionActivaDTO } from '@/lib/dto/member.dto';
+
+const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
+  { key: 'nombre', label: 'Integrante' },
+  { key: 'rol', label: 'Rol' },
+  { key: 'estado', label: 'Estado' },
+  { key: 'tareasActivas', label: 'Tareas activas' },
+  { key: 'horasRegistradas', label: 'Horas registradas' },
+];
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -59,6 +69,39 @@ function SkeletonRows() {
         </TableRow>
       ))}
     </>
+  );
+}
+
+function SortableHeader({
+  columnKey,
+  label,
+  sortKey,
+  sortDirection,
+  onSort,
+}: {
+  columnKey: MiembroSortKey;
+  label: string;
+  sortKey: MiembroSortKey;
+  sortDirection: SortDirection;
+  onSort: (key: MiembroSortKey) => void;
+}) {
+  const isActive = sortKey === columnKey;
+  const Icon = isActive ? (sortDirection === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+
+  return (
+    <TableHead
+      aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary"
+    >
+      <button
+        type="button"
+        onClick={() => onSort(columnKey)}
+        className="inline-flex items-center gap-1 hover:text-on-surface transition-colors"
+      >
+        {label}
+        <Icon aria-hidden="true" className={`h-3 w-3 ${isActive ? 'text-primary' : 'text-tertiary/60'}`} />
+      </button>
+    </TableHead>
   );
 }
 
@@ -105,6 +148,23 @@ export default function MiembrosProyectoPage() {
   const idProyecto = Number(id);
 
   const { equipo, isLoading, isError, refetch } = useProjectTeam(idProyecto);
+
+  const [sortKey, setSortKey] = useState<MiembroSortKey>('nombre');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  function handleSort(key: MiembroSortKey) {
+    if (key === sortKey) {
+      setSortDirection((direccion) => (direccion === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  }
+
+  const equipoOrdenado = useMemo(
+    () => ordenarEquipo(equipo, sortKey, sortDirection),
+    [equipo, sortKey, sortDirection],
+  );
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
@@ -161,28 +221,23 @@ export default function MiembrosProyectoPage() {
           <Table>
             <TableHeader>
               <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Integrante
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Rol
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Estado
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Tareas activas
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Horas registradas
-                </TableHead>
+                {COLUMNAS_ORDENABLES.map((columna) => (
+                  <SortableHeader
+                    key={columna.key}
+                    columnKey={columna.key}
+                    label={columna.label}
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <SkeletonRows />
               ) : (
-                equipo.map((miembro) => <MiembroRow key={miembro.idParticipacion} miembro={miembro} />)
+                equipoOrdenado.map((miembro) => <MiembroRow key={miembro.idParticipacion} miembro={miembro} />)
               )}
             </TableBody>
           </Table>
