@@ -105,6 +105,15 @@ export class ProjectsController {
     return this.projectsService.findTeamMemberDetail(id, idUsuario, user.userId);
   }
 
+  @Get(':id/miembros/resumen')
+  @UseGuards(JwtAuthGuard)
+  getTeamSummary(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.getTeamSummary(id, user.userId);
+  }
+
   @Get(':id/owner')
   @UseGuards(JwtAuthGuard)
   findOneOwner(
