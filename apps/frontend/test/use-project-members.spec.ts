@@ -124,7 +124,7 @@ describe('useProjectMembers — retorno público completo', () => {
   });
 });
 
-describe('useProjectMembers — DTO compartido actual (Tarea 4, sin campos T-106)', () => {
+describe('useProjectMembers — DTO compartido actual (Tarea 4; T-106 agrega tareasActivas/horasRegistradas, que este hook descarta)', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('aplana un fixture tipado con ParticipacionActivaDTO al MiembroProyecto vigente', async () => {
@@ -133,6 +133,8 @@ describe('useProjectMembers — DTO compartido actual (Tarea 4, sin campos T-106
         idParticipacion: 9,
         estadoParticipacion: 'ACTIVO',
         fechaIngreso: '2026-02-01T00:00:00.000Z',
+        tareasActivas: 2,
+        horasRegistradas: 6,
         usuario: { idUsuario: 11, nombre: 'Luis', apellido: 'Perez', correo: 'luis@uvg.edu.gt', fotoUrl: null },
         rolProyecto: { idRolProyecto: 3, nombreRol: 'QA', descripcionRolProyecto: null },
       },
