@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ParticipacionActivaDTO } from '../lib/dto/member.dto';
 
 vi.mock('next/navigation', () => ({
@@ -65,7 +65,7 @@ describe('MiembrosProyectoPage — error', () => {
     renderPage();
 
     expect(screen.getByText('No fue posible cargar los integrantes.')).toBeInTheDocument();
-    screen.getByRole('button', { name: 'Reintentar' }).click();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(refetch).toHaveBeenCalled();
   });
 });
@@ -120,6 +120,77 @@ describe('MiembrosProyectoPage — tabla con datos', () => {
 
     expect(screen.getByText('0')).toBeInTheDocument();
     expect(screen.getByText('0 h')).toBeInTheDocument();
+  });
+});
+
+describe('MiembrosProyectoPage — ordenamiento', () => {
+  function equipoFixture(): ParticipacionActivaDTO[] {
+    return [
+      miembro({
+        idParticipacion: 10,
+        usuario: { idUsuario: 7, nombre: 'Carlos', apellido: 'Mendoza', correo: 'c@uvg.edu.gt', fotoUrl: null },
+        tareasActivas: 1,
+        horasRegistradas: 5,
+      }),
+      miembro({
+        idParticipacion: 11,
+        usuario: { idUsuario: 8, nombre: 'Ana', apellido: 'Lopez', correo: 'a@uvg.edu.gt', fotoUrl: null },
+        tareasActivas: 9,
+        horasRegistradas: 1,
+      }),
+    ];
+  }
+
+  function textoDeFilas(container: HTMLElement): string[] {
+    return Array.from(container.querySelectorAll('tbody tr')).map((fila) => fila.textContent ?? '');
+  }
+
+  it('por defecto ordena por nombre ascendente', () => {
+    mockHook({ equipo: equipoFixture() });
+    const { container } = renderPage();
+
+    const filas = textoDeFilas(container);
+    expect(filas[0]).toContain('Ana Lopez');
+    expect(filas[1]).toContain('Carlos Mendoza');
+  });
+
+  it('un clic en un encabezado ordenable reordena por esa columna', () => {
+    mockHook({ equipo: equipoFixture() });
+    const { container } = renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Tareas activas/i }));
+
+    // Carlos tiene 1 tarea activa, Ana 9 — ascendente pone a Carlos primero.
+    const filas = textoDeFilas(container);
+    expect(filas[0]).toContain('Carlos Mendoza');
+    expect(filas[1]).toContain('Ana Lopez');
+  });
+
+  it('un segundo clic en el mismo encabezado invierte el orden', () => {
+    mockHook({ equipo: equipoFixture() });
+    const { container } = renderPage();
+
+    const boton = screen.getByRole('button', { name: /Tareas activas/i });
+    fireEvent.click(boton);
+    fireEvent.click(boton);
+
+    const filas = textoDeFilas(container);
+    expect(filas[0]).toContain('Ana Lopez');
+    expect(filas[1]).toContain('Carlos Mendoza');
+  });
+
+  it('el <th> activo expone aria-sort para accesibilidad, el resto queda en "none"', () => {
+    mockHook({ equipo: equipoFixture() });
+    renderPage();
+
+    const encabezadoHoras = screen.getByRole('columnheader', { name: /Horas registradas/i });
+    expect(encabezadoHoras).toHaveAttribute('aria-sort', 'none');
+
+    fireEvent.click(screen.getByRole('button', { name: /Horas registradas/i }));
+    expect(encabezadoHoras).toHaveAttribute('aria-sort', 'ascending');
+
+    const encabezadoNombre = screen.getByRole('columnheader', { name: /Integrante/i });
+    expect(encabezadoNombre).toHaveAttribute('aria-sort', 'none');
   });
 });
 
