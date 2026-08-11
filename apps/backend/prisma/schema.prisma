@@ -187,6 +187,13 @@ enum EstadoSolicitudRecuperacion {
   ATENDIDA
 }
 
+enum EstadoSolicitudSalida {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  CANCELADA
+}
+
 model Usuario {
   idUsuario         Int           @id @default(autoincrement()) @map("id_usuario")
   correo            String        @unique @db.VarChar(255)
@@ -226,6 +233,8 @@ model Usuario {
   revisionesProyectoRealizadas     RevisionProyecto[]        @relation("RevisionesProyectoRealizadas")
   comentariosEscritos              Comentario[]
   mensajesRevisionEnviados         MensajeRevisionProyecto[] @relation("MensajesEnviados")
+  solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[] @relation("SolicitudSalidaSolicitante")
+  solicitudesSalidaResueltas       SolicitudSalidaProyecto[] @relation("SolicitudSalidaResolutor")
 
   @@map("usuario")
 }
@@ -421,16 +430,17 @@ model Proyecto {
   fechaActualizacion  DateTime?         @map("fecha_actualizacion")
   eliminadoEn         DateTime?         @map("eliminado_en")
 
-  creador          Usuario                   @relation(fields: [creadoPor], references: [idUsuario])
-  organizaciones   ProyectoOrganizacion[]
-  intereses        ProyectoInteres[]
-  roles            RolProyecto[]
-  hitos            Hito[]
-  tareas           Tarea[]
-  revisiones       RevisionProyecto[]
-  comentarios      Comentario[]
-  mensajesRevision MensajeRevisionProyecto[]
-  etiquetas        Etiqueta[]
+  creador           Usuario                   @relation(fields: [creadoPor], references: [idUsuario])
+  organizaciones    ProyectoOrganizacion[]
+  intereses         ProyectoInteres[]
+  roles             RolProyecto[]
+  hitos             Hito[]
+  tareas            Tarea[]
+  revisiones        RevisionProyecto[]
+  comentarios       Comentario[]
+  mensajesRevision  MensajeRevisionProyecto[]
+  etiquetas         Etiqueta[]
+  solicitudesSalida SolicitudSalidaProyecto[]
 
   @@map("proyecto")
 }
@@ -555,6 +565,36 @@ model ParticipacionProyecto {
   @@index([idRolProyecto, estadoParticipacion])
   @@index([idUsuario, estadoParticipacion])
   @@map("participacion_proyecto")
+}
+
+/// Identidad de la solicitud = (idProyecto, idUsuario), no idParticipacion: un
+/// usuario puede tener varios roles/participaciones en el proyecto, pero la
+/// salida que solicita es de la persona respecto al proyecto como un todo, no
+/// de una participación individual. A lo sumo puede existir una solicitud
+/// PENDIENTE simultánea por (idProyecto, idUsuario), enforced por PostgreSQL
+/// (no por Prisma) vía el índice único parcial
+/// `solicitud_salida_proyecto_pendiente_unique` (migración
+/// `20260811035302_add_solicitud_salida_proyecto`); APROBADA/RECHAZADA/CANCELADA
+/// no están restringidas, así que el historial completo se conserva y una
+/// persona puede volver a solicitar salir tras resolverse la anterior. La
+/// aplicación deberá traducir una violación de esa constraint (P2002) a 409
+/// Conflict — no implementado en esta tarea.
+model SolicitudSalidaProyecto {
+  idSolicitud     Int                   @id @default(autoincrement()) @map("id_solicitud")
+  idProyecto      Int                   @map("id_proyecto")
+  idUsuario       Int                   @map("id_usuario")
+  motivo          String                @db.Text
+  estadoSolicitud EstadoSolicitudSalida @default(PENDIENTE) @map("estado_solicitud")
+  solicitadaEn    DateTime              @default(now()) @map("solicitada_en")
+  resueltaEn      DateTime?             @map("resuelta_en")
+  resueltaPor     Int?                  @map("resuelta_por")
+
+  proyecto  Proyecto @relation(fields: [idProyecto], references: [idProyecto])
+  usuario   Usuario  @relation("SolicitudSalidaSolicitante", fields: [idUsuario], references: [idUsuario])
+  resolutor Usuario? @relation("SolicitudSalidaResolutor", fields: [resueltaPor], references: [idUsuario])
+
+  @@index([idProyecto, idUsuario])
+  @@map("solicitud_salida_proyecto")
 }
 
 model Hito {
