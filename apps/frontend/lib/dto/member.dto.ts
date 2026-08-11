@@ -1,15 +1,22 @@
 /**
  * Forma real de la respuesta del endpoint `GET /proyectos/:id/equipo`
- * (confirmada contra el `select` de Prisma en `findTeam`, no copiada del tipo
- * `Colaborador` de `equipo/page.tsx`, que está desactualizado — usa
- * `idParticipacionProyecto`/`fechaInicio` en vez de los campos reales
+ * (confirmada contra el `select`/agregación de Prisma en `findTeam`, no
+ * copiada del tipo `Colaborador` de `equipo/page.tsx`, que está desactualizado
+ * — usa `idParticipacionProyecto`/`fechaInicio` en vez de los campos reales
  * `idParticipacion`/`fechaIngreso`, y espera `usuario.perfil`/`usuario.habilidades`,
  * que el backend no selecciona).
+ *
+ * `tareasActivas`/`horasRegistradas` (HU-123/T-106) se calculan por
+ * `idUsuario`, no por `idParticipacion`: si el mismo usuario tiene más de una
+ * participación activa (varios roles), cada fila que le corresponde trae el
+ * mismo total agregado del proyecto, no un desglose por rol.
  */
 export interface ParticipacionActivaDTO {
   idParticipacion: number;
   estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
   fechaIngreso: string;
+  tareasActivas: number;
+  horasRegistradas: number;
   usuario: {
     idUsuario: number;
     nombre: string;
