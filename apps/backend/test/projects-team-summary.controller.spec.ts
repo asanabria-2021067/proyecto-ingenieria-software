@@ -1,0 +1,80 @@
+import { describe, expect, it, vi } from 'vitest';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { ProjectsController } from '../src/projects/projects.controller';
+import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+
+function makeService() {
+  return { getTeamSummary: vi.fn() } as any;
+}
+
+describe('ProjectsController.getTeamSummary (GET /proyectos/:id/miembros/resumen)', () => {
+  describe('metadata de ruta y guard', () => {
+    it('está registrado como GET en la ruta :id/miembros/resumen', () => {
+      expect(
+        Reflect.getMetadata(PATH_METADATA, ProjectsController.prototype.getTeamSummary),
+      ).toBe(':id/miembros/resumen');
+      expect(
+        Reflect.getMetadata(METHOD_METADATA, ProjectsController.prototype.getTeamSummary),
+      ).toBe(0); // GET
+    });
+
+    // 401 STRUCTURAL GUARD COVERAGE: no hay infraestructura HTTP E2E real en
+    // este repo (Supertest/Nest bootstrap), así que no se ejecuta una
+    // petición real sin token. Lo que se demuestra aquí es que el handler
+    // está decorado con JwtAuthGuard, el mismo guard que protege el resto de
+    // lecturas administrativas del controller.
+    it('401 STRUCTURAL GUARD COVERAGE — el handler está protegido por JwtAuthGuard', () => {
+      const guards = Reflect.getMetadata(GUARDS_METADATA, ProjectsController.prototype.getTeamSummary);
+      expect(guards).toContain(JwtAuthGuard);
+    });
+  });
+
+  // A. Delegación camino feliz (cobertura estructural del 200)
+  it('delega en ProjectsService.getTeamSummary con id y userId (CurrentUser), y retorna su resultado sin transformarlo', async () => {
+    const service = makeService();
+    const resumen = { lider: { idUsuario: 7 }, miembros: [] };
+    service.getTeamSummary.mockResolvedValue(resumen);
+    const controller = new ProjectsController(service);
+
+    const result = await controller.getTeamSummary(42, { userId: 7 });
+
+    expect(service.getTeamSummary).toHaveBeenCalledTimes(1);
+    expect(service.getTeamSummary).toHaveBeenCalledWith(42, 7);
+    expect(result).toBe(resumen);
+  });
+
+  // B. 403 — la excepción del service se propaga sin ser capturada/transformada
+  it('propaga ForbiddenException cuando el usuario autenticado no es el líder del proyecto', async () => {
+    const service = makeService();
+    const error = new ForbiddenException('No eres el líder de este proyecto');
+    service.getTeamSummary.mockRejectedValue(error);
+    const controller = new ProjectsController(service);
+
+    await expect(controller.getTeamSummary(42, { userId: 7 })).rejects.toBe(error);
+  });
+
+  // C. 404 — mismo criterio
+  it('propaga NotFoundException cuando el proyecto no existe o fue eliminado', async () => {
+    const service = makeService();
+    const error = new NotFoundException('Proyecto con id 42 no encontrado');
+    service.getTeamSummary.mockRejectedValue(error);
+    const controller = new ProjectsController(service);
+
+    await expect(controller.getTeamSummary(42, { userId: 7 })).rejects.toBe(error);
+  });
+
+  // D. :id usa ParseIntPipe en el decorador del handler real (inspección
+  // estructural del código fuente, igual que el patrón ya usado en
+  // tasks-queries.controller.spec.ts para otras rutas de este mismo repo).
+  // El parsing HTTP real de la ruta queda fuera de esta suite (no hay E2E).
+  it('el parámetro :id usa ParseIntPipe (inspección estructural, no HTTP E2E)', () => {
+    const { readFileSync } = require('node:fs') as typeof import('node:fs');
+    const { join } = require('node:path') as typeof import('node:path');
+    const source = readFileSync(join(__dirname, '../src/projects/projects.controller.ts'), 'utf-8');
+    const bloque = source.slice(source.indexOf("@Get(':id/miembros/resumen')"));
+    const bloqueHandler = bloque.slice(0, bloque.indexOf('\n\n'));
+
+    expect(bloqueHandler).toMatch(/@Param\('id',\s*ParseIntPipe\)/);
+  });
+});
