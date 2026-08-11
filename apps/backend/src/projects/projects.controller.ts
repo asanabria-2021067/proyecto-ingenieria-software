@@ -18,6 +18,7 @@ import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateEstadoProyectoDto } from './dto/update-estado-proyecto.dto';
 import { CreateHitoDto } from './dto/create-hito.dto';
+import { CreateSolicitudSalidaDto } from './dto/create-solicitud-salida.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -234,6 +235,17 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.createHito(id, user.userId, data);
+  }
+
+  @Post(':projectId/solicitudes-salida')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  createExitRequest(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Body() data: CreateSolicitudSalidaDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.createSolicitudSalida(projectId, user.userId, data.motivo);
   }
 
   // ---------- POSTULACIONES DEL PROYECTO ----------

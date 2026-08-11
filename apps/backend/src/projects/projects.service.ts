@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Inject,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -1468,6 +1469,118 @@ export class ProjectsService {
     });
 
     return { ...hito, fechaLimite: toDateOnly(hito.fechaLimite) };
+  }
+
+  /**
+   * Creación de una solicitud de salida (T-111, Tarea 6): NO usa
+   * _requireOwner porque el solicitante es un miembro, no el líder — eso
+   * rechazaría exactamente a quien necesita usar este flujo. En su lugar
+   * valida directamente: proyecto vigente, líder excluido, participación
+   * ACTIVO, motivo no vacío, cero asignaciones vigentes y ausencia de otra
+   * solicitud PENDIENTE. El orden de las dos primeras reglas se invierte
+   * respecto a la enumeración conceptual del contrato (líder antes que
+   * participación): el líder nunca tiene ParticipacionProyecto propia (ver
+   * comentario en Proyecto.creadoPor), así que comprobar participación
+   * primero le devolvería «no tienes participación activa» en vez del 403
+   * contractual «eres el líder, usa el flujo de traspaso», que no existe en
+   * este sprint. Única escritura productiva: solicitudSalidaProyecto.create;
+   * no se toca ParticipacionProyecto, HorasParticipacion, Tarea ni
+   * AsignacionTarea.
+   */
+  async createSolicitudSalida(idProyecto: number, idUsuario: number, motivo: string) {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: { idProyecto, eliminadoEn: null },
+      select: { idProyecto: true, creadoPor: true },
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
+    }
+
+    if (proyecto.creadoPor === idUsuario) {
+      throw new ForbiddenException(
+        'El líder del proyecto no puede solicitar su salida mediante este flujo',
+      );
+    }
+
+    const participacion = await this.prisma.participacionProyecto.findFirst({
+      where: {
+        idUsuario,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto },
+      },
+      select: { idParticipacion: true },
+    });
+    if (!participacion) {
+      throw new ForbiddenException('No tienes una participación activa en este proyecto');
+    }
+
+    const motivoLimpio = motivo.trim();
+    if (motivoLimpio.length === 0) {
+      throw new BadRequestException('motivo no puede estar vacío');
+    }
+
+    // Asignación vigente = desasignadaEn: null sobre una tarea del proyecto
+    // solicitado; sin filtro adicional de estadoTarea (eso pertenece a T-113,
+    // no a esta regla de creación). No se decide aquí ninguna política de
+    // soft-delete de tarea porque el contrato congelado de T-111 no la
+    // define; se usa únicamente el guard explícito (desasignadaEn + idProyecto).
+    const asignacionVigente = await this.prisma.asignacionTarea.findFirst({
+      where: { idUsuario, desasignadaEn: null, tarea: { idProyecto } },
+      select: { idAsignacion: true },
+    });
+    if (asignacionVigente) {
+      throw new ConflictException(
+        'No puedes solicitar salida mientras tengas asignaciones de tareas vigentes',
+      );
+    }
+
+    const solicitudPendiente = await this.prisma.solicitudSalidaProyecto.findFirst({
+      where: { idProyecto, idUsuario, estadoSolicitud: 'PENDIENTE' },
+      select: { idSolicitud: true },
+    });
+    if (solicitudPendiente) {
+      throw new ConflictException('Ya existe una solicitud de salida pendiente para este proyecto');
+    }
+
+    try {
+      return await this.prisma.solicitudSalidaProyecto.create({
+        data: { idProyecto, idUsuario, motivo: motivoLimpio },
+      });
+    } catch (error) {
+      if (this.isPendingExitRequestCollision(error)) {
+        throw new ConflictException('Ya existe una solicitud de salida pendiente para este proyecto');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Reconoce específicamente la violación del índice parcial
+   * solicitud_salida_proyecto_pendiente_unique (Tarea 5): defensa en
+   * profundidad contra la condición de carrera que el precheck de
+   * findFirst no puede cerrar por sí solo. Mismo criterio estrecho que
+   * isActiveAssignmentCollision en TasksService: no basta `code === 'P2002'`,
+   * se exige además modelo y columnas exactas del índice parcial. Cualquier
+   * otro P2002 (u otro código) se relanza sin cambios.
+   */
+  private isPendingExitRequestCollision(error: unknown): boolean {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+      return false;
+    }
+    if (error.code !== 'P2002') {
+      return false;
+    }
+
+    const modelName = error.meta?.modelName;
+    const target = error.meta?.target;
+
+    return (
+      modelName === 'SolicitudSalidaProyecto' &&
+      Array.isArray(target) &&
+      target.length === 2 &&
+      target.includes('id_proyecto') &&
+      target.includes('id_usuario')
+    );
   }
 
   async delete(id: number, userId: number) {
