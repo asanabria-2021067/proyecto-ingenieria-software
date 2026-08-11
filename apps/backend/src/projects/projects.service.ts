@@ -18,6 +18,8 @@ import {
 } from './dto/update-estado-proyecto.dto';
 import { EstadoHito, EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TeamSummaryMemberDto, TeamSummaryRoleDto } from './dto/team-summary-member.dto';
+import { TeamSummaryResponseDto } from './dto/team-summary-response.dto';
 
 const FEATURED_CACHE_KEY = 'projects:featured';
 const FEATURED_CACHE_TTL = 300_000;
@@ -673,6 +675,155 @@ export class ProjectsService {
           desasignadaEn: asignacionMasReciente.desasignadaEn,
         };
       }),
+    };
+  }
+
+  /**
+   * Resumen person-centric de integrantes para T-106
+   * (GET /proyectos/:id/miembros/resumen, aún no expuesto). Contrato
+   * congelado en team-summary-member.dto.ts / team-summary-response.dto.ts.
+   * O(1) queries respecto al número de integrantes: _requireOwner, líder,
+   * participaciones, tareas y horas se resuelven cada una en una única
+   * consulta fija; nunca dentro de un loop por miembro.
+   */
+  async getTeamSummary(idProyecto: number, userId: number): Promise<TeamSummaryResponseDto> {
+    const proyecto = await this._requireOwner(idProyecto, userId);
+
+    // El líder no tiene ParticipacionProyecto propia (ver comentario sobre
+    // Proyecto.creadoPor en schema.prisma): se resuelve aparte con una única
+    // query fija a Usuario, nunca a partir de las participaciones.
+    const liderUsuario = await this.prisma.usuario.findUnique({
+      where: { idUsuario: proyecto.creadoPor },
+      select: { idUsuario: true, nombre: true, apellido: true, correo: true, fotoUrl: true },
+    });
+    if (!liderUsuario) {
+      throw new NotFoundException(`Usuario líder con id ${proyecto.creadoPor} no encontrado`);
+    }
+
+    // Participaciones ACTIVO del proyecto, excluyendo al creador: el líder
+    // se modela por separado (lider) y nunca debe duplicarse dentro de
+    // miembros aunque además tenga una ParticipacionProyecto propia.
+    const participaciones = await this.prisma.participacionProyecto.findMany({
+      where: {
+        rolProyecto: { idProyecto },
+        estadoParticipacion: 'ACTIVO',
+        idUsuario: { not: proyecto.creadoPor },
+      },
+      select: {
+        idUsuario: true,
+        estadoParticipacion: true,
+        usuario: {
+          select: { idUsuario: true, nombre: true, apellido: true, correo: true, fotoUrl: true },
+        },
+        rolProyecto: { select: { idRolProyecto: true, nombreRol: true } },
+      },
+      orderBy: { fechaIngreso: 'asc' },
+    });
+
+    // Agrupación person-centric: la key del Map es idUsuario (no
+    // idParticipacion ni idRolProyecto), así que dos participaciones ACTIVO
+    // de la misma persona con distinto rol producen 1 miembro con
+    // roles.length = 2, nunca 2 miembros.
+    const miembrosPorUsuario = new Map<number, TeamSummaryMemberDto>();
+    for (const p of participaciones) {
+      let miembro = miembrosPorUsuario.get(p.idUsuario);
+      if (!miembro) {
+        miembro = {
+          idUsuario: p.usuario.idUsuario,
+          nombre: p.usuario.nombre,
+          apellido: p.usuario.apellido,
+          correo: p.usuario.correo,
+          fotoUrl: p.usuario.fotoUrl,
+          roles: [],
+          estadoParticipacion: p.estadoParticipacion,
+          tareasActivas: 0,
+          tareasCompletadas: 0,
+          horasReconocidas: 0,
+        };
+        miembrosPorUsuario.set(p.idUsuario, miembro);
+      }
+      const yaTieneRol = miembro.roles.some(
+        (r: TeamSummaryRoleDto) => r.idRolProyecto === p.rolProyecto.idRolProyecto,
+      );
+      if (!yaTieneRol) {
+        miembro.roles.push({
+          idRolProyecto: p.rolProyecto.idRolProyecto,
+          nombreRol: p.rolProyecto.nombreRol,
+        });
+      }
+    }
+
+    const idsUsuarios = [...miembrosPorUsuario.keys()];
+
+    if (idsUsuarios.length === 0) {
+      return { lider: liderUsuario, miembros: [] };
+    }
+
+    // Tareas vigentes (no soft-deleted) del proyecto con asignación ACTUAL
+    // (desasignadaEn: null) hacia alguno de los miembros. Una sola query
+    // fija para todos los miembros, aislada a idProyecto explícitamente.
+    const tareas = await this.prisma.tarea.findMany({
+      where: {
+        idProyecto,
+        eliminadoEn: null,
+        asignaciones: { some: { idUsuario: { in: idsUsuarios }, desasignadaEn: null } },
+      },
+      select: {
+        idTarea: true,
+        estadoTarea: true,
+        asignaciones: {
+          where: { idUsuario: { in: idsUsuarios }, desasignadaEn: null },
+          select: { idUsuario: true },
+        },
+      },
+    });
+
+    // Deduplicación (idUsuario, idTarea): un usuario puede tener más de un
+    // tramo histórico sobre la misma tarea, pero al filtrar por la
+    // asignación vigente (desasignadaEn: null) el invariante del schema ya
+    // garantiza como mucho un tramo actual por (idUsuario, idTarea); el Set
+    // es la salvaguarda simple contra datos inesperados, no una necesidad
+    // estructural.
+    const tareasContadas = new Set<string>();
+    for (const t of tareas) {
+      for (const a of t.asignaciones) {
+        const clave = `${a.idUsuario}:${t.idTarea}`;
+        if (tareasContadas.has(clave)) continue;
+        tareasContadas.add(clave);
+
+        const miembro = miembrosPorUsuario.get(a.idUsuario);
+        if (!miembro) continue;
+        if (t.estadoTarea === 'HECHO') {
+          miembro.tareasCompletadas += 1;
+        } else {
+          miembro.tareasActivas += 1;
+        }
+      }
+    }
+
+    // horasReconocidas: exclusivamente HorasParticipacion.horasAprobadas con
+    // estadoHoras = APROBADA, agrupado por idUsuario. Nunca
+    // AsignacionTarea.horasReales ni tiempoEstimadoHoras.
+    const horas = await this.prisma.horasParticipacion.findMany({
+      where: {
+        estadoHoras: 'APROBADA',
+        participacion: { idUsuario: { in: idsUsuarios }, rolProyecto: { idProyecto } },
+      },
+      select: {
+        horasAprobadas: true,
+        participacion: { select: { idUsuario: true } },
+      },
+    });
+
+    for (const h of horas) {
+      const miembro = miembrosPorUsuario.get(h.participacion.idUsuario);
+      if (!miembro) continue;
+      miembro.horasReconocidas += h.horasAprobadas ? h.horasAprobadas.toNumber() : 0;
+    }
+
+    return {
+      lider: liderUsuario,
+      miembros: idsUsuarios.map((id) => miembrosPorUsuario.get(id)!),
     };
   }
 
