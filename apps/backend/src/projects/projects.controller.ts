@@ -248,6 +248,28 @@ export class ProjectsController {
     return this.projectsService.createSolicitudSalida(projectId, user.userId, data.motivo);
   }
 
+  @Post(':projectId/solicitudes-salida/:idSolicitud/aprobar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  approveExitRequest(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.approveSolicitudSalida(projectId, idSolicitud, user.userId);
+  }
+
+  @Post(':projectId/solicitudes-salida/:idSolicitud/rechazar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  rejectExitRequest(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.rejectSolicitudSalida(projectId, idSolicitud, user.userId);
+  }
+
   // ---------- POSTULACIONES DEL PROYECTO ----------
 
   @Get(':id/postulaciones')
