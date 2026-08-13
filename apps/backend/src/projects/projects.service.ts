@@ -1588,10 +1588,12 @@ export class ProjectsService {
    * liderazgo que approveClosure/rejectClosure (_requireOwner). La regla de
    * bloqueo aplica SOLO a la aprobación: cuenta en una única consulta las
    * tareas con asignación vigente cuyo estado sea distinto de HECHO — si hay
-   * alguna, se rechaza sin tocar la solicitud ni la participación.
+   * alguna, se rechaza sin tocar la solicitud ni la participación. Ambos
+   * métodos notifican al solicitante (nunca al líder) dentro de la misma
+   * transacción, igual que approveClosure/rejectClosure.
    */
   async approveSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
-    await this._requireOwner(idProyecto, liderId);
+    const proyecto = await this._requireOwner(idProyecto, liderId);
     const solicitud = await this._requirePendingSolicitudSalida(idProyecto, idSolicitud);
 
     const tareasPendientes = await this.prisma.asignacionTarea.count({
@@ -1623,17 +1625,34 @@ export class ProjectsService {
         },
         data: { estadoParticipacion: 'RETIRADO', fechaSalida: ahora },
       });
+      // Destinatario = el solicitante (SolicitudSalidaProyecto.idUsuario),
+      // nunca el líder que resuelve ni el resto del equipo.
+      await this.notifications.notifyFromTemplate(
+        [solicitud.idUsuario],
+        'PARTICIPACION_ACTUALIZADA',
+        { projectTitle: proyecto.tituloProyecto, projectId: idProyecto, approved: true },
+        tx,
+      );
       return actualizada;
     });
   }
 
   async rejectSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
-    await this._requireOwner(idProyecto, liderId);
+    const proyecto = await this._requireOwner(idProyecto, liderId);
     const solicitud = await this._requirePendingSolicitudSalida(idProyecto, idSolicitud);
 
-    return this.prisma.solicitudSalidaProyecto.update({
-      where: { idSolicitud: solicitud.idSolicitud },
-      data: { estadoSolicitud: 'RECHAZADA', resueltaEn: new Date(), resueltaPor: liderId },
+    return this.prisma.$transaction(async (tx) => {
+      const actualizada = await tx.solicitudSalidaProyecto.update({
+        where: { idSolicitud: solicitud.idSolicitud },
+        data: { estadoSolicitud: 'RECHAZADA', resueltaEn: new Date(), resueltaPor: liderId },
+      });
+      await this.notifications.notifyFromTemplate(
+        [solicitud.idUsuario],
+        'PARTICIPACION_ACTUALIZADA',
+        { projectTitle: proyecto.tituloProyecto, projectId: idProyecto, approved: false },
+        tx,
+      );
+      return actualizada;
     });
   }
 
