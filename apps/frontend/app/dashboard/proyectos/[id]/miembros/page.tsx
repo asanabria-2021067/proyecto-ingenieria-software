@@ -10,6 +10,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   CheckCircle2,
+  ChevronRight,
   Clock,
   ListTodo,
   Users,
@@ -81,6 +82,9 @@ function SkeletonRows() {
           <TableCell className="px-4 py-3">
             <Skeleton className="h-4 w-14 rounded bg-surface-container-high" />
           </TableCell>
+          <TableCell className="px-4 py-3">
+            <Skeleton className="h-4 w-16 rounded bg-surface-container-high" />
+          </TableCell>
         </TableRow>
       ))}
     </>
@@ -148,7 +152,7 @@ function MetricTile({
   );
 }
 
-function MiembroRow({ miembro }: { miembro: MiembroProyectoResumenDTO }) {
+function MiembroRow({ miembro, idProyecto }: { miembro: MiembroProyectoResumenDTO; idProyecto: number }) {
   const estilo = ESTADO_PARTICIPACION_STYLE[miembro.estadoParticipacion];
 
   return (
@@ -190,6 +194,15 @@ function MiembroRow({ miembro }: { miembro: MiembroProyectoResumenDTO }) {
       </TableCell>
       <TableCell className="px-4 py-3">
         <span className="text-sm text-on-surface whitespace-nowrap">{formatHoras(miembro.horasReconocidas)} h</span>
+      </TableCell>
+      <TableCell className="px-4 py-3">
+        <Link
+          href={`/dashboard/proyectos/${idProyecto}/equipo/${miembro.idUsuario}`}
+          className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline whitespace-nowrap"
+        >
+          Ver detalle
+          <ChevronRight className="w-3.5 h-3.5" />
+        </Link>
       </TableCell>
     </TableRow>
   );
@@ -321,13 +334,18 @@ export default function MiembrosProyectoPage() {
                       onSort={handleSort}
                     />
                   ))}
+                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap">
+                    Detalle
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <SkeletonRows />
                 ) : (
-                  miembrosOrdenados.map((miembro) => <MiembroRow key={miembro.idUsuario} miembro={miembro} />)
+                  miembrosOrdenados.map((miembro) => (
+                    <MiembroRow key={miembro.idUsuario} miembro={miembro} idProyecto={idProyecto} />
+                  ))
                 )}
               </TableBody>
             </Table>
