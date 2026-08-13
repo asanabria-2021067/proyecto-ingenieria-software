@@ -1,24 +1,22 @@
-import type { ParticipacionActivaDTO } from '@/lib/dto/member.dto';
+import type { MiembroProyectoResumenDTO } from '@/lib/dto/member.dto';
 
 /**
- * Cuenta usuarios únicos, no filas: un mismo usuario con dos roles activos
- * aparece dos veces en `equipo` (una fila por participación), pero debe
- * contar como un solo integrante.
+ * Agregaciones puramente presentacionales sobre el payload person-centric de
+ * T-106 (`GET /proyectos/:id/miembros/resumen`): `tareasActivas`,
+ * `tareasCompletadas` y `horasReconocidas` ya vienen calculadas por
+ * integrante desde el backend, así que sumar por fila no duplica nada (a
+ * diferencia del extinto `findTeam`, que repetía un mismo total agregado en
+ * cada fila de un usuario con varios roles).
  */
-export function contarIntegrantesActivos(equipo: ParticipacionActivaDTO[]): number {
-  return new Set(equipo.map((p) => p.usuario.idUsuario)).size;
+export function sumarTareasActivas(miembros: MiembroProyectoResumenDTO[]): number {
+  return miembros.reduce((total, miembro) => total + miembro.tareasActivas, 0);
 }
 
-/**
- * Suma horasRegistradas por usuario único, no por fila: `findTeam` repite el
- * mismo total agregado del proyecto en cada participación de un mismo
- * usuario (ver comentario en ProjectsService.findTeam), así que sumar fila
- * por fila duplicaría las horas de quien tiene más de un rol activo.
- */
-export function sumarHorasAcumuladas(equipo: ParticipacionActivaDTO[]): number {
-  const horasPorUsuario = new Map<number, number>();
-  for (const participacion of equipo) {
-    horasPorUsuario.set(participacion.usuario.idUsuario, participacion.horasRegistradas);
-  }
-  return [...horasPorUsuario.values()].reduce((total, horas) => total + horas, 0);
+export function sumarTareasCompletadas(miembros: MiembroProyectoResumenDTO[]): number {
+  return miembros.reduce((total, miembro) => total + miembro.tareasCompletadas, 0);
+}
+
+/** Suma exclusivamente `horasReconocidas` (HorasParticipacion.horasAprobadas, APROBADA). */
+export function sumarHorasReconocidas(miembros: MiembroProyectoResumenDTO[]): number {
+  return miembros.reduce((total, miembro) => total + miembro.horasReconocidas, 0);
 }

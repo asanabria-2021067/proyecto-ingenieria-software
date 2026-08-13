@@ -1,26 +1,30 @@
-import type { ParticipacionActivaDTO } from '@/lib/dto/member.dto';
+import type { MiembroProyectoResumenDTO } from '@/lib/dto/member.dto';
 
-export type MiembroSortKey = 'nombre' | 'rol' | 'estado' | 'tareasActivas' | 'horasRegistradas';
+export type MiembroSortKey = 'nombre' | 'roles' | 'estado' | 'tareasActivas' | 'horasReconocidas';
 export type SortDirection = 'asc' | 'desc';
 
-const VALOR_ORDENABLE: Record<MiembroSortKey, (m: ParticipacionActivaDTO) => string | number> = {
-  nombre: (m) => `${m.usuario.nombre} ${m.usuario.apellido}`.toLowerCase(),
-  rol: (m) => m.rolProyecto.nombreRol.toLowerCase(),
+function rolesLabel(miembro: MiembroProyectoResumenDTO): string {
+  return miembro.roles.map((rol) => rol.nombreRol).join(', ').toLowerCase();
+}
+
+const VALOR_ORDENABLE: Record<MiembroSortKey, (m: MiembroProyectoResumenDTO) => string | number> = {
+  nombre: (m) => `${m.nombre} ${m.apellido}`.toLowerCase(),
+  roles: (m) => rolesLabel(m),
   estado: (m) => m.estadoParticipacion,
   tareasActivas: (m) => m.tareasActivas,
-  horasRegistradas: (m) => m.horasRegistradas,
+  horasReconocidas: (m) => m.horasReconocidas,
 };
 
-/** Devuelve una copia ordenada del equipo; nunca muta el arreglo recibido. */
-export function ordenarEquipo(
-  equipo: ParticipacionActivaDTO[],
+/** Devuelve una copia ordenada de los miembros; nunca muta el arreglo recibido. */
+export function ordenarMiembros(
+  miembros: MiembroProyectoResumenDTO[],
   sortKey: MiembroSortKey,
   sortDirection: SortDirection,
-): ParticipacionActivaDTO[] {
+): MiembroProyectoResumenDTO[] {
   const factor = sortDirection === 'asc' ? 1 : -1;
   const obtenerValor = VALOR_ORDENABLE[sortKey];
 
-  return [...equipo].sort((a, b) => {
+  return [...miembros].sort((a, b) => {
     const valorA = obtenerValor(a);
     const valorB = obtenerValor(b);
     if (typeof valorA === 'number' && typeof valorB === 'number') {
