@@ -53,14 +53,19 @@ function makePrisma() {
     deleteMany: vi.fn(),
     upsert: vi.fn(),
   });
-  return {
+  const prisma: any = {
     proyecto: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn(), ...writeSpies() },
-    asignacionTarea: { findFirst: vi.fn(), ...writeSpies() },
+    asignacionTarea: { findFirst: vi.fn(), count: vi.fn(), ...writeSpies() },
     horasParticipacion: { ...writeSpies() },
     tarea: { ...writeSpies() },
-    solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn() },
-  } as any;
+    solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+  };
+  // approveSolicitudSalida corre en $transaction; reusar el mismo objeto
+  // prisma como tx deja las aserciones sobre solicitudSalidaProyecto.update /
+  // participacionProyecto.updateMany apuntando a los mismos spies de arriba.
+  prisma.$transaction = vi.fn(async (cb: (tx: any) => unknown) => cb(prisma));
+  return prisma;
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
@@ -372,5 +377,205 @@ describe('ProjectsService.createSolicitudSalida', () => {
         service.createSolicitudSalida(PROYECTO_ID, MIEMBRO_ID, 'motivo válido'),
       ).rejects.toBe(original);
     });
+  });
+});
+
+const SOLICITUD_ID = 500;
+
+const SOLICITUD_PENDIENTE = {
+  idSolicitud: SOLICITUD_ID,
+  idProyecto: PROYECTO_ID,
+  idUsuario: MIEMBRO_ID,
+  motivo: 'Cambio de disponibilidad de horario',
+  estadoSolicitud: 'PENDIENTE',
+  solicitadaEn: new Date('2026-01-10T00:00:00.000Z'),
+  resueltaEn: null,
+  resueltaPor: null,
+};
+
+// Deja el prisma mock listo para el camino feliz de resolución (líder real,
+// solicitud PENDIENTE encontrada); cada test sobreescribe lo que necesita.
+function setupResolutionPath(prisma: ReturnType<typeof makePrisma>) {
+  prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+  prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(SOLICITUD_PENDIENTE);
+}
+
+describe('ProjectsService.approveSolicitudSalida', () => {
+  // Caso A / D — 0 tareas pendientes (o todas HECHO, mismo conteo)
+  it('aprueba y retira la participación cuando el integrante tiene 0 tareas distintas de HECHO', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(0);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'APROBADA',
+    });
+    const service = makeService(prisma);
+
+    const resultado = await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    expect(resultado.estadoSolicitud).toBe('APROBADA');
+    expect(prisma.solicitudSalidaProyecto.update).toHaveBeenCalledWith({
+      where: { idSolicitud: SOLICITUD_ID },
+      data: { estadoSolicitud: 'APROBADA', resueltaEn: expect.any(Date), resueltaPor: LIDER_ID },
+    });
+    expect(prisma.participacionProyecto.updateMany).toHaveBeenCalledWith({
+      where: { idUsuario: MIEMBRO_ID, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: PROYECTO_ID } },
+      data: { estadoParticipacion: 'RETIRADO', fechaSalida: expect.any(Date) },
+    });
+  });
+
+  // Caso B — 1 tarea pendiente
+  it('rechaza la aprobación con BadRequestException cuando hay 1 tarea pendiente, e informa la cantidad', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(1);
+    const service = makeService(prisma);
+
+    try {
+      await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+      throw new Error('no debía resolver');
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(BadRequestException);
+      expect(e.message).toContain('1 tarea(s) pendiente(s)');
+    }
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+    expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Caso C — varias tareas pendientes
+  it('rechaza la aprobación e informa la cantidad exacta cuando hay 5 tareas pendientes', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(5);
+    const service = makeService(prisma);
+
+    try {
+      await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+      throw new Error('no debía resolver');
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(BadRequestException);
+      expect(e.message).toContain('5 tarea(s) pendiente(s)');
+    }
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('cuenta las tareas pendientes en una sola consulta, filtrando desasignadaEn null y estadoTarea distinto de HECHO (sin N+1)', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(0);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue(SOLICITUD_PENDIENTE);
+    const service = makeService(prisma);
+
+    await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    expect(prisma.asignacionTarea.count).toHaveBeenCalledTimes(1);
+    expect(prisma.asignacionTarea.count).toHaveBeenCalledWith({
+      where: {
+        idUsuario: MIEMBRO_ID,
+        desasignadaEn: null,
+        tarea: { idProyecto: PROYECTO_ID, eliminadoEn: null, estadoTarea: { not: 'HECHO' } },
+      },
+    });
+  });
+
+  it('rechaza con ForbiddenException a quien no es el líder, sin consultar la solicitud ni las tareas', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: 999 });
+    const service = makeService(prisma);
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.solicitudSalidaProyecto.findFirst).not.toHaveBeenCalled();
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con NotFoundException cuando la solicitud no existe o no pertenece a ese proyecto', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_ID, 999, LIDER_ID),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con BadRequestException cuando la solicitud ya fue resuelta (no está PENDIENTE)', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'APROBADA',
+    });
+    const service = makeService(prisma);
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProjectsService.rejectSolicitudSalida', () => {
+  // Caso E — el rechazo nunca se bloquea por tareas pendientes
+  it('rechaza la solicitud sin consultar tareas ni tocar la participación, aunque el integrante tenga tareas activas', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'RECHAZADA',
+    });
+    const service = makeService(prisma);
+
+    const resultado = await service.rejectSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    expect(resultado.estadoSolicitud).toBe('RECHAZADA');
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+    expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+    expect(prisma.solicitudSalidaProyecto.update).toHaveBeenCalledWith({
+      where: { idSolicitud: SOLICITUD_ID },
+      data: { estadoSolicitud: 'RECHAZADA', resueltaEn: expect.any(Date), resueltaPor: LIDER_ID },
+    });
+  });
+
+  it('rechaza con ForbiddenException a quien no es el líder', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: 999 });
+    const service = makeService(prisma);
+
+    await expect(
+      service.rejectSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.solicitudSalidaProyecto.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con NotFoundException si la solicitud no existe', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await expect(
+      service.rejectSolicitudSalida(PROYECTO_ID, 999, LIDER_ID),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rechaza con BadRequestException si la solicitud ya fue resuelta', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'RECHAZADA',
+    });
+    const service = makeService(prisma);
+
+    await expect(
+      service.rejectSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
   });
 });
