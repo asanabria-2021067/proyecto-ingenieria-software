@@ -132,6 +132,14 @@ describe('MiembrosProyectoPage — tabla con datos', () => {
     expect(screen.getAllByText('Activo')).toHaveLength(2);
   });
 
+  it('cada fila enlaza al detalle del integrante (findTeamMemberDetail, fuera de alcance de T-106)', () => {
+    mockHook({ miembros: [miembro({ idUsuario: 7 })] });
+    renderPage();
+
+    const link = screen.getByRole('link', { name: /Ver detalle/i });
+    expect(link).toHaveAttribute('href', '/dashboard/proyectos/42/equipo/7');
+  });
+
   it('un integrante con 0 tareas y 0 horas se muestra tal cual en su fila, no null/undefined', () => {
     mockHook({ miembros: [miembro({ tareasActivas: 0, horasReconocidas: 0 })] });
     const { container } = renderPage();
