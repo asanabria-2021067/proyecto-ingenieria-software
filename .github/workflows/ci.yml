@@ -81,3 +81,99 @@ jobs:
 
       - name: Pruebas (Vitest)
         run: npm run test
+
+  e2e:
+    name: E2E - suite de humo (Playwright)
+    runs-on: ubuntu-latest
+    # A diferencia de los jobs backend/frontend (que usan mocks), este job
+    # necesita una base de datos y un Redis reales: arranca el backend de
+    # verdad y navega la app de verdad con un navegador.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: uvg_collab_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d uvg_collab_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
+      JWT_SECRET: e2e-ci-secret
+      PORT: 3001
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      FRONTEND_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias del backend
+        working-directory: apps/backend
+        run: npm ci
+
+      - name: Preparar base de datos (schema + seed)
+        working-directory: apps/backend
+        run: |
+          npx prisma db push
+          npx prisma db seed
+
+      - name: Compilar y levantar el backend en segundo plano
+        working-directory: apps/backend
+        run: |
+          npm run build
+          npm run start:prod &
+
+      - name: Esperar a que el backend responda
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/api > /dev/null; then
+              echo "Backend listo"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "El backend no respondió a tiempo"
+          exit 1
+
+      - name: Instalar dependencias del frontend
+        working-directory: apps/frontend
+        run: npm ci
+
+      - name: Instalar navegador de Playwright
+        working-directory: apps/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Ejecutar suite de humo E2E
+        working-directory: apps/frontend
+        run: npm run test:e2e
+
+      - name: Subir reporte de Playwright (solo si falla)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/frontend/playwright-report/
+          retention-days: 7
