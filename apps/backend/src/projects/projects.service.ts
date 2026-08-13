@@ -522,19 +522,8 @@ export class ProjectsService {
     });
   }
 
-  /**
-   * Equipo activo del proyecto, con métricas por integrante (HU-123/T-106):
-   * `tareasActivas` (tareas con asignación vigente y estado != HECHO) y
-   * `horasRegistradas` (suma de horasReales de TODOS sus tramos de
-   * asignación en el proyecto, igual criterio que findTeamMemberDetail).
-   *
-   * Las métricas se calculan por idUsuario, no por idParticipacion: si un
-   * mismo usuario tiene más de una participación activa (varios roles), cada
-   * fila que se le devuelve muestra el mismo total agregado del proyecto, no
-   * un desglose por rol.
-   */
   async findTeam(id: number) {
-    const participaciones = await this.prisma.participacionProyecto.findMany({
+    return this.prisma.participacionProyecto.findMany({
       where: {
         rolProyecto: { idProyecto: id },
         estadoParticipacion: 'ACTIVO',
@@ -564,45 +553,6 @@ export class ProjectsService {
         fechaIngreso: 'asc',
       },
     });
-
-    if (participaciones.length === 0) {
-      return [];
-    }
-
-    const idsUsuarios = [...new Set(participaciones.map((p) => p.usuario.idUsuario))];
-
-    // Todos los tramos (vigentes e históricos) de estos usuarios sobre
-    // tareas no eliminadas del proyecto, en una sola consulta para evitar
-    // N+1. horasRegistradas suma todos los tramos; tareasActivas solo cuenta
-    // los vigentes (desasignadaEn: null) sobre tareas que no están HECHO.
-    const asignaciones = await this.prisma.asignacionTarea.findMany({
-      where: {
-        idUsuario: { in: idsUsuarios },
-        tarea: { idProyecto: id, eliminadoEn: null },
-      },
-      select: {
-        idUsuario: true,
-        desasignadaEn: true,
-        horasReales: true,
-        tarea: { select: { estadoTarea: true } },
-      },
-    });
-
-    const metricasPorUsuario = new Map(
-      idsUsuarios.map((idUsuario) => [idUsuario, { tareasActivas: 0, horasRegistradas: 0 }]),
-    );
-    for (const asignacion of asignaciones) {
-      const metricas = metricasPorUsuario.get(asignacion.idUsuario)!;
-      metricas.horasRegistradas += asignacion.horasReales?.toNumber() ?? 0;
-      if (asignacion.desasignadaEn === null && asignacion.tarea.estadoTarea !== 'HECHO') {
-        metricas.tareasActivas += 1;
-      }
-    }
-
-    return participaciones.map((p) => ({
-      ...p,
-      ...metricasPorUsuario.get(p.usuario.idUsuario)!,
-    }));
   }
 
   /**

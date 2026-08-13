@@ -2,33 +2,33 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api/client';
-import { projectMembersQueryKey } from '@/lib/query-keys/members';
-import type { ParticipacionActivaDTO } from '@/lib/dto/member.dto';
+import { projectTeamSummaryQueryKey } from '@/lib/query-keys/members';
+import type { ResumenEquipoProyectoDTO } from '@/lib/dto/member.dto';
 
 function isValidProjectId(idProyecto: number): boolean {
   return Number.isInteger(idProyecto) && idProyecto > 0;
 }
 
 /**
- * Mismo endpoint y misma query key que `useProjectMembers` (GET
- * /proyectos/:id/equipo, `projectMembersQueryKey`) — comparten caché a
- * propósito, no es una petición duplicada. A diferencia de ese hook, este no
- * aplana la respuesta: la tabla de integrantes (HU-123/T-107) necesita
- * fechaIngreso, estadoParticipacion, tareasActivas y horasRegistradas,
- * campos que useProjectMembers descarta porque su consumidor (el selector
- * de asignación de tareas) no los necesita.
+ * Consume `GET /proyectos/:id/miembros/resumen` (T-106,
+ * `ProjectsService.getTeamSummary`), la fuente canónica person-centric de
+ * HU-123. No comparte caché con `useProjectMembers`/`GET /proyectos/:id/equipo`
+ * — su respuesta tiene una forma distinta (`lider` + `miembros[]` agrupados
+ * por `idUsuario`, no una fila por participación), por eso usa
+ * `projectTeamSummaryQueryKey` en vez de `projectMembersQueryKey`.
  */
 export function useProjectTeam(idProyecto: number) {
   const enabled = isValidProjectId(idProyecto);
 
-  const query = useQuery<ParticipacionActivaDTO[]>({
-    queryKey: projectMembersQueryKey(idProyecto),
-    queryFn: () => apiFetch<ParticipacionActivaDTO[]>(`/proyectos/${idProyecto}/equipo`),
+  const query = useQuery<ResumenEquipoProyectoDTO>({
+    queryKey: projectTeamSummaryQueryKey(idProyecto),
+    queryFn: () => apiFetch<ResumenEquipoProyectoDTO>(`/proyectos/${idProyecto}/miembros/resumen`),
     enabled,
   });
 
   return {
-    equipo: query.data ?? [],
+    lider: query.data?.lider ?? null,
+    miembros: query.data?.miembros ?? [],
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
