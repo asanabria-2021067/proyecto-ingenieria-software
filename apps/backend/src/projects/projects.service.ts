@@ -1583,6 +1583,92 @@ export class ProjectsService {
     );
   }
 
+  /**
+   * Resolución de una solicitud de salida (T-113). Mismo guard de
+   * liderazgo que approveClosure/rejectClosure (_requireOwner). La regla de
+   * bloqueo aplica SOLO a la aprobación: cuenta en una única consulta las
+   * tareas con asignación vigente cuyo estado sea distinto de HECHO — si hay
+   * alguna, se rechaza sin tocar la solicitud ni la participación. Ambos
+   * métodos notifican al solicitante (nunca al líder) dentro de la misma
+   * transacción, igual que approveClosure/rejectClosure.
+   */
+  async approveSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
+    const proyecto = await this._requireOwner(idProyecto, liderId);
+    const solicitud = await this._requirePendingSolicitudSalida(idProyecto, idSolicitud);
+
+    const tareasPendientes = await this.prisma.asignacionTarea.count({
+      where: {
+        idUsuario: solicitud.idUsuario,
+        desasignadaEn: null,
+        tarea: { idProyecto, eliminadoEn: null, estadoTarea: { not: 'HECHO' } },
+      },
+    });
+    if (tareasPendientes > 0) {
+      throw new BadRequestException(
+        `No se puede aprobar la salida: el integrante tiene ${tareasPendientes} tarea(s) pendiente(s) que deben reasignarse antes de aprobar la salida`,
+      );
+    }
+
+    const ahora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const actualizada = await tx.solicitudSalidaProyecto.update({
+        where: { idSolicitud },
+        data: { estadoSolicitud: 'APROBADA', resueltaEn: ahora, resueltaPor: liderId },
+      });
+      // Mismo criterio que approveClosure: solo se retira la participación
+      // ACTIVO, nunca una ya RETIRADA/COMPLETADA de otro tramo histórico.
+      await tx.participacionProyecto.updateMany({
+        where: {
+          idUsuario: solicitud.idUsuario,
+          estadoParticipacion: 'ACTIVO',
+          rolProyecto: { idProyecto },
+        },
+        data: { estadoParticipacion: 'RETIRADO', fechaSalida: ahora },
+      });
+      // Destinatario = el solicitante (SolicitudSalidaProyecto.idUsuario),
+      // nunca el líder que resuelve ni el resto del equipo.
+      await this.notifications.notifyFromTemplate(
+        [solicitud.idUsuario],
+        'PARTICIPACION_ACTUALIZADA',
+        { projectTitle: proyecto.tituloProyecto, projectId: idProyecto, approved: true },
+        tx,
+      );
+      return actualizada;
+    });
+  }
+
+  async rejectSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
+    const proyecto = await this._requireOwner(idProyecto, liderId);
+    const solicitud = await this._requirePendingSolicitudSalida(idProyecto, idSolicitud);
+
+    return this.prisma.$transaction(async (tx) => {
+      const actualizada = await tx.solicitudSalidaProyecto.update({
+        where: { idSolicitud: solicitud.idSolicitud },
+        data: { estadoSolicitud: 'RECHAZADA', resueltaEn: new Date(), resueltaPor: liderId },
+      });
+      await this.notifications.notifyFromTemplate(
+        [solicitud.idUsuario],
+        'PARTICIPACION_ACTUALIZADA',
+        { projectTitle: proyecto.tituloProyecto, projectId: idProyecto, approved: false },
+        tx,
+      );
+      return actualizada;
+    });
+  }
+
+  private async _requirePendingSolicitudSalida(idProyecto: number, idSolicitud: number) {
+    const solicitud = await this.prisma.solicitudSalidaProyecto.findFirst({
+      where: { idSolicitud, idProyecto },
+    });
+    if (!solicitud) {
+      throw new NotFoundException(`Solicitud con id ${idSolicitud} no encontrada`);
+    }
+    if (solicitud.estadoSolicitud !== 'PENDIENTE') {
+      throw new BadRequestException('Solo se puede resolver una solicitud en estado PENDIENTE');
+    }
+    return solicitud;
+  }
+
   async delete(id: number, userId: number) {
     await this._requireOwner(id, userId);
 

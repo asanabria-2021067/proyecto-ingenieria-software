@@ -53,20 +53,33 @@ function makePrisma() {
     deleteMany: vi.fn(),
     upsert: vi.fn(),
   });
-  return {
+  const prisma: any = {
     proyecto: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn(), ...writeSpies() },
-    asignacionTarea: { findFirst: vi.fn(), ...writeSpies() },
+    asignacionTarea: { findFirst: vi.fn(), count: vi.fn(), ...writeSpies() },
     horasParticipacion: { ...writeSpies() },
     tarea: { ...writeSpies() },
-    solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn() },
-  } as any;
+    solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+  };
+  // approveSolicitudSalida corre en $transaction; reusar el mismo objeto
+  // prisma como tx deja las aserciones sobre solicitudSalidaProyecto.update /
+  // participacionProyecto.updateMany apuntando a los mismos spies de arriba.
+  prisma.$transaction = vi.fn(async (cb: (tx: any) => unknown) => cb(prisma));
+  return prisma;
 }
 
-function makeService(prisma: ReturnType<typeof makePrisma>) {
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  notificationsOverride: Partial<{ notifyFromTemplate: ReturnType<typeof vi.fn> }> = {},
+) {
   return new ProjectsService(
     prisma,
-    { isAdmin: vi.fn(), notifyAdminsFromTemplate: vi.fn(), notifyFromTemplate: vi.fn() } as any,
+    {
+      isAdmin: vi.fn(),
+      notifyAdminsFromTemplate: vi.fn(),
+      notifyFromTemplate: vi.fn(),
+      ...notificationsOverride,
+    } as any,
     {} as any,
   );
 }
@@ -372,5 +385,350 @@ describe('ProjectsService.createSolicitudSalida', () => {
         service.createSolicitudSalida(PROYECTO_ID, MIEMBRO_ID, 'motivo válido'),
       ).rejects.toBe(original);
     });
+  });
+});
+
+const SOLICITUD_ID = 500;
+
+const SOLICITUD_PENDIENTE = {
+  idSolicitud: SOLICITUD_ID,
+  idProyecto: PROYECTO_ID,
+  idUsuario: MIEMBRO_ID,
+  motivo: 'Cambio de disponibilidad de horario',
+  estadoSolicitud: 'PENDIENTE',
+  solicitadaEn: new Date('2026-01-10T00:00:00.000Z'),
+  resueltaEn: null,
+  resueltaPor: null,
+};
+
+// Deja el prisma mock listo para el camino feliz de resolución (líder real,
+// solicitud PENDIENTE encontrada); cada test sobreescribe lo que necesita.
+const PROYECTO_TITULO = 'Proyecto Demo';
+
+function setupResolutionPath(prisma: ReturnType<typeof makePrisma>) {
+  prisma.proyecto.findFirst.mockResolvedValue({
+    idProyecto: PROYECTO_ID,
+    creadoPor: LIDER_ID,
+    tituloProyecto: PROYECTO_TITULO,
+  });
+  prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(SOLICITUD_PENDIENTE);
+}
+
+describe('ProjectsService.approveSolicitudSalida', () => {
+  // Caso A / D — 0 tareas pendientes (o todas HECHO, mismo conteo)
+  it('aprueba y retira la participación cuando el integrante tiene 0 tareas distintas de HECHO', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(0);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'APROBADA',
+    });
+    const service = makeService(prisma);
+
+    const resultado = await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    expect(resultado.estadoSolicitud).toBe('APROBADA');
+    expect(prisma.solicitudSalidaProyecto.update).toHaveBeenCalledWith({
+      where: { idSolicitud: SOLICITUD_ID },
+      data: { estadoSolicitud: 'APROBADA', resueltaEn: expect.any(Date), resueltaPor: LIDER_ID },
+    });
+    expect(prisma.participacionProyecto.updateMany).toHaveBeenCalledWith({
+      where: { idUsuario: MIEMBRO_ID, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: PROYECTO_ID } },
+      data: { estadoParticipacion: 'RETIRADO', fechaSalida: expect.any(Date) },
+    });
+  });
+
+  // Caso B — 1 tarea pendiente
+  it('rechaza la aprobación con BadRequestException cuando hay 1 tarea pendiente, e informa la cantidad', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(1);
+    const service = makeService(prisma);
+
+    try {
+      await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+      throw new Error('no debía resolver');
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(BadRequestException);
+      expect(e.message).toContain('1 tarea(s) pendiente(s)');
+    }
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+    expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Caso C — varias tareas pendientes
+  it('rechaza la aprobación e informa la cantidad exacta cuando hay 5 tareas pendientes', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(5);
+    const service = makeService(prisma);
+
+    try {
+      await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+      throw new Error('no debía resolver');
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(BadRequestException);
+      expect(e.message).toContain('5 tarea(s) pendiente(s)');
+    }
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('cuenta las tareas pendientes en una sola consulta, filtrando desasignadaEn null y estadoTarea distinto de HECHO (sin N+1)', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(0);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue(SOLICITUD_PENDIENTE);
+    const service = makeService(prisma);
+
+    await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    expect(prisma.asignacionTarea.count).toHaveBeenCalledTimes(1);
+    expect(prisma.asignacionTarea.count).toHaveBeenCalledWith({
+      where: {
+        idUsuario: MIEMBRO_ID,
+        desasignadaEn: null,
+        tarea: { idProyecto: PROYECTO_ID, eliminadoEn: null, estadoTarea: { not: 'HECHO' } },
+      },
+    });
+  });
+
+  it('rechaza con ForbiddenException a quien no es el líder, sin consultar la solicitud ni las tareas', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: 999 });
+    const service = makeService(prisma);
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.solicitudSalidaProyecto.findFirst).not.toHaveBeenCalled();
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con NotFoundException cuando la solicitud no existe o no pertenece a ese proyecto', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_ID, 999, LIDER_ID),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con BadRequestException cuando la solicitud ya fue resuelta (no está PENDIENTE)', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'APROBADA',
+    });
+    const service = makeService(prisma);
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+  });
+
+  // Request changes (revisión HU-125/T-113), punto 12 — notificación al aprobar
+  it('notifica al solicitante cuando el líder aprueba la solicitud', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(0);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'APROBADA',
+    });
+    const notifyFromTemplate = vi.fn();
+    const service = makeService(prisma, { notifyFromTemplate });
+
+    await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    expect(notifyFromTemplate).toHaveBeenCalledTimes(1);
+    // Destinatario exacto = el solicitante (MIEMBRO_ID); nunca el líder que
+    // resuelve (LIDER_ID) ni ningún otro integrante.
+    expect(notifyFromTemplate).toHaveBeenCalledWith(
+      [MIEMBRO_ID],
+      'PARTICIPACION_ACTUALIZADA',
+      { projectTitle: PROYECTO_TITULO, projectId: PROYECTO_ID, approved: true },
+      prisma, // tx === prisma en este mock de $transaction
+    );
+    const [destinatarios] = notifyFromTemplate.mock.calls[0];
+    expect(destinatarios).not.toContain(LIDER_ID);
+  });
+
+  // Request changes, punto 15 — evidencia de atomicidad: si una escritura
+  // dentro de la transacción falla, la operación completa debe rechazar y no
+  // debe notificarse (la notificación va después en el mismo callback).
+  it('propaga el error y no notifica si falla una escritura dentro de la transacción de aprobación', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(0);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'APROBADA',
+    });
+    prisma.participacionProyecto.updateMany.mockRejectedValue(new Error('db down'));
+    const notifyFromTemplate = vi.fn();
+    const service = makeService(prisma, { notifyFromTemplate });
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toThrow('db down');
+
+    // Todas las escrituras (solicitud, participación, notificación) están
+    // dentro del único callback de $transaction: nunca se ejecutan
+    // directamente sobre this.prisma fuera de él.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(notifyFromTemplate).not.toHaveBeenCalled();
+  });
+
+  // Request changes, punto 16 — T-113 no administra HorasParticipacion.
+  it('no realiza ninguna escritura en HorasParticipacion al aprobar', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(0);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'APROBADA',
+    });
+    const service = makeService(prisma);
+
+    await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    for (const metodo of ['create', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert'] as const) {
+      expect(prisma.horasParticipacion[metodo]).not.toHaveBeenCalled();
+    }
+  });
+});
+
+// Request changes, punto 14 — regresión explícita de aislamiento cross-project
+// en la resolución (no solo en la creación). approveSolicitudSalida y
+// rejectSolicitudSalida comparten exactamente el mismo helper de pertenencia
+// (_requirePendingSolicitudSalida, filtro { idSolicitud, idProyecto }), por lo
+// que un segundo test idéntico para el rechazo sería completamente redundante.
+describe('ProjectsService.approveSolicitudSalida — aislamiento cross-project', () => {
+  it('no permite aprobar una solicitud perteneciente a otro proyecto', async () => {
+    const PROYECTO_A = 10;
+    const PROYECTO_B = 20;
+    const SOLICITUD_DE_B = 55;
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockImplementation(async ({ where }: any) =>
+      where.idProyecto === PROYECTO_A
+        ? { idProyecto: PROYECTO_A, creadoPor: LIDER_ID, tituloProyecto: 'Proyecto A' }
+        : null,
+    );
+    // La solicitud 55 pertenece al Proyecto B: el filtro compuesto
+    // { idSolicitud, idProyecto } no debe encontrarla al resolver bajo A.
+    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: any) =>
+      where.idProyecto === PROYECTO_B && where.idSolicitud === SOLICITUD_DE_B
+        ? { ...SOLICITUD_PENDIENTE, idSolicitud: SOLICITUD_DE_B, idProyecto: PROYECTO_B }
+        : null,
+    );
+    const notifyFromTemplate = vi.fn();
+    const service = makeService(prisma, { notifyFromTemplate });
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_A, SOLICITUD_DE_B, LIDER_ID),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+    expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+    expect(notifyFromTemplate).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProjectsService.rejectSolicitudSalida', () => {
+  // Caso E — el rechazo nunca se bloquea por tareas pendientes
+  it('rechaza la solicitud sin consultar tareas ni tocar la participación, aunque el integrante tenga tareas activas', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'RECHAZADA',
+    });
+    const service = makeService(prisma);
+
+    const resultado = await service.rejectSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    expect(resultado.estadoSolicitud).toBe('RECHAZADA');
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+    expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+    expect(prisma.solicitudSalidaProyecto.update).toHaveBeenCalledWith({
+      where: { idSolicitud: SOLICITUD_ID },
+      data: { estadoSolicitud: 'RECHAZADA', resueltaEn: expect.any(Date), resueltaPor: LIDER_ID },
+    });
+  });
+
+  it('rechaza con ForbiddenException a quien no es el líder', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: 999 });
+    const service = makeService(prisma);
+
+    await expect(
+      service.rejectSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.solicitudSalidaProyecto.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con NotFoundException si la solicitud no existe', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await expect(
+      service.rejectSolicitudSalida(PROYECTO_ID, 999, LIDER_ID),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rechaza con BadRequestException si la solicitud ya fue resuelta', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'RECHAZADA',
+    });
+    const service = makeService(prisma);
+
+    await expect(
+      service.rejectSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+  });
+
+  // Request changes, punto 13 — notificación al rechazar
+  it('notifica al solicitante cuando el líder rechaza la solicitud, sin retirar participaciones ni tocar horas', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.solicitudSalidaProyecto.update.mockResolvedValue({
+      ...SOLICITUD_PENDIENTE,
+      estadoSolicitud: 'RECHAZADA',
+    });
+    const notifyFromTemplate = vi.fn();
+    const service = makeService(prisma, { notifyFromTemplate });
+
+    const resultado = await service.rejectSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
+
+    expect(resultado.estadoSolicitud).toBe('RECHAZADA');
+    expect(notifyFromTemplate).toHaveBeenCalledTimes(1);
+    // Destinatario exacto = el solicitante; misma semántica reutilizada
+    // (PARTICIPACION_ACTUALIZADA) que la aprobación, pero con approved: false.
+    expect(notifyFromTemplate).toHaveBeenCalledWith(
+      [MIEMBRO_ID],
+      'PARTICIPACION_ACTUALIZADA',
+      { projectTitle: PROYECTO_TITULO, projectId: PROYECTO_ID, approved: false },
+      prisma,
+    );
+    const [destinatarios] = notifyFromTemplate.mock.calls[0];
+    expect(destinatarios).not.toContain(LIDER_ID);
+
+    expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+    for (const metodo of ['create', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert'] as const) {
+      expect(prisma.horasParticipacion[metodo]).not.toHaveBeenCalled();
+    }
   });
 });
