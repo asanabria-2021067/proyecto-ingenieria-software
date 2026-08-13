@@ -2,18 +2,18 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, renderHook, screen, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 
 vi.mock('../lib/api/client', () => ({ apiFetch: vi.fn() }));
 
-let legacyRouteParams: { id: string } = { id: '42' };
 vi.mock('next/navigation', () => ({
-  useParams: () => legacyRouteParams,
+  redirect: vi.fn(),
 }));
 
 import { useProjectMembers, projectMembersQueryKey } from '../hooks/use-project-members';
 import { apiFetch } from '../lib/api/client';
 import type { MiembroProyecto, ParticipacionActivaDTO } from '../lib/dto/member.dto';
+import { redirect } from 'next/navigation';
 import EquipoProyectoPage from '../app/dashboard/proyectos/[id]/equipo/page';
 
 function createWrapper() {
@@ -124,7 +124,7 @@ describe('useProjectMembers — retorno público completo', () => {
   });
 });
 
-describe('useProjectMembers — DTO compartido actual (Tarea 4, sin campos T-106)', () => {
+describe('useProjectMembers — DTO compartido actual (HU-123/T-106 vive en un DTO person-centric aparte, ver member.dto.ts)', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('aplana un fixture tipado con ParticipacionActivaDTO al MiembroProyecto vigente', async () => {
@@ -154,64 +154,13 @@ describe('useProjectMembers — DTO compartido actual (Tarea 4, sin campos T-106
   });
 });
 
-describe('página legacy equipo/page.tsx conserva la misma key efectiva y renderiza tras T13', () => {
+describe('ruta legacy /equipo (item 10 del review HU-123): redirect hacia /miembros', () => {
   afterEach(() => vi.clearAllMocks());
 
-  it('produce la misma key efectiva que projectMembersQueryKey(id) y renderiza contenido válido', async () => {
-    legacyRouteParams = { id: '42' };
-    (apiFetch as any).mockResolvedValue([
-      {
-        idParticipacionProyecto: 1,
-        fechaInicio: '2026-01-01T00:00:00.000Z',
-        rolProyecto: { idRolProyecto: 2, nombreRol: 'Backend' },
-        usuario: {
-          idUsuario: 5,
-          nombre: 'Ana',
-          apellido: 'Lopez',
-          correo: 'ana@uvg.edu.gt',
-          perfil: null,
-          habilidades: [],
-        },
-      },
-    ]);
+  it('redirige a /dashboard/proyectos/:id/miembros en vez de renderizar una vista propia', async () => {
+    await EquipoProyectoPage({ params: Promise.resolve({ id: '42' }) });
 
-    const { queryClient, wrapper } = createWrapper();
-    render(createElement(EquipoProyectoPage), { wrapper });
-
-    expect(await screen.findByText('Ana Lopez')).toBeInTheDocument();
-    expect(screen.getByText('Backend')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Equipo del Proyecto' })).toBeInTheDocument();
-
-    const cachedQuery = queryClient.getQueryCache().getAll()[0];
-    expect(cachedQuery.queryKey).toEqual(['proyecto-equipo', 42]);
-    expect(cachedQuery.queryKey).toEqual(projectMembersQueryKey(42));
-    expect(typeof cachedQuery.queryKey[1]).toBe('number');
-  });
-});
-
-describe('identidad de cache moderno vs legacy (REG-T22-001 corregido)', () => {
-  afterEach(() => vi.clearAllMocks());
-
-  it('la key del hook moderno y la de la página legacy son exactamente iguales para el mismo proyecto', async () => {
-    (apiFetch as any).mockResolvedValue([]);
-    const { queryClient: modernClient, wrapper: modernWrapper } = createWrapper();
-    renderHook(() => useProjectMembers(42), { wrapper: modernWrapper });
-    await waitFor(() => {
-      expect(modernClient.getQueryCache().find({ queryKey: projectMembersQueryKey(42) })).toBeDefined();
-    });
-    const modernKey = modernClient.getQueryCache().getAll()[0].queryKey;
-
-    legacyRouteParams = { id: '42' };
-    (apiFetch as any).mockResolvedValue([]);
-    const { queryClient: legacyClient, wrapper: legacyWrapper } = createWrapper();
-    render(createElement(EquipoProyectoPage), { wrapper: legacyWrapper });
-    await waitFor(() => expect(legacyClient.getQueryCache().getAll()).toHaveLength(1));
-    const legacyKey = legacyClient.getQueryCache().getAll()[0].queryKey;
-
-    expect(modernKey).toEqual(['proyecto-equipo', 42]);
-    expect(legacyKey).toEqual(['proyecto-equipo', 42]);
-    expect(legacyKey).toEqual(modernKey);
-    expect(typeof modernKey[1]).toBe('number');
-    expect(typeof legacyKey[1]).toBe('number');
+    expect(redirect).toHaveBeenCalledWith('/dashboard/proyectos/42/miembros');
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 });

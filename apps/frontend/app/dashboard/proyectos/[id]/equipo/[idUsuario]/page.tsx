@@ -26,6 +26,7 @@ import {
 } from '@/components/projects/task-board.utils';
 import type { EstadoTarea } from '@/lib/types/tasks';
 import type { TareaHistorialIntegranteDTO } from '@/lib/dto/member-detail.dto';
+import { ESTADO_PARTICIPACION_STYLE } from '@/components/projects/member-status.utils';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -40,15 +41,6 @@ function formatearFechaHora(iso: string): string {
     day: 'numeric',
   });
 }
-
-const ESTADO_PARTICIPACION_STYLE: Record<
-  'ACTIVO' | 'RETIRADO' | 'COMPLETADO',
-  { className: string; label: string }
-> = {
-  ACTIVO: { className: 'bg-primary-container text-on-primary-container', label: 'Activo' },
-  RETIRADO: { className: 'bg-surface-container-high text-tertiary', label: 'Retirado' },
-  COMPLETADO: { className: 'bg-secondary-container/30 text-secondary', label: 'Completado' },
-};
 
 function sumaHorasReales(tareas: TareaHistorialIntegranteDTO[]): number {
   return tareas.reduce((total, tarea) => total + (tarea.horasReales ?? 0), 0);
