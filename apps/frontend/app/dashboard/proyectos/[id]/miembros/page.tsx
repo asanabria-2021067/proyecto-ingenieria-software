@@ -15,7 +15,6 @@ import {
   Users,
 } from 'lucide-react';
 import { useProjectTeam } from '@/hooks/use-project-team';
-import { useProjectAvance } from '@/hooks/use-project-avance';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -35,16 +34,20 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { ESTADO_PARTICIPACION_STYLE } from '@/components/projects/member-status.utils';
-import { ordenarEquipo, type MiembroSortKey, type SortDirection } from '@/components/projects/member-sort.utils';
-import { contarIntegrantesActivos, sumarHorasAcumuladas } from '@/components/projects/team-metrics.utils';
-import type { ParticipacionActivaDTO } from '@/lib/dto/member.dto';
+import { ordenarMiembros, type MiembroSortKey, type SortDirection } from '@/components/projects/member-sort.utils';
+import {
+  sumarTareasActivas,
+  sumarTareasCompletadas,
+  sumarHorasReconocidas,
+} from '@/components/projects/team-metrics.utils';
+import type { MiembroProyectoResumenDTO } from '@/lib/dto/member.dto';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'nombre', label: 'Integrante' },
-  { key: 'rol', label: 'Rol' },
+  { key: 'roles', label: 'Roles' },
   { key: 'estado', label: 'Estado' },
   { key: 'tareasActivas', label: 'Tareas activas' },
-  { key: 'horasRegistradas', label: 'Horas registradas' },
+  { key: 'horasReconocidas', label: 'Horas reconocidas' },
 ];
 
 function getInitials(nombre: string, apellido: string): string {
@@ -103,7 +106,7 @@ function SortableHeader({
   return (
     <TableHead
       aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-      className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary"
+      className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap"
     >
       <button
         type="button"
@@ -145,7 +148,7 @@ function MetricTile({
   );
 }
 
-function MiembroRow({ miembro }: { miembro: ParticipacionActivaDTO }) {
+function MiembroRow({ miembro }: { miembro: MiembroProyectoResumenDTO }) {
   const estilo = ESTADO_PARTICIPACION_STYLE[miembro.estadoParticipacion];
 
   return (
@@ -153,22 +156,31 @@ function MiembroRow({ miembro }: { miembro: ParticipacionActivaDTO }) {
       <TableCell className="px-4 py-3">
         <div className="flex items-center gap-3">
           <Avatar className="size-8 shrink-0">
-            {miembro.usuario.fotoUrl && <AvatarImage src={miembro.usuario.fotoUrl} alt="" />}
+            {miembro.fotoUrl && <AvatarImage src={miembro.fotoUrl} alt="" />}
             <AvatarFallback className="bg-primary-container text-xs font-bold text-on-primary-container">
-              {getInitials(miembro.usuario.nombre, miembro.usuario.apellido)}
+              {getInitials(miembro.nombre, miembro.apellido)}
             </AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium text-on-surface">
-            {miembro.usuario.nombre} {miembro.usuario.apellido}
+          <span className="text-sm font-medium text-on-surface whitespace-nowrap">
+            {miembro.nombre} {miembro.apellido}
           </span>
         </div>
       </TableCell>
       <TableCell className="px-4 py-3">
-        <span className="text-sm text-on-surface">{miembro.rolProyecto.nombreRol}</span>
+        <div className="flex flex-wrap gap-1">
+          {miembro.roles.map((rol) => (
+            <span
+              key={rol.idRolProyecto}
+              className="inline-flex items-center rounded-full bg-secondary-container/30 px-2 py-0.5 text-xs font-bold text-secondary"
+            >
+              {rol.nombreRol}
+            </span>
+          ))}
+        </div>
       </TableCell>
       <TableCell className="px-4 py-3">
         <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${estilo.className}`}
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
         >
           {estilo.label}
         </span>
@@ -177,7 +189,7 @@ function MiembroRow({ miembro }: { miembro: ParticipacionActivaDTO }) {
         <span className="text-sm text-on-surface">{miembro.tareasActivas}</span>
       </TableCell>
       <TableCell className="px-4 py-3">
-        <span className="text-sm text-on-surface">{formatHoras(miembro.horasRegistradas)} h</span>
+        <span className="text-sm text-on-surface whitespace-nowrap">{formatHoras(miembro.horasReconocidas)} h</span>
       </TableCell>
     </TableRow>
   );
@@ -187,16 +199,12 @@ export default function MiembrosProyectoPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
 
-  const { equipo, isLoading, isError, refetch } = useProjectTeam(idProyecto);
-  const { data: avance, isLoading: isLoadingAvance } = useProjectAvance(idProyecto);
+  const { lider, miembros, isLoading, isError, refetch } = useProjectTeam(idProyecto);
 
-  const integrantesActivos = contarIntegrantesActivos(equipo);
-  const horasAcumuladas = sumarHorasAcumuladas(equipo);
-  // avance es undefined mientras carga o si el backend respondió 403 (quien
-  // consulta no es líder ni participante activo) — en ambos casos se
-  // muestra 0, no un error visible (mismo criterio que useProjectAvance).
-  const tareasAbiertas = avance ? avance.tareas.total - avance.tareas.hecho : 0;
-  const tareasCompletadas = avance?.tareas.hecho ?? 0;
+  const integrantesActivos = miembros.length;
+  const tareasActivas = useMemo(() => sumarTareasActivas(miembros), [miembros]);
+  const tareasCompletadas = useMemo(() => sumarTareasCompletadas(miembros), [miembros]);
+  const horasReconocidas = useMemo(() => sumarHorasReconocidas(miembros), [miembros]);
 
   const [sortKey, setSortKey] = useState<MiembroSortKey>('nombre');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -210,9 +218,9 @@ export default function MiembrosProyectoPage() {
     }
   }
 
-  const equipoOrdenado = useMemo(
-    () => ordenarEquipo(equipo, sortKey, sortDirection),
-    [equipo, sortKey, sortDirection],
+  const miembrosOrdenados = useMemo(
+    () => ordenarMiembros(miembros, sortKey, sortDirection),
+    [miembros, sortKey, sortDirection],
   );
 
   return (
@@ -231,8 +239,13 @@ export default function MiembrosProyectoPage() {
           <h1 className="font-headline font-extrabold text-3xl text-on-surface">Miembros</h1>
         </div>
         <p className="text-tertiary text-sm">
-          Integrantes activos del proyecto, su rol y su carga de trabajo actual.
+          Integrantes activos del proyecto, sus roles y su carga de trabajo actual.
         </p>
+        {lider && (
+          <p className="text-tertiary text-sm mt-1">
+            Líder: <span className="font-medium text-on-surface">{lider.nombre} {lider.apellido}</span>
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4">
@@ -244,20 +257,20 @@ export default function MiembrosProyectoPage() {
         />
         <MetricTile
           icon={ListTodo}
-          label="Tareas abiertas"
-          value={String(tareasAbiertas)}
-          isLoading={isLoadingAvance}
+          label="Tareas activas"
+          value={String(tareasActivas)}
+          isLoading={isLoading}
         />
         <MetricTile
           icon={CheckCircle2}
           label="Tareas completadas"
           value={String(tareasCompletadas)}
-          isLoading={isLoadingAvance}
+          isLoading={isLoading}
         />
         <MetricTile
           icon={Clock}
-          label="Horas acumuladas"
-          value={`${formatHoras(horasAcumuladas)} h`}
+          label="Horas reconocidas"
+          value={`${formatHoras(horasReconocidas)} h`}
           isLoading={isLoading}
         />
       </div>
@@ -280,7 +293,7 @@ export default function MiembrosProyectoPage() {
             </button>
           </EmptyContent>
         </Empty>
-      ) : !isLoading && equipo.length === 0 ? (
+      ) : !isLoading && miembros.length === 0 ? (
         <Empty tone="muted" role="status">
           <EmptyMedia variant="icon">
             <Users aria-hidden="true" className="h-7 w-7" />
@@ -288,35 +301,37 @@ export default function MiembrosProyectoPage() {
           <EmptyHeader>
             <EmptyTitle>Aún no hay integrantes en este proyecto.</EmptyTitle>
             <EmptyDescription>
-              Cuando alguien se una al equipo, aparecerá aquí junto con su rol y su carga de trabajo.
+              Cuando alguien se una al equipo, aparecerá aquí junto con sus roles y su carga de trabajo.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                {COLUMNAS_ORDENABLES.map((columna) => (
-                  <SortableHeader
-                    key={columna.key}
-                    columnKey={columna.key}
-                    label={columna.label}
-                    sortKey={sortKey}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <SkeletonRows />
-              ) : (
-                equipoOrdenado.map((miembro) => <MiembroRow key={miembro.idParticipacion} miembro={miembro} />)
-              )}
-            </TableBody>
-          </Table>
+        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
+                  {COLUMNAS_ORDENABLES.map((columna) => (
+                    <SortableHeader
+                      key={columna.key}
+                      columnKey={columna.key}
+                      label={columna.label}
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <SkeletonRows />
+                ) : (
+                  miembrosOrdenados.map((miembro) => <MiembroRow key={miembro.idUsuario} miembro={miembro} />)
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </div>

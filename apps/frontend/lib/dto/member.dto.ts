@@ -1,22 +1,15 @@
 /**
  * Forma real de la respuesta del endpoint `GET /proyectos/:id/equipo`
- * (confirmada contra el `select`/agregación de Prisma en `findTeam`, no
- * copiada del tipo `Colaborador` de `equipo/page.tsx`, que está desactualizado
- * — usa `idParticipacionProyecto`/`fechaInicio` en vez de los campos reales
+ * (confirmada contra el `select` de Prisma en `findTeam`, no copiada del
+ * tipo `Colaborador` de `equipo/page.tsx`, que está desactualizado — usa
+ * `idParticipacionProyecto`/`fechaInicio` en vez de los campos reales
  * `idParticipacion`/`fechaIngreso`, y espera `usuario.perfil`/`usuario.habilidades`,
  * que el backend no selecciona).
- *
- * `tareasActivas`/`horasRegistradas` (HU-123/T-106) se calculan por
- * `idUsuario`, no por `idParticipacion`: si el mismo usuario tiene más de una
- * participación activa (varios roles), cada fila que le corresponde trae el
- * mismo total agregado del proyecto, no un desglose por rol.
  */
 export interface ParticipacionActivaDTO {
   idParticipacion: number;
   estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
   fechaIngreso: string;
-  tareasActivas: number;
-  horasRegistradas: number;
   usuario: {
     idUsuario: number;
     nombre: string;
@@ -42,32 +35,29 @@ export interface MiembroProyecto {
 }
 
 /**
- * Una participación concreta de un integrante en un rol del proyecto, tal
- * como se agrupará dentro de `MiembroProyectoResumenDTO.roles`.
- *
- * `idParticipacion` identifica esa participación puntual; un mismo usuario
- * puede tener varias (una por rol), por lo que NO debe usarse como
- * identidad del integrante.
+ * Rol que un integrante ocupa dentro del proyecto, tal como se agrupa dentro
+ * de `MiembroProyectoResumenDTO.roles`. Espejo exacto de
+ * `TeamSummaryRoleDto` (apps/backend/src/projects/dto/team-summary-member.dto.ts):
+ * no lleva `idParticipacion` ni `estadoParticipacion` propios — esos viven a
+ * nivel de integrante, no de rol individual.
  */
 export interface RolMiembroProyectoDTO {
   idRolProyecto: number;
-  idParticipacion: number;
   nombreRol: string;
-  estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
 }
 
 /**
  * Contrato canónico person-centric de integrante: "miembro = usuario dentro
- * del proyecto", NO "una fila de `ParticipacionProyecto`".
+ * del proyecto", NO "una fila de `ParticipacionProyecto`". Espejo exacto de
+ * `TeamSummaryMemberDto`, la respuesta real de
+ * `GET /proyectos/:id/miembros/resumen` (T-106).
  *
- * El integrante se identifica por `idUsuario`; sus participaciones/roles se
- * agrupan en `roles[]` en vez de repetir a la persona una vez por rol.
+ * El integrante se identifica por `idUsuario`; sus roles se agrupan en
+ * `roles[]` en vez de repetir a la persona una vez por rol.
  *
- * Este tipo describe el contrato compartido futuro para T-106/HU-123/HU-124
- * (Sprint 6). Todavía NO hay endpoint que lo produzca — `useProjectMembers`
- * sigue devolviendo `MiembroProyecto` a partir de `ParticipacionActivaDTO`.
- * No usar este tipo para consumir `GET /proyectos/:id/equipo` hasta que T-106
- * exista.
+ * `horasReconocidas` es exclusivamente la suma de
+ * `HorasParticipacion.horasAprobadas` con `estadoHoras = APROBADA` —  nunca
+ * `AsignacionTarea.horasReales` ni `Tarea.tiempoEstimadoHoras`.
  */
 export interface MiembroProyectoResumenDTO {
   idUsuario: number;
@@ -76,13 +66,17 @@ export interface MiembroProyectoResumenDTO {
   correo: string;
   fotoUrl: string | null;
   roles: RolMiembroProyectoDTO[];
+  estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
+  tareasActivas: number;
+  tareasCompletadas: number;
+  horasReconocidas: number;
 }
 
 /**
  * El líder del proyecto proviene de `Proyecto.creadoPor` (ver
  * `apps/backend/prisma/schema.prisma`), no de una `ParticipacionProyecto`.
- * No tiene `idParticipacion`: no inventar uno sintético para representarlo
- * como si fuera un miembro más.
+ * No tiene `idParticipacion`, roles, ni métricas: no inventarle ninguno para
+ * representarlo como si fuera un miembro más.
  */
 export interface LiderProyectoDTO {
   idUsuario: number;
@@ -93,10 +87,9 @@ export interface LiderProyectoDTO {
 }
 
 /**
- * Contrato canónico futuro del resumen de equipo (T-106): separa
- * explícitamente al líder (`Proyecto.creadoPor`) del resto de integrantes
- * (`ParticipacionProyecto` agrupadas por usuario). Todavía NO existe un
- * endpoint que produzca esta forma.
+ * Contrato de respuesta de `GET /proyectos/:id/miembros/resumen` (T-106):
+ * separa explícitamente al líder (`Proyecto.creadoPor`) del resto de
+ * integrantes (`ParticipacionProyecto` agrupadas por usuario).
  */
 export interface ResumenEquipoProyectoDTO {
   lider: LiderProyectoDTO;

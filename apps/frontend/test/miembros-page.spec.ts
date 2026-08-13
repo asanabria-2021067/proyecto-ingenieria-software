@@ -1,37 +1,46 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import type { ParticipacionActivaDTO } from '../lib/dto/member.dto';
-import type { AvanceProyectoDTO } from '../lib/dto/project.dto';
+import type { LiderProyectoDTO, MiembroProyectoResumenDTO } from '../lib/dto/member.dto';
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '42' }),
 }));
 
 vi.mock('../hooks/use-project-team', () => ({ useProjectTeam: vi.fn() }));
-vi.mock('../hooks/use-project-avance', () => ({ useProjectAvance: vi.fn() }));
 
 import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';
 import { useProjectTeam } from '../hooks/use-project-team';
-import { useProjectAvance } from '../hooks/use-project-avance';
 
-function miembro(overrides: Partial<ParticipacionActivaDTO> = {}): ParticipacionActivaDTO {
+const LIDER: LiderProyectoDTO = {
+  idUsuario: 1,
+  nombre: 'Sofia',
+  apellido: 'Castillo',
+  correo: 'sofia@uvg.edu.gt',
+  fotoUrl: null,
+};
+
+function miembro(overrides: Partial<MiembroProyectoResumenDTO> = {}): MiembroProyectoResumenDTO {
   return {
-    idParticipacion: 10,
+    idUsuario: 7,
+    nombre: 'Carlos',
+    apellido: 'Mendoza',
+    correo: 'carlos@uvg.edu.gt',
+    fotoUrl: null,
+    roles: [{ idRolProyecto: 3, nombreRol: 'Backend' }],
     estadoParticipacion: 'ACTIVO',
-    fechaIngreso: '2026-01-05T00:00:00.000Z',
     tareasActivas: 3,
-    horasRegistradas: 12.5,
-    usuario: { idUsuario: 7, nombre: 'Carlos', apellido: 'Mendoza', correo: 'carlos@uvg.edu.gt', fotoUrl: null },
-    rolProyecto: { idRolProyecto: 3, nombreRol: 'Backend', descripcionRolProyecto: null },
+    tareasCompletadas: 1,
+    horasReconocidas: 12.5,
     ...overrides,
   };
 }
 
 function mockHook(overrides: Partial<ReturnType<typeof useProjectTeam>> = {}) {
   (useProjectTeam as any).mockReturnValue({
-    equipo: [],
+    lider: LIDER,
+    miembros: [],
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -41,23 +50,9 @@ function mockHook(overrides: Partial<ReturnType<typeof useProjectTeam>> = {}) {
   });
 }
 
-function mockAvance(overrides: { data?: AvanceProyectoDTO; isLoading?: boolean; isError?: boolean } = {}) {
-  (useProjectAvance as any).mockReturnValue({
-    data: undefined,
-    isLoading: false,
-    isError: false,
-    error: null,
-    ...overrides,
-  });
-}
-
 function renderPage() {
   return render(createElement(MiembrosProyectoPage));
 }
-
-beforeEach(() => {
-  mockAvance();
-});
 
 afterEach(() => {
   cleanup();
@@ -89,7 +84,7 @@ describe('MiembrosProyectoPage — error', () => {
 
 describe('MiembrosProyectoPage — vacío', () => {
   it('sin integrantes muestra el estado vacío, sin errores', () => {
-    mockHook({ equipo: [] });
+    mockHook({ miembros: [] });
     renderPage();
 
     expect(screen.getByText('Aún no hay integrantes en este proyecto.')).toBeInTheDocument();
@@ -98,27 +93,31 @@ describe('MiembrosProyectoPage — vacío', () => {
 });
 
 describe('MiembrosProyectoPage — tabla con datos', () => {
-  it('renderiza nombre, rol, estado, tareas activas y horas registradas de cada integrante', () => {
+  it('renderiza nombre, roles, estado, tareas activas y horas reconocidas de cada integrante', () => {
     mockHook({
-      equipo: [
+      miembros: [
         miembro({
-          idParticipacion: 10,
-          usuario: { idUsuario: 7, nombre: 'Carlos', apellido: 'Mendoza', correo: 'c@uvg.edu.gt', fotoUrl: null },
-          rolProyecto: { idRolProyecto: 3, nombreRol: 'Backend', descripcionRolProyecto: null },
+          idUsuario: 7,
+          nombre: 'Carlos',
+          apellido: 'Mendoza',
+          roles: [{ idRolProyecto: 3, nombreRol: 'Backend' }],
           tareasActivas: 2,
-          horasRegistradas: 8,
+          horasReconocidas: 8,
         }),
         miembro({
-          idParticipacion: 11,
-          usuario: { idUsuario: 8, nombre: 'Ana', apellido: 'Lopez', correo: 'a@uvg.edu.gt', fotoUrl: null },
-          rolProyecto: { idRolProyecto: 4, nombreRol: 'QA', descripcionRolProyecto: null },
+          idUsuario: 8,
+          nombre: 'Ana',
+          apellido: 'Lopez',
+          roles: [{ idRolProyecto: 4, nombreRol: 'QA' }],
           tareasActivas: 0,
-          horasRegistradas: 0,
+          horasReconocidas: 0,
         }),
       ],
     });
     const { container } = renderPage();
     const filas = container.querySelectorAll('tbody tr');
+
+    expect(filas).toHaveLength(2);
 
     // Orden por defecto: nombre ascendente — Ana antes que Carlos.
     expect(within(filas[0] as HTMLElement).getByText('Ana Lopez')).toBeInTheDocument();
@@ -129,88 +128,137 @@ describe('MiembrosProyectoPage — tabla con datos', () => {
     expect(within(filas[1] as HTMLElement).getByText('Backend')).toBeInTheDocument();
     expect(within(filas[1] as HTMLElement).getByText('8 h')).toBeInTheDocument();
 
-    // Badge de estado de participación (findTeam solo devuelve integrantes ACTIVO).
+    // Badge de estado de participación (T-106 solo devuelve integrantes ACTIVO).
     expect(screen.getAllByText('Activo')).toHaveLength(2);
   });
 
   it('un integrante con 0 tareas y 0 horas se muestra tal cual en su fila, no null/undefined', () => {
-    mockHook({ equipo: [miembro({ tareasActivas: 0, horasRegistradas: 0 })] });
+    mockHook({ miembros: [miembro({ tareasActivas: 0, horasReconocidas: 0 })] });
     const { container } = renderPage();
 
     const fila = container.querySelector('tbody tr');
     expect(fila?.textContent).toContain('0');
     expect(fila?.textContent).toContain('0 h');
   });
-});
 
-describe('MiembrosProyectoPage — métricas de cabecera', () => {
-  function valorDeMetrica(labelText: string): string | null {
-    const label = screen.getByText(labelText);
-    return label.nextElementSibling?.textContent ?? null;
-  }
-
-  it('integrantes activos cuenta usuarios únicos, no filas (un usuario con 2 roles no se duplica)', () => {
+  it('un integrante con múltiples roles produce UNA sola fila con ambos roles visibles', () => {
+    // Fixture contractual (item 13 del review): idUsuario=100 con roles
+    // Backend + QA debe producir una única fila, nunca dos.
     mockHook({
-      equipo: [
+      miembros: [
         miembro({
-          idParticipacion: 20,
-          usuario: { idUsuario: 100, nombre: 'Elena', apellido: 'Ruiz', correo: 'e@uvg.edu.gt', fotoUrl: null },
-          rolProyecto: { idRolProyecto: 1, nombreRol: 'Backend', descripcionRolProyecto: null },
-          horasRegistradas: 15,
-        }),
-        miembro({
-          idParticipacion: 21,
-          usuario: { idUsuario: 100, nombre: 'Elena', apellido: 'Ruiz', correo: 'e@uvg.edu.gt', fotoUrl: null },
-          rolProyecto: { idRolProyecto: 2, nombreRol: 'QA', descripcionRolProyecto: null },
-          horasRegistradas: 15,
-        }),
-        miembro({
-          idParticipacion: 22,
-          usuario: { idUsuario: 200, nombre: 'Marco', apellido: 'Diaz', correo: 'm@uvg.edu.gt', fotoUrl: null },
-          horasRegistradas: 5,
+          idUsuario: 100,
+          nombre: 'Elena',
+          apellido: 'Ruiz',
+          roles: [
+            { idRolProyecto: 1, nombreRol: 'Backend' },
+            { idRolProyecto: 2, nombreRol: 'QA' },
+          ],
         }),
       ],
     });
-    renderPage();
+    const { container } = renderPage();
+    const filas = container.querySelectorAll('tbody tr');
 
-    expect(valorDeMetrica('Integrantes activos')).toBe('2');
-    expect(valorDeMetrica('Horas acumuladas')).toBe('20 h');
+    expect(filas).toHaveLength(1);
+    expect(within(filas[0] as HTMLElement).getAllByText('Elena Ruiz')).toHaveLength(1);
+    expect(within(filas[0] as HTMLElement).getByText('Backend')).toBeInTheDocument();
+    expect(within(filas[0] as HTMLElement).getByText('QA')).toBeInTheDocument();
   });
 
-  it('tareas abiertas y completadas vienen de useProjectAvance, no de la tabla de equipo', () => {
-    mockHook({ equipo: [] });
-    mockAvance({
-      data: {
-        tareas: { total: 10, hecho: 4, porHacer: 3, enProgreso: 3, porcentaje: 40 },
-        hitos: { total: 0, pendiente: 0, enProgreso: 0, completado: 0, porcentaje: 0 },
-      },
+  it('varios usuarios, cada uno con su propio conteo de roles, producen una fila por usuario', () => {
+    mockHook({
+      miembros: [
+        miembro({ idUsuario: 1, nombre: 'Uno', roles: [{ idRolProyecto: 1, nombreRol: 'Backend' }] }),
+        miembro({
+          idUsuario: 2,
+          nombre: 'Dos',
+          roles: [
+            { idRolProyecto: 2, nombreRol: 'QA' },
+            { idRolProyecto: 3, nombreRol: 'Frontend' },
+            { idRolProyecto: 4, nombreRol: 'DevOps' },
+          ],
+        }),
+      ],
     });
+    const { container } = renderPage();
+
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
+  });
+});
+
+describe('MiembrosProyectoPage — líder', () => {
+  it('muestra al líder por separado, no como una fila más de la tabla', () => {
+    mockHook({ miembros: [miembro({ idUsuario: 7 })] });
     renderPage();
 
-    expect(valorDeMetrica('Tareas abiertas')).toBe('6');
-    expect(valorDeMetrica('Tareas completadas')).toBe('4');
+    expect(screen.getByText(/Sofia Castillo/)).toBeInTheDocument();
+    const filas = document.querySelectorAll('tbody tr');
+    expect(filas).toHaveLength(1);
+    expect(within(filas[0] as HTMLElement).queryByText(/Sofia Castillo/)).not.toBeInTheDocument();
+  });
+});
+
+describe('MiembrosProyectoPage — métricas de cabecera', () => {
+  // "Tareas activas" y "Horas reconocidas" también aparecen como encabezado
+  // de columna ordenable; el grid de métricas se busca aparte para no
+  // colisionar con esos <button> del <thead>.
+  function metricasGrid(container: HTMLElement): HTMLElement {
+    return container.querySelector('.grid.grid-cols-2') as HTMLElement;
+  }
+
+  function valorDeMetrica(container: HTMLElement, labelText: string): string | null {
+    const label = within(metricasGrid(container)).getByText(labelText);
+    return label.nextElementSibling?.textContent ?? null;
+  }
+
+  it('todas las métricas se agregan exclusivamente desde el payload de T-106 (miembros[])', () => {
+    mockHook({
+      miembros: [
+        miembro({ idUsuario: 100, tareasActivas: 2, tareasCompletadas: 3, horasReconocidas: 15 }),
+        miembro({ idUsuario: 200, tareasActivas: 1, tareasCompletadas: 0, horasReconocidas: 5 }),
+      ],
+    });
+    const { container } = renderPage();
+
+    expect(valorDeMetrica(container, 'Integrantes activos')).toBe('2');
+    expect(valorDeMetrica(container, 'Tareas activas')).toBe('3');
+    expect(valorDeMetrica(container, 'Tareas completadas')).toBe('3');
+    expect(valorDeMetrica(container, 'Horas reconocidas')).toBe('20 h');
   });
 
-  it('sin datos de avance (403 o carga) las métricas de tareas muestran 0, no un error visible', () => {
-    mockHook({ equipo: [] });
-    mockAvance({ data: undefined, isError: true });
-    renderPage();
+  it('un integrante con múltiples roles no infla "Integrantes activos": cuenta personas, no roles', () => {
+    mockHook({
+      miembros: [
+        miembro({
+          idUsuario: 100,
+          roles: [
+            { idRolProyecto: 1, nombreRol: 'Backend' },
+            { idRolProyecto: 2, nombreRol: 'QA' },
+          ],
+          horasReconocidas: 15,
+        }),
+        miembro({ idUsuario: 200, horasReconocidas: 5 }),
+      ],
+    });
+    const { container } = renderPage();
 
-    expect(valorDeMetrica('Tareas abiertas')).toBe('0');
-    expect(valorDeMetrica('Tareas completadas')).toBe('0');
-    expect(screen.queryByText('No fue posible cargar los integrantes.')).not.toBeInTheDocument();
+    expect(valorDeMetrica(container, 'Integrantes activos')).toBe('2');
+    expect(valorDeMetrica(container, 'Horas reconocidas')).toBe('20 h');
   });
 
-  it('un proyecto sin integrantes muestra 0 integrantes activos y 0 horas acumuladas, sin errores', () => {
-    mockHook({ equipo: [] });
-    renderPage();
+  it('un proyecto sin integrantes muestra 0 en todas las métricas, sin errores', () => {
+    mockHook({ miembros: [] });
+    const { container } = renderPage();
 
-    expect(valorDeMetrica('Integrantes activos')).toBe('0');
-    expect(valorDeMetrica('Horas acumuladas')).toBe('0 h');
+    expect(valorDeMetrica(container, 'Integrantes activos')).toBe('0');
+    expect(valorDeMetrica(container, 'Tareas activas')).toBe('0');
+    expect(valorDeMetrica(container, 'Tareas completadas')).toBe('0');
+    expect(valorDeMetrica(container, 'Horas reconocidas')).toBe('0 h');
     expect(screen.getByText('Aún no hay integrantes en este proyecto.')).toBeInTheDocument();
   });
 
-  it('mientras useProjectTeam carga, las métricas que dependen del equipo muestran skeleton', () => {
+  it('mientras useProjectTeam carga, las métricas muestran skeleton', () => {
     mockHook({ isLoading: true });
     const { container } = renderPage();
 
@@ -219,20 +267,10 @@ describe('MiembrosProyectoPage — métricas de cabecera', () => {
 });
 
 describe('MiembrosProyectoPage — ordenamiento', () => {
-  function equipoFixture(): ParticipacionActivaDTO[] {
+  function miembrosFixture(): MiembroProyectoResumenDTO[] {
     return [
-      miembro({
-        idParticipacion: 10,
-        usuario: { idUsuario: 7, nombre: 'Carlos', apellido: 'Mendoza', correo: 'c@uvg.edu.gt', fotoUrl: null },
-        tareasActivas: 1,
-        horasRegistradas: 5,
-      }),
-      miembro({
-        idParticipacion: 11,
-        usuario: { idUsuario: 8, nombre: 'Ana', apellido: 'Lopez', correo: 'a@uvg.edu.gt', fotoUrl: null },
-        tareasActivas: 9,
-        horasRegistradas: 1,
-      }),
+      miembro({ idUsuario: 7, nombre: 'Carlos', apellido: 'Mendoza', tareasActivas: 1, horasReconocidas: 5 }),
+      miembro({ idUsuario: 8, nombre: 'Ana', apellido: 'Lopez', tareasActivas: 9, horasReconocidas: 1 }),
     ];
   }
 
@@ -241,7 +279,7 @@ describe('MiembrosProyectoPage — ordenamiento', () => {
   }
 
   it('por defecto ordena por nombre ascendente', () => {
-    mockHook({ equipo: equipoFixture() });
+    mockHook({ miembros: miembrosFixture() });
     const { container } = renderPage();
 
     const filas = textoDeFilas(container);
@@ -250,7 +288,7 @@ describe('MiembrosProyectoPage — ordenamiento', () => {
   });
 
   it('un clic en un encabezado ordenable reordena por esa columna', () => {
-    mockHook({ equipo: equipoFixture() });
+    mockHook({ miembros: miembrosFixture() });
     const { container } = renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: /Tareas activas/i }));
@@ -262,7 +300,7 @@ describe('MiembrosProyectoPage — ordenamiento', () => {
   });
 
   it('un segundo clic en el mismo encabezado invierte el orden', () => {
-    mockHook({ equipo: equipoFixture() });
+    mockHook({ miembros: miembrosFixture() });
     const { container } = renderPage();
 
     const boton = screen.getByRole('button', { name: /Tareas activas/i });
@@ -275,13 +313,13 @@ describe('MiembrosProyectoPage — ordenamiento', () => {
   });
 
   it('el <th> activo expone aria-sort para accesibilidad, el resto queda en "none"', () => {
-    mockHook({ equipo: equipoFixture() });
+    mockHook({ miembros: miembrosFixture() });
     renderPage();
 
-    const encabezadoHoras = screen.getByRole('columnheader', { name: /Horas registradas/i });
+    const encabezadoHoras = screen.getByRole('columnheader', { name: /Horas reconocidas/i });
     expect(encabezadoHoras).toHaveAttribute('aria-sort', 'none');
 
-    fireEvent.click(screen.getByRole('button', { name: /Horas registradas/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Horas reconocidas/i }));
     expect(encabezadoHoras).toHaveAttribute('aria-sort', 'ascending');
 
     const encabezadoNombre = screen.getByRole('columnheader', { name: /Integrante/i });
@@ -291,7 +329,7 @@ describe('MiembrosProyectoPage — ordenamiento', () => {
 
 describe('MiembrosProyectoPage — navegación', () => {
   it('el link de volver apunta al detalle del proyecto correcto', () => {
-    mockHook({ equipo: [] });
+    mockHook({ miembros: [] });
     renderPage();
 
     const link = screen.getByRole('link', { name: /Volver al proyecto/i });
