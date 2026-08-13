@@ -37,6 +37,9 @@ yarn-error.log*
 # ── Testing ───────────────────────────────────────────────
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+blob-report/
 
 # ── TypeScript ────────────────────────────────────────────
 *.tsbuildinfo
