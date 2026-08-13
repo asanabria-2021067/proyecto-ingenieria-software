@@ -1,64 +1,81 @@
 import { describe, expect, it } from 'vitest';
-import { contarIntegrantesActivos, sumarHorasAcumuladas } from '../components/projects/team-metrics.utils';
-import type { ParticipacionActivaDTO } from '../lib/dto/member.dto';
+import {
+  sumarTareasActivas,
+  sumarTareasCompletadas,
+  sumarHorasReconocidas,
+} from '../components/projects/team-metrics.utils';
+import type { MiembroProyectoResumenDTO } from '../lib/dto/member.dto';
 
-function miembro(overrides: Partial<ParticipacionActivaDTO> = {}): ParticipacionActivaDTO {
+function miembro(overrides: Partial<MiembroProyectoResumenDTO> = {}): MiembroProyectoResumenDTO {
   return {
-    idParticipacion: 1,
+    idUsuario: 1,
+    nombre: 'Ana',
+    apellido: 'Lopez',
+    correo: 'ana@uvg.edu.gt',
+    fotoUrl: null,
+    roles: [{ idRolProyecto: 1, nombreRol: 'Backend' }],
     estadoParticipacion: 'ACTIVO',
-    fechaIngreso: '2026-01-01T00:00:00.000Z',
     tareasActivas: 0,
-    horasRegistradas: 0,
-    usuario: { idUsuario: 1, nombre: 'Ana', apellido: 'Lopez', correo: 'ana@uvg.edu.gt', fotoUrl: null },
-    rolProyecto: { idRolProyecto: 1, nombreRol: 'Backend', descripcionRolProyecto: null },
+    tareasCompletadas: 0,
+    horasReconocidas: 0,
     ...overrides,
   };
 }
 
-describe('contarIntegrantesActivos', () => {
-  it('un proyecto sin integrantes cuenta 0, no produce error', () => {
-    expect(contarIntegrantesActivos([])).toBe(0);
+describe('sumarTareasActivas', () => {
+  it('un proyecto sin integrantes suma 0, no produce error', () => {
+    expect(sumarTareasActivas([])).toBe(0);
   });
 
-  it('cuenta cada usuario distinto una vez', () => {
-    const equipo = [
-      miembro({ idParticipacion: 1, usuario: { ...miembro().usuario, idUsuario: 1 } }),
-      miembro({ idParticipacion: 2, usuario: { ...miembro().usuario, idUsuario: 2 } }),
+  it('suma tareasActivas ya agregadas por integrante desde T-106', () => {
+    const miembros = [
+      miembro({ idUsuario: 1, tareasActivas: 2 }),
+      miembro({ idUsuario: 2, tareasActivas: 3 }),
     ];
-    expect(contarIntegrantesActivos(equipo)).toBe(2);
-  });
-
-  it('un usuario con dos participaciones activas (dos roles) cuenta como un solo integrante', () => {
-    // Mismo usuario (idUsuario: 1, valor por defecto del fixture), dos filas
-    // porque tiene dos roles activos distintos en el proyecto.
-    const equipo = [
-      miembro({ idParticipacion: 10, rolProyecto: { idRolProyecto: 1, nombreRol: 'Backend', descripcionRolProyecto: null } }),
-      miembro({ idParticipacion: 11, rolProyecto: { idRolProyecto: 2, nombreRol: 'QA', descripcionRolProyecto: null } }),
-    ];
-    expect(contarIntegrantesActivos(equipo)).toBe(1);
+    expect(sumarTareasActivas(miembros)).toBe(5);
   });
 });
 
-describe('sumarHorasAcumuladas', () => {
+describe('sumarTareasCompletadas', () => {
   it('un proyecto sin integrantes suma 0, no produce error', () => {
-    expect(sumarHorasAcumuladas([])).toBe(0);
+    expect(sumarTareasCompletadas([])).toBe(0);
   });
 
-  it('suma las horas de usuarios distintos', () => {
-    const equipo = [
-      miembro({ idParticipacion: 1, usuario: { ...miembro().usuario, idUsuario: 1 }, horasRegistradas: 4 }),
-      miembro({ idParticipacion: 2, usuario: { ...miembro().usuario, idUsuario: 2 }, horasRegistradas: 6.5 }),
+  it('suma tareasCompletadas ya agregadas por integrante desde T-106', () => {
+    const miembros = [
+      miembro({ idUsuario: 1, tareasCompletadas: 4 }),
+      miembro({ idUsuario: 2, tareasCompletadas: 1 }),
     ];
-    expect(sumarHorasAcumuladas(equipo)).toBe(10.5);
+    expect(sumarTareasCompletadas(miembros)).toBe(5);
+  });
+});
+
+describe('sumarHorasReconocidas', () => {
+  it('un proyecto sin integrantes suma 0, no produce error', () => {
+    expect(sumarHorasReconocidas([])).toBe(0);
   });
 
-  it('un usuario con dos roles activos NO duplica sus horas (findTeam repite el mismo total en cada fila)', () => {
-    const equipo = [
-      miembro({ idParticipacion: 10, horasRegistradas: 8 }),
-      miembro({ idParticipacion: 11, horasRegistradas: 8 }),
+  it('suma horasReconocidas (HorasParticipacion.horasAprobadas, APROBADA) por integrante', () => {
+    const miembros = [
+      miembro({ idUsuario: 1, horasReconocidas: 5 }),
+      miembro({ idUsuario: 2, horasReconocidas: 7 }),
     ];
-    // Ambas filas son el mismo usuario (idUsuario: 1 por defecto en el fixture)
-    // con el mismo total agregado — sumar debe dar 8, no 16.
-    expect(sumarHorasAcumuladas(equipo)).toBe(8);
+    expect(sumarHorasReconocidas(miembros)).toBe(12);
+  });
+
+  it('un integrante con múltiples roles no duplica horas: T-106 ya entrega un único total por persona', () => {
+    // Person-centric: no hay una fila por rol que sumar dos veces, solo un
+    // MiembroProyectoResumenDTO con roles[] de longitud 2.
+    const miembros = [
+      miembro({
+        idUsuario: 1,
+        roles: [
+          { idRolProyecto: 1, nombreRol: 'Backend' },
+          { idRolProyecto: 2, nombreRol: 'QA' },
+        ],
+        horasReconocidas: 8,
+      }),
+    ];
+    expect(sumarHorasReconocidas(miembros)).toBe(8);
   });
 });
