@@ -118,6 +118,20 @@ export interface NotificationTemplateData {
     carne: string;
     solicitudId: number;
   };
+
+  // T-113 (HU-125, salida completa del proyecto): notifica al solicitante la
+  // resolución de su SolicitudSalidaProyecto. Reutiliza
+  // TipoNotificacion.PARTICIPACION_ACTUALIZADA — existe en el schema desde la
+  // migración inicial y no tenía ninguna plantilla asociada. Se descartó
+  // ROL_ABANDONADO a propósito: esa semántica es abandonar UN rol, mientras
+  // que HU-125 es la salida completa del proyecto (todas las participaciones
+  // ACTIVO). `approved` distingue aprobación/rechazo dentro del mismo tipo,
+  // igual que POSTULACION_RESUELTA.accepted.
+  PARTICIPACION_ACTUALIZADA: {
+    projectTitle: string;
+    projectId: number;
+    approved: boolean;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -230,6 +244,15 @@ export const NOTIFICATION_TEMPLATES = {
       data: NotificationTemplateData['SOLICITUD_RECUPERACION_CONTRASENA'],
     ) =>
       `${data.userName} (carné ${data.carne}) solicitó recuperar su contraseña.`,
+  },
+
+  PARTICIPACION_ACTUALIZADA: {
+    title: (data: NotificationTemplateData['PARTICIPACION_ACTUALIZADA']) =>
+      data.approved ? 'Tu salida del proyecto fue aprobada' : 'Tu solicitud de salida fue rechazada',
+    message: (data: NotificationTemplateData['PARTICIPACION_ACTUALIZADA']) =>
+      data.approved
+        ? `Tu solicitud de salida de "${data.projectTitle}" fue aprobada. Tu participación en el proyecto quedó en estado RETIRADO.`
+        : `Tu solicitud de salida de "${data.projectTitle}" fue rechazada. Continúas activo en el proyecto.`,
   },
 } as const;
 
