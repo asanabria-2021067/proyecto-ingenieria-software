@@ -58,7 +58,7 @@ function makePrisma() {
   const prisma: any = {
     proyecto: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn(), ...writeSpies() },
-    asignacionTarea: { findFirst: vi.fn(), count: vi.fn(), ...writeSpies() },
+    asignacionTarea: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), ...writeSpies() },
     horasParticipacion: { ...writeSpies() },
     tarea: { ...writeSpies() },
     solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -91,6 +91,10 @@ function makeService(
 const LIDER_ID = 1;
 const MIEMBRO_ID = 2;
 const PROYECTO_ID = 10;
+
+function decimal(value: number) {
+  return { toNumber: () => value };
+}
 
 const SOLICITUD_CREADA = {
   idSolicitud: 500,
@@ -408,6 +412,181 @@ describe('ExitRequestsService.createSolicitudSalida', () => {
         service.createSolicitudSalida(PROYECTO_ID, MIEMBRO_ID, 'motivo válido'),
       ).rejects.toBe(original);
     });
+  });
+});
+
+const SOLICITUD_PREPARACION = {
+  idSolicitud: 501,
+  idProyecto: PROYECTO_ID,
+  idUsuario: MIEMBRO_ID,
+  estadoSolicitud: 'PREPARACION',
+  solicitadaEn: new Date('2026-01-11T00:00:00.000Z'),
+};
+
+function setupPreparationSummaryPath(prisma: ReturnType<typeof makePrisma>, blockers: unknown[] = []) {
+  prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+  prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(SOLICITUD_PREPARACION);
+  prisma.asignacionTarea.findMany.mockResolvedValue(blockers);
+}
+
+function makePreparationBlocker(
+  idAsignacion: number,
+  overrides: Partial<{
+    idTarea: number;
+    fechaAsignacion: Date;
+    horasReales: ReturnType<typeof decimal> | null;
+    tituloTarea: string;
+    estadoTarea: string;
+    registrosAvance: number;
+  }> = {},
+) {
+  return {
+    idAsignacion,
+    idTarea: overrides.idTarea ?? idAsignacion + 1000,
+    fechaAsignacion: overrides.fechaAsignacion ?? new Date(`2026-01-${String(idAsignacion).padStart(2, '0')}T00:00:00.000Z`),
+    horasReales: overrides.horasReales ?? null,
+    tarea: {
+      tituloTarea: overrides.tituloTarea ?? `Tarea ${idAsignacion}`,
+      estadoTarea: overrides.estadoTarea ?? 'EN_PROGRESO',
+    },
+    _count: { registrosAvance: overrides.registrosAvance ?? 0 },
+  };
+}
+
+describe('ExitRequestsService.getExitPreparationSummary', () => {
+  it('devuelve 0 blockers y puedeContinuar true cuando la solicitud PREPARACION no tiene asignaciones activas', async () => {
+    const prisma = makePrisma();
+    setupPreparationSummaryPath(prisma, []);
+    const service = makeService(prisma);
+
+    const summary = await service.getExitPreparationSummary(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(summary).toEqual({
+      solicitud: SOLICITUD_PREPARACION,
+      blockers: [],
+      cantidadBlockers: 0,
+      puedeContinuar: true,
+    });
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+    expect(prisma.asignacionTarea.update).not.toHaveBeenCalled();
+    expect(prisma.tarea.update).not.toHaveBeenCalled();
+  });
+
+  it('devuelve 1 blocker y puedeContinuar false con los datos mínimos de la asignación activa', async () => {
+    const blocker = makePreparationBlocker(1, {
+      idTarea: 20,
+      tituloTarea: 'Cerrar documentación',
+      estadoTarea: 'POR_HACER',
+    });
+    const prisma = makePrisma();
+    setupPreparationSummaryPath(prisma, [blocker]);
+    const service = makeService(prisma);
+
+    const summary = await service.getExitPreparationSummary(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(summary.cantidadBlockers).toBe(1);
+    expect(summary.puedeContinuar).toBe(false);
+    expect(summary.blockers).toEqual([
+      {
+        idAsignacion: 1,
+        idTarea: 20,
+        tituloTarea: 'Cerrar documentación',
+        estadoTarea: 'POR_HACER',
+        fechaAsignacion: blocker.fechaAsignacion,
+        horasReales: null,
+        tieneHoras: false,
+        tieneAvance: false,
+        estadoPreparacion: 'PENDIENTE',
+      },
+    ]);
+  });
+
+  it('devuelve N blockers activos en orden determinista', async () => {
+    const blockers = [
+      makePreparationBlocker(1),
+      makePreparationBlocker(2),
+      makePreparationBlocker(3),
+    ];
+    const prisma = makePrisma();
+    setupPreparationSummaryPath(prisma, blockers);
+    const service = makeService(prisma);
+
+    const summary = await service.getExitPreparationSummary(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(summary.blockers.map((b) => b.idAsignacion)).toEqual([1, 2, 3]);
+    expect(summary.cantidadBlockers).toBe(3);
+    expect(summary.puedeContinuar).toBe(false);
+    expect(prisma.asignacionTarea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ fechaAsignacion: 'asc' }, { idAsignacion: 'asc' }],
+      }),
+    );
+  });
+
+  it('calcula indicadores de horas y avance desde horasReales y _count.registrosAvance sin escribir datos', async () => {
+    const blockers = [
+      makePreparationBlocker(1, { horasReales: decimal(0), registrosAvance: 1 }),
+      makePreparationBlocker(2, { horasReales: null, registrosAvance: 2 }),
+    ];
+    const prisma = makePrisma();
+    setupPreparationSummaryPath(prisma, blockers);
+    const service = makeService(prisma);
+
+    const summary = await service.getExitPreparationSummary(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(summary.blockers[0]).toMatchObject({
+      horasReales: 0,
+      tieneHoras: true,
+      tieneAvance: true,
+      estadoPreparacion: 'COMPLETA',
+    });
+    expect(summary.blockers[1]).toMatchObject({
+      horasReales: null,
+      tieneHoras: false,
+      tieneAvance: true,
+      estadoPreparacion: 'PENDIENTE',
+    });
+    expect(prisma.asignacionTarea.updateMany).not.toHaveBeenCalled();
+    expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('consulta blockers con projectId, actorUserId y desasignadaEn null para evitar contaminación cross-project y cross-user', async () => {
+    const prisma = makePrisma();
+    setupPreparationSummaryPath(prisma, []);
+    const service = makeService(prisma);
+
+    await service.getExitPreparationSummary(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(prisma.solicitudSalidaProyecto.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          idProyecto: PROYECTO_ID,
+          idUsuario: MIEMBRO_ID,
+          estadoSolicitud: 'PREPARACION',
+        },
+      }),
+    );
+    expect(prisma.asignacionTarea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          idUsuario: MIEMBRO_ID,
+          desasignadaEn: null,
+          tarea: { idProyecto: PROYECTO_ID },
+        },
+      }),
+    );
+  });
+
+  it('rechaza si no existe solicitud PREPARACION del actor en el proyecto', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await expect(
+      service.getExitPreparationSummary(PROYECTO_ID, MIEMBRO_ID),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.asignacionTarea.findMany).not.toHaveBeenCalled();
   });
 });
 
