@@ -189,7 +189,7 @@ enum EstadoSolicitudRecuperacion {
 
 enum EstadoSolicitudSalida {
   PREPARACION
-  PENDIENTE
+  PENDIENTE_LIDER
   APROBADA
   RECHAZADA
   CANCELADA
@@ -580,20 +580,22 @@ model ParticipacionProyecto {
 /// usuario puede tener varios roles/participaciones en el proyecto, pero la
 /// salida que solicita es de la persona respecto al proyecto como un todo, no
 /// de una participación individual. A lo sumo puede existir una solicitud
-/// PENDIENTE simultánea por (idProyecto, idUsuario), enforced por PostgreSQL
-/// (no por Prisma) vía el índice único parcial
-/// `solicitud_salida_proyecto_pendiente_unique` (migración
-/// `20260811035302_add_solicitud_salida_proyecto`); APROBADA/RECHAZADA/CANCELADA
-/// no están restringidas, así que el historial completo se conserva y una
-/// persona puede volver a solicitar salir tras resolverse la anterior. La
-/// aplicación deberá traducir una violación de esa constraint (P2002) a 409
-/// Conflict — no implementado en esta tarea.
+/// abierta (PREPARACION o PENDIENTE_LIDER) simultánea por (idProyecto,
+/// idUsuario), enforced por PostgreSQL (no por Prisma) vía el índice único
+/// parcial `solicitud_salida_proyecto_pendiente_unique` (migración original
+/// `20260811035302_add_solicitud_salida_proyecto`, ampliada en FND-05 —
+/// migración `20260815160000_rename_exit_request_pending_and_extend_open_index`
+/// — para cubrir ambos estados abiertos tras añadir PREPARACION en FND-04);
+/// APROBADA/RECHAZADA/CANCELADA no están restringidas, así que el historial
+/// completo se conserva y una persona puede volver a solicitar salir tras
+/// resolverse la anterior. La aplicación deberá traducir una violación de esa
+/// constraint (P2002) a 409 Conflict — no implementado en esta tarea.
 model SolicitudSalidaProyecto {
   idSolicitud     Int                   @id @default(autoincrement()) @map("id_solicitud")
   idProyecto      Int                   @map("id_proyecto")
   idUsuario       Int                   @map("id_usuario")
   motivo          String                @db.Text
-  estadoSolicitud EstadoSolicitudSalida @default(PENDIENTE) @map("estado_solicitud")
+  estadoSolicitud EstadoSolicitudSalida @default(PENDIENTE_LIDER) @map("estado_solicitud")
   solicitadaEn    DateTime              @default(now()) @map("solicitada_en")
   resueltaEn      DateTime?             @map("resuelta_en")
   resueltaPor     Int?                  @map("resuelta_por")
