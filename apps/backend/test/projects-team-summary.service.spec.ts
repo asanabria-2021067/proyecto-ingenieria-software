@@ -1,6 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { ProjectsService } from '../src/projects/projects.service';
+import { TeamService } from '../src/team/team.service';
 
 function makePrisma() {
   return {
@@ -13,11 +13,7 @@ function makePrisma() {
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new ProjectsService(
-    prisma,
-    { isAdmin: vi.fn(), notifyAdminsFromTemplate: vi.fn(), notifyFromTemplate: vi.fn() } as any,
-    {} as any,
-  );
+  return new TeamService(prisma);
 }
 
 const LIDER = {
@@ -59,7 +55,7 @@ function decimal(value: number) {
   return { toNumber: () => value };
 }
 
-describe('ProjectsService.getTeamSummary', () => {
+describe('TeamService.getTeamSummary', () => {
   // Caso 1 — líder válido
   it('devuelve lider y miembros cuando userId es el creador del proyecto', async () => {
     const prisma = makePrisma();

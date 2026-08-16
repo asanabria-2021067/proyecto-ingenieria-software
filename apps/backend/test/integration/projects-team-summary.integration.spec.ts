@@ -11,7 +11,7 @@ import {
   createIntegrationTaskAssignment,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
-import { ProjectsService } from '../../src/projects/projects.service';
+import { TeamService } from '../../src/team/team.service';
 
 /**
  * Integración real T-106 (Tarea 4) contra PostgreSQL: getTeamSummary
@@ -26,18 +26,15 @@ import { ProjectsService } from '../../src/projects/projects.service';
  * DISTINTOS del mismo usuario en el mismo proyecto sí pueden estar ambos
  * ACTIVO simultáneamente — para construir el escenario multi-rol real.
  */
-const fakeNotifications = { isAdmin: async () => false } as any;
-const fakeCacheManager = {} as any;
-
-describeIntegration('ProjectsService.getTeamSummary — integración PostgreSQL real', () => {
+describeIntegration('TeamService.getTeamSummary — integración PostgreSQL real', () => {
   let prisma: PrismaClient;
-  let service: ProjectsService;
+  let service: TeamService;
   let scope: IntegrationCleanupScope;
   let horasParticipacionIds: number[];
 
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
-    service = new ProjectsService(prisma as any, fakeNotifications, fakeCacheManager);
+    service = new TeamService(prisma as any);
     await prisma.$connect();
   });
 
