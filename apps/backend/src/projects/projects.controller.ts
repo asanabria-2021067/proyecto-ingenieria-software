@@ -89,12 +89,6 @@ export class ProjectsController {
     return this.projectsService.findOneAdmin(id, user.userId);
   }
 
-  @Get(':id/equipo')
-  @UseGuards(JwtAuthGuard)
-  findTeam(@Param('id', ParseIntPipe) id: number) {
-    return this.projectsService.findTeam(id);
-  }
-
   @Get(':id/owner')
   @UseGuards(JwtAuthGuard)
   findOneOwner(

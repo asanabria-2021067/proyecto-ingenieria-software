@@ -57,6 +57,39 @@ export class TeamService {
     return value ? value.toISOString().slice(0, 10) : null;
   }
 
+  async findTeam(idProyecto: number) {
+    return this.prisma.participacionProyecto.findMany({
+      where: {
+        rolProyecto: { idProyecto },
+        estadoParticipacion: 'ACTIVO',
+      },
+      select: {
+        idParticipacion: true,
+        estadoParticipacion: true,
+        fechaIngreso: true,
+        usuario: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+            fotoUrl: true,
+          },
+        },
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
+          },
+        },
+      },
+      orderBy: {
+        fechaIngreso: 'asc',
+      },
+    });
+  }
+
   /**
    * Detalle de un integrante dentro de un proyecto: participación(es),
    * historial completo de tareas con asignación (activa o pasada) y horas
