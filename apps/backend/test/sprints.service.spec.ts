@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { SprintsService } from '../src/sprints/sprints.service';
 
@@ -49,6 +54,7 @@ function makeTx() {
   return {
     sprint: { findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
     tarea: { count: vi.fn() },
+    horasParticipacion: { findFirst: vi.fn(), update: vi.fn() },
   };
 }
 
@@ -67,6 +73,7 @@ function makeSprintsAuthorization() {
   return {
     assertCanStartSprint: vi.fn().mockResolvedValue(undefined),
     assertCanFinalizeSprint: vi.fn(),
+    assertCanAdjustRecognizedHours: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
 
@@ -589,6 +596,262 @@ describe('SprintsService', () => {
       );
       expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
       expect(notifications.notifySprintFinalizationStarted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('adjustRecognizedHours', () => {
+    const PARTICIPATION_ID = 30;
+
+    function registroHoras(overrides: Record<string, unknown> = {}) {
+      return {
+        idRegistroHoras: 100,
+        idParticipacion: PARTICIPATION_ID,
+        idSprint: SPRINT_ID,
+        horasCalculadas: new Prisma.Decimal(10),
+        horasAprobadas: null,
+        justificacionAjuste: null,
+        ...overrides,
+      };
+    }
+
+    // AsignacionTarea nunca se toca desde A7: makeTx() no expone
+    // `asignacionTarea` en absoluto, así que cualquier intento de
+    // leerla/escribirla desde adjustRecognizedHours haría fallar la prueba
+    // con un TypeError, demostrando la invariante de horasReales inmutable
+    // (Sección 10 / criterio 13) sin necesitar una fila real de fixture.
+
+    it('caso 1: aumento con justificación válida — acepta, persiste horasAprobadas y justificacionAjuste', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras());
+      const actualizado = registroHoras({ horasAprobadas: new Prisma.Decimal(15), justificacionAjuste: 'Horas extra validadas con evidencia' });
+      tx.horasParticipacion.update.mockResolvedValue(actualizado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const dto = { horasAprobadas: 15, justificacionAjuste: 'Horas extra validadas con evidencia' };
+      const result = await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto);
+
+      expect(result).toBe(actualizado);
+      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
+        where: { idRegistroHoras: 100 },
+        data: { horasAprobadas: 15, justificacionAjuste: 'Horas extra validadas con evidencia' },
+      });
+    });
+
+    it('caso 2: disminución con justificación válida — acepta, persiste horasAprobadas y justificacionAjuste', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras());
+      const actualizado = registroHoras({ horasAprobadas: new Prisma.Decimal(6), justificacionAjuste: 'Se descuentan horas no verificables' });
+      tx.horasParticipacion.update.mockResolvedValue(actualizado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const dto = { horasAprobadas: 6, justificacionAjuste: 'Se descuentan horas no verificables' };
+      const result = await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto);
+
+      expect(result).toBe(actualizado);
+      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
+        where: { idRegistroHoras: 100 },
+        data: { horasAprobadas: 6, justificacionAjuste: 'Se descuentan horas no verificables' },
+      });
+    });
+
+    it('caso 3: diferencia sin justificación (campo ausente) — lanza BadRequestException sin persistir', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras());
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const dto = { horasAprobadas: 12 };
+      await expect(
+        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
+    });
+
+    it('caso 3b: justificación whitespace-only no satisface la regla — lanza BadRequestException sin persistir', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras());
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const dto = { horasAprobadas: 12, justificacionAjuste: '   ' };
+      await expect(
+        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
+    });
+
+    it('caso 4: igualdad (horasAprobadas == horasCalculadas) sin justificación — acepta y persiste horasAprobadas', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: new Prisma.Decimal(10) }));
+      const actualizado = registroHoras({ horasAprobadas: new Prisma.Decimal(10) });
+      tx.horasParticipacion.update.mockResolvedValue(actualizado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const dto = { horasAprobadas: 10 };
+      const result = await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto);
+
+      expect(result).toBe(actualizado);
+      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
+        where: { idRegistroHoras: 100 },
+        data: { horasAprobadas: 10, justificacionAjuste: null },
+      });
+    });
+
+    it('caso 5: localiza el registro acotando por idParticipacion + idSprint + proyecto (aislamiento cross-project)', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: new Prisma.Decimal(10) }));
+      tx.horasParticipacion.update.mockResolvedValue(registroHoras({ horasAprobadas: new Prisma.Decimal(10) }));
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 10 });
+
+      expect(tx.horasParticipacion.findFirst).toHaveBeenCalledWith({
+        where: {
+          idParticipacion: PARTICIPATION_ID,
+          idSprint: SPRINT_ID,
+          participacion: { rolProyecto: { idProyecto: PROJECT_ID } },
+        },
+      });
+      expect(authorization.assertCanAdjustRecognizedHours).toHaveBeenCalledWith(
+        PROJECT_ID,
+        SPRINT_ID,
+        LIDER_ID,
+        tx,
+      );
+    });
+
+    it('caso 6: registro de horas inexistente para la participación/Sprint — lanza NotFoundException sin persistir', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(null);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 5 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
+    });
+
+    it('caso 7: usuario no líder — propaga la excepción de autorización sin buscar ni persistir el registro', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanAdjustRecognizedHours.mockRejectedValue(
+        new ForbiddenException('No eres el líder de este proyecto'),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 5 }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(tx.horasParticipacion.findFirst).not.toHaveBeenCalled();
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
+    });
+
+    it('caso 8: horasCalculadas null se rechaza (A7.1) — NUNCA se trata como 0, sin importar si se envía justificación', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: null }));
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      // Con el fallback antiguo (?? new Prisma.Decimal(0)) esta llamada con
+      // justificación habría sido ACEPTADA (3 != 0, justificación presente).
+      // A7.1 debe rechazarla igual: sin horasCalculadas persistido no hay
+      // base de cálculo sobre la cual ajustar, independientemente de que se
+      // envíe justificación.
+      await expect(
+        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, {
+          horasAprobadas: 3,
+          justificacionAjuste: 'justificación válida no vacía',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
+    });
+
+    it('caso 8b: horasCalculadas null con horasAprobadas = 0 también se rechaza (no hay fallback implícito a 0)', async () => {
+      const tx = makeTx();
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: null }));
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      // Con el fallback antiguo, horasAprobadas=0 habría igualado el 0
+      // implícito y se habría aceptado SIN justificación. A7.1 debe
+      // rechazar de todos modos: null nunca se interpreta como 0.
+      await expect(
+        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 0 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
+    });
+
+    it('caso 9: horasReales de AsignacionTarea permanece exactamente igual antes/después del ajuste (invariante de la Sección 10)', async () => {
+      // Fixture explícito de dos tramos AsignacionTarea con horasReales
+      // conocidas, independiente del mock de HorasParticipacion — simula el
+      // estado real de la base de datos antes y después de la operación.
+      const asignacionesAntes = [
+        { idAsignacion: 501, horasReales: new Prisma.Decimal(3) },
+        { idAsignacion: 502, horasReales: new Prisma.Decimal(2) },
+      ];
+      // Copia profunda independiente para comparar "estado post-operación"
+      // sin compartir referencia con `asignacionesAntes`.
+      const asignacionTareaStore = asignacionesAntes.map((a) => ({ ...a, horasReales: new Prisma.Decimal(a.horasReales) }));
+
+      const tx = makeTx();
+      // AsignacionTarea SÍ está disponible en este tx (a diferencia de otros
+      // casos de este describe), precisamente para poder leerla antes y
+      // después y comparar valores reales, no solo ausencia de llamadas.
+      (tx as any).asignacionTarea = {
+        findMany: vi.fn(async () => asignacionTareaStore.map((a) => ({ ...a }))),
+      };
+      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: new Prisma.Decimal(10) }));
+      tx.horasParticipacion.update.mockResolvedValue(registroHoras({ horasAprobadas: new Prisma.Decimal(10) }));
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const antes = await (tx as any).asignacionTarea.findMany();
+
+      await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 10 });
+
+      const despues = await (tx as any).asignacionTarea.findMany();
+
+      expect(despues).toHaveLength(antes.length);
+      antes.forEach((asignacionAntes: { idAsignacion: number; horasReales: Prisma.Decimal }, index: number) => {
+        const asignacionDespues = despues[index];
+        expect(asignacionDespues.idAsignacion).toBe(asignacionAntes.idAsignacion);
+        expect(asignacionDespues.horasReales.equals(asignacionAntes.horasReales)).toBe(true);
+      });
+      // Aserción explícita adicional por valor concreto, sin depender solo
+      // del bucle: los dos tramos conservan exactamente 3 y 2.
+      expect(despues[0].horasReales.equals(new Prisma.Decimal(3))).toBe(true);
+      expect(despues[1].horasReales.equals(new Prisma.Decimal(2))).toBe(true);
+      // adjustRecognizedHours nunca invoca asignacionTarea: la única
+      // llamada registrada es la del propio test (antes/después), no del
+      // servicio.
+      expect((tx as any).asignacionTarea.findMany).toHaveBeenCalledTimes(2);
     });
   });
 });
