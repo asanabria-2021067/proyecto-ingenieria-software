@@ -24,4 +24,14 @@ export class SprintsController {
   ) {
     return this.sprintsService.startSprint(projectId, user.userId);
   }
+
+  @Post(':sprintId/finalizar')
+  @HttpCode(HttpStatus.OK)
+  finalize(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.finalizeSprint(projectId, sprintId, user.userId);
+  }
 }

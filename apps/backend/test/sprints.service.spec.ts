@@ -47,7 +47,8 @@ function makeForeignKeyError() {
 
 function makeTx() {
   return {
-    sprint: { findFirst: vi.fn(), create: vi.fn() },
+    sprint: { findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
+    tarea: { count: vi.fn() },
   };
 }
 
@@ -63,12 +64,23 @@ function makeSprintsContext() {
 }
 
 function makeSprintsAuthorization() {
-  return { assertCanStartSprint: vi.fn().mockResolvedValue(undefined) } as any;
+  return {
+    assertCanStartSprint: vi.fn().mockResolvedValue(undefined),
+    assertCanFinalizeSprint: vi.fn(),
+  } as any;
+}
+
+function makeNotifications() {
+  return {
+    notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
+    notifySprintFinalizationStarted: vi.fn().mockResolvedValue(undefined),
+  } as any;
 }
 
 const LIDER_ID = 1;
 const NO_LIDER_ID = 2;
 const PROJECT_ID = 10;
+const SPRINT_ID = 20;
 
 describe('SprintsService', () => {
   describe('startSprint', () => {
@@ -81,7 +93,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       const result = await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -101,7 +113,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       const result = await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -126,7 +138,7 @@ describe('SprintsService', () => {
         estado: 'ACTIVO',
       });
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -144,7 +156,7 @@ describe('SprintsService', () => {
         estado: 'EN_FINALIZACION',
       });
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -163,7 +175,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       const result = await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -179,7 +191,7 @@ describe('SprintsService', () => {
       authorization.assertCanStartSprint.mockRejectedValue(
         new ForbiddenException('No eres el líder de este proyecto'),
       );
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await expect(service.startSprint(PROJECT_ID, NO_LIDER_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -196,7 +208,7 @@ describe('SprintsService', () => {
       authorization.assertCanStartSprint.mockRejectedValue(
         new NotFoundException('Proyecto con id 10 no encontrado'),
       );
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -216,7 +228,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       const result = await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -234,7 +246,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -249,7 +261,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
@@ -264,7 +276,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
@@ -279,7 +291,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
@@ -299,7 +311,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -320,12 +332,263 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization);
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       await service.startSprint(PROJECT_ID, LIDER_ID);
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(context.getCurrentSprint).toHaveBeenCalledWith(PROJECT_ID, tx);
+    });
+  });
+
+  describe('finalizeSprint', () => {
+    function sprintActivo(overrides: Record<string, unknown> = {}) {
+      return {
+        idSprint: SPRINT_ID,
+        idProyecto: PROJECT_ID,
+        numero: 3,
+        estado: 'ACTIVO',
+        fechaFinalizacionIniciada: null,
+        ...overrides,
+      };
+    }
+
+    it('caso 1: todas las tareas HECHO -> ACTIVO pasa a EN_FINALIZACION, persiste fechaFinalizacionIniciada y notifica', async () => {
+      const tx = makeTx();
+      const sprint = sprintActivo();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
+      tx.tarea.count.mockResolvedValue(0);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
+      tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      const result = await service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result).toBe(sprintFinalizado);
+      expect(tx.sprint.updateMany).toHaveBeenCalledWith({
+        where: { idSprint: SPRINT_ID, idProyecto: PROJECT_ID, estado: 'ACTIVO' },
+        data: expect.objectContaining({ estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: expect.any(Date) }),
+      });
+      expect(notifications.notifyProjectActiveParticipants).toHaveBeenCalledTimes(1);
+      expect(notifications.notifySprintFinalizationStarted).toHaveBeenCalledTimes(1);
+      expect(notifications.notifySprintFinalizationStarted).toHaveBeenCalledWith(
+        PROJECT_ID,
+        LIDER_ID,
+        { projectId: PROJECT_ID, sprintId: SPRINT_ID },
+      );
+    });
+
+    it('caso 2: una tarea EN_PROGRESO bloquea, sin updateMany ni notificaciones', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
+      tx.tarea.count.mockResolvedValue(1); // una tarea EN_PROGRESO cuenta como no-HECHO
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(tx.sprint.updateMany).not.toHaveBeenCalled();
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+      expect(notifications.notifySprintFinalizationStarted).not.toHaveBeenCalled();
+    });
+
+    it('caso 3: una tarea PENDIENTE (POR_HACER) bloquea igual que cualquier estado != HECHO', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
+      tx.tarea.count.mockResolvedValue(1);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(tx.tarea.count).toHaveBeenCalledWith({
+        where: {
+          idProyecto: PROJECT_ID,
+          idSprint: SPRINT_ID,
+          eliminadoEn: null,
+          estadoTarea: { not: 'HECHO' },
+        },
+      });
+    });
+
+    it('caso 4: Sprint EN_FINALIZACION rechaza sin notificar', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(
+        sprintActivo({ estado: 'EN_FINALIZACION' }),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(tx.tarea.count).not.toHaveBeenCalled();
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+    });
+
+    it('caso 5: Sprint CERRADO rechaza sin notificar', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo({ estado: 'CERRADO' }));
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+    });
+
+    it('caso 6: usuario no líder — propaga la excepción de assertCanFinalizeSprint sin mutar ni notificar', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockRejectedValue(
+        new ForbiddenException('No eres el líder de este proyecto'),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await expect(
+        service.finalizeSprint(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(tx.sprint.updateMany).not.toHaveBeenCalled();
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+    });
+
+    it('caso 7: cross-project — sprintId válido de otro proyecto se rechaza vía assertCanFinalizeSprint (aislamiento projectId+sprintId)', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockRejectedValue(
+        new NotFoundException(`Sprint con id ${SPRINT_ID} no encontrado en el proyecto ${PROJECT_ID}`),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await expect(
+        service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(tx.tarea.count).not.toHaveBeenCalled();
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+    });
+
+    it('caso 8: Sprint sin tareas (0 relevantes) permite la transición — A4 no exige "al menos una tarea"', async () => {
+      const tx = makeTx();
+      const sprint = sprintActivo();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
+      tx.tarea.count.mockResolvedValue(0);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
+      tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      const result = await service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.estado).toBe('EN_FINALIZACION');
+    });
+
+    it('caso 9: la notificación ocurre después de que $transaction resuelve (orden temporal explícito)', async () => {
+      const tx = makeTx();
+      const sprint = sprintActivo();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
+      tx.tarea.count.mockResolvedValue(0);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
+      tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
+
+      const orden: string[] = [];
+      const prisma = {
+        $transaction: vi.fn(async (callback: any) => {
+          const resultado = await callback(tx);
+          orden.push('transaction-resuelta');
+          return resultado;
+        }),
+      } as any;
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      notifications.notifyProjectActiveParticipants.mockImplementation(async () => {
+        orden.push('notificacion-bandeja');
+      });
+      notifications.notifySprintFinalizationStarted.mockImplementation(async () => {
+        orden.push('notificacion-realtime');
+      });
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(orden).toEqual([
+        'transaction-resuelta',
+        'notificacion-bandeja',
+        'notificacion-realtime',
+      ]);
+    });
+
+    it('caso 10: si la transacción falla (rollback), las notificaciones nunca se llaman', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
+      tx.tarea.count.mockResolvedValue(0);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      // Simula un fallo dentro de la transacción DESPUÉS del updateMany (p.
+      // ej. la relectura final falla) — el callback de $transaction
+      // propaga el rechazo tal como Prisma haría en un rollback real.
+      const prisma = {
+        $transaction: vi.fn(async (callback: any) => {
+          tx.sprint.findFirst.mockResolvedValue(null);
+          return callback(tx);
+        }),
+      } as any;
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toThrow();
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+      expect(notifications.notifySprintFinalizationStarted).not.toHaveBeenCalled();
+    });
+
+    it('caso 11: updateMany.count === 0 (carrera perdida) -> ConflictException, sin notificar', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
+      tx.tarea.count.mockResolvedValue(0);
+      tx.sprint.updateMany.mockResolvedValue({ count: 0 }); // otra transacción ya ganó la carrera
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
+
+      await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
+      expect(notifications.notifySprintFinalizationStarted).not.toHaveBeenCalled();
     });
   });
 });

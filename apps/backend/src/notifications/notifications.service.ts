@@ -219,6 +219,42 @@ export class NotificationsService {
   }
 
   /**
+   * A4: emite el evento realtime SPRINT_FINALIZATION_STARTED a los
+   * participantes activos del proyecto (mismo criterio de audiencia que
+   * notifyProjectActiveParticipants, sin tocar ese método: ACTIVO,
+   * excluyendo al actor, deduplicado por idUsuario) — pero sin persistir
+   * ninguna fila de Notificacion, porque es una señal realtime pura para
+   * refrescar UI (SprintsService la llama junto a
+   * notifyProjectActiveParticipants, que sí crea la notificación de
+   * bandeja), no un mensaje de bandeja. Por eso no reutiliza notifyUsers
+   * (que siempre persiste) y en su lugar llama directamente al gateway.
+   */
+  async notifySprintFinalizationStarted(
+    idProyecto: number,
+    autorId: number,
+    payload: { projectId: number; sprintId: number },
+    tx?: TxClient,
+  ): Promise<void> {
+    const db = tx ?? this.prisma;
+    const participaciones = await db.participacionProyecto.findMany({
+      where: {
+        estadoParticipacion: 'ACTIVO',
+        idUsuario: { not: autorId },
+        rolProyecto: { idProyecto },
+      },
+      distinct: ['idUsuario'],
+      select: { idUsuario: true },
+    });
+
+    if (this.gateway?.server) {
+      await this.gateway.notifySprintFinalizationStarted(
+        participaciones.map((p) => p.idUsuario),
+        payload,
+      );
+    }
+  }
+
+  /**
    * Tarea 33: destinatarios = miembros con participación ACTIVA en un rol
    * concreto de un proyecto concreto (nunca miembros de otro rol o de otro
    * proyecto), excluyendo al actor y deduplicados por `idUsuario`. A
