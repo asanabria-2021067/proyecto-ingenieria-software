@@ -24,6 +24,7 @@ import { LabelsModule } from './labels/labels.module';
 import { RolesModule } from './roles/roles.module';
 import { ProgressRecordsModule } from './progress-records/progress-records.module';
 import { SprintsModule } from './sprints/sprints.module';
+import { ExitRequestsModule } from './exit-requests/exit-requests.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { SprintsModule } from './sprints/sprints.module';
     RolesModule,
     ProgressRecordsModule,
     SprintsModule,
+    ExitRequestsModule,
   ],
   controllers: [AppController],
   providers: [
