@@ -20,6 +20,7 @@ import { AssignTaskDto } from './dto/assign-task.dto';
 import { CloseAssignmentDto } from './dto/close-assignment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 
 @Controller('proyectos/:projectId/tareas')
 @UseGuards(JwtAuthGuard)
@@ -45,6 +46,7 @@ export class TasksController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ProjectWriteGuard)
   create(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
@@ -54,6 +56,7 @@ export class TasksController {
   }
 
   @Patch(':taskId')
+  @UseGuards(ProjectWriteGuard)
   update(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -64,6 +67,7 @@ export class TasksController {
   }
 
   @Patch(':taskId/estado')
+  @UseGuards(ProjectWriteGuard)
   updateEstado(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -75,6 +79,7 @@ export class TasksController {
 
   @Delete(':taskId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(ProjectWriteGuard)
   async remove(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -85,6 +90,7 @@ export class TasksController {
 
   @Post(':taskId/asignar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
   assign(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -96,6 +102,7 @@ export class TasksController {
 
   @Delete(':taskId/asignar')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(ProjectWriteGuard)
   async unassign(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -106,6 +113,7 @@ export class TasksController {
 
   @Post(':taskId/asignaciones/:assignmentId/cerrar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
   closeAssignment(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
