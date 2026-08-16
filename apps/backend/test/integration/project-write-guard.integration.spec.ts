@@ -10,6 +10,7 @@ import {
   createIntegrationParticipation,
   createIntegrationSprint,
   createIntegrationTask,
+  createIntegrationTaskAssignment,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { ProjectWriteGuard } from '../../src/common/guards/project-write.guard';
@@ -260,22 +261,34 @@ describeIntegration(
       expect(sinCambiosFinalizacion?.tituloTarea).toBe('Editado en ACTIVO');
     });
 
-    it('ASSIGN TASK: bloqueada sin Sprint operable, permitida en ACTIVO, bloqueada en EN_FINALIZACION', async () => {
+    it('ASSIGN TASK: bloqueada sin Sprint operable, permitida en ACTIVO (incluida reasignación real, X4), bloqueada en EN_FINALIZACION', async () => {
       const leader = await createIntegrationUser(prisma);
       const assignee = await createIntegrationUser(prisma);
-      scope.userIds = [leader.idUsuario, assignee.idUsuario];
+      const assigneeB = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario, assignee.idUsuario, assigneeB.idUsuario];
       const project = await createIntegrationProject(prisma, leader.idUsuario);
       scope.projectIds = [project.idProyecto];
 
       const role = await createIntegrationProjectRole(prisma, project.idProyecto);
-      scope.roleIds = [role.idRolProyecto];
+      const roleB = await createIntegrationProjectRole(prisma, project.idProyecto, { nombreRol: 'X4 Rol B' });
+      scope.roleIds = [role.idRolProyecto, roleB.idRolProyecto];
       const participation = await createIntegrationParticipation(
         prisma,
         assignee.idUsuario,
         role.idRolProyecto,
         { estadoParticipacion: 'ACTIVO' },
       );
-      scope.participationIds = [participation.idParticipacion];
+      // X4 (Kanban/reasignación): segundo candidato con su propia
+      // participación ACTIVO, para reasignar A -> B mientras el Sprint
+      // sigue ACTIVO y verificar que X1.1 resuelve idParticipacion de B
+      // (nunca la de A) también en este camino guiado por el guard real.
+      const participationB = await createIntegrationParticipation(
+        prisma,
+        assigneeB.idUsuario,
+        roleB.idRolProyecto,
+        { estadoParticipacion: 'ACTIVO' },
+      );
+      scope.participationIds = [participation.idParticipacion, participationB.idParticipacion];
 
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, {
         estado: 'ACTIVO',
@@ -307,7 +320,7 @@ describeIntegration(
       });
       expect(conteoSinSprint).toBe(0);
 
-      // --- ACTIVO ---
+      // --- ACTIVO: asignación inicial real, a través del guard real ---
       await prisma.sprint.update({ where: { idSprint: sprint.idSprint }, data: { estado: 'ACTIVO' } });
 
       await runThroughRealGuard('assign', project.idProyecto, () =>
@@ -322,7 +335,33 @@ describeIntegration(
         where: { idTarea: task.idTarea, desasignadaEn: null },
       });
       expect(asignacionActiva?.idUsuario).toBe(assignee.idUsuario);
+      // X1.1: idParticipacion correcto para A ya en este camino guiado por el guard.
+      expect(asignacionActiva?.idParticipacion).toBe(participation.idParticipacion);
       scope.assignmentIds = [asignacionActiva!.idAsignacion];
+
+      // --- ACTIVO: reasignación real A -> B (X4 Kanban) ---
+      await runThroughRealGuard('assign', project.idProyecto, () =>
+        controller.assign(
+          project.idProyecto,
+          task.idTarea,
+          { userId: leader.idUsuario },
+          { idUsuario: assigneeB.idUsuario } as any,
+        ),
+      );
+      const asignacionAntigua = await prisma.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: asignacionActiva!.idAsignacion },
+        select: { desasignadaEn: true },
+      });
+      expect(asignacionAntigua.desasignadaEn).not.toBeNull();
+
+      const todasActivas = await prisma.asignacionTarea.findMany({
+        where: { idTarea: task.idTarea, desasignadaEn: null },
+      });
+      // Invariante Kanban: exactamente una asignación activa tras reasignar, nunca dos.
+      expect(todasActivas).toHaveLength(1);
+      expect(todasActivas[0].idUsuario).toBe(assigneeB.idUsuario);
+      expect(todasActivas[0].idParticipacion).toBe(participationB.idParticipacion);
+      scope.assignmentIds = [asignacionActiva!.idAsignacion, todasActivas[0].idAsignacion];
 
       // --- EN_FINALIZACION ---
       await prisma.sprint.update({
@@ -347,7 +386,108 @@ describeIntegration(
       const asignacionSinCambios = await prisma.asignacionTarea.findFirst({
         where: { idTarea: task.idTarea, desasignadaEn: null },
       });
-      expect(asignacionSinCambios?.idUsuario).toBe(assignee.idUsuario); // no cambió durante EN_FINALIZACION
+      expect(asignacionSinCambios?.idUsuario).toBe(assigneeB.idUsuario); // no cambió durante EN_FINALIZACION
+    });
+
+    /**
+     * X4 (Kanban/unassign): mismo checkpoint de matriz 3x3 (sin Sprint
+     * operable / ACTIVO / EN_FINALIZACION) que CREATE/EDIT/ASSIGN, pero
+     * para `unassign` — sin cobertura previa en esta suite (A3), aunque el
+     * endpoint real ya está decorado con `@UseGuards(ProjectWriteGuard)`
+     * (tasks.controller.ts). `TasksService.unassign` no toca
+     * `idParticipacion` (ver X1.1: solo cierra el tramo activo, nunca
+     * recrea la fila), así que aquí solo se verifica `desasignadaEn`.
+     */
+    it('UNASSIGN TASK: bloqueada sin Sprint operable, permitida en ACTIVO, bloqueada en EN_FINALIZACION', async () => {
+      const leader = await createIntegrationUser(prisma);
+      const assignee = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario, assignee.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      scope.projectIds = [project.idProyecto];
+
+      const role = await createIntegrationProjectRole(prisma, project.idProyecto);
+      scope.roleIds = [role.idRolProyecto];
+      const participation = await createIntegrationParticipation(
+        prisma,
+        assignee.idUsuario,
+        role.idRolProyecto,
+        { estadoParticipacion: 'ACTIVO' },
+      );
+      scope.participationIds = [participation.idParticipacion];
+
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
+      scope.sprintIds = [sprint.idSprint];
+
+      const task = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint);
+      scope.taskIds = [task.idTarea];
+
+      const assignment = await createIntegrationTaskAssignment(
+        prisma,
+        task.idTarea,
+        assignee.idUsuario,
+        leader.idUsuario,
+      );
+      scope.assignmentIds = [assignment.idAsignacion];
+
+      // --- SIN SPRINT OPERABLE ---
+      await prisma.sprint.update({ where: { idSprint: sprint.idSprint }, data: { estado: 'CERRADO' } });
+
+      let rejection: unknown;
+      try {
+        await runThroughRealGuard('unassign', project.idProyecto, () =>
+          controller.unassign(project.idProyecto, task.idTarea, { userId: leader.idUsuario }),
+        );
+      } catch (error) {
+        rejection = error;
+      }
+      expect(rejection).toBeInstanceOf(ConflictException);
+      const sinCambiosSinSprint = await prisma.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: assignment.idAsignacion },
+        select: { desasignadaEn: true },
+      });
+      expect(sinCambiosSinSprint.desasignadaEn).toBeNull();
+
+      // --- ACTIVO: unassign real, a través del guard real ---
+      await prisma.sprint.update({ where: { idSprint: sprint.idSprint }, data: { estado: 'ACTIVO' } });
+
+      await runThroughRealGuard('unassign', project.idProyecto, () =>
+        controller.unassign(project.idProyecto, task.idTarea, { userId: leader.idUsuario }),
+      );
+      const trasUnassign = await prisma.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: assignment.idAsignacion },
+        select: { desasignadaEn: true, idUsuario: true },
+      });
+      expect(trasUnassign.desasignadaEn).not.toBeNull();
+      expect(trasUnassign.idUsuario).toBe(assignee.idUsuario); // el titular histórico nunca cambia
+
+      // --- EN_FINALIZACION: nueva asignación + intento de unassign bloqueado ---
+      const assignment2 = await createIntegrationTaskAssignment(
+        prisma,
+        task.idTarea,
+        assignee.idUsuario,
+        leader.idUsuario,
+      );
+      scope.assignmentIds!.push(assignment2.idAsignacion);
+
+      await prisma.sprint.update({
+        where: { idSprint: sprint.idSprint },
+        data: { estado: 'EN_FINALIZACION' },
+      });
+
+      let rejectionFinalizacion: unknown;
+      try {
+        await runThroughRealGuard('unassign', project.idProyecto, () =>
+          controller.unassign(project.idProyecto, task.idTarea, { userId: leader.idUsuario }),
+        );
+      } catch (error) {
+        rejectionFinalizacion = error;
+      }
+      expect(rejectionFinalizacion).toBeInstanceOf(ConflictException);
+      const sinCambiosFinalizacion = await prisma.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: assignment2.idAsignacion },
+        select: { desasignadaEn: true },
+      });
+      expect(sinCambiosFinalizacion.desasignadaEn).toBeNull(); // no cambió durante EN_FINALIZACION
     });
   },
 );
