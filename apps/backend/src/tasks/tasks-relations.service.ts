@@ -15,6 +15,17 @@ export interface RelatedResourcesResult {
   hito: Hito | null | undefined;
   rolProyecto: RolProyecto | null | undefined;
   etiquetas: Etiqueta[] | undefined;
+  /**
+   * X1.1: ParticipacionProyecto exacta resuelta para `idUsuarioAsignado`
+   * (rol exacto si la tarea tiene idRolProyecto, cualquier participación
+   * ACTIVO del proyecto si no) — la misma fila que
+   * `assertUserParticipationForEffectiveRole` ya valida que existe.
+   * `undefined` cuando `validateCreateTaskRelations` no recibió
+   * `idUsuarioAsignado` (sin asignación inicial que crear); nunca `null`
+   * en ese caso, para no confundirlo con "resuelto pero sin participación"
+   * (imposible: la validación ya lanza si no encuentra ninguna).
+   */
+  idParticipacionAsignado?: number;
 }
 
 export interface CreateTaskRelationsInput {
@@ -88,20 +99,25 @@ export class TasksRelationsService {
    * lo haya hecho. validateCreateTaskRelations NO pasa por este método
    * cuando ya validó el rol — reutiliza directamente los helpers privados
    * de abajo para evitar la segunda consulta del mismo rol.
+   *
+   * X1.1: devuelve el `idParticipacion` exacto resuelto (nunca `null`: la
+   * propia validación lanza BadRequestException si no encuentra ninguna
+   * participación compatible), para que el caller pueda persistirlo en
+   * `AsignacionTarea.idParticipacion` sin una segunda consulta.
    */
   async assertUserAssignableToProject(
     projectId: number,
     userId: number,
     roleId: number | null,
     tx?: TxClient,
-  ): Promise<void> {
+  ): Promise<number> {
     await this.assertUserExists(userId, tx);
 
     if (roleId !== null) {
       await this.tasksContext.getRoleInProjectOrThrow(projectId, roleId, tx);
     }
 
-    await this.assertUserParticipationForEffectiveRole(projectId, userId, roleId, tx);
+    return this.assertUserParticipationForEffectiveRole(projectId, userId, roleId, tx);
   }
 
   private async assertUserExists(userId: number, tx?: TxClient): Promise<void> {
@@ -120,13 +136,21 @@ export class TasksRelationsService {
    * no valida la existencia del rol ni del usuario. roleId numérico exige
    * participación ACTIVO en ese rol exacto; roleId null exige cualquier
    * participación ACTIVO dentro del proyecto.
+   *
+   * X1.1: retorna el `idParticipacion` de la fila encontrada (siempre
+   * numérico: ambas ramas lanzan BadRequestException antes de retornar si
+   * no hay ninguna) — única fuente de verdad de "qué participación exacta
+   * corresponde a este usuario+rol efectivo+proyecto", reutilizada por
+   * `assertUserAssignableToProject`/`validateCreateTaskRelations` para
+   * persistir `AsignacionTarea.idParticipacion` sin duplicar el criterio
+   * de resolución en el caller.
    */
   private async assertUserParticipationForEffectiveRole(
     projectId: number,
     userId: number,
     roleId: number | null,
     tx?: TxClient,
-  ): Promise<void> {
+  ): Promise<number> {
     const db = tx ?? this.prisma;
 
     if (roleId !== null) {
@@ -144,7 +168,7 @@ export class TasksRelationsService {
           'El usuario no tiene una participación activa en el rol de la tarea',
         );
       }
-      return;
+      return participacionConRol.idParticipacion;
     }
 
     const participacionEnProyecto = await db.participacionProyecto.findFirst({
@@ -158,6 +182,7 @@ export class TasksRelationsService {
     if (!participacionEnProyecto) {
       throw new BadRequestException('El usuario no tiene una participación activa en el proyecto');
     }
+    return participacionEnProyecto.idParticipacion;
   }
 
   /**
@@ -188,7 +213,7 @@ export class TasksRelationsService {
       await this.assertUserExists(input.idUsuarioAsignado, tx);
 
       const rolEfectivo = input.idRolProyecto ?? null;
-      await this.assertUserParticipationForEffectiveRole(
+      recursos.idParticipacionAsignado = await this.assertUserParticipationForEffectiveRole(
         projectId,
         input.idUsuarioAsignado,
         rolEfectivo,
