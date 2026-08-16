@@ -11,7 +11,7 @@ function makePrisma() {
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new TeamService(prisma);
+  return new TeamService(prisma, { findAll: vi.fn() } as any);
 }
 
 const USUARIO = {
