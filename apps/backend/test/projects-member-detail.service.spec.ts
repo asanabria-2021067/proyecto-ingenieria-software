@@ -1,6 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { ProjectsService } from '../src/projects/projects.service';
+import { TeamService } from '../src/team/team.service';
 
 function makePrisma() {
   return {
@@ -11,11 +11,7 @@ function makePrisma() {
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new ProjectsService(
-    prisma,
-    { isAdmin: vi.fn(), notifyAdminsFromTemplate: vi.fn(), notifyFromTemplate: vi.fn() } as any,
-    {} as any,
-  );
+  return new TeamService(prisma);
 }
 
 const USUARIO = {
@@ -26,7 +22,7 @@ const USUARIO = {
   fotoUrl: null,
 };
 
-describe('ProjectsService.findTeamMemberDetail', () => {
+describe('TeamService.findTeamMemberDetail', () => {
   it('rechaza cuando el proyecto no existe', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
@@ -180,7 +176,7 @@ describe('ProjectsService.findTeamMemberDetail', () => {
     prisma.participacionProyecto.findMany.mockImplementation(async ({ where }: any) => {
       return PARTICIPACIONES.filter(
         (p) => p.usuario.idUsuario === where.idUsuario && p.idProyectoReal === where.rolProyecto.idProyecto,
-      ).map(({ idProyectoReal, ...resto }) => resto);
+      ).map(({ idProyectoReal: _idProyectoReal, ...resto }) => resto);
     });
     prisma.tarea.findMany.mockResolvedValue([]);
     const service = makeService(prisma);
