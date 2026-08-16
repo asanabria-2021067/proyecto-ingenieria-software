@@ -1,15 +1,18 @@
 import {
+  Body,
   Controller,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { SprintsService } from './sprints.service';
+import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
 
 @Controller('proyectos/:projectId/sprints')
 @UseGuards(JwtAuthGuard)
@@ -33,5 +36,23 @@ export class SprintsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.sprintsService.finalizeSprint(projectId, sprintId, user.userId);
+  }
+
+  @Patch(':sprintId/horas/:participacionId')
+  @HttpCode(HttpStatus.OK)
+  adjustHours(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Param('participacionId', ParseIntPipe) participacionId: number,
+    @Body() dto: AdjustRecognizedHoursDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.adjustRecognizedHours(
+      projectId,
+      sprintId,
+      participacionId,
+      user.userId,
+      dto,
+    );
   }
 }
