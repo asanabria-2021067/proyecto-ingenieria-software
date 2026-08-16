@@ -65,6 +65,8 @@ function makePrisma(tx = makeTx()) {
     tx,
     $transaction: vi.fn(async (callback: any) => callback(tx)),
     $queryRaw: vi.fn(),
+    sprint: { findFirst: vi.fn(), findMany: vi.fn() },
+    hito: { findMany: vi.fn() },
   } as any;
 }
 
@@ -79,6 +81,8 @@ function makeSprintsAuthorization() {
     assertCanCloseSprint: vi.fn(),
     assertCanAdjustRecognizedHours: vi.fn().mockResolvedValue(undefined),
     assertCanViewClosingSummary: vi.fn().mockResolvedValue(undefined),
+    assertCanListSprintHistory: vi.fn().mockResolvedValue(undefined),
+    assertCanViewSprintHistory: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
 
@@ -1216,6 +1220,284 @@ describe('SprintsService', () => {
         service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(tx.sprint.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listSprints', () => {
+    function sprintRow(overrides: Record<string, unknown> = {}) {
+      return {
+        idSprint: 1,
+        idProyecto: PROJECT_ID,
+        numero: 1,
+        estado: 'CERRADO',
+        fechaInicio: new Date('2026-01-01'),
+        fechaFinalizacionIniciada: new Date('2026-01-20'),
+        fechaCierre: new Date('2026-01-25'),
+        ...overrides,
+      };
+    }
+
+    it('caso 1: proyecto con varios Sprints — devuelve exclusivamente los suyos', async () => {
+      const filas = [sprintRow({ idSprint: 2, numero: 2 }), sprintRow({ idSprint: 1, numero: 1 })];
+      const prisma = makePrisma();
+      prisma.sprint.findMany.mockResolvedValue(filas);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.listSprints(PROJECT_ID, LIDER_ID);
+
+      expect(result).toBe(filas);
+      expect(authorization.assertCanListSprintHistory).toHaveBeenCalledWith(PROJECT_ID, LIDER_ID);
+    });
+
+    it('caso 2: proyecto sin Sprints — devuelve [] sin lanzar error artificial', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findMany.mockResolvedValue([]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.listSprints(PROJECT_ID, LIDER_ID);
+
+      expect(result).toEqual([]);
+    });
+
+    it('caso 3: aislamiento — el where de la consulta filtra por idProyecto, no un filtro posterior en JS', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findMany.mockResolvedValue([]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.listSprints(PROJECT_ID, LIDER_ID);
+
+      expect(prisma.sprint.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { idProyecto: PROJECT_ID } }),
+      );
+    });
+
+    it('caso 4: tipado/metadata — los campos del SprintListItem corresponden a los datos persistidos', async () => {
+      const fila = sprintRow({ idSprint: 5, numero: 3, estado: 'ACTIVO', fechaFinalizacionIniciada: null, fechaCierre: null });
+      const prisma = makePrisma();
+      prisma.sprint.findMany.mockResolvedValue([fila]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.listSprints(PROJECT_ID, LIDER_ID);
+
+      expect(result[0]).toEqual(fila);
+    });
+
+    it('usuario no líder: propaga la excepción de autorización sin ejecutar la consulta', async () => {
+      const prisma = makePrisma();
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanListSprintHistory.mockRejectedValue(
+        new ForbiddenException('No eres el líder de este proyecto'),
+      );
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(service.listSprints(PROJECT_ID, NO_LIDER_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(prisma.sprint.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getSprintDetail', () => {
+    const AUTOR_SELECT = { idUsuario: true, nombre: true, apellido: true, fotoUrl: true };
+
+    function usuarioPublico(overrides: Record<string, unknown> = {}) {
+      return { idUsuario: 40, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null, ...overrides };
+    }
+
+    function sprintConTareas(tareas: unknown[], overrides: Record<string, unknown> = {}) {
+      return {
+        idSprint: SPRINT_ID,
+        idProyecto: PROJECT_ID,
+        numero: 3,
+        estado: 'CERRADO',
+        fechaInicio: new Date('2026-01-01'),
+        fechaFinalizacionIniciada: new Date('2026-01-20'),
+        fechaCierre: new Date('2026-01-25'),
+        cerradoPor: LIDER_ID,
+        tareas,
+        ...overrides,
+      };
+    }
+
+    it('caso 1: Sprint cerrado completo — reconstruye metadata, tareas, asignaciones, comentarios e hitos', async () => {
+      const prisma = makePrisma();
+      const tarea = {
+        idTarea: 100,
+        tituloTarea: 'TASK-HISTORY',
+        descripcionTarea: 'desc',
+        estadoTarea: 'HECHO',
+        prioridad: 'MEDIA',
+        idHito: 200,
+        fechaCreacion: new Date('2026-01-02'),
+        fechaLimite: new Date('2026-01-15'),
+        tiempoEstimadoHoras: 10,
+        asignaciones: [
+          {
+            idAsignacion: 300,
+            usuario: usuarioPublico(),
+            fechaAsignacion: new Date('2026-01-02'),
+            desasignadaEn: new Date('2026-01-10'),
+            horasReales: { toNumber: () => 5 },
+          },
+        ],
+        comentarios: [
+          {
+            idComentario: 400,
+            autor: usuarioPublico({ idUsuario: 41, nombre: 'Beto' }),
+            contenido: 'COMMENT-HISTORY',
+            creadoEn: new Date('2026-01-05'),
+          },
+        ],
+      };
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([tarea]));
+      prisma.hito.findMany.mockResolvedValue([{ idHito: 200, tituloHito: 'MILESTONE-A', estadoHito: 'COMPLETADO' }]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.idSprint).toBe(SPRINT_ID);
+      expect(result.estado).toBe('CERRADO');
+      expect(result.fechaCierre).toEqual(new Date('2026-01-25'));
+      expect(result.cerradoPor).toBe(LIDER_ID);
+      expect(result.tareas).toHaveLength(1);
+      expect(result.tareas[0].idTarea).toBe(100);
+      expect(result.tareas[0].asignaciones).toHaveLength(1);
+      expect(result.tareas[0].asignaciones[0].horasReales).toBe(5);
+      expect(result.tareas[0].comentarios).toHaveLength(1);
+      expect(result.tareas[0].comentarios[0].contenido).toBe('COMMENT-HISTORY');
+      expect(result.hitos).toEqual([{ idHito: 200, tituloHito: 'MILESTONE-A', estadoHito: 'COMPLETADO' }]);
+    });
+
+    it('caso 2: una tarea con varios tramos de asignación aparece UNA vez, con todos sus tramos conservados', async () => {
+      const prisma = makePrisma();
+      const tarea = {
+        idTarea: 100,
+        tituloTarea: 'TASK-REASIGNADA',
+        descripcionTarea: null,
+        estadoTarea: 'HECHO',
+        prioridad: 'MEDIA',
+        idHito: null,
+        fechaCreacion: new Date('2026-01-02'),
+        fechaLimite: null,
+        tiempoEstimadoHoras: null,
+        asignaciones: [
+          {
+            idAsignacion: 301,
+            usuario: usuarioPublico({ idUsuario: 41 }),
+            fechaAsignacion: new Date('2026-01-02'),
+            desasignadaEn: new Date('2026-01-05'),
+            horasReales: { toNumber: () => 2 },
+          },
+          {
+            idAsignacion: 302,
+            usuario: usuarioPublico({ idUsuario: 42 }),
+            fechaAsignacion: new Date('2026-01-05'),
+            desasignadaEn: null,
+            horasReales: null,
+          },
+        ],
+        comentarios: [],
+      };
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([tarea]));
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.tareas).toHaveLength(1);
+      expect(result.tareas[0].asignaciones).toHaveLength(2);
+      expect(result.tareas[0].asignaciones.map((a) => a.idAsignacion)).toEqual([301, 302]);
+      expect(result.tareas[0].asignaciones[1].horasReales).toBeNull();
+    });
+
+    it('caso 3: el mismo Hito usado por varias tareas no se duplica en la colección top-level', async () => {
+      const prisma = makePrisma();
+      const tarea1 = {
+        idTarea: 100,
+        tituloTarea: 'T1',
+        descripcionTarea: null,
+        estadoTarea: 'HECHO',
+        prioridad: 'MEDIA',
+        idHito: 200,
+        fechaCreacion: new Date('2026-01-02'),
+        fechaLimite: null,
+        tiempoEstimadoHoras: null,
+        asignaciones: [],
+        comentarios: [],
+      };
+      const tarea2 = { ...tarea1, idTarea: 101, tituloTarea: 'T2' };
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([tarea1, tarea2]));
+      prisma.hito.findMany.mockResolvedValue([{ idHito: 200, tituloHito: 'MILESTONE-COMPARTIDO', estadoHito: 'EN_PROGRESO' }]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.tareas).toHaveLength(2);
+      expect(result.hitos).toHaveLength(1);
+      expect(result.tareas[0].idHito).toBe(200);
+      expect(result.tareas[1].idHito).toBe(200);
+      // hito.findMany se llama UNA vez con ambos ids deduplicados (Set),
+      // nunca una consulta por tarea.
+      expect(prisma.hito.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.hito.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { idHito: { in: [200] }, idProyecto: PROJECT_ID } }),
+      );
+    });
+
+    it('caso 4: Sprint ajeno al proyecto — propaga NotFoundException sin ejecutar la reconstrucción', async () => {
+      const prisma = makePrisma();
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanViewSprintHistory.mockRejectedValue(
+        new NotFoundException(`Sprint con id ${SPRINT_ID} no encontrado en el proyecto ${PROJECT_ID}`),
+      );
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.sprint.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('caso 5: Sprint inexistente (autorización pasó pero la relectura no encuentra fila) — NotFoundException', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(null);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('caso 6: la consulta de tareas está acotada por idProyecto + eliminadoEn:null — evidencia contra contaminación cross-project', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([]));
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      const callArgs = prisma.sprint.findFirst.mock.calls[0][0];
+      expect(callArgs.where).toEqual({ idSprint: SPRINT_ID, idProyecto: PROJECT_ID });
+      expect(callArgs.include.tareas.where).toEqual({ idProyecto: PROJECT_ID, eliminadoEn: null });
+      expect(callArgs.include.tareas.include.comentarios.where).toEqual({ eliminadoEn: null });
     });
   });
 });
