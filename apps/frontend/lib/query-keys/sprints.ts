@@ -6,3 +6,14 @@
  */
 
 export const projectSprintsQueryKey = (idProyecto: number) => ['project-sprints', idProyecto] as const;
+
+/**
+ * Detalle histórico de un único Sprint (F4) — distinta de la lista
+ * (`project-sprints`) porque representa un read-model diferente
+ * (`GET /proyectos/:id/sprints/:sprintId`, no `GET /proyectos/:id/sprints`).
+ * Incluye ambos ids para que Sprints de dos proyectos nunca colisionen en
+ * caché, mismo criterio que `projectMemberDetailQueryKey`
+ * (apps/frontend/lib/query-keys/members.ts).
+ */
+export const sprintDetailQueryKey = (idProyecto: number, idSprint: number) =>
+  ['sprint-detail', idProyecto, idSprint] as const;

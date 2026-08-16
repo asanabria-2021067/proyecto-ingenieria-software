@@ -1,12 +1,23 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { projectSprintsQueryKey } from '@/lib/query-keys/sprints';
-import { closeSprint, finalizeSprint, getProjectSprints, startSprint } from '@/lib/services/sprints';
-import type { SprintDto } from '@/lib/types/sprints';
+import { projectSprintsQueryKey, sprintDetailQueryKey } from '@/lib/query-keys/sprints';
+import {
+  closeSprint,
+  finalizeSprint,
+  getProjectSprints,
+  getSprintDetail,
+  startSprint,
+} from '@/lib/services/sprints';
+import type { SprintDetailDto, SprintDto } from '@/lib/types/sprints';
 
 function isValidProjectId(idProyecto: number): boolean {
   return Number.isInteger(idProyecto) && idProyecto > 0;
+}
+
+/** Mismo predicado que `isValidProjectId`, con nombre genérico porque F4 lo aplica también a `idSprint`. */
+function isValidId(id: number): boolean {
+  return Number.isInteger(id) && id > 0;
 }
 
 /**
@@ -74,4 +85,29 @@ export function useCloseSprint(idProyecto: number) {
       queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(idProyecto) });
     },
   });
+}
+
+/**
+ * Detalle histórico de un único Sprint (F4) — `GET /proyectos/:id/sprints/:sprintId`.
+ * Read-only: a diferencia de las mutations anteriores, este hook no expone
+ * ninguna invalidación propia porque no muta nada; F4 nunca reabre ni edita
+ * un Sprint desde esta pantalla.
+ */
+export function useSprintDetail(idProyecto: number, idSprint: number) {
+  const enabled = isValidId(idProyecto) && isValidId(idSprint);
+
+  const query = useQuery<SprintDetailDto>({
+    queryKey: sprintDetailQueryKey(idProyecto, idSprint),
+    queryFn: () => getSprintDetail(idProyecto, idSprint),
+    enabled,
+  });
+
+  return {
+    detail: query.data,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
 }
