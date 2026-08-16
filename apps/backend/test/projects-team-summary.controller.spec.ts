@@ -5,7 +5,11 @@ import { TeamController } from '../src/team/team.controller';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 
 function makeService() {
-  return { getTeamSummary: vi.fn(), findTeamMemberDetail: vi.fn() } as any;
+  return {
+    getTeamSummary: vi.fn(),
+    findTeamMemberDetail: vi.fn(),
+    getPendingPostulations: vi.fn(),
+  } as any;
 }
 
 describe('TeamController.getTeamSummary (GET /proyectos/:id/miembros/resumen)', () => {
