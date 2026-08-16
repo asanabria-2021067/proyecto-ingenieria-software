@@ -5,7 +5,14 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AsignacionTarea, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
+import {
+  AsignacionTarea,
+  EstadoSprint,
+  EstadoTarea,
+  Prioridad,
+  Prisma,
+  TipoNotificacion,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
 import { TasksContextService } from './tasks-context.service';
@@ -288,11 +295,27 @@ export class TasksService {
     const row = await this.prisma.$transaction(async (tx) => {
       await this.tasksAuthorization.assertCanCreateTask(projectId, userId, tx);
 
+      // El proyecto solo admite tareas nuevas mientras tenga un Sprint
+      // ACTIVO (contrato Sprint 6): EN_FINALIZACION, CERRADO o la ausencia
+      // de Sprint bloquean la creación. El Sprint nunca se crea aquí — el
+      // primer Sprint y los siguientes los inicia el líder manualmente
+      // (fuera de este flujo).
+      const sprintActivo = await tx.sprint.findFirst({
+        where: { idProyecto: projectId, estado: EstadoSprint.ACTIVO },
+        select: { idSprint: true },
+      });
+      if (!sprintActivo) {
+        throw new ConflictException(
+          'No se pueden crear tareas porque el proyecto no tiene un Sprint activo.',
+        );
+      }
+
       const recursos = await this.tasksRelations.validateCreateTaskRelations(projectId, dto, tx);
 
       const tarea = await tx.tarea.create({
         data: {
           idProyecto: projectId,
+          idSprint: sprintActivo.idSprint,
           creadaPor: userId,
           tituloTarea: dto.tituloTarea,
           // Conserva '' si se envió explícitamente; solo el omitido se

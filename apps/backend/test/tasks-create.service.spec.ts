@@ -7,6 +7,10 @@ function makeTx() {
     tarea: { create: vi.fn(), findFirst: vi.fn() },
     asignacionTarea: { create: vi.fn() },
     tareaEtiqueta: { createMany: vi.fn() },
+    // Por defecto el proyecto tiene un Sprint ACTIVO (FND-03.B): los tests
+    // que necesitan probar el rechazo por falta de Sprint sobreescriben
+    // este mock explícitamente con mockResolvedValue(null).
+    sprint: { findFirst: vi.fn().mockResolvedValue({ idSprint: 1 }) },
   };
 }
 
@@ -148,6 +152,57 @@ describe('TasksService.create', () => {
       const data = tx.tarea.create.mock.calls[0][0].data;
       expect(data.idHito).toBeNull();
       expect(data.idRolProyecto).toBeNull();
+    });
+  });
+
+  describe('resolución del Sprint activo (FND-03.B)', () => {
+    it('con Sprint ACTIVO: asigna activeSprint.idSprint a la tarea creada', async () => {
+      const tx = makeTx();
+      tx.sprint.findFirst.mockResolvedValue({ idSprint: 77 });
+      const prisma = makePrisma(tx);
+      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      tx.tarea.create.mockResolvedValue({ idTarea: 100 });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+
+      await service.create(5, 1, BASE_DTO);
+
+      expect(tx.sprint.findFirst).toHaveBeenCalledWith({
+        where: { idProyecto: 5, estado: 'ACTIVO' },
+        select: { idSprint: true },
+      });
+      expect(tx.tarea.create.mock.calls[0][0].data.idSprint).toBe(77);
+    });
+
+    it('sin Sprint ACTIVO (ninguno o solo EN_FINALIZACION/CERRADO, filtrado por la propia query): ConflictException, no crea la tarea', async () => {
+      const tx = makeTx();
+      tx.sprint.findFirst.mockResolvedValue(null);
+      const prisma = makePrisma(tx);
+      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+
+      await expect(service.create(5, 1, BASE_DTO)).rejects.toThrow(
+        'No se pueden crear tareas porque el proyecto no tiene un Sprint activo.',
+      );
+      expect(tx.tarea.create).not.toHaveBeenCalled();
+    });
+
+    it('aísla la búsqueda al proyecto de la tarea (no a un Sprint ACTIVO de otro proyecto)', async () => {
+      const tx = makeTx();
+      // Sprint ACTIVO real, pero de un proyecto distinto: el mock simula
+      // exactamente lo que Postgres devolvería para ese WHERE (nada), ya
+      // que la query siempre incluye idProyecto = projectId.
+      tx.sprint.findFirst.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.idProyecto === 999 ? { idSprint: 77 } : null),
+      );
+      const prisma = makePrisma(tx);
+      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+
+      await expect(service.create(5, 1, BASE_DTO)).rejects.toThrow(
+        'No se pueden crear tareas porque el proyecto no tiene un Sprint activo.',
+      );
+      expect(tx.sprint.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { idProyecto: 5, estado: 'ACTIVO' } }),
+      );
+      expect(tx.tarea.create).not.toHaveBeenCalled();
     });
   });
 

@@ -645,7 +645,7 @@ model Tarea {
   idProyecto          Int         @map("id_proyecto")
   idHito              Int?        @map("id_hito")
   idRolProyecto       Int?        @map("id_rol_proyecto")
-  idSprint            Int?        @map("id_sprint")
+  idSprint            Int         @map("id_sprint")
   tituloTarea         String      @map("titulo_tarea") @db.VarChar(255)
   descripcionTarea    String?     @map("descripcion_tarea") @db.Text
   estadoTarea         EstadoTarea @default(POR_HACER) @map("estado_tarea")
@@ -661,7 +661,7 @@ model Tarea {
   proyecto     Proyecto          @relation(fields: [idProyecto], references: [idProyecto])
   hito         Hito?             @relation(fields: [idHito], references: [idHito])
   rolProyecto  RolProyecto?      @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
-  sprint       Sprint?           @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
+  sprint       Sprint            @relation(fields: [idSprint], references: [idSprint])
   creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario])
   asignaciones AsignacionTarea[]
   evidencias   Evidencia[]
