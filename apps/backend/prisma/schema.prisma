@@ -188,6 +188,7 @@ enum EstadoSolicitudRecuperacion {
 }
 
 enum EstadoSolicitudSalida {
+  PREPARACION
   PENDIENTE
   APROBADA
   RECHAZADA
