@@ -6,6 +6,40 @@ import { TeamSummaryResponseDto } from './dto/team-summary-response.dto';
 
 type ApplicationSummary = Awaited<ReturnType<ApplicationsService['findAll']>>[number];
 
+type MemberDetailTask = {
+  idTarea: number;
+  idSprint: number;
+  tituloTarea: string;
+  estadoTarea: string;
+  prioridad: string;
+  fechaCreacion: Date;
+  fechaLimite: string | null;
+  actualizadaEn: Date | null;
+  tiempoEstimadoHoras: number | null;
+  horasReales: number | null;
+  fechaAsignacion: Date;
+  desasignadaEn: Date | null;
+};
+
+type MemberDetailSprintGroup = {
+  idSprint: number;
+  numero: number;
+  estado: string;
+  fechaInicio: Date;
+  fechaFinalizacionIniciada: Date | null;
+  fechaCierre: Date | null;
+  horasCalculadas: number;
+  horasAprobadas: number;
+  tareas: MemberDetailTask[];
+  registrosHoras: {
+    idRegistroHoras: number;
+    idParticipacion: number;
+    estadoHoras: string;
+    horasCalculadas: number | null;
+    horasAprobadas: number | null;
+  }[];
+};
+
 @Injectable()
 export class TeamService {
   constructor(
@@ -75,6 +109,7 @@ export class TeamService {
       },
       select: {
         idTarea: true,
+        idSprint: true,
         tituloTarea: true,
         estadoTarea: true,
         prioridad: true,
@@ -82,6 +117,16 @@ export class TeamService {
         fechaLimite: true,
         actualizadaEn: true,
         tiempoEstimadoHoras: true,
+        sprint: {
+          select: {
+            idSprint: true,
+            numero: true,
+            estado: true,
+            fechaInicio: true,
+            fechaFinalizacionIniciada: true,
+            fechaCierre: true,
+          },
+        },
         asignaciones: {
           where: { idUsuario },
           orderBy: { fechaAsignacion: 'desc' },
@@ -90,6 +135,112 @@ export class TeamService {
       },
       orderBy: { fechaCreacion: 'desc' },
     });
+
+    const idsParticipaciones = participaciones.map((p) => p.idParticipacion);
+    const registrosHorasSprint = await this.prisma.horasParticipacion.findMany({
+      where: {
+        idParticipacion: { in: idsParticipaciones },
+        idSprint: { not: null },
+        estadoHoras: 'APROBADA',
+        sprint: { idProyecto },
+      },
+      select: {
+        idRegistroHoras: true,
+        idParticipacion: true,
+        idSprint: true,
+        estadoHoras: true,
+        horasCalculadas: true,
+        horasAprobadas: true,
+        sprint: {
+          select: {
+            idSprint: true,
+            numero: true,
+            estado: true,
+            fechaInicio: true,
+            fechaFinalizacionIniciada: true,
+            fechaCierre: true,
+          },
+        },
+      },
+      orderBy: [{ sprint: { numero: 'asc' } }, { idRegistroHoras: 'asc' }],
+    });
+
+    const sprintsPorId = new Map<number, MemberDetailSprintGroup>();
+    const ensureSprintGroup = (sprint: {
+      idSprint: number;
+      numero: number;
+      estado: string;
+      fechaInicio: Date;
+      fechaFinalizacionIniciada: Date | null;
+      fechaCierre: Date | null;
+    }) => {
+      let grupo = sprintsPorId.get(sprint.idSprint);
+      if (!grupo) {
+        grupo = {
+          idSprint: sprint.idSprint,
+          numero: sprint.numero,
+          estado: sprint.estado,
+          fechaInicio: sprint.fechaInicio,
+          fechaFinalizacionIniciada: sprint.fechaFinalizacionIniciada,
+          fechaCierre: sprint.fechaCierre,
+          horasCalculadas: 0,
+          horasAprobadas: 0,
+          tareas: [],
+          registrosHoras: [],
+        };
+        sprintsPorId.set(sprint.idSprint, grupo);
+      }
+      return grupo;
+    };
+
+    const tareasDetalle = tareas.map((t) => {
+      const asignacionMasReciente = t.asignaciones[0];
+      const horasPorTramo = t.asignaciones
+        .map((a) => a.horasReales)
+        .filter((h): h is NonNullable<typeof h> => h !== null);
+      const horasReales =
+        horasPorTramo.length === 0
+          ? null
+          : horasPorTramo.reduce((total, h) => total + h.toNumber(), 0);
+
+      const tarea: MemberDetailTask = {
+        idTarea: t.idTarea,
+        idSprint: t.idSprint,
+        tituloTarea: t.tituloTarea,
+        estadoTarea: t.estadoTarea,
+        prioridad: t.prioridad,
+        fechaCreacion: t.fechaCreacion,
+        fechaLimite: this.toDateOnly(t.fechaLimite),
+        actualizadaEn: t.actualizadaEn,
+        tiempoEstimadoHoras: t.tiempoEstimadoHoras,
+        horasReales,
+        fechaAsignacion: asignacionMasReciente.fechaAsignacion,
+        desasignadaEn: asignacionMasReciente.desasignadaEn,
+      };
+
+      if (t.sprint) {
+        ensureSprintGroup(t.sprint).tareas.push(tarea);
+      }
+
+      return tarea;
+    });
+
+    for (const registro of registrosHorasSprint) {
+      if (!registro.idSprint || !registro.sprint) continue;
+      const grupo = ensureSprintGroup(registro.sprint);
+      const horasCalculadas = registro.horasCalculadas?.toNumber() ?? null;
+      const horasAprobadas = registro.horasAprobadas?.toNumber() ?? null;
+
+      grupo.registrosHoras.push({
+        idRegistroHoras: registro.idRegistroHoras,
+        idParticipacion: registro.idParticipacion,
+        estadoHoras: registro.estadoHoras,
+        horasCalculadas,
+        horasAprobadas,
+      });
+      grupo.horasCalculadas += horasCalculadas ?? 0;
+      grupo.horasAprobadas += horasAprobadas ?? 0;
+    }
 
     return {
       usuario: participaciones[0].usuario,
@@ -100,40 +251,8 @@ export class TeamService {
         fechaSalida: this.toDateOnly(p.fechaSalida),
         rolProyecto: p.rolProyecto,
       })),
-      tareas: tareas.map((t) => {
-        // Más reciente primero (orderBy: fechaAsignacion desc ya aplicado en
-        // la consulta): fechaAsignacion/desasignadaEn mostradas son las del
-        // tramo vigente o, si no hay uno vigente, el último cerrado.
-        const asignacionMasReciente = t.asignaciones[0];
-
-        // horasReales es la SUMA de TODOS los tramos de idUsuario sobre esta
-        // tarea (puede haber sido desasignado y reasignado más de una vez),
-        // nunca solo el del tramo más reciente — de lo contrario se pierden
-        // silenciosamente las horas de tramos anteriores. null únicamente
-        // cuando ningún tramo reportó horas; un tramo sin horas no descarta
-        // las horas sí reportadas en otro tramo.
-        const horasPorTramo = t.asignaciones
-          .map((a) => a.horasReales)
-          .filter((h): h is NonNullable<typeof h> => h !== null);
-        const horasReales =
-          horasPorTramo.length === 0
-            ? null
-            : horasPorTramo.reduce((total, h) => total + h.toNumber(), 0);
-
-        return {
-          idTarea: t.idTarea,
-          tituloTarea: t.tituloTarea,
-          estadoTarea: t.estadoTarea,
-          prioridad: t.prioridad,
-          fechaCreacion: t.fechaCreacion,
-          fechaLimite: this.toDateOnly(t.fechaLimite),
-          actualizadaEn: t.actualizadaEn,
-          tiempoEstimadoHoras: t.tiempoEstimadoHoras,
-          horasReales,
-          fechaAsignacion: asignacionMasReciente.fechaAsignacion,
-          desasignadaEn: asignacionMasReciente.desasignadaEn,
-        };
-      }),
+      tareas: tareasDetalle,
+      sprints: [...sprintsPorId.values()].sort((a, b) => a.numero - b.numero),
     };
   }
 
