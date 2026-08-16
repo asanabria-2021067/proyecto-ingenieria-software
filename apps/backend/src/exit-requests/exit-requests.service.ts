@@ -255,10 +255,23 @@ export class ExitRequestsService {
 
     const ahora = new Date();
     return this.prisma.$transaction(async (tx) => {
-      const actualizada = await tx.solicitudSalidaProyecto.update({
-        where: { idSolicitud },
-        data: { estadoSolicitud: 'APROBADA', resueltaEn: ahora, resueltaPor: liderId },
+      const actualizada = {
+        ...solicitud,
+        estadoSolicitud: EstadoSolicitudSalida.APROBADA,
+        resueltaEn: ahora,
+        resueltaPor: liderId,
+      };
+      const resolved = await tx.solicitudSalidaProyecto.updateMany({
+        where: {
+          idSolicitud,
+          idProyecto,
+          estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER,
+        },
+        data: { estadoSolicitud: EstadoSolicitudSalida.APROBADA, resueltaEn: ahora, resueltaPor: liderId },
       });
+      if (resolved.count !== 1) {
+        throw new ConflictException('La solicitud ya no está en estado PENDIENTE_LIDER');
+      }
       await tx.participacionProyecto.updateMany({
         where: {
           idUsuario: solicitud.idUsuario,
@@ -282,10 +295,24 @@ export class ExitRequestsService {
     const solicitud = await this.context.getPendingSolicitudSalidaOrThrow(idProyecto, idSolicitud);
 
     return this.prisma.$transaction(async (tx) => {
-      const actualizada = await tx.solicitudSalidaProyecto.update({
-        where: { idSolicitud: solicitud.idSolicitud },
-        data: { estadoSolicitud: 'RECHAZADA', resueltaEn: new Date(), resueltaPor: liderId },
+      const ahora = new Date();
+      const actualizada = {
+        ...solicitud,
+        estadoSolicitud: EstadoSolicitudSalida.RECHAZADA,
+        resueltaEn: ahora,
+        resueltaPor: liderId,
+      };
+      const resolved = await tx.solicitudSalidaProyecto.updateMany({
+        where: {
+          idSolicitud: solicitud.idSolicitud,
+          idProyecto,
+          estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER,
+        },
+        data: { estadoSolicitud: EstadoSolicitudSalida.RECHAZADA, resueltaEn: ahora, resueltaPor: liderId },
       });
+      if (resolved.count !== 1) {
+        throw new ConflictException('La solicitud ya no está en estado PENDIENTE_LIDER');
+      }
       await this.notifications.notifyFromTemplate(
         [solicitud.idUsuario],
         'PARTICIPACION_ACTUALIZADA',
