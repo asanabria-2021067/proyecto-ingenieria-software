@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import { EstadoSolicitudSalida, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { HoursRecognitionService } from '../sprints/hours-recognition.service';
+import { SprintsContextService } from '../sprints/sprints-context.service';
 import { ExitRequestsAuthorizationService } from './exit-requests.authorization.service';
 import { ExitRequestsContextService } from './exit-requests.context.service';
 
@@ -12,6 +14,8 @@ export class ExitRequestsService {
     private readonly notifications: NotificationsService,
     private readonly authorization: ExitRequestsAuthorizationService,
     private readonly context: ExitRequestsContextService,
+    private readonly hoursRecognition?: HoursRecognitionService,
+    private readonly sprintsContext?: SprintsContextService,
   ) {}
 
   async createSolicitudSalida(idProyecto: number, idUsuario: number, motivo: string) {
@@ -272,6 +276,33 @@ export class ExitRequestsService {
       if (resolved.count !== 1) {
         throw new ConflictException('La solicitud ya no está en estado PENDIENTE_LIDER');
       }
+      if (!this.hoursRecognition || !this.sprintsContext) {
+        throw new Error('HoursRecognitionService y SprintsContextService son requeridos para aprobar salidas');
+      }
+
+      const sprint = await this.sprintsContext.getCurrentSprint(idProyecto, tx);
+      if (!sprint) {
+        throw new ConflictException('No hay un Sprint activo en este proyecto');
+      }
+
+      const participacionesActivas = await tx.participacionProyecto.findMany({
+        where: {
+          idUsuario: solicitud.idUsuario,
+          estadoParticipacion: 'ACTIVO',
+          rolProyecto: { idProyecto },
+        },
+        select: { idParticipacion: true },
+        orderBy: { idParticipacion: 'asc' },
+      });
+
+      for (const participacion of participacionesActivas) {
+        await this.hoursRecognition.recognizeParticipationHours(tx, {
+          projectId: idProyecto,
+          sprintId: sprint.idSprint,
+          participationId: participacion.idParticipacion,
+        });
+      }
+
       await tx.participacionProyecto.updateMany({
         where: {
           idUsuario: solicitud.idUsuario,

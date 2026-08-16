@@ -17,6 +17,8 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { ExitRequestsAuthorizationService } from '../../src/exit-requests/exit-requests.authorization.service';
 import { ExitRequestsContextService } from '../../src/exit-requests/exit-requests.context.service';
 import { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
+import { HoursRecognitionService } from '../../src/sprints/hours-recognition.service';
+import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 
 function makeExitRequestsService(prisma: PrismaClient) {
   const prismaService = prisma as unknown as PrismaService;
@@ -26,6 +28,8 @@ function makeExitRequestsService(prisma: PrismaClient) {
     { notifyFromTemplate: vi.fn() } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
+    new HoursRecognitionService(prismaService),
+    new SprintsContextService(prismaService),
   );
 }
 
@@ -67,6 +71,8 @@ describeIntegration('B9 resolución de solicitud de salida (PostgreSQL real)', (
     const projectP1 = await createIntegrationProject(prisma, leader.idUsuario);
     const projectP2 = await createIntegrationProject(prisma, leader.idUsuario);
     scope.projectIds = [projectP1.idProyecto, projectP2.idProyecto];
+    const sprintP1 = await createIntegrationSprint(prisma, projectP1.idProyecto);
+    scope.sprintIds = [sprintP1.idSprint];
 
     const roleP1A = await createIntegrationProjectRole(prisma, projectP1.idProyecto, {
       nombreRol: 'B9 P1 Rol A',

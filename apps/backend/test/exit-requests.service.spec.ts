@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 import { ExitRequestsAuthorizationService } from '../src/exit-requests/exit-requests.authorization.service';
 import { ExitRequestsContextService } from '../src/exit-requests/exit-requests.context.service';
 import { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
+import { HoursRecognitionService } from '../src/sprints/hours-recognition.service';
+import { SprintsContextService } from '../src/sprints/sprints-context.service';
 
 /**
  * Tarea 5: el índice parcial `solicitud_salida_proyecto_pendiente_unique` (a
@@ -57,9 +59,10 @@ function makePrisma() {
   });
   const prisma: any = {
     proyecto: { findFirst: vi.fn() },
-    participacionProyecto: { findFirst: vi.fn(), ...writeSpies() },
+    participacionProyecto: { findFirst: vi.fn(), findMany: vi.fn(), ...writeSpies() },
     asignacionTarea: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), ...writeSpies() },
     horasParticipacion: { ...writeSpies() },
+    sprint: { findFirst: vi.fn() },
     tarea: { ...writeSpies() },
     registroAvanceAsignacion: { ...writeSpies() },
     solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
@@ -76,8 +79,19 @@ function makeService(
   notificationsOverride: Partial<{
     notifyFromTemplate: ReturnType<typeof vi.fn>;
   }> = {},
+  hoursRecognitionOverride: Partial<{
+    recognizeParticipationHours: ReturnType<typeof vi.fn>;
+  }> = {},
 ) {
   const context = new ExitRequestsContextService(prisma);
+  const hoursRecognition = {
+    recognizeParticipationHours: vi.fn().mockResolvedValue({
+      horasReconocidas: 0,
+      idsAsignacionesReconocidas: [],
+      horasParticipacion: null,
+    }),
+    ...hoursRecognitionOverride,
+  } as unknown as HoursRecognitionService;
   return new ExitRequestsService(
     prisma,
     {
@@ -88,12 +102,15 @@ function makeService(
     } as any,
     new ExitRequestsAuthorizationService(context),
     context,
+    hoursRecognition,
+    new SprintsContextService(prisma),
   );
 }
 
 const LIDER_ID = 1;
 const MIEMBRO_ID = 2;
 const PROYECTO_ID = 10;
+const SPRINT_ID = 900;
 
 function decimal(value: number) {
   return { toNumber: () => value };
@@ -842,6 +859,8 @@ function setupResolutionPath(prisma: ReturnType<typeof makePrisma>) {
   });
   prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(SOLICITUD_PENDIENTE);
   prisma.solicitudSalidaProyecto.updateMany.mockResolvedValue({ count: 1 });
+  prisma.sprint.findFirst.mockResolvedValue({ idSprint: SPRINT_ID, idProyecto: PROYECTO_ID, estado: 'ACTIVO' });
+  prisma.participacionProyecto.findMany.mockResolvedValue([{ idParticipacion: 77 }]);
 }
 
 describe('ExitRequestsService.approveSolicitudSalida', () => {
@@ -850,7 +869,12 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     const prisma = makePrisma();
     setupResolutionPath(prisma);
     prisma.asignacionTarea.count.mockResolvedValue(0);
-    const service = makeService(prisma);
+    const recognizeParticipationHours = vi.fn().mockResolvedValue({
+      horasReconocidas: 5,
+      idsAsignacionesReconocidas: [901, 902],
+      horasParticipacion: { idRegistroHoras: 300 },
+    });
+    const service = makeService(prisma, {}, { recognizeParticipationHours });
 
     const resultado = await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
 
@@ -866,23 +890,57 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
       data: { estadoSolicitud: 'APROBADA', resueltaEn: expect.any(Date), resueltaPor: LIDER_ID },
     });
     expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
+    expect(prisma.sprint.findFirst).toHaveBeenCalledWith({
+      where: { idProyecto: PROYECTO_ID, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
+    });
+    expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith({
+      where: { idUsuario: MIEMBRO_ID, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: PROYECTO_ID } },
+      select: { idParticipacion: true },
+      orderBy: { idParticipacion: 'asc' },
+    });
+    expect(recognizeParticipationHours).toHaveBeenCalledTimes(1);
+    expect(recognizeParticipationHours).toHaveBeenCalledWith(prisma, {
+      projectId: PROYECTO_ID,
+      sprintId: SPRINT_ID,
+      participationId: 77,
+    });
     expect(prisma.participacionProyecto.updateMany).toHaveBeenCalledWith({
       where: { idUsuario: MIEMBRO_ID, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: PROYECTO_ID } },
       data: { estadoParticipacion: 'RETIRADO', fechaSalida: expect.any(Date) },
     });
     expect(prisma.solicitudSalidaProyecto.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      recognizeParticipationHours.mock.invocationCallOrder[0],
+    );
+    expect(recognizeParticipationHours.mock.invocationCallOrder[0]).toBeLessThan(
       prisma.participacionProyecto.updateMany.mock.invocationCallOrder[0],
     );
   });
 
-  it('retira todas las participaciones ACTIVO del usuario en el proyecto sin alcanzar otros proyectos', async () => {
+  it('reconoce una vez por participación activa y luego retira todas las participaciones ACTIVO del usuario en el proyecto', async () => {
     const prisma = makePrisma();
     setupResolutionPath(prisma);
     prisma.asignacionTarea.count.mockResolvedValue(0);
-    const service = makeService(prisma);
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idParticipacion: 77 }, { idParticipacion: 88 }]);
+    const recognizeParticipationHours = vi.fn().mockResolvedValue({
+      horasReconocidas: 0,
+      idsAsignacionesReconocidas: [],
+      horasParticipacion: null,
+    });
+    const service = makeService(prisma, {}, { recognizeParticipationHours });
 
     await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
 
+    expect(recognizeParticipationHours).toHaveBeenCalledTimes(2);
+    expect(recognizeParticipationHours).toHaveBeenNthCalledWith(1, prisma, {
+      projectId: PROYECTO_ID,
+      sprintId: SPRINT_ID,
+      participationId: 77,
+    });
+    expect(recognizeParticipationHours).toHaveBeenNthCalledWith(2, prisma, {
+      projectId: PROYECTO_ID,
+      sprintId: SPRINT_ID,
+      participationId: 88,
+    });
     const [{ where }] = prisma.participacionProyecto.updateMany.mock.calls[0];
     expect(where).toEqual({
       idUsuario: MIEMBRO_ID,
@@ -897,7 +955,8 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     const prisma = makePrisma();
     setupResolutionPath(prisma);
     prisma.asignacionTarea.count.mockResolvedValue(1);
-    const service = makeService(prisma);
+    const recognizeParticipationHours = vi.fn();
+    const service = makeService(prisma, {}, { recognizeParticipationHours });
 
     try {
       await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
@@ -908,6 +967,7 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     }
     expect(prisma.solicitudSalidaProyecto.updateMany).not.toHaveBeenCalled();
     expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+    expect(recognizeParticipationHours).not.toHaveBeenCalled();
   });
 
   // Caso C — varias tareas pendientes
@@ -948,7 +1008,8 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
   it('rechaza con ForbiddenException a quien no es el líder, sin consultar la solicitud ni las tareas', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: 999 });
-    const service = makeService(prisma);
+    const recognizeParticipationHours = vi.fn();
+    const service = makeService(prisma, {}, { recognizeParticipationHours });
 
     await expect(
       service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
@@ -956,6 +1017,7 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
 
     expect(prisma.solicitudSalidaProyecto.findFirst).not.toHaveBeenCalled();
     expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+    expect(recognizeParticipationHours).not.toHaveBeenCalled();
   });
 
   it('rechaza con NotFoundException cuando la solicitud no existe o no pertenece a ese proyecto', async () => {
@@ -1007,12 +1069,31 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     prisma.asignacionTarea.count.mockResolvedValue(0);
     prisma.solicitudSalidaProyecto.updateMany.mockResolvedValue({ count: 0 });
     const notifyFromTemplate = vi.fn();
-    const service = makeService(prisma, { notifyFromTemplate });
+    const recognizeParticipationHours = vi.fn();
+    const service = makeService(prisma, { notifyFromTemplate }, { recognizeParticipationHours });
 
     await expect(
       service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
     ).rejects.toBeInstanceOf(ConflictException);
 
+    expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+    expect(recognizeParticipationHours).not.toHaveBeenCalled();
+    expect(notifyFromTemplate).not.toHaveBeenCalled();
+  });
+
+  it('propaga el fallo de reconocimiento y no retira participaciones ni notifica', async () => {
+    const prisma = makePrisma();
+    setupResolutionPath(prisma);
+    prisma.asignacionTarea.count.mockResolvedValue(0);
+    const notifyFromTemplate = vi.fn();
+    const recognizeParticipationHours = vi.fn().mockRejectedValue(new Error('recognition failed'));
+    const service = makeService(prisma, { notifyFromTemplate }, { recognizeParticipationHours });
+
+    await expect(
+      service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID),
+    ).rejects.toThrow('recognition failed');
+
+    expect(recognizeParticipationHours).toHaveBeenCalledTimes(1);
     expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
     expect(notifyFromTemplate).not.toHaveBeenCalled();
   });
@@ -1062,21 +1143,26 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     expect(notifyFromTemplate).not.toHaveBeenCalled();
   });
 
-  // Request changes, punto 16 — T-113 no administra HorasParticipacion.
-  it('no realiza escrituras en HorasParticipacion, tramos, tareas o avances al aprobar', async () => {
+  it('delega la persistencia/idempotencia de horas a Flow A sin escribirlas manualmente desde ExitRequests', async () => {
     const prisma = makePrisma();
     setupResolutionPath(prisma);
     prisma.asignacionTarea.count.mockResolvedValue(0);
-    const service = makeService(prisma);
+    const recognizeParticipationHours = vi.fn().mockResolvedValue({
+      horasReconocidas: 2,
+      idsAsignacionesReconocidas: [700],
+      horasParticipacion: { idRegistroHoras: 44 },
+    });
+    const service = makeService(prisma, {}, { recognizeParticipationHours });
 
     await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
 
+    expect(recognizeParticipationHours).toHaveBeenCalledTimes(1);
     for (const metodo of ['create', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert'] as const) {
       expect(prisma.horasParticipacion[metodo]).not.toHaveBeenCalled();
-      expect(prisma.asignacionTarea[metodo]).not.toHaveBeenCalled();
       expect(prisma.tarea[metodo]).not.toHaveBeenCalled();
       expect(prisma.registroAvanceAsignacion[metodo]).not.toHaveBeenCalled();
     }
+    expect(prisma.asignacionTarea.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -1104,7 +1190,8 @@ describe('ExitRequestsService.approveSolicitudSalida — aislamiento cross-proje
         : null,
     );
     const notifyFromTemplate = vi.fn();
-    const service = makeService(prisma, { notifyFromTemplate });
+    const recognizeParticipationHours = vi.fn();
+    const service = makeService(prisma, { notifyFromTemplate }, { recognizeParticipationHours });
 
     await expect(
       service.approveSolicitudSalida(PROYECTO_A, SOLICITUD_DE_B, LIDER_ID),
@@ -1112,6 +1199,7 @@ describe('ExitRequestsService.approveSolicitudSalida — aislamiento cross-proje
 
     expect(prisma.solicitudSalidaProyecto.update).not.toHaveBeenCalled();
     expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+    expect(recognizeParticipationHours).not.toHaveBeenCalled();
     expect(notifyFromTemplate).not.toHaveBeenCalled();
   });
 });
@@ -1121,7 +1209,8 @@ describe('ExitRequestsService.rejectSolicitudSalida', () => {
   it('rechaza la solicitud sin consultar tareas ni tocar la participación, aunque el integrante tenga tareas activas', async () => {
     const prisma = makePrisma();
     setupResolutionPath(prisma);
-    const service = makeService(prisma);
+    const recognizeParticipationHours = vi.fn();
+    const service = makeService(prisma, {}, { recognizeParticipationHours });
 
     const resultado = await service.rejectSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
 
@@ -1130,6 +1219,7 @@ describe('ExitRequestsService.rejectSolicitudSalida', () => {
     expect(resultado.resueltaPor).toBe(LIDER_ID);
     expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
     expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
+    expect(recognizeParticipationHours).not.toHaveBeenCalled();
     expect(prisma.solicitudSalidaProyecto.updateMany).toHaveBeenCalledWith({
       where: {
         idSolicitud: SOLICITUD_ID,
