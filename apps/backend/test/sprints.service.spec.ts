@@ -76,6 +76,7 @@ function makeSprintsAuthorization() {
   return {
     assertCanStartSprint: vi.fn().mockResolvedValue(undefined),
     assertCanFinalizeSprint: vi.fn(),
+    assertCanCloseSprint: vi.fn(),
     assertCanAdjustRecognizedHours: vi.fn().mockResolvedValue(undefined),
     assertCanViewClosingSummary: vi.fn().mockResolvedValue(undefined),
   } as any;
@@ -1031,6 +1032,190 @@ describe('SprintsService', () => {
 
       await contarQueriesParaNParticipantes(1);
       await contarQueriesParaNParticipantes(5);
+    });
+  });
+
+  describe('closeSprint', () => {
+    function sprintEnFinalizacion(overrides: Record<string, unknown> = {}) {
+      return {
+        idSprint: SPRINT_ID,
+        idProyecto: PROJECT_ID,
+        numero: 3,
+        estado: 'EN_FINALIZACION',
+        fechaCierre: null,
+        cerradoPor: null,
+        ...overrides,
+      };
+    }
+
+    it('caso 1: cierre exitoso — EN_FINALIZACION -> CERRADO, persiste fechaCierre y cerradoPor', async () => {
+      const tx = makeTx();
+      const sprint = sprintEnFinalizacion();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintCerrado = {
+        ...sprint,
+        estado: 'CERRADO',
+        fechaCierre: new Date('2026-08-20T10:00:00Z'),
+        cerradoPor: LIDER_ID,
+      };
+      tx.sprint.findFirst.mockResolvedValue(sprintCerrado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result).toBe(sprintCerrado);
+      expect(tx.sprint.updateMany).toHaveBeenCalledWith({
+        where: { idSprint: SPRINT_ID, idProyecto: PROJECT_ID, estado: 'EN_FINALIZACION' },
+        data: {
+          estado: 'CERRADO',
+          fechaCierre: expect.any(Date),
+          cerradoPor: LIDER_ID,
+        },
+      });
+    });
+
+    it('caso 2: Sprint ACTIVO — rechaza sin persistir metadata de cierre', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprintEnFinalizacion({ estado: 'ACTIVO' }));
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(tx.sprint.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('caso 3: Sprint ya CERRADO — rechaza sin alterar fechaCierre/cerradoPor existentes', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      const fechaCierreExistente = new Date('2026-08-15T00:00:00Z');
+      authorization.assertCanCloseSprint.mockResolvedValue(
+        sprintEnFinalizacion({ estado: 'CERRADO', fechaCierre: fechaCierreExistente, cerradoPor: 99 }),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(tx.sprint.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('caso 4: el estado cambia entre la autorización y el updateMany (carrera) — count=0 rechaza sin sobrescribir', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      // La autorización/lectura inicial todavía ve EN_FINALIZACION, pero
+      // para cuando el updateMany condicionado se ejecuta, otra transacción
+      // ya cambió el estado real (p. ej. otro cierre concurrente ya ganó) —
+      // simulado aquí con count: 0 sin importar la causa exacta.
+      authorization.assertCanCloseSprint.mockResolvedValue(sprintEnFinalizacion());
+      tx.sprint.updateMany.mockResolvedValue({ count: 0 });
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      // La revalidación SÍ se intentó (no se depende únicamente de la
+      // lectura previa de autorización) — el updateMany fue llamado con la
+      // condición correcta — pero como count=0, no hay relectura ni
+      // sobrescritura posterior.
+      expect(tx.sprint.updateMany).toHaveBeenCalledWith({
+        where: { idSprint: SPRINT_ID, idProyecto: PROJECT_ID, estado: 'EN_FINALIZACION' },
+        data: expect.objectContaining({ estado: 'CERRADO' }),
+      });
+    });
+
+    it('caso 5: usuario no líder — propaga la excepción de autorización sin ejecutar updateMany', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockRejectedValue(
+        new ForbiddenException('No eres el líder de este proyecto'),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.closeSprint(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(tx.sprint.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('caso 6: aislamiento cross-project — sprintId ajeno al proyecto se rechaza vía assertCanCloseSprint, sin ejecutar updateMany', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockRejectedValue(
+        new NotFoundException(`Sprint con id ${SPRINT_ID} no encontrado en el proyecto ${PROJECT_ID}`),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(tx.sprint.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('caso 7: preserva las horas de A7 — closeSprint nunca lee ni escribe HorasParticipacion/AsignacionTarea', async () => {
+      const tx = makeTx();
+      const sprint = sprintEnFinalizacion();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      tx.sprint.findFirst.mockResolvedValue({ ...sprint, estado: 'CERRADO' });
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(tx.horasParticipacion.findFirst).not.toHaveBeenCalled();
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
+      // makeTx() tampoco expone asignacionTarea: si closeSprint intentara
+      // tocarla, la llamada fallaría con TypeError antes de llegar aquí.
+      expect((tx as any).asignacionTarea).toBeUndefined();
+    });
+
+    it('terminalidad: una segunda llamada a closeSprint sobre un Sprint ya CERRADO se rechaza (mismo caso 3, verificado explícitamente como "terminal")', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(
+        sprintEnFinalizacion({ estado: 'CERRADO', fechaCierre: new Date('2026-08-15'), cerradoPor: LIDER_ID }),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('terminalidad: finalizeSprint sobre un Sprint CERRADO sigue rechazando (A4 intacta, sin ruta de reapertura)', async () => {
+      const tx = makeTx();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(
+        sprintEnFinalizacion({ estado: 'CERRADO', fechaCierre: new Date('2026-08-15'), cerradoPor: LIDER_ID }),
+      );
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(tx.sprint.updateMany).not.toHaveBeenCalled();
     });
   });
 });

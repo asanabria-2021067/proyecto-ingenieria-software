@@ -39,6 +39,16 @@ export class SprintsController {
     return this.sprintsService.finalizeSprint(projectId, sprintId, user.userId);
   }
 
+  @Post(':sprintId/cerrar')
+  @HttpCode(HttpStatus.OK)
+  close(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.closeSprint(projectId, sprintId, user.userId);
+  }
+
   @Patch(':sprintId/horas/:participacionId')
   @HttpCode(HttpStatus.OK)
   adjustHours(
