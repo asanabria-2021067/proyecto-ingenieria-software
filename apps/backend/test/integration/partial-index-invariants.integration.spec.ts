@@ -7,6 +7,7 @@ import {
   createIntegrationProject,
   createIntegrationProjectRole,
   createIntegrationParticipation,
+  createIntegrationSprint,
   createIntegrationTask,
   createIntegrationTaskAssignment,
 } from './setup/fixtures';
@@ -84,7 +85,10 @@ describeIntegration('partial PostgreSQL index invariants', () => {
     const project = await createIntegrationProject(prisma, creator.idUsuario);
     scope.projectIds = [project.idProyecto];
 
-    const task = await createIntegrationTask(prisma, project.idProyecto, creator.idUsuario);
+    const sprint = await createIntegrationSprint(prisma, project.idProyecto);
+    scope.sprintIds = [sprint.idSprint];
+
+    const task = await createIntegrationTask(prisma, project.idProyecto, creator.idUsuario, sprint.idSprint);
     scope.taskIds = [task.idTarea];
 
     const [assignedA, assignedB] = await Promise.all([
