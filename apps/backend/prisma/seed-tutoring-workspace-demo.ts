@@ -187,7 +187,41 @@ async function main() {
   const ingresoDate = dateOnly(-40);
 
   // ── 5. Participaciones (idempotentes; respetan el índice único parcial) ────
+  // FND-08.B: cuando el estado deseado es ACTIVO, el `findFirst` original
+  // (sin filtrar por estado) podía devolver una fila RETIRADO histórica —
+  // Postgres no garantiza qué fila entrega sin ORDER BY cuando ya existen
+  // varias para el mismo (idUsuario, idRolProyecto) — y el `update`
+  // posterior la reactivaba a ACTIVO, chocando con
+  // `participacion_proyecto_activa_unique` si YA había otra fila ACTIVO
+  // para ese mismo par (como ocurre en los datos reales de vernel/ROL_B:
+  // #62 RETIRADO + #67 ACTIVO). La historia (RETIRADO/COMPLETADO) nunca
+  // debe reactivarse solo para satisfacer el seed.
+  //
+  // Para un objetivo ACTIVO: busca explícitamente una fila YA ACTIVO para
+  // ese par; si existe, la reutiliza (nunca toca una RETIRADO); si no
+  // existe, crea una fila ACTIVO nueva — nunca reactiva una histórica.
+  //
+  // Para cualquier otro objetivo (p.ej. RETIRADO, como el caso de E6): ese
+  // estado no está protegido por el índice parcial, así que el patrón
+  // original findFirst/update-or-create sigue siendo seguro tal cual.
   async function ensureParticipacion(idUsuario: number, idRolProyecto: number, estado: EstadoParticipacion, fechaSalida: Date | null) {
+    if (estado === EstadoParticipacion.ACTIVO) {
+      const activa = await prisma.participacionProyecto.findFirst({
+        where: { idUsuario, idRolProyecto, estadoParticipacion: EstadoParticipacion.ACTIVO },
+      });
+      if (activa) {
+        await prisma.participacionProyecto.update({
+          where: { idParticipacion: activa.idParticipacion },
+          data: { fechaIngreso: ingresoDate, fechaSalida },
+        });
+        return;
+      }
+      await prisma.participacionProyecto.create({
+        data: { idUsuario, idRolProyecto, estadoParticipacion: estado, fechaIngreso: ingresoDate, fechaSalida },
+      });
+      return;
+    }
+
     const existente = await prisma.participacionProyecto.findFirst({ where: { idUsuario, idRolProyecto } });
     if (existente) {
       await prisma.participacionProyecto.update({
@@ -239,12 +273,35 @@ async function main() {
     }
   }
 
+  // ── 7b. Sprint (FND-08) ─────────────────────────────────────────────────
+  // Tarea.idSprint es obligatoria desde FND-03: toda tarea del escenario
+  // necesita un Sprint del mismo proyecto antes de crearse. Igual que en
+  // seed.ts, NO se asume el estado del proyecto ni se hace upsert por id
+  // determinista — se relee estadoProyecto real y se reutiliza un Sprint
+  // existente compatible si ya hay uno (del backfill de FND-02 o de una
+  // corrida previa de este mismo escenario), o se crea uno nuevo del estado
+  // correcto si no hay ninguno. Nunca reactiva ni modifica un Sprint
+  // existente.
+  const proyectoTerminal = proyecto.estadoProyecto === 'CERRADO' || proyecto.estadoProyecto === 'CANCELADO';
+  let sprintEscenario = await prisma.sprint.findFirst({
+    where: proyectoTerminal
+      ? { idProyecto, estado: 'CERRADO' }
+      : { idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
+  });
+  if (!sprintEscenario) {
+    sprintEscenario = await prisma.sprint.create({
+      data: { idProyecto, numero: 1, estado: proyectoTerminal ? 'CERRADO' : 'ACTIVO' },
+    });
+  }
+  console.log(`Sprint del escenario → #${sprintEscenario.idSprint} (estado=${sprintEscenario.estado})`);
+
   // ── 8. Tareas (idempotentes por título) + reconstrucción de hijos ──────────
   const taskId: Record<number, number> = {};
   for (const t of TASKS) {
     const data = {
       idHito: t.hito ? hitoId[t.hito] : null,
       idRolProyecto: t.rol ? rolById[t.rol].idRolProyecto : null,
+      idSprint: sprintEscenario.idSprint,
       descripcionTarea: t.descripcion,
       estadoTarea: t.estado,
       prioridad: t.prioridad,

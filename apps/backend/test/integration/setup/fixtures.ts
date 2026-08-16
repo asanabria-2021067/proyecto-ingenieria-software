@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
-import { TipoProyecto, type EstadoParticipacion, type EstadoTarea } from '@prisma/client';
+import { TipoProyecto, type EstadoParticipacion, type EstadoSprint, type EstadoTarea } from '@prisma/client';
 
 /**
  * Fixtures genéricas de infraestructura para el harness de integración
@@ -93,22 +93,58 @@ export async function createIntegrationParticipation(
   });
 }
 
+interface IntegrationSprintOverrides {
+  numero?: number;
+  estado?: EstadoSprint;
+}
+
+/**
+ * FND-08: Tarea.idSprint es obligatoria desde FND-03, así que toda
+ * createIntegrationTask necesita un Sprint real del mismo proyecto — de ahí
+ * este fixture. `numero` por defecto es 1 (no implementa MAX(numero)+1, eso
+ * es lógica de producto futura); `estado` por defecto ACTIVO, coherente con
+ * el uso típico de un fixture de test (proyecto de trabajo abierto).
+ */
+export async function createIntegrationSprint(
+  prisma: PrismaClient,
+  idProyecto: number,
+  overrides: IntegrationSprintOverrides = {},
+) {
+  return prisma.sprint.create({
+    data: {
+      idProyecto,
+      numero: overrides.numero ?? 1,
+      ...(overrides.estado !== undefined ? { estado: overrides.estado } : {}),
+    },
+  });
+}
+
 interface IntegrationTaskOverrides {
   tituloTarea?: string;
   estadoTarea?: EstadoTarea;
   idRolProyecto?: number | null;
 }
 
+/**
+ * `idSprint` es un parámetro explícito obligatorio (no un override opcional)
+ * desde FND-08: Tarea.idSprint es NOT NULL desde FND-03, así que el llamador
+ * siempre debe resolver/crear un Sprint del mismo proyecto primero (ver
+ * `createIntegrationSprint`) — este fixture nunca crea un Sprint implícito
+ * por su cuenta, para que el caller mantenga el control total del scope de
+ * limpieza.
+ */
 export async function createIntegrationTask(
   prisma: PrismaClient,
   idProyecto: number,
   creadaPor: number,
+  idSprint: number,
   overrides: IntegrationTaskOverrides = {},
 ) {
   return prisma.tarea.create({
     data: {
       idProyecto,
       creadaPor,
+      idSprint,
       tituloTarea: overrides.tituloTarea ?? `Tarea ${randomUUID()}`,
       ...(overrides.estadoTarea !== undefined ? { estadoTarea: overrides.estadoTarea } : {}),
       ...(overrides.idRolProyecto !== undefined ? { idRolProyecto: overrides.idRolProyecto } : {}),
