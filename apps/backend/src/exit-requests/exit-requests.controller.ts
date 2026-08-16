@@ -55,4 +55,13 @@ export class ExitRequestsController {
   ) {
     return this.exitRequestsService.continueExitPreparation(projectId, user.userId);
   }
+
+  @Post('salida/preparacion/cancelar')
+  @HttpCode(HttpStatus.OK)
+  cancelExitPreparation(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.exitRequestsService.cancelExitPreparation(projectId, user.userId);
+  }
 }
