@@ -25,6 +25,7 @@ import { RolesModule } from './roles/roles.module';
 import { ProgressRecordsModule } from './progress-records/progress-records.module';
 import { SprintsModule } from './sprints/sprints.module';
 import { ExitRequestsModule } from './exit-requests/exit-requests.module';
+import { TeamModule } from './team/team.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { ExitRequestsModule } from './exit-requests/exit-requests.module';
     ProgressRecordsModule,
     SprintsModule,
     ExitRequestsModule,
+    TeamModule,
   ],
   controllers: [AppController],
   providers: [
