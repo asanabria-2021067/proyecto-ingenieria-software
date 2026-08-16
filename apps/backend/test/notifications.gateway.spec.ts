@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { GATEWAY_OPTIONS } from '@nestjs/websockets/constants';
 import { NotificationsGateway } from '../src/notifications/notifications.gateway';
 
 function makeGateway() {
@@ -61,6 +62,52 @@ describe('NotificationsGateway', () => {
       await gateway.notifySprintFinalizationStarted([], { projectId: 1, sprintId: 2 });
 
       expect(emit).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * X4 (Parte C): regresión de que incorporar SPRINT_FINALIZATION_STARTED
+   * (A4) no alteró la configuración observable del gateway ni reemplazó el
+   * evento genérico `notification` ya existente. Lee la metadata REAL que
+   * Nest ya consulta en producción (`@WebSocketGateway` la escribe vía
+   * `Reflect.defineMetadata` — mismo mecanismo ya usado por
+   * project-write-guard.integration.spec.ts para `GUARDS_METADATA`), nunca
+   * una constante hardcodeada aparte que pudiera divergir silenciosamente
+   * del decorador real.
+   */
+  describe('configuración del gateway (X4 — no regresión tras SPRINT_FINALIZATION_STARTED)', () => {
+    it('namespace permanece "/notifications" y las opciones CORS existentes no cambiaron', () => {
+      // `@WebSocketGateway({ cors, namespace })` persiste el objeto de
+      // opciones completo bajo GATEWAY_OPTIONS (ver
+      // node_modules/@nestjs/websockets/decorators/socket-gateway.decorator.js)
+      // — el mismo objeto que Nest lee en producción al montar el gateway.
+      const options = Reflect.getMetadata(GATEWAY_OPTIONS, NotificationsGateway);
+      expect(options).toMatchObject({
+        namespace: '/notifications',
+        cors: { origin: '*', credentials: true },
+      });
+    });
+
+    it('SPRINT_FINALIZATION_STARTED coexiste con "notification" — ninguno reemplaza al otro en la misma sesión del gateway', async () => {
+      const { gateway, emit } = makeGateway();
+
+      await gateway.notifyUsers([1], { tituloNotificacion: 'postulación existente' });
+      await gateway.notifySprintFinalizationStarted([1], { projectId: 10, sprintId: 20 });
+      await gateway.notifyUsers([1], { tituloNotificacion: 'otra notificación existente' });
+
+      const eventosEmitidos = emit.mock.calls.map(([evento]) => evento);
+      expect(eventosEmitidos).toEqual(['notification', 'SPRINT_FINALIZATION_STARTED', 'notification']);
+      expect(emit).toHaveBeenCalledTimes(3);
+    });
+
+    it('la room user:{idUsuario} es idéntica para ambos eventos (mismo mecanismo, sin room dedicada nueva)', async () => {
+      const { gateway, to } = makeGateway();
+
+      await gateway.notifyUsers([4], { tituloNotificacion: 'x' });
+      await gateway.notifySprintFinalizationStarted([4], { projectId: 1, sprintId: 2 });
+
+      expect(to).toHaveBeenCalledWith('user:4');
+      expect(to).toHaveBeenCalledTimes(2);
     });
   });
 });
