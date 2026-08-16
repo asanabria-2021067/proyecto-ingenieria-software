@@ -524,39 +524,6 @@ export class ProjectsService {
     });
   }
 
-  async findTeam(id: number) {
-    return this.prisma.participacionProyecto.findMany({
-      where: {
-        rolProyecto: { idProyecto: id },
-        estadoParticipacion: 'ACTIVO',
-      },
-      select: {
-        idParticipacion: true,
-        estadoParticipacion: true,
-        fechaIngreso: true,
-        usuario: {
-          select: {
-            idUsuario: true,
-            nombre: true,
-            apellido: true,
-            correo: true,
-            fotoUrl: true,
-          },
-        },
-        rolProyecto: {
-          select: {
-            idRolProyecto: true,
-            nombreRol: true,
-            descripcionRolProyecto: true,
-          },
-        },
-      },
-      orderBy: {
-        fechaIngreso: 'asc',
-      },
-    });
-  }
-
   async findFeatured() {
     const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
     if (cached) return cached;

@@ -16,6 +16,12 @@ export class TeamController {
     return this.teamService.getPendingPostulations(id, user.userId);
   }
 
+  @Get(':id/equipo')
+  @UseGuards(JwtAuthGuard)
+  findTeam(@Param('id', ParseIntPipe) id: number) {
+    return this.teamService.findTeam(id);
+  }
+
   @Get(':id/equipo/:idUsuario')
   @UseGuards(JwtAuthGuard)
   findTeamMemberDetail(

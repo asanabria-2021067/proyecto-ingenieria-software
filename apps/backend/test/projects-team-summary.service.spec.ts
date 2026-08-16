@@ -50,6 +50,75 @@ function participacion(
   };
 }
 
+describe('TeamService.findTeam', () => {
+  it('devuelve las participaciones ACTIVO del proyecto con el contrato histórico de GET /proyectos/:id/equipo', async () => {
+    const prisma = makePrisma();
+    const equipo = [
+      {
+        idParticipacion: 10,
+        estadoParticipacion: 'ACTIVO',
+        fechaIngreso: new Date('2026-01-01T00:00:00.000Z'),
+        usuario: usuario(2),
+        rolProyecto: {
+          idRolProyecto: 5,
+          nombreRol: 'Dev',
+          descripcionRolProyecto: 'Desarrollo',
+        },
+      },
+    ];
+    prisma.participacionProyecto.findMany.mockResolvedValue(equipo);
+    const service = makeService(prisma);
+
+    const result = await service.findTeam(1);
+
+    expect(result).toBe(equipo);
+    expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith({
+      where: {
+        rolProyecto: { idProyecto: 1 },
+        estadoParticipacion: 'ACTIVO',
+      },
+      select: {
+        idParticipacion: true,
+        estadoParticipacion: true,
+        fechaIngreso: true,
+        usuario: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+            fotoUrl: true,
+          },
+        },
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
+          },
+        },
+      },
+      orderBy: {
+        fechaIngreso: 'asc',
+      },
+    });
+  });
+
+  it('no aplica clasificación B12 ni transforma el shape del endpoint histórico', async () => {
+    const prisma = makePrisma();
+    prisma.participacionProyecto.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    const result = await service.findTeam(1);
+
+    expect(result).toEqual([]);
+    expect(prisma.proyecto.findFirst).not.toHaveBeenCalled();
+    expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
+    expect(prisma.tarea.findMany).not.toHaveBeenCalled();
+    expect(prisma.horasParticipacion.findMany).not.toHaveBeenCalled();
+  });
+});
+
 // Decimal falso: replica la única API que el service consume (.toNumber()),
 // igual que el patrón ya usado en projects-member-detail.service.spec.ts.
 function decimal(value: number) {

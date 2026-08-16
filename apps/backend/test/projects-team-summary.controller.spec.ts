@@ -6,11 +6,48 @@ import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 
 function makeService() {
   return {
+    findTeam: vi.fn(),
     getTeamSummary: vi.fn(),
     findTeamMemberDetail: vi.fn(),
     getPendingPostulations: vi.fn(),
   } as any;
 }
+
+describe('TeamController.findTeam (GET /proyectos/:id/equipo)', () => {
+  it('está registrado con la ruta pública histórica y protegido por JwtAuthGuard', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, TeamController.prototype.findTeam)).toBe(':id/equipo');
+    expect(Reflect.getMetadata(METHOD_METADATA, TeamController.prototype.findTeam)).toBe(0); // GET
+
+    const guards = Reflect.getMetadata(GUARDS_METADATA, TeamController.prototype.findTeam);
+    expect(guards).toContain(JwtAuthGuard);
+  });
+
+  it('delega en TeamService.findTeam con id parseado, sin transformar la respuesta', async () => {
+    const service = makeService();
+    const equipo = [{ idParticipacion: 1 }];
+    service.findTeam.mockResolvedValue(equipo);
+    const controller = new TeamController(service);
+
+    const result = await controller.findTeam(42);
+
+    expect(service.findTeam).toHaveBeenCalledTimes(1);
+    expect(service.findTeam).toHaveBeenCalledWith(42);
+    expect(result).toBe(equipo);
+  });
+
+  it('el parámetro :id usa ParseIntPipe y ProjectsController ya no declara GET :id/equipo', () => {
+    const { readFileSync } = require('node:fs') as typeof import('node:fs');
+    const { join } = require('node:path') as typeof import('node:path');
+    const teamSource = readFileSync(join(__dirname, '../src/team/team.controller.ts'), 'utf-8');
+    const bloque = teamSource.slice(teamSource.indexOf("@Get(':id/equipo')"));
+    const bloqueHandler = bloque.slice(0, bloque.indexOf('\n\n'));
+
+    expect(bloqueHandler).toMatch(/@Param\('id',\s*ParseIntPipe\)/);
+
+    const projectsSource = readFileSync(join(__dirname, '../src/projects/projects.controller.ts'), 'utf-8');
+    expect(projectsSource).not.toContain("@Get(':id/equipo')");
+  });
+});
 
 describe('TeamController.getTeamSummary (GET /proyectos/:id/miembros/resumen)', () => {
   describe('metadata de ruta y guard', () => {
