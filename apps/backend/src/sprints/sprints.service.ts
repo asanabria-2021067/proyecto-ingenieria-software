@@ -5,6 +5,7 @@ import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
+import { SprintClosingSummaryDto, SprintClosingSummaryParticipantDto } from './dto/sprint-closing-summary.dto';
 
 @Injectable()
 export class SprintsService {
@@ -248,6 +249,114 @@ export class SprintsService {
         },
       });
     });
+  }
+
+  /**
+   * A8: read-model de revisión/finalización de horas del Sprint
+   * (SprintClosingSummary), person-centric — cada participante aparece una
+   * única vez sin importar cuántos roles tenga en el proyecto (mismo
+   * invariante que ProjectsService.getTeamSummary /
+   * TeamSummaryMemberDto). Puramente de lectura: nunca recalcula horas
+   * (A5), nunca invoca `adjustRecognizedHours` (A7), nunca toca
+   * `AsignacionTarea.horasReales` ni marca tramos como reconocidos.
+   *
+   * Presupuesto de ≤2 queries por invocación, independiente del número de
+   * participantes:
+   *   1) `assertCanViewClosingSummary` (Sprint+Proyecto+liderazgo en una
+   *      sola consulta vía `getSprintWithProjectOrThrow`) — aísla
+   *      projectId+sprintId y rechaza con NotFoundException/ForbiddenException
+   *      ANTES de agregar nada.
+   *   2) una única consulta SQL agregada (`$queryRaw` con CTEs) que resuelve
+   *      participantes+roles+tareas+horas de una vez — nunca un loop en
+   *      JavaScript que consulte persona por persona.
+   *
+   * Estrategia de agregación (evita duplicación por JOIN):
+   *   - `participantes`: UNION de usuarios con asignación en una tarea del
+   *     Sprint y usuarios con HorasParticipacion de este Sprint — ambos
+   *     acotados a projectId+sprintId, nunca solo sprintId.
+   *   - `tareas_por_usuario`: COUNT(DISTINCT id_tarea) — identidad de Tarea,
+   *     nunca cantidad de filas de AsignacionTarea (varios tramos históricos
+   *     de la misma tarea cuentan una sola vez).
+   *   - `horas_por_usuario`: SUM por usuario sobre HorasParticipacion
+   *     filtrado a idSprint — si el usuario tiene varias ParticipacionProyecto
+   *     (multirol) en el proyecto, cada una aporta a lo sumo una fila de
+   *     HorasParticipacion para este Sprint (invariante de A7.1, índice
+   *     único parcial `horas_participacion_sprint_unique`), así que el SUM
+   *     nunca duplica horas por rol.
+   *   - `roles_por_usuario`: `json_agg(DISTINCT ...)` sobre
+   *     ParticipacionProyecto/RolProyecto acotado a idProyecto — produce el
+   *     array de roles sin duplicar al participante.
+   * Los tres CTE se combinan con LEFT JOIN sobre `participantes` (1 fila por
+   * usuario), así que el resultado final tiene exactamente 1 fila por
+   * participante sin importar cuántos roles/tareas/registros de horas tenga.
+   */
+  async getSprintClosingSummary(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+  ): Promise<SprintClosingSummaryDto> {
+    await this.sprintsAuthorization.assertCanViewClosingSummary(projectId, sprintId, userId);
+
+    const participantes = await this.prisma.$queryRaw<SprintClosingSummaryParticipantDto[]>(Prisma.sql`
+      WITH participantes AS (
+        SELECT DISTINCT at.id_usuario AS id_usuario
+        FROM asignacion_tarea at
+        JOIN tarea t ON t.id_tarea = at.id_tarea
+        WHERE t.id_proyecto = ${projectId} AND t.id_sprint = ${sprintId}
+        UNION
+        SELECT DISTINCT pp.id_usuario AS id_usuario
+        FROM horas_participacion hp
+        JOIN participacion_proyecto pp ON pp.id_participacion = hp.id_participacion
+        JOIN rol_proyecto rp ON rp.id_rol_proyecto = pp.id_rol_proyecto
+        WHERE hp.id_sprint = ${sprintId} AND rp.id_proyecto = ${projectId}
+      ),
+      tareas_por_usuario AS (
+        SELECT at.id_usuario AS id_usuario, COUNT(DISTINCT at.id_tarea)::int AS tareas_realizadas
+        FROM asignacion_tarea at
+        JOIN tarea t ON t.id_tarea = at.id_tarea
+        WHERE t.id_proyecto = ${projectId} AND t.id_sprint = ${sprintId}
+        GROUP BY at.id_usuario
+      ),
+      horas_por_usuario AS (
+        SELECT pp.id_usuario AS id_usuario,
+               COALESCE(SUM(hp.horas_reportadas), 0)::float8 AS horas_reportadas,
+               COALESCE(SUM(hp.horas_calculadas), 0)::float8 AS horas_calculadas,
+               COALESCE(SUM(hp.horas_aprobadas), 0)::float8 AS horas_aprobadas
+        FROM horas_participacion hp
+        JOIN participacion_proyecto pp ON pp.id_participacion = hp.id_participacion
+        JOIN rol_proyecto rp ON rp.id_rol_proyecto = pp.id_rol_proyecto
+        WHERE hp.id_sprint = ${sprintId} AND rp.id_proyecto = ${projectId}
+        GROUP BY pp.id_usuario
+      ),
+      roles_por_usuario AS (
+        SELECT pp.id_usuario AS id_usuario,
+               json_agg(DISTINCT jsonb_build_object('idRolProyecto', rp.id_rol_proyecto, 'nombreRol', rp.nombre_rol)) AS roles
+        FROM participacion_proyecto pp
+        JOIN rol_proyecto rp ON rp.id_rol_proyecto = pp.id_rol_proyecto
+        WHERE rp.id_proyecto = ${projectId}
+          AND pp.id_usuario IN (SELECT id_usuario FROM participantes)
+        GROUP BY pp.id_usuario
+      )
+      SELECT
+        u.id_usuario AS "idUsuario",
+        u.nombre AS "nombre",
+        u.apellido AS "apellido",
+        u.correo AS "correo",
+        u.foto_url AS "fotoUrl",
+        COALESCE(rpu.roles, '[]'::json) AS "roles",
+        COALESCE(tpu.tareas_realizadas, 0) AS "tareasRealizadas",
+        COALESCE(hpu.horas_reportadas, 0) AS "horasReportadas",
+        COALESCE(hpu.horas_calculadas, 0) AS "horasCalculadas",
+        COALESCE(hpu.horas_aprobadas, 0) AS "horasAprobadas"
+      FROM participantes p
+      JOIN usuario u ON u.id_usuario = p.id_usuario
+      LEFT JOIN tareas_por_usuario tpu ON tpu.id_usuario = p.id_usuario
+      LEFT JOIN horas_por_usuario hpu ON hpu.id_usuario = p.id_usuario
+      LEFT JOIN roles_por_usuario rpu ON rpu.id_usuario = p.id_usuario
+      ORDER BY u.apellido, u.nombre, u.id_usuario
+    `);
+
+    return { idProyecto: projectId, idSprint: sprintId, participantes };
   }
 
   /**
