@@ -12,6 +12,7 @@ function makeController() {
     rejectSolicitudSalida: vi.fn(),
     getExitPreparationSummary: vi.fn(),
     continueExitPreparation: vi.fn(),
+    cancelExitPreparation: vi.fn(),
   };
   return { controller: new ExitRequestsController(service as any), service };
 }
@@ -70,6 +71,14 @@ describe('ExitRequestsController', () => {
     });
   });
 
+  it('expone POST /proyectos/:projectId/salida/preparacion/cancelar con 200', () => {
+    expect(routeMetadata('cancelExitPreparation')).toEqual({
+      path: 'salida/preparacion/cancelar',
+      method: RequestMethod.POST,
+      status: HttpStatus.OK,
+    });
+  });
+
   it('delega creación con projectId, userId de CurrentUser y motivo del DTO', async () => {
     const { controller, service } = makeController();
     service.createSolicitudSalida.mockResolvedValue({ idSolicitud: 1 });
@@ -122,5 +131,15 @@ describe('ExitRequestsController', () => {
 
     expect(service.continueExitPreparation).toHaveBeenCalledWith(10, 2);
     expect(result).toEqual({ estadoSolicitud: 'PENDIENTE_LIDER' });
+  });
+
+  it('delega cancelar preparación con projectId y userId de CurrentUser', async () => {
+    const { controller, service } = makeController();
+    service.cancelExitPreparation.mockResolvedValue({ estadoSolicitud: 'CANCELADA' });
+
+    const result = await controller.cancelExitPreparation(10, { userId: 2 });
+
+    expect(service.cancelExitPreparation).toHaveBeenCalledWith(10, 2);
+    expect(result).toEqual({ estadoSolicitud: 'CANCELADA' });
   });
 });
