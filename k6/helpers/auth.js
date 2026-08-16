@@ -27,9 +27,22 @@ const LOGIN_SUCCESS_STATUS = 201;
  * respuesta no coinciden con el contrato real, lanza un error explícito
  * (sanitizado: nunca incluye la contraseña ni el body completo) para que el
  * escenario falle de inmediato en vez de arrastrar un token vacío.
+ *
+ * K2.1: acepta opcionalmente credenciales explícitas `{ email, password }`
+ * para autenticar una SEGUNDA identidad distinta de K6_USER_EMAIL/
+ * K6_USER_PASSWORD (necesario para escenarios de dos actores, p. ej.
+ * socket-io.js verificando SPRINT_FINALIZATION_STARTED con un listener
+ * distinto del líder que finaliza). Retrocompatible: `login()` sin
+ * argumentos se comporta exactamente igual que antes (getCredentials()
+ * desde __ENV). Sigue existiendo un único código que hace
+ * `POST {baseUrl}/auth/login` — `credentials` solo decide de dónde salen
+ * `email`/`password` antes de esa única llamada.
  */
-export function login() {
-  const { email, password } = getCredentials();
+export function login(credentials) {
+  const { email, password } = credentials ?? getCredentials();
+  if (!email || !password) {
+    throw new Error('login() falló: credenciales explícitas incompletas (faltan email/password)');
+  }
   const url = `${config.baseUrl}${LOGIN_PATH}`;
 
   const res = http.post(
