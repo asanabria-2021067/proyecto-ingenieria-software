@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -16,6 +17,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
+import { CloseAssignmentDto } from './dto/close-assignment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -100,5 +102,21 @@ export class TasksController {
     @CurrentUser() user: { userId: number },
   ): Promise<void> {
     await this.tasksService.unassign(projectId, taskId, user.userId);
+  }
+
+  @Post(':taskId/asignaciones/:assignmentId/cerrar')
+  @HttpCode(HttpStatus.OK)
+  closeAssignment(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param() params: { assignmentId?: string },
+    @CurrentUser() user: { userId: number },
+    @Body() dto: CloseAssignmentDto,
+  ) {
+    const assignmentId = Number(params.assignmentId);
+    if (!Number.isInteger(assignmentId)) {
+      throw new BadRequestException('assignmentId debe ser un número entero');
+    }
+    return this.tasksService.closeAssignment(projectId, taskId, assignmentId, user.userId, dto);
   }
 }
