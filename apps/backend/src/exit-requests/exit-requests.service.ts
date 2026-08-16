@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EstadoSolicitudSalida, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ExitRequestsAuthorizationService } from './exit-requests.authorization.service';
@@ -22,27 +22,26 @@ export class ExitRequestsService {
       throw new BadRequestException('motivo no puede estar vacío');
     }
 
-    const asignacionVigente = await this.prisma.asignacionTarea.findFirst({
-      where: { idUsuario, desasignadaEn: null, tarea: { idProyecto } },
-      select: { idAsignacion: true },
-    });
-    if (asignacionVigente) {
-      throw new ConflictException(
-        'No puedes solicitar salida mientras tengas asignaciones de tareas vigentes',
-      );
-    }
-
-    const solicitudPendiente = await this.prisma.solicitudSalidaProyecto.findFirst({
-      where: { idProyecto, idUsuario, estadoSolicitud: 'PENDIENTE_LIDER' },
+    const solicitudAbierta = await this.prisma.solicitudSalidaProyecto.findFirst({
+      where: {
+        idProyecto,
+        idUsuario,
+        estadoSolicitud: { in: ['PREPARACION', 'PENDIENTE_LIDER'] },
+      },
       select: { idSolicitud: true },
     });
-    if (solicitudPendiente) {
+    if (solicitudAbierta) {
       throw new ConflictException('Ya existe una solicitud de salida pendiente para este proyecto');
     }
 
     try {
       return await this.prisma.solicitudSalidaProyecto.create({
-        data: { idProyecto, idUsuario, motivo: motivoLimpio },
+        data: {
+          idProyecto,
+          idUsuario,
+          motivo: motivoLimpio,
+          estadoSolicitud: EstadoSolicitudSalida.PREPARACION,
+        },
       });
     } catch (error) {
       if (this.isPendingExitRequestCollision(error)) {
