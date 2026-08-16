@@ -236,6 +236,11 @@ describe('TasksService.create', () => {
         hito: HITO_VALIDADO,
         rolProyecto: ROL_VALIDADO,
         etiquetas: ETIQUETAS_VALIDADAS,
+        // X1.1: participación exacta ya resuelta por
+        // validateCreateTaskRelations para idUsuarioAsignado — distinta de
+        // idUsuarioAsignado (3) a propósito, para que la aserción de abajo
+        // no pueda pasar por coincidencia de valores.
+        idParticipacionAsignado: 77,
       });
       const notifications = makeNotifications();
       // A12.1: la tarea creada aquí tiene idHito=4, así que create()
@@ -286,6 +291,55 @@ describe('TasksService.create', () => {
         data: {
           idTarea: 100,
           idUsuario: 3,
+          // X1.1: la participación exacta ya resuelta por
+          // validateCreateTaskRelations (idParticipacionAsignado) se
+          // persiste tal cual — necesaria para que HoursRecognitionService
+          // (B10) pueda encontrar este tramo como reconocible.
+          idParticipacion: 77,
+          asignadoPor: 1,
+          desasignadaEn: null,
+        },
+      });
+    });
+
+    it('sin idParticipacionAsignado resuelto (recurso no provisto): la asignación se crea con idParticipacion null, nunca omitido ni inventado', async () => {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      const auth = makeAuthorization();
+      // Deliberadamente sin idParticipacionAsignado: simula un llamador que
+      // no pasó por la resolución real (no debería ocurrir en producción,
+      // pero el fallback explícito a null documenta el comportamiento en
+      // vez de dejarlo implícito o de omitir el campo).
+      const relations = makeRelations({
+        hito: HITO_VALIDADO,
+        rolProyecto: ROL_VALIDADO,
+        etiquetas: ETIQUETAS_VALIDADAS,
+      });
+      const notifications = makeNotifications();
+      tx.hito = { update: vi.fn() };
+      tx.tarea.create.mockResolvedValue({ idTarea: 100 });
+      tx.tarea.findFirst.mockResolvedValue(
+        tareaRow({
+          idHito: 4,
+          idRolProyecto: 6,
+          tiempoEstimadoHoras: 8,
+          hito: { idHito: 4, tituloHito: 'MVP' },
+          rolProyecto: { idRolProyecto: 6, nombreRol: 'Fullstack' },
+          asignaciones: [],
+          etiquetas: ETIQUETAS_VALIDADAS.map((etiqueta) => ({ etiqueta })),
+        }),
+      );
+      prisma.usuario.findUnique.mockResolvedValue({ nombre: 'Carlos', apellido: 'Mendoza' });
+      prisma.proyecto.findUnique.mockResolvedValue({ tituloProyecto: 'Portal de Empleo UVG' });
+      const service = new TasksService(prisma, auth, relations, notifications);
+
+      await service.create(5, 1, DTO_COMPLETO);
+
+      expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
+        data: {
+          idTarea: 100,
+          idUsuario: 3,
+          idParticipacion: null,
           asignadoPor: 1,
           desasignadaEn: null,
         },
