@@ -63,4 +63,19 @@ export class NotificationsGateway
       this.server.to(`user:${userId}`).emit('notification', notification);
     }
   }
+
+  /**
+   * A4: mismo mecanismo de rooms (`user:{idUsuario}`) que notifyUsers, pero
+   * con un nombre de evento propio (`SPRINT_FINALIZATION_STARTED`) en vez
+   * del genérico `notification` — señal realtime específica de Sprint 6,
+   * sin namespace/gateway/WebSocketServer nuevos.
+   */
+  async notifySprintFinalizationStarted(
+    userIds: number[],
+    payload: { projectId: number; sprintId: number },
+  ) {
+    for (const userId of userIds) {
+      this.server.to(`user:${userId}`).emit('SPRINT_FINALIZATION_STARTED', payload);
+    }
+  }
 }

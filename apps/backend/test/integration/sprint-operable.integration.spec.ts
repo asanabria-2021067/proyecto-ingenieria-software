@@ -33,7 +33,11 @@ describeIntegration(
       prisma = createIntegrationPrismaClient();
       const context = new SprintsContextService(prisma as any);
       const authorization = new SprintsAuthorizationService(context);
-      service = new SprintsService(prisma as any, context, authorization);
+      // startSprint (A2) nunca llama a NotificationsService — solo
+      // finalizeSprint (A4) lo hace — así que un doble vacío es suficiente
+      // aquí; nunca se invoca en este archivo.
+      const notifications = {} as any;
+      service = new SprintsService(prisma as any, context, authorization, notifications);
       await prisma.$connect();
     });
 

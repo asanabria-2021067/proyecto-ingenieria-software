@@ -1,8 +1,9 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { EstadoSprint, Prisma } from '@prisma/client';
+import { EstadoSprint, EstadoTarea, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SprintsService {
@@ -10,6 +11,7 @@ export class SprintsService {
     private readonly prisma: PrismaService,
     private readonly sprintsContext: SprintsContextService,
     private readonly sprintsAuthorization: SprintsAuthorizationService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -70,6 +72,110 @@ export class SprintsService {
         throw error;
       }
     });
+  }
+
+  /**
+   * Finaliza el Sprint (ACTIVO -> EN_FINALIZACION): exclusivo del líder
+   * (reutiliza SprintsAuthorizationService.assertCanFinalizeSprint, que ya
+   * aísla projectId+sprintId — Contrato A1/A3), solo si el Sprint sigue
+   * ACTIVO y todas sus tareas (no eliminadas) están HECHO. Toda la
+   * validación y la transición ocurren dentro de una única transacción:
+   *
+   *   autorización -> estado ACTIVO -> tareas no-HECHO -> updateMany
+   *   condicionado por estado=ACTIVO -> lectura final
+   *
+   * La comprobación explícita de `estado === ACTIVO` es un precheck legible
+   * (falla rápido con un mensaje claro); la garantía real contra dos
+   * finalizaciones concurrentes es el `updateMany` condicionado por
+   * `estado: ACTIVO` — si `count === 0`, otra transacción ya ganó la carrera
+   * (o el Sprint cambió de estado entre el precheck y este punto) y se
+   * traduce a ConflictException sin tocar ninguna fila.
+   *
+   * La notificación ocurre DESPUÉS de que `$transaction` resuelve (nunca
+   * dentro): si la transacción lanza en cualquier paso, el callback de
+   * notificación ni siquiera se alcanza, así que un rollback nunca notifica.
+   * Se hacen dos llamadas post-commit, ambas reutilizando NotificationsService
+   * sin duplicar su lógica de audiencia/rooms: notifyProjectActiveParticipants
+   * (bandeja persistida + evento genérico 'notification', mismo mecanismo
+   * que ya usa el resto del dominio) y notifySprintFinalizationStarted
+   * (extensión mínima de A4: mismo criterio de audiencia, evento realtime
+   * específico SPRINT_FINALIZATION_STARTED, sin persistir bandeja
+   * duplicada).
+   */
+  async finalizeSprint(projectId: number, sprintId: number, userId: number) {
+    const sprintFinalizado = await this.prisma.$transaction(async (tx) => {
+      const sprint = await this.sprintsAuthorization.assertCanFinalizeSprint(
+        projectId,
+        sprintId,
+        userId,
+        tx,
+      );
+
+      if (sprint.estado !== EstadoSprint.ACTIVO) {
+        throw new ConflictException('El Sprint ya no está en estado ACTIVO');
+      }
+
+      // Tarea.eliminadoEn: null — mismo filtro de soft delete que el resto
+      // del dominio tasks/ ya aplica (TasksContextService.getTaskInProjectOrThrow,
+      // TasksService.findAll/findOne): una tarea eliminada no cuenta como
+      // pendiente. Un Sprint sin ninguna tarea (0 relevantes) cumple
+      // trivialmente "0 tareas no-HECHO" — A4 no introduce una regla de
+      // "mínimo una tarea" que Foundation/A1-A3 nunca definieron.
+      const tareasPendientes = await tx.tarea.count({
+        where: {
+          idProyecto: projectId,
+          idSprint: sprintId,
+          eliminadoEn: null,
+          estadoTarea: { not: EstadoTarea.HECHO },
+        },
+      });
+      if (tareasPendientes > 0) {
+        throw new ConflictException(
+          'No se puede finalizar el Sprint mientras existan tareas pendientes',
+        );
+      }
+
+      const actualizado = await tx.sprint.updateMany({
+        where: {
+          idSprint: sprintId,
+          idProyecto: projectId,
+          estado: EstadoSprint.ACTIVO,
+        },
+        data: {
+          estado: EstadoSprint.EN_FINALIZACION,
+          fechaFinalizacionIniciada: new Date(),
+        },
+      });
+
+      if (actualizado.count === 0) {
+        throw new ConflictException('El Sprint ya no está en estado ACTIVO');
+      }
+
+      const filaFinal = await tx.sprint.findFirst({
+        where: { idSprint: sprintId, idProyecto: projectId },
+      });
+      if (!filaFinal) {
+        throw new Error(
+          `No se pudo leer el Sprint con id ${sprintId} recién finalizado dentro de la transacción`,
+        );
+      }
+
+      return filaFinal;
+    });
+
+    await this.notificationsService.notifyProjectActiveParticipants(projectId, userId, {
+      tipoNotificacion: TipoNotificacion.CAMBIO_ESTADO_PROYECTO,
+      tituloNotificacion: 'Sprint en finalización',
+      mensajeNotificacion: `El Sprint #${sprintFinalizado.numero} entró en finalización.`,
+      datosJson: { projectId, sprintId },
+    });
+
+    await this.notificationsService.notifySprintFinalizationStarted(projectId, userId, {
+      projectId,
+      sprintId,
+    });
+
+    return sprintFinalizado;
   }
 
   /**
