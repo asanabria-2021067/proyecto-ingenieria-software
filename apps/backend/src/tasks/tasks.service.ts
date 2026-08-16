@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -22,6 +23,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
+import { CloseAssignmentDto } from './dto/close-assignment.dto';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -91,6 +93,8 @@ const UPDATE_TASK_FIELDS = [
   'idRolProyecto',
   'idsEtiquetas',
 ] as const;
+
+const MIN_PROGRESS_CONTENT_LENGTH = 200;
 
 interface UsuarioResumenPublico {
   idUsuario: number;
@@ -908,6 +912,104 @@ export class TasksService {
         resultado.taskTitle,
         actorUserId,
         resultado.previousUserId,
+      );
+    }
+  }
+
+  async closeAssignment(
+    projectId: number,
+    taskId: number,
+    assignmentId: number,
+    actorUserId: number,
+    dto: CloseAssignmentDto,
+  ): Promise<TareaPublica> {
+    this.assertValidAssignmentClosureInput(dto);
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
+
+      const asignacion = await tx.asignacionTarea.findFirst({
+        where: { idAsignacion: assignmentId, idTarea: taskId },
+        select: {
+          idAsignacion: true,
+          idTarea: true,
+          idUsuario: true,
+          desasignadaEn: true,
+        },
+      });
+      if (!asignacion) {
+        throw new NotFoundException(
+          `Asignación con id ${assignmentId} no encontrada en la tarea ${taskId}`,
+        );
+      }
+
+      if (asignacion.idUsuario !== actorUserId) {
+        throw new ForbiddenException('Solo el usuario asignado puede cerrar este tramo');
+      }
+
+      await this.tasksContext.assertActiveProjectParticipant(projectId, actorUserId, tx);
+
+      const desasignadaEn = new Date();
+      const closed = await tx.asignacionTarea.updateMany({
+        where: {
+          idAsignacion: assignmentId,
+          idTarea: taskId,
+          idUsuario: actorUserId,
+          desasignadaEn: null,
+        },
+        data: {
+          horasReales: dto.horasReales,
+          desasignadaEn,
+        },
+      });
+
+      if (closed.count !== 1) {
+        throw new ConflictException('La asignación ya fue cerrada');
+      }
+
+      await tx.registroAvanceAsignacion.create({
+        data: {
+          idAsignacion: assignmentId,
+          idAutor: actorUserId,
+          contenido: dto.contenidoAvance,
+        },
+      });
+
+      if (dto.marcarComoHecha === true) {
+        await tx.tarea.update({
+          where: { idTarea: taskId },
+          data: { estadoTarea: EstadoTarea.HECHO },
+        });
+      }
+
+      const filaFinal = await tx.tarea.findFirst({
+        where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
+        select: TASK_SELECT,
+      });
+
+      if (!filaFinal) {
+        throw new Error(
+          `No se pudo leer la tarea con id ${taskId} recién cerrada dentro de la transacción`,
+        );
+      }
+
+      return filaFinal;
+    });
+
+    return mapTarea(row);
+  }
+
+  private assertValidAssignmentClosureInput(dto: CloseAssignmentDto): void {
+    if (!Number.isFinite(dto.horasReales) || dto.horasReales < 0) {
+      throw new BadRequestException('horasReales debe ser un número válido mayor o igual a 0');
+    }
+
+    if (
+      typeof dto.contenidoAvance !== 'string' ||
+      dto.contenidoAvance.trim().length < MIN_PROGRESS_CONTENT_LENGTH
+    ) {
+      throw new BadRequestException(
+        `contenidoAvance debe tener al menos ${MIN_PROGRESS_CONTENT_LENGTH} caracteres significativos`,
       );
     }
   }
