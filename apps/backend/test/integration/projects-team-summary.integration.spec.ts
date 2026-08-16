@@ -6,6 +6,7 @@ import {
   createIntegrationProject,
   createIntegrationProjectRole,
   createIntegrationParticipation,
+  createIntegrationSprint,
   createIntegrationTask,
   createIntegrationTaskAssignment,
 } from './setup/fixtures';
@@ -138,10 +139,14 @@ describeIntegration('ProjectsService.getTeamSummary — integración PostgreSQL 
     });
     scope.participationIds = [participacionA.idParticipacion, participacionB.idParticipacion];
 
-    const taskA = await createIntegrationTask(prisma, projectA.idProyecto, leaderA.idUsuario, {
+    const sprintA = await createIntegrationSprint(prisma, projectA.idProyecto);
+    const sprintB = await createIntegrationSprint(prisma, projectB.idProyecto);
+    scope.sprintIds = [sprintA.idSprint, sprintB.idSprint];
+
+    const taskA = await createIntegrationTask(prisma, projectA.idProyecto, leaderA.idUsuario, sprintA.idSprint, {
       estadoTarea: 'HECHO',
     });
-    const taskB = await createIntegrationTask(prisma, projectB.idProyecto, leaderB.idUsuario, {
+    const taskB = await createIntegrationTask(prisma, projectB.idProyecto, leaderB.idUsuario, sprintB.idSprint, {
       estadoTarea: 'HECHO',
     });
     scope.taskIds = [taskA.idTarea, taskB.idTarea];
