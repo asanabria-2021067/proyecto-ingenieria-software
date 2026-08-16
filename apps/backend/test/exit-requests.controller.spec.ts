@@ -10,6 +10,7 @@ function makeController() {
     createSolicitudSalida: vi.fn(),
     approveSolicitudSalida: vi.fn(),
     rejectSolicitudSalida: vi.fn(),
+    getExitPreparationSummary: vi.fn(),
   };
   return { controller: new ExitRequestsController(service as any), service };
 }
@@ -24,15 +25,13 @@ function routeMetadata(methodName: keyof ExitRequestsController) {
 }
 
 describe('ExitRequestsController', () => {
-  it('mantiene el prefijo público proyectos/:projectId/solicitudes-salida', () => {
-    expect(Reflect.getMetadata(PATH_METADATA, ExitRequestsController)).toBe(
-      'proyectos/:projectId/solicitudes-salida',
-    );
+  it('mantiene el prefijo público proyectos/:projectId', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, ExitRequestsController)).toBe('proyectos/:projectId');
   });
 
   it('mantiene POST /proyectos/:projectId/solicitudes-salida con 201', () => {
     expect(routeMetadata('createExitRequest')).toEqual({
-      path: '/',
+      path: 'solicitudes-salida',
       method: RequestMethod.POST,
       status: HttpStatus.CREATED,
     });
@@ -40,7 +39,7 @@ describe('ExitRequestsController', () => {
 
   it('mantiene POST /proyectos/:projectId/solicitudes-salida/:idSolicitud/aprobar con 200', () => {
     expect(routeMetadata('approveExitRequest')).toEqual({
-      path: ':idSolicitud/aprobar',
+      path: 'solicitudes-salida/:idSolicitud/aprobar',
       method: RequestMethod.POST,
       status: HttpStatus.OK,
     });
@@ -48,9 +47,17 @@ describe('ExitRequestsController', () => {
 
   it('mantiene POST /proyectos/:projectId/solicitudes-salida/:idSolicitud/rechazar con 200', () => {
     expect(routeMetadata('rejectExitRequest')).toEqual({
-      path: ':idSolicitud/rechazar',
+      path: 'solicitudes-salida/:idSolicitud/rechazar',
       method: RequestMethod.POST,
       status: HttpStatus.OK,
+    });
+  });
+
+  it('expone GET /proyectos/:projectId/salida/preparacion con status estándar', () => {
+    expect(routeMetadata('getExitPreparationSummary')).toEqual({
+      path: 'salida/preparacion',
+      method: RequestMethod.GET,
+      status: undefined,
     });
   });
 
@@ -82,5 +89,19 @@ describe('ExitRequestsController', () => {
 
     expect(service.rejectSolicitudSalida).toHaveBeenCalledWith(10, 55, 1);
     expect(result).toEqual({ estadoSolicitud: 'RECHAZADA' });
+  });
+
+  it('delega el resumen de preparación con projectId y userId de CurrentUser', async () => {
+    const { controller, service } = makeController();
+    service.getExitPreparationSummary.mockResolvedValue({
+      cantidadBlockers: 0,
+      puedeContinuar: true,
+      blockers: [],
+    });
+
+    const result = await controller.getExitPreparationSummary(10, { userId: 2 });
+
+    expect(service.getExitPreparationSummary).toHaveBeenCalledWith(10, 2);
+    expect(result).toEqual({ cantidadBlockers: 0, puedeContinuar: true, blockers: [] });
   });
 });

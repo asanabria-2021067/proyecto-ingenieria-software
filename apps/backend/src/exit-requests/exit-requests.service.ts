@@ -51,6 +51,76 @@ export class ExitRequestsService {
     }
   }
 
+  async getExitPreparationSummary(idProyecto: number, actorUserId: number) {
+    await this.context.getProjectOrThrow(idProyecto);
+
+    const solicitud = await this.prisma.solicitudSalidaProyecto.findFirst({
+      where: {
+        idProyecto,
+        idUsuario: actorUserId,
+        estadoSolicitud: EstadoSolicitudSalida.PREPARACION,
+      },
+      select: {
+        idSolicitud: true,
+        idProyecto: true,
+        idUsuario: true,
+        estadoSolicitud: true,
+        solicitadaEn: true,
+      },
+    });
+
+    if (!solicitud) {
+      throw new BadRequestException('No existe una solicitud de salida en estado PREPARACION');
+    }
+
+    const blockers = await this.prisma.asignacionTarea.findMany({
+      where: {
+        idUsuario: actorUserId,
+        desasignadaEn: null,
+        tarea: { idProyecto },
+      },
+      orderBy: [{ fechaAsignacion: 'asc' }, { idAsignacion: 'asc' }],
+      select: {
+        idAsignacion: true,
+        idTarea: true,
+        fechaAsignacion: true,
+        horasReales: true,
+        tarea: {
+          select: {
+            tituloTarea: true,
+            estadoTarea: true,
+          },
+        },
+        _count: {
+          select: { registrosAvance: true },
+        },
+      },
+    });
+
+    const items = blockers.map((asignacion) => {
+      const tieneHoras = asignacion.horasReales !== null;
+      const tieneAvance = asignacion._count.registrosAvance > 0;
+      return {
+        idAsignacion: asignacion.idAsignacion,
+        idTarea: asignacion.idTarea,
+        tituloTarea: asignacion.tarea.tituloTarea,
+        estadoTarea: asignacion.tarea.estadoTarea,
+        fechaAsignacion: asignacion.fechaAsignacion,
+        horasReales: asignacion.horasReales?.toNumber() ?? null,
+        tieneHoras,
+        tieneAvance,
+        estadoPreparacion: tieneHoras && tieneAvance ? 'COMPLETA' : 'PENDIENTE',
+      };
+    });
+
+    return {
+      solicitud,
+      blockers: items,
+      cantidadBlockers: items.length,
+      puedeContinuar: items.length === 0,
+    };
+  }
+
   async approveSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
     const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId);
     const solicitud = await this.context.getPendingSolicitudSalidaOrThrow(idProyecto, idSolicitud);
