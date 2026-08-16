@@ -61,7 +61,7 @@ function makePrisma() {
     asignacionTarea: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), ...writeSpies() },
     horasParticipacion: { ...writeSpies() },
     tarea: { ...writeSpies() },
-    solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+    solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   };
   // approveSolicitudSalida corre en $transaction; reusar el mismo objeto
   // prisma como tx deja las aserciones sobre solicitudSalidaProyecto.update /
@@ -72,7 +72,9 @@ function makePrisma() {
 
 function makeService(
   prisma: ReturnType<typeof makePrisma>,
-  notificationsOverride: Partial<{ notifyFromTemplate: ReturnType<typeof vi.fn> }> = {},
+  notificationsOverride: Partial<{
+    notifyFromTemplate: ReturnType<typeof vi.fn>;
+  }> = {},
 ) {
   const context = new ExitRequestsContextService(prisma);
   return new ExitRequestsService(
@@ -587,6 +589,108 @@ describe('ExitRequestsService.getExitPreparationSummary', () => {
       service.getExitPreparationSummary(PROYECTO_ID, MIEMBRO_ID),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.asignacionTarea.findMany).not.toHaveBeenCalled();
+  });
+});
+
+const SOLICITUD_PREPARACION_TRANSICION = {
+  idSolicitud: 502,
+  idProyecto: PROYECTO_ID,
+  idUsuario: MIEMBRO_ID,
+  motivo: 'Cambio de disponibilidad',
+  estadoSolicitud: 'PREPARACION',
+  solicitadaEn: new Date('2026-01-12T00:00:00.000Z'),
+};
+
+function setupContinuePreparationPath(prisma: ReturnType<typeof makePrisma>) {
+  prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(SOLICITUD_PREPARACION_TRANSICION);
+  prisma.asignacionTarea.findFirst.mockResolvedValue(null);
+  prisma.solicitudSalidaProyecto.updateMany.mockResolvedValue({ count: 1 });
+}
+
+describe('ExitRequestsService.continueExitPreparation', () => {
+  it('rechaza con ConflictException y no transiciona cuando existen blockers activos', async () => {
+    const prisma = makePrisma();
+    setupContinuePreparationPath(prisma);
+    prisma.asignacionTarea.findFirst.mockResolvedValue({ idAsignacion: 900 });
+    const service = makeService(prisma);
+
+    await expect(
+      service.continueExitPreparation(PROYECTO_ID, MIEMBRO_ID),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.solicitudSalidaProyecto.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('transiciona PREPARACION a PENDIENTE_LIDER con 0 blockers usando updateMany condicional', async () => {
+    const prisma = makePrisma();
+    setupContinuePreparationPath(prisma);
+    const service = makeService(prisma);
+
+    const resultado = await service.continueExitPreparation(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(resultado).toEqual({
+      idSolicitud: 502,
+      idProyecto: PROYECTO_ID,
+      idUsuario: MIEMBRO_ID,
+      motivo: 'Cambio de disponibilidad',
+      solicitadaEn: SOLICITUD_PREPARACION_TRANSICION.solicitadaEn,
+      estadoSolicitud: 'PENDIENTE_LIDER',
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.solicitudSalidaProyecto.updateMany).toHaveBeenCalledWith({
+      where: {
+        idSolicitud: 502,
+        idProyecto: PROYECTO_ID,
+        idUsuario: MIEMBRO_ID,
+        estadoSolicitud: 'PREPARACION',
+      },
+      data: { estadoSolicitud: 'PENDIENTE_LIDER' },
+    });
+  });
+
+  it.each(['PENDIENTE_LIDER', 'APROBADA', 'RECHAZADA', 'CANCELADA'] as const)(
+    'rechaza si no existe solicitud PREPARACION porque la solicitud está en %s',
+    async (estadoSolicitud) => {
+      const prisma = makePrisma();
+      prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+      const service = makeService(prisma);
+
+      await expect(
+        service.continueExitPreparation(PROYECTO_ID, MIEMBRO_ID),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(estadoSolicitud).toBeTruthy();
+      expect(prisma.asignacionTarea.findFirst).not.toHaveBeenCalled();
+      expect(prisma.solicitudSalidaProyecto.updateMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it('revalida blockers server-side dentro de la transición con filtros de actor, proyecto y desasignadaEn null', async () => {
+    const prisma = makePrisma();
+    setupContinuePreparationPath(prisma);
+    const service = makeService(prisma);
+
+    await service.continueExitPreparation(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(prisma.asignacionTarea.findFirst).toHaveBeenCalledWith({
+      where: {
+        idUsuario: MIEMBRO_ID,
+        desasignadaEn: null,
+        tarea: { idProyecto: PROYECTO_ID },
+      },
+      select: { idAsignacion: true },
+    });
+  });
+
+  it('rechaza si updateMany devuelve count 0', async () => {
+    const prisma = makePrisma();
+    setupContinuePreparationPath(prisma);
+    prisma.solicitudSalidaProyecto.updateMany.mockResolvedValue({ count: 0 });
+    const service = makeService(prisma);
+
+    await expect(
+      service.continueExitPreparation(PROYECTO_ID, MIEMBRO_ID),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
 
