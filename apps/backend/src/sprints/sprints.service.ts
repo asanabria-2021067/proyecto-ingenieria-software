@@ -6,6 +6,11 @@ import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
 import { SprintClosingSummaryDto, SprintClosingSummaryParticipantDto } from './dto/sprint-closing-summary.dto';
+import {
+  SprintDetailDto,
+  SprintDetailHitoDto,
+  SprintListItemDto,
+} from './dto/sprint-history.dto';
 
 @Injectable()
 export class SprintsService {
@@ -438,6 +443,157 @@ export class SprintsService {
 
       return filaFinal;
     });
+  }
+
+  /**
+   * A10: mismo subconjunto público de Usuario que
+   * ComentariosService.autorSelect — nunca contrasena/tokens/objeto
+   * completo.
+   */
+  private static readonly HISTORY_USUARIO_SELECT = {
+    idUsuario: true,
+    nombre: true,
+    apellido: true,
+    fotoUrl: true,
+  } as const;
+
+  /**
+   * A10: listado histórico de Sprints del proyecto — metadata mínima
+   * (Sección 5), sin reconstrucción de tareas/horas/agregaciones. El
+   * aislamiento por proyecto vive en el propio `where` de la consulta
+   * (`idProyecto: projectId`), no en un filtro posterior en JavaScript.
+   */
+  async listSprints(projectId: number, userId: number): Promise<SprintListItemDto[]> {
+    await this.sprintsAuthorization.assertCanListSprintHistory(projectId, userId);
+
+    return this.prisma.sprint.findMany({
+      where: { idProyecto: projectId },
+      orderBy: { numero: 'desc' },
+      select: {
+        idSprint: true,
+        idProyecto: true,
+        numero: true,
+        estado: true,
+        fechaInicio: true,
+        fechaFinalizacionIniciada: true,
+        fechaCierre: true,
+      },
+    });
+  }
+
+  /**
+   * A10: reconstruye el detalle histórico de un Sprint desde las tablas
+   * relacionales actuales — no existe tabla de snapshot/histórico; la
+   * fuente de verdad sigue siendo Tarea/AsignacionTarea/Comentario/Hito.
+   *
+   * Aislamiento cross-project: `assertCanViewSprintHistory` ya resuelve el
+   * Sprint vía `idSprint + idProyecto` (mismo contrato que
+   * finalizar/cerrar/ajustar horas) — un `sprintId` de otro proyecto nunca
+   * llega a la reconstrucción, lanza NotFoundException antes.
+   *
+   * Sin N+1 manual: 2 consultas fijas, ninguna dentro de un loop:
+   *   1) Sprint + tareas (con `eliminadoEn: null`, mismo criterio de
+   *      soft-delete que TasksService.findAll/findOne) + sus asignaciones
+   *      (TODOS los tramos, no solo el activo — Sección 6.C) + sus
+   *      comentarios (`eliminadoEn: null`, mismo criterio que
+   *      ComentariosService), todo vía un único `include` anidado.
+   *   2) Los Hitos referenciados por esas tareas, en una única consulta
+   *      `IN (...)` (nunca una consulta por tarea).
+   *
+   * Una tarea con varios tramos de AsignacionTarea aparece UNA vez, con
+   * todos sus tramos anidados dentro de `asignaciones` — nunca se duplica
+   * la tarea por el JOIN. Un mismo Hito referenciado por varias tareas
+   * aparece UNA vez en `hitos` (Map por idHito); cada tarea solo referencia
+   * su `idHito`, nunca embebe una copia del Hito.
+   *
+   * `estadoHito` se devuelve exactamente como está persistido — A10 no
+   * corrige ni recalcula ese campo (contrato exclusivo de A12), y no se
+   * agrega ningún porcentaje/progreso por Hito.
+   */
+  async getSprintDetail(projectId: number, sprintId: number, userId: number): Promise<SprintDetailDto> {
+    await this.sprintsAuthorization.assertCanViewSprintHistory(projectId, sprintId, userId);
+
+    const sprint = await this.prisma.sprint.findFirst({
+      where: { idSprint: sprintId, idProyecto: projectId },
+      include: {
+        tareas: {
+          where: { idProyecto: projectId, eliminadoEn: null },
+          orderBy: { orden: 'asc' },
+          include: {
+            asignaciones: {
+              orderBy: { fechaAsignacion: 'asc' },
+              include: { usuario: { select: SprintsService.HISTORY_USUARIO_SELECT } },
+            },
+            comentarios: {
+              where: { eliminadoEn: null },
+              orderBy: { creadoEn: 'asc' },
+              include: { autor: { select: SprintsService.HISTORY_USUARIO_SELECT } },
+            },
+          },
+        },
+      },
+    });
+
+    if (!sprint) {
+      throw new NotFoundException(
+        `Sprint con id ${sprintId} no encontrado en el proyecto ${projectId}`,
+      );
+    }
+
+    const idsHito = [
+      ...new Set(
+        sprint.tareas
+          .map((tarea) => tarea.idHito)
+          .filter((idHito): idHito is number => idHito !== null),
+      ),
+    ];
+
+    const hitosPorId = new Map<number, SprintDetailHitoDto>();
+    if (idsHito.length > 0) {
+      const hitos = await this.prisma.hito.findMany({
+        where: { idHito: { in: idsHito }, idProyecto: projectId },
+        select: { idHito: true, tituloHito: true, estadoHito: true },
+      });
+      for (const hito of hitos) {
+        hitosPorId.set(hito.idHito, hito);
+      }
+    }
+
+    return {
+      idSprint: sprint.idSprint,
+      idProyecto: sprint.idProyecto,
+      numero: sprint.numero,
+      estado: sprint.estado,
+      fechaInicio: sprint.fechaInicio,
+      fechaFinalizacionIniciada: sprint.fechaFinalizacionIniciada,
+      fechaCierre: sprint.fechaCierre,
+      cerradoPor: sprint.cerradoPor,
+      tareas: sprint.tareas.map((tarea) => ({
+        idTarea: tarea.idTarea,
+        tituloTarea: tarea.tituloTarea,
+        descripcionTarea: tarea.descripcionTarea,
+        estadoTarea: tarea.estadoTarea,
+        prioridad: tarea.prioridad,
+        idHito: tarea.idHito,
+        fechaCreacion: tarea.fechaCreacion,
+        fechaLimite: tarea.fechaLimite,
+        tiempoEstimadoHoras: tarea.tiempoEstimadoHoras,
+        asignaciones: tarea.asignaciones.map((asignacion) => ({
+          idAsignacion: asignacion.idAsignacion,
+          usuario: asignacion.usuario,
+          fechaAsignacion: asignacion.fechaAsignacion,
+          desasignadaEn: asignacion.desasignadaEn,
+          horasReales: asignacion.horasReales?.toNumber() ?? null,
+        })),
+        comentarios: tarea.comentarios.map((comentario) => ({
+          idComentario: comentario.idComentario,
+          autor: comentario.autor,
+          contenido: comentario.contenido,
+          creadoEn: comentario.creadoEn,
+        })),
+      })),
+      hitos: [...hitosPorId.values()],
+    };
   }
 
   /**

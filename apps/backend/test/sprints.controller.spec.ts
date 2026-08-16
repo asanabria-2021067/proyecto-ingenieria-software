@@ -10,6 +10,8 @@ function makeService() {
     adjustRecognizedHours: vi.fn(),
     getSprintClosingSummary: vi.fn(),
     closeSprint: vi.fn(),
+    listSprints: vi.fn(),
+    getSprintDetail: vi.fn(),
   } as any;
 }
 
@@ -239,5 +241,87 @@ describe('SprintsController.getClosingSummary (GET /proyectos/:projectId/sprints
     const controller = new SprintsController(service);
 
     await expect(controller.getClosingSummary(5, 12, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.list (GET /proyectos/:projectId/sprints)', () => {
+  it('está registrado como GET en la ruta raíz del controller anidado', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.list)).toBe('/');
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.list)).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.list)).toBe(200);
+  });
+
+  it('delega en SprintsService.listSprints con projectId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = new SprintsController(service);
+
+    controller.list(5, { userId: 9 });
+
+    expect(service.listSprints).toHaveBeenCalledTimes(1);
+    expect(service.listSprints).toHaveBeenCalledWith(5, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.listSprints, sin transformarlo', async () => {
+    const service = makeService();
+    const lista = [{ idSprint: 1, idProyecto: 5, numero: 1, estado: 'CERRADO' }];
+    service.listSprints.mockResolvedValue(lista);
+    const controller = new SprintsController(service);
+
+    const result = await controller.list(5, { userId: 9 });
+
+    expect(result).toBe(lista);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.listSprints', async () => {
+    const service = makeService();
+    const error = new Error('no autorizado');
+    service.listSprints.mockRejectedValue(error);
+    const controller = new SprintsController(service);
+
+    await expect(controller.list(5, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.detail (GET /proyectos/:projectId/sprints/:sprintId)', () => {
+  it('está registrado como GET en :sprintId', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.detail)).toBe(':sprintId');
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.detail)).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.detail)).toBe(200);
+  });
+
+  it('delega en SprintsService.getSprintDetail con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = new SprintsController(service);
+
+    controller.detail(5, 12, { userId: 9 });
+
+    expect(service.getSprintDetail).toHaveBeenCalledTimes(1);
+    expect(service.getSprintDetail).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.getSprintDetail, sin transformarlo', async () => {
+    const service = makeService();
+    const detalle = { idSprint: 12, idProyecto: 5, tareas: [], hitos: [] };
+    service.getSprintDetail.mockResolvedValue(detalle);
+    const controller = new SprintsController(service);
+
+    const result = await controller.detail(5, 12, { userId: 9 });
+
+    expect(result).toBe(detalle);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.getSprintDetail', async () => {
+    const service = makeService();
+    const error = new Error('no encontrado');
+    service.getSprintDetail.mockRejectedValue(error);
+    const controller = new SprintsController(service);
+
+    await expect(controller.detail(5, 12, { userId: 9 })).rejects.toBe(error);
   });
 });

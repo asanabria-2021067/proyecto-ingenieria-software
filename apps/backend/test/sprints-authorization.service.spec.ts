@@ -65,10 +65,52 @@ describe('SprintsAuthorizationService', () => {
     });
   });
 
+  describe('assertCanListSprintHistory (A10)', () => {
+    it('permite al líder del proyecto', async () => {
+      const ctx = makeContext();
+      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      const service = new SprintsAuthorizationService(ctx);
+
+      await expect(service.assertCanListSprintHistory(1, LIDER_ID)).resolves.toBeUndefined();
+    });
+
+    it('rechaza a un usuario que no es líder', async () => {
+      const ctx = makeContext();
+      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      const service = new SprintsAuthorizationService(ctx);
+
+      await expect(service.assertCanListSprintHistory(1, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('propaga NotFoundException si el proyecto no existe', async () => {
+      const ctx = makeContext();
+      ctx.assertProjectLeader.mockRejectedValue(NOT_FOUND_PROYECTO());
+      const service = new SprintsAuthorizationService(ctx);
+
+      await expect(service.assertCanListSprintHistory(99, LIDER_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('traslada el cliente transaccional recibido', async () => {
+      const ctx = makeContext();
+      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      const tx = { marker: 'tx' } as any;
+      const service = new SprintsAuthorizationService(ctx);
+
+      await service.assertCanListSprintHistory(1, LIDER_ID, tx);
+
+      expect(ctx.assertProjectLeader).toHaveBeenCalledWith(1, LIDER_ID, tx);
+    });
+  });
+
   describe.each([
     ['assertCanFinalizeSprint' as const, 'finalizar'],
     ['assertCanCloseSprint' as const, 'cerrar'],
     ['assertCanAdjustRecognizedHours' as const, 'ajustar horas'],
+    ['assertCanViewSprintHistory' as const, 'ver detalle histórico (A10)'],
   ])('%s (%s)', (method, _accion) => {
     it('permite al líder y devuelve el Sprint validado', async () => {
       const ctx = makeContext();

@@ -76,4 +76,23 @@ export class SprintsController {
   ) {
     return this.sprintsService.getSprintClosingSummary(projectId, sprintId, user.userId);
   }
+
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  list(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.listSprints(projectId, user.userId);
+  }
+
+  @Get(':sprintId')
+  @HttpCode(HttpStatus.OK)
+  detail(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.getSprintDetail(projectId, sprintId, user.userId);
+  }
 }
