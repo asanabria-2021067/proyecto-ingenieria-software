@@ -349,6 +349,12 @@ export class TasksService {
           data: {
             idTarea: tarea.idTarea,
             idUsuario: dto.idUsuarioAsignado,
+            // X1.1: participación exacta ya resuelta por
+            // validateCreateTaskRelations (misma fila validada, sin
+            // segunda consulta) — nunca queda NULL para una asignación
+            // inicial real, condición que HoursRecognitionService (B10)
+            // exige para poder reconocer horas de este tramo.
+            idParticipacion: recursos.idParticipacionAsignado ?? null,
             asignadoPor: userId,
             desasignadaEn: null,
           },
@@ -740,7 +746,12 @@ export class TasksService {
       );
 
       const rolEfectivo = tarea.idRolProyecto ?? null;
-      await this.tasksRelations.assertUserAssignableToProject(
+      // X1.1: idParticipacion exacto ya resuelto por esta misma validación
+      // (rol exacto si la tarea tiene idRolProyecto, participación ACTIVO
+      // del proyecto si no) — se reutiliza tal cual al crear la fila
+      // activa, sin una segunda consulta y sin adivinar entre varias
+      // participaciones del mismo usuario (multirol).
+      const idParticipacionResuelta = await this.tasksRelations.assertUserAssignableToProject(
         projectId,
         dto.idUsuario,
         rolEfectivo,
@@ -754,6 +765,7 @@ export class TasksService {
         await this.createActiveAssignment(tx, {
           idTarea: taskId,
           idUsuario: dto.idUsuario,
+          idParticipacion: idParticipacionResuelta,
           asignadoPor: actorUserId,
           desasignadaEn: null,
         });
@@ -773,6 +785,7 @@ export class TasksService {
         await this.createActiveAssignment(tx, {
           idTarea: taskId,
           idUsuario: dto.idUsuario,
+          idParticipacion: idParticipacionResuelta,
           asignadoPor: actorUserId,
           desasignadaEn: null,
         });
@@ -835,7 +848,13 @@ export class TasksService {
    */
   private async createActiveAssignment(
     tx: Prisma.TransactionClient,
-    data: { idTarea: number; idUsuario: number; asignadoPor: number; desasignadaEn: null },
+    data: {
+      idTarea: number;
+      idUsuario: number;
+      idParticipacion: number;
+      asignadoPor: number;
+      desasignadaEn: null;
+    },
   ): Promise<AsignacionTarea> {
     try {
       return await tx.asignacionTarea.create({ data });
