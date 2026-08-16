@@ -24,6 +24,10 @@ vi.mock('../hooks/use-project-labels', () => ({ useProjectLabels: vi.fn() }));
 vi.mock('../hooks/use-project-milestones', () => ({ useProjectMilestones: vi.fn() }));
 vi.mock('../hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
+vi.mock('../hooks/use-project-sprints', () => ({
+  useProjectSprints: vi.fn(),
+  useStartSprint: vi.fn(),
+}));
 
 // Fuera de un app router real `useSearchParams()` devuelve null; se simula con
 // parámetros vacíos para no arrastrar el router completo.
@@ -39,6 +43,8 @@ import { useProjectLabels } from '../hooks/use-project-labels';
 import { useProjectMilestones } from '../hooks/use-project-milestones';
 import { useProjectMembers } from '../hooks/use-project-members';
 import { useCurrentUser } from '../hooks/use-current-user';
+import { useProjectSprints, useStartSprint } from '../hooks/use-project-sprints';
+import type { SprintDto } from '../lib/types/sprints';
 
 const proyectoFixture: ProyectoDetalleDTO = {
   idProyecto: 42,
@@ -143,6 +149,38 @@ function mockUseProjectMilestones(overrides: Record<string, unknown> = {}) {
   });
 }
 
+function sprint(overrides: Partial<SprintDto> = {}): SprintDto {
+  return {
+    idSprint: 1,
+    idProyecto: 42,
+    numero: 1,
+    estado: 'ACTIVO',
+    fechaInicio: '2026-01-01T00:00:00.000Z',
+    fechaFinalizacionIniciada: null,
+    fechaCierre: null,
+    ...overrides,
+  };
+}
+
+// Default: un Sprint ACTIVO — así el resto de los tests preexistentes de
+// este archivo (que no ejercitan F2) conservan exactamente el comportamiento
+// previo del Kanban, sin tener que conocer el nuevo gate de Sprint.
+function mockUseProjectSprints(overrides: Record<string, unknown> = {}) {
+  (useProjectSprints as any).mockReturnValue({
+    sprints: [sprint()],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    ...overrides,
+  });
+}
+
+function mockUseStartSprint(overrides: Record<string, unknown> = {}) {
+  (useStartSprint as any).mockReturnValue(mutationStub(overrides));
+}
+
 function mockUseProjectMembers(overrides: Record<string, unknown> = {}) {
   (useProjectMembers as any).mockReturnValue({
     members: [],
@@ -172,6 +210,8 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     mockUseProjectLabels();
     mockUseProjectMilestones();
     mockUseProjectMembers();
+    mockUseProjectSprints();
+    mockUseStartSprint();
   });
 
   afterEach(() => {
@@ -395,5 +435,155 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
 
     expect(useProjectDetail).toHaveBeenCalledTimes(1);
     expect(useProjectDetail).toHaveBeenCalledWith(42);
+  });
+});
+
+describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
+  beforeEach(() => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    mockUseProjectLabels();
+    mockUseProjectMilestones();
+    mockUseProjectMembers();
+    mockUseStartSprint();
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('Caso 1 — líder sin Sprint ve el Empty state con "Iniciar Sprint"', () => {
+    mockUseProjectSprints({ sprints: [] });
+
+    renderWorkspace();
+
+    expect(
+      screen.getByText('Todavía no hay un Sprint activo en este proyecto'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Cuando se cree un Sprint, el tablero y las tareas aparecerán aquí.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Iniciar Sprint' })).toBeInTheDocument();
+  });
+
+  it('Caso 2 — un no-líder sin Sprint ve el Empty state pero nunca el botón "Iniciar Sprint"', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    mockUseProjectSprints({ sprints: [] });
+
+    renderWorkspace();
+
+    expect(
+      screen.getByText('Todavía no hay un Sprint activo en este proyecto'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Iniciar Sprint' })).not.toBeInTheDocument();
+  });
+
+  it('Caso 3 — sin Sprint activo, "Nueva tarea" no existe y no hay forma de abrir el formulario de creación', () => {
+    mockUseProjectSprints({ sprints: [] });
+
+    renderWorkspace();
+
+    expect(screen.queryByRole('button', { name: /nueva tarea/i })).not.toBeInTheDocument();
+    // El único disparador de TaskFormDialog en modo creación es ese botón:
+    // al no existir, el formulario tampoco puede estar montado/abierto.
+    expect(screen.queryByLabelText('Título de la tarea')).not.toBeInTheDocument();
+  });
+
+  it('Caso 4 — con Sprint ACTIVO no aparece el Empty state y el Kanban normal sigue funcionando', () => {
+    mockUseProjectSprints({ sprints: [sprint({ estado: 'ACTIVO' })] });
+    mockUseProjectTasks({
+      tasks: [
+        tarea({ idTarea: 1, tituloTarea: 'Tarea 1', estadoTarea: 'POR_HACER' }),
+      ],
+    });
+
+    renderWorkspace();
+
+    expect(
+      screen.queryByText('Todavía no hay un Sprint activo en este proyecto'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Por hacer' })).toBeInTheDocument();
+    expect(screen.getByText('Tarea 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /nueva tarea/i })).toBeInTheDocument();
+  });
+
+  it('Caso 5 — "Iniciar Sprint" invoca la mutación de F1 exactamente una vez', () => {
+    mockUseProjectSprints({ sprints: [] });
+    const mutate = vi.fn();
+    mockUseStartSprint({ mutate });
+
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sprint' }));
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(useStartSprint).toHaveBeenCalledWith(42);
+  });
+
+  it('Caso 6 — mientras startSprint está pendiente, el botón queda disabled y evita doble click', () => {
+    mockUseProjectSprints({ sprints: [] });
+    const mutate = vi.fn();
+    mockUseStartSprint({ mutate, isPending: true });
+
+    renderWorkspace();
+    const boton = screen.getByRole('button', { name: /iniciando/i });
+    expect(boton).toBeDisabled();
+
+    fireEvent.click(boton);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it('Caso 7 — mientras useProjectSprints está cargando no aparece el falso Empty state', () => {
+    mockUseProjectSprints({ sprints: [], isLoading: true });
+
+    renderWorkspace();
+
+    expect(
+      screen.queryByText('Todavía no hay un Sprint activo en este proyecto'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Iniciar Sprint' })).not.toBeInTheDocument();
+  });
+
+  it('un error de la consulta de Sprints no se interpreta como ausencia de Sprint, y permite reintentar', () => {
+    const refetch = vi.fn();
+    mockUseProjectSprints({ sprints: [], isLoading: false, isError: true, error: new Error('500'), refetch });
+
+    renderWorkspace();
+
+    expect(
+      screen.queryByText('Todavía no hay un Sprint activo en este proyecto'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /no se pudo verificar el estado del sprint/i,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /reintentar/i }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('Caso 8 — un Sprint EN_FINALIZACION no se trata como "todavía no hay Sprint" ni renderiza el banner de F6', () => {
+    mockUseProjectSprints({ sprints: [sprint({ estado: 'EN_FINALIZACION' })] });
+    mockUseProjectTasks({
+      tasks: [tarea({ idTarea: 1, tituloTarea: 'Tarea en curso', estadoTarea: 'POR_HACER' })],
+    });
+
+    renderWorkspace();
+
+    expect(
+      screen.queryByText('Todavía no hay un Sprint activo en este proyecto'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Tarea en curso')).toBeInTheDocument();
+    // F2 no implementa el banner de F6 (bloqueado temporalmente):
+    expect(screen.queryByText(/temporalmente bloqueado/i)).not.toBeInTheDocument();
+  });
+
+  it('un Sprint CERRADO (más reciente que ningún Sprint operable) sí cuenta como "todavía no hay Sprint"', () => {
+    mockUseProjectSprints({ sprints: [sprint({ estado: 'CERRADO', numero: 1 })] });
+
+    renderWorkspace();
+
+    expect(
+      screen.getByText('Todavía no hay un Sprint activo en este proyecto'),
+    ).toBeInTheDocument();
   });
 });
