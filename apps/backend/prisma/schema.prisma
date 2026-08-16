@@ -700,6 +700,8 @@ model AsignacionTarea {
   asignadoPor     Int       @map("asignado_por")
   /// Horas realmente trabajadas por idUsuario durante ESTE tramo concreto de asignación (nunca el total de la tarea): una tarea reasignada tiene una fila de AsignacionTarea por tramo, y cada una lleva sus propias horas. Reportado manualmente por el líder al editar la tarea. Fuente granular que HU-126 (HorasParticipacion.horasCalculadas) consumirá después; no confundir con esa capa de agregación/aprobación, que este PR no implementa.
   horasReales     Decimal?  @map("horas_reales") @db.Decimal(6, 2)
+  /// FND-09 (A5.1): marca el momento en que este tramo (horasReales) fue consumido por un proceso de reconocimiento de horas (Flow A: cálculo por Sprint / Flow B: reconocimiento anticipado por salida). NULL = todavía reconocible; NOT NULL = ya reconocido, no debe volver a sumarse. Sin default: todos los tramos existentes y los tramos nuevos nacen NULL — no hay trazabilidad histórica suficiente para inferir reconocimiento retroactivo, y ningún reconocimiento granular está implementado todavía (ver HorasParticipacion, que no referencia AsignacionTarea individuales).
+  reconocidoEn    DateTime? @map("reconocido_en")
 
   tarea           Tarea                      @relation(fields: [idTarea], references: [idTarea])
   usuario         Usuario                    @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
