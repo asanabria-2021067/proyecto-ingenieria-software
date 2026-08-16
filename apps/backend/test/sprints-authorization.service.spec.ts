@@ -67,6 +67,7 @@ describe('SprintsAuthorizationService', () => {
   describe.each([
     ['assertCanFinalizeSprint' as const, 'finalizar'],
     ['assertCanCloseSprint' as const, 'cerrar'],
+    ['assertCanAdjustRecognizedHours' as const, 'ajustar horas'],
   ])('%s (%s)', (method, _accion) => {
     it('permite al líder y devuelve el Sprint validado', async () => {
       const ctx = makeContext();
