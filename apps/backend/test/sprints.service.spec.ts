@@ -67,6 +67,11 @@ function makePrisma(tx = makeTx()) {
     $queryRaw: vi.fn(),
     sprint: { findFirst: vi.fn(), findMany: vi.fn() },
     hito: { findMany: vi.fn() },
+    // A12: getSprintDetail usa esto para calcular `porcentaje` por Hito
+    // (TODAS las tareas vigentes del Hito en el proyecto). Por defecto []
+    // para no romper los tests preexistentes de getSprintDetail que nunca
+    // configuran este mock explícitamente.
+    tarea: { findMany: vi.fn().mockResolvedValue([]) },
   } as any;
 }
 
@@ -1360,6 +1365,10 @@ describe('SprintsService', () => {
       };
       prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([tarea]));
       prisma.hito.findMany.mockResolvedValue([{ idHito: 200, tituloHito: 'MILESTONE-A', estadoHito: 'COMPLETADO' }]);
+      // A12: porcentaje se deriva de TODAS las tareas vigentes del Hito en
+      // el proyecto (aquí: 1 de 1 HECHO -> 100%), coherente con el
+      // estadoHito COMPLETADO ya persistido/mockeado arriba.
+      prisma.tarea.findMany.mockResolvedValue([{ idHito: 200, estadoTarea: 'HECHO' }]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications());
@@ -1376,7 +1385,9 @@ describe('SprintsService', () => {
       expect(result.tareas[0].asignaciones[0].horasReales).toBe(5);
       expect(result.tareas[0].comentarios).toHaveLength(1);
       expect(result.tareas[0].comentarios[0].contenido).toBe('COMMENT-HISTORY');
-      expect(result.hitos).toEqual([{ idHito: 200, tituloHito: 'MILESTONE-A', estadoHito: 'COMPLETADO' }]);
+      expect(result.hitos).toEqual([
+        { idHito: 200, tituloHito: 'MILESTONE-A', estadoHito: 'COMPLETADO', porcentaje: 100 },
+      ]);
     });
 
     it('caso 2: una tarea con varios tramos de asignación aparece UNA vez, con todos sus tramos conservados', async () => {
@@ -1440,6 +1451,16 @@ describe('SprintsService', () => {
       const tarea2 = { ...tarea1, idTarea: 101, tituloTarea: 'T2' };
       prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([tarea1, tarea2]));
       prisma.hito.findMany.mockResolvedValue([{ idHito: 200, tituloHito: 'MILESTONE-COMPARTIDO', estadoHito: 'EN_PROGRESO' }]);
+      // A12: 4 tareas del Hito EN TODO EL PROYECTO (no solo las 2 de este
+      // Sprint, que están ambas HECHO) — demuestra que el porcentaje usa el
+      // scope project-wide de calcularAvanceHitos/getAvance, no las tareas
+      // ya cargadas del Sprint: 2 de 4 HECHO = 50%, nunca 100%.
+      prisma.tarea.findMany.mockResolvedValue([
+        { idHito: 200, estadoTarea: 'HECHO' },
+        { idHito: 200, estadoTarea: 'HECHO' },
+        { idHito: 200, estadoTarea: 'EN_PROGRESO' },
+        { idHito: 200, estadoTarea: 'POR_HACER' },
+      ]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications());
@@ -1456,6 +1477,81 @@ describe('SprintsService', () => {
       expect(prisma.hito.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { idHito: { in: [200] }, idProyecto: PROJECT_ID } }),
       );
+      // El porcentaje se calcula UNA sola vez para el Hito compartido, no
+      // una vez por cada tarea que lo referencia.
+      expect(prisma.tarea.findMany).toHaveBeenCalledTimes(1);
+      expect(result.hitos[0]).toEqual({
+        idHito: 200,
+        tituloHito: 'MILESTONE-COMPARTIDO',
+        estadoHito: 'EN_PROGRESO',
+        porcentaje: 50,
+      });
+    });
+
+    it('A12: porcentaje por Hito con números limpios — 4 tareas del Hito, 2 completadas -> 50%', async () => {
+      const prisma = makePrisma();
+      const tarea = {
+        idTarea: 100,
+        tituloTarea: 'T1',
+        descripcionTarea: null,
+        estadoTarea: 'HECHO',
+        prioridad: 'MEDIA',
+        idHito: 300,
+        fechaCreacion: new Date('2026-01-02'),
+        fechaLimite: null,
+        tiempoEstimadoHoras: null,
+        asignaciones: [],
+        comentarios: [],
+      };
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([tarea]));
+      prisma.hito.findMany.mockResolvedValue([{ idHito: 300, tituloHito: 'MILESTONE-50', estadoHito: 'EN_PROGRESO' }]);
+      prisma.tarea.findMany.mockResolvedValue([
+        { idHito: 300, estadoTarea: 'HECHO' },
+        { idHito: 300, estadoTarea: 'HECHO' },
+        { idHito: 300, estadoTarea: 'POR_HACER' },
+        { idHito: 300, estadoTarea: 'POR_HACER' },
+      ]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.hitos).toEqual([
+        { idHito: 300, tituloHito: 'MILESTONE-50', estadoHito: 'EN_PROGRESO', porcentaje: 50 },
+      ]);
+    });
+
+    it('A12: Hito sin tareas en el proyecto — porcentaje 0, sin NaN ni error', async () => {
+      const prisma = makePrisma();
+      const tarea = {
+        idTarea: 100,
+        tituloTarea: 'T1',
+        descripcionTarea: null,
+        estadoTarea: 'POR_HACER',
+        prioridad: 'MEDIA',
+        idHito: 400,
+        fechaCreacion: new Date('2026-01-02'),
+        fechaLimite: null,
+        tiempoEstimadoHoras: null,
+        asignaciones: [],
+        comentarios: [],
+      };
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([tarea]));
+      prisma.hito.findMany.mockResolvedValue([{ idHito: 400, tituloHito: 'MILESTONE-VACIO', estadoHito: 'PENDIENTE' }]);
+      // Caso límite: la consulta project-wide no encuentra tareas vigentes
+      // para el Hito (p. ej. todas soft-deleted) — nunca debe producir NaN.
+      prisma.tarea.findMany.mockResolvedValue([]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.hitos).toEqual([
+        { idHito: 400, tituloHito: 'MILESTONE-VACIO', estadoHito: 'PENDIENTE', porcentaje: 0 },
+      ]);
+      expect(Number.isNaN(result.hitos[0].porcentaje)).toBe(false);
     });
 
     it('caso 4: Sprint ajeno al proyecto — propaga NotFoundException sin ejecutar la reconstrucción', async () => {

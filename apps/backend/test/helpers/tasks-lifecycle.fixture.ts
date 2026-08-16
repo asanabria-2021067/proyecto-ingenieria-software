@@ -563,6 +563,9 @@ export function makeFakeDb(state: FixtureState) {
         const rows = state.tareas.filter(
           (t) =>
             (where.idProyecto === undefined || t.idProyecto === where.idProyecto) &&
+            // A12.1: syncHitoEstado filtra por idHito — necesario para que
+            // esta fixture soporte esa consulta correctamente.
+            (where.idHito === undefined || t.idHito === where.idHito) &&
             (where.eliminadoEn === undefined || t.eliminadoEn === where.eliminadoEn),
         );
         return rows.map((row) => (args.select ? buildTareaSelectShape(row, state) : row));
@@ -680,6 +683,17 @@ export function makeFakeDb(state: FixtureState) {
       findUnique: vi.fn(async (args: any) => {
         maybeFail('hito.findUnique');
         return state.hitos.find((h) => h.idHito === args.where.idHito) ?? null;
+      }),
+      // A12.1: usado por syncHitoEstado para persistir el progreso
+      // recalculado tras crear/mutar/eliminar una tarea de un Hito.
+      update: vi.fn(async (args: any) => {
+        maybeFail('hito.update');
+        const hito = state.hitos.find((h) => h.idHito === args.where.idHito);
+        if (!hito) throw new Error(`fixture: hito ${args.where.idHito} no encontrado`);
+        const before = { ...hito };
+        recordUndo(() => Object.assign(hito, before));
+        Object.assign(hito, args.data);
+        return hito;
       }),
     },
 
