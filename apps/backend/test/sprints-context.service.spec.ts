@@ -222,4 +222,64 @@ describe('SprintsContextService', () => {
       expect(prisma.sprint.findFirst).not.toHaveBeenCalled();
     });
   });
+
+  describe('getSprintWithProjectOrThrow (A8)', () => {
+    it('devuelve el Sprint con proyecto.creadoPor resuelto en la MISMA consulta (una sola llamada a sprint.findFirst)', async () => {
+      const prisma = makeClient();
+      const sprint = {
+        idSprint: 10,
+        idProyecto: 1,
+        proyecto: { creadoPor: 5, eliminadoEn: null },
+      };
+      prisma.sprint.findFirst.mockResolvedValue(sprint);
+      const service = new SprintsContextService(prisma);
+
+      const result = await service.getSprintWithProjectOrThrow(1, 10);
+
+      expect(result).toBe(sprint);
+      expect(prisma.sprint.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.sprint.findFirst).toHaveBeenCalledWith({
+        where: { idSprint: 10, idProyecto: 1 },
+        include: { proyecto: { select: { creadoPor: true, eliminadoEn: true } } },
+      });
+    });
+
+    it('lanza NotFoundException si el Sprint no existe en el proyecto', async () => {
+      const prisma = makeClient();
+      prisma.sprint.findFirst.mockResolvedValue(null);
+      const service = new SprintsContextService(prisma);
+
+      await expect(service.getSprintWithProjectOrThrow(1, 999)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('lanza NotFoundException si el proyecto del Sprint está soft-deleted (mismo criterio que getProjectOrThrow)', async () => {
+      const prisma = makeClient();
+      prisma.sprint.findFirst.mockResolvedValue({
+        idSprint: 10,
+        idProyecto: 1,
+        proyecto: { creadoPor: 5, eliminadoEn: new Date('2026-01-01') },
+      });
+      const service = new SprintsContextService(prisma);
+
+      await expect(service.getSprintWithProjectOrThrow(1, 10)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('usa el cliente transaccional proporcionado en vez del PrismaService principal', async () => {
+      const prisma = makeClient();
+      const tx = makeClient();
+      const sprint = { idSprint: 10, idProyecto: 1, proyecto: { creadoPor: 5, eliminadoEn: null } };
+      tx.sprint.findFirst.mockResolvedValue(sprint);
+      const service = new SprintsContextService(prisma);
+
+      const result = await service.getSprintWithProjectOrThrow(1, 10, tx);
+
+      expect(result).toBe(sprint);
+      expect(tx.sprint.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.sprint.findFirst).not.toHaveBeenCalled();
+    });
+  });
 });
