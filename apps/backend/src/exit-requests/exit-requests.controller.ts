@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { CreateSolicitudSalidaDto } from './dto/create-solicitud-salida.dto';
 import { ExitRequestsService } from './exit-requests.service';
 
@@ -11,6 +12,7 @@ export class ExitRequestsController {
 
   @Post('solicitudes-salida')
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ProjectWriteGuard)
   createExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() data: CreateSolicitudSalidaDto,
@@ -21,6 +23,7 @@ export class ExitRequestsController {
 
   @Post('solicitudes-salida/:idSolicitud/aprobar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
   approveExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
@@ -31,6 +34,7 @@ export class ExitRequestsController {
 
   @Post('solicitudes-salida/:idSolicitud/rechazar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
   rejectExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
@@ -49,6 +53,7 @@ export class ExitRequestsController {
 
   @Post('salida/preparacion/continuar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
   continueExitPreparation(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
@@ -58,6 +63,7 @@ export class ExitRequestsController {
 
   @Post('salida/preparacion/cancelar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
   cancelExitPreparation(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
