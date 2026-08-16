@@ -7,6 +7,15 @@ import { TeamService } from './team.service';
 export class TeamController {
   constructor(private teamService: TeamService) {}
 
+  @Get(':id/miembros/postulaciones-pendientes')
+  @UseGuards(JwtAuthGuard)
+  getPendingPostulations(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.teamService.getPendingPostulations(id, user.userId);
+  }
+
   @Get(':id/equipo/:idUsuario')
   @UseGuards(JwtAuthGuard)
   findTeamMemberDetail(
