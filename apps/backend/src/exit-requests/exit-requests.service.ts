@@ -121,6 +121,70 @@ export class ExitRequestsService {
     };
   }
 
+  async continueExitPreparation(idProyecto: number, actorUserId: number) {
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const solicitud = await tx.solicitudSalidaProyecto.findFirst({
+        where: {
+          idProyecto,
+          idUsuario: actorUserId,
+          estadoSolicitud: EstadoSolicitudSalida.PREPARACION,
+        },
+        select: {
+          idSolicitud: true,
+          idProyecto: true,
+          idUsuario: true,
+          estadoSolicitud: true,
+          solicitadaEn: true,
+          motivo: true,
+        },
+      });
+
+      if (!solicitud) {
+        throw new BadRequestException('No existe una solicitud de salida en estado PREPARACION');
+      }
+
+      const blocker = await tx.asignacionTarea.findFirst({
+        where: {
+          idUsuario: actorUserId,
+          desasignadaEn: null,
+          tarea: { idProyecto },
+        },
+        select: { idAsignacion: true },
+      });
+
+      if (blocker) {
+        throw new ConflictException('No puedes continuar mientras tengas asignaciones de tareas vigentes');
+      }
+
+      const updated = await tx.solicitudSalidaProyecto.updateMany({
+        where: {
+          idSolicitud: solicitud.idSolicitud,
+          idProyecto,
+          idUsuario: actorUserId,
+          estadoSolicitud: EstadoSolicitudSalida.PREPARACION,
+        },
+        data: {
+          estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER,
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new ConflictException('La solicitud ya no está en estado PREPARACION');
+      }
+
+      return {
+        idSolicitud: solicitud.idSolicitud,
+        idProyecto: solicitud.idProyecto,
+        idUsuario: solicitud.idUsuario,
+        motivo: solicitud.motivo,
+        solicitadaEn: solicitud.solicitadaEn,
+        estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER,
+      };
+    });
+
+    return resultado;
+  }
+
   async approveSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
     const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId);
     const solicitud = await this.context.getPendingSolicitudSalidaOrThrow(idProyecto, idSolicitud);
