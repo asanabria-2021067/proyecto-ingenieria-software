@@ -790,6 +790,7 @@ model RevisionEvidencia {
 }
 
 /// Fuente de verdad de horas de una participación. Para horas reconocidas/agregadas se usa `horasAprobadas` únicamente cuando `estadoHoras = APROBADA`, siguiendo el patrón ya usado por el resto del código.
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una fila por (idParticipacion, idSprint) cuando idSprint NO es NULL, vía índice único parcial `horas_participacion_sprint_unique` (migración `20260816010000_add_sprint_hours_participation_uniqueness`, A7.1). Los registros históricos con idSprint = NULL no están restringidos: una participación conserva múltiples filas periódicas no vinculadas a Sprint.
 /// horasCalculadas/idSprint (FND-07) son Foundation de datos exclusivamente:
 /// preparan la persistencia para el futuro reconocimiento de horas por
 /// Sprint (Flow A), pero no implementan todavía cálculo, reconocimiento,
