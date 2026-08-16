@@ -69,13 +69,19 @@ export interface SprintDetailTareaDto {
 }
 
 /**
- * `estadoHito` es el valor persistido tal cual — A10 no corrige ni
- * recalcula `Hito.estadoHito` (eso es contrato exclusivo de A12).
+ * `estadoHito` es el valor persistido de `Hito.estadoHito` (A12 corrigió su
+ * sincronización en TasksService — ver hito-progreso.ts — así que ya es
+ * confiable; SprintDetail sigue devolviendo el campo persistido tal cual,
+ * nunca un recálculo distinto). `porcentaje` se deriva con la MISMA fórmula
+ * canónica (`calcularProgresoHito`), usando TODAS las tareas vigentes del
+ * Hito en el proyecto (mismo scope que `ProjectsService.calcularAvanceHitos`
+ * / `getAvance`) — no solo las tareas de este Sprint.
  */
 export interface SprintDetailHitoDto {
   idHito: number;
   tituloHito: string;
   estadoHito: EstadoHito;
+  porcentaje: number;
 }
 
 /**

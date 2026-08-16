@@ -24,6 +24,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
 import { CloseAssignmentDto } from './dto/close-assignment.dto';
+import { calcularProgresoHito } from '../common/hito-progreso';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -379,6 +380,15 @@ export class TasksService {
         );
       }
 
+      // A12.1: una tarea nueva con idHito != null cambia el conjunto de
+      // tareas vigentes que determina el progreso de ese Hito (nace
+      // POR_HACER, así que puede degradar un Hito antes COMPLETADO) —
+      // mismo mecanismo de sincronización que updateEstado/closeAssignment
+      // (A12), reutilizado sin duplicar la fórmula.
+      if (filaFinal.idHito !== null) {
+        await this.syncHitoEstado(tx, filaFinal.idHito);
+      }
+
       return filaFinal;
     });
 
@@ -584,6 +594,14 @@ export class TasksService {
         );
       }
 
+      // A12: updateEstado escribe estadoTarea incondicionalmente (sin
+      // atajo de idempotencia, ver docstring de este método) — si la
+      // tarea pertenece a un Hito, su progreso persistido puede haber
+      // cambiado.
+      if (filaFinal.idHito !== null) {
+        await this.syncHitoEstado(tx, filaFinal.idHito);
+      }
+
       return filaFinal;
     });
 
@@ -649,6 +667,14 @@ export class TasksService {
         where: { idTarea: taskId },
         data: { eliminadoEn },
       });
+
+      // A12.1: el soft-delete saca la tarea del conjunto vigente
+      // (`eliminadoEn: null`) que determina el progreso de su Hito — la
+      // misma invariante que corrige la creación; se resincroniza con el
+      // mismo mecanismo (A12), dentro de esta misma transacción.
+      if (tarea.idHito !== null) {
+        await this.syncHitoEstado(tx, tarea.idHito);
+      }
 
       return {
         taskId: tarea.idTarea,
@@ -993,10 +1019,40 @@ export class TasksService {
         );
       }
 
+      // A12: solo cuando este cierre de tramo efectivamente cambió
+      // estadoTarea (marcarComoHecha) y la tarea pertenece a un Hito.
+      if (dto.marcarComoHecha === true && filaFinal.idHito !== null) {
+        await this.syncHitoEstado(tx, filaFinal.idHito);
+      }
+
       return filaFinal;
     });
 
     return mapTarea(row);
+  }
+
+  /**
+   * A12: sincroniza `Hito.estadoHito` con el progreso real derivado de sus
+   * tareas vigentes — misma fórmula única que `ProjectsService.calcularAvanceHitos`
+   * (vía `calcularProgresoHito`, src/common/hito-progreso.ts), nunca una
+   * segunda definición. Se llama SIEMPRE dentro de la misma transacción que
+   * acaba de escribir `estadoTarea`, así que la consulta ve el estado ya
+   * comprometido (no el anterior). Acotado por `idHito`: una sola consulta
+   * (`tarea.findMany` filtrado por ese Hito, `eliminadoEn: null`) y una sola
+   * escritura (`hito.update`) — nunca recorre otros Hitos ni otros
+   * proyectos. El caller es responsable de solo invocar esto cuando la
+   * tarea realmente tiene `idHito !== null`.
+   */
+  private async syncHitoEstado(tx: Prisma.TransactionClient, idHito: number): Promise<void> {
+    const tareasHito = await tx.tarea.findMany({
+      where: { idHito, eliminadoEn: null },
+      select: { estadoTarea: true },
+    });
+    const { estadoHito } = calcularProgresoHito(tareasHito);
+    await tx.hito.update({
+      where: { idHito },
+      data: { estadoHito },
+    });
   }
 
   private assertValidAssignmentClosureInput(dto: CloseAssignmentDto): void {
