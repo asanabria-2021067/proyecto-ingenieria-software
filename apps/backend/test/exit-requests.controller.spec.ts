@@ -1,9 +1,16 @@
 import 'reflect-metadata';
 import { describe, expect, it, vi } from 'vitest';
 import { HttpStatus } from '@nestjs/common';
-import { PATH_METADATA, METHOD_METADATA, HTTP_CODE_METADATA } from '@nestjs/common/constants';
+import {
+  GUARDS_METADATA,
+  PATH_METADATA,
+  METHOD_METADATA,
+  HTTP_CODE_METADATA,
+} from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common/enums/request-method.enum';
 import { ExitRequestsController } from '../src/exit-requests/exit-requests.controller';
+import { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
+import { ProjectWriteGuard } from '../src/common/guards/project-write.guard';
 
 function makeController() {
   const service = {
@@ -14,7 +21,7 @@ function makeController() {
     continueExitPreparation: vi.fn(),
     cancelExitPreparation: vi.fn(),
   };
-  return { controller: new ExitRequestsController(service as any), service };
+  return { controller: new ExitRequestsController(service as unknown as ExitRequestsService), service };
 }
 
 function routeMetadata(methodName: keyof ExitRequestsController) {
@@ -24,6 +31,11 @@ function routeMetadata(methodName: keyof ExitRequestsController) {
     method: Reflect.getMetadata(METHOD_METADATA, handler),
     status: Reflect.getMetadata(HTTP_CODE_METADATA, handler),
   };
+}
+
+function guardsOf(methodName: keyof ExitRequestsController): unknown[] {
+  const handler = ExitRequestsController.prototype[methodName];
+  return Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
 }
 
 describe('ExitRequestsController', () => {
@@ -77,6 +89,20 @@ describe('ExitRequestsController', () => {
       method: RequestMethod.POST,
       status: HttpStatus.OK,
     });
+  });
+
+  it.each([
+    'createExitRequest',
+    'approveExitRequest',
+    'rejectExitRequest',
+    'continueExitPreparation',
+    'cancelExitPreparation',
+  ] as const)('%s tiene ProjectWriteGuard aplicado', (methodName) => {
+    expect(guardsOf(methodName)).toContain(ProjectWriteGuard);
+  });
+
+  it('no aplica ProjectWriteGuard al GET de preparación', () => {
+    expect(guardsOf('getExitPreparationSummary')).not.toContain(ProjectWriteGuard);
   });
 
   it('delega creación con projectId, userId de CurrentUser y motivo del DTO', async () => {
