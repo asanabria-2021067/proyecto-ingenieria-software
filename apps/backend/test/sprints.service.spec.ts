@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { SprintsService } from '../src/sprints/sprints.service';
+import { SprintsContextService } from '../src/sprints/sprints-context.service';
+import { SprintsAuthorizationService } from '../src/sprints/sprints-authorization.service';
 
 /**
  * Reproduce la violación real del índice parcial `sprint_operable_unique`
@@ -62,6 +64,7 @@ function makePrisma(tx = makeTx()) {
   return {
     tx,
     $transaction: vi.fn(async (callback: any) => callback(tx)),
+    $queryRaw: vi.fn(),
   } as any;
 }
 
@@ -74,6 +77,7 @@ function makeSprintsAuthorization() {
     assertCanStartSprint: vi.fn().mockResolvedValue(undefined),
     assertCanFinalizeSprint: vi.fn(),
     assertCanAdjustRecognizedHours: vi.fn().mockResolvedValue(undefined),
+    assertCanViewClosingSummary: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
 
@@ -852,6 +856,181 @@ describe('SprintsService', () => {
       // llamada registrada es la del propio test (antes/después), no del
       // servicio.
       expect((tx as any).asignacionTarea.findMany).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getSprintClosingSummary', () => {
+    function participanteRaw(overrides: Record<string, unknown> = {}) {
+      return {
+        idUsuario: 40,
+        nombre: 'Ana',
+        apellido: 'Pérez',
+        correo: 'ana@example.test',
+        fotoUrl: null,
+        roles: [{ idRolProyecto: 1, nombreRol: 'Desarrollador' }],
+        tareasRealizadas: 2,
+        horasReportadas: 10,
+        horasCalculadas: 10,
+        horasAprobadas: 10,
+        ...overrides,
+      };
+    }
+
+    it('caso feliz: devuelve un summary tipado con múltiples participantes, sin transformar las filas agregadas', async () => {
+      const tx = makeTx();
+      const filas = [
+        participanteRaw({ idUsuario: 40 }),
+        participanteRaw({
+          idUsuario: 41,
+          nombre: 'Beto',
+          roles: [
+            { idRolProyecto: 1, nombreRol: 'Desarrollador' },
+            { idRolProyecto: 2, nombreRol: 'QA' },
+          ],
+          tareasRealizadas: 5,
+          horasReportadas: 8,
+          horasCalculadas: 7,
+          horasAprobadas: 7,
+        }),
+      ];
+      const prisma = makePrisma(tx);
+      prisma.$queryRaw.mockResolvedValue(filas);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result).toEqual({
+        idProyecto: PROJECT_ID,
+        idSprint: SPRINT_ID,
+        participantes: filas,
+      });
+      expect(authorization.assertCanViewClosingSummary).toHaveBeenCalledWith(
+        PROJECT_ID,
+        SPRINT_ID,
+        LIDER_ID,
+      );
+    });
+
+    it('caso multirol: una persona con varios roles llega como UNA sola fila con roles.length > 1 (paso directo, sin duplicar)', async () => {
+      const tx = makeTx();
+      const filaMultirol = participanteRaw({
+        idUsuario: 42,
+        roles: [
+          { idRolProyecto: 1, nombreRol: 'Desarrollador' },
+          { idRolProyecto: 3, nombreRol: 'Líder técnico' },
+        ],
+      });
+      const prisma = makePrisma(tx);
+      prisma.$queryRaw.mockResolvedValue([filaMultirol]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.participantes).toHaveLength(1);
+      expect(result.participantes[0].idUsuario).toBe(42);
+      expect(result.participantes[0].roles).toHaveLength(2);
+    });
+
+    it('ausencia de datos: Sprint sin contribuciones devuelve participantes: [], no un error', async () => {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      prisma.$queryRaw.mockResolvedValue([]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result).toEqual({ idProyecto: PROJECT_ID, idSprint: SPRINT_ID, participantes: [] });
+    });
+
+    it('Sprint ajeno al proyecto: propaga NotFoundException sin ejecutar la consulta agregada', async () => {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanViewClosingSummary.mockRejectedValue(
+        new NotFoundException(`Sprint con id ${SPRINT_ID} no encontrado en el proyecto ${PROJECT_ID}`),
+      );
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('usuario no líder: propaga ForbiddenException sin ejecutar la consulta agregada', async () => {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanViewClosingSummary.mockRejectedValue(
+        new ForbiddenException('No eres el líder de este proyecto'),
+      );
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('aislamiento: la consulta agregada parametriza projectId y sprintId (sin concatenación de strings)', async () => {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      prisma.$queryRaw.mockResolvedValue([]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const sqlArg = prisma.$queryRaw.mock.calls[0][0] as { values: unknown[]; strings: string[] };
+      // Prisma.sql produce un objeto con `.values` (los parámetros reales
+      // que viajarán como $1, $2, ... — nunca interpolados directamente en
+      // `.strings`), evidencia de que la consulta usa parametrización
+      // segura, no concatenación de strings.
+      expect(Array.isArray(sqlArg.values)).toBe(true);
+      expect(Array.isArray(sqlArg.strings)).toBe(true);
+      expect(sqlArg.values).toContain(PROJECT_ID);
+      expect(sqlArg.values).toContain(SPRINT_ID);
+      expect(sqlArg.strings.join('')).not.toContain(String(PROJECT_ID));
+      expect(sqlArg.strings.join('')).not.toContain(String(SPRINT_ID));
+    });
+
+    it('query count: exactamente 2 consultas de base de datos (contexto+autorización + agregación), sin crecer con N participantes', async () => {
+      async function contarQueriesParaNParticipantes(n: number) {
+        const sprintFilas = Array.from({ length: n }, (_, i) => participanteRaw({ idUsuario: 100 + i }));
+        const sprintFindFirst = vi.fn().mockResolvedValue({
+          idSprint: SPRINT_ID,
+          idProyecto: PROJECT_ID,
+          proyecto: { creadoPor: LIDER_ID, eliminadoEn: null },
+        });
+        const queryRaw = vi.fn().mockResolvedValue(sprintFilas);
+        const prisma = { sprint: { findFirst: sprintFindFirst }, $queryRaw: queryRaw } as any;
+
+        // Servicios reales (no mocks de conveniencia) para que el conteo
+        // refleje exactamente las llamadas a Prisma que la cadena
+        // real autorización -> agregación efectúa.
+        const context = new SprintsContextService(prisma);
+        const authorization = new SprintsAuthorizationService(context);
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+        expect(result.participantes).toHaveLength(n);
+        expect(sprintFindFirst).toHaveBeenCalledTimes(1);
+        expect(queryRaw).toHaveBeenCalledTimes(1);
+      }
+
+      await contarQueriesParaNParticipantes(1);
+      await contarQueriesParaNParticipantes(5);
     });
   });
 });

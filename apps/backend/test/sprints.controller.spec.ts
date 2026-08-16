@@ -4,7 +4,12 @@ import { SprintsController } from '../src/sprints/sprints.controller';
 import { ProjectWriteGuard } from '../src/common/guards/project-write.guard';
 
 function makeService() {
-  return { startSprint: vi.fn(), finalizeSprint: vi.fn(), adjustRecognizedHours: vi.fn() } as any;
+  return {
+    startSprint: vi.fn(),
+    finalizeSprint: vi.fn(),
+    adjustRecognizedHours: vi.fn(),
+    getSprintClosingSummary: vi.fn(),
+  } as any;
 }
 
 describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
@@ -143,5 +148,52 @@ describe('SprintsController.adjustHours (PATCH /proyectos/:projectId/sprints/:sp
     await expect(
       controller.adjustHours(5, 12, 30, { horasAprobadas: 8 }, { userId: 9 }),
     ).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.getClosingSummary (GET /proyectos/:projectId/sprints/:sprintId/resumen-cierre)', () => {
+  it('está registrado como GET en :sprintId/resumen-cierre', () => {
+    expect(
+      Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.getClosingSummary),
+    ).toBe(':sprintId/resumen-cierre');
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.getClosingSummary),
+    ).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.getClosingSummary),
+    ).toBe(200);
+  });
+
+  it('delega en SprintsService.getSprintClosingSummary con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = new SprintsController(service);
+
+    controller.getClosingSummary(5, 12, { userId: 9 });
+
+    expect(service.getSprintClosingSummary).toHaveBeenCalledTimes(1);
+    expect(service.getSprintClosingSummary).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.getSprintClosingSummary, sin transformarlo', async () => {
+    const service = makeService();
+    const summary = { idProyecto: 5, idSprint: 12, participantes: [] };
+    service.getSprintClosingSummary.mockResolvedValue(summary);
+    const controller = new SprintsController(service);
+
+    const result = await controller.getClosingSummary(5, 12, { userId: 9 });
+
+    expect(result).toBe(summary);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.getSprintClosingSummary', async () => {
+    const service = makeService();
+    const error = new Error('no autorizado');
+    service.getSprintClosingSummary.mockRejectedValue(error);
+    const controller = new SprintsController(service);
+
+    await expect(controller.getClosingSummary(5, 12, { userId: 9 })).rejects.toBe(error);
   });
 });

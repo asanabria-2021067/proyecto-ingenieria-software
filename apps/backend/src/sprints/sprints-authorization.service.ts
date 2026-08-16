@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { SprintsContextService } from './sprints-context.service';
 
@@ -40,6 +40,27 @@ export class SprintsAuthorizationService {
     tx?: TxClient,
   ) {
     return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
+  }
+
+  /**
+   * Ver resumen de cierre del Sprint (A8): exclusivo del líder, misma regla
+   * de acceso que gestionar el Sprint (finalizar/cerrar/ajustar horas). A
+   * diferencia de `_requireSprintAndLeadership` (2 queries: Sprint + Proyecto
+   * por separado), resuelve Sprint+liderazgo en UNA sola consulta vía
+   * `SprintsContextService.getSprintWithProjectOrThrow` — el read-model de
+   * A8 tiene un presupuesto de ≤2 queries totales por invocación.
+   */
+  async assertCanViewClosingSummary(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+    tx?: TxClient,
+  ) {
+    const sprint = await this.sprintsContext.getSprintWithProjectOrThrow(projectId, sprintId, tx);
+    if (sprint.proyecto.creadoPor !== userId) {
+      throw new ForbiddenException('No eres el líder de este proyecto');
+    }
+    return sprint;
   }
 
   /**

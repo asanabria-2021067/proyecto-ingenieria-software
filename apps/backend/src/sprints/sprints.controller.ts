@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -54,5 +55,15 @@ export class SprintsController {
       user.userId,
       dto,
     );
+  }
+
+  @Get(':sprintId/resumen-cierre')
+  @HttpCode(HttpStatus.OK)
+  getClosingSummary(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.getSprintClosingSummary(projectId, sprintId, user.userId);
   }
 }

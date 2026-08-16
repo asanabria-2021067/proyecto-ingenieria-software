@@ -8,6 +8,7 @@ function makeContext() {
     assertProjectLeader: vi.fn(),
     getCurrentSprint: vi.fn(),
     getSprintInProjectOrThrow: vi.fn(),
+    getSprintWithProjectOrThrow: vi.fn(),
   } as any;
 }
 
@@ -147,6 +148,68 @@ describe('SprintsAuthorizationService', () => {
 
       expect(ctx.getSprintInProjectOrThrow).toHaveBeenCalledWith(1, 10, tx);
       expect(ctx.assertProjectLeader).toHaveBeenCalledWith(1, LIDER_ID, tx);
+    });
+  });
+
+  describe('assertCanViewClosingSummary (A8)', () => {
+    const SPRINT_CON_PROYECTO = { idSprint: 10, idProyecto: 1, proyecto: { creadoPor: LIDER_ID } };
+
+    it('permite al líder y devuelve el Sprint validado, en UNA sola consulta de contexto (getSprintWithProjectOrThrow)', async () => {
+      const ctx = makeContext();
+      ctx.getSprintWithProjectOrThrow.mockResolvedValue(SPRINT_CON_PROYECTO);
+      const service = new SprintsAuthorizationService(ctx);
+
+      const result = await service.assertCanViewClosingSummary(1, 10, LIDER_ID);
+
+      expect(result).toBe(SPRINT_CON_PROYECTO);
+      expect(ctx.getSprintWithProjectOrThrow).toHaveBeenCalledTimes(1);
+      // A diferencia de assertCanFinalizeSprint/assertCanCloseSprint/
+      // assertCanAdjustRecognizedHours, esta variante NUNCA llama a
+      // assertProjectLeader por separado: el liderazgo ya viaja en la
+      // misma fila (proyecto.creadoPor) resuelta por
+      // getSprintWithProjectOrThrow — ese es el ahorro de query de A8.
+      expect(ctx.assertProjectLeader).not.toHaveBeenCalled();
+    });
+
+    it('rechaza a un usuario que no es líder con ForbiddenException', async () => {
+      const ctx = makeContext();
+      ctx.getSprintWithProjectOrThrow.mockResolvedValue(SPRINT_CON_PROYECTO);
+      const service = new SprintsAuthorizationService(ctx);
+
+      await expect(
+        service.assertCanViewClosingSummary(1, 10, PARTICIPANTE_ID),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rechaza a un usuario externo al proyecto con ForbiddenException', async () => {
+      const ctx = makeContext();
+      ctx.getSprintWithProjectOrThrow.mockResolvedValue(SPRINT_CON_PROYECTO);
+      const service = new SprintsAuthorizationService(ctx);
+
+      await expect(
+        service.assertCanViewClosingSummary(1, 10, EXTERNO_ID),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('propaga NotFoundException si el Sprint no existe en el proyecto (sin evaluar liderazgo)', async () => {
+      const ctx = makeContext();
+      ctx.getSprintWithProjectOrThrow.mockRejectedValue(NOT_FOUND_SPRINT());
+      const service = new SprintsAuthorizationService(ctx);
+
+      await expect(service.assertCanViewClosingSummary(1, 999, LIDER_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('traslada el cliente transaccional recibido', async () => {
+      const ctx = makeContext();
+      ctx.getSprintWithProjectOrThrow.mockResolvedValue(SPRINT_CON_PROYECTO);
+      const tx = { marker: 'tx' } as any;
+      const service = new SprintsAuthorizationService(ctx);
+
+      await service.assertCanViewClosingSummary(1, 10, LIDER_ID, tx);
+
+      expect(ctx.getSprintWithProjectOrThrow).toHaveBeenCalledWith(1, 10, tx);
     });
   });
 
