@@ -1,15 +1,15 @@
-import { Body, Controller, HttpCode, HttpStatus, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateSolicitudSalidaDto } from './dto/create-solicitud-salida.dto';
 import { ExitRequestsService } from './exit-requests.service';
 
-@Controller('proyectos/:projectId/solicitudes-salida')
+@Controller('proyectos/:projectId')
 @UseGuards(JwtAuthGuard)
 export class ExitRequestsController {
   constructor(private readonly exitRequestsService: ExitRequestsService) {}
 
-  @Post()
+  @Post('solicitudes-salida')
   @HttpCode(HttpStatus.CREATED)
   createExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
@@ -19,7 +19,7 @@ export class ExitRequestsController {
     return this.exitRequestsService.createSolicitudSalida(projectId, user.userId, data.motivo);
   }
 
-  @Post(':idSolicitud/aprobar')
+  @Post('solicitudes-salida/:idSolicitud/aprobar')
   @HttpCode(HttpStatus.OK)
   approveExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
@@ -29,7 +29,7 @@ export class ExitRequestsController {
     return this.exitRequestsService.approveSolicitudSalida(projectId, idSolicitud, user.userId);
   }
 
-  @Post(':idSolicitud/rechazar')
+  @Post('solicitudes-salida/:idSolicitud/rechazar')
   @HttpCode(HttpStatus.OK)
   rejectExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
@@ -37,5 +37,13 @@ export class ExitRequestsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.exitRequestsService.rejectSolicitudSalida(projectId, idSolicitud, user.userId);
+  }
+
+  @Get('salida/preparacion')
+  getExitPreparationSummary(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.exitRequestsService.getExitPreparationSummary(projectId, user.userId);
   }
 }
