@@ -1,11 +1,17 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ApplicationsService } from '../applications/applications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamSummaryMemberDto, TeamSummaryRoleDto } from './dto/team-summary-member.dto';
 import { TeamSummaryResponseDto } from './dto/team-summary-response.dto';
 
+type ApplicationSummary = Awaited<ReturnType<ApplicationsService['findAll']>>[number];
+
 @Injectable()
 export class TeamService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private applicationsService: ApplicationsService,
+  ) {}
 
   /**
    * Mismo motivo documentado en tasks.service.ts#toDateOnly: las columnas
@@ -306,6 +312,20 @@ export class TeamService {
       lider: liderUsuario,
       miembros: idsUsuarios.map((id) => miembrosPorUsuario.get(id)!),
     };
+  }
+
+  async getPendingPostulations(
+    idProyecto: number,
+    userId: number,
+  ): Promise<ApplicationSummary[]> {
+    await this.requireOwner(idProyecto, userId);
+
+    const postulaciones = await this.applicationsService.findAll();
+    return postulaciones.filter(
+      (postulacion) =>
+        postulacion.estadoPostulacion === 'PENDIENTE' &&
+        postulacion.rolProyecto.proyecto.idProyecto === idProyecto,
+    );
   }
 
   private async requireOwner(idProyecto: number, userId: number) {
