@@ -23,6 +23,7 @@ import { AdminModule } from './admin/admin.module';
 import { LabelsModule } from './labels/labels.module';
 import { RolesModule } from './roles/roles.module';
 import { ProgressRecordsModule } from './progress-records/progress-records.module';
+import { SprintsModule } from './sprints/sprints.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { ProgressRecordsModule } from './progress-records/progress-records.modul
     LabelsModule,
     RolesModule,
     ProgressRecordsModule,
+    SprintsModule,
   ],
   controllers: [AppController],
   providers: [
