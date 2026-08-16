@@ -221,28 +221,29 @@ model Usuario {
   organizacionesCreadas            Organizacion[]
   membresiasOrganizacion           UsuarioOrganizacion[]
   proyectosCreados                 Proyecto[]
-  postulaciones                    Postulacion[]             @relation("Postulante")
-  postulacionesResueltas           Postulacion[]             @relation("PostulacionResolutor")
+  postulaciones                    Postulacion[]              @relation("Postulante")
+  postulacionesResueltas           Postulacion[]              @relation("PostulacionResolutor")
   participaciones                  ParticipacionProyecto[]
   tareasCreadas                    Tarea[]
-  tareasAsignadas                  AsignacionTarea[]         @relation("TareaAsignada")
-  tareasQueAsigno                  AsignacionTarea[]         @relation("TareaAsignador")
+  tareasAsignadas                  AsignacionTarea[]          @relation("TareaAsignada")
+  tareasQueAsigno                  AsignacionTarea[]          @relation("TareaAsignador")
   evidenciasCargadas               Evidencia[]
   revisionesRealizadas             RevisionEvidencia[]
   horasAprobadas                   HorasParticipacion[]
   certificadosEmitidos             Certificado[]
   notificaciones                   Notificacion[]
-  solicitudesRecuperacion          SolicitudRecuperacion[]   @relation("SolicitudRecuperacionUsuario")
-  solicitudesRecuperacionAtendidas SolicitudRecuperacion[]   @relation("SolicitudRecuperacionAdmin")
+  solicitudesRecuperacion          SolicitudRecuperacion[]    @relation("SolicitudRecuperacionUsuario")
+  solicitudesRecuperacionAtendidas SolicitudRecuperacion[]    @relation("SolicitudRecuperacionAdmin")
   rolesAcceso                      UsuarioRolAcceso[]
   auditorias                       BitacoraAuditoria[]
   configuracionesActualizadas      ConfiguracionSistema[]
-  revisionesProyectoRealizadas     RevisionProyecto[]        @relation("RevisionesProyectoRealizadas")
+  revisionesProyectoRealizadas     RevisionProyecto[]         @relation("RevisionesProyectoRealizadas")
   comentariosEscritos              Comentario[]
-  mensajesRevisionEnviados         MensajeRevisionProyecto[] @relation("MensajesEnviados")
-  solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[] @relation("SolicitudSalidaSolicitante")
-  solicitudesSalidaResueltas       SolicitudSalidaProyecto[] @relation("SolicitudSalidaResolutor")
+  mensajesRevisionEnviados         MensajeRevisionProyecto[]  @relation("MensajesEnviados")
+  solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[]  @relation("SolicitudSalidaSolicitante")
+  solicitudesSalidaResueltas       SolicitudSalidaProyecto[]  @relation("SolicitudSalidaResolutor")
   sprintsCerrados                  Sprint[]
+  registrosAvanceEscritos          RegistroAvanceAsignacion[]
 
   @@map("usuario")
 }
@@ -565,11 +566,12 @@ model ParticipacionProyecto {
   fechaIngreso        DateTime            @default(now()) @map("fecha_ingreso") @db.Date
   fechaSalida         DateTime?           @map("fecha_salida") @db.Date
 
-  usuario        Usuario              @relation(fields: [idUsuario], references: [idUsuario])
-  rolProyecto    RolProyecto          @relation(fields: [idRolProyecto], references: [idRolProyecto])
-  postulacion    Postulacion?         @relation(fields: [idPostulacion], references: [idPostulacion])
-  registrosHoras HorasParticipacion[]
-  certificados   Certificado[]
+  usuario           Usuario              @relation(fields: [idUsuario], references: [idUsuario])
+  rolProyecto       RolProyecto          @relation(fields: [idRolProyecto], references: [idRolProyecto])
+  postulacion       Postulacion?         @relation(fields: [idPostulacion], references: [idPostulacion])
+  registrosHoras    HorasParticipacion[]
+  certificados      Certificado[]
+  asignacionesTarea AsignacionTarea[]
 
   @@index([idRolProyecto, estadoParticipacion])
   @@index([idUsuario, estadoParticipacion])
@@ -680,22 +682,51 @@ model Tarea {
 
 /// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una asignación activa (desasignadaEn IS NULL) por idTarea, vía índice único parcial `asignacion_tarea_activa_unique` (migración `20260720190329_enforce_one_active_task_assignment`).
 /// Fuente de verdad de asignaciones de tareas: asignación vigente = `desasignadaEn == null`. El soft-delete de la tarea vive en `Tarea.eliminadoEn`, NO aquí.
+/// idParticipacion (FND-06) es opcional y de mejor esfuerzo: solo los tramos
+/// activos legacy fueron backfilleados (migración
+/// `20260815170100_add_participacion_context_to_asignacion_tarea`), y solo
+/// cuando existía una única ParticipacionProyecto ACTIVO inequívoca para el
+/// mismo (usuario, rol de la tarea). Los tramos cerrados nunca se tocaron.
+/// No usar como fuente de verdad histórica todavía: puede ser NULL incluso
+/// en tramos donde una participación compatible sí existe.
 model AsignacionTarea {
   idAsignacion    Int       @id @default(autoincrement()) @map("id_asignacion")
   idTarea         Int       @map("id_tarea")
   idUsuario       Int       @map("id_usuario")
+  idParticipacion Int?      @map("id_participacion")
   fechaAsignacion DateTime  @default(now()) @map("fecha_asignacion")
   desasignadaEn   DateTime? @map("desasignada_en")
   asignadoPor     Int       @map("asignado_por")
   /// Horas realmente trabajadas por idUsuario durante ESTE tramo concreto de asignación (nunca el total de la tarea): una tarea reasignada tiene una fila de AsignacionTarea por tramo, y cada una lleva sus propias horas. Reportado manualmente por el líder al editar la tarea. Fuente granular que HU-126 (HorasParticipacion.horasCalculadas) consumirá después; no confundir con esa capa de agregación/aprobación, que este PR no implementa.
   horasReales     Decimal?  @map("horas_reales") @db.Decimal(6, 2)
 
-  tarea     Tarea   @relation(fields: [idTarea], references: [idTarea])
-  usuario   Usuario @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
-  asignador Usuario @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
+  tarea           Tarea                      @relation(fields: [idTarea], references: [idTarea])
+  usuario         Usuario                    @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
+  asignador       Usuario                    @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
+  participacion   ParticipacionProyecto?     @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: SetNull)
+  registrosAvance RegistroAvanceAsignacion[]
 
   @@index([idUsuario, desasignadaEn])
+  @@index([idParticipacion])
   @@map("asignacion_tarea")
+}
+
+/// Registro de avance de una AsignacionTarea (FND-06 — Foundation de datos
+/// exclusivamente). El contrato funcional futuro (B1: mínimo 200 caracteres,
+/// autorización de autor, edición, ausencia de delete vía service) NO está
+/// implementado aquí; esta tabla solo prepara la persistencia.
+model RegistroAvanceAsignacion {
+  idRegistroAvance Int       @id @default(autoincrement()) @map("id_registro_avance")
+  idAsignacion     Int       @map("id_asignacion")
+  idAutor          Int       @map("id_autor")
+  contenido        String    @db.Text
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  editadoEn        DateTime? @map("editado_en")
+
+  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion])
+  autor      Usuario         @relation(fields: [idAutor], references: [idUsuario])
+
+  @@map("registro_avance_asignacion")
 }
 
 model Etiqueta {
