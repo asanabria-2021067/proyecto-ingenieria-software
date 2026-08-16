@@ -22,6 +22,9 @@ function makeTx() {
     tarea: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn() },
     asignacionTarea: { create: vi.fn(), updateMany: vi.fn() },
     tareaEtiqueta: { createMany: vi.fn(), deleteMany: vi.fn() },
+    // Por defecto el proyecto tiene un Sprint ACTIVO (FND-03.B): irrelevante
+    // para estos tests de notificaciones, que no ejercitan ese rechazo.
+    sprint: { findFirst: vi.fn().mockResolvedValue({ idSprint: 1 }) },
   };
 }
 
