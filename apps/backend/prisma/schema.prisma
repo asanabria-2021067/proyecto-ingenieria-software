@@ -194,6 +194,12 @@ enum EstadoSolicitudSalida {
   CANCELADA
 }
 
+enum EstadoSprint {
+  ACTIVO
+  EN_FINALIZACION
+  CERRADO
+}
+
 model Usuario {
   idUsuario         Int           @id @default(autoincrement()) @map("id_usuario")
   correo            String        @unique @db.VarChar(255)
@@ -235,6 +241,7 @@ model Usuario {
   mensajesRevisionEnviados         MensajeRevisionProyecto[] @relation("MensajesEnviados")
   solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[] @relation("SolicitudSalidaSolicitante")
   solicitudesSalidaResueltas       SolicitudSalidaProyecto[] @relation("SolicitudSalidaResolutor")
+  sprintsCerrados                  Sprint[]
 
   @@map("usuario")
 }
@@ -441,6 +448,7 @@ model Proyecto {
   mensajesRevision  MensajeRevisionProyecto[]
   etiquetas         Etiqueta[]
   solicitudesSalida SolicitudSalidaProyecto[]
+  sprints           Sprint[]
 
   @@map("proyecto")
 }
@@ -613,11 +621,31 @@ model Hito {
   @@map("hito")
 }
 
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo un Sprint operable (estado ACTIVO o EN_FINALIZACION) por idProyecto, vía índice único parcial `sprint_operable_unique` (migración `20260815000000_add_sprint`). CERRADO no está restringido, así que el historial de sprints se conserva íntegro.
+model Sprint {
+  idSprint                  Int          @id @default(autoincrement()) @map("id_sprint")
+  idProyecto                Int          @map("id_proyecto")
+  numero                    Int
+  estado                    EstadoSprint @default(ACTIVO)
+  fechaInicio               DateTime     @default(now()) @map("fecha_inicio")
+  fechaFinalizacionIniciada DateTime?    @map("fecha_finalizacion_iniciada")
+  fechaCierre               DateTime?    @map("fecha_cierre")
+  cerradoPor                Int?         @map("cerrado_por")
+
+  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
+  cerrador Usuario? @relation(fields: [cerradoPor], references: [idUsuario])
+  tareas   Tarea[]
+
+  @@index([idProyecto, estado])
+  @@map("sprint")
+}
+
 model Tarea {
   idTarea             Int         @id @default(autoincrement()) @map("id_tarea")
   idProyecto          Int         @map("id_proyecto")
   idHito              Int?        @map("id_hito")
   idRolProyecto       Int?        @map("id_rol_proyecto")
+  idSprint            Int?        @map("id_sprint")
   tituloTarea         String      @map("titulo_tarea") @db.VarChar(255)
   descripcionTarea    String?     @map("descripcion_tarea") @db.Text
   estadoTarea         EstadoTarea @default(POR_HACER) @map("estado_tarea")
@@ -633,6 +661,7 @@ model Tarea {
   proyecto     Proyecto          @relation(fields: [idProyecto], references: [idProyecto])
   hito         Hito?             @relation(fields: [idHito], references: [idHito])
   rolProyecto  RolProyecto?      @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
+  sprint       Sprint?           @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
   creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario])
   asignaciones AsignacionTarea[]
   evidencias   Evidencia[]
@@ -642,6 +671,7 @@ model Tarea {
   @@index([idProyecto, eliminadoEn, estadoTarea])
   @@index([idProyecto, idRolProyecto])
   @@index([idHito])
+  @@index([idSprint])
   @@map("tarea")
 }
 
