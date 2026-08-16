@@ -61,6 +61,7 @@ function makePrisma() {
     asignacionTarea: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), ...writeSpies() },
     horasParticipacion: { ...writeSpies() },
     tarea: { ...writeSpies() },
+    registroAvanceAsignacion: { ...writeSpies() },
     solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   };
   // approveSolicitudSalida corre en $transaction; reusar el mismo objeto
@@ -690,6 +691,127 @@ describe('ExitRequestsService.continueExitPreparation', () => {
 
     await expect(
       service.continueExitPreparation(PROYECTO_ID, MIEMBRO_ID),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+const SOLICITUD_PREPARACION_CANCELACION = {
+  idSolicitud: 503,
+  idProyecto: PROYECTO_ID,
+  idUsuario: MIEMBRO_ID,
+  motivo: 'Ya no deseo salir',
+  estadoSolicitud: 'PREPARACION',
+  solicitadaEn: new Date('2026-01-13T00:00:00.000Z'),
+};
+
+function setupCancelPreparationPath(prisma: ReturnType<typeof makePrisma>) {
+  prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(SOLICITUD_PREPARACION_CANCELACION);
+  prisma.solicitudSalidaProyecto.updateMany.mockResolvedValue({ count: 1 });
+}
+
+describe('ExitRequestsService.cancelExitPreparation', () => {
+  it('transiciona PREPARACION a CANCELADA con updateMany condicionado por proyecto, actor y estado', async () => {
+    const prisma = makePrisma();
+    setupCancelPreparationPath(prisma);
+    const service = makeService(prisma);
+
+    const resultado = await service.cancelExitPreparation(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(resultado).toEqual({
+      idSolicitud: 503,
+      idProyecto: PROYECTO_ID,
+      idUsuario: MIEMBRO_ID,
+      motivo: 'Ya no deseo salir',
+      solicitadaEn: SOLICITUD_PREPARACION_CANCELACION.solicitadaEn,
+      estadoSolicitud: 'CANCELADA',
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.solicitudSalidaProyecto.updateMany).toHaveBeenCalledWith({
+      where: {
+        idSolicitud: 503,
+        idProyecto: PROYECTO_ID,
+        idUsuario: MIEMBRO_ID,
+        estadoSolicitud: 'PREPARACION',
+      },
+      data: { estadoSolicitud: 'CANCELADA' },
+    });
+  });
+
+  it('rechaza si el actor no posee una solicitud PREPARACION en el proyecto', async () => {
+    const prisma = makePrisma();
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await expect(
+      service.cancelExitPreparation(PROYECTO_ID, MIEMBRO_ID + 1),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.solicitudSalidaProyecto.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          idProyecto: PROYECTO_ID,
+          idUsuario: MIEMBRO_ID + 1,
+          estadoSolicitud: 'PREPARACION',
+        },
+      }),
+    );
+    expect(prisma.solicitudSalidaProyecto.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['PENDIENTE_LIDER', 'APROBADA', 'RECHAZADA', 'CANCELADA'] as const)(
+    'rechaza si no existe solicitud PREPARACION porque la solicitud está en %s',
+    async (estadoSolicitud) => {
+      const prisma = makePrisma();
+      prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+      const service = makeService(prisma);
+
+      await expect(
+        service.cancelExitPreparation(PROYECTO_ID, MIEMBRO_ID),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(estadoSolicitud).toBeTruthy();
+      expect(prisma.solicitudSalidaProyecto.updateMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it('no reabre tramos ni escribe tareas, avances, participaciones u horas', async () => {
+    const prisma = makePrisma();
+    setupCancelPreparationPath(prisma);
+    const service = makeService(prisma);
+
+    await service.cancelExitPreparation(PROYECTO_ID, MIEMBRO_ID);
+
+    for (const metodo of ['create', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert'] as const) {
+      expect(prisma.asignacionTarea[metodo]).not.toHaveBeenCalled();
+      expect(prisma.tarea[metodo]).not.toHaveBeenCalled();
+      expect(prisma.registroAvanceAsignacion[metodo]).not.toHaveBeenCalled();
+      expect(prisma.participacionProyecto[metodo]).not.toHaveBeenCalled();
+      expect(prisma.horasParticipacion[metodo]).not.toHaveBeenCalled();
+    }
+  });
+
+  it('cancela aunque existan asignaciones activas y no consulta blockers', async () => {
+    const prisma = makePrisma();
+    setupCancelPreparationPath(prisma);
+    prisma.asignacionTarea.findFirst.mockResolvedValue({ idAsignacion: 900 });
+    const service = makeService(prisma);
+
+    const resultado = await service.cancelExitPreparation(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(resultado.estadoSolicitud).toBe('CANCELADA');
+    expect(prisma.asignacionTarea.findFirst).not.toHaveBeenCalled();
+    expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
+    expect(prisma.asignacionTarea.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rechaza si updateMany devuelve count 0', async () => {
+    const prisma = makePrisma();
+    setupCancelPreparationPath(prisma);
+    prisma.solicitudSalidaProyecto.updateMany.mockResolvedValue({ count: 0 });
+    const service = makeService(prisma);
+
+    await expect(
+      service.cancelExitPreparation(PROYECTO_ID, MIEMBRO_ID),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });
