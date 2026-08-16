@@ -1,7 +1,9 @@
 import { ForbiddenException, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
-import { ProjectsService } from '../src/projects/projects.service';
+import { ExitRequestsAuthorizationService } from '../src/exit-requests/exit-requests.authorization.service';
+import { ExitRequestsContextService } from '../src/exit-requests/exit-requests.context.service';
+import { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 
 /**
  * Tarea 5: el índice parcial `solicitud_salida_proyecto_pendiente_unique` (a
@@ -72,7 +74,8 @@ function makeService(
   prisma: ReturnType<typeof makePrisma>,
   notificationsOverride: Partial<{ notifyFromTemplate: ReturnType<typeof vi.fn> }> = {},
 ) {
-  return new ProjectsService(
+  const context = new ExitRequestsContextService(prisma);
+  return new ExitRequestsService(
     prisma,
     {
       isAdmin: vi.fn(),
@@ -80,7 +83,8 @@ function makeService(
       notifyFromTemplate: vi.fn(),
       ...notificationsOverride,
     } as any,
-    {} as any,
+    new ExitRequestsAuthorizationService(context),
+    context,
   );
 }
 
@@ -109,7 +113,7 @@ function setupHappyPath(prisma: ReturnType<typeof makePrisma>) {
   prisma.solicitudSalidaProyecto.create.mockResolvedValue(SOLICITUD_CREADA);
 }
 
-describe('ProjectsService.createSolicitudSalida', () => {
+describe('ExitRequestsService.createSolicitudSalida', () => {
   // Caso 1 — participante ACTIVO puede solicitar
   it('crea la solicitud cuando el proyecto existe, el solicitante es participante ACTIVO y no hay bloqueos', async () => {
     const prisma = makePrisma();
@@ -414,7 +418,7 @@ function setupResolutionPath(prisma: ReturnType<typeof makePrisma>) {
   prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(SOLICITUD_PENDIENTE);
 }
 
-describe('ProjectsService.approveSolicitudSalida', () => {
+describe('ExitRequestsService.approveSolicitudSalida', () => {
   // Caso A / D — 0 tareas pendientes (o todas HECHO, mismo conteo)
   it('aprueba y retira la participación cuando el integrante tiene 0 tareas distintas de HECHO', async () => {
     const prisma = makePrisma();
@@ -610,7 +614,7 @@ describe('ProjectsService.approveSolicitudSalida', () => {
 // rejectSolicitudSalida comparten exactamente el mismo helper de pertenencia
 // (_requirePendingSolicitudSalida, filtro { idSolicitud, idProyecto }), por lo
 // que un segundo test idéntico para el rechazo sería completamente redundante.
-describe('ProjectsService.approveSolicitudSalida — aislamiento cross-project', () => {
+describe('ExitRequestsService.approveSolicitudSalida — aislamiento cross-project', () => {
   it('no permite aprobar una solicitud perteneciente a otro proyecto', async () => {
     const PROYECTO_A = 10;
     const PROYECTO_B = 20;
@@ -641,7 +645,7 @@ describe('ProjectsService.approveSolicitudSalida — aislamiento cross-project',
   });
 });
 
-describe('ProjectsService.rejectSolicitudSalida', () => {
+describe('ExitRequestsService.rejectSolicitudSalida', () => {
   // Caso E — el rechazo nunca se bloquea por tareas pendientes
   it('rechaza la solicitud sin consultar tareas ni tocar la participación, aunque el integrante tenga tareas activas', async () => {
     const prisma = makePrisma();

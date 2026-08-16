@@ -9,11 +9,13 @@ import {
   createIntegrationParticipation,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
-import { ProjectsService } from '../../src/projects/projects.service';
+import { ExitRequestsAuthorizationService } from '../../src/exit-requests/exit-requests.authorization.service';
+import { ExitRequestsContextService } from '../../src/exit-requests/exit-requests.context.service';
+import { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
 
 /**
  * Integración real T-111 (Tarea 7): concurrencia real de
- * ProjectsService.createSolicitudSalida contra el índice único parcial
+ * ExitRequestsService.createSolicitudSalida contra el índice único parcial
  * `solicitud_salida_proyecto_pendiente_unique` (Tarea 5, migración
  * 20260811035302_add_solicitud_salida_proyecto) — algo que un mock de Prisma
  * no puede demostrar por sí solo, ya que el precheck de findFirst en la
@@ -28,19 +30,24 @@ import { ProjectsService } from '../../src/projects/projects.service';
  * "CONCURRENCIA".
  */
 const fakeNotifications = { isAdmin: async () => false } as any;
-const fakeCacheManager = {} as any;
 
 describeIntegration(
-  'ProjectsService.createSolicitudSalida — concurrencia real contra solicitud_salida_proyecto_pendiente_unique',
+  'ExitRequestsService.createSolicitudSalida — concurrencia real contra solicitud_salida_proyecto_pendiente_unique',
   () => {
     let prisma: PrismaClient;
-    let service: ProjectsService;
+    let service: ExitRequestsService;
     let scope: IntegrationCleanupScope;
     let solicitudIds: number[];
 
     beforeAll(async () => {
       prisma = createIntegrationPrismaClient();
-      service = new ProjectsService(prisma as any, fakeNotifications, fakeCacheManager);
+      const context = new ExitRequestsContextService(prisma as any);
+      service = new ExitRequestsService(
+        prisma as any,
+        fakeNotifications as any,
+        new ExitRequestsAuthorizationService(context),
+        context,
+      );
       await prisma.$connect();
     });
 
