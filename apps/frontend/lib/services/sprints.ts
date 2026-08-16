@@ -1,8 +1,13 @@
 import { apiFetch } from '@/lib/api/client';
-import type { SprintDto } from '@/lib/types/sprints';
+import type { SprintDetailDto, SprintDto } from '@/lib/types/sprints';
 
 export function getProjectSprints(idProyecto: number): Promise<SprintDto[]> {
   return apiFetch<SprintDto[]>(`/proyectos/${idProyecto}/sprints`);
+}
+
+/** Detalle histórico — `GET /proyectos/:id/sprints/:sprintId` (A10/A12, `SprintsService.getSprintDetail`). */
+export function getSprintDetail(idProyecto: number, idSprint: number): Promise<SprintDetailDto> {
+  return apiFetch<SprintDetailDto>(`/proyectos/${idProyecto}/sprints/${idSprint}`);
 }
 
 export function startSprint(idProyecto: number): Promise<SprintDto> {

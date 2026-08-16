@@ -8,16 +8,24 @@ vi.mock('../lib/services/sprints', () => ({
   startSprint: vi.fn(),
   finalizeSprint: vi.fn(),
   closeSprint: vi.fn(),
+  getSprintDetail: vi.fn(),
 }));
 
 import {
   useCloseSprint,
   useFinalizeSprint,
   useProjectSprints,
+  useSprintDetail,
   useStartSprint,
 } from '../hooks/use-project-sprints';
-import { projectSprintsQueryKey } from '../lib/query-keys/sprints';
-import { closeSprint, finalizeSprint, getProjectSprints, startSprint } from '../lib/services/sprints';
+import { projectSprintsQueryKey, sprintDetailQueryKey } from '../lib/query-keys/sprints';
+import {
+  closeSprint,
+  finalizeSprint,
+  getProjectSprints,
+  getSprintDetail,
+  startSprint,
+} from '../lib/services/sprints';
 
 // vitest.config.ts solo incluye `test/**/*.spec.ts` (no `.spec.tsx`); este
 // archivo evita JSX deliberadamente (createElement), mismo patrón que
@@ -258,5 +266,84 @@ describe('useCloseSprint', () => {
 
     await expect(result.current.mutateAsync(1)).rejects.toThrow('409');
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+});
+
+function sprintDetail(overrides: Partial<any> = {}) {
+  return {
+    idSprint: 1,
+    idProyecto: 7,
+    numero: 1,
+    estado: 'CERRADO',
+    fechaInicio: '2026-01-01T00:00:00.000Z',
+    fechaFinalizacionIniciada: '2026-01-10T00:00:00.000Z',
+    fechaCierre: '2026-01-12T00:00:00.000Z',
+    cerradoPor: 3,
+    tareas: [],
+    hitos: [],
+    ...overrides,
+  };
+}
+
+describe('useSprintDetail (F4)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa la query key canónica exacta, distinta por proyecto y por Sprint', () => {
+    expect(sprintDetailQueryKey(7, 1)).toEqual(['sprint-detail', 7, 1]);
+    expect(sprintDetailQueryKey(7, 1)).not.toEqual(sprintDetailQueryKey(8, 1));
+    expect(sprintDetailQueryKey(7, 1)).not.toEqual(sprintDetailQueryKey(7, 2));
+    expect(sprintDetailQueryKey(7, 1)).not.toEqual(projectSprintsQueryKey(7));
+  });
+
+  it('consulta una sola vez con projectId y sprintId correctos', async () => {
+    (getSprintDetail as any).mockResolvedValue(sprintDetail());
+    const { wrapper } = createWrapper();
+    renderHook(() => useSprintDetail(7, 1), { wrapper });
+
+    await waitFor(() => expect(getSprintDetail).toHaveBeenCalledTimes(1));
+    expect(getSprintDetail).toHaveBeenCalledWith(7, 1);
+  });
+
+  it.each([
+    [0, 1],
+    [7, 0],
+    [-1, 1],
+    [7, NaN],
+  ])('con projectId=%s / sprintId=%s inválidos no consulta', async (idProyecto, idSprint) => {
+    (getSprintDetail as any).mockResolvedValue(sprintDetail());
+    const { wrapper } = createWrapper();
+    renderHook(() => useSprintDetail(idProyecto, idSprint), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getSprintDetail).not.toHaveBeenCalled();
+  });
+
+  it('expone el detalle resuelto por el service', async () => {
+    (getSprintDetail as any).mockResolvedValue(sprintDetail({ numero: 4 }));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintDetail(7, 1), { wrapper });
+
+    await waitFor(() => expect(result.current.detail?.numero).toBe(4));
+  });
+
+  it('detail es undefined antes de resolver, con isLoading true', () => {
+    (getSprintDetail as any).mockReturnValue(new Promise(() => {}));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintDetail(7, 1), { wrapper });
+
+    expect(result.current.detail).toBeUndefined();
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it('expone isError y error cuando la query falla', async () => {
+    const boom = new Error('404');
+    (getSprintDetail as any).mockRejectedValue(boom);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintDetail(7, 1), { wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(boom);
   });
 });
