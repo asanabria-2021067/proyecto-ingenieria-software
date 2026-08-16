@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { TeamSummaryMemberDto, TeamSummaryRoleDto } from '../projects/dto/team-summary-member.dto';
-import { TeamSummaryResponseDto } from '../projects/dto/team-summary-response.dto';
+import { TeamSummaryMemberDto, TeamSummaryRoleDto } from './dto/team-summary-member.dto';
+import { TeamSummaryResponseDto } from './dto/team-summary-response.dto';
 
 @Injectable()
 export class TeamService {
@@ -153,13 +153,13 @@ export class TeamService {
       throw new NotFoundException(`Usuario líder con id ${proyecto.creadoPor} no encontrado`);
     }
 
-    // Participaciones ACTIVO del proyecto, excluyendo al creador: el líder
-    // se modela por separado (lider) y nunca debe duplicarse dentro de
-    // miembros aunque además tenga una ParticipacionProyecto propia.
+    // Participaciones del proyecto, excluyendo al creador: el líder se
+    // modela por separado (lider) y nunca debe duplicarse dentro de miembros
+    // aunque además tenga una ParticipacionProyecto propia. B12 incluye
+    // activas y retiradas para clasificar a cada persona en el resumen.
     const participaciones = await this.prisma.participacionProyecto.findMany({
       where: {
         rolProyecto: { idProyecto },
-        estadoParticipacion: 'ACTIVO',
         idUsuario: { not: proyecto.creadoPor },
       },
       select: {
@@ -189,11 +189,18 @@ export class TeamService {
           fotoUrl: p.usuario.fotoUrl,
           roles: [],
           estadoParticipacion: p.estadoParticipacion,
+          grupo:
+            p.estadoParticipacion === 'ACTIVO'
+              ? 'ACTIVOS'
+              : 'RETIRADOS_SIN_CONTRIBUCION',
           tareasActivas: 0,
           tareasCompletadas: 0,
           horasReconocidas: 0,
         };
         miembrosPorUsuario.set(p.idUsuario, miembro);
+      } else if (p.estadoParticipacion === 'ACTIVO') {
+        miembro.estadoParticipacion = 'ACTIVO';
+        miembro.grupo = 'ACTIVOS';
       }
       const yaTieneRol = miembro.roles.some(
         (r: TeamSummaryRoleDto) => r.idRolProyecto === p.rolProyecto.idRolProyecto,
@@ -210,6 +217,27 @@ export class TeamService {
 
     if (idsUsuarios.length === 0) {
       return { lider: liderUsuario, miembros: [] };
+    }
+
+    // Contribución histórica B12: existencia de al menos un tramo de
+    // AsignacionTarea del usuario dentro del proyecto con horasReales no
+    // null. Se resuelve en una única query batch para todos los usuarios
+    // (semántica EXISTS por persona, sin round-trips por integrante).
+    const contribuciones = await this.prisma.asignacionTarea.findMany({
+      where: {
+        idUsuario: { in: idsUsuarios },
+        horasReales: { not: null },
+        tarea: { idProyecto },
+      },
+      select: { idUsuario: true },
+      distinct: ['idUsuario'],
+    });
+
+    const usuariosConContribucion = new Set(contribuciones.map((c) => c.idUsuario));
+    for (const idUsuario of usuariosConContribucion) {
+      const miembro = miembrosPorUsuario.get(idUsuario);
+      if (!miembro || miembro.grupo === 'ACTIVOS') continue;
+      miembro.grupo = 'RETIRADOS_CON_CONTRIBUCION';
     }
 
     // Tareas vigentes (no soft-deleted) del proyecto con asignación ACTUAL
