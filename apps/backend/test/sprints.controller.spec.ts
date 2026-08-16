@@ -4,7 +4,7 @@ import { SprintsController } from '../src/sprints/sprints.controller';
 import { ProjectWriteGuard } from '../src/common/guards/project-write.guard';
 
 function makeService() {
-  return { startSprint: vi.fn(), finalizeSprint: vi.fn() } as any;
+  return { startSprint: vi.fn(), finalizeSprint: vi.fn(), adjustRecognizedHours: vi.fn() } as any;
 }
 
 describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
@@ -95,5 +95,53 @@ describe('SprintsController.finalize (POST /proyectos/:projectId/sprints/:sprint
     const controller = new SprintsController(service);
 
     await expect(controller.finalize(5, 12, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.adjustHours (PATCH /proyectos/:projectId/sprints/:sprintId/horas/:participacionId)', () => {
+  it('está registrado como PATCH en :sprintId/horas/:participacionId', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.adjustHours)).toBe(
+      ':sprintId/horas/:participacionId',
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.adjustHours)).toBe(4); // PATCH
+  });
+
+  it('responde con 200 OK', () => {
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.adjustHours)).toBe(
+      200,
+    );
+  });
+
+  it('delega en SprintsService.adjustRecognizedHours con projectId, sprintId, participacionId, userId y el body', () => {
+    const service = makeService();
+    const controller = new SprintsController(service);
+    const dto = { horasAprobadas: 8, justificacionAjuste: 'ajuste válido' };
+
+    controller.adjustHours(5, 12, 30, dto, { userId: 9 });
+
+    expect(service.adjustRecognizedHours).toHaveBeenCalledTimes(1);
+    expect(service.adjustRecognizedHours).toHaveBeenCalledWith(5, 12, 30, 9, dto);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.adjustRecognizedHours, sin transformarlo', async () => {
+    const service = makeService();
+    const registroActualizado = { idRegistroHoras: 100, horasAprobadas: 8 };
+    service.adjustRecognizedHours.mockResolvedValue(registroActualizado);
+    const controller = new SprintsController(service);
+
+    const result = await controller.adjustHours(5, 12, 30, { horasAprobadas: 8 }, { userId: 9 });
+
+    expect(result).toBe(registroActualizado);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.adjustRecognizedHours', async () => {
+    const service = makeService();
+    const error = new Error('justificación requerida');
+    service.adjustRecognizedHours.mockRejectedValue(error);
+    const controller = new SprintsController(service);
+
+    await expect(
+      controller.adjustHours(5, 12, 30, { horasAprobadas: 8 }, { userId: 9 }),
+    ).rejects.toBe(error);
   });
 });
