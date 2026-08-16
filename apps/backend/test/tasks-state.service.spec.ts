@@ -4,9 +4,13 @@ import { TasksService } from '../src/tasks/tasks.service';
 
 function makeTx() {
   return {
-    tarea: { update: vi.fn(), findFirst: vi.fn() },
+    tarea: { update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     tareaEtiqueta: { deleteMany: vi.fn(), createMany: vi.fn() },
     asignacionTarea: undefined,
+    // A12: usado exclusivamente por syncHitoEstado cuando la tarea tiene
+    // idHito. Por defecto ausente para no romper los tests preexistentes
+    // que usan `idHito: null`; cada test A12 lo añade explícitamente.
+    hito: undefined,
   };
 }
 
@@ -497,6 +501,83 @@ describe('TasksService.updateEstado', () => {
         service.updateEstado(5, 42, 3, { estadoTarea: 'HECHO' } as any),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('A12 — sincronización de Hito.estadoHito tras updateEstado', () => {
+    it('tarea con idHito: persiste Hito.estadoHito=COMPLETADO cuando todas sus tareas quedan HECHO, dentro de la MISMA transacción', async () => {
+      const tx = makeTx();
+      tx.hito = { update: vi.fn() } as any;
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'HECHO' }));
+      // Progreso real del Hito tras el cambio: 1 sola tarea, ya HECHO -> 100%.
+      tx.tarea.findMany.mockResolvedValue([{ idHito: 7, estadoTarea: 'HECHO' }]);
+      const prisma = makePrisma(tx);
+      const auth = makeAuthorization();
+      const notifications = makeNotifications();
+      const relations = {} as any;
+      const context = {} as any;
+      const service = new TasksService(prisma, auth, relations, notifications, context);
+
+      await service.updateEstado(5, 42, 1, { estadoTarea: 'HECHO' } as any);
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 7 },
+        data: { estadoHito: 'COMPLETADO' },
+      });
+      // La consulta que alimenta el cálculo está acotada por idHito
+      // (nunca todos los Hitos del proyecto/base) + eliminadoEn: null.
+      expect(tx.tarea.findMany).toHaveBeenCalledWith({
+        where: { idHito: 7, eliminadoEn: null },
+        select: { estadoTarea: true },
+      });
+    });
+
+    it('tarea con idHito: persiste EN_PROGRESO cuando el progreso del Hito es parcial', async () => {
+      const tx = makeTx();
+      tx.hito = { update: vi.fn() } as any;
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'EN_PROGRESO' }));
+      tx.tarea.findMany.mockResolvedValue([
+        { idHito: 7, estadoTarea: 'HECHO' },
+        { idHito: 7, estadoTarea: 'EN_PROGRESO' },
+      ]);
+      const prisma = makePrisma(tx);
+      const service = new TasksService(prisma, makeAuthorization(), {} as any, makeNotifications(), {} as any);
+
+      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 7 },
+        data: { estadoHito: 'EN_PROGRESO' },
+      });
+    });
+
+    it('tarea con idHito: persiste PENDIENTE cuando ninguna tarea del Hito está HECHO', async () => {
+      const tx = makeTx();
+      tx.hito = { update: vi.fn() } as any;
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'POR_HACER' }));
+      tx.tarea.findMany.mockResolvedValue([{ idHito: 7, estadoTarea: 'POR_HACER' }]);
+      const prisma = makePrisma(tx);
+      const service = new TasksService(prisma, makeAuthorization(), {} as any, makeNotifications(), {} as any);
+
+      await service.updateEstado(5, 42, 1, { estadoTarea: 'POR_HACER' } as any);
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 7 },
+        data: { estadoHito: 'PENDIENTE' },
+      });
+    });
+
+    it('tarea SIN Hito (idHito: null): la mutación de estado funciona normalmente y nunca intenta hito.update', async () => {
+      const { tx, service } = makeService();
+      // tx.hito permanece undefined (default de makeTx()): si el código
+      // intentara sincronizar un Hito aquí, esta llamada fallaría con
+      // TypeError antes de completarse.
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: null, estadoTarea: 'EN_PROGRESO' }));
+
+      const result = await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+
+      expect(result.estadoTarea).toBe('EN_PROGRESO');
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
     });
   });
 });

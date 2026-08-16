@@ -58,6 +58,10 @@ function makeTx() {
     tarea: {
       findFirst: vi.fn().mockResolvedValue(tareaRow()),
       update: vi.fn().mockResolvedValue(tareaRow({ estadoTarea: 'HECHO' })),
+      // A12: usado exclusivamente por syncHitoEstado cuando la tarea
+      // recién marcada HECHO tiene idHito. Por defecto [] para no romper
+      // los tests preexistentes.
+      findMany: vi.fn().mockResolvedValue([]),
     },
     asignacionTarea: {
       findFirst: vi.fn().mockResolvedValue(asignacion()),
@@ -71,6 +75,10 @@ function makeTx() {
         contenido: LONG_CONTENT,
       }),
     },
+    // A12: presente únicamente en los tests que ejercitan la
+    // sincronización de Hito (idHito no nulo); ausente (undefined) en el
+    // resto, igual que antes de A12.
+    hito: undefined as { update: ReturnType<typeof vi.fn> } | undefined,
   };
 }
 
@@ -260,5 +268,49 @@ describe('TasksService.closeAssignment', () => {
     expect(prisma.asignacionTarea.updateMany).not.toHaveBeenCalled();
     expect(prisma.registroAvanceAsignacion.create).not.toHaveBeenCalled();
     expect(prisma.tarea.update).not.toHaveBeenCalled();
+  });
+
+  describe('A12 — sincronización de Hito.estadoHito tras marcarComoHecha', () => {
+    it('marcarComoHecha=true en una tarea con idHito: persiste Hito.estadoHito=COMPLETADO cuando ya no quedan tareas pendientes en el Hito', async () => {
+      const { service, tx } = makeService();
+      tx.hito = { update: vi.fn() };
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'HECHO' }));
+      tx.tarea.findMany.mockResolvedValue([{ idHito: 7, estadoTarea: 'HECHO' }]);
+
+      await service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, VALID_DTO);
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 7 },
+        data: { estadoHito: 'COMPLETADO' },
+      });
+      expect(tx.tarea.findMany).toHaveBeenCalledWith({
+        where: { idHito: 7, eliminadoEn: null },
+        select: { estadoTarea: true },
+      });
+    });
+
+    it('marcarComoHecha=false u omitido: NUNCA sincroniza el Hito, aunque la tarea tenga idHito', async () => {
+      const { service, tx } = makeService();
+      // tx.hito permanece undefined: si el código intentara sincronizar,
+      // esta prueba fallaría con TypeError antes de completarse.
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'EN_PROGRESO' }));
+
+      await service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, {
+        horasReales: 3,
+        contenidoAvance: LONG_CONTENT,
+        marcarComoHecha: false,
+      });
+
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
+    });
+
+    it('marcarComoHecha=true en una tarea SIN Hito (idHito: null): no intenta hito.update', async () => {
+      const { service, tx } = makeService();
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: null, estadoTarea: 'HECHO' }));
+
+      await service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, VALID_DTO);
+
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
+    });
   });
 });

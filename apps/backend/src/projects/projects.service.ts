@@ -19,6 +19,7 @@ import {
 } from './dto/update-estado-proyecto.dto';
 import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { calcularProgresoHito } from '../common/hito-progreso';
 
 const FEATURED_CACHE_KEY = 'projects:featured';
 const FEATURED_CACHE_TTL = 300_000;
@@ -58,14 +59,19 @@ function calcularAvanceTareas(tareas: { estadoTarea: string }[]) {
 }
 
 /**
- * El estado de un hito NUNCA se lee de `Hito.estadoHito`: esa columna se fija
- * en PENDIENTE al crear el hito (createHito) y ningún flujo la vuelve a
- * escribir, así que quedaba congelada aunque se completaran todas sus tareas
- * (bug de cálculo de la barra de progreso de hitos). El estado real se deriva
- * de las tareas asociadas (`tarea.idHito`), con el mismo criterio que ya usa
- * el frontend en `calcularStats` (hitos-section.tsx): % = hechas/total de sus
- * tareas; COMPLETADO al 100% con al menos una tarea, EN_PROGRESO si %>0,
- * PENDIENTE en otro caso (incluye hitos sin tareas asociadas).
+ * El estado de un hito, históricamente, NUNCA se leía de `Hito.estadoHito`:
+ * esa columna se fijaba en PENDIENTE al crear el hito (createHito) y ningún
+ * flujo la volvía a escribir, así que quedaba congelada aunque se
+ * completaran todas sus tareas (bug de cálculo de la barra de progreso de
+ * hitos). A12 corrige la persistencia (ver `TasksService` — sincroniza
+ * `Hito.estadoHito` en los write-paths reales de `estadoTarea`), pero este
+ * agregado de PROYECTO sigue derivando en memoria a partir de las tareas
+ * (`tarea.idHito`), nunca de la columna persistida: es un GET puro, no debe
+ * depender de que la sincronización ya haya corrido. La fórmula por-Hito
+ * (% = hechas/total; COMPLETADO al 100% con al menos una tarea, EN_PROGRESO
+ * si %>0, PENDIENTE en otro caso, incluye hitos sin tareas) es la misma
+ * semántica canónica de `calcularProgresoHito` (src/common/hito-progreso.ts,
+ * A12) — única fuente de verdad, reutilizada aquí en vez de duplicada.
  */
 function calcularAvanceHitos(
   hitos: { idHito: number }[],
@@ -78,13 +84,11 @@ function calcularAvanceHitos(
 
   for (const hito of hitos) {
     const tareasHito = tareas.filter((t) => t.idHito === hito.idHito);
-    const totalTareas = tareasHito.length;
-    const hechoTareas = tareasHito.filter((t) => t.estadoTarea === 'HECHO').length;
-    const porcentajeHito = totalTareas === 0 ? 0 : Math.round((hechoTareas / totalTareas) * 100);
+    const { estadoHito } = calcularProgresoHito(tareasHito);
 
-    if (porcentajeHito === 100 && totalTareas > 0) {
+    if (estadoHito === EstadoHito.COMPLETADO) {
       completado += 1;
-    } else if (porcentajeHito > 0) {
+    } else if (estadoHito === EstadoHito.EN_PROGRESO) {
       enProgreso += 1;
     } else {
       pendiente += 1;
