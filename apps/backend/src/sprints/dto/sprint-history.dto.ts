@@ -1,0 +1,98 @@
+import { EstadoHito, EstadoSprint, EstadoTarea, Prioridad } from '@prisma/client';
+
+/**
+ * Contrato de un elemento de `GET /proyectos/:projectId/sprints` (A10).
+ * Metadata mínima suficiente para identificar el Sprint y navegar a su
+ * detalle — deliberadamente NO incluye agregaciones de A8
+ * (SprintClosingSummary) ni ninguna métrica calculada.
+ */
+export interface SprintListItemDto {
+  idSprint: number;
+  idProyecto: number;
+  numero: number;
+  estado: EstadoSprint;
+  fechaInicio: Date;
+  fechaFinalizacionIniciada: Date | null;
+  fechaCierre: Date | null;
+}
+
+/**
+ * Identidad pública mínima de un usuario dentro del histórico (autor de
+ * comentario / usuario de una asignación) — mismo subconjunto de campos que
+ * `autorSelect` en ComentariosService, nunca el objeto `Usuario` completo.
+ */
+export interface SprintHistoryUsuarioDto {
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  fotoUrl: string | null;
+}
+
+/**
+ * Un tramo histórico de `AsignacionTarea` — incluye tramos cerrados
+ * (`desasignadaEn` no nulo), no solo el tramo activo: A10 reconstruye
+ * historia, no el estado vigente.
+ */
+export interface SprintDetailAsignacionDto {
+  idAsignacion: number;
+  usuario: SprintHistoryUsuarioDto;
+  fechaAsignacion: Date;
+  desasignadaEn: Date | null;
+  horasReales: number | null;
+}
+
+export interface SprintDetailComentarioDto {
+  idComentario: number;
+  autor: SprintHistoryUsuarioDto;
+  contenido: string;
+  creadoEn: Date;
+}
+
+/**
+ * `idHito` es una referencia al elemento correspondiente de
+ * `SprintDetailDto.hitos` (colección top-level deduplicada) — nunca el
+ * objeto Hito embebido, para que un mismo Hito compartido por varias
+ * tareas no se duplique.
+ */
+export interface SprintDetailTareaDto {
+  idTarea: number;
+  tituloTarea: string;
+  descripcionTarea: string | null;
+  estadoTarea: EstadoTarea;
+  prioridad: Prioridad;
+  idHito: number | null;
+  fechaCreacion: Date;
+  fechaLimite: Date | null;
+  tiempoEstimadoHoras: number | null;
+  asignaciones: SprintDetailAsignacionDto[];
+  comentarios: SprintDetailComentarioDto[];
+}
+
+/**
+ * `estadoHito` es el valor persistido tal cual — A10 no corrige ni
+ * recalcula `Hito.estadoHito` (eso es contrato exclusivo de A12).
+ */
+export interface SprintDetailHitoDto {
+  idHito: number;
+  tituloHito: string;
+  estadoHito: EstadoHito;
+}
+
+/**
+ * Contrato de `GET /proyectos/:projectId/sprints/:sprintId` (A10).
+ * Reconstruido desde las tablas relacionales actuales — no existe ninguna
+ * tabla de snapshot/histórico; `hitos` es una colección top-level
+ * deduplicada (ver `SprintDetailTareaDto.idHito`).
+ */
+export interface SprintDetailDto {
+  idSprint: number;
+  idProyecto: number;
+  numero: number;
+  estado: EstadoSprint;
+  fechaInicio: Date;
+  fechaFinalizacionIniciada: Date | null;
+  fechaCierre: Date | null;
+  cerradoPor: number | null;
+  tareas: SprintDetailTareaDto[];
+  hitos: SprintDetailHitoDto[];
+}

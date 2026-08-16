@@ -64,6 +64,31 @@ export class SprintsAuthorizationService {
   }
 
   /**
+   * Listar histórico de Sprints del proyecto (A10): exclusivo del líder,
+   * misma política de lectura que el resto de `sprints/` (ninguna operación
+   * del módulo es visible para participantes no-líder todavía) — no se
+   * introduce una política funcional nueva. Solo exige liderazgo sobre el
+   * proyecto porque el listado no tiene un Sprint concreto que validar.
+   */
+  async assertCanListSprintHistory(projectId: number, userId: number, tx?: TxClient): Promise<void> {
+    await this.sprintsContext.assertProjectLeader(projectId, userId, tx);
+  }
+
+  /**
+   * Ver detalle histórico de un Sprint (A10): exclusivo del líder, mismo
+   * patrón que finalizar/cerrar/ajustar horas — Sprint+liderazgo validados
+   * juntos vía `_requireSprintAndLeadership`.
+   */
+  async assertCanViewSprintHistory(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+    tx?: TxClient,
+  ) {
+    return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
+  }
+
+  /**
    * Secuencia compartida por finalizar/cerrar: validar el Sprint dentro del
    * proyecto y luego exigir liderazgo, en ese orden (mismo patrón que
    * TasksAuthorizationService._requireTaskAndLeadership).
