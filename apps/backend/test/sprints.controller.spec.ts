@@ -9,6 +9,7 @@ function makeService() {
     finalizeSprint: vi.fn(),
     adjustRecognizedHours: vi.fn(),
     getSprintClosingSummary: vi.fn(),
+    closeSprint: vi.fn(),
   } as any;
 }
 
@@ -100,6 +101,49 @@ describe('SprintsController.finalize (POST /proyectos/:projectId/sprints/:sprint
     const controller = new SprintsController(service);
 
     await expect(controller.finalize(5, 12, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/cerrar)', () => {
+  it('está registrado como POST en :sprintId/cerrar', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.close)).toBe(
+      ':sprintId/cerrar',
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.close)).toBe(1); // POST
+  });
+
+  it('responde con 200 OK', () => {
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.close)).toBe(200);
+  });
+
+  it('delega en SprintsService.closeSprint con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = new SprintsController(service);
+
+    controller.close(5, 12, { userId: 9 });
+
+    expect(service.closeSprint).toHaveBeenCalledTimes(1);
+    expect(service.closeSprint).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.closeSprint, sin transformarlo', async () => {
+    const service = makeService();
+    const sprintCerrado = { idSprint: 12, idProyecto: 5, estado: 'CERRADO' };
+    service.closeSprint.mockResolvedValue(sprintCerrado);
+    const controller = new SprintsController(service);
+
+    const result = await controller.close(5, 12, { userId: 9 });
+
+    expect(result).toBe(sprintCerrado);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.closeSprint', async () => {
+    const service = makeService();
+    const error = new Error('conflicto');
+    service.closeSprint.mockRejectedValue(error);
+    const controller = new SprintsController(service);
+
+    await expect(controller.close(5, 12, { userId: 9 })).rejects.toBe(error);
   });
 });
 
