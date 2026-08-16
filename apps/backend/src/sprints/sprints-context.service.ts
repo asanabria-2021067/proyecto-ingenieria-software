@@ -66,4 +66,30 @@ export class SprintsContextService {
     }
     return sprint;
   }
+
+  /**
+   * A8: variante de `getSprintInProjectOrThrow` que además resuelve
+   * `Proyecto.creadoPor` (y su soft-delete) en la MISMA consulta, vía
+   * `include`, para que la autorización del resumen de cierre pueda validar
+   * liderazgo sin una segunda consulta — el read-model de A8 tiene un
+   * presupuesto de ≤2 queries totales por invocación (esta + la agregación),
+   * así que no puede pagar el costo de dos consultas separadas
+   * (`getSprintInProjectOrThrow` + `assertProjectLeader`) como hacen
+   * finalizar/cerrar/ajustar horas. Mismo criterio de "no encontrado" que
+   * `getProjectOrThrow` (proyecto soft-deleted = 404), replicado aquí para
+   * no divergir del resto del módulo.
+   */
+  async getSprintWithProjectOrThrow(projectId: number, sprintId: number, tx?: TxClient) {
+    const db = tx ?? this.prisma;
+    const sprint = await db.sprint.findFirst({
+      where: { idSprint: sprintId, idProyecto: projectId },
+      include: { proyecto: { select: { creadoPor: true, eliminadoEn: true } } },
+    });
+    if (!sprint || sprint.proyecto.eliminadoEn !== null) {
+      throw new NotFoundException(
+        `Sprint con id ${sprintId} no encontrado en el proyecto ${projectId}`,
+      );
+    }
+    return sprint;
+  }
 }
