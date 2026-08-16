@@ -11,6 +11,7 @@ function makeController() {
     approveSolicitudSalida: vi.fn(),
     rejectSolicitudSalida: vi.fn(),
     getExitPreparationSummary: vi.fn(),
+    continueExitPreparation: vi.fn(),
   };
   return { controller: new ExitRequestsController(service as any), service };
 }
@@ -61,6 +62,14 @@ describe('ExitRequestsController', () => {
     });
   });
 
+  it('expone POST /proyectos/:projectId/salida/preparacion/continuar con 200', () => {
+    expect(routeMetadata('continueExitPreparation')).toEqual({
+      path: 'salida/preparacion/continuar',
+      method: RequestMethod.POST,
+      status: HttpStatus.OK,
+    });
+  });
+
   it('delega creación con projectId, userId de CurrentUser y motivo del DTO', async () => {
     const { controller, service } = makeController();
     service.createSolicitudSalida.mockResolvedValue({ idSolicitud: 1 });
@@ -103,5 +112,15 @@ describe('ExitRequestsController', () => {
 
     expect(service.getExitPreparationSummary).toHaveBeenCalledWith(10, 2);
     expect(result).toEqual({ cantidadBlockers: 0, puedeContinuar: true, blockers: [] });
+  });
+
+  it('delega continuar preparación con projectId y userId de CurrentUser', async () => {
+    const { controller, service } = makeController();
+    service.continueExitPreparation.mockResolvedValue({ estadoSolicitud: 'PENDIENTE_LIDER' });
+
+    const result = await controller.continueExitPreparation(10, { userId: 2 });
+
+    expect(service.continueExitPreparation).toHaveBeenCalledWith(10, 2);
+    expect(result).toEqual({ estadoSolicitud: 'PENDIENTE_LIDER' });
   });
 });
