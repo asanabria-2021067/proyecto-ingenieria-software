@@ -71,7 +71,7 @@ describeIntegration(
       await cleanupIntegrationFixtures(prisma, scope);
     });
 
-    it('dos solicitudes concurrentes para el mismo (idProyecto, idUsuario) nunca dejan dos PENDIENTE: una se cumple, la otra recibe ConflictException', async () => {
+    it('dos solicitudes concurrentes para el mismo (idProyecto, idUsuario) nunca dejan dos PENDIENTE_LIDER: una se cumple, la otra recibe ConflictException', async () => {
       const leader = await createIntegrationUser(prisma);
       const member = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, member.idUsuario];
@@ -83,7 +83,7 @@ describeIntegration(
       scope.roleIds = [role.idRolProyecto];
 
       // Participación ACTIVO del miembro; sin AsignacionTarea vigente ni
-      // SolicitudSalidaProyecto PENDIENTE previa (precondición de la carrera).
+      // SolicitudSalidaProyecto PENDIENTE_LIDER previa (precondición de la carrera).
       const participation = await createIntegrationParticipation(
         prisma,
         member.idUsuario,
@@ -112,16 +112,16 @@ describeIntegration(
       });
       solicitudIds = creadas.map((s) => s.idSolicitud);
 
-      const pendientes = creadas.filter((s) => s.estadoSolicitud === 'PENDIENTE');
+      const pendientes = creadas.filter((s) => s.estadoSolicitud === 'PENDIENTE_LIDER');
       expect(pendientes).toHaveLength(1);
 
       // Doble verificación vía COUNT con exactamente la misma condición que
-      // protege el índice parcial real (id_proyecto, id_usuario, PENDIENTE).
+      // protege el índice parcial real (id_proyecto, id_usuario, PENDIENTE_LIDER).
       const conteoPendientes = await prisma.solicitudSalidaProyecto.count({
         where: {
           idProyecto: project.idProyecto,
           idUsuario: member.idUsuario,
-          estadoSolicitud: 'PENDIENTE',
+          estadoSolicitud: 'PENDIENTE_LIDER',
         },
       });
       expect(conteoPendientes).toBe(1);

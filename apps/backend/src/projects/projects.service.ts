@@ -1477,7 +1477,7 @@ export class ProjectsService {
    * rechazaría exactamente a quien necesita usar este flujo. En su lugar
    * valida directamente: proyecto vigente, líder excluido, participación
    * ACTIVO, motivo no vacío, cero asignaciones vigentes y ausencia de otra
-   * solicitud PENDIENTE. El orden de las dos primeras reglas se invierte
+   * solicitud PENDIENTE_LIDER. El orden de las dos primeras reglas se invierte
    * respecto a la enumeración conceptual del contrato (líder antes que
    * participación): el líder nunca tiene ParticipacionProyecto propia (ver
    * comentario en Proyecto.creadoPor), así que comprobar participación
@@ -1535,7 +1535,7 @@ export class ProjectsService {
     }
 
     const solicitudPendiente = await this.prisma.solicitudSalidaProyecto.findFirst({
-      where: { idProyecto, idUsuario, estadoSolicitud: 'PENDIENTE' },
+      where: { idProyecto, idUsuario, estadoSolicitud: 'PENDIENTE_LIDER' },
       select: { idSolicitud: true },
     });
     if (solicitudPendiente) {
@@ -1663,8 +1663,8 @@ export class ProjectsService {
     if (!solicitud) {
       throw new NotFoundException(`Solicitud con id ${idSolicitud} no encontrada`);
     }
-    if (solicitud.estadoSolicitud !== 'PENDIENTE') {
-      throw new BadRequestException('Solo se puede resolver una solicitud en estado PENDIENTE');
+    if (solicitud.estadoSolicitud !== 'PENDIENTE_LIDER') {
+      throw new BadRequestException('Solo se puede resolver una solicitud en estado PENDIENTE_LIDER');
     }
     return solicitud;
   }

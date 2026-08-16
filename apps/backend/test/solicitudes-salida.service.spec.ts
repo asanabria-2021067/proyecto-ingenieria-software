@@ -5,7 +5,7 @@ import { ProjectsService } from '../src/projects/projects.service';
 
 /**
  * Tarea 5: el índice parcial `solicitud_salida_proyecto_pendiente_unique` (a
- * lo sumo una fila PENDIENTE por (id_proyecto, id_usuario)) puede rechazar
+ * lo sumo una fila PENDIENTE_LIDER por (id_proyecto, id_usuario)) puede rechazar
  * una segunda inserción concurrente. Mismo patrón que
  * tasks-assignment-conflict.spec.ts / labels-conflict.spec.ts: se construye
  * la CLASE REAL `Prisma.PrismaClientKnownRequestError` (no un objeto
@@ -93,7 +93,7 @@ const SOLICITUD_CREADA = {
   idProyecto: PROYECTO_ID,
   idUsuario: MIEMBRO_ID,
   motivo: 'Cambio de disponibilidad de horario',
-  estadoSolicitud: 'PENDIENTE',
+  estadoSolicitud: 'PENDIENTE_LIDER',
   solicitadaEn: new Date('2026-01-10T00:00:00.000Z'),
   resueltaEn: null,
   resueltaPor: null,
@@ -213,8 +213,8 @@ describe('ProjectsService.createSolicitudSalida', () => {
     expect(prisma.solicitudSalidaProyecto.create).not.toHaveBeenCalled();
   });
 
-  // Caso 7 — la solicitud nace PENDIENTE (delegado a los defaults de Prisma)
-  it('crea con idProyecto/idUsuario/motivo recortado únicamente, sin fijar estadoSolicitud/resueltaEn/resueltaPor, y conserva PENDIENTE en el resultado', async () => {
+  // Caso 7 — la solicitud nace PENDIENTE_LIDER (delegado a los defaults de Prisma)
+  it('crea con idProyecto/idUsuario/motivo recortado únicamente, sin fijar estadoSolicitud/resueltaEn/resueltaPor, y conserva PENDIENTE_LIDER en el resultado', async () => {
     const prisma = makePrisma();
     setupHappyPath(prisma);
     const service = makeService(prisma);
@@ -228,11 +228,11 @@ describe('ProjectsService.createSolicitudSalida', () => {
     expect(dataEnviada).not.toHaveProperty('estadoSolicitud');
     expect(dataEnviada).not.toHaveProperty('resueltaEn');
     expect(dataEnviada).not.toHaveProperty('resueltaPor');
-    expect(resultado.estadoSolicitud).toBe('PENDIENTE');
+    expect(resultado.estadoSolicitud).toBe('PENDIENTE_LIDER');
   });
 
-  // Caso 8 — segunda PENDIENTE rechazada (precheck)
-  it('rechaza con ConflictException cuando ya existe una solicitud PENDIENTE para (idProyecto, idUsuario)', async () => {
+  // Caso 8 — segunda PENDIENTE_LIDER rechazada (precheck)
+  it('rechaza con ConflictException cuando ya existe una solicitud PENDIENTE_LIDER para (idProyecto, idUsuario)', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
     prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 77 });
@@ -246,7 +246,7 @@ describe('ProjectsService.createSolicitudSalida', () => {
 
     expect(prisma.solicitudSalidaProyecto.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { idProyecto: PROYECTO_ID, idUsuario: MIEMBRO_ID, estadoSolicitud: 'PENDIENTE' },
+        where: { idProyecto: PROYECTO_ID, idUsuario: MIEMBRO_ID, estadoSolicitud: 'PENDIENTE_LIDER' },
       }),
     );
     expect(prisma.solicitudSalidaProyecto.create).not.toHaveBeenCalled();
@@ -292,7 +292,7 @@ describe('ProjectsService.createSolicitudSalida', () => {
     );
     expect(prisma.solicitudSalidaProyecto.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { idProyecto: PROYECTO_ID, idUsuario: MIEMBRO_ID, estadoSolicitud: 'PENDIENTE' },
+        where: { idProyecto: PROYECTO_ID, idUsuario: MIEMBRO_ID, estadoSolicitud: 'PENDIENTE_LIDER' },
       }),
     );
     expect(prisma.solicitudSalidaProyecto.create).toHaveBeenCalledWith({
@@ -395,14 +395,14 @@ const SOLICITUD_PENDIENTE = {
   idProyecto: PROYECTO_ID,
   idUsuario: MIEMBRO_ID,
   motivo: 'Cambio de disponibilidad de horario',
-  estadoSolicitud: 'PENDIENTE',
+  estadoSolicitud: 'PENDIENTE_LIDER',
   solicitadaEn: new Date('2026-01-10T00:00:00.000Z'),
   resueltaEn: null,
   resueltaPor: null,
 };
 
 // Deja el prisma mock listo para el camino feliz de resolución (líder real,
-// solicitud PENDIENTE encontrada); cada test sobreescribe lo que necesita.
+// solicitud PENDIENTE_LIDER encontrada); cada test sobreescribe lo que necesita.
 const PROYECTO_TITULO = 'Proyecto Demo';
 
 function setupResolutionPath(prisma: ReturnType<typeof makePrisma>) {
@@ -518,7 +518,7 @@ describe('ProjectsService.approveSolicitudSalida', () => {
     expect(prisma.asignacionTarea.count).not.toHaveBeenCalled();
   });
 
-  it('rechaza con BadRequestException cuando la solicitud ya fue resuelta (no está PENDIENTE)', async () => {
+  it('rechaza con BadRequestException cuando la solicitud ya fue resuelta (no está PENDIENTE_LIDER)', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
     prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue({
