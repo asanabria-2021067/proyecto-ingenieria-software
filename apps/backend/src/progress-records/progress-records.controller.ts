@@ -1,6 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { CreateProgressRecordDto } from './dto/create-progress-record.dto';
 import { UpdateProgressRecordDto } from './dto/update-progress-record.dto';
 import { ProgressRecordsService } from './progress-records.service';
@@ -12,6 +13,7 @@ export class ProgressRecordsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ProjectWriteGuard)
   create(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -23,6 +25,7 @@ export class ProgressRecordsController {
   }
 
   @Patch(':progressRecordId')
+  @UseGuards(ProjectWriteGuard)
   update(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
