@@ -360,6 +360,87 @@ export class SprintsService {
   }
 
   /**
+   * A9: cierra el Sprint (EN_FINALIZACION -> CERRADO), única transición que
+   * esta tarea implementa — CERRADO es terminal, sin ruta de reapertura.
+   * Reutiliza `SprintsAuthorizationService.assertCanCloseSprint` (ya
+   * existente desde A1-A3, mismo patrón que `assertCanFinalizeSprint`):
+   * exclusivo del líder, aislado por projectId+sprintId.
+   *
+   * Mismo patrón exacto que `finalizeSprint` (precheck legible + `updateMany`
+   * condicionado + relectura final), para no introducir una segunda
+   * estrategia de transición en el mismo módulo:
+   *
+   *   autorización (lee el Sprint) -> precheck estado EN_FINALIZACION ->
+   *   updateMany condicionado por estado=EN_FINALIZACION -> relectura final
+   *
+   * El precheck es solo un fallo rápido y legible; la garantía real contra
+   * la carrera "el estado cambió entre la autorización/lectura inicial y el
+   * commit" es el propio `updateMany` con `where: { ..., estado:
+   * EN_FINALIZACION }` — si otra transacción ya cerró (o de algún modo
+   * cambió) el Sprint entre la lectura de autorización y este punto,
+   * `count === 0` y se traduce a ConflictException SIN sobrescribir el
+   * estado real ni tocar fechaCierre/cerradoPor. No existe ninguna vía para
+   * que `estado = CERRADO` quede persistido sin que `fechaCierre` y
+   * `cerradoPor` también lo estén: los tres campos viajan en el mismo
+   * `data` de una única sentencia condicionada, dentro de la misma
+   * transacción — si cualquier paso posterior de la transacción lanza,
+   * PostgreSQL revierte los tres a la vez.
+   *
+   * `fechaCierre` se genera server-side (`new Date()`), nunca se acepta del
+   * cliente. `cerradoPor` es siempre el actor autorizado que ejecutó la
+   * operación (mismo `userId` ya validado como líder), nunca un valor
+   * enviado por el cliente.
+   *
+   * A9 nunca recalcula horas ni toca AsignacionTarea.horasReales: no
+   * selecciona, no actualiza ni referencia HorasParticipacion/AsignacionTarea
+   * en absoluto — los valores de A7 (horasCalculadas/horasAprobadas/
+   * justificacionAjuste) permanecen exactamente como estaban, porque
+   * closeSprint jamás los toca.
+   */
+  async closeSprint(projectId: number, sprintId: number, userId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const sprint = await this.sprintsAuthorization.assertCanCloseSprint(
+        projectId,
+        sprintId,
+        userId,
+        tx,
+      );
+
+      if (sprint.estado !== EstadoSprint.EN_FINALIZACION) {
+        throw new ConflictException('El Sprint no está en estado EN_FINALIZACION');
+      }
+
+      const actualizado = await tx.sprint.updateMany({
+        where: {
+          idSprint: sprintId,
+          idProyecto: projectId,
+          estado: EstadoSprint.EN_FINALIZACION,
+        },
+        data: {
+          estado: EstadoSprint.CERRADO,
+          fechaCierre: new Date(),
+          cerradoPor: userId,
+        },
+      });
+
+      if (actualizado.count === 0) {
+        throw new ConflictException('El Sprint ya no está en estado EN_FINALIZACION');
+      }
+
+      const filaFinal = await tx.sprint.findFirst({
+        where: { idSprint: sprintId, idProyecto: projectId },
+      });
+      if (!filaFinal) {
+        throw new Error(
+          `No se pudo leer el Sprint con id ${sprintId} recién cerrado dentro de la transacción`,
+        );
+      }
+
+      return filaFinal;
+    });
+  }
+
+  /**
    * Reconoce específicamente la violación del índice parcial
    * `sprint_operable_unique` (idProyecto), mismo criterio estrecho que
    * TasksService.isActiveAssignmentCollision: no basta `code === 'P2002'`,
