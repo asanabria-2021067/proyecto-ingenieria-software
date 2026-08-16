@@ -4,13 +4,19 @@ import { TasksService } from '../src/tasks/tasks.service';
 
 function makeTx() {
   return {
-    tarea: { create: vi.fn(), findFirst: vi.fn() },
+    // A12.1: findMany se usa exclusivamente por syncHitoEstado cuando la
+    // tarea creada tiene idHito != null. Por defecto [] para no romper los
+    // tests preexistentes (idHito: null en tareaRow() por defecto).
+    tarea: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     asignacionTarea: { create: vi.fn() },
     tareaEtiqueta: { createMany: vi.fn() },
     // Por defecto el proyecto tiene un Sprint ACTIVO (FND-03.B): los tests
     // que necesitan probar el rechazo por falta de Sprint sobreescriben
     // este mock explícitamente con mockResolvedValue(null).
     sprint: { findFirst: vi.fn().mockResolvedValue({ idSprint: 1 }) },
+    // A12.1: presente únicamente en los tests que crean una tarea con
+    // idHito != null; ausente (undefined) en el resto.
+    hito: undefined as { update: ReturnType<typeof vi.fn> } | undefined,
   };
 }
 
@@ -232,6 +238,9 @@ describe('TasksService.create', () => {
         etiquetas: ETIQUETAS_VALIDADAS,
       });
       const notifications = makeNotifications();
+      // A12.1: la tarea creada aquí tiene idHito=4, así que create()
+      // sincroniza ese Hito — necesita hito.update disponible en el tx.
+      tx.hito = { update: vi.fn() };
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(
         tareaRow({
@@ -685,6 +694,73 @@ describe('TasksService.create', () => {
           'cantidadComentarios',
         ].sort(),
       );
+    });
+  });
+
+  describe('A12.1 — sincronización de Hito.estadoHito al crear una tarea', () => {
+    function setupCreacionConHito(idHito: number) {
+      const tx = makeTx();
+      tx.hito = { update: vi.fn() };
+      const prisma = makePrisma(tx);
+      const auth = makeAuthorization();
+      const relations = makeRelations({ hito: { idHito, idProyecto: 5, tituloHito: 'H' } });
+      const notifications = makeNotifications();
+      tx.tarea.create.mockResolvedValue({ idTarea: 100 });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito }));
+      const service = new TasksService(prisma, auth, relations, notifications);
+      return { tx, service };
+    }
+
+    it('Hito previamente COMPLETADO + nueva tarea POR_HACER: persiste EN_PROGRESO (1 de 2 HECHO = 50%)', async () => {
+      const { tx, service } = setupCreacionConHito(4);
+      // Estado del Hito ANTES de esta creación: 1 tarea, HECHO (100%,
+      // COMPLETADO). La consulta project-wide ya ve la tarea recién creada
+      // (POR_HACER) junto con la existente (HECHO) — el nuevo estado de la
+      // tarea ya participa en el cálculo.
+      tx.tarea.findMany.mockResolvedValue([
+        { idHito: 4, estadoTarea: 'HECHO' },
+        { idHito: 4, estadoTarea: 'POR_HACER' },
+      ]);
+
+      await service.create(5, 1, { ...BASE_DTO, idHito: 4 });
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 4 },
+        data: { estadoHito: 'EN_PROGRESO' },
+      });
+      expect(tx.tarea.findMany).toHaveBeenCalledWith({
+        where: { idHito: 4, eliminadoEn: null },
+        select: { estadoTarea: true },
+      });
+    });
+
+    it('Hito PENDIENTE recibe su primera tarea POR_HACER: permanece PENDIENTE (sin estado artificial)', async () => {
+      const { tx, service } = setupCreacionConHito(5);
+      tx.tarea.findMany.mockResolvedValue([{ idHito: 5, estadoTarea: 'POR_HACER' }]);
+
+      await service.create(5, 1, { ...BASE_DTO, idHito: 5 });
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 5 },
+        data: { estadoHito: 'PENDIENTE' },
+      });
+    });
+
+    it('crear tarea SIN Hito: no intenta sincronizar ningún Hito', async () => {
+      const tx = makeTx();
+      // tx.hito permanece undefined: si el código intentara sincronizar,
+      // esta prueba fallaría con TypeError antes de completarse.
+      const prisma = makePrisma(tx);
+      const auth = makeAuthorization();
+      const relations = makeRelations();
+      const notifications = makeNotifications();
+      tx.tarea.create.mockResolvedValue({ idTarea: 100 });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: null }));
+      const service = new TasksService(prisma, auth, relations, notifications);
+
+      await service.create(5, 1, BASE_DTO);
+
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
     });
   });
 });

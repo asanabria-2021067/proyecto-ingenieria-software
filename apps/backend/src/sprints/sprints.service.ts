@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { calcularProgresoHito } from '../common/hito-progreso';
 import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
 import { SprintClosingSummaryDto, SprintClosingSummaryParticipantDto } from './dto/sprint-closing-summary.dto';
 import {
@@ -491,14 +492,17 @@ export class SprintsService {
    * finalizar/cerrar/ajustar horas) — un `sprintId` de otro proyecto nunca
    * llega a la reconstrucción, lanza NotFoundException antes.
    *
-   * Sin N+1 manual: 2 consultas fijas, ninguna dentro de un loop:
+   * Sin N+1 manual: 3 consultas fijas, ninguna dentro de un loop:
    *   1) Sprint + tareas (con `eliminadoEn: null`, mismo criterio de
    *      soft-delete que TasksService.findAll/findOne) + sus asignaciones
    *      (TODOS los tramos, no solo el activo — Sección 6.C) + sus
    *      comentarios (`eliminadoEn: null`, mismo criterio que
    *      ComentariosService), todo vía un único `include` anidado.
-   *   2) Los Hitos referenciados por esas tareas, en una única consulta
-   *      `IN (...)` (nunca una consulta por tarea).
+   *   2) y 3) Los Hitos referenciados por esas tareas y TODAS las tareas
+   *      vigentes de esos Hitos en el proyecto (no solo las de este
+   *      Sprint — mismo scope que `ProjectsService.calcularAvanceHitos` /
+   *      `getAvance`), en paralelo vía `Promise.all`, cada una con una
+   *      única consulta `IN (...)` (nunca una consulta por tarea/Hito).
    *
    * Una tarea con varios tramos de AsignacionTarea aparece UNA vez, con
    * todos sus tramos anidados dentro de `asignaciones` — nunca se duplica
@@ -506,9 +510,13 @@ export class SprintsService {
    * aparece UNA vez en `hitos` (Map por idHito); cada tarea solo referencia
    * su `idHito`, nunca embebe una copia del Hito.
    *
-   * `estadoHito` se devuelve exactamente como está persistido — A10 no
-   * corrige ni recalcula ese campo (contrato exclusivo de A12), y no se
-   * agrega ningún porcentaje/progreso por Hito.
+   * `estadoHito` (A12) se devuelve exactamente como está persistido —
+   * TasksService ya lo mantiene sincronizado en los write-paths reales de
+   * `estadoTarea` (ver hito-progreso.ts), así que SprintDetail sigue sin
+   * recalcularlo, solo lo lee. `porcentaje` (A12) se deriva con la MISMA
+   * fórmula canónica (`calcularProgresoHito`), nunca una segunda
+   * definición — puro cálculo de lectura, esta consulta GET nunca escribe
+   * `Hito.estadoHito`.
    */
   async getSprintDetail(projectId: number, sprintId: number, userId: number): Promise<SprintDetailDto> {
     await this.sprintsAuthorization.assertCanViewSprintHistory(projectId, sprintId, userId);
@@ -550,12 +558,28 @@ export class SprintsService {
 
     const hitosPorId = new Map<number, SprintDetailHitoDto>();
     if (idsHito.length > 0) {
-      const hitos = await this.prisma.hito.findMany({
-        where: { idHito: { in: idsHito }, idProyecto: projectId },
-        select: { idHito: true, tituloHito: true, estadoHito: true },
-      });
+      const [hitos, tareasDeHitos] = await Promise.all([
+        this.prisma.hito.findMany({
+          where: { idHito: { in: idsHito }, idProyecto: projectId },
+          select: { idHito: true, tituloHito: true, estadoHito: true },
+        }),
+        // Scope idéntico a ProjectsService.calcularAvanceHitos/getAvance:
+        // TODAS las tareas vigentes del Hito en el proyecto, no solo las
+        // de este Sprint.
+        this.prisma.tarea.findMany({
+          where: { idHito: { in: idsHito }, idProyecto: projectId, eliminadoEn: null },
+          select: { idHito: true, estadoTarea: true },
+        }),
+      ]);
       for (const hito of hitos) {
-        hitosPorId.set(hito.idHito, hito);
+        const tareasDelHito = tareasDeHitos.filter((tarea) => tarea.idHito === hito.idHito);
+        const { porcentaje } = calcularProgresoHito(tareasDelHito);
+        hitosPorId.set(hito.idHito, {
+          idHito: hito.idHito,
+          tituloHito: hito.tituloHito,
+          estadoHito: hito.estadoHito,
+          porcentaje,
+        });
       }
     }
 
