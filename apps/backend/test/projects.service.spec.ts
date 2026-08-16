@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EstadoProyecto } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { EstadoProyectoCreador } from '../src/projects/dto/update-estado-proyecto.dto';
@@ -23,6 +23,11 @@ function makePrisma() {
     rolProyecto: { findMany: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     requisitoHabilidadRol: { deleteMany: vi.fn(), createMany: vi.fn() },
     proyectoOrganizacion: { deleteMany: vi.fn(), createMany: vi.fn() },
+    // A11: usado exclusivamente por assertNoOperableSprint (requestClose /
+    // changeEstado -> CERRADO). Por defecto sin Sprint operable
+    // (mockResolvedValue(null)), para que los tests preexistentes de este
+    // archivo que nunca configuran este mock sigan pasando sin cambios.
+    sprint: { findFirst: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn(async (cb: (tx: any) => unknown) => cb({
       proyecto: {
         create: vi.fn(),
@@ -241,6 +246,146 @@ describe('ProjectsService', () => {
     await expect(service.changeEstado(1, 1, EstadoProyectoCreador.PUBLICADO)).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  describe('A11 — assertNoOperableSprint (Decisión Bloqueante #2)', () => {
+    function proyectoEnProgreso(overrides: Record<string, unknown> = {}) {
+      return { idProyecto: 1, estadoProyecto: EstadoProyecto.EN_PROGRESO, creadoPor: 1, ...overrides };
+    }
+
+    describe('requestClose', () => {
+      it('caso 1: Sprint ACTIVO — rechaza con ConflictException y mensaje explícito, sin ejecutar la transición', async () => {
+        const prisma = makePrisma();
+        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
+        prisma.sprint.findFirst.mockResolvedValue({ idSprint: 99 });
+        const service = new ProjectsService(prisma, {} as any);
+
+        await expect(service.requestClose(1, 1)).rejects.toBeInstanceOf(ConflictException);
+        await expect(service.requestClose(1, 1)).rejects.toThrow(
+          'Debes cerrar el Sprint actual antes de solicitar el cierre del proyecto',
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('caso 2: Sprint EN_FINALIZACION — rechaza igual, sin ejecutar la transición', async () => {
+        const prisma = makePrisma();
+        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
+        prisma.sprint.findFirst.mockResolvedValue({ idSprint: 99 });
+        const service = new ProjectsService(prisma, {} as any);
+
+        await expect(service.requestClose(1, 1)).rejects.toBeInstanceOf(ConflictException);
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('caso 3: solo existe Sprint CERRADO — no bloquea, requestClose continúa con su comportamiento previo', async () => {
+        const prisma = makePrisma();
+        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
+        // La consulta de assertNoOperableSprint ya filtra por
+        // estado IN (ACTIVO, EN_FINALIZACION): un proyecto con un Sprint
+        // CERRADO simplemente no matchea esa consulta -> null, exactamente
+        // el mock por defecto de makePrisma().
+        prisma.sprint.findFirst.mockResolvedValue(null);
+        const tx = {
+          proyecto: {
+            update: vi.fn().mockResolvedValue({
+              idProyecto: 1,
+              estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE,
+              tituloProyecto: 'P',
+            }),
+          },
+        };
+        prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
+        const notifications = { notifyAdminsFromTemplate: vi.fn() } as any;
+        const service = new ProjectsService(prisma, notifications);
+
+        const result = await service.requestClose(1, 1);
+
+        expect(result.estadoProyecto).toBe(EstadoProyecto.EN_SOLICITUD_CIERRE);
+        expect(notifications.notifyAdminsFromTemplate).toHaveBeenCalled();
+      });
+
+      it('caso 4: sin ningún Sprint — no bloquea, requestClose continúa con su comportamiento previo', async () => {
+        const prisma = makePrisma();
+        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
+        prisma.sprint.findFirst.mockResolvedValue(null);
+        const tx = {
+          proyecto: {
+            update: vi.fn().mockResolvedValue({
+              idProyecto: 1,
+              estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE,
+              tituloProyecto: 'P',
+            }),
+          },
+        };
+        prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
+        const notifications = { notifyAdminsFromTemplate: vi.fn() } as any;
+        const service = new ProjectsService(prisma, notifications);
+
+        const result = await service.requestClose(1, 1);
+
+        expect(result.estadoProyecto).toBe(EstadoProyecto.EN_SOLICITUD_CIERRE);
+      });
+
+      it('aislamiento: la consulta de Sprint operable está acotada por idProyecto + estado IN (ACTIVO, EN_FINALIZACION)', async () => {
+        const prisma = makePrisma();
+        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso({ idProyecto: 7 }));
+        prisma.sprint.findFirst.mockResolvedValue(null);
+        const tx = { proyecto: { update: vi.fn().mockResolvedValue({ tituloProyecto: 'P' }) } };
+        prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
+        const service = new ProjectsService(prisma, { notifyAdminsFromTemplate: vi.fn() } as any);
+
+        await service.requestClose(7, 1);
+
+        expect(prisma.sprint.findFirst).toHaveBeenCalledWith({
+          where: { idProyecto: 7, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
+          select: { idSprint: true },
+        });
+      });
+    });
+
+    describe('changeEstado -> CERRADO (transición real que persiste EstadoProyecto.CERRADO)', () => {
+      it('Sprint ACTIVO bloquea la transición a CERRADO, sin persistir el nuevo estado', async () => {
+        const prisma = makePrisma();
+        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
+        prisma.sprint.findFirst.mockResolvedValue({ idSprint: 99 });
+        const service = new ProjectsService(prisma, {} as any);
+
+        await expect(
+          service.changeEstado(1, 1, EstadoProyectoCreador.CERRADO),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(prisma.proyecto.update).not.toHaveBeenCalled();
+      });
+
+      it('Sprint EN_FINALIZACION bloquea la transición a CERRADO, sin persistir el nuevo estado', async () => {
+        const prisma = makePrisma();
+        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
+        prisma.sprint.findFirst.mockResolvedValue({ idSprint: 99 });
+        const service = new ProjectsService(prisma, {} as any);
+
+        await expect(
+          service.changeEstado(1, 1, EstadoProyectoCreador.CERRADO),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(prisma.proyecto.update).not.toHaveBeenCalled();
+      });
+
+      it('sin Sprint operable, changeEstado(CERRADO) NO se bloquea por A11 (llega a intentar persistir)', async () => {
+        const prisma = makePrisma();
+        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
+        prisma.sprint.findFirst.mockResolvedValue(null);
+        prisma.proyecto.update.mockResolvedValue({
+          idProyecto: 1,
+          estadoProyecto: EstadoProyecto.CERRADO,
+          tituloProyecto: 'P',
+        });
+        prisma.participacionProyecto.findMany.mockResolvedValue([]);
+        const notifications = { notifyFromTemplate: vi.fn() } as any;
+        const service = new ProjectsService(prisma, notifications);
+
+        const result = await service.changeEstado(1, 1, EstadoProyectoCreador.CERRADO);
+
+        expect(result.estadoProyecto).toBe(EstadoProyecto.CERRADO);
+      });
+    });
   });
 
   it('findPostulacionesByProject exige ownership', async () => {

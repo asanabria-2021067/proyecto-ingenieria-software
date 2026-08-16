@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Inject,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -16,7 +17,7 @@ import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoHito, EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
+import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const FEATURED_CACHE_KEY = 'projects:featured';
@@ -911,6 +912,7 @@ export class ProjectsService {
         'Solo se puede solicitar cierre para proyectos en estado EN_PROGRESO',
       );
     }
+    await this.assertNoOperableSprint(id);
     return this.prisma.$transaction(async (tx) => {
       const actualizado = await tx.proyecto.update({
         where: { idProyecto: id },
@@ -1033,6 +1035,14 @@ export class ProjectsService {
         `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
       );
     }
+    // A11 / Decisión Bloqueante #2: esta es la transición real que persiste
+    // EstadoProyecto.CERRADO (EN_PROGRESO -> CERRADO, vía
+    // TRANSICIONES_PERMITIDAS) — no `approveClosure`, que en el flujo
+    // administrativo actual persiste CANCELADO, no CERRADO. La invariante
+    // "Proyecto=CERRADO con Sprint operable" se protege aquí.
+    if (nuevoEstado === EstadoProyectoCreador.CERRADO) {
+      await this.assertNoOperableSprint(id);
+    }
     const estadoAnterior = proyecto.estadoProyecto;
 
     const actualizado = await this.prisma.proyecto.update({
@@ -1117,6 +1127,32 @@ export class ProjectsService {
       throw new ForbiddenException('No eres el líder de este proyecto');
     }
     return proyecto;
+  }
+
+  /**
+   * A11 — Decisión Bloqueante #2 (congelada): un Proyecto no puede avanzar
+   * hacia su cierre mientras exista un Sprint operable (ACTIVO o
+   * EN_FINALIZACION) en ese proyecto. CERRADO nunca bloquea — Foundation ya
+   * establece esa misma semántica de "operable" para el índice parcial
+   * `sprint_operable_unique` (sprints/sprints-context.service.ts,
+   * getCurrentSprint). Consulta mínima: solo existencia, acotada por
+   * idProyecto — no carga tareas, horas, participantes ni histórico. No
+   * cierra, finaliza ni crea ningún Sprint; únicamente rechaza la
+   * transición del Proyecto si corresponde.
+   */
+  private async assertNoOperableSprint(idProyecto: number): Promise<void> {
+    const sprintOperable = await this.prisma.sprint.findFirst({
+      where: {
+        idProyecto,
+        estado: { in: [EstadoSprint.ACTIVO, EstadoSprint.EN_FINALIZACION] },
+      },
+      select: { idSprint: true },
+    });
+    if (sprintOperable) {
+      throw new ConflictException(
+        'Debes cerrar el Sprint actual antes de solicitar el cierre del proyecto',
+      );
+    }
   }
 
   private async _requireAdmin(userId: number) {
