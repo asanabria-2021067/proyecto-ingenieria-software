@@ -5,7 +5,9 @@
  * `startSprint`/`finalizeSprint`/`closeSprint` en
  * apps/backend/src/sprints/sprints.service.ts, un superconjunto compatible
  * de los mismos campos base (más `cerradoPor`, opcional aquí porque
- * `listSprints` no lo selecciona).
+ * `listSprints` no lo selecciona; y `tareas`/`hitos`/`horasEstimadas`
+ * — A10.1 —, opcionales por el motivo inverso: las mutaciones devuelven la
+ * fila cruda de `Sprint`, que nunca las calcula).
  *
  * Fechas como `string`: igual que `TareaPublicaDTO` en `@/lib/types/tasks`,
  * son JSON serializado por `apiFetch`, nunca instancias de `Date`.
@@ -24,6 +26,10 @@ export interface SprintDto {
   fechaFinalizacionIniciada: string | null;
   fechaCierre: string | null;
   cerradoPor?: number | null;
+  /** A10.1 — presente en `GET /proyectos/:id/sprints`, ausente en las mutaciones. */
+  tareas?: number;
+  hitos?: number;
+  horasEstimadas?: number;
 }
 
 /**
