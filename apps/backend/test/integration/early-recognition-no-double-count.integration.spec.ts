@@ -72,6 +72,7 @@ function makeSprintsService(prisma: PrismaClient): SprintsService {
   const notifications = {
     notifyProjectActiveParticipants: async () => undefined,
     notifySprintFinalizationStarted: async () => undefined,
+    notifySprintClosed: async () => undefined,
   } as unknown as NotificationsService;
   return new SprintsService(prismaService, context, authorization, notifications);
 }

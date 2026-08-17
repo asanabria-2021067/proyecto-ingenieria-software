@@ -65,6 +65,55 @@ describe('NotificationsGateway', () => {
     });
   });
 
+  describe('notifySprintClosed (A9.1)', () => {
+    it('emite literalmente el evento SPRINT_CLOSED', async () => {
+      const { gateway, emit } = makeGateway();
+
+      await gateway.notifySprintClosed([5], { projectId: 10, sprintId: 20 });
+
+      expect(emit).toHaveBeenCalledWith('SPRINT_CLOSED', { projectId: 10, sprintId: 20 });
+    });
+
+    it('el payload incluye projectId y sprintId', async () => {
+      const { gateway, emit } = makeGateway();
+
+      await gateway.notifySprintClosed([5], { projectId: 42, sprintId: 99 });
+
+      const [, payload] = emit.mock.calls[0];
+      expect(payload).toEqual({ projectId: 42, sprintId: 99 });
+    });
+
+    it('usa el mismo mecanismo de rooms user:{idUsuario} que notifySprintFinalizationStarted, uno por destinatario', async () => {
+      const { gateway, to, emit } = makeGateway();
+
+      await gateway.notifySprintClosed([7, 8, 9], { projectId: 1, sprintId: 2 });
+
+      expect(to).toHaveBeenCalledWith('user:7');
+      expect(to).toHaveBeenCalledWith('user:8');
+      expect(to).toHaveBeenCalledWith('user:9');
+      expect(emit).toHaveBeenCalledTimes(3);
+    });
+
+    it('con lista vacía de destinatarios no emite nada', async () => {
+      const { gateway, emit } = makeGateway();
+
+      await gateway.notifySprintClosed([], { projectId: 1, sprintId: 2 });
+
+      expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('SPRINT_CLOSED coexiste con SPRINT_FINALIZATION_STARTED y "notification" — ninguno reemplaza a otro', async () => {
+      const { gateway, emit } = makeGateway();
+
+      await gateway.notifyUsers([1], { tituloNotificacion: 'x' });
+      await gateway.notifySprintFinalizationStarted([1], { projectId: 10, sprintId: 20 });
+      await gateway.notifySprintClosed([1], { projectId: 10, sprintId: 20 });
+
+      const eventosEmitidos = emit.mock.calls.map(([evento]) => evento);
+      expect(eventosEmitidos).toEqual(['notification', 'SPRINT_FINALIZATION_STARTED', 'SPRINT_CLOSED']);
+    });
+  });
+
   /**
    * X4 (Parte C): regresión de que incorporar SPRINT_FINALIZATION_STARTED
    * (A4) no alteró la configuración observable del gateway ni reemplazó el

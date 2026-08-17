@@ -171,4 +171,59 @@ describe('NotificationsService', () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe('notifySprintClosed (A9.1)', () => {
+    function makeConnectedGateway() {
+      const gateway = new NotificationsGateway(new JwtService());
+      Reflect.set(gateway, 'server', {});
+      vi.spyOn(gateway, 'notifySprintClosed').mockResolvedValue(undefined);
+      return gateway;
+    }
+
+    function makeDisconnectedGateway() {
+      return new NotificationsGateway(new JwtService());
+    }
+
+    it('destinatarios = participantes ACTIVO del proyecto, excluyendo al autor (mismo criterio que START)', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }, { idUsuario: 9 }]);
+      const gateway = makeConnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await service.notifySprintClosed(1, 2, { projectId: 1, sprintId: 5 });
+
+      expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith({
+        where: {
+          estadoParticipacion: 'ACTIVO',
+          idUsuario: { not: 2 },
+          rolProyecto: { idProyecto: 1 },
+        },
+        distinct: ['idUsuario'],
+        select: { idUsuario: true },
+      });
+      expect(gateway.notifySprintClosed).toHaveBeenCalledWith([8, 9], { projectId: 1, sprintId: 5 });
+    });
+
+    it('no persiste ninguna fila de Notificacion (señal realtime pura, no bandeja)', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }]);
+      const gateway = makeConnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await service.notifySprintClosed(1, 2, { projectId: 1, sprintId: 5 });
+
+      expect(prisma.notificacion.createMany).not.toHaveBeenCalled();
+    });
+
+    it('sin gateway.server disponible, no intenta emitir', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }]);
+      const gateway = makeDisconnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await expect(
+        service.notifySprintClosed(1, 2, { projectId: 1, sprintId: 5 }),
+      ).resolves.toBeUndefined();
+    });
+  });
 });
