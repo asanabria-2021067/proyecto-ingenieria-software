@@ -19,8 +19,8 @@ jobs:
     name: Pruebas antes de desplegar
     uses: ./.github/workflows/ci.yml
 
-  deploy:
-    needs: test
+  build-frontend:
+    name: Build y push imagen frontend
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,18 +39,14 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare image names
+      - name: Prepare image name
         id: vars
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          frontend_image="ghcr.io/${owner}/${repo_name}-frontend"
-          backend_image="ghcr.io/${owner}/${repo_name}-backend"
-          echo "frontend_image=${frontend_image}" >> "$GITHUB_OUTPUT"
-          echo "backend_image=${backend_image}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend" >> "$GITHUB_OUTPUT"
 
       - name: Build and push frontend image
-        id: build_frontend
         uses: docker/build-push-action@v5
         with:
           context: ./apps/frontend
@@ -65,11 +61,37 @@ jobs:
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+  build-backend:
+    name: Build y push imagen backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare image name
+        id: vars
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
+          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend" >> "$GITHUB_OUTPUT"
 
       - name: Build and push backend image
-        id: build_backend
         uses: docker/build-push-action@v5
         with:
           context: ./apps/backend
@@ -77,14 +99,21 @@ jobs:
           tags: |
             ${{ steps.vars.outputs.backend_image }}:${{ github.sha }}
             ${{ steps.vars.outputs.backend_image }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
 
-      - name: Export image tags
-        id: images
+  deploy:
+    name: Desplegar en la VM
+    needs: [test, build-frontend, build-backend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare image names
+        id: vars
         run: |
-          echo "frontend_image=${{ steps.vars.outputs.frontend_image }}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "backend_image=${{ steps.vars.outputs.backend_image }}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
+          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -125,11 +154,9 @@ jobs:
             RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
             MAIL_FROM=${{ secrets.MAIL_FROM }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-            BACKEND_IMAGE=${{ steps.images.outputs.backend_image }}
-            FRONTEND_IMAGE=${{ steps.images.outputs.frontend_image }}
+            BACKEND_IMAGE=${{ steps.vars.outputs.backend_image }}
+            FRONTEND_IMAGE=${{ steps.vars.outputs.frontend_image }}
             ENVEOF
-
-            docker compose --profile app down
 
             n=0
             until docker compose --profile app pull; do
@@ -141,6 +168,8 @@ jobs:
               echo "Pull failed (attempt $n/5), retrying in 15s..."
               sleep 15
             done
+
+            docker compose --profile app down
             docker compose --profile app up -d --remove-orphans
 
             echo "Waiting for backend to be healthy..."
@@ -155,9 +184,8 @@ jobs:
                 docker compose logs --tail=120 backend || true
                 exit 1
               fi
-              sleep 5
+              sleep 3
             done
 
-            docker compose exec -T backend npx prisma db seed
             docker compose --profile app ps
             docker image prune -f
