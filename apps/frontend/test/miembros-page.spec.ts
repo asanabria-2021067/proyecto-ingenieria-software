@@ -18,6 +18,8 @@ vi.mock('../hooks/use-exit-request', () => ({
   useApproveExitRequest: vi.fn(),
   useRejectExitRequest: vi.fn(),
 }));
+vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 
 import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';
 import { useProjectTeam } from '../hooks/use-project-team';
@@ -30,6 +32,8 @@ import {
   useProjectPendingExitRequests,
   useRejectExitRequest,
 } from '../hooks/use-exit-request';
+import { useProjectDetail } from '../hooks/use-project-detail';
+import { useCurrentUser } from '../hooks/use-current-user';
 import type { PendingLeaderReviewDto } from '../lib/types/exit-requests';
 
 const LIDER: LiderProyectoDTO = {
@@ -140,6 +144,16 @@ function seccionPorTitulo(titulo: string): HTMLElement {
 beforeEach(() => {
   mockPendingPostulationsHook();
   mockPendingExitRequestsHook();
+  // GET /proyectos/:id/miembros/resumen es exclusivo del líder en backend
+  // (TeamService.getTeamSummary → requireOwner) — F17.1 lo gatea también
+  // client-side. Todos los tests de este archivo asumen el punto de vista
+  // del líder salvo que digan lo contrario explícitamente (Sección
+  // "autorización").
+  (useProjectDetail as any).mockReturnValue({
+    data: { idProyecto: 42, creador: { idUsuario: 1 } },
+    isLoading: false,
+  });
+  (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 }, isLoading: false });
 });
 
 afterEach(() => {
@@ -340,6 +354,10 @@ describe('MiembrosProyectoPage — F13 integrada, F12 intacta', () => {
     renderPage();
 
     expect(screen.getByText('Postulaciones pendientes')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ver postulaciones pendientes/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/miembros/postulaciones',
+    );
     expect(screen.getByRole('heading', { level: 2, name: TITULO_ACTIVOS })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: TITULO_RETIRADOS_CON_CONTRIBUCION })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: TITULO_RETIRADOS_SIN_CONTRIBUCION })).toBeInTheDocument();
@@ -524,7 +542,33 @@ describe('MiembrosProyectoPage — navegación', () => {
     renderPage();
 
     const link = screen.getByRole('link', { name: /Volver al proyecto/i });
-    expect(link).toHaveAttribute('href', '/dashboard/proyectos/42');
+    // Debe apuntar al hub real del líder (F17), no a la vista pública/de
+    // postulación de /dashboard/proyectos/[id] — regresión del bug donde el
+    // líder terminaba viéndose a sí mismo como si no lo fuera.
+    expect(link).toHaveAttribute('href', '/dashboard/projects/42');
+  });
+});
+
+describe('MiembrosProyectoPage — autorización', () => {
+  it('un no-líder ve el aviso "¡No eres líder!" en vez de los tres grupos', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 }, isLoading: false });
+    mockHook({ miembros: [miembro()] });
+    renderPage();
+
+    expect(screen.getByText('¡No eres líder!')).toBeInTheDocument();
+    expect(screen.getByText('No puedes acceder a los miembros de este proyecto.')).toBeInTheDocument();
+    expect(screen.queryByText(TITULO_ACTIVOS)).not.toBeInTheDocument();
+  });
+
+  it('un no-líder ve "Volver al proyecto" apuntando a /dashboard/proyectos (vista pública), no a /dashboard/projects (hub del líder)', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 }, isLoading: false });
+    mockHook({ miembros: [] });
+    renderPage();
+
+    expect(screen.getByRole('link', { name: /Volver al proyecto/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42',
+    );
   });
 });
 

@@ -19,6 +19,9 @@ import {
   useCloseSprint,
   useSprintClosingSummary,
 } from '@/hooks/use-project-sprints';
+import { useProjectDetail } from '@/hooks/use-project-detail';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -375,7 +378,7 @@ function SprintClosingForm({
         timerProgressBar: true,
         showConfirmButton: false,
       });
-      router.push(`/dashboard/proyectos/${idProyecto}`);
+      router.push(`/dashboard/projects/${idProyecto}`);
     } catch (error) {
       setSubmitError(mensajeDeError(error));
       setIsSubmitting(false);
@@ -473,7 +476,7 @@ function EmptyParticipantsClose({ idProyecto, idSprint }: { idProyecto: number; 
         timerProgressBar: true,
         showConfirmButton: false,
       });
-      router.push(`/dashboard/proyectos/${idProyecto}`);
+      router.push(`/dashboard/projects/${idProyecto}`);
     } catch (error) {
       setSubmitError(mensajeDeError(error));
     }
@@ -518,7 +521,14 @@ export default function SprintClosingPage() {
   const idSprint = Number(sprintId);
 
   const { summary, isLoading, isError, error, refetch } = useSprintClosingSummary(idProyecto, idSprint);
-  const volverHref = `/dashboard/proyectos/${id}`;
+
+  // GET .../sprints/:sprintId/cierre es exclusivo del líder en backend
+  // (SprintsAuthorizationService.assertCanViewClosingSummary). Mismo
+  // criterio de detección client-side que el resto de proyectos/[id]/*.
+  const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
+  const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
+  const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
+  const volverHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
@@ -530,6 +540,10 @@ export default function SprintClosingPage() {
         Volver al proyecto
       </Link>
 
+      {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
+        <LeaderOnlyNotice description="No puedes acceder al cierre de este Sprint." />
+      ) : (
+        <>
       {isLoading && <ClosingSkeleton />}
 
       {!isLoading && isError && (
@@ -583,6 +597,8 @@ export default function SprintClosingPage() {
             <SprintClosingForm idProyecto={idProyecto} idSprint={idSprint} summary={summary} />
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );
