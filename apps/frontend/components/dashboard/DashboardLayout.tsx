@@ -21,6 +21,7 @@ import { TokenRefreshManager } from '@/components/TokenRefreshManager';
 import { getAccessToken } from '@/lib/utils/token';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
+import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
 import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
@@ -151,6 +152,13 @@ export default function DashboardLayout({
             </div>
           </div>
         </header>
+
+        {/* F6: franja global de bloqueo por finalización de Sprint — fuera del
+            área con scroll para que no desaparezca al desplazar la página,
+            en flujo normal (no fixed/overlay). Host único: decide por sí
+            mismo si la ruta actual es project-scoped, sin duplicarse por
+            página. */}
+        <ProjectFinalizationBannerHost />
 
         {/* Scrollable page body */}
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain pb-20 md:pb-0">

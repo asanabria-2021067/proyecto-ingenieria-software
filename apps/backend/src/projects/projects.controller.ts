@@ -18,7 +18,6 @@ import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateEstadoProyectoDto } from './dto/update-estado-proyecto.dto';
 import { CreateHitoDto } from './dto/create-hito.dto';
-import { CreateSolicitudSalidaDto } from './dto/create-solicitud-salida.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -88,31 +87,6 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.findOneAdmin(id, user.userId);
-  }
-
-  @Get(':id/equipo')
-  @UseGuards(JwtAuthGuard)
-  findTeam(@Param('id', ParseIntPipe) id: number) {
-    return this.projectsService.findTeam(id);
-  }
-
-  @Get(':id/equipo/:idUsuario')
-  @UseGuards(JwtAuthGuard)
-  findTeamMemberDetail(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('idUsuario', ParseIntPipe) idUsuario: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.projectsService.findTeamMemberDetail(id, idUsuario, user.userId);
-  }
-
-  @Get(':id/miembros/resumen')
-  @UseGuards(JwtAuthGuard)
-  getTeamSummary(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.projectsService.getTeamSummary(id, user.userId);
   }
 
   @Get(':id/owner')
@@ -235,39 +209,6 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.createHito(id, user.userId, data);
-  }
-
-  @Post(':projectId/solicitudes-salida')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.CREATED)
-  createExitRequest(
-    @Param('projectId', ParseIntPipe) projectId: number,
-    @Body() data: CreateSolicitudSalidaDto,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.projectsService.createSolicitudSalida(projectId, user.userId, data.motivo);
-  }
-
-  @Post(':projectId/solicitudes-salida/:idSolicitud/aprobar')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  approveExitRequest(
-    @Param('projectId', ParseIntPipe) projectId: number,
-    @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.projectsService.approveSolicitudSalida(projectId, idSolicitud, user.userId);
-  }
-
-  @Post(':projectId/solicitudes-salida/:idSolicitud/rechazar')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  rejectExitRequest(
-    @Param('projectId', ParseIntPipe) projectId: number,
-    @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.projectsService.rejectSolicitudSalida(projectId, idSolicitud, user.userId);
   }
 
   // ---------- POSTULACIONES DEL PROYECTO ----------

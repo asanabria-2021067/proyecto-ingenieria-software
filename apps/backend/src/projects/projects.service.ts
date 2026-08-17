@@ -17,10 +17,9 @@ import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoHito, EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
+import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TeamSummaryMemberDto, TeamSummaryRoleDto } from './dto/team-summary-member.dto';
-import { TeamSummaryResponseDto } from './dto/team-summary-response.dto';
+import { calcularProgresoHito } from '../common/hito-progreso';
 
 const FEATURED_CACHE_KEY = 'projects:featured';
 const FEATURED_CACHE_TTL = 300_000;
@@ -60,14 +59,19 @@ function calcularAvanceTareas(tareas: { estadoTarea: string }[]) {
 }
 
 /**
- * El estado de un hito NUNCA se lee de `Hito.estadoHito`: esa columna se fija
- * en PENDIENTE al crear el hito (createHito) y ningún flujo la vuelve a
- * escribir, así que quedaba congelada aunque se completaran todas sus tareas
- * (bug de cálculo de la barra de progreso de hitos). El estado real se deriva
- * de las tareas asociadas (`tarea.idHito`), con el mismo criterio que ya usa
- * el frontend en `calcularStats` (hitos-section.tsx): % = hechas/total de sus
- * tareas; COMPLETADO al 100% con al menos una tarea, EN_PROGRESO si %>0,
- * PENDIENTE en otro caso (incluye hitos sin tareas asociadas).
+ * El estado de un hito, históricamente, NUNCA se leía de `Hito.estadoHito`:
+ * esa columna se fijaba en PENDIENTE al crear el hito (createHito) y ningún
+ * flujo la volvía a escribir, así que quedaba congelada aunque se
+ * completaran todas sus tareas (bug de cálculo de la barra de progreso de
+ * hitos). A12 corrige la persistencia (ver `TasksService` — sincroniza
+ * `Hito.estadoHito` en los write-paths reales de `estadoTarea`), pero este
+ * agregado de PROYECTO sigue derivando en memoria a partir de las tareas
+ * (`tarea.idHito`), nunca de la columna persistida: es un GET puro, no debe
+ * depender de que la sincronización ya haya corrido. La fórmula por-Hito
+ * (% = hechas/total; COMPLETADO al 100% con al menos una tarea, EN_PROGRESO
+ * si %>0, PENDIENTE en otro caso, incluye hitos sin tareas) es la misma
+ * semántica canónica de `calcularProgresoHito` (src/common/hito-progreso.ts,
+ * A12) — única fuente de verdad, reutilizada aquí en vez de duplicada.
  */
 function calcularAvanceHitos(
   hitos: { idHito: number }[],
@@ -80,13 +84,11 @@ function calcularAvanceHitos(
 
   for (const hito of hitos) {
     const tareasHito = tareas.filter((t) => t.idHito === hito.idHito);
-    const totalTareas = tareasHito.length;
-    const hechoTareas = tareasHito.filter((t) => t.estadoTarea === 'HECHO').length;
-    const porcentajeHito = totalTareas === 0 ? 0 : Math.round((hechoTareas / totalTareas) * 100);
+    const { estadoHito } = calcularProgresoHito(tareasHito);
 
-    if (porcentajeHito === 100 && totalTareas > 0) {
+    if (estadoHito === EstadoHito.COMPLETADO) {
       completado += 1;
-    } else if (porcentajeHito > 0) {
+    } else if (estadoHito === EstadoHito.EN_PROGRESO) {
       enProgreso += 1;
     } else {
       pendiente += 1;
@@ -522,312 +524,6 @@ export class ProjectsService {
     });
   }
 
-  async findTeam(id: number) {
-    return this.prisma.participacionProyecto.findMany({
-      where: {
-        rolProyecto: { idProyecto: id },
-        estadoParticipacion: 'ACTIVO',
-      },
-      select: {
-        idParticipacion: true,
-        estadoParticipacion: true,
-        fechaIngreso: true,
-        usuario: {
-          select: {
-            idUsuario: true,
-            nombre: true,
-            apellido: true,
-            correo: true,
-            fotoUrl: true,
-          },
-        },
-        rolProyecto: {
-          select: {
-            idRolProyecto: true,
-            nombreRol: true,
-            descripcionRolProyecto: true,
-          },
-        },
-      },
-      orderBy: {
-        fechaIngreso: 'asc',
-      },
-    });
-  }
-
-  /**
-   * Mismo motivo documentado en tasks.service.ts#toDateOnly: las columnas
-   * @db.Date se leen como Date a medianoche UTC del día calendario
-   * almacenado, y toISOString() es la única extracción segura (los getters
-   * locales pueden desplazar el día según la zona horaria del proceso).
-   */
-  private toDateOnly(value: Date | null): string | null {
-    return value ? value.toISOString().slice(0, 10) : null;
-  }
-
-  /**
-   * Detalle de un integrante dentro de un proyecto: participación(es),
-   * historial completo de tareas con asignación (activa o pasada) y horas
-   * por tarea. Exclusivo del líder (_requireOwner, igual que el resto de
-   * lecturas administrativas del proyecto) — "guard de membresía y
-   * liderazgo": liderazgo de quien consulta, membresía de idUsuario.
-   */
-  async findTeamMemberDetail(idProyecto: number, idUsuario: number, userId: number) {
-    await this._requireOwner(idProyecto, userId);
-
-    // Todas las participaciones del usuario en el proyecto (activas e
-    // históricas), no solo la ACTIVO: el detalle debe reflejar también a
-    // quien ya se retiró. El usuario viaja embebido en la misma consulta
-    // para no necesitar una segunda ida a la base de datos.
-    const participaciones = await this.prisma.participacionProyecto.findMany({
-      where: { idUsuario, rolProyecto: { idProyecto } },
-      select: {
-        idParticipacion: true,
-        estadoParticipacion: true,
-        fechaIngreso: true,
-        fechaSalida: true,
-        rolProyecto: { select: { idRolProyecto: true, nombreRol: true } },
-        usuario: {
-          select: { idUsuario: true, nombre: true, apellido: true, correo: true, fotoUrl: true },
-        },
-      },
-      orderBy: { fechaIngreso: 'desc' },
-    });
-
-    if (participaciones.length === 0) {
-      throw new NotFoundException(
-        `El usuario con id ${idUsuario} no es integrante del proyecto ${idProyecto}`,
-      );
-    }
-
-    // Historial de tareas: cualquier tarea del proyecto donde el usuario
-    // tuvo alguna vez una AsignacionTarea (activa o cerrada), no solo la
-    // asignación vigente. Se traen TODOS sus tramos sobre esa tarea (sin
-    // take: 1): el mismo usuario puede haber sido desasignado y reasignado a
-    // la misma tarea más de una vez, y cada tramo tiene su propio
-    // horasReales — nunca un total agregado de la tarea entre usuarios
-    // distintos (cada usuario sigue viendo únicamente sus propios tramos,
-    // no los de otros usuarios que también trabajaron la misma tarea en
-    // otro momento).
-    const tareas = await this.prisma.tarea.findMany({
-      where: {
-        idProyecto,
-        eliminadoEn: null,
-        asignaciones: { some: { idUsuario } },
-      },
-      select: {
-        idTarea: true,
-        tituloTarea: true,
-        estadoTarea: true,
-        prioridad: true,
-        fechaCreacion: true,
-        fechaLimite: true,
-        actualizadaEn: true,
-        tiempoEstimadoHoras: true,
-        asignaciones: {
-          where: { idUsuario },
-          orderBy: { fechaAsignacion: 'desc' },
-          select: { fechaAsignacion: true, desasignadaEn: true, horasReales: true },
-        },
-      },
-      orderBy: { fechaCreacion: 'desc' },
-    });
-
-    return {
-      usuario: participaciones[0].usuario,
-      participaciones: participaciones.map((p) => ({
-        idParticipacion: p.idParticipacion,
-        estadoParticipacion: p.estadoParticipacion,
-        fechaIngreso: this.toDateOnly(p.fechaIngreso),
-        fechaSalida: this.toDateOnly(p.fechaSalida),
-        rolProyecto: p.rolProyecto,
-      })),
-      tareas: tareas.map((t) => {
-        // Más reciente primero (orderBy: fechaAsignacion desc ya aplicado en
-        // la consulta): fechaAsignacion/desasignadaEn mostradas son las del
-        // tramo vigente o, si no hay uno vigente, el último cerrado.
-        const asignacionMasReciente = t.asignaciones[0];
-
-        // horasReales es la SUMA de TODOS los tramos de idUsuario sobre esta
-        // tarea (puede haber sido desasignado y reasignado más de una vez),
-        // nunca solo el del tramo más reciente — de lo contrario se pierden
-        // silenciosamente las horas de tramos anteriores. null únicamente
-        // cuando ningún tramo reportó horas; un tramo sin horas no descarta
-        // las horas sí reportadas en otro tramo.
-        const horasPorTramo = t.asignaciones
-          .map((a) => a.horasReales)
-          .filter((h): h is NonNullable<typeof h> => h !== null);
-        const horasReales =
-          horasPorTramo.length === 0
-            ? null
-            : horasPorTramo.reduce((total, h) => total + h.toNumber(), 0);
-
-        return {
-          idTarea: t.idTarea,
-          tituloTarea: t.tituloTarea,
-          estadoTarea: t.estadoTarea,
-          prioridad: t.prioridad,
-          fechaCreacion: t.fechaCreacion,
-          fechaLimite: this.toDateOnly(t.fechaLimite),
-          actualizadaEn: t.actualizadaEn,
-          tiempoEstimadoHoras: t.tiempoEstimadoHoras,
-          horasReales,
-          fechaAsignacion: asignacionMasReciente.fechaAsignacion,
-          desasignadaEn: asignacionMasReciente.desasignadaEn,
-        };
-      }),
-    };
-  }
-
-  /**
-   * Resumen person-centric de integrantes para T-106
-   * (GET /proyectos/:id/miembros/resumen, aún no expuesto). Contrato
-   * congelado en team-summary-member.dto.ts / team-summary-response.dto.ts.
-   * O(1) queries respecto al número de integrantes: _requireOwner, líder,
-   * participaciones, tareas y horas se resuelven cada una en una única
-   * consulta fija; nunca dentro de un loop por miembro.
-   */
-  async getTeamSummary(idProyecto: number, userId: number): Promise<TeamSummaryResponseDto> {
-    const proyecto = await this._requireOwner(idProyecto, userId);
-
-    // El líder no tiene ParticipacionProyecto propia (ver comentario sobre
-    // Proyecto.creadoPor en schema.prisma): se resuelve aparte con una única
-    // query fija a Usuario, nunca a partir de las participaciones.
-    const liderUsuario = await this.prisma.usuario.findUnique({
-      where: { idUsuario: proyecto.creadoPor },
-      select: { idUsuario: true, nombre: true, apellido: true, correo: true, fotoUrl: true },
-    });
-    if (!liderUsuario) {
-      throw new NotFoundException(`Usuario líder con id ${proyecto.creadoPor} no encontrado`);
-    }
-
-    // Participaciones ACTIVO del proyecto, excluyendo al creador: el líder
-    // se modela por separado (lider) y nunca debe duplicarse dentro de
-    // miembros aunque además tenga una ParticipacionProyecto propia.
-    const participaciones = await this.prisma.participacionProyecto.findMany({
-      where: {
-        rolProyecto: { idProyecto },
-        estadoParticipacion: 'ACTIVO',
-        idUsuario: { not: proyecto.creadoPor },
-      },
-      select: {
-        idUsuario: true,
-        estadoParticipacion: true,
-        usuario: {
-          select: { idUsuario: true, nombre: true, apellido: true, correo: true, fotoUrl: true },
-        },
-        rolProyecto: { select: { idRolProyecto: true, nombreRol: true } },
-      },
-      orderBy: { fechaIngreso: 'asc' },
-    });
-
-    // Agrupación person-centric: la key del Map es idUsuario (no
-    // idParticipacion ni idRolProyecto), así que dos participaciones ACTIVO
-    // de la misma persona con distinto rol producen 1 miembro con
-    // roles.length = 2, nunca 2 miembros.
-    const miembrosPorUsuario = new Map<number, TeamSummaryMemberDto>();
-    for (const p of participaciones) {
-      let miembro = miembrosPorUsuario.get(p.idUsuario);
-      if (!miembro) {
-        miembro = {
-          idUsuario: p.usuario.idUsuario,
-          nombre: p.usuario.nombre,
-          apellido: p.usuario.apellido,
-          correo: p.usuario.correo,
-          fotoUrl: p.usuario.fotoUrl,
-          roles: [],
-          estadoParticipacion: p.estadoParticipacion,
-          tareasActivas: 0,
-          tareasCompletadas: 0,
-          horasReconocidas: 0,
-        };
-        miembrosPorUsuario.set(p.idUsuario, miembro);
-      }
-      const yaTieneRol = miembro.roles.some(
-        (r: TeamSummaryRoleDto) => r.idRolProyecto === p.rolProyecto.idRolProyecto,
-      );
-      if (!yaTieneRol) {
-        miembro.roles.push({
-          idRolProyecto: p.rolProyecto.idRolProyecto,
-          nombreRol: p.rolProyecto.nombreRol,
-        });
-      }
-    }
-
-    const idsUsuarios = [...miembrosPorUsuario.keys()];
-
-    if (idsUsuarios.length === 0) {
-      return { lider: liderUsuario, miembros: [] };
-    }
-
-    // Tareas vigentes (no soft-deleted) del proyecto con asignación ACTUAL
-    // (desasignadaEn: null) hacia alguno de los miembros. Una sola query
-    // fija para todos los miembros, aislada a idProyecto explícitamente.
-    const tareas = await this.prisma.tarea.findMany({
-      where: {
-        idProyecto,
-        eliminadoEn: null,
-        asignaciones: { some: { idUsuario: { in: idsUsuarios }, desasignadaEn: null } },
-      },
-      select: {
-        idTarea: true,
-        estadoTarea: true,
-        asignaciones: {
-          where: { idUsuario: { in: idsUsuarios }, desasignadaEn: null },
-          select: { idUsuario: true },
-        },
-      },
-    });
-
-    // Deduplicación (idUsuario, idTarea): un usuario puede tener más de un
-    // tramo histórico sobre la misma tarea, pero al filtrar por la
-    // asignación vigente (desasignadaEn: null) el invariante del schema ya
-    // garantiza como mucho un tramo actual por (idUsuario, idTarea); el Set
-    // es la salvaguarda simple contra datos inesperados, no una necesidad
-    // estructural.
-    const tareasContadas = new Set<string>();
-    for (const t of tareas) {
-      for (const a of t.asignaciones) {
-        const clave = `${a.idUsuario}:${t.idTarea}`;
-        if (tareasContadas.has(clave)) continue;
-        tareasContadas.add(clave);
-
-        const miembro = miembrosPorUsuario.get(a.idUsuario);
-        if (!miembro) continue;
-        if (t.estadoTarea === 'HECHO') {
-          miembro.tareasCompletadas += 1;
-        } else {
-          miembro.tareasActivas += 1;
-        }
-      }
-    }
-
-    // horasReconocidas: exclusivamente HorasParticipacion.horasAprobadas con
-    // estadoHoras = APROBADA, agrupado por idUsuario. Nunca
-    // AsignacionTarea.horasReales ni tiempoEstimadoHoras.
-    const horas = await this.prisma.horasParticipacion.findMany({
-      where: {
-        estadoHoras: 'APROBADA',
-        participacion: { idUsuario: { in: idsUsuarios }, rolProyecto: { idProyecto } },
-      },
-      select: {
-        horasAprobadas: true,
-        participacion: { select: { idUsuario: true } },
-      },
-    });
-
-    for (const h of horas) {
-      const miembro = miembrosPorUsuario.get(h.participacion.idUsuario);
-      if (!miembro) continue;
-      miembro.horasReconocidas += h.horasAprobadas ? h.horasAprobadas.toNumber() : 0;
-    }
-
-    return {
-      lider: liderUsuario,
-      miembros: idsUsuarios.map((id) => miembrosPorUsuario.get(id)!),
-    };
-  }
-
   async findFeatured() {
     const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
     if (cached) return cached;
@@ -850,7 +546,7 @@ export class ProjectsService {
       }))
       .sort((a, b) => b.totalPostulaciones - a.totalPostulaciones)
       .slice(0, 6)
-      .map(({ totalPostulaciones, ...p }) => p);
+      .map(({ totalPostulaciones: _totalPostulaciones, ...p }) => p);
 
     await this.cacheManager.set(FEATURED_CACHE_KEY, destacados, FEATURED_CACHE_TTL).catch(() => {});
     return destacados;
@@ -1187,6 +883,7 @@ export class ProjectsService {
         'Solo se puede solicitar cierre para proyectos en estado EN_PROGRESO',
       );
     }
+    await this.assertNoOperableSprint(id);
     return this.prisma.$transaction(async (tx) => {
       const actualizado = await tx.proyecto.update({
         where: { idProyecto: id },
@@ -1309,6 +1006,14 @@ export class ProjectsService {
         `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
       );
     }
+    // A11 / Decisión Bloqueante #2: esta es la transición real que persiste
+    // EstadoProyecto.CERRADO (EN_PROGRESO -> CERRADO, vía
+    // TRANSICIONES_PERMITIDAS) — no `approveClosure`, que en el flujo
+    // administrativo actual persiste CANCELADO, no CERRADO. La invariante
+    // "Proyecto=CERRADO con Sprint operable" se protege aquí.
+    if (nuevoEstado === EstadoProyectoCreador.CERRADO) {
+      await this.assertNoOperableSprint(id);
+    }
     const estadoAnterior = proyecto.estadoProyecto;
 
     const actualizado = await this.prisma.proyecto.update({
@@ -1395,6 +1100,32 @@ export class ProjectsService {
     return proyecto;
   }
 
+  /**
+   * A11 — Decisión Bloqueante #2 (congelada): un Proyecto no puede avanzar
+   * hacia su cierre mientras exista un Sprint operable (ACTIVO o
+   * EN_FINALIZACION) en ese proyecto. CERRADO nunca bloquea — Foundation ya
+   * establece esa misma semántica de "operable" para el índice parcial
+   * `sprint_operable_unique` (sprints/sprints-context.service.ts,
+   * getCurrentSprint). Consulta mínima: solo existencia, acotada por
+   * idProyecto — no carga tareas, horas, participantes ni histórico. No
+   * cierra, finaliza ni crea ningún Sprint; únicamente rechaza la
+   * transición del Proyecto si corresponde.
+   */
+  private async assertNoOperableSprint(idProyecto: number): Promise<void> {
+    const sprintOperable = await this.prisma.sprint.findFirst({
+      where: {
+        idProyecto,
+        estado: { in: [EstadoSprint.ACTIVO, EstadoSprint.EN_FINALIZACION] },
+      },
+      select: { idSprint: true },
+    });
+    if (sprintOperable) {
+      throw new ConflictException(
+        'Debes cerrar el Sprint actual antes de solicitar el cierre del proyecto',
+      );
+    }
+  }
+
   private async _requireAdmin(userId: number) {
     const esAdmin = await this.notifications.isAdmin(userId);
     if (!esAdmin) {
@@ -1469,204 +1200,6 @@ export class ProjectsService {
     });
 
     return { ...hito, fechaLimite: toDateOnly(hito.fechaLimite) };
-  }
-
-  /**
-   * Creación de una solicitud de salida (T-111, Tarea 6): NO usa
-   * _requireOwner porque el solicitante es un miembro, no el líder — eso
-   * rechazaría exactamente a quien necesita usar este flujo. En su lugar
-   * valida directamente: proyecto vigente, líder excluido, participación
-   * ACTIVO, motivo no vacío, cero asignaciones vigentes y ausencia de otra
-   * solicitud PENDIENTE. El orden de las dos primeras reglas se invierte
-   * respecto a la enumeración conceptual del contrato (líder antes que
-   * participación): el líder nunca tiene ParticipacionProyecto propia (ver
-   * comentario en Proyecto.creadoPor), así que comprobar participación
-   * primero le devolvería «no tienes participación activa» en vez del 403
-   * contractual «eres el líder, usa el flujo de traspaso», que no existe en
-   * este sprint. Única escritura productiva: solicitudSalidaProyecto.create;
-   * no se toca ParticipacionProyecto, HorasParticipacion, Tarea ni
-   * AsignacionTarea.
-   */
-  async createSolicitudSalida(idProyecto: number, idUsuario: number, motivo: string) {
-    const proyecto = await this.prisma.proyecto.findFirst({
-      where: { idProyecto, eliminadoEn: null },
-      select: { idProyecto: true, creadoPor: true },
-    });
-    if (!proyecto) {
-      throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
-    }
-
-    if (proyecto.creadoPor === idUsuario) {
-      throw new ForbiddenException(
-        'El líder del proyecto no puede solicitar su salida mediante este flujo',
-      );
-    }
-
-    const participacion = await this.prisma.participacionProyecto.findFirst({
-      where: {
-        idUsuario,
-        estadoParticipacion: 'ACTIVO',
-        rolProyecto: { idProyecto },
-      },
-      select: { idParticipacion: true },
-    });
-    if (!participacion) {
-      throw new ForbiddenException('No tienes una participación activa en este proyecto');
-    }
-
-    const motivoLimpio = motivo.trim();
-    if (motivoLimpio.length === 0) {
-      throw new BadRequestException('motivo no puede estar vacío');
-    }
-
-    // Asignación vigente = desasignadaEn: null sobre una tarea del proyecto
-    // solicitado; sin filtro adicional de estadoTarea (eso pertenece a T-113,
-    // no a esta regla de creación). No se decide aquí ninguna política de
-    // soft-delete de tarea porque el contrato congelado de T-111 no la
-    // define; se usa únicamente el guard explícito (desasignadaEn + idProyecto).
-    const asignacionVigente = await this.prisma.asignacionTarea.findFirst({
-      where: { idUsuario, desasignadaEn: null, tarea: { idProyecto } },
-      select: { idAsignacion: true },
-    });
-    if (asignacionVigente) {
-      throw new ConflictException(
-        'No puedes solicitar salida mientras tengas asignaciones de tareas vigentes',
-      );
-    }
-
-    const solicitudPendiente = await this.prisma.solicitudSalidaProyecto.findFirst({
-      where: { idProyecto, idUsuario, estadoSolicitud: 'PENDIENTE' },
-      select: { idSolicitud: true },
-    });
-    if (solicitudPendiente) {
-      throw new ConflictException('Ya existe una solicitud de salida pendiente para este proyecto');
-    }
-
-    try {
-      return await this.prisma.solicitudSalidaProyecto.create({
-        data: { idProyecto, idUsuario, motivo: motivoLimpio },
-      });
-    } catch (error) {
-      if (this.isPendingExitRequestCollision(error)) {
-        throw new ConflictException('Ya existe una solicitud de salida pendiente para este proyecto');
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Reconoce específicamente la violación del índice parcial
-   * solicitud_salida_proyecto_pendiente_unique (Tarea 5): defensa en
-   * profundidad contra la condición de carrera que el precheck de
-   * findFirst no puede cerrar por sí solo. Mismo criterio estrecho que
-   * isActiveAssignmentCollision en TasksService: no basta `code === 'P2002'`,
-   * se exige además modelo y columnas exactas del índice parcial. Cualquier
-   * otro P2002 (u otro código) se relanza sin cambios.
-   */
-  private isPendingExitRequestCollision(error: unknown): boolean {
-    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
-      return false;
-    }
-    if (error.code !== 'P2002') {
-      return false;
-    }
-
-    const modelName = error.meta?.modelName;
-    const target = error.meta?.target;
-
-    return (
-      modelName === 'SolicitudSalidaProyecto' &&
-      Array.isArray(target) &&
-      target.length === 2 &&
-      target.includes('id_proyecto') &&
-      target.includes('id_usuario')
-    );
-  }
-
-  /**
-   * Resolución de una solicitud de salida (T-113). Mismo guard de
-   * liderazgo que approveClosure/rejectClosure (_requireOwner). La regla de
-   * bloqueo aplica SOLO a la aprobación: cuenta en una única consulta las
-   * tareas con asignación vigente cuyo estado sea distinto de HECHO — si hay
-   * alguna, se rechaza sin tocar la solicitud ni la participación. Ambos
-   * métodos notifican al solicitante (nunca al líder) dentro de la misma
-   * transacción, igual que approveClosure/rejectClosure.
-   */
-  async approveSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
-    const proyecto = await this._requireOwner(idProyecto, liderId);
-    const solicitud = await this._requirePendingSolicitudSalida(idProyecto, idSolicitud);
-
-    const tareasPendientes = await this.prisma.asignacionTarea.count({
-      where: {
-        idUsuario: solicitud.idUsuario,
-        desasignadaEn: null,
-        tarea: { idProyecto, eliminadoEn: null, estadoTarea: { not: 'HECHO' } },
-      },
-    });
-    if (tareasPendientes > 0) {
-      throw new BadRequestException(
-        `No se puede aprobar la salida: el integrante tiene ${tareasPendientes} tarea(s) pendiente(s) que deben reasignarse antes de aprobar la salida`,
-      );
-    }
-
-    const ahora = new Date();
-    return this.prisma.$transaction(async (tx) => {
-      const actualizada = await tx.solicitudSalidaProyecto.update({
-        where: { idSolicitud },
-        data: { estadoSolicitud: 'APROBADA', resueltaEn: ahora, resueltaPor: liderId },
-      });
-      // Mismo criterio que approveClosure: solo se retira la participación
-      // ACTIVO, nunca una ya RETIRADA/COMPLETADA de otro tramo histórico.
-      await tx.participacionProyecto.updateMany({
-        where: {
-          idUsuario: solicitud.idUsuario,
-          estadoParticipacion: 'ACTIVO',
-          rolProyecto: { idProyecto },
-        },
-        data: { estadoParticipacion: 'RETIRADO', fechaSalida: ahora },
-      });
-      // Destinatario = el solicitante (SolicitudSalidaProyecto.idUsuario),
-      // nunca el líder que resuelve ni el resto del equipo.
-      await this.notifications.notifyFromTemplate(
-        [solicitud.idUsuario],
-        'PARTICIPACION_ACTUALIZADA',
-        { projectTitle: proyecto.tituloProyecto, projectId: idProyecto, approved: true },
-        tx,
-      );
-      return actualizada;
-    });
-  }
-
-  async rejectSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
-    const proyecto = await this._requireOwner(idProyecto, liderId);
-    const solicitud = await this._requirePendingSolicitudSalida(idProyecto, idSolicitud);
-
-    return this.prisma.$transaction(async (tx) => {
-      const actualizada = await tx.solicitudSalidaProyecto.update({
-        where: { idSolicitud: solicitud.idSolicitud },
-        data: { estadoSolicitud: 'RECHAZADA', resueltaEn: new Date(), resueltaPor: liderId },
-      });
-      await this.notifications.notifyFromTemplate(
-        [solicitud.idUsuario],
-        'PARTICIPACION_ACTUALIZADA',
-        { projectTitle: proyecto.tituloProyecto, projectId: idProyecto, approved: false },
-        tx,
-      );
-      return actualizada;
-    });
-  }
-
-  private async _requirePendingSolicitudSalida(idProyecto: number, idSolicitud: number) {
-    const solicitud = await this.prisma.solicitudSalidaProyecto.findFirst({
-      where: { idSolicitud, idProyecto },
-    });
-    if (!solicitud) {
-      throw new NotFoundException(`Solicitud con id ${idSolicitud} no encontrada`);
-    }
-    if (solicitud.estadoSolicitud !== 'PENDIENTE') {
-      throw new BadRequestException('Solo se puede resolver una solicitud en estado PENDIENTE');
-    }
-    return solicitud;
   }
 
   async delete(id: number, userId: number) {

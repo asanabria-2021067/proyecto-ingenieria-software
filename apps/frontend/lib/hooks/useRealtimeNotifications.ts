@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { projectSprintsQueryKey } from '@/lib/query-keys/sprints';
 
 export interface Notification {
   tipoNotificacion: string;
@@ -8,10 +10,17 @@ export interface Notification {
   datosJson?: any;
 }
 
+/** Payload real de A4/A9.1 — ver notifications.gateway.ts (backend): `{ projectId, sprintId }`. */
+interface SprintRealtimePayload {
+  projectId: number;
+  sprintId: number;
+}
+
 export function useRealtimeNotifications(token: string | null) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [latestNotification, setLatestNotification] = useState<Notification | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!token) return;
@@ -24,28 +33,57 @@ export function useRealtimeNotifications(token: string | null) {
       transports: ['websocket', 'polling'],
     });
 
-    newSocket.on('connect', () => {
+    const handleConnect = () => {
       setIsConnected(true);
-    });
+    };
 
-    newSocket.on('disconnect', () => {
+    const handleDisconnect = () => {
       setIsConnected(false);
-    });
+    };
 
-    newSocket.on('connected', (data) => {
+    const handleConnected = (data: unknown) => {
       console.log('WebSocket connected:', data);
-    });
+    };
 
-    newSocket.on('notification', (data: Notification) => {
+    const handleNotification = (data: Notification) => {
       setLatestNotification(data);
-    });
+    };
+
+    // F6 (A4/A9.1): el estado real de un Sprint sigue viviendo en la query
+    // `project-sprints` (F1) — estos dos handlers únicamente invalidan esa
+    // key con el `projectId` real del payload, nunca guardan un booleano de
+    // "finalizando"/"cerrado" aparte. Así, FinalizationLockBanner deriva
+    // siempre del backend (persistencia tras reload/reconexión/entrar
+    // tarde ya cubierta por la propia query, no por haber presenciado el
+    // evento). `projectId` (no `idProyecto`) porque así lo emite el
+    // gateway real — ver payload documentado arriba.
+    const handleSprintFinalizationStarted = (payload: SprintRealtimePayload) => {
+      queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(payload.projectId) });
+    };
+
+    const handleSprintClosed = (payload: SprintRealtimePayload) => {
+      queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(payload.projectId) });
+    };
+
+    newSocket.on('connect', handleConnect);
+    newSocket.on('disconnect', handleDisconnect);
+    newSocket.on('connected', handleConnected);
+    newSocket.on('notification', handleNotification);
+    newSocket.on('SPRINT_FINALIZATION_STARTED', handleSprintFinalizationStarted);
+    newSocket.on('SPRINT_CLOSED', handleSprintClosed);
 
     setSocket(newSocket);
 
     return () => {
+      newSocket.off('connect', handleConnect);
+      newSocket.off('disconnect', handleDisconnect);
+      newSocket.off('connected', handleConnected);
+      newSocket.off('notification', handleNotification);
+      newSocket.off('SPRINT_FINALIZATION_STARTED', handleSprintFinalizationStarted);
+      newSocket.off('SPRINT_CLOSED', handleSprintClosed);
       newSocket.close();
     };
-  }, [token]);
+  }, [token, queryClient]);
 
   return { socket, latestNotification, isConnected };
 }

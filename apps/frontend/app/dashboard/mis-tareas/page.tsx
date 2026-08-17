@@ -229,7 +229,7 @@ export default function MisTareasPage() {
                   return (
                     <Link
                       key={tarea.idTarea}
-                      href={`/dashboard/projects/${proyecto.idProyecto}?tarea=${tarea.idTarea}`}
+                      href={`/dashboard/projects/${proyecto.idProyecto}/kanban/tasks/${tarea.idTarea}`}
                       className="flex flex-wrap items-center gap-3 bg-surface-container-low rounded-xl px-4 py-3 hover:bg-surface-container transition-colors"
                     >
                       <span className="flex-1 min-w-[10rem] text-sm text-on-surface truncate">

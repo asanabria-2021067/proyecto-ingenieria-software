@@ -1,21 +1,18 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { ProjectsService } from '../src/projects/projects.service';
+import { TeamService } from '../src/team/team.service';
 
 function makePrisma() {
   return {
     proyecto: { findFirst: vi.fn() },
     participacionProyecto: { findMany: vi.fn() },
     tarea: { findMany: vi.fn() },
+    horasParticipacion: { findMany: vi.fn().mockResolvedValue([]) },
   } as any;
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new ProjectsService(
-    prisma,
-    { isAdmin: vi.fn(), notifyAdminsFromTemplate: vi.fn(), notifyFromTemplate: vi.fn() } as any,
-    {} as any,
-  );
+  return new TeamService(prisma, { findAll: vi.fn() } as any, { getPendingLeaderReviews: vi.fn() } as any);
 }
 
 const USUARIO = {
@@ -26,7 +23,22 @@ const USUARIO = {
   fotoUrl: null,
 };
 
-describe('ProjectsService.findTeamMemberDetail', () => {
+function sprint(idSprint: number, numero: number) {
+  return {
+    idSprint,
+    numero,
+    estado: 'CERRADO',
+    fechaInicio: new Date(`2026-0${numero}-01T00:00:00.000Z`),
+    fechaFinalizacionIniciada: new Date(`2026-0${numero}-10T00:00:00.000Z`),
+    fechaCierre: new Date(`2026-0${numero}-15T00:00:00.000Z`),
+  };
+}
+
+function decimal(value: number) {
+  return { toNumber: () => value };
+}
+
+describe('TeamService.findTeamMemberDetail', () => {
   it('rechaza cuando el proyecto no existe', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
@@ -180,7 +192,7 @@ describe('ProjectsService.findTeamMemberDetail', () => {
     prisma.participacionProyecto.findMany.mockImplementation(async ({ where }: any) => {
       return PARTICIPACIONES.filter(
         (p) => p.usuario.idUsuario === where.idUsuario && p.idProyectoReal === where.rolProyecto.idProyecto,
-      ).map(({ idProyectoReal, ...resto }) => resto);
+      ).map(({ idProyectoReal: _idProyectoReal, ...resto }) => resto);
     });
     prisma.tarea.findMany.mockResolvedValue([]);
     const service = makeService(prisma);
@@ -379,5 +391,158 @@ describe('ProjectsService.findTeamMemberDetail', () => {
     // Las fechas mostradas corresponden al tramo vigente (el más reciente),
     // no al cerrado: la suma de horas no debe alterar esa semántica.
     expect(detalle.tareas[0].desasignadaEn).toBeNull();
+  });
+
+  it('agrupa la actividad histórica en dos Sprints sin mezclar tareas ni horas aprobadas', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      {
+        idParticipacion: 10,
+        estadoParticipacion: 'ACTIVO',
+        fechaIngreso: new Date('2026-01-01T00:00:00.000Z'),
+        fechaSalida: null,
+        rolProyecto: { idRolProyecto: 5, nombreRol: 'Desarrollador' },
+        usuario: USUARIO,
+      },
+    ]);
+    const sprint1 = sprint(101, 1);
+    const sprint2 = sprint(102, 2);
+    prisma.tarea.findMany.mockResolvedValue([
+      {
+        idTarea: 1001,
+        idSprint: sprint1.idSprint,
+        sprint: sprint1,
+        tituloTarea: 'Tarea Sprint 1',
+        estadoTarea: 'HECHO',
+        prioridad: 'MEDIA',
+        fechaCreacion: new Date('2026-01-02T00:00:00.000Z'),
+        fechaLimite: null,
+        actualizadaEn: null,
+        tiempoEstimadoHoras: null,
+        asignaciones: [
+          {
+            fechaAsignacion: new Date('2026-01-02T00:00:00.000Z'),
+            desasignadaEn: new Date('2026-01-10T00:00:00.000Z'),
+            horasReales: decimal(3),
+          },
+        ],
+      },
+      {
+        idTarea: 1002,
+        idSprint: sprint2.idSprint,
+        sprint: sprint2,
+        tituloTarea: 'Tarea Sprint 2',
+        estadoTarea: 'HECHO',
+        prioridad: 'ALTA',
+        fechaCreacion: new Date('2026-02-02T00:00:00.000Z'),
+        fechaLimite: null,
+        actualizadaEn: null,
+        tiempoEstimadoHoras: null,
+        asignaciones: [
+          {
+            fechaAsignacion: new Date('2026-02-02T00:00:00.000Z'),
+            desasignadaEn: new Date('2026-02-10T00:00:00.000Z'),
+            horasReales: decimal(7),
+          },
+        ],
+      },
+    ]);
+    prisma.horasParticipacion.findMany.mockResolvedValue([
+      {
+        idRegistroHoras: 1,
+        idParticipacion: 10,
+        idSprint: sprint1.idSprint,
+        estadoHoras: 'APROBADA',
+        horasCalculadas: decimal(3),
+        horasAprobadas: decimal(3),
+        sprint: sprint1,
+      },
+      {
+        idRegistroHoras: 2,
+        idParticipacion: 10,
+        idSprint: sprint2.idSprint,
+        estadoHoras: 'APROBADA',
+        horasCalculadas: decimal(7),
+        horasAprobadas: decimal(7),
+        sprint: sprint2,
+      },
+    ]);
+    const service = makeService(prisma);
+
+    const detalle = await service.findTeamMemberDetail(1, 2, 1);
+
+    expect(detalle.sprints).toHaveLength(2);
+    expect(detalle.sprints[0].idSprint).toBe(sprint1.idSprint);
+    expect(detalle.sprints[0].tareas.map((t) => t.idTarea)).toEqual([1001]);
+    expect(detalle.sprints[0].tareas.some((t) => t.idTarea === 1002)).toBe(false);
+    expect(detalle.sprints[0].horasAprobadas).toBe(3);
+
+    expect(detalle.sprints[1].idSprint).toBe(sprint2.idSprint);
+    expect(detalle.sprints[1].tareas.map((t) => t.idTarea)).toEqual([1002]);
+    expect(detalle.sprints[1].tareas.some((t) => t.idTarea === 1001)).toBe(false);
+    expect(detalle.sprints[1].horasAprobadas).toBe(7);
+  });
+
+  it('filtra horas de Sprint por participaciones del usuario y por proyecto, sin consultar por Sprint en loop', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      {
+        idParticipacion: 10,
+        estadoParticipacion: 'RETIRADO',
+        fechaIngreso: new Date('2026-01-01T00:00:00.000Z'),
+        fechaSalida: new Date('2026-03-01T00:00:00.000Z'),
+        rolProyecto: { idRolProyecto: 5, nombreRol: 'Desarrollador' },
+        usuario: USUARIO,
+      },
+      {
+        idParticipacion: 11,
+        estadoParticipacion: 'RETIRADO',
+        fechaIngreso: new Date('2026-01-01T00:00:00.000Z'),
+        fechaSalida: new Date('2026-03-01T00:00:00.000Z'),
+        rolProyecto: { idRolProyecto: 6, nombreRol: 'QA' },
+        usuario: USUARIO,
+      },
+    ]);
+    prisma.tarea.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    await service.findTeamMemberDetail(1, 2, 1);
+
+    expect(prisma.horasParticipacion.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.horasParticipacion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          idParticipacion: { in: [10, 11] },
+          idSprint: { not: null },
+          estadoHoras: 'APROBADA',
+          sprint: { idProyecto: 1 },
+        },
+      }),
+    );
+  });
+
+  it('mantiene tareas y sprints vacíos cuando el miembro existe pero no tiene actividad histórica', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      {
+        idParticipacion: 10,
+        estadoParticipacion: 'ACTIVO',
+        fechaIngreso: new Date('2026-01-01T00:00:00.000Z'),
+        fechaSalida: null,
+        rolProyecto: { idRolProyecto: 5, nombreRol: 'Desarrollador' },
+        usuario: USUARIO,
+      },
+    ]);
+    prisma.tarea.findMany.mockResolvedValue([]);
+    prisma.horasParticipacion.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    const detalle = await service.findTeamMemberDetail(1, 2, 1);
+
+    expect(detalle.tareas).toEqual([]);
+    expect(detalle.sprints).toEqual([]);
   });
 });
