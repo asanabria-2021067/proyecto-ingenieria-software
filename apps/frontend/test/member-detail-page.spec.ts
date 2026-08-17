@@ -1,9 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
-import type { DetalleIntegranteProyectoDTO } from '../lib/dto/member-detail.dto';
+import type {
+  DetalleIntegranteProyectoDTO,
+  HistorialSprintIntegranteDTO,
+  TareaHistorialIntegranteDTO,
+} from '../lib/dto/member-detail.dto';
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '42', idUsuario: '7' }),
@@ -36,6 +40,43 @@ function detalle(overrides: Partial<DetalleIntegranteProyectoDTO> = {}): Detalle
       },
     ],
     tareas: [],
+    sprints: [],
+    ...overrides,
+  };
+}
+
+/** Tarea de historial con valores por defecto — usada dentro de fixtures de `sprints`. */
+function tareaHistorial(overrides: Partial<TareaHistorialIntegranteDTO>): TareaHistorialIntegranteDTO {
+  return {
+    idTarea: 1,
+    idSprint: 1,
+    tituloTarea: 'Tarea sin título',
+    estadoTarea: 'HECHO',
+    prioridad: 'MEDIA',
+    fechaCreacion: '2026-01-01T00:00:00.000Z',
+    fechaLimite: null,
+    actualizadaEn: null,
+    tiempoEstimadoHoras: null,
+    horasReales: null,
+    fechaAsignacion: '2026-01-01T00:00:00.000Z',
+    desasignadaEn: null,
+    ...overrides,
+  };
+}
+
+/** Grupo de Sprint del read-model B14 (`TeamService.findTeamMemberDetail`) — mismo shape real, con valores por defecto razonables. */
+function sprintGrupo(overrides: Partial<HistorialSprintIntegranteDTO>): HistorialSprintIntegranteDTO {
+  return {
+    idSprint: 1,
+    numero: 1,
+    estado: 'CERRADO',
+    fechaInicio: '2026-01-01T00:00:00.000Z',
+    fechaFinalizacionIniciada: '2026-01-14T00:00:00.000Z',
+    fechaCierre: '2026-01-15T00:00:00.000Z',
+    horasCalculadas: 0,
+    horasAprobadas: 0,
+    tareas: [],
+    registrosHoras: [],
     ...overrides,
   };
 }
@@ -92,68 +133,173 @@ describe('DetalleIntegranteProyectoPage — error del backend', () => {
     renderPage();
 
     expect(screen.getByText('No eres el líder de este proyecto')).toBeInTheDocument();
+    // No debe mostrarse un "Historial por Sprint" falso mientras hay error.
+    expect(screen.queryByText('Historial por Sprint')).not.toBeInTheDocument();
   });
 });
 
-describe('DetalleIntegranteProyectoPage — desglose de tareas y horas', () => {
-  it('agrupa tareas por estado y muestra el total de horas con su desglose', () => {
+describe('DetalleIntegranteProyectoPage — cabecera y resumen preservados', () => {
+  it('preserva nombre, correo, roles y el resumen de horas reales / tareas del contrato actual', () => {
     mockHooks({
       isLeader: true,
       detalleData: detalle({
         tareas: [
-          {
-            idTarea: 1,
-            tituloTarea: 'Diseñar wireframes',
-            estadoTarea: 'HECHO',
-            prioridad: 'ALTA',
-            fechaCreacion: '2026-01-01T00:00:00.000Z',
-            fechaLimite: '2026-01-20',
-            actualizadaEn: '2026-01-19T09:00:00.000Z',
-            tiempoEstimadoHoras: 8,
-            horasReales: 7.5,
-            fechaAsignacion: '2026-01-10T12:00:00.000Z',
-            desasignadaEn: '2026-01-19T09:00:00.000Z',
-          },
-          {
-            idTarea: 2,
-            tituloTarea: 'Implementar formulario',
-            estadoTarea: 'EN_PROGRESO',
-            prioridad: 'MEDIA',
-            fechaCreacion: '2026-02-01T00:00:00.000Z',
-            fechaLimite: null,
-            actualizadaEn: null,
-            tiempoEstimadoHoras: null,
-            horasReales: 2,
-            fechaAsignacion: '2026-02-01T00:00:00.000Z',
-            desasignadaEn: null,
-          },
+          tareaHistorial({ idTarea: 1, idSprint: 1, horasReales: 7.5 }),
+          tareaHistorial({ idTarea: 2, idSprint: 1, horasReales: 2 }),
         ],
       }),
     });
     renderPage();
 
-    // Cabecera del integrante.
     expect(screen.getByRole('heading', { level: 1, name: 'Carlos Mendoza' })).toBeInTheDocument();
+    expect(screen.getByText('carlos@uvg.edu.gt')).toBeInTheDocument();
     expect(screen.getByText(/Backend/)).toBeInTheDocument();
 
-    // Total general: 7.5 + 2 = 9.5 h.
+    // "Total de horas reales" sigue viniendo de `tareas` (flat), nunca de
+    // `sprints[].horasAprobadas`: 7.5 + 2 = 9.5 h, no confundir con reconocidas.
     expect(screen.getByText('9.5 h')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument(); // cantidad de tareas
+    expect(screen.getByText('2')).toBeInTheDocument(); // TAREAS
+  });
+});
 
-    // Cada tarea agrupada bajo el encabezado humano de su estado.
-    expect(screen.getByText('Hecho')).toBeInTheDocument();
-    expect(screen.getByText('En progreso')).toBeInTheDocument();
-    expect(screen.getByText('Diseñar wireframes')).toBeInTheDocument();
-    expect(screen.getByText('Implementar formulario')).toBeInTheDocument();
-    expect(screen.queryByText('HECHO')).not.toBeInTheDocument();
+describe('DetalleIntegranteProyectoPage — Historial por Sprint (F15)', () => {
+  function detalleConDosSprints() {
+    return detalle({
+      sprints: [
+        sprintGrupo({
+          idSprint: 201,
+          numero: 1,
+          horasAprobadas: 10,
+          tareas: [
+            tareaHistorial({
+              idTarea: 1001,
+              idSprint: 201,
+              tituloTarea: 'Configurar entorno del proyecto',
+              estadoTarea: 'HECHO',
+              horasReales: 3,
+            }),
+          ],
+        }),
+        sprintGrupo({
+          idSprint: 202,
+          numero: 2,
+          horasAprobadas: 8,
+          tareas: [
+            tareaHistorial({
+              idTarea: 1002,
+              idSprint: 202,
+              tituloTarea: 'Ajustar validaciones',
+              estadoTarea: 'HECHO',
+              horasReales: 5,
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  /** Localiza el `<section>` de un Sprint por su heading accesible "Sprint N". */
+  function getSprintSection(numero: number): HTMLElement {
+    const heading = screen.getByRole('heading', { name: `Sprint ${numero}` });
+    const section = heading.closest('section');
+    if (!section) throw new Error(`No se encontró la sección del Sprint ${numero}`);
+    return section as HTMLElement;
+  }
+
+  it('renderiza cada Sprint como un grupo independiente', () => {
+    mockHooks({ isLeader: true, detalleData: detalleConDosSprints() });
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Historial por Sprint' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sprint 1' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sprint 2' })).toBeInTheDocument();
   });
 
-  it('sin tareas asignadas muestra el estado vacío en vez de grupos', () => {
-    mockHooks({ isLeader: true, detalleData: detalle({ tareas: [] }) });
+  it('el Sprint más reciente (numero mayor) se presenta primero', () => {
+    mockHooks({ isLeader: true, detalleData: detalleConDosSprints() });
+    renderPage();
+
+    const headings = screen.getAllByRole('heading', { name: /^Sprint \d$/ });
+    expect(headings.map((h) => h.textContent)).toEqual(['Sprint 2', 'Sprint 1']);
+  });
+
+  it('las tareas no se mezclan entre Sprints', () => {
+    mockHooks({ isLeader: true, detalleData: detalleConDosSprints() });
+    renderPage();
+
+    const sprint1 = getSprintSection(1);
+    const sprint2 = getSprintSection(2);
+
+    expect(within(sprint1).getByText('Configurar entorno del proyecto')).toBeInTheDocument();
+    expect(within(sprint1).queryByText('Ajustar validaciones')).not.toBeInTheDocument();
+
+    expect(within(sprint2).getByText('Ajustar validaciones')).toBeInTheDocument();
+    expect(within(sprint2).queryByText('Configurar entorno del proyecto')).not.toBeInTheDocument();
+  });
+
+  it('las horas reconocidas no se mezclan entre Sprints', () => {
+    mockHooks({ isLeader: true, detalleData: detalleConDosSprints() });
+    renderPage();
+
+    const sprint1 = getSprintSection(1);
+    const sprint2 = getSprintSection(2);
+
+    expect(within(sprint1).getByText('10 h')).toBeInTheDocument();
+    expect(within(sprint1).queryByText('8 h')).not.toBeInTheDocument();
+
+    expect(within(sprint2).getByText('8 h')).toBeInTheDocument();
+    expect(within(sprint2).queryByText('10 h')).not.toBeInTheDocument();
+  });
+
+  it('muestra el estado de cada tarea a partir del DTO real (no asume HECHO para todo el historial)', () => {
+    mockHooks({
+      isLeader: true,
+      detalleData: detalle({
+        sprints: [
+          sprintGrupo({
+            idSprint: 301,
+            numero: 1,
+            horasAprobadas: 4,
+            tareas: [
+              tareaHistorial({
+                idTarea: 2001,
+                idSprint: 301,
+                tituloTarea: 'Tarea en progreso',
+                estadoTarea: 'EN_PROGRESO',
+                horasReales: 4,
+              }),
+            ],
+          }),
+        ],
+      }),
+    });
+    renderPage();
+
+    const sprint1 = getSprintSection(1);
+    expect(within(sprint1).getByText('En progreso')).toBeInTheDocument();
+    expect(within(sprint1).queryByText('Hecho')).not.toBeInTheDocument();
+  });
+
+  it('un Sprint sin tareas muestra un aviso discreto en vez de una card vacía o datos falsos', () => {
+    mockHooks({
+      isLeader: true,
+      detalleData: detalle({
+        sprints: [sprintGrupo({ idSprint: 401, numero: 1, horasAprobadas: 0, tareas: [] })],
+      }),
+    });
+    renderPage();
+
+    const sprint1 = getSprintSection(1);
+    expect(within(sprint1).getByText('No hay tareas registradas para este Sprint.')).toBeInTheDocument();
+  });
+
+  it('sin historial de Sprints, muestra el estado vacío y no fabrica un Sprint 1', () => {
+    mockHooks({ isLeader: true, detalleData: detalle({ sprints: [] }) });
     renderPage();
 
     expect(
-      screen.getByText('Este integrante no tiene tareas asignadas (activas ni pasadas) en el proyecto.'),
+      screen.getByText('Este integrante aún no tiene actividad registrada en Sprints.'),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/^Sprint \d/)).not.toBeInTheDocument();
   });
 });

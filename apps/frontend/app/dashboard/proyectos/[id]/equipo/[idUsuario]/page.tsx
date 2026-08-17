@@ -5,6 +5,8 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   Calendar,
+  CheckCircle2,
+  Circle,
   Clock,
   ListChecks,
   ShieldAlert,
@@ -15,18 +17,33 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectMemberDetail } from '@/hooks/use-project-member-detail';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
-  COLUMNAS_TABLERO,
   ESTADO_COLUMNA_STYLE,
   ESTADO_LABEL,
-  PRIORIDAD_COLOR,
-  PRIORIDAD_ICON,
-  PRIORIDAD_LABEL,
   formatearFechaLimite,
 } from '@/components/projects/task-board.utils';
-import type { EstadoTarea } from '@/lib/types/tasks';
-import type { TareaHistorialIntegranteDTO } from '@/lib/dto/member-detail.dto';
+import type {
+  HistorialSprintIntegranteDTO,
+  TareaHistorialIntegranteDTO,
+} from '@/lib/dto/member-detail.dto';
 import { ESTADO_PARTICIPACION_STYLE } from '@/components/projects/member-status.utils';
+import type { EstadoSprint } from '@/lib/types/sprints';
+
+/**
+ * Estilos de estado de Sprint (mismo criterio `statusConfig` manual que
+ * `ESTADO_SPRINT_STYLE` en `sprints/page.tsx` y `sprints/[sprintId]/page.tsx`,
+ * F4 — no exportado en ninguna de las dos, así que se repite localmente en
+ * vez de importar entre páginas congeladas).
+ */
+const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
+  ACTIVO: { label: 'ACTIVO', className: 'bg-primary-container text-on-primary-container' },
+  EN_FINALIZACION: {
+    label: 'EN FINALIZACIÓN',
+    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+  },
+  CERRADO: { label: 'CERRADO', className: 'bg-surface-container-high text-tertiary' },
+};
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -46,17 +63,15 @@ function sumaHorasReales(tareas: TareaHistorialIntegranteDTO[]): number {
   return tareas.reduce((total, tarea) => total + (tarea.horasReales ?? 0), 0);
 }
 
-function agruparPorEstado(
-  tareas: TareaHistorialIntegranteDTO[],
-): Record<EstadoTarea, TareaHistorialIntegranteDTO[]> {
-  const grupos: Record<EstadoTarea, TareaHistorialIntegranteDTO[]> = {
-    POR_HACER: [],
-    EN_PROGRESO: [],
-    EN_REVISION: [],
-    HECHO: [],
-  };
-  for (const tarea of tareas) grupos[tarea.estadoTarea].push(tarea);
-  return grupos;
+function formatearHoras(horas: number): string {
+  return horas.toLocaleString('es-GT', { maximumFractionDigits: 2 });
+}
+
+/** B14 no garantiza orden descendente (ordena `sprints` ascendente por `numero`); esto es puramente presentacional, nunca reagrupa tareas/horas. */
+function ordenarSprintsDescendente(
+  sprints: HistorialSprintIntegranteDTO[],
+): HistorialSprintIntegranteDTO[] {
+  return [...sprints].sort((a, b) => b.numero - a.numero);
 }
 
 function DetalleSkeleton() {
@@ -142,9 +157,9 @@ function DetalleIntegranteContent({
   idProyecto: number;
   detalle: NonNullable<ReturnType<typeof useProjectMemberDetail>['data']>;
 }) {
-  const { usuario, participaciones, tareas } = detalle;
+  const { usuario, participaciones, tareas, sprints } = detalle;
   const totalHorasReales = sumaHorasReales(tareas);
-  const grupos = agruparPorEstado(tareas);
+  const sprintsOrdenados = ordenarSprintsDescendente(sprints);
 
   return (
     <div className="space-y-6">
@@ -207,87 +222,128 @@ function DetalleIntegranteContent({
         </div>
       </div>
 
-      {/* Desglose de tareas por estado */}
+      {/* Historial por Sprint — F15, agrupación entregada por B14, nunca reconstruida aquí */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <ListChecks className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h2 className="font-headline font-bold text-lg text-on-surface">
-            Tareas por estado
-          </h2>
+        <div className="flex items-start gap-2">
+          <ListChecks className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <h2 className="font-headline font-bold text-lg text-on-surface">
+              Historial por Sprint
+            </h2>
+            <p className="text-sm text-tertiary">
+              Actividad, tareas y horas reconocidas del integrante organizadas por Sprint.
+            </p>
+          </div>
         </div>
 
-        {tareas.length === 0 && (
-          <p className="text-sm text-tertiary py-6 text-center">
-            Este integrante no tiene tareas asignadas (activas ni pasadas) en el proyecto.
-          </p>
+        {sprintsOrdenados.length === 0 && (
+          <Empty tone="muted" role="status">
+            <EmptyMedia variant="icon">
+              <ListChecks aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>Este integrante aún no tiene actividad registrada en Sprints.</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
         )}
 
-        {COLUMNAS_TABLERO.map((columna) => {
-          const tareasDelGrupo = grupos[columna.estado];
-          if (tareasDelGrupo.length === 0) return null;
-          const estilo = ESTADO_COLUMNA_STYLE[columna.estado];
-          const horasDelGrupo = sumaHorasReales(tareasDelGrupo);
-
-          return (
-            <div
-              key={columna.estado}
-              className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden"
-            >
-              <div className={`flex items-center gap-2 px-5 py-3 ${estilo.headerBg}`}>
-                <span className={`size-2 rounded-full ${estilo.dot}`} aria-hidden="true" />
-                <span className={`text-sm font-bold ${estilo.headerText}`}>
-                  {ESTADO_LABEL[columna.estado]}
-                </span>
-                <span className={`text-xs font-medium ${estilo.headerText} opacity-80`}>
-                  ({tareasDelGrupo.length})
-                </span>
-                <span className={`ml-auto text-sm font-bold ${estilo.headerText}`}>
-                  {horasDelGrupo.toLocaleString('es-GT', { maximumFractionDigits: 2 })} h
-                </span>
-              </div>
-
-              <ul className="divide-y divide-outline-variant/40">
-                {tareasDelGrupo.map((tarea) => {
-                  const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
-                  return (
-                    <li key={tarea.idTarea} className="flex items-center gap-3 px-5 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-on-surface truncate">
-                          {tarea.tituloTarea}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-tertiary">
-                          <span className={`inline-flex items-center gap-1 font-semibold ${PRIORIDAD_COLOR[tarea.prioridad]}`}>
-                            <PrioridadIcon className="size-3" aria-hidden="true" />
-                            {PRIORIDAD_LABEL[tarea.prioridad]}
-                          </span>
-                          <span className="inline-flex items-center gap-1">
-                            <Calendar className="size-3" aria-hidden="true" />
-                            {tarea.fechaLimite ? formatearFechaLimite(tarea.fechaLimite) : 'Sin fecha límite'}
-                          </span>
-                          <span>
-                            Asignada: {formatearFechaHora(tarea.fechaAsignacion)}
-                            {tarea.desasignadaEn && ` · Desasignada: ${formatearFechaHora(tarea.desasignadaEn)}`}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-bold text-on-surface">
-                          {tarea.horasReales !== null
-                            ? `${tarea.horasReales.toLocaleString('es-GT', { maximumFractionDigits: 2 })} h`
-                            : '— h'}
-                        </p>
-                        <p className="text-xs text-tertiary">
-                          Estimado: {tarea.tiempoEstimadoHoras !== null ? `${tarea.tiempoEstimadoHoras} h` : '—'}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
+        {sprintsOrdenados.map((sprint) => (
+          <MemberSprintHistoryCard key={sprint.idSprint} sprint={sprint} />
+        ))}
       </div>
     </div>
+  );
+}
+
+function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegranteDTO }) {
+  const estilo = ESTADO_SPRINT_STYLE[sprint.estado];
+  const headingId = `sprint-historial-${sprint.idSprint}`;
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden"
+    >
+      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <Calendar className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 id={headingId} className="text-base font-bold text-on-surface">
+                Sprint {sprint.numero}
+              </h3>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+              >
+                {estilo.label}
+              </span>
+            </div>
+            <p className="text-xs text-tertiary mt-0.5">
+              {sprint.fechaCierre
+                ? `${formatearFechaHora(sprint.fechaInicio)} – ${formatearFechaHora(sprint.fechaCierre)}`
+                : formatearFechaHora(sprint.fechaInicio)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-5 shrink-0">
+          <div className="flex items-center gap-2">
+            <ListChecks className="w-4 h-4 text-tertiary shrink-0" aria-hidden="true" />
+            <div>
+              <p className="text-base font-bold text-on-surface leading-tight">
+                {sprint.tareas.length}
+              </p>
+              <p className="text-[11px] text-tertiary whitespace-nowrap">
+                {sprint.tareas.length === 1 ? 'tarea realizada' : 'tareas realizadas'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="text-base font-bold text-on-surface leading-tight">
+                {formatearHoras(sprint.horasAprobadas)} h
+              </p>
+              <p className="text-[11px] text-tertiary whitespace-nowrap">horas reconocidas</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {sprint.tareas.length === 0 ? (
+        <p className="border-t border-outline-variant/40 px-5 py-4 text-sm text-tertiary">
+          No hay tareas registradas para este Sprint.
+        </p>
+      ) : (
+        <ul className="divide-y divide-outline-variant/40 border-t border-outline-variant/40">
+          {sprint.tareas.map((tarea) => {
+            const estiloTarea = ESTADO_COLUMNA_STYLE[tarea.estadoTarea];
+            return (
+              <li key={tarea.idTarea} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                {tarea.estadoTarea === 'HECHO' ? (
+                  <CheckCircle2
+                    className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Circle className="w-4 h-4 text-tertiary/40 shrink-0" aria-hidden="true" />
+                )}
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-on-surface">
+                  {tarea.tituloTarea}
+                </p>
+                <span
+                  className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${estiloTarea.headerBg} ${estiloTarea.headerText}`}
+                >
+                  {ESTADO_LABEL[tarea.estadoTarea]}
+                </span>
+                <span className="shrink-0 text-sm font-bold text-on-surface">
+                  {tarea.horasReales !== null ? `${formatearHoras(tarea.horasReales)} h` : '— h'}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
