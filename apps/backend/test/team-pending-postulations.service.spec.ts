@@ -18,7 +18,7 @@ function makeService(
   prisma: ReturnType<typeof makePrisma>,
   applications = makeApplications(),
 ) {
-  return new TeamService(prisma, applications);
+  return new TeamService(prisma, applications, { getPendingLeaderReviews: vi.fn() } as any);
 }
 
 function postulacion(

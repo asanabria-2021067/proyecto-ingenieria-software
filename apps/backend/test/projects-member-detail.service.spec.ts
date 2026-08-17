@@ -12,7 +12,7 @@ function makePrisma() {
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new TeamService(prisma, { findAll: vi.fn() } as any);
+  return new TeamService(prisma, { findAll: vi.fn() } as any, { getPendingLeaderReviews: vi.fn() } as any);
 }
 
 const USUARIO = {
