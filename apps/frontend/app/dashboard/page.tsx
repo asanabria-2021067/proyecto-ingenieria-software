@@ -46,6 +46,8 @@ import {
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import { useTheme } from 'next-themes';
+import { useFeedSocial } from '@/hooks/use-social';
+import { SocialProjectCard } from '@/components/social/social-project-card';
 
 const estadoColors: Record<string, string> = {
   PENDIENTE: 'bg-blue-100 text-blue-800',
@@ -114,6 +116,8 @@ export default function DashboardPage() {
     queryKey: ['dashboard-featured'],
     queryFn: () => apiFetch('/proyectos/destacados'),
   });
+
+  const { proyectosDeAmigos, proyectosDeSeguidos } = useFeedSocial();
 
   const isLoading = userLoading || statsLoading || projectsLoading || featuredLoading;
 
@@ -246,6 +250,32 @@ export default function DashboardPage() {
             <Zap className="absolute -bottom-4 -right-4 h-20 w-20 text-white/10" />
           </div>
         </div>
+
+        {proyectosDeAmigos.length > 0 && (
+          <section className="mb-12">
+            <h2 className="mb-6 font-headline text-2xl font-black tracking-tight">
+              Proyectos de tus amigos
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {proyectosDeAmigos.map((p) => (
+                <SocialProjectCard key={p.idProyecto} proyecto={p} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {proyectosDeSeguidos.length > 0 && (
+          <section className="mb-12">
+            <h2 className="mb-6 font-headline text-2xl font-black tracking-tight">
+              De personas que sigues
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {proyectosDeSeguidos.map((p) => (
+                <SocialProjectCard key={p.idProyecto} proyecto={p} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           <div className="space-y-12 lg:col-span-8">
