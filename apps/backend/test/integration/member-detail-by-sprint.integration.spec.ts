@@ -21,7 +21,7 @@ describeIntegration('TeamService.findTeamMemberDetail — agrupación por Sprint
 
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
-    service = new TeamService(prisma as any, { findAll: async () => [] } as any);
+    service = new TeamService(prisma as any, { findAll: async () => [] } as any, { getPendingLeaderReviews: async () => [] } as any);
     await prisma.$connect();
   });
 
