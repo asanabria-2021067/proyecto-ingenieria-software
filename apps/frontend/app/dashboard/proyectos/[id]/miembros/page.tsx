@@ -17,8 +17,11 @@ import {
   UserMinus,
   Users,
 } from 'lucide-react';
+import { useProjectDetail } from '@/hooks/use-project-detail';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectTeam } from '@/hooks/use-project-team';
 import { useProjectPendingExitRequests } from '@/hooks/use-exit-request';
+import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -47,6 +50,7 @@ import {
 import type { GrupoMiembroProyecto, MiembroProyectoResumenDTO } from '@/lib/dto/member.dto';
 import type { PendingLeaderReviewDto } from '@/lib/types/exit-requests';
 import { PendingPostulationsCard } from '@/components/projects/pending-postulations-card';
+import { PendingExitRequestsCard } from '@/components/projects/pending-exit-requests-card';
 import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
@@ -333,6 +337,17 @@ export default function MiembrosProyectoPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
 
+  // GET /proyectos/:id/miembros/resumen es exclusivo del líder en backend
+  // (TeamService.getTeamSummary → requireOwner). Se detecta client-side con
+  // el mismo criterio que el resto del detalle del proyecto
+  // (creador.idUsuario === currentUser.idUsuario) para mostrar un aviso
+  // claro en vez de una tabla vacía o un 403 crudo.
+  const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
+  const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
+  const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
+  const cargandoPermisos = cargandoProyecto || cargandoUsuario;
+  const volverAlProyectoHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
+
   const { lider, miembros, isLoading, isError, refetch } = useProjectTeam(idProyecto);
   const {
     requests: pendingExitRequests,
@@ -385,13 +400,17 @@ export default function MiembrosProyectoPage() {
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
       <Link
-        href={`/dashboard/proyectos/${id}`}
+        href={volverAlProyectoHref}
         className="inline-flex items-center gap-1.5 text-sm text-tertiary hover:text-primary mb-6 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Volver al proyecto
       </Link>
 
+      {!cargandoPermisos && !isLeader ? (
+        <LeaderOnlyNotice description="No puedes acceder a los miembros de este proyecto." />
+      ) : (
+        <>
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -408,7 +427,10 @@ export default function MiembrosProyectoPage() {
           )}
         </div>
 
-        <PendingPostulationsCard idProyecto={idProyecto} />
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <PendingPostulationsCard idProyecto={idProyecto} />
+          <PendingExitRequestsCard idProyecto={idProyecto} />
+        </div>
       </div>
 
       {isExitRequestsError && (
@@ -542,6 +564,8 @@ export default function MiembrosProyectoPage() {
             pendingExitRequests={pendingExitRequests}
           />
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
@@ -8,7 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ApplicationCreatedEvent } from '../notifications/events/application-created.event';
-import { EstadoProyecto, TipoNotificacion } from '@prisma/client';
+import { EstadoProyecto, Prisma, TipoNotificacion } from '@prisma/client';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
@@ -183,6 +184,50 @@ export class ApplicationsService {
     return postulacion;
   }
 
+  /**
+   * Aceptar una postulación debe producir un integrante activo real, no solo
+   * cambiar el estado de la fila `Postulacion` — de lo contrario la persona
+   * queda "aceptada" en el papel pero invisible en /miembros y sin poder
+   * recibir tareas (idParticipacion inexistente). Reutiliza una
+   * `ParticipacionProyecto` previa del mismo (usuario, rol) si existe
+   * —típicamente RETIRADO de un ciclo anterior— reactivándola en vez de
+   * crear una fila duplicada; solo crea una nueva cuando no existe ninguna.
+   * Enlaza `idPostulacion` para conservar la trazabilidad del origen, igual
+   * que ya hace `seed.ts`.
+   */
+  private async activarParticipacionPorPostulacion(
+    tx: Prisma.TransactionClient,
+    idUsuario: number,
+    idRolProyecto: number,
+    idPostulacion: number,
+  ) {
+    const existente = await tx.participacionProyecto.findFirst({
+      where: { idUsuario, idRolProyecto },
+      orderBy: { idParticipacion: 'desc' },
+    });
+
+    if (!existente) {
+      return tx.participacionProyecto.create({
+        data: { idUsuario, idRolProyecto, idPostulacion, estadoParticipacion: 'ACTIVO' },
+      });
+    }
+
+    if (existente.estadoParticipacion === 'ACTIVO') {
+      // Ya activo (carrera/reintento) — no duplicar ni tocar fechaIngreso.
+      return existente;
+    }
+
+    return tx.participacionProyecto.update({
+      where: { idParticipacion: existente.idParticipacion },
+      data: {
+        estadoParticipacion: 'ACTIVO',
+        fechaIngreso: new Date(),
+        fechaSalida: null,
+        idPostulacion,
+      },
+    });
+  }
+
   async updateEstado(
     id: number,
     dto: UpdateEstadoPostulacionDto,
@@ -211,25 +256,46 @@ export class ApplicationsService {
       );
     }
 
-    const postulacionActualizada = await this.prisma.postulacion.update({
-      where: { idPostulacion: id },
-      data: {
-        estadoPostulacion: dto.estadoPostulacion,
-        comentarioResolucion: dto.comentarioResolucion ?? null,
-        resueltaPor: resolutorId,
-        fechaResolucion: new Date(),
-      },
-      include: {
-        rolProyecto: {
-          include: { proyecto: true },
+    const esAceptada = dto.estadoPostulacion === 'ACEPTADA';
+
+    const postulacionActualizada = await this.prisma.$transaction(async (tx) => {
+      // `updateMany` condicionado por PENDIENTE (mismo patrón que
+      // SprintsService/ExitRequestsService): si otra resolución concurrente
+      // ya ganó la carrera entre el findUnique de arriba y este punto,
+      // count === 0 y se traduce a ConflictException en vez de resolver dos
+      // veces la misma postulación (y, con ACEPTADA, crear dos
+      // participaciones).
+      const resuelta = await tx.postulacion.updateMany({
+        where: { idPostulacion: id, estadoPostulacion: 'PENDIENTE' },
+        data: {
+          estadoPostulacion: dto.estadoPostulacion,
+          comentarioResolucion: dto.comentarioResolucion ?? null,
+          resueltaPor: resolutorId,
+          fechaResolucion: new Date(),
         },
-      },
+      });
+      if (resuelta.count !== 1) {
+        throw new ConflictException('Esta postulación ya fue resuelta');
+      }
+
+      if (esAceptada) {
+        await this.activarParticipacionPorPostulacion(
+          tx,
+          postulacion.idUsuarioPostulante,
+          postulacion.idRolProyecto,
+          id,
+        );
+      }
+
+      return tx.postulacion.findUniqueOrThrow({
+        where: { idPostulacion: id },
+        include: { rolProyecto: { include: { proyecto: true } } },
+      });
     });
 
     const tituloProyecto = postulacion.rolProyecto.proyecto.tituloProyecto;
     const nombreRol = postulacion.rolProyecto.nombreRol;
     const estado = dto.estadoPostulacion;
-    const esAceptada = estado === 'ACEPTADA';
 
     await this.notificationsService.notifyUsers(
       [postulacion.idUsuarioPostulante],

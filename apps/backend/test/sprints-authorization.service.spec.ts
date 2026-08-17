@@ -6,6 +6,7 @@ function makeContext() {
   return {
     getProjectOrThrow: vi.fn(),
     assertProjectLeader: vi.fn(),
+    assertActiveProjectParticipant: vi.fn(),
     getCurrentSprint: vi.fn(),
     getSprintInProjectOrThrow: vi.fn(),
     getSprintWithProjectOrThrow: vi.fn(),
@@ -68,25 +69,37 @@ describe('SprintsAuthorizationService', () => {
   describe('assertCanListSprintHistory (A10)', () => {
     it('permite al líder del proyecto', async () => {
       const ctx = makeContext();
-      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
       const service = new SprintsAuthorizationService(ctx);
 
       await expect(service.assertCanListSprintHistory(1, LIDER_ID)).resolves.toBeUndefined();
     });
 
-    it('rechaza a un usuario que no es líder', async () => {
+    it('permite a un participante con rol activo (lo necesita el tablero Kanban)', async () => {
       const ctx = makeContext();
-      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
       const service = new SprintsAuthorizationService(ctx);
 
-      await expect(service.assertCanListSprintHistory(1, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
+      await expect(
+        service.assertCanListSprintHistory(1, PARTICIPANTE_ID),
+      ).resolves.toBeUndefined();
+    });
+
+    it('rechaza a un usuario sin participación activa ni liderazgo', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockRejectedValue(
+        new ForbiddenException('No tienes una participación activa en este proyecto'),
+      );
+      const service = new SprintsAuthorizationService(ctx);
+
+      await expect(service.assertCanListSprintHistory(1, EXTERNO_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
       );
     });
 
     it('propaga NotFoundException si el proyecto no existe', async () => {
       const ctx = makeContext();
-      ctx.assertProjectLeader.mockRejectedValue(NOT_FOUND_PROYECTO());
+      ctx.assertActiveProjectParticipant.mockRejectedValue(NOT_FOUND_PROYECTO());
       const service = new SprintsAuthorizationService(ctx);
 
       await expect(service.assertCanListSprintHistory(99, LIDER_ID)).rejects.toBeInstanceOf(
@@ -96,13 +109,13 @@ describe('SprintsAuthorizationService', () => {
 
     it('traslada el cliente transaccional recibido', async () => {
       const ctx = makeContext();
-      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
       const tx = { marker: 'tx' } as any;
       const service = new SprintsAuthorizationService(ctx);
 
       await service.assertCanListSprintHistory(1, LIDER_ID, tx);
 
-      expect(ctx.assertProjectLeader).toHaveBeenCalledWith(1, LIDER_ID, tx);
+      expect(ctx.assertActiveProjectParticipant).toHaveBeenCalledWith(1, LIDER_ID, tx);
     });
   });
 

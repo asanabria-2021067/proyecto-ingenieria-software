@@ -250,7 +250,7 @@ function TaskDetailView({
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link
-                href={`/dashboard/projects/${idProyecto}`}
+                href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}
                 className="max-w-56 truncate text-tertiary hover:text-on-surface"
               >
                 {proyecto.tituloProyecto}

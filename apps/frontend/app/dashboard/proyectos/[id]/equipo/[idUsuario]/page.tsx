@@ -28,6 +28,7 @@ import type {
   TareaHistorialIntegranteDTO,
 } from '@/lib/dto/member-detail.dto';
 import { ESTADO_PARTICIPACION_STYLE } from '@/components/projects/member-status.utils';
+import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import type { EstadoSprint } from '@/lib/types/sprints';
 
 /**
@@ -118,15 +119,10 @@ export default function DetalleIntegranteProyectoPage() {
       {cargandoPermisos && <DetalleSkeleton />}
 
       {!cargandoPermisos && !isLeader && (
-        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-10 text-center">
-          <ShieldAlert className="w-10 h-10 text-error mx-auto mb-3" />
-          <h1 className="font-headline font-bold text-lg text-on-surface mb-1">
-            Solo el líder puede ver este detalle
-          </h1>
-          <p className="text-sm text-tertiary">
-            El desglose de tareas y horas de un integrante es visible únicamente para quien lidera el proyecto.
-          </p>
-        </div>
+        <LeaderOnlyNotice
+          title="Solo el líder puede ver este detalle"
+          description="El desglose de tareas y horas de un integrante es visible únicamente para quien lidera el proyecto."
+        />
       )}
 
       {!cargandoPermisos && isLeader && (
