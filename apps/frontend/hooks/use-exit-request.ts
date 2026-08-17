@@ -1,7 +1,11 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { currentExitRequestQueryKey, exitPreparationSummaryQueryKey } from '@/lib/query-keys/exit-requests';
+import {
+  currentExitRequestQueryKey,
+  exitPreparationSummaryQueryKey,
+  projectPendingExitRequestsQueryKey,
+} from '@/lib/query-keys/exit-requests';
 import {
   projectMemberDetailQueryKey,
   projectMembersQueryKey,
@@ -14,12 +18,14 @@ import {
   createExitRequest,
   getCurrentExitRequest,
   getExitPreparationSummary,
+  getPendingExitRequests,
   rejectExitRequest,
 } from '@/lib/services/exit-requests';
 import type {
   CreateExitRequestInput,
   CurrentExitRequestDto,
   ExitPreparationSummaryDto,
+  PendingLeaderReviewDto,
 } from '@/lib/types/exit-requests';
 
 function isValidProjectId(idProyecto: number): boolean {
@@ -73,6 +79,32 @@ export function useExitPreparationSummary(idProyecto: number, habilitado: boolea
 
   return {
     summary: query.data,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * F14.1 — `GET /proyectos/:id/miembros/solicitudes-salida-pendientes`.
+ * Reader LEADER-FACING, independiente de `useCurrentExitRequest` (esa es
+ * scoped al actor) y de `useProjectTeam` (B12, sin campo de solicitud de
+ * salida): una query propia para que un fallo o loading aquí nunca tumbe las
+ * tres secciones de F12 ni la tarjeta de F13.
+ */
+export function useProjectPendingExitRequests(idProyecto: number) {
+  const enabled = isValidProjectId(idProyecto);
+
+  const query = useQuery<PendingLeaderReviewDto[]>({
+    queryKey: projectPendingExitRequestsQueryKey(idProyecto),
+    queryFn: () => getPendingExitRequests(idProyecto),
+    enabled,
+  });
+
+  return {
+    requests: query.data ?? [],
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
@@ -175,6 +207,11 @@ export function useCancelExitPreparation(idProyecto: number) {
  * sobre el Sprint activo resuelto server-side, cuyo `idSprint` esta
  * respuesta nunca expone — no hay forma de construir esa key sin inventar
  * un id (ver riesgos de la auditoría final).
+ *
+ * F14.1: la solicitud aprobada deja de estar `PENDIENTE_LIDER`, así que
+ * `pending-exit-requests` (el reader leader-facing de F14) también queda
+ * obsoleto — se invalida en `onSettled` (éxito Y error) para reconciliar
+ * incluso si otro líder ya la resolvió primero.
  */
 export function useApproveExitRequest(idProyecto: number) {
   const queryClient = useQueryClient();
@@ -188,6 +225,9 @@ export function useApproveExitRequest(idProyecto: number) {
         queryKey: projectMemberDetailQueryKey(idProyecto, data.idUsuario),
       });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: projectPendingExitRequestsQueryKey(idProyecto) });
+    },
   });
 }
 
@@ -198,11 +238,19 @@ export function useApproveExitRequest(idProyecto: number) {
  * toca `ParticipacionProyecto` ni horas, solo el estado de la solicitud y
  * una notificación. Ningún read-model consumido por F7 (ni
  * `exit-preparation-summary`, que solo mira PREPARACION; ni
- * `members`/`team`, que rechazar nunca modifica) queda obsoleto, así que
- * esta mutation no invalida ninguna query.
+ * `members`/`team`, que rechazar nunca modifica) queda obsoleto.
+ *
+ * F14.1: sí queda obsoleto `pending-exit-requests` — la solicitud rechazada
+ * deja de estar `PENDIENTE_LIDER`, así que debe desaparecer del reader
+ * leader-facing de F14 tras el refetch.
  */
 export function useRejectExitRequest(idProyecto: number) {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (idSolicitud: number) => rejectExitRequest(idProyecto, idSolicitud),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: projectPendingExitRequestsQueryKey(idProyecto) });
+    },
   });
 }

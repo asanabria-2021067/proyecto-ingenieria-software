@@ -16,5 +16,6 @@ import { ExitRequestsService } from './exit-requests.service';
     ExitRequestsAuthorizationService,
     ProjectWriteGuard,
   ],
+  exports: [ExitRequestsService],
 })
 export class ExitRequestsModule {}

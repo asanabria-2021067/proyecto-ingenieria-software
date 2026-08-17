@@ -11,6 +11,7 @@ vi.mock('../lib/services/exit-requests', () => ({
   cancelExitPreparation: vi.fn(),
   approveExitRequest: vi.fn(),
   rejectExitRequest: vi.fn(),
+  getPendingExitRequests: vi.fn(),
 }));
 
 import {
@@ -20,9 +21,14 @@ import {
   useCreateExitRequest,
   useCurrentExitRequest,
   useExitPreparationSummary,
+  useProjectPendingExitRequests,
   useRejectExitRequest,
 } from '../hooks/use-exit-request';
-import { currentExitRequestQueryKey, exitPreparationSummaryQueryKey } from '../lib/query-keys/exit-requests';
+import {
+  currentExitRequestQueryKey,
+  exitPreparationSummaryQueryKey,
+  projectPendingExitRequestsQueryKey,
+} from '../lib/query-keys/exit-requests';
 import { projectSprintsQueryKey } from '../lib/query-keys/sprints';
 import { projectTasksQueryKey } from '../lib/query-keys/tasks';
 import {
@@ -37,6 +43,7 @@ import {
   createExitRequest,
   getCurrentExitRequest,
   getExitPreparationSummary,
+  getPendingExitRequests,
   rejectExitRequest,
 } from '../lib/services/exit-requests';
 
@@ -181,6 +188,74 @@ describe('useCurrentExitRequest', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(getCurrentExitRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('useProjectPendingExitRequests', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa GET /proyectos/:id/miembros/solicitudes-salida-pendientes (F14.1), leader-facing, no el reader del actor', async () => {
+    (getPendingExitRequests as any).mockResolvedValue([]);
+    const { wrapper } = createWrapper();
+    renderHook(() => useProjectPendingExitRequests(7), { wrapper });
+
+    await waitFor(() => expect(getPendingExitRequests).toHaveBeenCalledWith(7));
+    expect(getCurrentExitRequest).not.toHaveBeenCalled();
+  });
+
+  it('usa la query key projectPendingExitRequestsQueryKey, distinta de currentExitRequestQueryKey', async () => {
+    (getPendingExitRequests as any).mockResolvedValue([]);
+    const { queryClient, wrapper } = createWrapper();
+    renderHook(() => useProjectPendingExitRequests(7), { wrapper });
+
+    await waitFor(() => {
+      expect(queryClient.getQueryState(projectPendingExitRequestsQueryKey(7))).toBeDefined();
+    });
+    expect(projectPendingExitRequestsQueryKey(7)).not.toEqual(currentExitRequestQueryKey(7));
+  });
+
+  it('expone requests=[] por defecto antes de resolver, con isLoading true', () => {
+    (getPendingExitRequests as any).mockReturnValue(new Promise(() => {}));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useProjectPendingExitRequests(7), { wrapper });
+
+    expect(result.current.requests).toEqual([]);
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it('con varias solicitudes PENDIENTE_LIDER, las expone tal cual las devuelve el reader', async () => {
+    const fixture = [
+      solicitudAbierta({ idSolicitud: 1, idUsuario: 50, estadoSolicitud: 'PENDIENTE_LIDER' }),
+      solicitudAbierta({ idSolicitud: 2, idUsuario: 51, estadoSolicitud: 'PENDIENTE_LIDER' }),
+    ];
+    (getPendingExitRequests as any).mockResolvedValue(fixture);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useProjectPendingExitRequests(7), { wrapper });
+
+    await waitFor(() => expect(result.current.requests).toHaveLength(2));
+    expect(result.current.requests).toEqual(fixture);
+  });
+
+  it('preserva isError, error y requests=[] cuando la petición falla', async () => {
+    const boom = new Error('fallo de red');
+    (getPendingExitRequests as any).mockRejectedValue(boom);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useProjectPendingExitRequests(7), { wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(boom);
+    expect(result.current.requests).toEqual([]);
+  });
+
+  it('un idProyecto inválido no consulta', async () => {
+    (getPendingExitRequests as any).mockResolvedValue([]);
+    const { wrapper } = createWrapper();
+    renderHook(() => useProjectPendingExitRequests(-1), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getPendingExitRequests).not.toHaveBeenCalled();
   });
 });
 
@@ -474,7 +549,7 @@ describe('useApproveExitRequest', () => {
     expect(approveExitRequest).toHaveBeenCalledWith(7, 1);
   });
 
-  it('en éxito invalida exactamente members/team/member-detail del usuario resuelto (cross-domain)', async () => {
+  it('en éxito invalida exactamente members/team/member-detail del usuario resuelto (cross-domain) más pending-exit-requests (F14.1)', async () => {
     (approveExitRequest as any).mockResolvedValue(solicitud({ estadoSolicitud: 'APROBADA', idUsuario: 9 }));
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -483,10 +558,11 @@ describe('useApproveExitRequest', () => {
     result.current.mutate(1);
 
     await waitFor(() => expect(approveExitRequest).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(4));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectMembersQueryKey(7) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectTeamSummaryQueryKey(7) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectMemberDetailQueryKey(7, 9) });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectPendingExitRequestsQueryKey(7) });
   });
 
   it('no invalida exit-preparation-summary (PENDIENTE_LIDER nunca calificó para ese read-model)', async () => {
@@ -497,20 +573,21 @@ describe('useApproveExitRequest', () => {
 
     result.current.mutate(1);
 
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(4));
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: exitPreparationSummaryQueryKey(7) });
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-tasks', 7] });
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-sprints', 7] });
   });
 
-  it('una mutation fallida no invalida nada como éxito', async () => {
+  it('una mutation fallida igual reconcilia pending-exit-requests (F14.1: otro líder pudo resolverla primero), nada más', async () => {
     (approveExitRequest as any).mockRejectedValue(new Error('400'));
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useApproveExitRequest(7), { wrapper });
 
     await expect(result.current.mutateAsync(1)).rejects.toThrow('400');
-    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectPendingExitRequestsQueryKey(7) });
   });
 });
 
@@ -530,7 +607,7 @@ describe('useRejectExitRequest', () => {
     expect(rejectExitRequest).toHaveBeenCalledWith(7, 1);
   });
 
-  it('rechazar no retira participaciones: no invalida members/team en éxito (a diferencia de approve)', async () => {
+  it('rechazar no retira participaciones: no invalida members/team en éxito (a diferencia de approve), solo pending-exit-requests (F14.1)', async () => {
     (rejectExitRequest as any).mockResolvedValue(solicitud({ estadoSolicitud: 'RECHAZADA', idUsuario: 9 }));
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -538,16 +615,20 @@ describe('useRejectExitRequest', () => {
 
     await result.current.mutateAsync(1);
 
-    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectPendingExitRequestsQueryKey(7) });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: projectMembersQueryKey(7) });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: projectTeamSummaryQueryKey(7) });
   });
 
-  it('una mutation fallida no invalida nada', async () => {
+  it('una mutation fallida igual reconcilia pending-exit-requests, nada más', async () => {
     (rejectExitRequest as any).mockRejectedValue(new Error('400'));
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useRejectExitRequest(7), { wrapper });
 
     await expect(result.current.mutateAsync(1)).rejects.toThrow('400');
-    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectPendingExitRequestsQueryKey(7) });
   });
 });

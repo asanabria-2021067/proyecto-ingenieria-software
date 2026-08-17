@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useProjectTeam } from '@/hooks/use-project-team';
+import { useProjectPendingExitRequests } from '@/hooks/use-exit-request';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -44,7 +45,9 @@ import {
   sumarHorasReconocidas,
 } from '@/components/projects/team-metrics.utils';
 import type { GrupoMiembroProyecto, MiembroProyectoResumenDTO } from '@/lib/dto/member.dto';
+import type { PendingLeaderReviewDto } from '@/lib/types/exit-requests';
 import { PendingPostulationsCard } from '@/components/projects/pending-postulations-card';
+import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'nombre', label: 'Integrante' },
@@ -155,8 +158,17 @@ function MetricTile({
   );
 }
 
-function MiembroRow({ miembro, idProyecto }: { miembro: MiembroProyectoResumenDTO; idProyecto: number }) {
+function MiembroRow({
+  miembro,
+  idProyecto,
+  exitRequest,
+}: {
+  miembro: MiembroProyectoResumenDTO;
+  idProyecto: number;
+  exitRequest?: PendingLeaderReviewDto;
+}) {
   const estilo = ESTADO_PARTICIPACION_STYLE[miembro.estadoParticipacion];
+  const nombreCompleto = `${miembro.nombre} ${miembro.apellido}`;
 
   return (
     <TableRow className="border-outline-variant/40 hover:bg-surface-container-low transition-colors">
@@ -168,9 +180,10 @@ function MiembroRow({ miembro, idProyecto }: { miembro: MiembroProyectoResumenDT
               {getInitials(miembro.nombre, miembro.apellido)}
             </AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium text-on-surface whitespace-nowrap">
-            {miembro.nombre} {miembro.apellido}
-          </span>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-on-surface whitespace-nowrap">{nombreCompleto}</span>
+            <ExitRequestBadge request={exitRequest} />
+          </div>
         </div>
       </TableCell>
       <TableCell className="px-4 py-3">
@@ -199,13 +212,17 @@ function MiembroRow({ miembro, idProyecto }: { miembro: MiembroProyectoResumenDT
         <span className="text-sm text-on-surface whitespace-nowrap">{formatHoras(miembro.horasReconocidas)} h</span>
       </TableCell>
       <TableCell className="px-4 py-3">
-        <Link
-          href={`/dashboard/proyectos/${idProyecto}/equipo/${miembro.idUsuario}`}
-          className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline whitespace-nowrap"
-        >
-          Ver detalle
-          <ChevronRight className="w-3.5 h-3.5" />
-        </Link>
+        {exitRequest ? (
+          <ExitRequestActions request={exitRequest} idProyecto={idProyecto} nombreCompleto={nombreCompleto} />
+        ) : (
+          <Link
+            href={`/dashboard/proyectos/${idProyecto}/equipo/${miembro.idUsuario}`}
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline whitespace-nowrap"
+          >
+            Ver detalle
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -229,6 +246,7 @@ function MembersGroupSection({
   sortKey,
   sortDirection,
   onSort,
+  pendingExitRequests,
 }: {
   groupId: string;
   icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
@@ -241,6 +259,7 @@ function MembersGroupSection({
   sortKey: MiembroSortKey;
   sortDirection: SortDirection;
   onSort: (key: MiembroSortKey) => void;
+  pendingExitRequests: PendingLeaderReviewDto[];
 }) {
   const headingId = `${groupId}-heading`;
 
@@ -287,7 +306,12 @@ function MembersGroupSection({
               </TableHeader>
               <TableBody>
                 {miembros.map((miembro) => (
-                  <MiembroRow key={miembro.idUsuario} miembro={miembro} idProyecto={idProyecto} />
+                  <MiembroRow
+                    key={miembro.idUsuario}
+                    miembro={miembro}
+                    idProyecto={idProyecto}
+                    exitRequest={pendingExitRequests.find((request) => request.idUsuario === miembro.idUsuario)}
+                  />
                 ))}
               </TableBody>
             </Table>
@@ -310,6 +334,11 @@ export default function MiembrosProyectoPage() {
   const idProyecto = Number(id);
 
   const { lider, miembros, isLoading, isError, refetch } = useProjectTeam(idProyecto);
+  const {
+    requests: pendingExitRequests,
+    isError: isExitRequestsError,
+    refetch: refetchExitRequests,
+  } = useProjectPendingExitRequests(idProyecto);
 
   const tareasActivas = useMemo(() => sumarTareasActivas(miembros), [miembros]);
   const tareasCompletadas = useMemo(() => sumarTareasCompletadas(miembros), [miembros]);
@@ -381,6 +410,22 @@ export default function MiembrosProyectoPage() {
 
         <PendingPostulationsCard idProyecto={idProyecto} />
       </div>
+
+      {isExitRequestsError && (
+        <div
+          role="alert"
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-error/25 bg-error-container/20 px-4 py-3 text-sm text-on-surface"
+        >
+          <span>No fue posible verificar solicitudes de salida pendientes de los integrantes.</span>
+          <button
+            type="button"
+            onClick={() => refetchExitRequests()}
+            className="inline-flex items-center justify-center rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4">
         <MetricTile
@@ -466,6 +511,7 @@ export default function MiembrosProyectoPage() {
             sortKey={sortKey}
             sortDirection={sortDirection}
             onSort={handleSort}
+            pendingExitRequests={pendingExitRequests}
           />
           <MembersGroupSection
             groupId="retirados-con-contribucion"
@@ -479,6 +525,7 @@ export default function MiembrosProyectoPage() {
             sortKey={sortKey}
             sortDirection={sortDirection}
             onSort={handleSort}
+            pendingExitRequests={pendingExitRequests}
           />
           <MembersGroupSection
             groupId="retirados-sin-contribucion"
@@ -492,6 +539,7 @@ export default function MiembrosProyectoPage() {
             sortKey={sortKey}
             sortDirection={sortDirection}
             onSort={handleSort}
+            pendingExitRequests={pendingExitRequests}
           />
         </div>
       )}
