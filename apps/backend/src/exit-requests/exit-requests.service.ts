@@ -88,6 +88,38 @@ export class ExitRequestsService {
     return { solicitud };
   }
 
+  /**
+   * F14.1 — reader LEADER-FACING: todas las `SolicitudSalidaProyecto` en
+   * `PENDIENTE_LIDER` del proyecto, sin importar qué usuario las presentó
+   * (a diferencia de `getSolicitudSalidaAbierta`, scoped al actor). Único
+   * reader de este dominio pensado para que el LÍDER vea las solicitudes de
+   * OTROS, por eso exige `assertProjectLeader` en vez de limitarse a
+   * `getProjectOrThrow`. `team.service.ts` delega aquí en vez de consultar
+   * `Prisma.solicitudSalidaProyecto` directamente, para no duplicar el
+   * dominio de exit-requests fuera de su servicio dueño (mismo precedente
+   * que `TeamService.getPendingPostulations` → `ApplicationsService.findAll`
+   * para B13).
+   */
+  async getPendingLeaderReviews(idProyecto: number, liderId: number) {
+    await this.authorization.assertProjectLeader(idProyecto, liderId);
+
+    return this.prisma.solicitudSalidaProyecto.findMany({
+      where: {
+        idProyecto,
+        estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER,
+      },
+      select: {
+        idSolicitud: true,
+        idProyecto: true,
+        idUsuario: true,
+        motivo: true,
+        solicitadaEn: true,
+        estadoSolicitud: true,
+      },
+      orderBy: { solicitadaEn: 'asc' },
+    });
+  }
+
   async getExitPreparationSummary(idProyecto: number, actorUserId: number) {
     await this.context.getProjectOrThrow(idProyecto);
 

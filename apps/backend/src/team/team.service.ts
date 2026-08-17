@@ -1,10 +1,12 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ApplicationsService } from '../applications/applications.service';
+import { ExitRequestsService } from '../exit-requests/exit-requests.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamSummaryMemberDto, TeamSummaryRoleDto } from './dto/team-summary-member.dto';
 import { TeamSummaryResponseDto } from './dto/team-summary-response.dto';
 
 type ApplicationSummary = Awaited<ReturnType<ApplicationsService['findAll']>>[number];
+type PendingLeaderReview = Awaited<ReturnType<ExitRequestsService['getPendingLeaderReviews']>>[number];
 
 type MemberDetailTask = {
   idTarea: number;
@@ -45,6 +47,7 @@ export class TeamService {
   constructor(
     private prisma: PrismaService,
     private applicationsService: ApplicationsService,
+    private exitRequestsService: ExitRequestsService,
   ) {}
 
   /**
@@ -478,6 +481,17 @@ export class TeamService {
         postulacion.estadoPostulacion === 'PENDIENTE' &&
         postulacion.rolProyecto.proyecto.idProyecto === idProyecto,
     );
+  }
+
+  /**
+   * F14.1 — delega íntegramente en `ExitRequestsService.getPendingLeaderReviews`:
+   * `exit-requests` sigue siendo el dueño del dominio `SolicitudSalidaProyecto`
+   * (autorización de liderazgo incluida), Team solo expone la ruta bajo
+   * `/miembros` para que el frontend la consuma junto al resumen person-centric.
+   * Nunca consulta `Prisma.solicitudSalidaProyecto` directamente.
+   */
+  async getPendingExitRequests(idProyecto: number, userId: number): Promise<PendingLeaderReview[]> {
+    return this.exitRequestsService.getPendingLeaderReviews(idProyecto, userId);
   }
 
   private async requireOwner(idProyecto: number, userId: number) {

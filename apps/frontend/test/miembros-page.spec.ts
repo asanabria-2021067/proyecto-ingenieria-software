@@ -13,6 +13,11 @@ vi.mock('../hooks/use-project-pending-postulations', () => ({
   useProjectPendingPostulations: vi.fn(),
   useResolvePostulacion: vi.fn(),
 }));
+vi.mock('../hooks/use-exit-request', () => ({
+  useProjectPendingExitRequests: vi.fn(),
+  useApproveExitRequest: vi.fn(),
+  useRejectExitRequest: vi.fn(),
+}));
 
 import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';
 import { useProjectTeam } from '../hooks/use-project-team';
@@ -20,6 +25,12 @@ import {
   useProjectPendingPostulations,
   useResolvePostulacion,
 } from '../hooks/use-project-pending-postulations';
+import {
+  useApproveExitRequest,
+  useProjectPendingExitRequests,
+  useRejectExitRequest,
+} from '../hooks/use-exit-request';
+import type { PendingLeaderReviewDto } from '../lib/types/exit-requests';
 
 const LIDER: LiderProyectoDTO = {
   idUsuario: 1,
@@ -85,6 +96,38 @@ function mockPendingPostulationsHook(overrides: Partial<ReturnType<typeof usePro
   });
 }
 
+/**
+ * F14 vive parcialmente en `ExitRequestActions`/`ExitRequestBadge`
+ * (member-exit-request-actions.tsx), pero el reader (`useProjectPendingExitRequests`)
+ * se consulta desde esta misma página — se mockea aquí para que los tests de
+ * F12/F13 (que no conocen solicitudes de salida) sigan aislados.
+ */
+function mockPendingExitRequestsHook(overrides: Partial<ReturnType<typeof useProjectPendingExitRequests>> = {}) {
+  (useProjectPendingExitRequests as any).mockReturnValue({
+    requests: [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    ...overrides,
+  });
+  (useApproveExitRequest as any).mockReturnValue({ mutate: vi.fn(), isPending: false });
+  (useRejectExitRequest as any).mockReturnValue({ mutate: vi.fn(), isPending: false });
+}
+
+function pendingExitRequest(overrides: Partial<PendingLeaderReviewDto> = {}): PendingLeaderReviewDto {
+  return {
+    idSolicitud: 900,
+    idProyecto: 42,
+    idUsuario: 7,
+    motivo: 'Cambio de disponibilidad',
+    solicitadaEn: '2026-01-05T00:00:00.000Z',
+    estadoSolicitud: 'PENDIENTE_LIDER',
+    ...overrides,
+  };
+}
+
 function renderPage() {
   return render(createElement(MiembrosProyectoPage));
 }
@@ -96,6 +139,7 @@ function seccionPorTitulo(titulo: string): HTMLElement {
 
 beforeEach(() => {
   mockPendingPostulationsHook();
+  mockPendingExitRequestsHook();
 });
 
 afterEach(() => {
@@ -481,5 +525,115 @@ describe('MiembrosProyectoPage — navegación', () => {
 
     const link = screen.getByRole('link', { name: /Volver al proyecto/i });
     expect(link).toHaveAttribute('href', '/dashboard/proyectos/42');
+  });
+});
+
+describe('MiembrosProyectoPage — F14: asociación por idUsuario', () => {
+  it('un miembro sin solicitud de salida conserva únicamente "Ver detalle"', () => {
+    mockHook({ miembros: [miembro({ idUsuario: 7, nombre: 'Carlos', apellido: 'Mendoza', grupo: 'ACTIVOS' })] });
+    mockPendingExitRequestsHook({ requests: [] });
+    renderPage();
+
+    const seccion = seccionPorTitulo(TITULO_ACTIVOS);
+    expect(within(seccion).getByRole('link', { name: /Ver detalle/i })).toBeInTheDocument();
+    expect(within(seccion).queryByText('Salida pendiente')).not.toBeInTheDocument();
+    expect(within(seccion).queryByRole('button', { name: /Aprobar solicitud de salida/i })).not.toBeInTheDocument();
+  });
+
+  it('un miembro con solicitud PENDIENTE_LIDER muestra el badge y las acciones, no "Ver detalle"', () => {
+    mockHook({ miembros: [miembro({ idUsuario: 7, nombre: 'Ana', apellido: 'García', grupo: 'ACTIVOS' })] });
+    mockPendingExitRequestsHook({ requests: [pendingExitRequest({ idUsuario: 7 })] });
+    renderPage();
+
+    const seccion = seccionPorTitulo(TITULO_ACTIVOS);
+    expect(within(seccion).getByText('Salida pendiente')).toBeInTheDocument();
+    expect(within(seccion).getByRole('button', { name: 'Aprobar solicitud de salida de Ana García' })).toBeInTheDocument();
+    expect(within(seccion).getByRole('button', { name: 'Rechazar solicitud de salida de Ana García' })).toBeInTheDocument();
+    expect(within(seccion).queryByRole('link', { name: /Ver detalle/i })).not.toBeInTheDocument();
+  });
+
+  it('el miembro con solicitud pendiente sigue mostrando "Activo" (F14 no cambia el estado de participación)', () => {
+    mockHook({
+      miembros: [miembro({ idUsuario: 7, nombre: 'Ana', apellido: 'García', grupo: 'ACTIVOS', estadoParticipacion: 'ACTIVO' })],
+    });
+    mockPendingExitRequestsHook({ requests: [pendingExitRequest({ idUsuario: 7 })] });
+    renderPage();
+
+    expect(within(seccionPorTitulo(TITULO_ACTIVOS)).getByText('Activo')).toBeInTheDocument();
+  });
+
+  it('la solicitud de un usuario B no afecta la fila del usuario A (asociación exclusivamente por idUsuario)', () => {
+    mockHook({
+      miembros: [
+        miembro({ idUsuario: 7, nombre: 'Carlos', apellido: 'Mendoza', grupo: 'ACTIVOS' }),
+        miembro({ idUsuario: 8, nombre: 'Ana', apellido: 'García', grupo: 'ACTIVOS' }),
+      ],
+    });
+    mockPendingExitRequestsHook({ requests: [pendingExitRequest({ idUsuario: 8 })] });
+    renderPage();
+
+    const seccion = seccionPorTitulo(TITULO_ACTIVOS);
+    const filaCarlos = within(seccion).getByText('Carlos Mendoza').closest('tr') as HTMLElement;
+    const filaAna = within(seccion).getByText('Ana García').closest('tr') as HTMLElement;
+
+    expect(within(filaCarlos).queryByText('Salida pendiente')).not.toBeInTheDocument();
+    expect(within(filaCarlos).getByRole('link', { name: /Ver detalle/i })).toBeInTheDocument();
+    expect(within(filaAna).getByText('Salida pendiente')).toBeInTheDocument();
+    expect(within(filaAna).getByRole('button', { name: /Aprobar solicitud de salida/i })).toBeInTheDocument();
+  });
+
+  it('multirol: un integrante con varios roles y una solicitud pendiente produce UN solo par Aprobar/Rechazar', () => {
+    mockHook({
+      miembros: [
+        miembro({
+          idUsuario: 7,
+          nombre: 'Ana',
+          apellido: 'García',
+          grupo: 'ACTIVOS',
+          roles: [
+            { idRolProyecto: 1, nombreRol: 'Backend' },
+            { idRolProyecto: 2, nombreRol: 'QA' },
+          ],
+        }),
+      ],
+    });
+    mockPendingExitRequestsHook({ requests: [pendingExitRequest({ idUsuario: 7 })] });
+    renderPage();
+
+    const seccion = seccionPorTitulo(TITULO_ACTIVOS);
+    expect(within(seccion).getAllByRole('button', { name: /Aprobar solicitud de salida/i })).toHaveLength(1);
+    expect(within(seccion).getAllByRole('button', { name: /Rechazar solicitud de salida/i })).toHaveLength(1);
+    expect(within(seccion).getAllByText('Ana García')).toHaveLength(1);
+  });
+});
+
+describe('MiembrosProyectoPage — F14: loading/error local no afecta F12/F13', () => {
+  it('mientras carga el reader de solicitudes de salida, los tres grupos de F12 se renderizan igual (sin acciones falsas)', () => {
+    mockHook({ miembros: [miembro({ idUsuario: 7, grupo: 'ACTIVOS' })] });
+    mockPendingExitRequestsHook({ requests: [], isLoading: true });
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_ACTIVOS })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_RETIRADOS_CON_CONTRIBUCION })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_RETIRADOS_SIN_CONTRIBUCION })).toBeInTheDocument();
+    expect(screen.queryByText('Salida pendiente')).not.toBeInTheDocument();
+  });
+
+  it('un error del reader de solicitudes de salida no destruye F12 ni F13, y avisa con opción de reintentar', () => {
+    const refetchExitRequests = vi.fn();
+    mockHook({ miembros: [miembro({ idUsuario: 7, grupo: 'ACTIVOS' })] });
+    mockPendingExitRequestsHook({ isError: true, refetch: refetchExitRequests });
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_ACTIVOS })).toBeInTheDocument();
+    expect(screen.getByText('Postulaciones pendientes')).toBeInTheDocument();
+    expect(
+      screen.getByText('No fue posible verificar solicitudes de salida pendientes de los integrantes.'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(refetchExitRequests).toHaveBeenCalled();
+    // Ningún miembro muestra acciones potencialmente incorrectas mientras el reader falla.
+    expect(screen.queryByRole('button', { name: /Aprobar solicitud de salida/i })).not.toBeInTheDocument();
   });
 });
