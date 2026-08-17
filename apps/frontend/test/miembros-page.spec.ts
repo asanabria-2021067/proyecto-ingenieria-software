@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { LiderProyectoDTO, MiembroProyectoResumenDTO } from '../lib/dto/member.dto';
 
@@ -9,9 +9,17 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('../hooks/use-project-team', () => ({ useProjectTeam: vi.fn() }));
+vi.mock('../hooks/use-project-pending-postulations', () => ({
+  useProjectPendingPostulations: vi.fn(),
+  useResolvePostulacion: vi.fn(),
+}));
 
 import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';
 import { useProjectTeam } from '../hooks/use-project-team';
+import {
+  useProjectPendingPostulations,
+  useResolvePostulacion,
+} from '../hooks/use-project-pending-postulations';
 
 const LIDER: LiderProyectoDTO = {
   idUsuario: 1,
@@ -55,6 +63,28 @@ function mockHook(overrides: Partial<ReturnType<typeof useProjectTeam>> = {}) {
   });
 }
 
+/**
+ * F13 vive en `PendingPostulationsCard`, montada dentro de esta página pero
+ * con su propia query — se mockea aquí para que los tests de F12 (que no
+ * conocen postulaciones) sigan aislados de esa pieza.
+ */
+function mockPendingPostulationsHook(overrides: Partial<ReturnType<typeof useProjectPendingPostulations>> = {}) {
+  (useProjectPendingPostulations as any).mockReturnValue({
+    postulaciones: [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    ...overrides,
+  });
+  (useResolvePostulacion as any).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+    variables: undefined,
+  });
+}
+
 function renderPage() {
   return render(createElement(MiembrosProyectoPage));
 }
@@ -63,6 +93,10 @@ function seccionPorTitulo(titulo: string): HTMLElement {
   const heading = screen.getByRole('heading', { level: 2, name: titulo });
   return heading.closest('section') as HTMLElement;
 }
+
+beforeEach(() => {
+  mockPendingPostulationsHook();
+});
 
 afterEach(() => {
   cleanup();
@@ -255,14 +289,43 @@ describe('MiembrosProyectoPage — empty states independientes', () => {
   });
 });
 
-describe('MiembrosProyectoPage — fuera de alcance (F13/F14)', () => {
-  it('no muestra la tarjeta de Postulaciones pendientes (F13)', () => {
+describe('MiembrosProyectoPage — F13 integrada, F12 intacta', () => {
+  it('muestra la tarjeta "Postulaciones pendientes" junto con las tres secciones de F12', () => {
     mockHook({ miembros: [miembro({ idUsuario: 7 })] });
+    mockPendingPostulationsHook({ postulaciones: [] });
     renderPage();
 
-    expect(screen.queryByText(/POSTULACIONES PENDIENTES/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Aceptar/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Rechazar postulación/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Postulaciones pendientes')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_ACTIVOS })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_RETIRADOS_CON_CONTRIBUCION })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_RETIRADOS_SIN_CONTRIBUCION })).toBeInTheDocument();
+  });
+
+  it('con postulaciones pendientes presentes, las tres secciones de F12 se siguen renderizando', () => {
+    mockHook({
+      miembros: [
+        miembro({ idUsuario: 1, grupo: 'ACTIVOS' }),
+        miembro({ idUsuario: 2, grupo: 'RETIRADOS_CON_CONTRIBUCION' }),
+        miembro({ idUsuario: 3, grupo: 'RETIRADOS_SIN_CONTRIBUCION' }),
+      ],
+    });
+    mockPendingPostulationsHook({
+      postulaciones: [
+        {
+          idPostulacion: 1,
+          justificacion: 'Quiero contribuir con backend.',
+          estadoPostulacion: 'PENDIENTE',
+          fechaPostulacion: '2026-01-05T00:00:00.000Z',
+          postulante: { idUsuario: 50, nombre: 'Diego', apellido: 'Solís', correo: 'diego@uvg.edu.gt' },
+          rolProyecto: { idRolProyecto: 9, nombreRol: 'Backend' },
+        } as any,
+      ],
+    });
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_ACTIVOS })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_RETIRADOS_CON_CONTRIBUCION })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: TITULO_RETIRADOS_SIN_CONTRIBUCION })).toBeInTheDocument();
   });
 
   it('no muestra acciones de resolución de salida (F14)', () => {
