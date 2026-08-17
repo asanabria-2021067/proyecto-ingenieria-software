@@ -6,24 +6,26 @@ const SCALE_LEVELS = [0.875, 1.0, 1.125, 1.25];
 const STORAGE_KEY = 'uvg-collab-font-scale';
 const DEFAULT_INDEX = 1;
 
+function readStoredIndex(): number {
+  if (typeof window === 'undefined') return DEFAULT_INDEX;
+  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const parsed = stored !== null ? Number(stored) : DEFAULT_INDEX;
+  return SCALE_LEVELS[parsed] !== undefined ? parsed : DEFAULT_INDEX;
+}
+
 function applyFontScale(index: number) {
   document.documentElement.style.fontSize = `${SCALE_LEVELS[index] * 100}%`;
 }
 
 export function FontScaleToggle() {
-  const [levelIndex, setLevelIndex] = useState(DEFAULT_INDEX);
+  const [levelIndex, setLevelIndex] = useState(readStoredIndex);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = stored !== null ? Number(stored) : DEFAULT_INDEX;
-    const index = SCALE_LEVELS[parsed] !== undefined ? parsed : DEFAULT_INDEX;
-    setLevelIndex(index);
-    applyFontScale(index);
-  }, []);
+    applyFontScale(levelIndex);
+  }, [levelIndex]);
 
   const changeLevel = (index: number) => {
     setLevelIndex(index);
-    applyFontScale(index);
     window.localStorage.setItem(STORAGE_KEY, String(index));
   };
 
