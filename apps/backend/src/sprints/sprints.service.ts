@@ -433,9 +433,20 @@ export class SprintsService {
    * en absoluto — los valores de A7 (horasCalculadas/horasAprobadas/
    * justificacionAjuste) permanecen exactamente como estaban, porque
    * closeSprint jamás los toca.
+   *
+   * A9.1: tras el `await` de `$transaction` (nunca dentro), emite
+   * `SPRINT_CLOSED` vía `notificationsService.notifySprintClosed` — mismo
+   * patrón exacto que `finalizeSprint` con `notifySprintFinalizationStarted`
+   * (side effect post-commit, nunca dentro de la transacción de negocio).
+   * Si la transacción lanza (Sprint ya no estaba EN_FINALIZACION, carrera
+   * perdida, etc.), el `return` nunca se alcanza y el evento nunca se
+   * emite — un cliente jamás recibe la señal de un cierre que en realidad
+   * fue rollback. A9.1 no persiste ninguna `Notificacion` (igual que A4):
+   * es una señal técnica realtime para que F6 invalide/oculte el banner de
+   * bloqueo, no un mensaje de bandeja.
    */
   async closeSprint(projectId: number, sprintId: number, userId: number) {
-    return this.prisma.$transaction(async (tx) => {
+    const sprintCerrado = await this.prisma.$transaction(async (tx) => {
       const sprint = await this.sprintsAuthorization.assertCanCloseSprint(
         projectId,
         sprintId,
@@ -475,6 +486,13 @@ export class SprintsService {
 
       return filaFinal;
     });
+
+    await this.notificationsService.notifySprintClosed(projectId, userId, {
+      projectId,
+      sprintId,
+    });
+
+    return sprintCerrado;
   }
 
   /**
@@ -495,21 +513,74 @@ export class SprintsService {
    * aislamiento por proyecto vive en el propio `where` de la consulta
    * (`idProyecto: projectId`), no en un filtro posterior en JavaScript.
    */
+  /**
+   * A10.1: agrega tareas/hitos/horas estimadas por Sprint del proyecto en
+   * una única consulta SQL (nunca una por Sprint) — presupuesto total de
+   * `listSprints` queda en 2 queries, independiente de cuántos Sprints tenga
+   * el proyecto. Mismo universo de tareas que `getSprintDetail` (A10):
+   * `idProyecto = projectId AND eliminadoEn IS NULL`, nunca un filtro
+   * distinto inventado solo para este agregado.
+   *
+   * `tareas` = COUNT(*) de esas tareas (identidad de Tarea, coherente con
+   * `tareasRealizadas` de A8 que también cuenta `Tarea` distinta).
+   * `hitos` = COUNT(DISTINCT id_hito), excluyendo NULL automáticamente
+   * (COUNT(DISTINCT col) de Postgres nunca cuenta NULL) — una tarea sin
+   * hito no aporta, y varias tareas del mismo hito cuentan una sola vez.
+   * `horasEstimadas` = SUM(tiempo_estimado_horas), nunca horasReales/
+   * horasCalculadas/horasAprobadas (eso es reconocimiento de A5/A7, un
+   * dominio completamente distinto que esta métrica no toca).
+   *
+   * Un Sprint sin tareas no aparece en el resultado de la consulta
+   * agregada (no hay fila que agrupar); se completa con 0/0/0 al fusionar
+   * en JavaScript, nunca se omite el Sprint de la lista final.
+   */
+  private async getSprintAggregatesByProject(
+    projectId: number,
+  ): Promise<Map<number, { tareas: number; hitos: number; horasEstimadas: number }>> {
+    const filas = await this.prisma.$queryRaw<
+      { idSprint: number; tareas: number; hitos: number; horasEstimadas: number }[]
+    >(Prisma.sql`
+      SELECT
+        id_sprint AS "idSprint",
+        COUNT(*)::int AS "tareas",
+        COUNT(DISTINCT id_hito)::int AS "hitos",
+        COALESCE(SUM(tiempo_estimado_horas), 0)::float8 AS "horasEstimadas"
+      FROM tarea
+      WHERE id_proyecto = ${projectId} AND eliminado_en IS NULL
+      GROUP BY id_sprint
+    `);
+
+    return new Map(filas.map((fila) => [fila.idSprint, fila]));
+  }
+
   async listSprints(projectId: number, userId: number): Promise<SprintListItemDto[]> {
     await this.sprintsAuthorization.assertCanListSprintHistory(projectId, userId);
 
-    return this.prisma.sprint.findMany({
-      where: { idProyecto: projectId },
-      orderBy: { numero: 'desc' },
-      select: {
-        idSprint: true,
-        idProyecto: true,
-        numero: true,
-        estado: true,
-        fechaInicio: true,
-        fechaFinalizacionIniciada: true,
-        fechaCierre: true,
-      },
+    const [sprints, agregadosPorSprint] = await Promise.all([
+      this.prisma.sprint.findMany({
+        where: { idProyecto: projectId },
+        orderBy: { numero: 'desc' },
+        select: {
+          idSprint: true,
+          idProyecto: true,
+          numero: true,
+          estado: true,
+          fechaInicio: true,
+          fechaFinalizacionIniciada: true,
+          fechaCierre: true,
+        },
+      }),
+      this.getSprintAggregatesByProject(projectId),
+    ]);
+
+    return sprints.map((sprint) => {
+      const agregados = agregadosPorSprint.get(sprint.idSprint);
+      return {
+        ...sprint,
+        tareas: agregados?.tareas ?? 0,
+        hitos: agregados?.hitos ?? 0,
+        horasEstimadas: agregados?.horasEstimadas ?? 0,
+      };
     });
   }
 

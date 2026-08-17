@@ -127,9 +127,16 @@ describeIntegration(
         estadoTarea: 'HECHO',
       });
       // Ambas tareas de A apuntan al MISMO Hito — demuestra que
-      // SprintDetail.hitos no lo duplica.
-      await prisma.tarea.update({ where: { idTarea: taskA1.idTarea }, data: { idHito: hitoA.idHito } });
-      await prisma.tarea.update({ where: { idTarea: taskA2.idTarea }, data: { idHito: hitoA.idHito } });
+      // SprintDetail.hitos no lo duplica, y que A10.1 (listSprints.hitos)
+      // tampoco: COUNT(DISTINCT idHito) debe dar 1, no 2.
+      await prisma.tarea.update({
+        where: { idTarea: taskA1.idTarea },
+        data: { idHito: hitoA.idHito, tiempoEstimadoHoras: 6 },
+      });
+      await prisma.tarea.update({
+        where: { idTarea: taskA2.idTarea },
+        data: { idHito: hitoA.idHito, tiempoEstimadoHoras: 4 },
+      });
 
       const taskB = await createIntegrationTask(prisma, projectB.idProyecto, leader.idUsuario, sprintB.idSprint, {
         tituloTarea: 'TASK-B-SECRET',
@@ -168,6 +175,26 @@ describeIntegration(
       const entradaA = lista.find((s) => s.idSprint === fx.sprintA.idSprint)!;
       expect(entradaA.estado).toBe('CERRADO');
       expect(entradaA.fechaCierre).not.toBeNull();
+
+      // A10.1: 2 tareas, ambas sobre el MISMO Hito (COUNT DISTINCT -> 1,
+      // nunca 2), horas estimadas = 6 + 4 = 10. Nunca contamina con B.
+      expect(entradaA.tareas).toBe(2);
+      expect(entradaA.hitos).toBe(1);
+      expect(entradaA.horasEstimadas).toBe(10);
+    });
+
+    it('Lista B: agregados A10.1 exclusivos de B (1 tarea, 1 hito, sin las horas/tareas de A)', async () => {
+      const fx = await buildFixture();
+
+      const lista = await service.listSprints(fx.projectB.idProyecto, fx.leader.idUsuario);
+
+      const entradaB = lista.find((s) => s.idSprint === fx.sprintB.idSprint)!;
+      expect(entradaB.tareas).toBe(1);
+      expect(entradaB.hitos).toBe(1);
+      // TASK-B-SECRET no tiene tiempoEstimadoHoras seteado en el fixture -> 0.
+      expect(entradaB.horasEstimadas).toBe(0);
+      expect(entradaB.tareas).not.toBe(2);
+      expect(entradaB.horasEstimadas).not.toBe(10);
     });
 
     it('Detalle A: reconstruye tareas/asignaciones/comentarios/Hito de A y NUNCA expone datos de B', async () => {
