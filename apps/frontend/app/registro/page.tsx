@@ -292,6 +292,7 @@ export default function RegistroPage() {
                 <div className="space-y-1.5 md:col-span-2">
                   <label className={labelClass}>Carrera</label>
                   <select
+                    data-testid="registro-carrera-select"
                     required
                     value={idCarrera}
                     onChange={(e) => {
