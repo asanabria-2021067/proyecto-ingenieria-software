@@ -9,11 +9,13 @@ import {
   createIntegrationParticipation,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
-import { ProjectsService } from '../../src/projects/projects.service';
+import { ExitRequestsAuthorizationService } from '../../src/exit-requests/exit-requests.authorization.service';
+import { ExitRequestsContextService } from '../../src/exit-requests/exit-requests.context.service';
+import { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
 
 /**
  * Integración real T-111 (Tarea 7): concurrencia real de
- * ProjectsService.createSolicitudSalida contra el índice único parcial
+ * ExitRequestsService.createSolicitudSalida contra el índice único parcial
  * `solicitud_salida_proyecto_pendiente_unique` (Tarea 5, migración
  * 20260811035302_add_solicitud_salida_proyecto) — algo que un mock de Prisma
  * no puede demostrar por sí solo, ya que el precheck de findFirst en la
@@ -28,19 +30,24 @@ import { ProjectsService } from '../../src/projects/projects.service';
  * "CONCURRENCIA".
  */
 const fakeNotifications = { isAdmin: async () => false } as any;
-const fakeCacheManager = {} as any;
 
 describeIntegration(
-  'ProjectsService.createSolicitudSalida — concurrencia real contra solicitud_salida_proyecto_pendiente_unique',
+  'ExitRequestsService.createSolicitudSalida — concurrencia real contra solicitud_salida_proyecto_pendiente_unique',
   () => {
     let prisma: PrismaClient;
-    let service: ProjectsService;
+    let service: ExitRequestsService;
     let scope: IntegrationCleanupScope;
     let solicitudIds: number[];
 
     beforeAll(async () => {
       prisma = createIntegrationPrismaClient();
-      service = new ProjectsService(prisma as any, fakeNotifications, fakeCacheManager);
+      const context = new ExitRequestsContextService(prisma as any);
+      service = new ExitRequestsService(
+        prisma as any,
+        fakeNotifications as any,
+        new ExitRequestsAuthorizationService(context),
+        context,
+      );
       await prisma.$connect();
     });
 
@@ -71,7 +78,7 @@ describeIntegration(
       await cleanupIntegrationFixtures(prisma, scope);
     });
 
-    it('dos solicitudes concurrentes para el mismo (idProyecto, idUsuario) nunca dejan dos PENDIENTE: una se cumple, la otra recibe ConflictException', async () => {
+    it('dos solicitudes concurrentes para el mismo (idProyecto, idUsuario) nunca dejan dos PREPARACION: una se cumple, la otra recibe ConflictException', async () => {
       const leader = await createIntegrationUser(prisma);
       const member = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, member.idUsuario];
@@ -82,8 +89,8 @@ describeIntegration(
       const role = await createIntegrationProjectRole(prisma, project.idProyecto);
       scope.roleIds = [role.idRolProyecto];
 
-      // Participación ACTIVO del miembro; sin AsignacionTarea vigente ni
-      // SolicitudSalidaProyecto PENDIENTE previa (precondición de la carrera).
+      // Participación ACTIVO del miembro; sin SolicitudSalidaProyecto abierta
+      // previa (precondición de la carrera).
       const participation = await createIntegrationParticipation(
         prisma,
         member.idUsuario,
@@ -112,19 +119,19 @@ describeIntegration(
       });
       solicitudIds = creadas.map((s) => s.idSolicitud);
 
-      const pendientes = creadas.filter((s) => s.estadoSolicitud === 'PENDIENTE');
-      expect(pendientes).toHaveLength(1);
+      const enPreparacion = creadas.filter((s) => s.estadoSolicitud === 'PREPARACION');
+      expect(enPreparacion).toHaveLength(1);
 
       // Doble verificación vía COUNT con exactamente la misma condición que
-      // protege el índice parcial real (id_proyecto, id_usuario, PENDIENTE).
-      const conteoPendientes = await prisma.solicitudSalidaProyecto.count({
+      // protege el índice parcial real para el estado abierto PREPARACION.
+      const conteoPreparacion = await prisma.solicitudSalidaProyecto.count({
         where: {
           idProyecto: project.idProyecto,
           idUsuario: member.idUsuario,
-          estadoSolicitud: 'PENDIENTE',
+          estadoSolicitud: 'PREPARACION',
         },
       });
-      expect(conteoPendientes).toBe(1);
+      expect(conteoPreparacion).toBe(1);
     });
   },
 );

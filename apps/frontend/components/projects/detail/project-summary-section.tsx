@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Tag } from 'lucide-react';
+import { Lock, Tag } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Breadcrumb,
@@ -11,6 +11,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
@@ -19,6 +20,15 @@ import {
 } from '@/components/projects/available-project-card';
 import { MODALIDAD_LABEL } from '@/types';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
+
+/**
+ * F16 — mensaje contractual de A11 (`ProjectsService.assertNoOperableSprint`,
+ * apps/backend/src/projects/projects.service.ts): un Sprint ACTIVO o
+ * EN_FINALIZACION bloquea `requestClose`. El texto se repite aquí
+ * literalmente, no se importa del backend.
+ */
+const SPRINT_OPERABLE_BLOCK_MSG =
+  'Debes cerrar el Sprint actual antes de solicitar el cierre del proyecto';
 
 const MIS_PROYECTOS_HREF = '/dashboard/projects/mine';
 
@@ -34,6 +44,12 @@ interface ProjectSummarySectionProps {
   isAdmin: boolean;
   puedeVerKanban: boolean;
   children?: ReactNode;
+  /** F16 — único entry point de "Solicitar cierre del proyecto" (A11). */
+  mostrarSolicitarCierre?: boolean;
+  solicitandoCierre?: boolean;
+  /** true cuando existe un Sprint ACTIVO/EN_FINALIZACION — bloquea únicamente por esta razón (A11). */
+  cierreBloqueadoPorSprint?: boolean;
+  onSolicitarCierre?: () => void;
 }
 
 export function ProjectSummarySection({
@@ -42,6 +58,10 @@ export function ProjectSummarySection({
   isAdmin,
   puedeVerKanban,
   children,
+  mostrarSolicitarCierre = false,
+  solicitandoCierre = false,
+  cierreBloqueadoPorSprint = false,
+  onSolicitarCierre,
 }: ProjectSummarySectionProps) {
   return (
     <>
@@ -131,11 +151,41 @@ export function ProjectSummarySection({
 
               {/* Para líder/participante estas acciones ahora viven en la barra de
                   tabs debajo del breadcrumb; aquí solo queda la única acción de
-                  quien todavía no participa. */}
+                  quien todavía no participa, más el disparador de cierre (F16). */}
               {!isLeader && !puedeVerKanban && !isAdmin && (
                 <Button className="shrink-0 rounded-md bg-primary px-5 text-sm font-bold text-on-primary hover:bg-primary/90">
                   Postularme
                 </Button>
+              )}
+
+              {mostrarSolicitarCierre && (
+                cierreBloqueadoPorSprint ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      {/* span envuelve el botón deshabilitado para que el tooltip reciba foco/hover (mismo patrón que role-admin-card.tsx) */}
+                      <span tabIndex={0} aria-label={SPRINT_OPERABLE_BLOCK_MSG} className="shrink-0">
+                        <Button
+                          type="button"
+                          disabled
+                          className="pointer-events-none w-full gap-1.5 rounded-md border border-outline-variant bg-surface-container-high px-5 text-sm font-bold text-on-surface-variant"
+                        >
+                          <Lock className="size-4" aria-hidden="true" />
+                          Solicitar cierre del proyecto
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{SPRINT_OPERABLE_BLOCK_MSG}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={onSolicitarCierre}
+                    disabled={solicitandoCierre}
+                    className="shrink-0 rounded-md bg-primary px-5 text-sm font-bold text-on-primary hover:bg-primary/90"
+                  >
+                    Solicitar cierre del proyecto
+                  </Button>
+                )
               )}
             </div>
           </div>

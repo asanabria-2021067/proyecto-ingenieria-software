@@ -32,7 +32,7 @@ export interface CreatePostulacionPayload {
 }
 
 export interface UpdateEstadoPostulacionPayload {
-  nuevoEstado: 'ACEPTADA' | 'RECHAZADA';
+  estadoPostulacion: 'ACEPTADA' | 'RECHAZADA';
   comentarioResolucion?: string;
 }
 

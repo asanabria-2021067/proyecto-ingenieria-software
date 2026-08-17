@@ -19,9 +19,19 @@ import { TasksService } from '../src/tasks/tasks.service';
 
 function makeTx() {
   return {
-    tarea: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn() },
+    // A12.1: findMany se usa exclusivamente por syncHitoEstado cuando la
+    // tarea creada/eliminada tiene idHito != null. Por defecto [] para no
+    // romper los tests preexistentes (idHito: null en las fixtures de
+    // este archivo).
+    tarea: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     asignacionTarea: { create: vi.fn(), updateMany: vi.fn() },
     tareaEtiqueta: { createMany: vi.fn(), deleteMany: vi.fn() },
+    // Por defecto el proyecto tiene un Sprint ACTIVO (FND-03.B): irrelevante
+    // para estos tests de notificaciones, que no ejercitan ese rechazo.
+    sprint: { findFirst: vi.fn().mockResolvedValue({ idSprint: 1 }) },
+    // A12.1: presente únicamente si algún test futuro crea/elimina una
+    // tarea con idHito != null; ausente (undefined) en el resto.
+    hito: undefined as { update: ReturnType<typeof vi.fn> } | undefined,
   };
 }
 
@@ -565,6 +575,7 @@ describe('TasksService — notificaciones de soft delete (Tarea 34)', () => {
         idProyecto: PROJECT_ID,
         tituloTarea: 'Tarea de prueba',
         idRolProyecto: null,
+        idHito: null,
         ...opts.tareaAutorizada,
       }),
     } as any;

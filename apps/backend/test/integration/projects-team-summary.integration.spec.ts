@@ -6,11 +6,12 @@ import {
   createIntegrationProject,
   createIntegrationProjectRole,
   createIntegrationParticipation,
+  createIntegrationSprint,
   createIntegrationTask,
   createIntegrationTaskAssignment,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
-import { ProjectsService } from '../../src/projects/projects.service';
+import { TeamService } from '../../src/team/team.service';
 
 /**
  * Integración real T-106 (Tarea 4) contra PostgreSQL: getTeamSummary
@@ -25,18 +26,15 @@ import { ProjectsService } from '../../src/projects/projects.service';
  * DISTINTOS del mismo usuario en el mismo proyecto sí pueden estar ambos
  * ACTIVO simultáneamente — para construir el escenario multi-rol real.
  */
-const fakeNotifications = { isAdmin: async () => false } as any;
-const fakeCacheManager = {} as any;
-
-describeIntegration('ProjectsService.getTeamSummary — integración PostgreSQL real', () => {
+describeIntegration('TeamService.getTeamSummary — integración PostgreSQL real', () => {
   let prisma: PrismaClient;
-  let service: ProjectsService;
+  let service: TeamService;
   let scope: IntegrationCleanupScope;
   let horasParticipacionIds: number[];
 
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
-    service = new ProjectsService(prisma as any, fakeNotifications, fakeCacheManager);
+    service = new TeamService(prisma as any, { findAll: async () => [] } as any, { getPendingLeaderReviews: async () => [] } as any);
     await prisma.$connect();
   });
 
@@ -138,10 +136,14 @@ describeIntegration('ProjectsService.getTeamSummary — integración PostgreSQL 
     });
     scope.participationIds = [participacionA.idParticipacion, participacionB.idParticipacion];
 
-    const taskA = await createIntegrationTask(prisma, projectA.idProyecto, leaderA.idUsuario, {
+    const sprintA = await createIntegrationSprint(prisma, projectA.idProyecto);
+    const sprintB = await createIntegrationSprint(prisma, projectB.idProyecto);
+    scope.sprintIds = [sprintA.idSprint, sprintB.idSprint];
+
+    const taskA = await createIntegrationTask(prisma, projectA.idProyecto, leaderA.idUsuario, sprintA.idSprint, {
       estadoTarea: 'HECHO',
     });
-    const taskB = await createIntegrationTask(prisma, projectB.idProyecto, leaderB.idUsuario, {
+    const taskB = await createIntegrationTask(prisma, projectB.idProyecto, leaderB.idUsuario, sprintB.idSprint, {
       estadoTarea: 'HECHO',
     });
     scope.taskIds = [taskA.idTarea, taskB.idTarea];
