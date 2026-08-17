@@ -37,7 +37,7 @@ export interface MiembroProyecto {
 /**
  * Rol que un integrante ocupa dentro del proyecto, tal como se agrupa dentro
  * de `MiembroProyectoResumenDTO.roles`. Espejo exacto de
- * `TeamSummaryRoleDto` (apps/backend/src/projects/dto/team-summary-member.dto.ts):
+ * `TeamSummaryRoleDto` (apps/backend/src/team/dto/team-summary-member.dto.ts):
  * no lleva `idParticipacion` ni `estadoParticipacion` propios — esos viven a
  * nivel de integrante, no de rol individual.
  */
@@ -47,10 +47,21 @@ export interface RolMiembroProyectoDTO {
 }
 
 /**
+ * Clasificación person-centric server-authoritative de B12. Espejo exacto de
+ * `TeamMemberGroup` (apps/backend/src/team/dto/team-summary-member.dto.ts):
+ * el frontend solo presenta este valor, nunca lo recalcula a partir de
+ * `estadoParticipacion`/`horasReconocidas`/tareas.
+ */
+export type GrupoMiembroProyecto =
+  | 'ACTIVOS'
+  | 'RETIRADOS_CON_CONTRIBUCION'
+  | 'RETIRADOS_SIN_CONTRIBUCION';
+
+/**
  * Contrato canónico person-centric de integrante: "miembro = usuario dentro
  * del proyecto", NO "una fila de `ParticipacionProyecto`". Espejo exacto de
  * `TeamSummaryMemberDto`, la respuesta real de
- * `GET /proyectos/:id/miembros/resumen` (T-106).
+ * `GET /proyectos/:id/miembros/resumen` (T-106/B12).
  *
  * El integrante se identifica por `idUsuario`; sus roles se agrupan en
  * `roles[]` en vez de repetir a la persona una vez por rol.
@@ -67,6 +78,7 @@ export interface MiembroProyectoResumenDTO {
   fotoUrl: string | null;
   roles: RolMiembroProyectoDTO[];
   estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
+  grupo: GrupoMiembroProyecto;
   tareasActivas: number;
   tareasCompletadas: number;
   horasReconocidas: number;
