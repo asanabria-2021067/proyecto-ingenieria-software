@@ -12,6 +12,7 @@
  */
 
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
+import type { EstadoSprint } from '@/lib/types/sprints';
 
 export interface UsuarioDetalleIntegranteDTO {
   idUsuario: number;
@@ -36,6 +37,8 @@ export interface ParticipacionIntegranteDTO {
 
 export interface TareaHistorialIntegranteDTO {
   idTarea: number;
+  /** Sprint al que pertenece la tarea (B14) — toda tarea tiene exactamente un Sprint (idSprint no nulo en el modelo). */
+  idSprint: number;
   tituloTarea: string;
   estadoTarea: EstadoTarea;
   prioridad: Prioridad;
@@ -48,8 +51,50 @@ export interface TareaHistorialIntegranteDTO {
   desasignadaEn: string | null;
 }
 
+export type EstadoRegistroHoras = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+
+/**
+ * Un registro individual de `HorasParticipacion` dentro de un Sprint (B14).
+ * No se usa hoy en la UI de F15 (que solo consume los agregados
+ * `horasCalculadas`/`horasAprobadas` del grupo), pero se tipa igual para que
+ * el contrato refleje exactamente lo que retorna el backend.
+ */
+export interface RegistroHorasSprintDTO {
+  idRegistroHoras: number;
+  idParticipacion: number;
+  estadoHoras: EstadoRegistroHoras;
+  horasCalculadas: number | null;
+  horasAprobadas: number | null;
+}
+
+/**
+ * Un grupo de historial por Sprint (B14 — `TeamService.findTeamMemberDetail`,
+ * campo `sprints`). `horasAprobadas` es la suma de `horasParticipacion`
+ * ya APROBADAS de ese Sprint (horas "reconocidas"): un concepto distinto e
+ * independiente de `TareaHistorialIntegranteDTO.horasReales`, que es horas
+ * reales trabajadas por tarea. No derivar uno del otro.
+ *
+ * `tareas` aquí es el mismo objeto de tarea que aparece en el `tareas` plano
+ * de `DetalleIntegranteProyectoDTO`, ya particionado por Sprint por el
+ * backend — nunca reconstruir esta partición en el frontend.
+ */
+export interface HistorialSprintIntegranteDTO {
+  idSprint: number;
+  numero: number;
+  estado: EstadoSprint;
+  fechaInicio: string;
+  fechaFinalizacionIniciada: string | null;
+  fechaCierre: string | null;
+  horasCalculadas: number;
+  horasAprobadas: number;
+  tareas: TareaHistorialIntegranteDTO[];
+  registrosHoras: RegistroHorasSprintDTO[];
+}
+
 export interface DetalleIntegranteProyectoDTO {
   usuario: UsuarioDetalleIntegranteDTO;
   participaciones: ParticipacionIntegranteDTO[];
   tareas: TareaHistorialIntegranteDTO[];
+  /** Historial agrupado por Sprint (B14) — orden ascendente por `numero`, no garantizado descendente. */
+  sprints: HistorialSprintIntegranteDTO[];
 }
