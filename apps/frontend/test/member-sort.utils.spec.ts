@@ -11,6 +11,7 @@ function miembro(overrides: Partial<MiembroProyectoResumenDTO> = {}): MiembroPro
     fotoUrl: null,
     roles: [{ idRolProyecto: 1, nombreRol: 'Backend' }],
     estadoParticipacion: 'ACTIVO',
+    grupo: 'ACTIVOS',
     tareasActivas: 0,
     tareasCompletadas: 0,
     horasReconocidas: 0,

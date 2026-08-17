@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Clock,
   ListTodo,
+  UserCheck,
+  UserMinus,
   Users,
 } from 'lucide-react';
 import { useProjectTeam } from '@/hooks/use-project-team';
@@ -41,7 +43,7 @@ import {
   sumarTareasCompletadas,
   sumarHorasReconocidas,
 } from '@/components/projects/team-metrics.utils';
-import type { MiembroProyectoResumenDTO } from '@/lib/dto/member.dto';
+import type { GrupoMiembroProyecto, MiembroProyectoResumenDTO } from '@/lib/dto/member.dto';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'nombre', label: 'Integrante' },
@@ -208,13 +210,106 @@ function MiembroRow({ miembro, idProyecto }: { miembro: MiembroProyectoResumenDT
   );
 }
 
+/**
+ * Una de las tres secciones fijas de HU-123/B12 (Miembros activos / Retirados
+ * con contribución / Retirados sin contribución). `miembros` ya viene
+ * filtrado y ordenado por el padre según `grupo` — server-authoritative, esta
+ * sección solo presenta, nunca reclasifica.
+ */
+function MembersGroupSection({
+  groupId,
+  icon: Icon,
+  title,
+  description,
+  emptyTitle,
+  emptyDescription,
+  miembros,
+  idProyecto,
+  sortKey,
+  sortDirection,
+  onSort,
+}: {
+  groupId: string;
+  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  title: string;
+  description: string;
+  emptyTitle: string;
+  emptyDescription: string;
+  miembros: MiembroProyectoResumenDTO[];
+  idProyecto: number;
+  sortKey: MiembroSortKey;
+  sortDirection: SortDirection;
+  onSort: (key: MiembroSortKey) => void;
+}) {
+  const headingId = `${groupId}-heading`;
+
+  return (
+    <section aria-labelledby={headingId}>
+      <div className="flex items-center gap-2 mb-1">
+        <Icon aria-hidden className="w-5 h-5 text-primary" />
+        <h2 id={headingId} className="font-headline font-extrabold text-xl text-on-surface">
+          {title}
+        </h2>
+      </div>
+      <p className="text-tertiary text-sm mb-4">{description}</p>
+
+      {miembros.length === 0 ? (
+        <Empty tone="muted" role="status">
+          <EmptyMedia variant="icon">
+            <Icon aria-hidden className="h-7 w-7" />
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle>{emptyTitle}</EmptyTitle>
+            <EmptyDescription>{emptyDescription}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
+                  {COLUMNAS_ORDENABLES.map((columna) => (
+                    <SortableHeader
+                      key={columna.key}
+                      columnKey={columna.key}
+                      label={columna.label}
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={onSort}
+                    />
+                  ))}
+                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap">
+                    Detalle
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {miembros.map((miembro) => (
+                  <MiembroRow key={miembro.idUsuario} miembro={miembro} idProyecto={idProyecto} />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function filtrarPorGrupo(
+  miembros: MiembroProyectoResumenDTO[],
+  grupo: GrupoMiembroProyecto,
+): MiembroProyectoResumenDTO[] {
+  return miembros.filter((miembro) => miembro.grupo === grupo);
+}
+
 export default function MiembrosProyectoPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
 
   const { lider, miembros, isLoading, isError, refetch } = useProjectTeam(idProyecto);
 
-  const integrantesActivos = miembros.length;
   const tareasActivas = useMemo(() => sumarTareasActivas(miembros), [miembros]);
   const tareasCompletadas = useMemo(() => sumarTareasCompletadas(miembros), [miembros]);
   const horasReconocidas = useMemo(() => sumarHorasReconocidas(miembros), [miembros]);
@@ -231,9 +326,30 @@ export default function MiembrosProyectoPage() {
     }
   }
 
-  const miembrosOrdenados = useMemo(
-    () => ordenarMiembros(miembros, sortKey, sortDirection),
-    [miembros, sortKey, sortDirection],
+  // B12 (`grupo` en TeamSummaryMemberDto) ya clasifica a cada integrante;
+  // esto solo filtra por el valor que el backend resolvió, nunca reconstruye
+  // el criterio (estadoParticipacion/horasReconocidas/tareas) en el cliente.
+  const activos = useMemo(() => filtrarPorGrupo(miembros, 'ACTIVOS'), [miembros]);
+  const retiradosConContribucion = useMemo(
+    () => filtrarPorGrupo(miembros, 'RETIRADOS_CON_CONTRIBUCION'),
+    [miembros],
+  );
+  const retiradosSinContribucion = useMemo(
+    () => filtrarPorGrupo(miembros, 'RETIRADOS_SIN_CONTRIBUCION'),
+    [miembros],
+  );
+
+  const activosOrdenados = useMemo(
+    () => ordenarMiembros(activos, sortKey, sortDirection),
+    [activos, sortKey, sortDirection],
+  );
+  const retiradosConContribucionOrdenados = useMemo(
+    () => ordenarMiembros(retiradosConContribucion, sortKey, sortDirection),
+    [retiradosConContribucion, sortKey, sortDirection],
+  );
+  const retiradosSinContribucionOrdenados = useMemo(
+    () => ordenarMiembros(retiradosSinContribucion, sortKey, sortDirection),
+    [retiradosSinContribucion, sortKey, sortDirection],
   );
 
   return (
@@ -252,7 +368,7 @@ export default function MiembrosProyectoPage() {
           <h1 className="font-headline font-extrabold text-3xl text-on-surface">Miembros</h1>
         </div>
         <p className="text-tertiary text-sm">
-          Integrantes activos del proyecto, sus roles y su carga de trabajo actual.
+          Integrantes del proyecto organizados por su estado y contribución.
         </p>
         {lider && (
           <p className="text-tertiary text-sm mt-1">
@@ -265,7 +381,7 @@ export default function MiembrosProyectoPage() {
         <MetricTile
           icon={Users}
           label="Integrantes activos"
-          value={String(integrantesActivos)}
+          value={String(activos.length)}
           isLoading={isLoading}
         />
         <MetricTile
@@ -306,33 +422,19 @@ export default function MiembrosProyectoPage() {
             </button>
           </EmptyContent>
         </Empty>
-      ) : !isLoading && miembros.length === 0 ? (
-        <Empty tone="muted" role="status">
-          <EmptyMedia variant="icon">
-            <Users aria-hidden="true" className="h-7 w-7" />
-          </EmptyMedia>
-          <EmptyHeader>
-            <EmptyTitle>Aún no hay integrantes en este proyecto.</EmptyTitle>
-            <EmptyDescription>
-              Cuando alguien se una al equipo, aparecerá aquí junto con sus roles y su carga de trabajo.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
+      ) : isLoading ? (
         <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
                   {COLUMNAS_ORDENABLES.map((columna) => (
-                    <SortableHeader
+                    <TableHead
                       key={columna.key}
-                      columnKey={columna.key}
-                      label={columna.label}
-                      sortKey={sortKey}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                    />
+                      className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap"
+                    >
+                      {columna.label}
+                    </TableHead>
                   ))}
                   <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap">
                     Detalle
@@ -340,16 +442,52 @@ export default function MiembrosProyectoPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
-                  <SkeletonRows />
-                ) : (
-                  miembrosOrdenados.map((miembro) => (
-                    <MiembroRow key={miembro.idUsuario} miembro={miembro} idProyecto={idProyecto} />
-                  ))
-                )}
+                <SkeletonRows />
               </TableBody>
             </Table>
           </div>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          <MembersGroupSection
+            groupId="activos"
+            icon={Users}
+            title="Miembros activos"
+            description="Integrantes activos del proyecto, sus roles y su carga de trabajo actual."
+            emptyTitle="Aún no hay integrantes activos en este proyecto."
+            emptyDescription="Cuando alguien se una al equipo, aparecerá aquí junto con sus roles y su carga de trabajo."
+            miembros={activosOrdenados}
+            idProyecto={idProyecto}
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+          />
+          <MembersGroupSection
+            groupId="retirados-con-contribucion"
+            icon={UserCheck}
+            title="Retirados con contribución"
+            description="Integrantes que ya no están activos, pero que cuentan con contribución reconocida."
+            emptyTitle="Aún no hay integrantes retirados con contribución en este proyecto."
+            emptyDescription="Cuando un integrante retirado cuente con contribución reconocida, aparecerá aquí junto con sus roles y sus horas."
+            miembros={retiradosConContribucionOrdenados}
+            idProyecto={idProyecto}
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+          />
+          <MembersGroupSection
+            groupId="retirados-sin-contribucion"
+            icon={UserMinus}
+            title="Retirados sin contribución"
+            description="Integrantes que ya no están activos y no cuentan con contribución reconocida."
+            emptyTitle="Aún no hay integrantes retirados sin contribución en este proyecto."
+            emptyDescription="Cuando un integrante se retire sin contribución reconocida, aparecerá aquí."
+            miembros={retiradosSinContribucionOrdenados}
+            idProyecto={idProyecto}
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+          />
         </div>
       )}
     </div>
