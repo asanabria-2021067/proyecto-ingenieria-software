@@ -55,6 +55,39 @@ export class ExitRequestsService {
     }
   }
 
+  /**
+   * F11.1 — reader aditivo, pequeño y estable: la solicitud de salida
+   * ABIERTA (PREPARACION o PENDIENTE_LIDER) del actor en este proyecto, o
+   * `null` si no tiene ninguna. A diferencia de `getExitPreparationSummary`
+   * (B6, acoplado a PREPARACION y que lanza 400 para cualquier otro caso),
+   * este endpoint nunca lanza por "no hay solicitud abierta" — esa ausencia
+   * es un resultado de lectura válido (`{ solicitud: null }`), no un error.
+   * No amplía el significado de B6; es un endpoint nuevo y paralelo.
+   */
+  async getSolicitudSalidaAbierta(idProyecto: number, actorUserId: number) {
+    await this.context.getProjectOrThrow(idProyecto);
+
+    const solicitud = await this.prisma.solicitudSalidaProyecto.findFirst({
+      where: {
+        idProyecto,
+        idUsuario: actorUserId,
+        estadoSolicitud: {
+          in: [EstadoSolicitudSalida.PREPARACION, EstadoSolicitudSalida.PENDIENTE_LIDER],
+        },
+      },
+      select: {
+        idSolicitud: true,
+        idProyecto: true,
+        idUsuario: true,
+        motivo: true,
+        solicitadaEn: true,
+        estadoSolicitud: true,
+      },
+    });
+
+    return { solicitud };
+  }
+
   async getExitPreparationSummary(idProyecto: number, actorUserId: number) {
     await this.context.getProjectOrThrow(idProyecto);
 
