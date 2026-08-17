@@ -44,6 +44,7 @@ import {
   sumarHorasReconocidas,
 } from '@/components/projects/team-metrics.utils';
 import type { GrupoMiembroProyecto, MiembroProyectoResumenDTO } from '@/lib/dto/member.dto';
+import { PendingPostulationsCard } from '@/components/projects/pending-postulations-card';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'nombre', label: 'Integrante' },
@@ -362,19 +363,23 @@ export default function MiembrosProyectoPage() {
         Volver al proyecto
       </Link>
 
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-2">
-          <Users className="w-6 h-6 text-primary" />
-          <h1 className="font-headline font-extrabold text-3xl text-on-surface">Miembros</h1>
-        </div>
-        <p className="text-tertiary text-sm">
-          Integrantes del proyecto organizados por su estado y contribución.
-        </p>
-        {lider && (
-          <p className="text-tertiary text-sm mt-1">
-            Líder: <span className="font-medium text-on-surface">{lider.nombre} {lider.apellido}</span>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="w-6 h-6 text-primary" />
+            <h1 className="font-headline font-extrabold text-3xl text-on-surface">Miembros</h1>
+          </div>
+          <p className="text-tertiary text-sm">
+            Integrantes del proyecto organizados por su estado y contribución.
           </p>
-        )}
+          {lider && (
+            <p className="text-tertiary text-sm mt-1">
+              Líder: <span className="font-medium text-on-surface">{lider.nombre} {lider.apellido}</span>
+            </p>
+          )}
+        </div>
+
+        <PendingPostulationsCard idProyecto={idProyecto} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4">
