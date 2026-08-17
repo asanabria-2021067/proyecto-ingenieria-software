@@ -19,8 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Prisma exige que la variable exista para generar el cliente.
-  # No se conecta a ninguna base de datos real: las pruebas usan mocks.
+  # Apunta al servicio postgres del job backend (ver services: mas abajo).
+  # Mismas credenciales ci/ci/ci en ambos lados para no duplicar valores.
   DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
   DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
 
@@ -31,6 +31,20 @@ jobs:
     defaults:
       run:
         working-directory: apps/backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -48,12 +62,24 @@ jobs:
       - name: Generar cliente Prisma
         run: npx prisma generate
 
+      - name: Aplicar migraciones a la base de CI
+        run: npx prisma migrate deploy
+
       - name: Lint
         run: npm run lint
         continue-on-error: true
 
-      - name: Pruebas unitarias y de integracion (Vitest)
+      - name: Pruebas unitarias (Vitest)
         run: npm run test
+
+      - name: Pruebas de integracion con PostgreSQL real (Vitest, en serie)
+        run: npm run test:integration
+        env:
+          # Corren en serie (vitest.integration.config.ts) para no pisarse
+          # entre si contra la misma base: varias hacen TRUNCATE/limpieza.
+          ROLES_IT_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+          INTEGRATION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+          RUN_REAL_DB_TESTS: '1'
 
   frontend:
     name: Frontend - lint y pruebas
@@ -81,3 +107,4 @@ jobs:
 
       - name: Pruebas (Vitest)
         run: npm run test
+        
