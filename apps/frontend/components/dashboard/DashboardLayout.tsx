@@ -11,6 +11,7 @@ import {
   Briefcase,
   FileText,
   ListChecks,
+  Users,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
@@ -30,6 +31,7 @@ import { FontScaleToggle } from '@/components/font-scale-toggle';
 
 const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/personas', label: 'Personas', icon: Users },
   {
     type: 'group',
     label: 'Proyectos',
