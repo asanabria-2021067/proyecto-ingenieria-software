@@ -180,6 +180,15 @@ enum TipoNotificacion {
   ROL_ASIGNADO_LIDER
   ROL_ACTUALIZADO
   SOLICITUD_RECUPERACION_CONTRASENA
+  SOLICITUD_AMISTAD
+  AMISTAD_ACEPTADA
+  NUEVO_SEGUIDOR
+}
+
+enum EstadoAmistad {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
 }
 
 enum EstadoSolicitudRecuperacion {
@@ -244,8 +253,40 @@ model Usuario {
   solicitudesSalidaResueltas       SolicitudSalidaProyecto[]  @relation("SolicitudSalidaResolutor")
   sprintsCerrados                  Sprint[]
   registrosAvanceEscritos          RegistroAvanceAsignacion[]
+  amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
+  amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
+  siguiendo                        Seguimiento[]              @relation("Siguiendo")
+  seguidores                       Seguimiento[]              @relation("Seguidores")
 
   @@map("usuario")
+}
+
+model Amistad {
+  idAmistad            Int           @id @default(autoincrement()) @map("id_amistad")
+  idUsuarioSolicitante Int           @map("id_usuario_solicitante")
+  idUsuarioReceptor    Int           @map("id_usuario_receptor")
+  estado               EstadoAmistad @default(PENDIENTE)
+  fechaSolicitud       DateTime      @default(now()) @map("fecha_solicitud")
+  fechaResolucion      DateTime?     @map("fecha_resolucion")
+
+  solicitante Usuario @relation("AmistadesSolicitadas", fields: [idUsuarioSolicitante], references: [idUsuario])
+  receptor    Usuario @relation("AmistadesRecibidas", fields: [idUsuarioReceptor], references: [idUsuario])
+
+  @@unique([idUsuarioSolicitante, idUsuarioReceptor])
+  @@map("amistad")
+}
+
+model Seguimiento {
+  idSeguimiento Int      @id @default(autoincrement()) @map("id_seguimiento")
+  idSeguidor    Int      @map("id_seguidor")
+  idSeguido     Int      @map("id_seguido")
+  fechaCreacion DateTime @default(now()) @map("fecha_creacion")
+
+  seguidor Usuario @relation("Siguiendo", fields: [idSeguidor], references: [idUsuario])
+  seguido  Usuario @relation("Seguidores", fields: [idSeguido], references: [idUsuario])
+
+  @@unique([idSeguidor, idSeguido])
+  @@map("seguimiento")
 }
 
 model UsuarioTelefono {
