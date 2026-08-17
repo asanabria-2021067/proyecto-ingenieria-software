@@ -125,7 +125,7 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
     expect(screen.queryByRole('tab', { name: 'Tablero' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Por hacer' })).not.toBeInTheDocument();
 
-    expect(screen.getByRole('link', { name: /revisiones previas/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /revisiones pasadas/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/mine/42?returnTo=/dashboard/projects/42',
     );

@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import type { SprintDetailDto, SprintDetailTareaDto } from '../lib/types/sprints';
 
@@ -9,9 +9,25 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('../hooks/use-project-sprints', () => ({ useSprintDetail: vi.fn() }));
+vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 
 import SprintDetailPage from '../app/dashboard/proyectos/[id]/sprints/[sprintId]/page';
 import { useSprintDetail } from '../hooks/use-project-sprints';
+import { useProjectDetail } from '../hooks/use-project-detail';
+import { useCurrentUser } from '../hooks/use-current-user';
+
+// GET .../sprints/:sprintId es exclusivo del líder en backend
+// (assertCanViewSprintHistory) — F17.1 lo gatea también client-side. Todos
+// los tests de este archivo asumen el punto de vista del líder salvo que
+// digan lo contrario explícitamente (Sección "autorización").
+beforeEach(() => {
+  (useProjectDetail as any).mockReturnValue({
+    data: { idProyecto: 42, creador: { idUsuario: 1 } },
+    isLoading: false,
+  });
+  (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 }, isLoading: false });
+});
 
 function usuario(overrides: Partial<SprintDetailTareaDto['asignaciones'][number]['usuario']> = {}) {
   return {
@@ -388,5 +404,28 @@ describe('SprintDetailPage — subsecciones vacías', () => {
     expect(screen.getByText('Este Sprint no tiene tareas registradas.')).toBeInTheDocument();
     expect(screen.getByText('No hay participantes registrados para este Sprint.')).toBeInTheDocument();
     expect(screen.getByText('Este Sprint no tiene hitos asociados.')).toBeInTheDocument();
+  });
+});
+
+describe('SprintDetailPage — autorización', () => {
+  it('un no-líder ve el aviso "¡No eres líder!" en vez del detalle del Sprint', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 }, isLoading: false });
+    mockDetail();
+    renderPage();
+
+    expect(screen.getByText('¡No eres líder!')).toBeInTheDocument();
+    expect(screen.getByText('No puedes acceder al detalle de este Sprint.')).toBeInTheDocument();
+    expect(screen.queryByText('Sprint 7')).not.toBeInTheDocument();
+  });
+
+  it('un no-líder ve "Volver al proyecto" apuntando a /dashboard/proyectos (vista pública), no a /dashboard/projects (hub del líder)', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 }, isLoading: false });
+    mockDetail();
+    renderPage();
+
+    expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42',
+    );
   });
 });

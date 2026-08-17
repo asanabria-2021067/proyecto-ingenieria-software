@@ -392,7 +392,7 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link
-                href={`/dashboard/projects/${idProyecto}`}
+                href={`/dashboard/proyectos/${idProyecto}`}
                 className="max-w-[16rem] truncate text-tertiary hover:text-on-surface"
               >
                 {proyecto.tituloProyecto}
@@ -438,7 +438,7 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
               size="sm"
               className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
             >
-              <Link href={`/dashboard/projects/${idProyecto}`}>Volver al proyecto</Link>
+              <Link href={`/dashboard/proyectos/${idProyecto}`}>Volver al proyecto</Link>
             </Button>
           </div>
         </div>
