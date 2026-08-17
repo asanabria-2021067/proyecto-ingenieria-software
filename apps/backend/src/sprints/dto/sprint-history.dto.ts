@@ -1,10 +1,20 @@
 import { EstadoHito, EstadoSprint, EstadoTarea, Prioridad } from '@prisma/client';
 
 /**
- * Contrato de un elemento de `GET /proyectos/:projectId/sprints` (A10).
- * Metadata mínima suficiente para identificar el Sprint y navegar a su
- * detalle — deliberadamente NO incluye agregaciones de A8
- * (SprintClosingSummary) ni ninguna métrica calculada.
+ * Contrato de un elemento de `GET /proyectos/:projectId/sprints` (A10 +
+ * A10.1). Metadata suficiente para identificar el Sprint, navegar a su
+ * detalle, y presentar el resumen de F3 sin N+1 — sigue sin incluir
+ * agregaciones de A8 (SprintClosingSummary) ni datos pesados de F4
+ * (tareas/hitos/asignaciones/comentarios completos), solo los tres
+ * conteos/sumas necesarios para la tarjeta de lista.
+ *
+ * `tareas`/`hitos`/`horasEstimadas` (A10.1): agregados sobre el mismo
+ * universo de tareas que `getSprintDetail` (`idProyecto` + `eliminadoEn:
+ * null`) — ver `SprintsService.getSprintAggregatesByProject`. `hitos` es
+ * `COUNT(DISTINCT idHito)` (nunca cuenta un mismo Hito dos veces).
+ * `horasEstimadas` es `SUM(tiempoEstimadoHoras)`, nunca horas
+ * reales/calculadas/aprobadas (eso es reconocimiento de A5/A7, no
+ * estimación).
  */
 export interface SprintListItemDto {
   idSprint: number;
@@ -14,6 +24,9 @@ export interface SprintListItemDto {
   fechaInicio: Date;
   fechaFinalizacionIniciada: Date | null;
   fechaCierre: Date | null;
+  tareas: number;
+  hitos: number;
+  horasEstimadas: number;
 }
 
 /**
