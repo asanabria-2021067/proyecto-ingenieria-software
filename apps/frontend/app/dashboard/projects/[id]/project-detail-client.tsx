@@ -16,8 +16,9 @@ import { ProjectRoleManagementSection } from '@/components/projects/detail/proje
 import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectRoles } from '@/hooks/use-project-roles';
+import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { approveProjectClosure, rejectProjectClosure } from '@/lib/services/projects';
+import { approveProjectClosure, rejectProjectClosure, requestProjectClosure } from '@/lib/services/projects';
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 
@@ -68,6 +69,55 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
   const enSolicitudCierre = proyecto.estadoProyecto === 'EN_SOLICITUD_CIERRE';
   const [resolviendoCierre, setResolviendoCierre] = useState(false);
+
+  // F16 — único disparador de "Solicitar cierre del proyecto" (A11:
+  // ProjectsService.requestClose). Solo el líder, y solo cuando el proyecto
+  // está EN_PROGRESO: es la única precondición de estado que A11 exige antes
+  // de evaluar el Sprint operable, así que fuera de EN_PROGRESO el control ni
+  // se muestra (mismo criterio que `enSolicitudCierre &&` para el aviso de
+  // aprobación pendiente).
+  const mostrarSolicitarCierre = isLeader && proyecto.estadoProyecto === 'EN_PROGRESO';
+  const { sprints } = useProjectSprints(idProyecto);
+  // A11 (`assertNoOperableSprint`): solo ACTIVO/EN_FINALIZACION bloquean;
+  // CERRADO y la ausencia de Sprint nunca bloquean por esta razón. El índice
+  // parcial `sprint_operable_unique` garantiza que a lo sumo un Sprint del
+  // proyecto está en uno de estos dos estados a la vez.
+  const cierreBloqueadoPorSprint = sprints.some(
+    (s) => s.estado === 'ACTIVO' || s.estado === 'EN_FINALIZACION',
+  );
+  const [solicitandoCierre, setSolicitandoCierre] = useState(false);
+
+  const solicitarCierre = async () => {
+    const { isConfirmed } = await uvgSwal.fire({
+      icon: 'question',
+      title: '¿Solicitar cierre del proyecto?',
+      text: 'Un administrador deberá aprobar la solicitud para finalizar el proyecto.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, solicitar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!isConfirmed) return;
+    setSolicitandoCierre(true);
+    try {
+      await requestProjectClosure(idProyecto);
+      await queryClient.invalidateQueries({ queryKey: ['project', idProyecto] });
+      await uvgSwal.fire({
+        icon: 'success',
+        title: 'Solicitud enviada',
+        text: 'Un administrador revisará tu solicitud de cierre.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (err: unknown) {
+      await uvgSwal.fire({
+        icon: 'error',
+        title: 'No se pudo solicitar el cierre',
+        text: err instanceof Error ? err.message : 'Ocurrió un error al solicitar el cierre del proyecto.',
+      });
+    } finally {
+      setSolicitandoCierre(false);
+    }
+  };
 
   const resolverCierre = async (accion: 'APROBAR' | 'RECHAZAR') => {
     const { isConfirmed } = await uvgSwal.fire({
@@ -166,7 +216,16 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 pb-12 pt-6 md:px-8">
-      <ProjectSummarySection proyecto={proyecto} isLeader={isLeader} isAdmin={isAdmin} puedeVerKanban={puedeVerKanban}>
+      <ProjectSummarySection
+        proyecto={proyecto}
+        isLeader={isLeader}
+        isAdmin={isAdmin}
+        puedeVerKanban={puedeVerKanban}
+        mostrarSolicitarCierre={mostrarSolicitarCierre}
+        solicitandoCierre={solicitandoCierre}
+        cierreBloqueadoPorSprint={cierreBloqueadoPorSprint}
+        onSolicitarCierre={() => void solicitarCierre()}
+      >
         {enSolicitudCierre && (
           <ProjectClosureSection
             proyecto={proyecto}
