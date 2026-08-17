@@ -342,6 +342,35 @@ export class SprintsService {
         WHERE rp.id_proyecto = ${projectId}
           AND pp.id_usuario IN (SELECT id_usuario FROM participantes)
         GROUP BY pp.id_usuario
+      ),
+      -- A8.1: desglose por ParticipacionProyecto individual, necesario para
+      -- que F5 pueda emitir PATCH .../horas/:participacionId (A7) por cada
+      -- rol de un participante multirol. Mismo filtro projectId+sprintId que
+      -- horas_por_usuario (nunca solo sprintId) -- cada idParticipacion
+      -- aporta a lo sumo una fila por Sprint (indice unico parcial
+      -- horas_participacion_sprint_unique, A7.1), asi que este json_agg
+      -- nunca duplica una participacion. Los totales person-centric de mas
+      -- abajo (horas_por_usuario) siguen siendo la fuente de los campos
+      -- agregados existentes -- este CTE es aditivo, no los reemplaza.
+      participaciones_por_usuario AS (
+        SELECT pp.id_usuario AS id_usuario,
+               json_agg(
+                 jsonb_build_object(
+                   'idParticipacion', hp.id_participacion,
+                   'idRolProyecto', rp.id_rol_proyecto,
+                   'nombreRol', rp.nombre_rol,
+                   'horasReportadas', hp.horas_reportadas::float8,
+                   'horasCalculadas', hp.horas_calculadas::float8,
+                   'horasAprobadas', hp.horas_aprobadas::float8,
+                   'justificacionAjuste', hp.justificacion_ajuste
+                 )
+                 ORDER BY rp.nombre_rol, hp.id_participacion
+               ) AS participaciones
+        FROM horas_participacion hp
+        JOIN participacion_proyecto pp ON pp.id_participacion = hp.id_participacion
+        JOIN rol_proyecto rp ON rp.id_rol_proyecto = pp.id_rol_proyecto
+        WHERE hp.id_sprint = ${sprintId} AND rp.id_proyecto = ${projectId}
+        GROUP BY pp.id_usuario
       )
       SELECT
         u.id_usuario AS "idUsuario",
@@ -353,12 +382,14 @@ export class SprintsService {
         COALESCE(tpu.tareas_realizadas, 0) AS "tareasRealizadas",
         COALESCE(hpu.horas_reportadas, 0) AS "horasReportadas",
         COALESCE(hpu.horas_calculadas, 0) AS "horasCalculadas",
-        COALESCE(hpu.horas_aprobadas, 0) AS "horasAprobadas"
+        COALESCE(hpu.horas_aprobadas, 0) AS "horasAprobadas",
+        COALESCE(ppu.participaciones, '[]'::json) AS "participaciones"
       FROM participantes p
       JOIN usuario u ON u.id_usuario = p.id_usuario
       LEFT JOIN tareas_por_usuario tpu ON tpu.id_usuario = p.id_usuario
       LEFT JOIN horas_por_usuario hpu ON hpu.id_usuario = p.id_usuario
       LEFT JOIN roles_por_usuario rpu ON rpu.id_usuario = p.id_usuario
+      LEFT JOIN participaciones_por_usuario ppu ON ppu.id_usuario = p.id_usuario
       ORDER BY u.apellido, u.nombre, u.id_usuario
     `);
 

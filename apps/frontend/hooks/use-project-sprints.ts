@@ -1,15 +1,21 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { projectSprintsQueryKey, sprintDetailQueryKey } from '@/lib/query-keys/sprints';
 import {
+  projectSprintsQueryKey,
+  sprintClosingSummaryQueryKey,
+  sprintDetailQueryKey,
+} from '@/lib/query-keys/sprints';
+import {
+  adjustSprintHours,
   closeSprint,
   finalizeSprint,
   getProjectSprints,
+  getSprintClosingSummary,
   getSprintDetail,
   startSprint,
 } from '@/lib/services/sprints';
-import type { SprintDetailDto, SprintDto } from '@/lib/types/sprints';
+import type { AdjustSprintHoursInput, SprintClosingSummaryDto, SprintDetailDto, SprintDto } from '@/lib/types/sprints';
 
 function isValidProjectId(idProyecto: number): boolean {
   return Number.isInteger(idProyecto) && idProyecto > 0;
@@ -110,4 +116,57 @@ export function useSprintDetail(idProyecto: number, idSprint: number) {
     error: query.error,
     refetch: query.refetch,
   };
+}
+
+/**
+ * SprintClosingSummary (F5) — `GET /proyectos/:id/sprints/:sprintId/resumen-cierre`.
+ * Read-only, mismo patrón que `useSprintDetail`: no expone invalidación
+ * propia porque no muta nada.
+ */
+export function useSprintClosingSummary(idProyecto: number, idSprint: number) {
+  const enabled = isValidId(idProyecto) && isValidId(idSprint);
+
+  const query = useQuery<SprintClosingSummaryDto>({
+    queryKey: sprintClosingSummaryQueryKey(idProyecto, idSprint),
+    queryFn: () => getSprintClosingSummary(idProyecto, idSprint),
+    enabled,
+  });
+
+  return {
+    summary: query.data,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Ajusta horas reconocidas de una participación (A7) —
+ * `PATCH /proyectos/:id/sprints/:sprintId/horas/:idParticipacion`. Opera
+ * sobre una `ParticipacionProyecto` concreta, nunca sobre una persona
+ * agregada (F5 puede necesitar invocarla varias veces, una por cada
+ * participación realmente modificada de un participante multirol).
+ *
+ * `SprintDetail` (F4) nunca lee `HorasParticipacion` — sus asignaciones solo
+ * exponen `horasReales` de `AsignacionTarea`, una tabla distinta que A7
+ * jamás toca — así que no hay causa contractual para invalidarlo aquí; solo
+ * `SprintClosingSummary` queda obsoleto tras un ajuste exitoso.
+ */
+export function useAdjustSprintHours(idProyecto: number, idSprint: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      idParticipacion,
+      ...input
+    }: { idParticipacion: number } & AdjustSprintHoursInput) =>
+      adjustSprintHours(idProyecto, idSprint, idParticipacion, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: sprintClosingSummaryQueryKey(idProyecto, idSprint),
+      });
+    },
+  });
 }
