@@ -78,4 +78,19 @@ export class NotificationsGateway
       this.server.to(`user:${userId}`).emit('SPRINT_FINALIZATION_STARTED', payload);
     }
   }
+
+  /**
+   * A9.1: mismo mecanismo exacto que `notifySprintFinalizationStarted`
+   * (rooms `user:{idUsuario}`, mismo namespace, sin persistir
+   * `Notificacion`) — señal realtime pura para que F6 pueda invalidar y
+   * ocultar el banner de bloqueo cuando el Sprint pasa a CERRADO.
+   */
+  async notifySprintClosed(
+    userIds: number[],
+    payload: { projectId: number; sprintId: number },
+  ) {
+    for (const userId of userIds) {
+      this.server.to(`user:${userId}`).emit('SPRINT_CLOSED', payload);
+    }
+  }
 }
