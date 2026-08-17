@@ -31,6 +31,7 @@ function makeNotificationsSpy() {
   return {
     notifyProjectActiveParticipants: async () => undefined,
     notifySprintFinalizationStarted: async () => undefined,
+    notifySprintClosed: async () => undefined,
   };
 }
 
@@ -245,6 +246,72 @@ describeIntegration(
       expect(Number(horasTrasCierre.horasCalculadas)).toBe(8);
       expect(Number(horasTrasCierre.horasAprobadas)).toBe(7);
       expect(horasTrasCierre.justificacionAjuste).toBe('ajuste aprobado por el líder antes del cierre');
+    });
+
+    it('E. A9.1: SPRINT_CLOSED se emite exactamente una vez tras un cierre real, con el payload correcto', async () => {
+      const leader = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      scope.projectIds = [project.idProyecto];
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
+      scope.sprintIds = [sprint.idSprint];
+
+      const notifySprintClosed = async () => undefined;
+      const spy = { calls: [] as unknown[][] };
+      const notifications = {
+        notifyProjectActiveParticipants: async () => undefined,
+        notifySprintFinalizationStarted: async () => undefined,
+        notifySprintClosed: async (...args: unknown[]) => {
+          spy.calls.push(args);
+          return notifySprintClosed();
+        },
+      };
+      const context = new SprintsContextService(prisma as any);
+      const authorization = new SprintsAuthorizationService(context);
+      const service = new SprintsService(prisma as any, context, authorization, notifications as any);
+
+      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
+
+      expect(spy.calls).toHaveLength(1);
+      expect(spy.calls[0]).toEqual([
+        project.idProyecto,
+        leader.idUsuario,
+        { projectId: project.idProyecto, sprintId: sprint.idSprint },
+      ]);
+    });
+
+    it('F. A9.1: si la transacción hace rollback real, SPRINT_CLOSED nunca se emite', async () => {
+      const leader = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      scope.projectIds = [project.idProyecto];
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
+      scope.sprintIds = [sprint.idSprint];
+
+      const spy = { calls: [] as unknown[][] };
+      const notifications = {
+        notifyProjectActiveParticipants: async () => undefined,
+        notifySprintFinalizationStarted: async () => undefined,
+        notifySprintClosed: async (...args: unknown[]) => {
+          spy.calls.push(args);
+        },
+      };
+      const injectedError = new Error('A9.1 rollback test: fallo inyectado DESPUÉS de la escritura real');
+      const rollbackPrisma = wrapWithRollbackAfterRealWrite(prisma, injectedError);
+      const context = new SprintsContextService(prisma as any);
+      const authorization = new SprintsAuthorizationService(context);
+      const service = new SprintsService(
+        rollbackPrisma as unknown as PrismaClient as any,
+        context,
+        authorization,
+        notifications as any,
+      );
+
+      await expect(
+        service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario),
+      ).rejects.toBe(injectedError);
+
+      expect(spy.calls).toHaveLength(0);
     });
   },
 );

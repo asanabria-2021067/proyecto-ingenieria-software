@@ -61,6 +61,7 @@ function makeFakeNotifications(): NotificationsService {
     notifyRoleMembers: async () => undefined,
     notifyProjectActiveParticipants: async () => undefined,
     notifySprintFinalizationStarted: async () => undefined,
+    notifySprintClosed: async () => undefined,
   } as unknown as NotificationsService;
 }
 
