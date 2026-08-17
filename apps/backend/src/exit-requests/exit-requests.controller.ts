@@ -43,6 +43,23 @@ export class ExitRequestsController {
     return this.exitRequestsService.rejectSolicitudSalida(projectId, idSolicitud, user.userId);
   }
 
+  /**
+   * F11.1 — reader aditivo: la solicitud de salida ABIERTA (PREPARACION o
+   * PENDIENTE_LIDER) del actor en este proyecto, o `{ solicitud: null }` si
+   * no tiene ninguna. Sin ProjectWriteGuard: es una lectura, no una
+   * escritura. Existe para que el frontend pueda recuperar
+   * server-authoritative si la solicitud está en PENDIENTE_LIDER tras un
+   * refresh — algo que `salida/preparacion` (B6) no puede responder porque
+   * está acoplado a PREPARACION.
+   */
+  @Get('salida/estado')
+  getCurrentExitRequest(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.exitRequestsService.getSolicitudSalidaAbierta(projectId, user.userId);
+  }
+
   @Get('salida/preparacion')
   getExitPreparationSummary(
     @Param('projectId', ParseIntPipe) projectId: number,

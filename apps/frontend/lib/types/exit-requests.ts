@@ -99,3 +99,37 @@ export interface ExitPreparationSummaryDto {
   cantidadBlockers: number;
   puedeContinuar: boolean;
 }
+
+/**
+ * Estados que cuentan como "solicitud abierta" para
+ * `getSolicitudSalidaAbierta` (F11.1) — nunca `APROBADA`/`RECHAZADA`/
+ * `CANCELADA`, que ese reader trata como ausencia de solicitud.
+ */
+export type EstadoSolicitudSalidaAbierta = 'PREPARACION' | 'PENDIENTE_LIDER';
+
+/**
+ * Forma exacta que devuelve `getSolicitudSalidaAbierta`
+ * (exit-requests.service.ts, F11.1): mismo `select` de 6 campos que B6 más
+ * `motivo`, nunca `resueltaEn`/`resueltaPor` (una solicitud abierta, por
+ * definición, todavía no fue resuelta).
+ */
+export interface SolicitudSalidaAbiertaDto {
+  idSolicitud: number;
+  idProyecto: number;
+  idUsuario: number;
+  motivo: string;
+  solicitadaEn: string;
+  estadoSolicitud: EstadoSolicitudSalidaAbierta;
+}
+
+/**
+ * `GET /proyectos/:id/salida/estado` (F11.1) — reader aditivo y
+ * server-authoritative de la solicitud ABIERTA (`PREPARACION` o
+ * `PENDIENTE_LIDER`) del actor en el proyecto. `solicitud: null` es un
+ * resultado de lectura válido (nunca un error) cuando no existe ninguna.
+ * Distinto de `ExitPreparationSummaryDto`: sin `blockers`, sin
+ * `puedeContinuar` — ese sigue siendo trabajo exclusivo de B6.
+ */
+export interface CurrentExitRequestDto {
+  solicitud: SolicitudSalidaAbiertaDto | null;
+}

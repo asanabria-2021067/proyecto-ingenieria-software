@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   CreateExitRequestInput,
+  CurrentExitRequestDto,
   ExitPreparationSummaryDto,
   SolicitudSalidaDto,
   SolicitudSalidaTransicionDto,
@@ -15,6 +16,16 @@ export function createExitRequest(
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+/**
+ * F11.1 — `GET /proyectos/:id/salida/estado`. Reader server-authoritative de
+ * la solicitud abierta del actor (PREPARACION o PENDIENTE_LIDER, o
+ * `solicitud: null`). Nunca lanza por "no existe" — a diferencia de B6, esa
+ * ausencia es una respuesta 200 válida.
+ */
+export function getCurrentExitRequest(idProyecto: number): Promise<CurrentExitRequestDto> {
+  return apiFetch<CurrentExitRequestDto>(`/proyectos/${idProyecto}/salida/estado`);
 }
 
 /** B6 — `GET /proyectos/:id/salida/preparacion` (read-model de blockers de la PREPARACION del actor). */
