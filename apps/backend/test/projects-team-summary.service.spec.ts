@@ -1,23 +1,20 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { ProjectsService } from '../src/projects/projects.service';
+import { TeamService } from '../src/team/team.service';
 
 function makePrisma() {
   return {
     proyecto: { findFirst: vi.fn() },
     usuario: { findUnique: vi.fn() },
     participacionProyecto: { findMany: vi.fn() },
+    asignacionTarea: { findMany: vi.fn().mockResolvedValue([]) },
     tarea: { findMany: vi.fn() },
     horasParticipacion: { findMany: vi.fn() },
   } as any;
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new ProjectsService(
-    prisma,
-    { isAdmin: vi.fn(), notifyAdminsFromTemplate: vi.fn(), notifyFromTemplate: vi.fn() } as any,
-    {} as any,
-  );
+  return new TeamService(prisma, { findAll: vi.fn() } as any, { getPendingLeaderReviews: vi.fn() } as any);
 }
 
 const LIDER = {
@@ -43,7 +40,7 @@ function participacion(
   idUsuario: number,
   idRolProyecto: number,
   nombreRol = `Rol ${idRolProyecto}`,
-  estadoParticipacion: 'ACTIVO' = 'ACTIVO',
+  estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO' = 'ACTIVO',
 ) {
   return {
     idUsuario,
@@ -53,13 +50,82 @@ function participacion(
   };
 }
 
+describe('TeamService.findTeam', () => {
+  it('devuelve las participaciones ACTIVO del proyecto con el contrato histórico de GET /proyectos/:id/equipo', async () => {
+    const prisma = makePrisma();
+    const equipo = [
+      {
+        idParticipacion: 10,
+        estadoParticipacion: 'ACTIVO',
+        fechaIngreso: new Date('2026-01-01T00:00:00.000Z'),
+        usuario: usuario(2),
+        rolProyecto: {
+          idRolProyecto: 5,
+          nombreRol: 'Dev',
+          descripcionRolProyecto: 'Desarrollo',
+        },
+      },
+    ];
+    prisma.participacionProyecto.findMany.mockResolvedValue(equipo);
+    const service = makeService(prisma);
+
+    const result = await service.findTeam(1);
+
+    expect(result).toBe(equipo);
+    expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith({
+      where: {
+        rolProyecto: { idProyecto: 1 },
+        estadoParticipacion: 'ACTIVO',
+      },
+      select: {
+        idParticipacion: true,
+        estadoParticipacion: true,
+        fechaIngreso: true,
+        usuario: {
+          select: {
+            idUsuario: true,
+            nombre: true,
+            apellido: true,
+            correo: true,
+            fotoUrl: true,
+          },
+        },
+        rolProyecto: {
+          select: {
+            idRolProyecto: true,
+            nombreRol: true,
+            descripcionRolProyecto: true,
+          },
+        },
+      },
+      orderBy: {
+        fechaIngreso: 'asc',
+      },
+    });
+  });
+
+  it('no aplica clasificación B12 ni transforma el shape del endpoint histórico', async () => {
+    const prisma = makePrisma();
+    prisma.participacionProyecto.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    const result = await service.findTeam(1);
+
+    expect(result).toEqual([]);
+    expect(prisma.proyecto.findFirst).not.toHaveBeenCalled();
+    expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
+    expect(prisma.tarea.findMany).not.toHaveBeenCalled();
+    expect(prisma.horasParticipacion.findMany).not.toHaveBeenCalled();
+  });
+});
+
 // Decimal falso: replica la única API que el service consume (.toNumber()),
 // igual que el patrón ya usado en projects-member-detail.service.spec.ts.
 function decimal(value: number) {
   return { toNumber: () => value };
 }
 
-describe('ProjectsService.getTeamSummary', () => {
+describe('TeamService.getTeamSummary', () => {
   // Caso 1 — líder válido
   it('devuelve lider y miembros cuando userId es el creador del proyecto', async () => {
     const prisma = makePrisma();
@@ -130,6 +196,7 @@ describe('ProjectsService.getTeamSummary', () => {
 
     expect(resumen.miembros).toHaveLength(1);
     expect(resumen.miembros[0].idUsuario).toBe(2);
+    expect(resumen.miembros[0].grupo).toBe('ACTIVOS');
     expect(resumen.miembros[0].roles).toEqual([{ idRolProyecto: 10, nombreRol: 'Desarrollador' }]);
   });
 
@@ -174,8 +241,8 @@ describe('ProjectsService.getTeamSummary', () => {
     expect(resumen.miembros[0].roles).toEqual([{ idRolProyecto: 10, nombreRol: 'Desarrollador' }]);
   });
 
-  // Caso 7 — solo ACTIVO por defecto (asertando el argumento real de Prisma)
-  it('consulta participaciones filtrando por rolProyecto.idProyecto y estadoParticipacion ACTIVO, excluyendo al creador', async () => {
+  // Caso 7 — todas las participaciones del proyecto (asertando el argumento real de Prisma)
+  it('consulta participaciones filtrando por rolProyecto.idProyecto y excluyendo al creador, sin filtrar solo ACTIVO', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 7, creadoPor: 1 });
     prisma.usuario.findUnique.mockResolvedValue(LIDER);
@@ -188,10 +255,102 @@ describe('ProjectsService.getTeamSummary', () => {
       expect.objectContaining({
         where: {
           rolProyecto: { idProyecto: 7 },
-          estadoParticipacion: 'ACTIVO',
           idUsuario: { not: 1 },
         },
       }),
+    );
+  });
+
+  it('clasifica como RETIRADOS_CON_CONTRIBUCION cuando no hay participación ACTIVO y existe horasReales no null en el mismo proyecto', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
+    prisma.usuario.findUnique.mockResolvedValue(LIDER);
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      participacion(2, 10, 'Desarrollador', 'RETIRADO'),
+    ]);
+    prisma.asignacionTarea.findMany.mockResolvedValue([{ idUsuario: 2 }]);
+    prisma.tarea.findMany.mockResolvedValue([]);
+    prisma.horasParticipacion.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    const resumen = await service.getTeamSummary(1, 1);
+
+    expect(resumen.miembros).toHaveLength(1);
+    expect(resumen.miembros[0].grupo).toBe('RETIRADOS_CON_CONTRIBUCION');
+    expect(prisma.asignacionTarea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          idUsuario: { in: [2] },
+          horasReales: { not: null },
+          tarea: { idProyecto: 1 },
+        },
+        distinct: ['idUsuario'],
+      }),
+    );
+  });
+
+  it('clasifica como RETIRADOS_SIN_CONTRIBUCION cuando no hay participación ACTIVO ni horasReales no null en el proyecto', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
+    prisma.usuario.findUnique.mockResolvedValue(LIDER);
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      participacion(3, 10, 'QA', 'RETIRADO'),
+    ]);
+    prisma.asignacionTarea.findMany.mockResolvedValue([]);
+    prisma.tarea.findMany.mockResolvedValue([]);
+    prisma.horasParticipacion.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    const resumen = await service.getTeamSummary(1, 1);
+
+    expect(resumen.miembros).toHaveLength(1);
+    expect(resumen.miembros[0].grupo).toBe('RETIRADOS_SIN_CONTRIBUCION');
+  });
+
+  it('prioriza ACTIVOS en multirol mixto: una participación RETIRADO y otra ACTIVO aparecen como una sola persona activa', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
+    prisma.usuario.findUnique.mockResolvedValue(LIDER);
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      participacion(4, 10, 'Diseñador', 'RETIRADO'),
+      participacion(4, 11, 'QA', 'ACTIVO'),
+    ]);
+    prisma.asignacionTarea.findMany.mockResolvedValue([{ idUsuario: 4 }]);
+    prisma.tarea.findMany.mockResolvedValue([]);
+    prisma.horasParticipacion.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    const resumen = await service.getTeamSummary(1, 1);
+
+    expect(resumen.miembros).toHaveLength(1);
+    expect(resumen.miembros[0].grupo).toBe('ACTIVOS');
+    expect(resumen.miembros[0].estadoParticipacion).toBe('ACTIVO');
+    expect(resumen.miembros[0].roles).toEqual([
+      { idRolProyecto: 10, nombreRol: 'Diseñador' },
+      { idRolProyecto: 11, nombreRol: 'QA' },
+    ]);
+  });
+
+  it('no deja que horasReales de otro proyecto clasifiquen como contribuyente al retirado del proyecto consultado', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
+    prisma.usuario.findUnique.mockResolvedValue(LIDER);
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      participacion(5, 10, 'Desarrollador', 'RETIRADO'),
+    ]);
+    prisma.asignacionTarea.findMany.mockImplementation(async ({ where }: any) =>
+      where.tarea.idProyecto === 1 ? [] : [{ idUsuario: 5 }],
+    );
+    prisma.tarea.findMany.mockResolvedValue([]);
+    prisma.horasParticipacion.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    const resumen = await service.getTeamSummary(1, 1);
+
+    expect(resumen.miembros).toHaveLength(1);
+    expect(resumen.miembros[0].grupo).toBe('RETIRADOS_SIN_CONTRIBUCION');
+    expect(prisma.asignacionTarea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tarea: { idProyecto: 1 } }) }),
     );
   });
 
@@ -331,6 +490,9 @@ describe('ProjectsService.getTeamSummary', () => {
     expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ rolProyecto: { idProyecto: 5 } }) }),
     );
+    expect(prisma.asignacionTarea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tarea: { idProyecto: 5 } }) }),
+    );
     expect(prisma.tarea.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ idProyecto: 5 }) }),
     );
@@ -399,7 +561,7 @@ describe('ProjectsService.getTeamSummary', () => {
   });
 
   // Caso 15 — no N+1: el número de queries es constante respecto al número de integrantes
-  it('con 5 integrantes, múltiples roles, tareas y horas, ejecuta exactamente 5 queries Prisma fijas (no N+1)', async () => {
+  it('con 5 integrantes, múltiples roles, tareas, contribuciones y horas, ejecuta exactamente 6 queries Prisma fijas (no N+1)', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 1 });
     prisma.usuario.findUnique.mockResolvedValue(LIDER);
@@ -428,6 +590,7 @@ describe('ProjectsService.getTeamSummary', () => {
     expect(prisma.proyecto.findFirst).toHaveBeenCalledTimes(1);
     expect(prisma.usuario.findUnique).toHaveBeenCalledTimes(1);
     expect(prisma.participacionProyecto.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.asignacionTarea.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.tarea.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.horasParticipacion.findMany).toHaveBeenCalledTimes(1);
   });

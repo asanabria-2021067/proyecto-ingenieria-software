@@ -4,8 +4,14 @@ import { TasksService } from '../src/tasks/tasks.service';
 
 function makeTx() {
   return {
-    tarea: { update: vi.fn() },
+    // A12.1: findMany se usa exclusivamente por syncHitoEstado cuando la
+    // tarea eliminada tiene idHito != null. Por defecto [] para no romper
+    // los tests preexistentes.
+    tarea: { update: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     asignacionTarea: { updateMany: vi.fn() },
+    // A12.1: presente únicamente en los tests que eliminan una tarea con
+    // idHito != null; ausente (undefined) en el resto.
+    hito: undefined as { update: ReturnType<typeof vi.fn> } | undefined,
   };
 }
 
@@ -18,9 +24,13 @@ function makePrisma(tx = makeTx()) {
 
 function makeAuthorization(overrides: Record<string, unknown> = {}) {
   return {
-    assertCanDeleteTask: vi
-      .fn()
-      .mockResolvedValue({ idTarea: 42, idProyecto: 5, idRolProyecto: null, tituloTarea: 'Tarea de prueba' }),
+    assertCanDeleteTask: vi.fn().mockResolvedValue({
+      idTarea: 42,
+      idProyecto: 5,
+      idRolProyecto: null,
+      idHito: null,
+      tituloTarea: 'Tarea de prueba',
+    }),
     ...overrides,
   } as any;
 }
@@ -266,7 +276,7 @@ describe('TasksService.remove', () => {
       const auth = {
         assertCanDeleteTask: vi.fn(async () => {
           orden.push('autorizacion');
-          return { idTarea: 42, idProyecto: 5, idRolProyecto: null, tituloTarea: 'Tarea de prueba' };
+          return { idTarea: 42, idProyecto: 5, idRolProyecto: null, idHito: null, tituloTarea: 'Tarea de prueba' };
         }),
       } as any;
       tx.asignacionTarea.updateMany.mockImplementation(async () => {
@@ -365,6 +375,49 @@ describe('TasksService.remove', () => {
       expect((tx.tarea as any).deleteMany).toBeUndefined();
       expect((tx.asignacionTarea as any).delete).toBeUndefined();
       expect((tx.asignacionTarea as any).deleteMany).toBeUndefined();
+    });
+  });
+
+  describe('A12.1 — sincronización de Hito.estadoHito al eliminar (soft-delete) una tarea', () => {
+    it('eliminar una tarea con idHito resincroniza el Hito: el conjunto vigente ya excluye la tarea eliminada', async () => {
+      const { tx, service } = makeService({
+        auth: makeAuthorization({
+          assertCanDeleteTask: vi.fn().mockResolvedValue({
+            idTarea: 42,
+            idProyecto: 5,
+            idRolProyecto: null,
+            idHito: 9,
+            tituloTarea: 'Tarea con hito',
+          }),
+        }),
+      });
+      tx.hito = { update: vi.fn() };
+      // La consulta de progreso, tras el soft-delete, ya filtra
+      // eliminadoEn: null — la tarea recién eliminada no aparece aquí
+      // (simulado directamente: solo queda 1 tarea restante, HECHO).
+      tx.tarea.findMany.mockResolvedValue([{ idHito: 9, estadoTarea: 'HECHO' }]);
+
+      await service.remove(5, 42, 1);
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 9 },
+        data: { estadoHito: 'COMPLETADO' },
+      });
+      expect(tx.tarea.findMany).toHaveBeenCalledWith({
+        where: { idHito: 9, eliminadoEn: null },
+        select: { estadoTarea: true },
+      });
+    });
+
+    it('eliminar una tarea SIN Hito: no intenta sincronizar ningún Hito', async () => {
+      // idHito: null por defecto en makeAuthorization() — tx.hito
+      // permanece undefined; si el código intentara sincronizar, esta
+      // prueba fallaría con TypeError antes de completarse.
+      const { tx, service } = makeService();
+
+      await service.remove(5, 42, 1);
+
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
     });
   });
 });
