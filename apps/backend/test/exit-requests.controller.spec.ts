@@ -17,6 +17,7 @@ function makeController() {
     createSolicitudSalida: vi.fn(),
     approveSolicitudSalida: vi.fn(),
     rejectSolicitudSalida: vi.fn(),
+    getSolicitudSalidaAbierta: vi.fn(),
     getExitPreparationSummary: vi.fn(),
     continueExitPreparation: vi.fn(),
     cancelExitPreparation: vi.fn(),
@@ -65,6 +66,18 @@ describe('ExitRequestsController', () => {
       method: RequestMethod.POST,
       status: HttpStatus.OK,
     });
+  });
+
+  it('expone GET /proyectos/:projectId/salida/estado con status estándar (F11.1)', () => {
+    expect(routeMetadata('getCurrentExitRequest')).toEqual({
+      path: 'salida/estado',
+      method: RequestMethod.GET,
+      status: undefined,
+    });
+  });
+
+  it('no aplica ProjectWriteGuard al GET de estado (F11.1)', () => {
+    expect(guardsOf('getCurrentExitRequest')).not.toContain(ProjectWriteGuard);
   });
 
   it('expone GET /proyectos/:projectId/salida/preparacion con status estándar', () => {
@@ -133,6 +146,16 @@ describe('ExitRequestsController', () => {
 
     expect(service.rejectSolicitudSalida).toHaveBeenCalledWith(10, 55, 1);
     expect(result).toEqual({ estadoSolicitud: 'RECHAZADA' });
+  });
+
+  it('delega la solicitud abierta con projectId y userId de CurrentUser (F11.1)', async () => {
+    const { controller, service } = makeController();
+    service.getSolicitudSalidaAbierta.mockResolvedValue({ solicitud: null });
+
+    const result = await controller.getCurrentExitRequest(10, { userId: 2 });
+
+    expect(service.getSolicitudSalidaAbierta).toHaveBeenCalledWith(10, 2);
+    expect(result).toEqual({ solicitud: null });
   });
 
   it('delega el resumen de preparación con projectId y userId de CurrentUser', async () => {

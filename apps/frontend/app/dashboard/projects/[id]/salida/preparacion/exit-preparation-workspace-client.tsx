@@ -4,8 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Info, Loader2 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
-import { useContinueExitPreparation, useExitPreparationSummary } from '@/hooks/use-exit-request';
+import {
+  useContinueExitPreparation,
+  useCurrentExitRequest,
+  useExitPreparationSummary,
+} from '@/hooks/use-exit-request';
 import { CloseAssignmentForm } from '@/components/projects/close-assignment-form';
+import { PendingLeaderReview } from '@/components/projects/pending-leader-review';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -46,7 +51,7 @@ function formatearFechaAsignacion(fechaIso: string): string {
   });
 }
 
-function summaryErrorMessage(error: unknown): string {
+function queryErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return 'No se pudo cargar la preparación de tu salida. Intenta nuevamente.';
 }
@@ -318,19 +323,31 @@ function ExitPreparationBodySkeleton() {
 function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const idProyecto = proyecto.idProyecto;
 
-  const { summary, isLoading, isError, error, refetch } = useExitPreparationSummary(idProyecto);
+  // F11.1 — única fuente de verdad server-authoritative para decidir entre
+  // PREPARACION / PENDIENTE_LIDER / NONE. Sobrevive refresh, hard reload y
+  // entrada directa por URL porque proviene de GET /salida/estado
+  // (getSolicitudSalidaAbierta), no de un useState poblado solo por la
+  // respuesta de una mutation en la sesión actual — ese placeholder
+  // (`solicitudPendiente`) se elimina por completo en F11.1.
+  const {
+    request: currentRequest,
+    isLoading: isLoadingCurrent,
+    isError: isErrorCurrent,
+    error: currentError,
+    refetch: refetchCurrent,
+  } = useCurrentExitRequest(idProyecto);
+
+  const esPreparacion = currentRequest?.estadoSolicitud === 'PREPARACION';
+  const esPendienteLider = currentRequest?.estadoSolicitud === 'PENDIENTE_LIDER';
+
+  // B6 (ExitPreparationSummary) solo debe dispararse cuando currentRequest ya
+  // confirmó PREPARACION — de lo contrario B6 respondería 400 de forma
+  // predecible e inútil (Sección 18/26 de la auditoría F11.1). `habilitado`
+  // es la extensión mínima que F7 necesitó para soportar este gating.
+  const { summary, isLoading: isLoadingSummary, isError: isErrorSummary, error: summaryError, refetch: refetchSummary } =
+    useExitPreparationSummary(idProyecto, esPreparacion);
   const continuarPreparacion = useContinueExitPreparation(idProyecto);
 
-  // F9 termina cuando PREPARACION -> PENDIENTE_LIDER se ejecuta con éxito
-  // (Sección 38 del prompt: F11/PENDIENTE_LIDER es una tarea aparte). Tras el
-  // éxito, `useContinueExitPreparation` (F7) invalida
-  // `exit-preparation-summary`; el próximo fetch de esa query fallará con 400
-  // ("no existe PREPARACION", exit-requests.service.ts) porque la solicitud
-  // ya no está en ese estado. Ese fetch en segundo plano sigue ocurriendo,
-  // pero `confirmado` hace que el árbol de loading/error de la query nunca se
-  // muestre — no es un error real que esconder, es un artefacto esperado de
-  // la propia transición exitosa.
-  const [confirmado, setConfirmado] = useState(false);
   const [continuarError, setContinuarError] = useState<string | null>(null);
 
   // F10 — responsabilidad seleccionada para "Cerrar tramo" (mismo
@@ -343,14 +360,19 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
 
   const handleContinuar = () => {
     setContinuarError(null);
+    // useContinueExitPreparation (F7/F11.1) ya siembra e invalida
+    // currentExitRequestQueryKey con el body real de B7 en su propio
+    // onSuccess: en cuanto esa query se actualiza, `currentRequest` cambia a
+    // PENDIENTE_LIDER y este componente vuelve a renderizar mostrando
+    // PendingLeaderReview automáticamente — no hace falta ningún callback
+    // local de éxito aquí.
     continuarPreparacion.mutate(undefined, {
-      onSuccess: () => setConfirmado(true),
       onError: (err) => {
         setContinuarError(getApiErrorMessage(err));
         // El backend revalida blockers al continuar (server-authoritative);
         // si rechazó la transición, refresca el read-model para reflejar el
         // estado real antes de dejar reintentar.
-        void refetch();
+        void refetchSummary();
       },
     });
   };
@@ -422,78 +444,99 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
         </div>
       </div>
 
-      {confirmado ? (
-        <div
-          role="status"
-          className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-8 text-center shadow-sm"
-        >
-          <CheckCircle2
-            className="mx-auto mb-3 size-10 text-green-600 dark:text-green-400"
-            aria-hidden="true"
-          />
-          <p className="text-base font-semibold text-on-surface">
-            Tu solicitud de salida fue enviada a tu líder.
-          </p>
-          <p className="mt-1 text-sm text-tertiary">Recibirás una notificación cuando sea revisada.</p>
-          <Button asChild variant="outline" size="sm" className="mt-4">
-            <Link href={`/dashboard/projects/${idProyecto}`}>Volver al proyecto</Link>
-          </Button>
-        </div>
-      ) : isLoading ? (
+      {/* F11.1 — orden de carga: primero se resuelve currentRequest
+          (server-authoritative). Mientras esté isLoadingCurrent, nunca se
+          renderiza F9 ni F11 — evita el flash "Kanban -> luego Solicitud
+          enviada" en carga directa. */}
+      {isLoadingCurrent ? (
         <ExitPreparationBodySkeleton />
-      ) : isError ? (
+      ) : isErrorCurrent ? (
         <div
           role="alert"
           className="space-y-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest py-10 text-center shadow-sm"
         >
-          <p className="text-sm font-medium text-red-600 dark:text-red-400">{summaryErrorMessage(error)}</p>
+          <p className="text-sm font-medium text-red-600 dark:text-red-400">{queryErrorMessage(currentError)}</p>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetch()}
+            onClick={() => refetchCurrent()}
             className="rounded-lg border-primary text-xs font-bold text-primary hover:bg-primary/10"
           >
             Reintentar
           </Button>
         </div>
-      ) : summary ? (
-        <>
-          <ExitPreparationProgressCard
-            summary={summary}
-            onContinuar={handleContinuar}
-            isContinuing={continuarPreparacion.isPending}
-            continuarError={continuarError}
-          />
-
-          <div className="min-h-0 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm md:p-5">
-            <div className="mb-5 flex items-center gap-2.5">
-              <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
-                Mis responsabilidades para salida
-              </h2>
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                {summary.blockers.length}{' '}
-                {summary.blockers.length === 1 ? 'responsabilidad' : 'responsabilidades'}
-              </span>
-            </div>
-
-            {summary.blockers.length === 0 ? (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <CheckCircle2 aria-hidden="true" />
-                  </EmptyMedia>
-                  <EmptyTitle>No tienes responsabilidades pendientes</EmptyTitle>
-                  <EmptyDescription>
-                    No hay asignaciones vigentes que preparar antes de continuar tu solicitud de salida.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <ExitPreparationBoard blockers={summary.blockers} onCerrarTramo={setCerrarTramoContexto} />
-            )}
+      ) : esPendienteLider ? (
+        <PendingLeaderReview solicitadaEn={currentRequest?.solicitadaEn} motivo={currentRequest?.motivo} />
+      ) : esPreparacion ? (
+        isLoadingSummary ? (
+          <ExitPreparationBodySkeleton />
+        ) : isErrorSummary ? (
+          <div
+            role="alert"
+            className="space-y-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest py-10 text-center shadow-sm"
+          >
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">{queryErrorMessage(summaryError)}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchSummary()}
+              className="rounded-lg border-primary text-xs font-bold text-primary hover:bg-primary/10"
+            >
+              Reintentar
+            </Button>
           </div>
-        </>
-      ) : null}
+        ) : summary ? (
+          <>
+            <ExitPreparationProgressCard
+              summary={summary}
+              onContinuar={handleContinuar}
+              isContinuing={continuarPreparacion.isPending}
+              continuarError={continuarError}
+            />
+
+            <div className="min-h-0 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm md:p-5">
+              <div className="mb-5 flex items-center gap-2.5">
+                <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
+                  Mis responsabilidades para salida
+                </h2>
+                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                  {summary.blockers.length}{' '}
+                  {summary.blockers.length === 1 ? 'responsabilidad' : 'responsabilidades'}
+                </span>
+              </div>
+
+              {summary.blockers.length === 0 ? (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <CheckCircle2 aria-hidden="true" />
+                    </EmptyMedia>
+                    <EmptyTitle>No tienes responsabilidades pendientes</EmptyTitle>
+                    <EmptyDescription>
+                      No hay asignaciones vigentes que preparar antes de continuar tu solicitud de salida.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <ExitPreparationBoard blockers={summary.blockers} onCerrarTramo={setCerrarTramoContexto} />
+              )}
+            </div>
+          </>
+        ) : null
+      ) : (
+        // NONE — currentRequest.request es null: no hay solicitud abierta
+        // (nunca se creó una, o ya fue APROBADA/RECHAZADA/CANCELADA). No es
+        // un error; es un resultado de lectura real y válido de F11.1. No se
+        // reimplementa F8 aquí — solo se informa el estado real.
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No tienes una solicitud de salida en preparación</EmptyTitle>
+            <EmptyDescription>
+              No existe actualmente una solicitud de salida abierta para este proyecto.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
 
       {/* F10 — mismo CloseAssignmentForm que el Kanban normal. Tras un cierre
           exitoso, B6 ya no devolverá esta asignación como blocker: se
@@ -511,7 +554,7 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
         tituloTarea={cerrarTramoContexto?.tituloTarea}
         onSuccess={() => {
           setCerrarTramoContexto(null);
-          void refetch();
+          void refetchSummary();
         }}
       />
     </div>

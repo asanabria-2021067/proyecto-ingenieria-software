@@ -5,6 +5,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 
 vi.mock('../lib/services/exit-requests', () => ({
   createExitRequest: vi.fn(),
+  getCurrentExitRequest: vi.fn(),
   getExitPreparationSummary: vi.fn(),
   continueExitPreparation: vi.fn(),
   cancelExitPreparation: vi.fn(),
@@ -17,10 +18,11 @@ import {
   useCancelExitPreparation,
   useContinueExitPreparation,
   useCreateExitRequest,
+  useCurrentExitRequest,
   useExitPreparationSummary,
   useRejectExitRequest,
 } from '../hooks/use-exit-request';
-import { exitPreparationSummaryQueryKey } from '../lib/query-keys/exit-requests';
+import { currentExitRequestQueryKey, exitPreparationSummaryQueryKey } from '../lib/query-keys/exit-requests';
 import { projectSprintsQueryKey } from '../lib/query-keys/sprints';
 import { projectTasksQueryKey } from '../lib/query-keys/tasks';
 import {
@@ -33,6 +35,7 @@ import {
   cancelExitPreparation,
   continueExitPreparation,
   createExitRequest,
+  getCurrentExitRequest,
   getExitPreparationSummary,
   rejectExitRequest,
 } from '../lib/services/exit-requests';
@@ -78,6 +81,108 @@ function summary(overrides: Partial<any> = {}) {
     ...overrides,
   };
 }
+
+function solicitudAbierta(overrides: Partial<any> = {}) {
+  return {
+    idSolicitud: 1,
+    idProyecto: 7,
+    idUsuario: 3,
+    motivo: 'Cambio de proyecto',
+    solicitadaEn: '2026-01-01T00:00:00.000Z',
+    estadoSolicitud: 'PREPARACION',
+    ...overrides,
+  };
+}
+
+// ── F11.1 — reader server-authoritative de la solicitud abierta ───────────
+describe('useCurrentExitRequest', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa la query key canónica exacta, distinta de exit-preparation-summary', async () => {
+    (getCurrentExitRequest as any).mockResolvedValue({ solicitud: null });
+    const { queryClient, wrapper } = createWrapper();
+    renderHook(() => useCurrentExitRequest(7), { wrapper });
+
+    await waitFor(() => {
+      expect(queryClient.getQueryState(currentExitRequestQueryKey(7))).toBeDefined();
+    });
+    expect(currentExitRequestQueryKey(7)).toEqual(['exit-request-current', 7]);
+    expect(currentExitRequestQueryKey(7)).not.toEqual(exitPreparationSummaryQueryKey(7));
+  });
+
+  it('no colisiona entre proyectos', () => {
+    expect(currentExitRequestQueryKey(17)).not.toEqual(currentExitRequestQueryKey(42));
+  });
+
+  it('consulta una sola vez con el projectId correcto', async () => {
+    (getCurrentExitRequest as any).mockResolvedValue({ solicitud: null });
+    const { wrapper } = createWrapper();
+    renderHook(() => useCurrentExitRequest(7), { wrapper });
+
+    await waitFor(() => expect(getCurrentExitRequest).toHaveBeenCalledTimes(1));
+    expect(getCurrentExitRequest).toHaveBeenCalledWith(7);
+  });
+
+  it('con PREPARACION, expone la solicitud tal cual la resuelve el service', async () => {
+    (getCurrentExitRequest as any).mockResolvedValue({
+      solicitud: solicitudAbierta({ estadoSolicitud: 'PREPARACION' }),
+    });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCurrentExitRequest(7), { wrapper });
+
+    await waitFor(() => expect(result.current.request?.estadoSolicitud).toBe('PREPARACION'));
+  });
+
+  it('con PENDIENTE_LIDER, expone la solicitud tal cual la resuelve el service', async () => {
+    (getCurrentExitRequest as any).mockResolvedValue({
+      solicitud: solicitudAbierta({ estadoSolicitud: 'PENDIENTE_LIDER' }),
+    });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCurrentExitRequest(7), { wrapper });
+
+    await waitFor(() => expect(result.current.request?.estadoSolicitud).toBe('PENDIENTE_LIDER'));
+  });
+
+  it('con solicitud: null (sin solicitud abierta), request es null — un resultado válido, no un error', async () => {
+    (getCurrentExitRequest as any).mockResolvedValue({ solicitud: null });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCurrentExitRequest(7), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.request).toBeNull();
+    expect(result.current.isError).toBe(false);
+  });
+
+  it('request es null antes de resolver, con isLoading true', () => {
+    (getCurrentExitRequest as any).mockReturnValue(new Promise(() => {}));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCurrentExitRequest(7), { wrapper });
+
+    expect(result.current.request).toBeNull();
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it('expone isError y error cuando la query falla', async () => {
+    const boom = new Error('500');
+    (getCurrentExitRequest as any).mockRejectedValue(boom);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCurrentExitRequest(7), { wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(boom);
+  });
+
+  it.each([0, -1, NaN])('un projectId inválido (%s) no consulta', async (idInvalido) => {
+    (getCurrentExitRequest as any).mockResolvedValue({ solicitud: null });
+    const { wrapper } = createWrapper();
+    renderHook(() => useCurrentExitRequest(idInvalido), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getCurrentExitRequest).not.toHaveBeenCalled();
+  });
+});
 
 describe('useExitPreparationSummary', () => {
   afterEach(() => {
@@ -150,6 +255,32 @@ describe('useExitPreparationSummary', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(getExitPreparationSummary).not.toHaveBeenCalled();
   });
+
+  // ── F11.1 — gating explícito por `habilitado` ────────────────────────────
+  it('por defecto (sin segundo argumento) consulta normalmente', async () => {
+    (getExitPreparationSummary as any).mockResolvedValue(summary());
+    const { wrapper } = createWrapper();
+    renderHook(() => useExitPreparationSummary(7), { wrapper });
+
+    await waitFor(() => expect(getExitPreparationSummary).toHaveBeenCalledTimes(1));
+  });
+
+  it('con habilitado=false NO consulta B6, aunque el projectId sea válido', async () => {
+    (getExitPreparationSummary as any).mockResolvedValue(summary());
+    const { wrapper } = createWrapper();
+    renderHook(() => useExitPreparationSummary(7, false), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getExitPreparationSummary).not.toHaveBeenCalled();
+  });
+
+  it('con habilitado=true consulta normalmente', async () => {
+    (getExitPreparationSummary as any).mockResolvedValue(summary());
+    const { wrapper } = createWrapper();
+    renderHook(() => useExitPreparationSummary(7, true), { wrapper });
+
+    await waitFor(() => expect(getExitPreparationSummary).toHaveBeenCalledTimes(1));
+  });
 });
 
 describe('useCreateExitRequest', () => {
@@ -168,7 +299,7 @@ describe('useCreateExitRequest', () => {
     expect(createExitRequest).toHaveBeenCalledWith(7, { motivo: 'Cambio de proyecto' });
   });
 
-  it('en éxito invalida exactamente exit-preparation-summary del proyecto', async () => {
+  it('en éxito invalida exactamente exit-preparation-summary y exit-request-current del proyecto (F11.1)', async () => {
     (createExitRequest as any).mockResolvedValue(solicitud());
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -180,7 +311,8 @@ describe('useCreateExitRequest', () => {
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['exit-preparation-summary', 7] }),
     );
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['exit-request-current', 7] });
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
   });
 
   it('no invalida caches ajenas (tasks/members)', async () => {
@@ -191,7 +323,7 @@ describe('useCreateExitRequest', () => {
 
     result.current.mutate({ motivo: 'Cambio de proyecto' });
 
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-tasks', 7] });
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['proyecto-equipo', 7] });
   });
@@ -223,8 +355,10 @@ describe('useContinueExitPreparation', () => {
     expect(continueExitPreparation).toHaveBeenCalledWith(7);
   });
 
-  it('en éxito invalida exactamente exit-preparation-summary del proyecto', async () => {
-    (continueExitPreparation as any).mockResolvedValue(solicitud({ estadoSolicitud: 'PENDIENTE_LIDER' }));
+  it('en éxito siembra exit-request-current con el body real de B7 (PENDIENTE_LIDER) e invalida esa key (F11.1)', async () => {
+    (continueExitPreparation as any).mockResolvedValue(
+      solicitud({ estadoSolicitud: 'PENDIENTE_LIDER', idSolicitud: 9, motivo: 'Cambio de proyecto' }),
+    );
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useContinueExitPreparation(7), { wrapper });
@@ -233,9 +367,28 @@ describe('useContinueExitPreparation', () => {
 
     await waitFor(() => expect(continueExitPreparation).toHaveBeenCalledTimes(1));
     await waitFor(() =>
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['exit-preparation-summary', 7] }),
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['exit-request-current', 7] }),
     );
     expect(invalidateSpy).toHaveBeenCalledTimes(1);
+
+    // La transición es inmediata (sin flash): el caché ya refleja PENDIENTE_LIDER
+    // con los datos reales de la respuesta, sin esperar el refetch de invalidateQueries.
+    const cacheado = queryClient.getQueryData(['exit-request-current', 7]) as any;
+    expect(cacheado.solicitud.estadoSolicitud).toBe('PENDIENTE_LIDER');
+    expect(cacheado.solicitud.idSolicitud).toBe(9);
+    expect(cacheado.solicitud.motivo).toBe('Cambio de proyecto');
+  });
+
+  it('ya NO invalida exit-preparation-summary (B6 queda gated por el consumidor, evitando el 400 esperado)', async () => {
+    (continueExitPreparation as any).mockResolvedValue(solicitud({ estadoSolicitud: 'PENDIENTE_LIDER' }));
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useContinueExitPreparation(7), { wrapper });
+
+    result.current.mutate();
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(1));
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['exit-preparation-summary', 7] });
   });
 
   it('no sobreinvalida members/team', async () => {
@@ -278,7 +431,7 @@ describe('useCancelExitPreparation', () => {
     expect(cancelExitPreparation).toHaveBeenCalledWith(7);
   });
 
-  it('en éxito invalida exactamente exit-preparation-summary del proyecto', async () => {
+  it('en éxito invalida exactamente exit-preparation-summary y exit-request-current del proyecto (F11.1)', async () => {
     (cancelExitPreparation as any).mockResolvedValue(solicitud({ estadoSolicitud: 'CANCELADA' }));
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -290,7 +443,8 @@ describe('useCancelExitPreparation', () => {
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['exit-preparation-summary', 7] }),
     );
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['exit-request-current', 7] });
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
   });
 
   it('una mutation fallida no invalida como éxito', async () => {

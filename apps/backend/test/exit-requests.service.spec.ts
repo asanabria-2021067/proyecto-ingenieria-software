@@ -611,6 +611,125 @@ describe('ExitRequestsService.getExitPreparationSummary', () => {
   });
 });
 
+// F11.1 — reader aditivo: la solicitud ABIERTA (PREPARACION o
+// PENDIENTE_LIDER) del actor, o null. Nunca lanza por ausencia de solicitud
+// (a diferencia de getExitPreparationSummary/B6).
+describe('ExitRequestsService.getSolicitudSalidaAbierta', () => {
+  // Caso 1 — PREPARACION
+  it('devuelve la solicitud cuando está en PREPARACION', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(SOLICITUD_PREPARACION);
+    const service = makeService(prisma);
+
+    const resultado = await service.getSolicitudSalidaAbierta(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(resultado).toEqual({ solicitud: SOLICITUD_PREPARACION });
+  });
+
+  // Caso 2 — PENDIENTE_LIDER (el caso que desbloquea F11)
+  it('devuelve la solicitud cuando está en PENDIENTE_LIDER', async () => {
+    const solicitudPendienteLider = { ...SOLICITUD_PREPARACION, estadoSolicitud: 'PENDIENTE_LIDER' };
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(solicitudPendienteLider);
+    const service = makeService(prisma);
+
+    const resultado = await service.getSolicitudSalidaAbierta(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(resultado).toEqual({ solicitud: solicitudPendienteLider });
+  });
+
+  // Caso 3 — sin solicitud abierta: null, nunca una excepción
+  it('devuelve solicitud: null cuando no existe una solicitud abierta, sin lanzar', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    const resultado = await service.getSolicitudSalidaAbierta(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(resultado).toEqual({ solicitud: null });
+  });
+
+  // Caso 4 — estados resueltos no son "abiertos"
+  it.each(['APROBADA', 'RECHAZADA', 'CANCELADA'] as const)(
+    'no reporta como abierta una solicitud en %s',
+    async () => {
+      const prisma = makePrisma();
+      prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+      // El mock respeta el filtro real: una solicitud resuelta nunca
+      // coincide con estadoSolicitud: { in: [PREPARACION, PENDIENTE_LIDER] }.
+      prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+      const service = makeService(prisma);
+
+      const resultado = await service.getSolicitudSalidaAbierta(PROYECTO_ID, MIEMBRO_ID);
+
+      expect(resultado).toEqual({ solicitud: null });
+    },
+  );
+
+  it('consulta con el filtro exacto: proyecto, actor y estadoSolicitud in (PREPARACION, PENDIENTE_LIDER)', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await service.getSolicitudSalidaAbierta(PROYECTO_ID, MIEMBRO_ID);
+
+    expect(prisma.solicitudSalidaProyecto.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          idProyecto: PROYECTO_ID,
+          idUsuario: MIEMBRO_ID,
+          estadoSolicitud: { in: ['PREPARACION', 'PENDIENTE_LIDER'] },
+        },
+      }),
+    );
+  });
+
+  // Caso 5 — aislamiento por usuario
+  it('no devuelve la solicitud abierta de otro usuario', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
+    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: any) =>
+      where.idUsuario === MIEMBRO_ID ? SOLICITUD_PREPARACION : null,
+    );
+    const service = makeService(prisma);
+
+    const otroUsuario = MIEMBRO_ID + 1;
+    const resultado = await service.getSolicitudSalidaAbierta(PROYECTO_ID, otroUsuario);
+
+    expect(resultado).toEqual({ solicitud: null });
+  });
+
+  // Caso 6 — aislamiento por proyecto
+  it('no devuelve la solicitud abierta del mismo usuario en otro proyecto', async () => {
+    const OTRO_PROYECTO = PROYECTO_ID + 1;
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: OTRO_PROYECTO, creadoPor: 999 });
+    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: any) =>
+      where.idProyecto === PROYECTO_ID ? SOLICITUD_PREPARACION : null,
+    );
+    const service = makeService(prisma);
+
+    const resultado = await service.getSolicitudSalidaAbierta(OTRO_PROYECTO, MIEMBRO_ID);
+
+    expect(resultado).toEqual({ solicitud: null });
+  });
+
+  it('rechaza con NotFoundException cuando el proyecto no existe', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await expect(
+      service.getSolicitudSalidaAbierta(999, MIEMBRO_ID),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.solicitudSalidaProyecto.findFirst).not.toHaveBeenCalled();
+  });
+});
+
 const SOLICITUD_PREPARACION_TRANSICION = {
   idSolicitud: 502,
   idProyecto: PROYECTO_ID,
