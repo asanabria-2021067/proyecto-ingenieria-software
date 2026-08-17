@@ -26,6 +26,7 @@ import { ProgressRecordsModule } from './progress-records/progress-records.modul
 import { SprintsModule } from './sprints/sprints.module';
 import { ExitRequestsModule } from './exit-requests/exit-requests.module';
 import { TeamModule } from './team/team.module';
+import { SocialModule } from './social/social.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { TeamModule } from './team/team.module';
     SprintsModule,
     ExitRequestsModule,
     TeamModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [
