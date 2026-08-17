@@ -19,9 +19,7 @@ export function getApiErrorMessage(error: unknown, scope: ApiErrorScope = 'task'
   switch (statusCode) {
     case 400:
       // Las reglas de negocio de roles (cupo lleno, último rol, rol utilizado…)
-      // y de cierre de horas (ajuste sin justificación, participación no
-      // ACTIVO) devuelven un mensaje funcional específico que conviene
-      // mostrar tal cual.
+      // devuelven un mensaje funcional específico que conviene mostrar tal cual.
       if (scope === 'role' || scope === 'horas') {
         return backendMessage || 'Revisa los datos ingresados y las relaciones seleccionadas.';
       }

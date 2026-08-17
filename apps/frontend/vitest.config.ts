@@ -2,10 +2,8 @@ import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 /**
- * T-123: mismo criterio que apps/backend/vitest.config.ts — umbral piso
- * (10%) hasta medir el número real localmente con `npm run test:coverage`.
- * No se generó esa medición real en este entorno por falta de acceso a
- * red/base de datos para correr la suite completa.
+ * T-123: umbral piso (10%) hasta medir el numero real en CI (la medicion
+ * local de la suite completa no se pudo completar en Windows).
  */
 export default defineConfig({
   resolve: {

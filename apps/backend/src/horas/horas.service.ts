@@ -6,13 +6,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CerrarParticipacionDto } from './dto/cerrar-participacion.dto';
 
 type TxClient = Prisma.TransactionClient;
 
-
+/**
+ * Cálculo de horas reconocidas y cierre de participación con ajuste
+ * opcional justificado. Fuente de horas: exclusivamente
+ * `HorasParticipacion`; no se toca `horasReportadas`/`horasAprobadas`.
+ */
 @Injectable()
 export class HorasService {
   private readonly logger = new Logger(HorasService.name);
@@ -21,8 +25,6 @@ export class HorasService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
   ) {}
-
-
 
   private async loadProjectOrThrow(projectId: number, tx?: TxClient) {
     const db = tx ?? this.prisma;
@@ -70,11 +72,11 @@ export class HorasService {
   }
 
   /**
-   * Suma tiempoEstimadoHoras de tareas HECHO, no eliminadas, del proyecto,
-   * donde el usuario tiene o tuvo (activa o cerrada) una AsignacionTarea
-   * (regla 14: AsignacionTarea es la fuente de verdad de asignaciones).
-   * Igual que Jira: el trabajo ya registrado se queda con quien lo hizo,
-   * aunque después se haya cerrado la asignación o cambiado de rol.
+   * Aproximación temporal vía Tarea.tiempoEstimadoHoras: NO representa
+   * horas reales trabajadas. El cálculo correcto es
+   * SUM(AsignacionTarea.horasReales) por participación/rol en tareas HECHO
+   * no eliminadas; ese campo aún no existe en la base compartida. Debe
+   * reemplazarse cuando esté disponible.
    */
   private async calcularHorasDesdeTareas(
     projectId: number,
@@ -100,10 +102,6 @@ export class HorasService {
     return { horasCalculadas, tareas };
   }
 
-  /**
-   * GET de previsualización para T-116: desglose antes de confirmar el
-   * cierre. Solo lectura, no persiste nada.
-   */
   async obtenerDesglose(projectId: number, participacionId: number, userId: number) {
     const proyecto = await this.loadProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
@@ -136,12 +134,8 @@ export class HorasService {
   }
 
   /**
-   * Cierre real (Sección D, reglas 39-47): lleva la participación a
-   * COMPLETADO (cierre normal — NUNCA transforma RETIRADO en COMPLETADO ni
-   * toca el flujo de salida completa de T-113, regla 43). Calcula
-   * horasCalculadas, persiste horasAprobadas (= ajuste si se justificó, o
-   * el valor calculado si no hubo ajuste) y deja estadoHoras: APROBADA para
-   * que T-106/dashboards sigan leyendo exactamente igual que hoy.
+   * Cierre normal ACTIVO -> COMPLETADO. Nunca actúa sobre RETIRADO: ese
+   * estado y su ciclo de vida pertenecen a T-113.
    */
   async cerrarParticipacion(
     projectId: number,
@@ -171,10 +165,21 @@ export class HorasService {
         tx,
       );
 
-      const huboAjuste =
-        dto.horasReconocidas !== undefined && dto.horasReconocidas !== horasCalculadas;
+      // Comparación segura con decimales: se redondea a 2 posiciones antes
+      // de comparar, para no disparar un "ajuste" falso por errores de
+      // punto flotante (ej. 1.1 + 2.2 !== 3.3 en JS).
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      const horasCalculadasRedondeadas = round2(horasCalculadas);
+      const justificacionLimpia = dto.justificacion?.trim();
 
-      if (huboAjuste && !dto.justificacion) {
+      const huboAjuste =
+        dto.horasReconocidas !== undefined &&
+        round2(dto.horasReconocidas) !== horasCalculadasRedondeadas;
+
+      // horasAprobadas != horasCalculadas exige justificacion no vacía.
+      // El trim también corre en el DTO; se repite aquí porque esta
+      // comparación depende del valor calculado en tiempo de ejecución.
+      if (huboAjuste && !justificacionLimpia) {
         throw new BadRequestException(
           'El ajuste de horas requiere una justificación (mínimo 10 caracteres)',
         );
@@ -191,7 +196,9 @@ export class HorasService {
           horasReportadas: horasCalculadas,
           horasAprobadas: horasReconocidas,
           horasCalculadas,
-          justificacionAjuste: huboAjuste ? dto.justificacion : null,
+          // Invariante: si NO hubo ajuste, justificacionAjuste es siempre
+          // null, sin importar qué haya enviado el cliente.
+          justificacionAjuste: huboAjuste ? justificacionLimpia : null,
           estadoHoras: 'APROBADA',
           aprobadoPor: userId,
           fechaAprobacion: ahora,
@@ -228,11 +235,6 @@ export class HorasService {
     };
   }
 
-  // ───────────────────────── aislamiento transaccional ─────────────────────────
-  // Mismo patrón que RolesService.runSerializable (Sección J, regla 80):
-  // SERIALIZABLE + reintento acotado (máx. 3) solo ante P2034 (write
-  // conflict/deadlock). No se rompe el encapsulamiento del helper privado de
-  // RolesService; se implementa un equivalente aquí, como permite la regla.
   private async runSerializable<T>(fn: (tx: TxClient) => Promise<T>): Promise<T> {
     const maxIntentos = 3;
     let ultimoError: unknown;
@@ -252,11 +254,6 @@ export class HorasService {
     throw ultimoError;
   }
 
-  /**
-   * Notificación best-effort posterior al commit: si falla, se registra y
-   * se continúa; nunca revierte el cierre ya persistido. Mismo patrón que
-   * RolesService.safeNotify.
-   */
   private async safeNotify(fn: () => Promise<void>): Promise<void> {
     try {
       await fn();

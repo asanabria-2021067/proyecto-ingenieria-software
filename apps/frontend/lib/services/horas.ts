@@ -1,13 +1,5 @@
 import { apiFetch } from '@/lib/api/client';
 
-/**
- * Capa de servicio de horas/cierre de participación (T-115/T-116).
- * Refleja el contrato real de `HorasController`
- * (apps/backend/src/horas/horas.controller.ts), montado en
- * `proyectos/:projectId/participaciones/:participacionId/horas`. Mismo
- * patrón que `lib/services/roles.ts`.
- */
-
 export interface DesgloseTareaDTO {
   idTarea: number;
   tituloTarea: string;

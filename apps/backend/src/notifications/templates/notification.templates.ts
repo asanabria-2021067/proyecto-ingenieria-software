@@ -23,7 +23,10 @@ export interface NotificationTemplateData {
     taskId: number;
     projectId: number;
   };
-
+  // Reutiliza TipoNotificacion.TAREA_ACTUALIZADA (Tarea 25): no existe un
+  // valor de enum dedicado a "tarea desasignada" y esta tarea no puede
+  // agregar un enum Prisma ni una migración. TAREA_ACTUALIZADA ya existía
+  // en el schema sin ninguna plantilla asociada.
   TAREA_ACTUALIZADA: {
     taskTitle: string;
     projectTitle: string;
@@ -92,7 +95,8 @@ export interface NotificationTemplateData {
     taskCount: number;
   };
 
-
+  // Sección 18B: el líder se auto-asignó a un rol. El actor (líder) siempre se
+  // excluye de los destinatarios, por lo que puede resultar en cero envíos.
   ROL_ASIGNADO_LIDER: {
     userName: string;
     roleName: string;
@@ -115,7 +119,7 @@ export interface NotificationTemplateData {
     solicitudId: number;
   };
 
-
+  // HORAS_VALIDADAS ya existía en el enum sin plantilla asociada.
   HORAS_VALIDADAS: {
     projectTitle: string;
     projectId: number;

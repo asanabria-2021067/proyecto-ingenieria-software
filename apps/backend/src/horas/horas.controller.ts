@@ -1,9 +1,8 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CerrarParticipacionDto } from './dto/cerrar-participacion.dto';
+import { Controller, Get, Post, Param, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { HorasService } from './horas.service';
-
+import { CerrarParticipacionDto } from './dto/cerrar-participacion.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('proyectos/:projectId/participaciones/:participacionId/horas')
 @UseGuards(JwtAuthGuard)

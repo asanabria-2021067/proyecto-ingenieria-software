@@ -15,11 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  cerrarParticipacion,
-  getDesgloseHoras,
-} from '@/lib/services/horas';
-import { projectMembersQueryKey } from '@/hooks/use-project-members';
+import { cerrarParticipacion, getDesgloseHoras } from '@/lib/services/horas';
+import { projectMembersQueryKey } from '@/lib/query-keys/members';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 
 interface CerrarParticipacionDialogProps {
@@ -30,6 +27,11 @@ interface CerrarParticipacionDialogProps {
   nombreCompleto: string;
 }
 
+/**
+ * Componente reutilizable de cierre de participación, sin conectar todavía
+ * a ninguna vista. Se conectará a la vista moderna de miembros cuando
+ * HU-123 esté disponible.
+ */
 export function CerrarParticipacionDialog({
   open,
   onOpenChange,
@@ -49,9 +51,6 @@ export function CerrarParticipacionDialog({
     enabled: open,
   });
 
-  // Al abrir, resetea el formulario de ajuste (mismo patrón que
-  // EditEndDateDialog: setState diferido fuera del cuerpo síncrono del
-  // efecto).
   useEffect(() => {
     if (!open) return;
     const raf = requestAnimationFrame(() => {
@@ -153,6 +152,7 @@ export function CerrarParticipacionDialog({
                     id="horas-ajustadas"
                     type="number"
                     min={0}
+                    step="0.01"
                     value={horasAjustadas}
                     onChange={(e) => setHorasAjustadas(e.target.value)}
                     placeholder={String(horasCalculadas)}
