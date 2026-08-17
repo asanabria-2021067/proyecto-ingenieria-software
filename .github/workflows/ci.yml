@@ -20,7 +20,9 @@ concurrency:
 
 env:
   # Prisma exige que la variable exista para generar el cliente.
-  # No se conecta a ninguna base de datos real: las pruebas usan mocks.
+  # Apunta al servicio postgres efimero del job backend (ver abajo).
+  # Las pruebas unitarias siguen usando mocks (nunca tocan esta base); las
+  # de integracion si se conectan realmente via INTEGRATION_DATABASE_URL.
   DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
   DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
 
@@ -31,6 +33,20 @@ jobs:
     defaults:
       run:
         working-directory: apps/backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -48,12 +64,20 @@ jobs:
       - name: Generar cliente Prisma
         run: npx prisma generate
 
+      - name: Aplicar migraciones Prisma
+        run: npx prisma migrate deploy
+
       - name: Lint
         run: npm run lint
         continue-on-error: true
 
-      - name: Pruebas unitarias y de integracion (Vitest)
-        run: npm run test
+      - name: Pruebas unitarias con cobertura (Vitest)
+        run: npm run test:coverage
+
+      - name: Pruebas de integracion en serie contra Postgres efimero (Vitest)
+        run: npm run test:integration
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
 
   frontend:
     name: Frontend - lint y pruebas
