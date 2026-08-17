@@ -17,3 +17,12 @@ export const projectSprintsQueryKey = (idProyecto: number) => ['project-sprints'
  */
 export const sprintDetailQueryKey = (idProyecto: number, idSprint: number) =>
   ['sprint-detail', idProyecto, idSprint] as const;
+
+/**
+ * SprintClosingSummary (F5) — read-model distinto de `sprint-detail`
+ * (`GET .../resumen-cierre`, no `GET .../sprints/:sprintId`), así que usa su
+ * propio namespace en vez de reutilizar `sprintDetailQueryKey`. Incluye
+ * ambos ids por el mismo criterio de aislamiento cross-project.
+ */
+export const sprintClosingSummaryQueryKey = (idProyecto: number, idSprint: number) =>
+  ['sprint-closing-summary', idProyecto, idSprint] as const;
