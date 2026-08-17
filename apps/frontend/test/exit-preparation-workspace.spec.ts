@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { ExitPreparationBlockerDto, ExitPreparationSummaryDto } from '../lib/types/exit-requests';
 
@@ -22,10 +22,22 @@ vi.mock('../hooks/use-exit-request', () => ({
   useExitPreparationSummary: vi.fn(),
   useContinueExitPreparation: vi.fn(),
 }));
+// F10: el workspace ahora monta <CloseAssignmentForm> (siempre presente,
+// visibilidad controlada por `open`), que internamente llama
+// `useProjectTasks` (necesita `cerrarAsignacion`). Se mockea aquí solo para
+// que el árbol monte sin QueryClientProvider — el comportamiento propio de
+// CloseAssignmentForm ya tiene su propia suite completa en
+// close-assignment-form.spec.ts; no se duplica aquí.
+vi.mock('../hooks/use-project-tasks', () => ({
+  useProjectTasks: vi.fn(() => ({
+    cerrarAsignacion: { mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null },
+  })),
+}));
 
 import ExitPreparationWorkspaceClient from '../app/dashboard/projects/[id]/salida/preparacion/exit-preparation-workspace-client';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useContinueExitPreparation, useExitPreparationSummary } from '../hooks/use-exit-request';
+import { useProjectTasks } from '../hooks/use-project-tasks';
 
 const proyectoFixture: ProyectoDetalleDTO = {
   idProyecto: 7,
@@ -370,5 +382,64 @@ describe('ExitPreparationWorkspaceClient (F9)', () => {
 
     expect(useExitPreparationSummary).toHaveBeenCalledWith(7);
     expect(useContinueExitPreparation).toHaveBeenCalledWith(7);
+  });
+
+  // ── F10: wiring del punto de entrada compartido CloseAssignmentForm ──────
+  describe('integración con F10 (Cerrar tramo)', () => {
+    it('cada responsabilidad ofrece "Cerrar tramo"; al pulsarlo abre el mismo CloseAssignmentForm con los ids correctos', async () => {
+      (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+      const blockers = [
+        blocker({ idAsignacion: 55, idTarea: 21, tituloTarea: 'Documentar procesos y procedimientos clave' }),
+      ];
+      mockSummaryHook({ summary: summary({ blockers, cantidadBlockers: 1, puedeContinuar: false }) });
+      mockContinueHook();
+
+      renderWorkspace();
+
+      expect(screen.queryByRole('heading', { name: 'Cerrar tramo' })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cerrar tramo' }));
+
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { name: 'Cerrar tramo' })).toBeInTheDocument(),
+      );
+      // CloseAssignmentForm llama useProjectTasks(idProyecto) internamente;
+      // aquí solo se confirma el wiring (ids correctos), no su comportamiento
+      // interno (ya cubierto en close-assignment-form.spec.ts).
+      expect(useProjectTasks).toHaveBeenCalledWith(7);
+    });
+
+    it('tras un cierre exitoso, refresca exit-preparation-summary (B6 vuelve a ser la fuente de verdad)', async () => {
+      (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+      const blockers = [blocker({ idAsignacion: 55, idTarea: 21 })];
+      const refetch = vi.fn();
+      mockSummaryHook({
+        summary: summary({ blockers, cantidadBlockers: 1, puedeContinuar: false }),
+        refetch,
+      });
+      mockContinueHook();
+      const mutate = vi.fn((_vars: unknown, opts: { onSuccess?: () => void }) => opts.onSuccess?.());
+      (useProjectTasks as any).mockReturnValue({
+        cerrarAsignacion: { mutate, reset: vi.fn(), isPending: false, isError: false, error: null },
+      });
+
+      renderWorkspace();
+      fireEvent.click(screen.getByRole('button', { name: 'Cerrar tramo' }));
+      const dialog = await screen.findByRole('dialog');
+
+      fireEvent.change(within(dialog).getByLabelText(/Horas reales/), { target: { value: '2' } });
+      fireEvent.change(within(dialog).getByLabelText(/Registro de avance/), {
+        target: { value: 'a'.repeat(200) },
+      });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar tramo' }));
+
+      await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+      expect(refetch).toHaveBeenCalledTimes(1);
+      // El diálogo se cierra tras el éxito — B6 decide, en el siguiente
+      // fetch real, si esa responsabilidad sigue apareciendo como blocker.
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'Cerrar tramo' })).not.toBeInTheDocument(),
+      );
+    });
   });
 });

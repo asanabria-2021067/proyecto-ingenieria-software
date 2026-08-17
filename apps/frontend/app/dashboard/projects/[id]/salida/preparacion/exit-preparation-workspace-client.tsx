@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CheckCircle2, Info, Loader2 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useContinueExitPreparation, useExitPreparationSummary } from '@/hooks/use-exit-request';
+import { CloseAssignmentForm } from '@/components/projects/close-assignment-form';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -94,7 +95,13 @@ function clasificarColumna(item: ExitPreparationBlockerDto): PreparationColumnKe
 // no expone descripción, asignado, etiquetas ni comentarios — solo el
 // subconjunto de AsignacionTarea relevante para la preparación de salida.
 // Fabricar esos campos inventaría datos que el backend no decide.
-function ResponsibilityCard({ item }: { item: ExitPreparationBlockerDto }) {
+function ResponsibilityCard({
+  item,
+  onCerrarTramo,
+}: {
+  item: ExitPreparationBlockerDto;
+  onCerrarTramo: (item: ExitPreparationBlockerDto) => void;
+}) {
   return (
     <div className="space-y-2 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-3 shadow-sm">
       <p className="text-sm font-semibold text-on-surface">{item.tituloTarea}</p>
@@ -116,6 +123,17 @@ function ResponsibilityCard({ item }: { item: ExitPreparationBlockerDto }) {
           />
         )}
       </div>
+      {/* F10 — punto de entrada compartido: abre el mismo CloseAssignmentForm
+          que el Kanban normal, nunca un formulario paralelo. */}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onCerrarTramo(item)}
+        className="h-8 w-full rounded-md border-outline-variant text-xs font-semibold"
+      >
+        Cerrar tramo
+      </Button>
     </div>
   );
 }
@@ -127,7 +145,13 @@ function ResponsibilityCard({ item }: { item: ExitPreparationBlockerDto }) {
 // está acoplado a EstadoTarea/DnD/@dnd-kit — este tablero es de solo lectura
 // (F9 no implementa el cierre de tramo; eso es F10) y el backend no expone
 // ninguna transición para "mover" una responsabilidad entre estas columnas.
-function ExitPreparationBoard({ blockers }: { blockers: ExitPreparationBlockerDto[] }) {
+function ExitPreparationBoard({
+  blockers,
+  onCerrarTramo,
+}: {
+  blockers: ExitPreparationBlockerDto[];
+  onCerrarTramo: (item: ExitPreparationBlockerDto) => void;
+}) {
   return (
     <div className="-mx-1 overflow-x-auto px-1 pb-2">
       <div className="grid min-h-72 min-w-280 grid-cols-4 gap-4 xl:min-w-0">
@@ -165,7 +189,9 @@ function ExitPreparationBoard({ blockers }: { blockers: ExitPreparationBlockerDt
                     <p className="text-xs text-tertiary">Sin responsabilidades en este estado.</p>
                   </div>
                 ) : (
-                  items.map((item) => <ResponsibilityCard key={item.idAsignacion} item={item} />)
+                  items.map((item) => (
+                    <ResponsibilityCard key={item.idAsignacion} item={item} onCerrarTramo={onCerrarTramo} />
+                  ))
                 )}
               </div>
             </section>
@@ -306,6 +332,14 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
   // la propia transición exitosa.
   const [confirmado, setConfirmado] = useState(false);
   const [continuarError, setContinuarError] = useState<string | null>(null);
+
+  // F10 — responsabilidad seleccionada para "Cerrar tramo" (mismo
+  // CloseAssignmentForm que el Kanban normal). null cuando el diálogo está
+  // cerrado; el propio Dialog controla su visibilidad vía `open`, este
+  // estado solo decide CUÁL asignación se cierra.
+  const [cerrarTramoContexto, setCerrarTramoContexto] = useState<ExitPreparationBlockerDto | null>(
+    null,
+  );
 
   const handleContinuar = () => {
     setContinuarError(null);
@@ -455,11 +489,31 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ExitPreparationBoard blockers={summary.blockers} />
+              <ExitPreparationBoard blockers={summary.blockers} onCerrarTramo={setCerrarTramoContexto} />
             )}
           </div>
         </>
       ) : null}
+
+      {/* F10 — mismo CloseAssignmentForm que el Kanban normal. Tras un cierre
+          exitoso, B6 ya no devolverá esta asignación como blocker: se
+          refresca `exit-preparation-summary` para que el próximo render
+          refleje el estado real del servidor — nunca se mantiene la card
+          "cerrada" artificialmente en el cliente. */}
+      <CloseAssignmentForm
+        open={cerrarTramoContexto !== null}
+        onOpenChange={(open) => {
+          if (!open) setCerrarTramoContexto(null);
+        }}
+        idProyecto={idProyecto}
+        idTarea={cerrarTramoContexto?.idTarea ?? 0}
+        idAsignacion={cerrarTramoContexto?.idAsignacion ?? 0}
+        tituloTarea={cerrarTramoContexto?.tituloTarea}
+        onSuccess={() => {
+          setCerrarTramoContexto(null);
+          void refetch();
+        }}
+      />
     </div>
   );
 }

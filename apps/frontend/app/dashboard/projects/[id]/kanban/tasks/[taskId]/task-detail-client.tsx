@@ -57,6 +57,7 @@ import {
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { TaskCommentsPanel } from '@/components/projects/task-comments-panel';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
+import { CloseAssignmentForm } from '@/components/projects/close-assignment-form';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
@@ -171,6 +172,7 @@ function TaskDetailView({
   const [editarAbierto, setEditarAbierto] = useState(false);
   const [etiquetasAbierto, setEtiquetasAbierto] = useState(false);
   const [borrarAbierto, setBorrarAbierto] = useState(false);
+  const [cerrarTramoAbierto, setCerrarTramoAbierto] = useState(false);
 
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
   const asignado = tarea.asignacionActiva?.usuario ?? null;
@@ -287,8 +289,26 @@ function TaskDetailView({
             Volver al tablero
           </Button>
 
-          {isLeader && (
+          {(esAsignadoActivo || isLeader) && (
             <div className="flex flex-wrap items-center gap-2">
+              {/* F10 — solo quien tiene la asignación activa puede cerrar su
+                  propio tramo (mismo criterio que el backend:
+                  tasks.service.ts closeAssignment rechaza con 403 si
+                  actorUserId !== asignacion.idUsuario). Independiente de
+                  isLeader: un líder sin asignación activa no ve este botón. */}
+              {esAsignadoActivo && tarea.asignacionActiva && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCerrarTramoAbierto(true)}
+                  aria-label={`Cerrar tramo de ${tarea.tituloTarea}`}
+                  className="h-9.5 gap-1.5 rounded-md border-outline-variant text-xs font-bold"
+                >
+                  Cerrar tramo
+                </Button>
+              )}
+              {isLeader && (
               <Button
                 type="button"
                 size="sm"
@@ -299,6 +319,8 @@ function TaskDetailView({
                 <Pencil className="size-3.5" aria-hidden="true" />
                 Editar tarea
               </Button>
+              )}
+              {isLeader && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -351,6 +373,7 @@ function TaskDetailView({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
             </div>
           )}
         </div>
@@ -596,6 +619,18 @@ function TaskDetailView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* F10 — Cerrar tramo (Kanban normal): reutiliza el mismo componente que F9. */}
+      {tarea.asignacionActiva && (
+        <CloseAssignmentForm
+          open={cerrarTramoAbierto}
+          onOpenChange={setCerrarTramoAbierto}
+          idProyecto={idProyecto}
+          idTarea={tarea.idTarea}
+          idAsignacion={tarea.asignacionActiva.idAsignacion}
+          tituloTarea={tarea.tituloTarea}
+        />
+      )}
 
       {/* Gestor de etiquetas (solo líder), abierto desde el formulario de edición */}
       {isLeader && (

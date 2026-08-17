@@ -100,3 +100,17 @@ export interface UpdateTaskStateInput {
 export interface AssignTaskInput {
   idUsuario: number;
 }
+
+/**
+ * Body de `POST /proyectos/:projectId/tareas/:taskId/asignaciones/:assignmentId/cerrar`
+ * (B2) — equivalente a `CloseAssignmentDto`. `contenidoAvance` viaja ya
+ * recortado (mismo `@Transform` que el backend aplica antes de validar los
+ * 200 caracteres). `marcarComoHecha` siempre se envía explícito (el DTO lo
+ * acepta como boolean opcional, pero `false` explícito es un valor válido
+ * idéntico a omitirlo).
+ */
+export interface CloseAssignmentInput {
+  horasReales: number;
+  contenidoAvance: string;
+  marcarComoHecha: boolean;
+}
