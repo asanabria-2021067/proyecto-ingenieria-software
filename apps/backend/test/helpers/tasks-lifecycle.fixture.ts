@@ -84,6 +84,12 @@ export interface ParticipacionRow {
   estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
 }
 
+export interface SprintRow {
+  idSprint: number;
+  idProyecto: number;
+  estado: 'ACTIVO' | 'EN_FINALIZACION' | 'CERRADO';
+}
+
 export interface TareaRow {
   idTarea: number;
   idProyecto: number;
@@ -143,6 +149,7 @@ export interface FixtureState {
   hitos: HitoRow[];
   etiquetas: EtiquetaRow[];
   participaciones: ParticipacionRow[];
+  sprints: SprintRow[];
   tareas: TareaRow[];
   asignaciones: AsignacionRow[];
   tareaEtiquetas: TareaEtiquetaRow[];
@@ -169,6 +176,7 @@ export const FIXTURE_IDS = {
   proyectos: { A: 1, B: 2 },
   roles: { desarrolloA: 10, disenoA: 11, desarrolloB: 20 },
   hitos: { A: 100, B: 200 },
+  sprints: { A: 1000, B: 2000 },
   etiquetas: { aUrgente: 1000, aBackend: 1001, bOtra: 2000 },
 } as const;
 
@@ -182,7 +190,7 @@ function nextId(state: FixtureState, table: string): number {
 export const FECHA_FUTURA = '2027-06-15';
 
 export function createFixtureState(): FixtureState {
-  const { usuarios: U, proyectos: P, roles: R, hitos: H, etiquetas: E } = FIXTURE_IDS;
+  const { usuarios: U, proyectos: P, roles: R, hitos: H, etiquetas: E, sprints: S } = FIXTURE_IDS;
 
   return {
     usuarios: [
@@ -245,6 +253,14 @@ export function createFixtureState(): FixtureState {
       { idParticipacion: 3, idUsuario: U.a3Diseno, idRolProyecto: R.disenoA, estadoParticipacion: 'ACTIVO' },
       { idParticipacion: 4, idUsuario: U.inactivoA, idRolProyecto: R.desarrolloA, estadoParticipacion: 'RETIRADO' },
       { idParticipacion: 5, idUsuario: U.participanteB, idRolProyecto: R.desarrolloB, estadoParticipacion: 'ACTIVO' },
+    ],
+    // Sprint ACTIVO por proyecto (FND-03.B): ambos proyectos del fixture
+    // admiten creación de tareas por defecto. Los tests que necesitan
+    // ejercitar el rechazo por falta de Sprint activo mutan este array
+    // directamente (p.ej. cambiando el estado a CERRADO o vaciándolo).
+    sprints: [
+      { idSprint: S.A, idProyecto: P.A, estado: 'ACTIVO' },
+      { idSprint: S.B, idProyecto: P.B, estado: 'ACTIVO' },
     ],
     tareas: [],
     asignaciones: [],
@@ -509,6 +525,25 @@ export function makeFakeDb(state: FixtureState) {
       }),
     },
 
+    sprint: {
+      findFirst: vi.fn(async (args: any) => {
+        maybeFail('sprint.findFirst');
+        const where = args.where ?? {};
+        const row = state.sprints.find(
+          (s) =>
+            (where.idProyecto === undefined || s.idProyecto === where.idProyecto) &&
+            (where.estado === undefined || s.estado === where.estado),
+        );
+        if (!row) return null;
+        if (!args.select) return row;
+        const result: Record<string, unknown> = {};
+        for (const key of Object.keys(args.select)) {
+          result[key] = (row as unknown as Record<string, unknown>)[key];
+        }
+        return result;
+      }),
+    },
+
     tarea: {
       findFirst: vi.fn(async (args: any) => {
         maybeFail('tarea.findFirst');
@@ -528,6 +563,9 @@ export function makeFakeDb(state: FixtureState) {
         const rows = state.tareas.filter(
           (t) =>
             (where.idProyecto === undefined || t.idProyecto === where.idProyecto) &&
+            // A12.1: syncHitoEstado filtra por idHito — necesario para que
+            // esta fixture soporte esa consulta correctamente.
+            (where.idHito === undefined || t.idHito === where.idHito) &&
             (where.eliminadoEn === undefined || t.eliminadoEn === where.eliminadoEn),
         );
         return rows.map((row) => (args.select ? buildTareaSelectShape(row, state) : row));
@@ -645,6 +683,17 @@ export function makeFakeDb(state: FixtureState) {
       findUnique: vi.fn(async (args: any) => {
         maybeFail('hito.findUnique');
         return state.hitos.find((h) => h.idHito === args.where.idHito) ?? null;
+      }),
+      // A12.1: usado por syncHitoEstado para persistir el progreso
+      // recalculado tras crear/mutar/eliminar una tarea de un Hito.
+      update: vi.fn(async (args: any) => {
+        maybeFail('hito.update');
+        const hito = state.hitos.find((h) => h.idHito === args.where.idHito);
+        if (!hito) throw new Error(`fixture: hito ${args.where.idHito} no encontrado`);
+        const before = { ...hito };
+        recordUndo(() => Object.assign(hito, before));
+        Object.assign(hito, args.data);
+        return hito;
       }),
     },
 

@@ -1,21 +1,62 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
-import { ProjectsController } from '../src/projects/projects.controller';
+import { TeamController } from '../src/team/team.controller';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 
 function makeService() {
-  return { getTeamSummary: vi.fn() } as any;
+  return {
+    findTeam: vi.fn(),
+    getTeamSummary: vi.fn(),
+    findTeamMemberDetail: vi.fn(),
+    getPendingPostulations: vi.fn(),
+  } as any;
 }
 
-describe('ProjectsController.getTeamSummary (GET /proyectos/:id/miembros/resumen)', () => {
+describe('TeamController.findTeam (GET /proyectos/:id/equipo)', () => {
+  it('está registrado con la ruta pública histórica y protegido por JwtAuthGuard', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, TeamController.prototype.findTeam)).toBe(':id/equipo');
+    expect(Reflect.getMetadata(METHOD_METADATA, TeamController.prototype.findTeam)).toBe(0); // GET
+
+    const guards = Reflect.getMetadata(GUARDS_METADATA, TeamController.prototype.findTeam);
+    expect(guards).toContain(JwtAuthGuard);
+  });
+
+  it('delega en TeamService.findTeam con id parseado, sin transformar la respuesta', async () => {
+    const service = makeService();
+    const equipo = [{ idParticipacion: 1 }];
+    service.findTeam.mockResolvedValue(equipo);
+    const controller = new TeamController(service);
+
+    const result = await controller.findTeam(42);
+
+    expect(service.findTeam).toHaveBeenCalledTimes(1);
+    expect(service.findTeam).toHaveBeenCalledWith(42);
+    expect(result).toBe(equipo);
+  });
+
+  it('el parámetro :id usa ParseIntPipe y ProjectsController ya no declara GET :id/equipo', () => {
+    const { readFileSync } = require('node:fs') as typeof import('node:fs');
+    const { join } = require('node:path') as typeof import('node:path');
+    const teamSource = readFileSync(join(__dirname, '../src/team/team.controller.ts'), 'utf-8');
+    const bloque = teamSource.slice(teamSource.indexOf("@Get(':id/equipo')"));
+    const bloqueHandler = bloque.slice(0, bloque.indexOf('\n\n'));
+
+    expect(bloqueHandler).toMatch(/@Param\('id',\s*ParseIntPipe\)/);
+
+    const projectsSource = readFileSync(join(__dirname, '../src/projects/projects.controller.ts'), 'utf-8');
+    expect(projectsSource).not.toContain("@Get(':id/equipo')");
+  });
+});
+
+describe('TeamController.getTeamSummary (GET /proyectos/:id/miembros/resumen)', () => {
   describe('metadata de ruta y guard', () => {
     it('está registrado como GET en la ruta :id/miembros/resumen', () => {
       expect(
-        Reflect.getMetadata(PATH_METADATA, ProjectsController.prototype.getTeamSummary),
+        Reflect.getMetadata(PATH_METADATA, TeamController.prototype.getTeamSummary),
       ).toBe(':id/miembros/resumen');
       expect(
-        Reflect.getMetadata(METHOD_METADATA, ProjectsController.prototype.getTeamSummary),
+        Reflect.getMetadata(METHOD_METADATA, TeamController.prototype.getTeamSummary),
       ).toBe(0); // GET
     });
 
@@ -25,17 +66,17 @@ describe('ProjectsController.getTeamSummary (GET /proyectos/:id/miembros/resumen
     // está decorado con JwtAuthGuard, el mismo guard que protege el resto de
     // lecturas administrativas del controller.
     it('401 STRUCTURAL GUARD COVERAGE — el handler está protegido por JwtAuthGuard', () => {
-      const guards = Reflect.getMetadata(GUARDS_METADATA, ProjectsController.prototype.getTeamSummary);
+      const guards = Reflect.getMetadata(GUARDS_METADATA, TeamController.prototype.getTeamSummary);
       expect(guards).toContain(JwtAuthGuard);
     });
   });
 
   // A. Delegación camino feliz (cobertura estructural del 200)
-  it('delega en ProjectsService.getTeamSummary con id y userId (CurrentUser), y retorna su resultado sin transformarlo', async () => {
+  it('delega en TeamService.getTeamSummary con id y userId (CurrentUser), y retorna su resultado sin transformarlo', async () => {
     const service = makeService();
     const resumen = { lider: { idUsuario: 7 }, miembros: [] };
     service.getTeamSummary.mockResolvedValue(resumen);
-    const controller = new ProjectsController(service);
+    const controller = new TeamController(service);
 
     const result = await controller.getTeamSummary(42, { userId: 7 });
 
@@ -49,7 +90,7 @@ describe('ProjectsController.getTeamSummary (GET /proyectos/:id/miembros/resumen
     const service = makeService();
     const error = new ForbiddenException('No eres el líder de este proyecto');
     service.getTeamSummary.mockRejectedValue(error);
-    const controller = new ProjectsController(service);
+    const controller = new TeamController(service);
 
     await expect(controller.getTeamSummary(42, { userId: 7 })).rejects.toBe(error);
   });
@@ -59,7 +100,7 @@ describe('ProjectsController.getTeamSummary (GET /proyectos/:id/miembros/resumen
     const service = makeService();
     const error = new NotFoundException('Proyecto con id 42 no encontrado');
     service.getTeamSummary.mockRejectedValue(error);
-    const controller = new ProjectsController(service);
+    const controller = new TeamController(service);
 
     await expect(controller.getTeamSummary(42, { userId: 7 })).rejects.toBe(error);
   });
@@ -71,10 +112,48 @@ describe('ProjectsController.getTeamSummary (GET /proyectos/:id/miembros/resumen
   it('el parámetro :id usa ParseIntPipe (inspección estructural, no HTTP E2E)', () => {
     const { readFileSync } = require('node:fs') as typeof import('node:fs');
     const { join } = require('node:path') as typeof import('node:path');
-    const source = readFileSync(join(__dirname, '../src/projects/projects.controller.ts'), 'utf-8');
+    const source = readFileSync(join(__dirname, '../src/team/team.controller.ts'), 'utf-8');
     const bloque = source.slice(source.indexOf("@Get(':id/miembros/resumen')"));
     const bloqueHandler = bloque.slice(0, bloque.indexOf('\n\n'));
 
     expect(bloqueHandler).toMatch(/@Param\('id',\s*ParseIntPipe\)/);
+  });
+});
+
+describe('TeamController.findTeamMemberDetail (GET /proyectos/:id/equipo/:idUsuario)', () => {
+  it('está registrado con la ruta pública histórica y protegido por JwtAuthGuard', () => {
+    expect(
+      Reflect.getMetadata(PATH_METADATA, TeamController.prototype.findTeamMemberDetail),
+    ).toBe(':id/equipo/:idUsuario');
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, TeamController.prototype.findTeamMemberDetail),
+    ).toBe(0); // GET
+
+    const guards = Reflect.getMetadata(GUARDS_METADATA, TeamController.prototype.findTeamMemberDetail);
+    expect(guards).toContain(JwtAuthGuard);
+  });
+
+  it('delega en TeamService.findTeamMemberDetail con id, idUsuario y userId, sin transformar la respuesta', async () => {
+    const service = makeService();
+    const detalle = { usuario: { idUsuario: 2 }, participaciones: [], tareas: [] };
+    service.findTeamMemberDetail.mockResolvedValue(detalle);
+    const controller = new TeamController(service);
+
+    const result = await controller.findTeamMemberDetail(42, 2, { userId: 7 });
+
+    expect(service.findTeamMemberDetail).toHaveBeenCalledTimes(1);
+    expect(service.findTeamMemberDetail).toHaveBeenCalledWith(42, 2, 7);
+    expect(result).toBe(detalle);
+  });
+
+  it('los parámetros :id y :idUsuario usan ParseIntPipe (inspección estructural)', () => {
+    const { readFileSync } = require('node:fs') as typeof import('node:fs');
+    const { join } = require('node:path') as typeof import('node:path');
+    const source = readFileSync(join(__dirname, '../src/team/team.controller.ts'), 'utf-8');
+    const bloque = source.slice(source.indexOf("@Get(':id/equipo/:idUsuario')"));
+    const bloqueHandler = bloque.slice(0, bloque.indexOf('\n\n'));
+
+    expect(bloqueHandler).toMatch(/@Param\('id',\s*ParseIntPipe\)/);
+    expect(bloqueHandler).toMatch(/@Param\('idUsuario',\s*ParseIntPipe\)/);
   });
 });

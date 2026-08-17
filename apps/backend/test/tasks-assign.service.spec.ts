@@ -335,9 +335,30 @@ describe('TasksService.assign', () => {
 
       expect(tx.asignacionTarea.create).toHaveBeenCalledTimes(1);
       expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
-        data: { idTarea: 42, idUsuario: 7, asignadoPor: 1, desasignadaEn: null },
+        data: { idTarea: 42, idUsuario: 7, idParticipacion: undefined, asignadoPor: 1, desasignadaEn: null },
       });
       expect(tx.asignacionTarea.updateMany).not.toHaveBeenCalled();
+    });
+
+    /**
+     * X1.1: idParticipacion exacto ya resuelto por
+     * assertUserAssignableToProject (misma consulta que ya valida al
+     * candidato — sin segunda consulta) se persiste tal cual en la fila
+     * activa. Necesario para que HoursRecognitionService (B10) pueda
+     * encontrar este tramo como reconocible.
+     */
+    it('el idParticipacion resuelto por assertUserAssignableToProject se persiste en la fila creada', async () => {
+      const relations = makeRelations({
+        assertUserAssignableToProject: vi.fn().mockResolvedValue(55),
+      });
+      const { tx, service } = makeService({ relations });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+
+      await service.assign(5, 42, 1, DTO);
+
+      expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
+        data: { idTarea: 42, idUsuario: 7, idParticipacion: 55, asignadoPor: 1, desasignadaEn: null },
+      });
     });
 
     it('lectura final ocurre después, respuesta pública con el nuevo asignado', async () => {
@@ -491,7 +512,33 @@ describe('TasksService.assign', () => {
       await service.assign(5, 42, 1, DTO);
 
       expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
-        data: { idTarea: 42, idUsuario: 7, asignadoPor: 1, desasignadaEn: null },
+        data: { idTarea: 42, idUsuario: 7, idParticipacion: undefined, asignadoPor: 1, desasignadaEn: null },
+      });
+    });
+
+    it('X1.1: reasignación persiste el idParticipacion exacto resuelto por assertUserAssignableToProject (camino compartido con la asignación inicial vía createActiveAssignment)', async () => {
+      const relations = makeRelations({
+        assertUserAssignableToProject: vi.fn().mockResolvedValue(88),
+      });
+      const { tx, service } = makeService({
+        relations,
+        context: makeContext({
+          getActiveAssignment: vi.fn().mockResolvedValue({
+            idAsignacion: 9,
+            idTarea: 42,
+            idUsuario: 3,
+            asignadoPor: 1,
+            fechaAsignacion: new Date('2026-01-05T00:00:00.000Z'),
+            desasignadaEn: null,
+          }),
+        }),
+      });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+
+      await service.assign(5, 42, 1, DTO);
+
+      expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
+        data: { idTarea: 42, idUsuario: 7, idParticipacion: 88, asignadoPor: 1, desasignadaEn: null },
       });
     });
 

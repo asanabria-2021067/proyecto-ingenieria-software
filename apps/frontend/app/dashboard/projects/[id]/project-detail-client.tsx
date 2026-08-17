@@ -11,13 +11,16 @@ import { Button } from '@/components/ui/button';
 import { type RolesSheetIntent } from '@/components/projects/project-roles-sheet';
 import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
 import { ProjectClosureSection } from '@/components/projects/detail/project-closure-section';
+import { ExitRequestSection } from '@/components/projects/detail/exit-request-section';
 import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
 import { ProjectRoleManagementSection } from '@/components/projects/detail/project-role-management-section';
 import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectRoles } from '@/hooks/use-project-roles';
+import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { approveProjectClosure, rejectProjectClosure } from '@/lib/services/projects';
+import { useCurrentExitRequest } from '@/hooks/use-exit-request';
+import { approveProjectClosure, rejectProjectClosure, requestProjectClosure } from '@/lib/services/projects';
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 
@@ -66,8 +69,60 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   // Liderazgo determinado exclusivamente por Proyecto.creadoPor.
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
 
+  // F9 — único punto de entrada en la UI hacia /salida/preparacion.
+  const { request: solicitudSalidaAbierta } = useCurrentExitRequest(idProyecto);
+
   const enSolicitudCierre = proyecto.estadoProyecto === 'EN_SOLICITUD_CIERRE';
   const [resolviendoCierre, setResolviendoCierre] = useState(false);
+
+  // F16 — único disparador de "Solicitar cierre del proyecto" (A11:
+  // ProjectsService.requestClose). Solo el líder, y solo cuando el proyecto
+  // está EN_PROGRESO: es la única precondición de estado que A11 exige antes
+  // de evaluar el Sprint operable, así que fuera de EN_PROGRESO el control ni
+  // se muestra (mismo criterio que `enSolicitudCierre &&` para el aviso de
+  // aprobación pendiente).
+  const mostrarSolicitarCierre = isLeader && proyecto.estadoProyecto === 'EN_PROGRESO';
+  const { sprints } = useProjectSprints(idProyecto);
+  // A11 (`assertNoOperableSprint`): solo ACTIVO/EN_FINALIZACION bloquean;
+  // CERRADO y la ausencia de Sprint nunca bloquean por esta razón. El índice
+  // parcial `sprint_operable_unique` garantiza que a lo sumo un Sprint del
+  // proyecto está en uno de estos dos estados a la vez.
+  const cierreBloqueadoPorSprint = sprints.some(
+    (s) => s.estado === 'ACTIVO' || s.estado === 'EN_FINALIZACION',
+  );
+  const [solicitandoCierre, setSolicitandoCierre] = useState(false);
+
+  const solicitarCierre = async () => {
+    const { isConfirmed } = await uvgSwal.fire({
+      icon: 'question',
+      title: '¿Solicitar cierre del proyecto?',
+      text: 'Un administrador deberá aprobar la solicitud para finalizar el proyecto.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, solicitar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!isConfirmed) return;
+    setSolicitandoCierre(true);
+    try {
+      await requestProjectClosure(idProyecto);
+      await queryClient.invalidateQueries({ queryKey: ['project', idProyecto] });
+      await uvgSwal.fire({
+        icon: 'success',
+        title: 'Solicitud enviada',
+        text: 'Un administrador revisará tu solicitud de cierre.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (err: unknown) {
+      await uvgSwal.fire({
+        icon: 'error',
+        title: 'No se pudo solicitar el cierre',
+        text: err instanceof Error ? err.message : 'Ocurrió un error al solicitar el cierre del proyecto.',
+      });
+    } finally {
+      setSolicitandoCierre(false);
+    }
+  };
 
   const resolverCierre = async (accion: 'APROBAR' | 'RECHAZAR') => {
     const { isConfirmed } = await uvgSwal.fire({
@@ -122,7 +177,11 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     currentUser != null && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeVerKanban = isLeader || esParticipante;
 
-  // Roles enriquecidos (stats + isMine/canLeave) solo para el líder.
+  // Roles enriquecidos (stats + isMine/canLeave): el líder los ve siempre;
+  // un participante activo también los necesita para "Mi rol"/"Salir de este
+  // rol" en su propia tarjeta (el backend acepta ambos casos — 403 solo si
+  // no es líder y no tiene ningún rol activo, caso que `esParticipante` ya
+  // descarta aquí).
   const {
     roles: rolesAdmin,
     crearRol,
@@ -130,7 +189,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     eliminarRol,
     asignarmeRol,
     salirDeRol,
-  } = useProjectRoles(idProyecto, { enabled: isLeader });
+  } = useProjectRoles(idProyecto, { enabled: isLeader || esParticipante });
 
   const [rolesSheetAbierto, setRolesSheetAbierto] = useState(false);
   const [rolesSheetIntent, setRolesSheetIntent] = useState<RolesSheetIntent>({ kind: 'list' });
@@ -166,7 +225,16 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 pb-12 pt-6 md:px-8">
-      <ProjectSummarySection proyecto={proyecto} isLeader={isLeader} isAdmin={isAdmin} puedeVerKanban={puedeVerKanban}>
+      <ProjectSummarySection
+        proyecto={proyecto}
+        isLeader={isLeader}
+        isAdmin={isAdmin}
+        puedeVerKanban={puedeVerKanban}
+        mostrarSolicitarCierre={mostrarSolicitarCierre}
+        solicitandoCierre={solicitandoCierre}
+        cierreBloqueadoPorSprint={cierreBloqueadoPorSprint}
+        onSolicitarCierre={() => void solicitarCierre()}
+      >
         {enSolicitudCierre && (
           <ProjectClosureSection
             proyecto={proyecto}
@@ -176,36 +244,51 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             resolverCierre={resolverCierre}
           />
         )}
+        {solicitudSalidaAbierta && (
+          <ExitRequestSection idProyecto={idProyecto} solicitud={solicitudSalidaAbierta} />
+        )}
       </ProjectSummarySection>
 
       {/* Barra de navegación estilo Jira: "Resumen" es la página actual (siempre
-          activa); el resto son los mismos enlaces/acciones de antes, solo con
-          apariencia de tab en vez de botones sueltos. */}
+          activa). Sprints/Miembros navegan a F3/F12 (rutas reales bajo
+          /dashboard/proyectos/[id], namespace distinto al de esta página mas
+          mismo idProyecto) y se muestran solo al líder porque esos endpoints
+          son exclusivos del líder en backend. */}
       {(isLeader || puedeVerKanban) && (
         <div className="my-5 flex items-center gap-5 overflow-x-auto border-b border-outline-variant/50">
           <span className={TAB_ACTIVE} aria-current="page">
             Resumen
           </span>
           {isLeader && (
+            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Editar Información
+            </Link>
+          )}
+          {isLeader && (
             <Link
               href={`/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`}
               className={TAB_INACTIVE}
             >
               <History className="size-3.5" aria-hidden="true" />
-              Revisiones previas
-            </Link>
-          )}
-          {isLeader && (
-            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
-              <Pencil className="size-3.5" aria-hidden="true" />
-              Editar información
+              Revisiones Pasadas
             </Link>
           )}
           {isLeader && (
             <button type="button" onClick={abrirGestionRoles} className={TAB_INACTIVE}>
               <Settings2 className="size-3.5" aria-hidden="true" />
-              Editar roles
+              Editar Roles
             </button>
+          )}
+          {isLeader && (
+            <Link href={`/dashboard/proyectos/${idProyecto}/miembros`} className={TAB_INACTIVE}>
+              Miembros
+            </Link>
+          )}
+          {isLeader && (
+            <Link href={`/dashboard/proyectos/${idProyecto}/sprints`} className={TAB_INACTIVE}>
+              Sprints
+            </Link>
           )}
           <Link href={kanbanBase} className={TAB_INACTIVE}>
             Tablero

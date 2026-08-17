@@ -271,9 +271,10 @@ describe('TasksRelationsService', () => {
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       const service = new TasksRelationsService(prisma, context);
 
-      await expect(
-        service.assertUserAssignableToProject(5, 3, 6),
-      ).resolves.toBeUndefined();
+      // X1.1: retorna el idParticipacion exacto ya resuelto por la
+      // consulta, para que el caller (TasksService) pueda persistirlo en
+      // AsignacionTarea.idParticipacion sin una segunda consulta.
+      await expect(service.assertUserAssignableToProject(5, 3, 6)).resolves.toBe(1);
     });
 
     it('rechaza con NotFoundException si el usuario no existe, sin validar el rol', async () => {
@@ -435,7 +436,7 @@ describe('TasksRelationsService', () => {
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       const service = new TasksRelationsService(prisma, context);
 
-      await expect(service.assertUserAssignableToProject(5, 3, null)).resolves.toBeUndefined();
+      await expect(service.assertUserAssignableToProject(5, 3, null)).resolves.toBe(1);
       expect(context.getRoleInProjectOrThrow).not.toHaveBeenCalled();
     });
 
@@ -581,6 +582,44 @@ describe('TasksRelationsService', () => {
       expect(prisma.participacionProyecto.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ idRolProyecto: 6 }) }),
       );
+    });
+
+    /**
+     * X1.1: caso multirol obligatorio — un usuario con DOS
+     * ParticipacionProyecto ACTIVO en el mismo proyecto (rol A y rol B)
+     * asignado a una tarea del rol B debe resolver EXACTAMENTE la
+     * participación de rol B, nunca la de rol A. El mock de
+     * `participacionProyecto.findFirst` sólo puede devolver una fila
+     * (`findFirst`, no `findMany`), así que la identidad exacta se
+     * demuestra devolviendo la fila de rol B (idParticipacion: 202,
+     * deliberadamente distinta de la de rol A, 101, que NUNCA se consulta
+     * porque el `where` ya filtra por idRolProyecto: 6) y verificando que
+     * `idParticipacionAsignado` sea exactamente 202.
+     */
+    it('multirol: usuario con participación en ROL_A (101) y ROL_B (202), asignado por ROL_B, resuelve idParticipacionAsignado = 202 (nunca 101)', async () => {
+      const prisma = makePrisma();
+      const context = makeContext();
+      const ROL_B = { idRolProyecto: 7, idProyecto: 5, nombreRol: 'QA' };
+      context.getRoleInProjectOrThrow.mockResolvedValue(ROL_B);
+      prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
+      // El where real exige idRolProyecto: 7 (ROL_B) — el mock simula que
+      // PostgreSQL solo encuentra la fila de esa participación exacta,
+      // nunca la de ROL_A (101), aunque el mismo usuario la tenga.
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 202 });
+      const service = new TasksRelationsService(prisma, context);
+
+      const recursos = await service.validateCreateTaskRelations(5, {
+        idRolProyecto: 7,
+        idUsuarioAsignado: 3,
+      });
+
+      expect(prisma.participacionProyecto.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ idUsuario: 3, idRolProyecto: 7, estadoParticipacion: 'ACTIVO' }),
+        }),
+      );
+      expect(recursos.idParticipacionAsignado).toBe(202);
+      expect(recursos.idParticipacionAsignado).not.toBe(101);
     });
 
     it('tarea con asignado sin rol: usa null como rol efectivo', async () => {
