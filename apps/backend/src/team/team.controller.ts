@@ -40,4 +40,13 @@ export class TeamController {
   ) {
     return this.teamService.getTeamSummary(id, user.userId);
   }
+
+  @Get(':id/miembros/solicitudes-salida-pendientes')
+  @UseGuards(JwtAuthGuard)
+  getPendingExitRequests(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.teamService.getPendingExitRequests(id, user.userId);
+  }
 }
