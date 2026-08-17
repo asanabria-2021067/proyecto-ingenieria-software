@@ -1,0 +1,101 @@
+/**
+ * Contratos del dominio `exit-requests` (B5-B9,
+ * apps/backend/src/exit-requests/exit-requests.service.ts). Reflejan
+ * exactamente las filas/objetos que devuelve cada endpoint — ninguno de
+ * estos métodos usa un DTO de respuesta dedicado, así que estos tipos
+ * describen la forma real de lo que Prisma/el service retornan.
+ */
+
+import type { EstadoTarea } from '@/lib/types/tasks';
+
+/**
+ * Espejo exacto de `EstadoSolicitudSalida` (schema.prisma:600). No
+ * reintroducir `PENDIENTE` (estado histórico ya reemplazado) ni inventar
+ * `BORRADOR`/`EN_REVISION`/`FINALIZADA`.
+ */
+export type EstadoSolicitudSalida =
+  | 'PREPARACION'
+  | 'PENDIENTE_LIDER'
+  | 'APROBADA'
+  | 'RECHAZADA'
+  | 'CANCELADA';
+
+/**
+ * Fila completa de `SolicitudSalidaProyecto` (schema.prisma:595-611). Forma
+ * devuelta por `createSolicitudSalida` (fila cruda de `create`) y por
+ * `approveSolicitudSalida`/`rejectSolicitudSalida` (`{ ...solicitud,
+ * estadoSolicitud, resueltaEn, resueltaPor }`, mismo conjunto de campos).
+ */
+export interface SolicitudSalidaDto {
+  idSolicitud: number;
+  idProyecto: number;
+  idUsuario: number;
+  motivo: string;
+  estadoSolicitud: EstadoSolicitudSalida;
+  solicitadaEn: string;
+  resueltaEn: string | null;
+  resueltaPor: number | null;
+}
+
+/**
+ * Forma devuelta por `continueExitPreparation`/`cancelExitPreparation`
+ * (exit-requests.service.ts:179-186, 230-237): un objeto construido a mano
+ * que nunca incluye `resueltaEn`/`resueltaPor` (esas transiciones no
+ * resuelven la solicitud, solo la mueven dentro de PREPARACION).
+ */
+export interface SolicitudSalidaTransicionDto {
+  idSolicitud: number;
+  idProyecto: number;
+  idUsuario: number;
+  motivo: string;
+  solicitadaEn: string;
+  estadoSolicitud: EstadoSolicitudSalida;
+}
+
+/** Body de `POST /proyectos/:id/solicitudes-salida` (`CreateSolicitudSalidaDto`). */
+export interface CreateExitRequestInput {
+  motivo: string;
+}
+
+/**
+ * Una `AsignacionTarea` vigente que bloquea continuar la preparación
+ * (exit-requests.service.ts:104-118, B6). `estadoPreparacion` es un campo
+ * calculado por el backend a partir de `tieneHoras`/`tieneAvance` — el
+ * frontend nunca lo recalcula.
+ */
+export interface ExitPreparationBlockerDto {
+  idAsignacion: number;
+  idTarea: number;
+  tituloTarea: string;
+  estadoTarea: EstadoTarea;
+  fechaAsignacion: string;
+  horasReales: number | null;
+  tieneHoras: boolean;
+  tieneAvance: boolean;
+  estadoPreparacion: 'COMPLETA' | 'PENDIENTE';
+}
+
+/**
+ * Subconjunto de `SolicitudSalidaDto` que expone `getExitPreparationSummary`
+ * (exit-requests.service.ts:67-74, solo `select` de esos 5 campos — nunca
+ * `motivo`/`resueltaEn`/`resueltaPor`).
+ */
+export interface ExitPreparationSolicitudDto {
+  idSolicitud: number;
+  idProyecto: number;
+  idUsuario: number;
+  estadoSolicitud: EstadoSolicitudSalida;
+  solicitadaEn: string;
+}
+
+/**
+ * `ExitPreparationSummary` (B6) — `GET /proyectos/:id/salida/preparacion`.
+ * Read-model completo: el frontend no recalcula `cantidadBlockers` ni
+ * `puedeContinuar` a partir de `blockers`, los consume tal cual.
+ */
+export interface ExitPreparationSummaryDto {
+  solicitud: ExitPreparationSolicitudDto;
+  blockers: ExitPreparationBlockerDto[];
+  cantidadBlockers: number;
+  puedeContinuar: boolean;
+}
