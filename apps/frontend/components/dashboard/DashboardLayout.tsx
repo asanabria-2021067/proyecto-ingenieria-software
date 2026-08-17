@@ -26,6 +26,7 @@ import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { FontScaleToggle } from '@/components/font-scale-toggle';
 
 const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -147,6 +148,7 @@ export default function DashboardLayout({
           </div>
           <div className="flex items-center gap-3">
             <NotificationsBell onlyIcon />
+            <FontScaleToggle />
             <div id="dashboard-theme-toggle">
               <ThemeToggle />
             </div>
