@@ -132,6 +132,14 @@ export interface NotificationTemplateData {
     projectId: number;
     approved: boolean;
   };
+
+  // HORAS_VALIDADAS ya existía en el enum sin plantilla asociada.
+  HORAS_VALIDADAS: {
+    projectTitle: string;
+    projectId: number;
+    horasReconocidas: number;
+    fueAjustado: boolean;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -253,6 +261,14 @@ export const NOTIFICATION_TEMPLATES = {
       data.approved
         ? `Tu solicitud de salida de "${data.projectTitle}" fue aprobada. Tu participación en el proyecto quedó en estado RETIRADO.`
         : `Tu solicitud de salida de "${data.projectTitle}" fue rechazada. Continúas activo en el proyecto.`,
+  },
+
+  HORAS_VALIDADAS: {
+    title: 'Se validaron tus horas',
+    message: (data: NotificationTemplateData['HORAS_VALIDADAS']) =>
+      data.fueAjustado
+        ? `Se cerró tu participación en "${data.projectTitle}" con ${data.horasReconocidas} horas reconocidas (con ajuste justificado).`
+        : `Se cerró tu participación en "${data.projectTitle}" con ${data.horasReconocidas} horas reconocidas.`,
   },
 } as const;
 
