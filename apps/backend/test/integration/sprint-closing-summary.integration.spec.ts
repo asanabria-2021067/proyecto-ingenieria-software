@@ -259,6 +259,10 @@ describeIntegration(
         rolADev,
         rolAQa,
         rolB,
+        participacionCompartidaDev,
+        participacionCompartidaQa,
+        participacionSoloA,
+        participacionCompartidaB,
       };
     }
 
@@ -296,6 +300,31 @@ describeIntegration(
       expect(entradaCompartida!.horasReportadas).not.toBe(99);
       expect(entradaCompartida!.horasAprobadas).not.toBe(98);
 
+      // A8.1: desglose por participación — usuarioCompartido tiene 2
+      // ParticipacionProyecto en A (dev=3h, qa=2h); ambas deben aparecer con
+      // su propio idParticipacion real, y su suma debe coincidir con el
+      // total person-centric de arriba (5 = 3 + 2).
+      expect(entradaCompartida!.participaciones).toHaveLength(2);
+      const idsParticipacion = entradaCompartida!.participaciones.map((p) => p.idParticipacion).sort();
+      expect(idsParticipacion).toEqual(
+        [fx.participacionCompartidaDev.idParticipacion, fx.participacionCompartidaQa.idParticipacion].sort(),
+      );
+      const dev = entradaCompartida!.participaciones.find(
+        (p) => p.idParticipacion === fx.participacionCompartidaDev.idParticipacion,
+      )!;
+      const qa = entradaCompartida!.participaciones.find(
+        (p) => p.idParticipacion === fx.participacionCompartidaQa.idParticipacion,
+      )!;
+      expect(dev.nombreRol).toBe('Desarrollador A');
+      expect(dev.horasCalculadas).toBe(3);
+      expect(dev.horasAprobadas).toBe(3);
+      expect(qa.nombreRol).toBe('QA A');
+      expect(qa.horasCalculadas).toBe(2);
+      expect(qa.horasAprobadas).toBe(2);
+      expect(
+        entradaCompartida!.participaciones.reduce((acc, p) => acc + (p.horasCalculadas ?? 0), 0),
+      ).toBe(entradaCompartida!.horasCalculadas);
+
       const entradaSoloA = summary.participantes.find((p) => p.idUsuario === fx.usuarioSoloA.idUsuario);
       expect(entradaSoloA).toBeDefined();
       expect(entradaSoloA!.roles).toHaveLength(1);
@@ -304,6 +333,12 @@ describeIntegration(
       expect(entradaSoloA!.horasReportadas).toBe(8);
       expect(entradaSoloA!.horasCalculadas).toBe(8);
       expect(entradaSoloA!.horasAprobadas).toBe(7);
+      // Participación única: desglose de un solo elemento, con el ajuste
+      // (8 calculadas -> 7 aprobadas) reflejado exactamente ahí.
+      expect(entradaSoloA!.participaciones).toHaveLength(1);
+      expect(entradaSoloA!.participaciones[0].idParticipacion).toBe(fx.participacionSoloA.idParticipacion);
+      expect(entradaSoloA!.participaciones[0].horasCalculadas).toBe(8);
+      expect(entradaSoloA!.participaciones[0].horasAprobadas).toBe(7);
 
       // Ningún participante de A trae el usuario/rol/hora exclusivo de B.
       expect(summary.participantes.every((p) => p.idUsuario !== fx.leaderB.idUsuario)).toBe(true);
@@ -335,6 +370,53 @@ describeIntegration(
       const nombresRoles = entrada.roles.map((r) => r.nombreRol);
       expect(nombresRoles).not.toContain('Desarrollador A');
       expect(nombresRoles).not.toContain('QA A');
+
+      // A8.1: el desglose de Proyecto B expone únicamente la participación
+      // de B (99/98), nunca los idParticipacion de A (dev/qa) del mismo
+      // usuario compartido — aislamiento cross-project real a nivel de
+      // participación individual, no solo del total agregado.
+      expect(entrada.participaciones).toHaveLength(1);
+      expect(entrada.participaciones[0].idParticipacion).toBe(fx.participacionCompartidaB.idParticipacion);
+      expect(entrada.participaciones[0].horasCalculadas).toBe(99);
+      expect(entrada.participaciones[0].horasAprobadas).toBe(98);
+      const idsParticipacionB = entrada.participaciones.map((p) => p.idParticipacion);
+      expect(idsParticipacionB).not.toContain(fx.participacionCompartidaDev.idParticipacion);
+      expect(idsParticipacionB).not.toContain(fx.participacionCompartidaQa.idParticipacion);
+    });
+
+    it('A8.1: justificacionAjuste ya persistida por un ajuste previo se expone en la participación correcta, no en las demás', async () => {
+      const fx = await buildFixture();
+      // Ajusta directamente el registro de horas de la participación "dev"
+      // (mismo efecto que dejaría un PATCH A7 exitoso), sin tocar "qa".
+      await prisma.horasParticipacion.update({
+        where: { idRegistroHoras: horasIds[0] }, // horasCompartidaDev, ver buildFixture
+        data: {
+          horasAprobadas: 5,
+          justificacionAjuste: 'Se reconocen dos horas adicionales por soporte fuera de horario.',
+        },
+      });
+
+      const summary = await service.getSprintClosingSummary(
+        fx.projectA.idProyecto,
+        fx.sprintA.idSprint,
+        fx.leaderA.idUsuario,
+      );
+
+      const entradaCompartida = summary.participantes.find(
+        (p) => p.idUsuario === fx.usuarioCompartido.idUsuario,
+      )!;
+      const dev = entradaCompartida.participaciones.find(
+        (p) => p.idParticipacion === fx.participacionCompartidaDev.idParticipacion,
+      )!;
+      const qa = entradaCompartida.participaciones.find(
+        (p) => p.idParticipacion === fx.participacionCompartidaQa.idParticipacion,
+      )!;
+      expect(dev.horasAprobadas).toBe(5);
+      expect(dev.justificacionAjuste).toBe(
+        'Se reconocen dos horas adicionales por soporte fuera de horario.',
+      );
+      expect(qa.justificacionAjuste).toBeNull();
+      expect(qa.horasAprobadas).toBe(2);
     });
 
     it('Sprint ajeno: sprintId de Proyecto B consultado bajo Proyecto A lanza NotFoundException, sin filtrar ningún dato', async () => {

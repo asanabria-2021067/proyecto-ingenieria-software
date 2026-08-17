@@ -764,6 +764,54 @@ describe('SprintsService', () => {
       expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
     });
 
+    it('caso 6b (A7.1 multirol): ajustar la participación #51 nunca toca el registro de horas de la participación #87 del mismo usuario', async () => {
+      const tx = makeTx();
+      const registro51 = registroHoras({
+        idRegistroHoras: 501,
+        idParticipacion: 51,
+        horasCalculadas: new Prisma.Decimal(10),
+        horasAprobadas: null,
+      });
+      const registro87 = registroHoras({
+        idRegistroHoras: 870,
+        idParticipacion: 87,
+        horasCalculadas: new Prisma.Decimal(8),
+        horasAprobadas: new Prisma.Decimal(8),
+      });
+      tx.horasParticipacion.findFirst.mockImplementation(async ({ where }: any) => {
+        if (where.idParticipacion === 51) return registro51;
+        if (where.idParticipacion === 87) return registro87;
+        return null;
+      });
+      tx.horasParticipacion.update.mockImplementation(async ({ where, data }: any) => {
+        if (where.idRegistroHoras === 501) return { ...registro51, ...data };
+        if (where.idRegistroHoras === 870) return { ...registro87, ...data };
+        throw new Error(`update dirigido a un idRegistroHoras inesperado: ${where.idRegistroHoras}`);
+      });
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const resultado51 = await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, 51, LIDER_ID, {
+        horasAprobadas: 12,
+        justificacionAjuste: 'Se reconocen dos horas adicionales',
+      });
+
+      expect(resultado51.horasAprobadas).toBe(12);
+      expect(tx.horasParticipacion.update).toHaveBeenCalledTimes(1);
+      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
+        where: { idRegistroHoras: 501 },
+        data: { horasAprobadas: 12, justificacionAjuste: 'Se reconocen dos horas adicionales' },
+      });
+      // #87 nunca fue leída ni escrita por este ajuste: solo se consultó una
+      // vez (para #51), y ningún update apuntó a su idRegistroHoras (870).
+      expect(tx.horasParticipacion.findFirst).toHaveBeenCalledTimes(1);
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ where: { idRegistroHoras: 870 } }),
+      );
+    });
+
     it('caso 7: usuario no líder — propaga la excepción de autorización sin buscar ni persistir el registro', async () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
@@ -882,6 +930,17 @@ describe('SprintsService', () => {
         horasReportadas: 10,
         horasCalculadas: 10,
         horasAprobadas: 10,
+        participaciones: [
+          {
+            idParticipacion: 501,
+            idRolProyecto: 1,
+            nombreRol: 'Desarrollador',
+            horasReportadas: 10,
+            horasCalculadas: 10,
+            horasAprobadas: 10,
+            justificacionAjuste: null,
+          },
+        ],
         ...overrides,
       };
     }
@@ -943,6 +1002,148 @@ describe('SprintsService', () => {
       expect(result.participantes).toHaveLength(1);
       expect(result.participantes[0].idUsuario).toBe(42);
       expect(result.participantes[0].roles).toHaveLength(2);
+    });
+
+    describe('A8.1 — desglose por participación (participaciones[])', () => {
+      it('multirol: expone una entrada de participaciones[] por cada ParticipacionProyecto, con su idParticipacion propio', async () => {
+        const tx = makeTx();
+        const filaMultirol = participanteRaw({
+          idUsuario: 42,
+          roles: [
+            { idRolProyecto: 1, nombreRol: 'Desarrollador' },
+            { idRolProyecto: 3, nombreRol: 'Líder técnico' },
+          ],
+          tareasRealizadas: 5,
+          horasReportadas: 18,
+          horasCalculadas: 18,
+          horasAprobadas: 18,
+          participaciones: [
+            {
+              idParticipacion: 51,
+              idRolProyecto: 1,
+              nombreRol: 'Desarrollador',
+              horasReportadas: 10,
+              horasCalculadas: 10,
+              horasAprobadas: 10,
+              justificacionAjuste: null,
+            },
+            {
+              idParticipacion: 87,
+              idRolProyecto: 3,
+              nombreRol: 'Líder técnico',
+              horasReportadas: 8,
+              horasCalculadas: 8,
+              horasAprobadas: 8,
+              justificacionAjuste: null,
+            },
+          ],
+        });
+        const prisma = makePrisma(tx);
+        prisma.$queryRaw.mockResolvedValue([filaMultirol]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+        const persona = result.participantes[0];
+        expect(persona.participaciones).toHaveLength(2);
+        const ids = persona.participaciones.map((p) => p.idParticipacion).sort();
+        expect(ids).toEqual([51, 87]);
+        // El total person-centric sigue siendo la SUMA de las participaciones,
+        // nunca un valor distinto inventado por el paso-through.
+        expect(persona.horasCalculadas).toBe(
+          persona.participaciones.reduce((acc, p) => acc + (p.horasCalculadas ?? 0), 0),
+        );
+        expect(persona.horasAprobadas).toBe(
+          persona.participaciones.reduce((acc, p) => acc + (p.horasAprobadas ?? 0), 0),
+        );
+      });
+
+      it('preserva justificacionAjuste ya persistida en la participación correcta, sin filtrarla a otras', async () => {
+        const tx = makeTx();
+        const filaMultirol = participanteRaw({
+          idUsuario: 42,
+          participaciones: [
+            {
+              idParticipacion: 51,
+              idRolProyecto: 1,
+              nombreRol: 'Desarrollador',
+              horasReportadas: 10,
+              horasCalculadas: 10,
+              horasAprobadas: 12,
+              justificacionAjuste: 'Se reconocen dos horas adicionales por soporte fuera de horario.',
+            },
+            {
+              idParticipacion: 87,
+              idRolProyecto: 3,
+              nombreRol: 'Líder técnico',
+              horasReportadas: 8,
+              horasCalculadas: 8,
+              horasAprobadas: 8,
+              justificacionAjuste: null,
+            },
+          ],
+        });
+        const prisma = makePrisma(tx);
+        prisma.$queryRaw.mockResolvedValue([filaMultirol]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+        const persona = result.participantes[0];
+        const p51 = persona.participaciones.find((p) => p.idParticipacion === 51)!;
+        const p87 = persona.participaciones.find((p) => p.idParticipacion === 87)!;
+        expect(p51.justificacionAjuste).toBe(
+          'Se reconocen dos horas adicionales por soporte fuera de horario.',
+        );
+        expect(p87.justificacionAjuste).toBeNull();
+      });
+
+      it('participación única: participaciones tiene exactamente un elemento, sin desglose superfluo', async () => {
+        const tx = makeTx();
+        const prisma = makePrisma(tx);
+        prisma.$queryRaw.mockResolvedValue([participanteRaw()]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+        expect(result.participantes[0].participaciones).toHaveLength(1);
+        expect(result.participantes[0].participaciones[0].idParticipacion).toBe(501);
+      });
+
+      it('horasCalculadas/horasAprobadas nulas por participación se preservan como null, sin normalizarlas a 0', async () => {
+        const tx = makeTx();
+        const filaSinCalculo = participanteRaw({
+          horasCalculadas: 0,
+          horasAprobadas: 0,
+          participaciones: [
+            {
+              idParticipacion: 501,
+              idRolProyecto: 1,
+              nombreRol: 'Desarrollador',
+              horasReportadas: 0,
+              horasCalculadas: null,
+              horasAprobadas: null,
+              justificacionAjuste: null,
+            },
+          ],
+        });
+        const prisma = makePrisma(tx);
+        prisma.$queryRaw.mockResolvedValue([filaSinCalculo]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+        expect(result.participantes[0].participaciones[0].horasCalculadas).toBeNull();
+        expect(result.participantes[0].participaciones[0].horasAprobadas).toBeNull();
+      });
     });
 
     it('ausencia de datos: Sprint sin contribuciones devuelve participantes: [], no un error', async () => {
