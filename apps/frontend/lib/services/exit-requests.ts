@@ -3,6 +3,7 @@ import type {
   CreateExitRequestInput,
   CurrentExitRequestDto,
   ExitPreparationSummaryDto,
+  PendingLeaderReviewDto,
   SolicitudSalidaDto,
   SolicitudSalidaTransicionDto,
 } from '@/lib/types/exit-requests';
@@ -61,4 +62,13 @@ export function rejectExitRequest(idProyecto: number, idSolicitud: number): Prom
     `/proyectos/${idProyecto}/solicitudes-salida/${idSolicitud}/rechazar`,
     { method: 'POST' },
   );
+}
+
+/**
+ * F14.1 — `GET /proyectos/:id/miembros/solicitudes-salida-pendientes`.
+ * Reader LEADER-FACING: todas las solicitudes `PENDIENTE_LIDER` del
+ * proyecto (no solo la del actor). Restringido al líder por el backend.
+ */
+export function getPendingExitRequests(idProyecto: number): Promise<PendingLeaderReviewDto[]> {
+  return apiFetch<PendingLeaderReviewDto[]>(`/proyectos/${idProyecto}/miembros/solicitudes-salida-pendientes`);
 }

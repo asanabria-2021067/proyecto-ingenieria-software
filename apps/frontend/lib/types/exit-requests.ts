@@ -133,3 +133,16 @@ export interface SolicitudSalidaAbiertaDto {
 export interface CurrentExitRequestDto {
   solicitud: SolicitudSalidaAbiertaDto | null;
 }
+
+/**
+ * `GET /proyectos/:id/miembros/solicitudes-salida-pendientes` (F14.1,
+ * `TeamService.getPendingExitRequests` → `ExitRequestsService.getPendingLeaderReviews`).
+ * A diferencia de `SolicitudSalidaAbiertaDto` (scoped al ACTOR autenticado,
+ * una sola solicitud o `null`), este reader es LEADER-FACING: devuelve TODAS
+ * las solicitudes `PENDIENTE_LIDER` del proyecto, de cualquier usuario. El
+ * `select` del backend usa exactamente los mismos 6 campos, por eso
+ * reutiliza `SolicitudSalidaAbiertaDto` en vez de duplicar la interfaz —
+ * solo se re-exporta con un nombre que deja explícito el reader al que
+ * pertenece cada arreglo.
+ */
+export type PendingLeaderReviewDto = SolicitudSalidaAbiertaDto;

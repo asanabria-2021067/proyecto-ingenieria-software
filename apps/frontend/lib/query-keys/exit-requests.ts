@@ -19,3 +19,15 @@ export const exitPreparationSummaryQueryKey = (idProyecto: number) =>
  */
 export const currentExitRequestQueryKey = (idProyecto: number) =>
   ['exit-request-current', idProyecto] as const;
+
+/**
+ * F14.1 — `GET /proyectos/:id/miembros/solicitudes-salida-pendientes`
+ * (PendingLeaderReview: TODAS las solicitudes `PENDIENTE_LIDER` del
+ * proyecto, leader-facing). Distinta de `currentExitRequestQueryKey`: esa
+ * es "¿cuál es MI propia solicitud abierta?" (scoped al actor); esta es
+ * "¿qué solicitudes de OTROS espera resolver el líder?" — namespaces
+ * separados a propósito, igual que B13 mantiene
+ * `projectPendingPostulationsQueryKey` aparte de `projectTeamSummaryQueryKey`.
+ */
+export const projectPendingExitRequestsQueryKey = (idProyecto: number) =>
+  ['proyecto-solicitudes-salida-pendientes', idProyecto] as const;
