@@ -95,6 +95,7 @@ function makeNotifications() {
   return {
     notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
     notifySprintFinalizationStarted: vi.fn().mockResolvedValue(undefined),
+    notifySprintClosed: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
 
@@ -1273,7 +1274,8 @@ describe('SprintsService', () => {
       tx.sprint.findFirst.mockResolvedValue(sprintCerrado);
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications);
 
       const result = await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1285,6 +1287,88 @@ describe('SprintsService', () => {
           fechaCierre: expect.any(Date),
           cerradoPor: LIDER_ID,
         },
+      });
+      // A9.1: SPRINT_CLOSED se emite exactamente una vez, con el payload real.
+      expect(notifications.notifySprintClosed).toHaveBeenCalledTimes(1);
+      expect(notifications.notifySprintClosed).toHaveBeenCalledWith(PROJECT_ID, LIDER_ID, {
+        projectId: PROJECT_ID,
+        sprintId: SPRINT_ID,
+      });
+    });
+
+    describe('A9.1 — SPRINT_CLOSED realtime post-commit', () => {
+      it('se emite DESPUÉS de que la transacción resuelve (no antes ni dentro): el orden de llamadas lo demuestra', async () => {
+        const tx = makeTx();
+        const sprint = sprintEnFinalizacion();
+        const authorization = makeSprintsAuthorization();
+        authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+        tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+        const sprintCerrado = { ...sprint, estado: 'CERRADO' };
+        tx.sprint.findFirst.mockResolvedValue(sprintCerrado);
+        const prisma = makePrisma(tx);
+        const context = makeSprintsContext();
+        const notifications = makeNotifications();
+        const llamadas: string[] = [];
+        tx.sprint.updateMany.mockImplementation(async () => {
+          llamadas.push('updateMany');
+          return { count: 1 };
+        });
+        notifications.notifySprintClosed.mockImplementation(async () => {
+          llamadas.push('notifySprintClosed');
+        });
+        const service = new SprintsService(prisma, context, authorization, notifications);
+
+        await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+        expect(llamadas).toEqual(['updateMany', 'notifySprintClosed']);
+      });
+
+      it('si la transacción falla (Sprint ya no EN_FINALIZACION), SPRINT_CLOSED nunca se emite', async () => {
+        const tx = makeTx();
+        const authorization = makeSprintsAuthorization();
+        authorization.assertCanCloseSprint.mockResolvedValue(sprintEnFinalizacion({ estado: 'ACTIVO' }));
+        const prisma = makePrisma(tx);
+        const context = makeSprintsContext();
+        const notifications = makeNotifications();
+        const service = new SprintsService(prisma, context, authorization, notifications);
+
+        await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+          ConflictException,
+        );
+        expect(notifications.notifySprintClosed).not.toHaveBeenCalled();
+      });
+
+      it('si la carrera del updateMany pierde (count=0), SPRINT_CLOSED nunca se emite', async () => {
+        const tx = makeTx();
+        const authorization = makeSprintsAuthorization();
+        authorization.assertCanCloseSprint.mockResolvedValue(sprintEnFinalizacion());
+        tx.sprint.updateMany.mockResolvedValue({ count: 0 });
+        const prisma = makePrisma(tx);
+        const context = makeSprintsContext();
+        const notifications = makeNotifications();
+        const service = new SprintsService(prisma, context, authorization, notifications);
+
+        await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+          ConflictException,
+        );
+        expect(notifications.notifySprintClosed).not.toHaveBeenCalled();
+      });
+
+      it('un Sprint rechazado por autorización (no líder) nunca emite SPRINT_CLOSED', async () => {
+        const tx = makeTx();
+        const authorization = makeSprintsAuthorization();
+        authorization.assertCanCloseSprint.mockRejectedValue(
+          new ForbiddenException('No eres el líder de este proyecto'),
+        );
+        const prisma = makePrisma(tx);
+        const context = makeSprintsContext();
+        const notifications = makeNotifications();
+        const service = new SprintsService(prisma, context, authorization, notifications);
+
+        await expect(
+          service.closeSprint(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(notifications.notifySprintClosed).not.toHaveBeenCalled();
       });
     });
 
@@ -1443,23 +1527,35 @@ describe('SprintsService', () => {
       };
     }
 
-    it('caso 1: proyecto con varios Sprints — devuelve exclusivamente los suyos', async () => {
+    function agregadoRaw(overrides: Record<string, unknown> = {}) {
+      return { idSprint: 1, tareas: 0, hitos: 0, horasEstimadas: 0, ...overrides };
+    }
+
+    it('caso 1: proyecto con varios Sprints — devuelve exclusivamente los suyos, con agregados A10.1 fusionados', async () => {
       const filas = [sprintRow({ idSprint: 2, numero: 2 }), sprintRow({ idSprint: 1, numero: 1 })];
       const prisma = makePrisma();
       prisma.sprint.findMany.mockResolvedValue(filas);
+      prisma.$queryRaw.mockResolvedValue([
+        agregadoRaw({ idSprint: 2, tareas: 5, hitos: 2, horasEstimadas: 20 }),
+        agregadoRaw({ idSprint: 1, tareas: 3, hitos: 1, horasEstimadas: 10 }),
+      ]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
-      expect(result).toBe(filas);
+      expect(result).toEqual([
+        { ...filas[0], tareas: 5, hitos: 2, horasEstimadas: 20 },
+        { ...filas[1], tareas: 3, hitos: 1, horasEstimadas: 10 },
+      ]);
       expect(authorization.assertCanListSprintHistory).toHaveBeenCalledWith(PROJECT_ID, LIDER_ID);
     });
 
     it('caso 2: proyecto sin Sprints — devuelve [] sin lanzar error artificial', async () => {
       const prisma = makePrisma();
       prisma.sprint.findMany.mockResolvedValue([]);
+      prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications());
@@ -1469,9 +1565,10 @@ describe('SprintsService', () => {
       expect(result).toEqual([]);
     });
 
-    it('caso 3: aislamiento — el where de la consulta filtra por idProyecto, no un filtro posterior en JS', async () => {
+    it('caso 3: aislamiento — el where de la consulta de Sprints filtra por idProyecto, no un filtro posterior en JS', async () => {
       const prisma = makePrisma();
       prisma.sprint.findMany.mockResolvedValue([]);
+      prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications());
@@ -1483,20 +1580,21 @@ describe('SprintsService', () => {
       );
     });
 
-    it('caso 4: tipado/metadata — los campos del SprintListItem corresponden a los datos persistidos', async () => {
+    it('caso 4: tipado/metadata — los campos de metadata del SprintListItem corresponden a los datos persistidos', async () => {
       const fila = sprintRow({ idSprint: 5, numero: 3, estado: 'ACTIVO', fechaFinalizacionIniciada: null, fechaCierre: null });
       const prisma = makePrisma();
       prisma.sprint.findMany.mockResolvedValue([fila]);
+      prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
       const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
-      expect(result[0]).toEqual(fila);
+      expect(result[0]).toEqual({ ...fila, tareas: 0, hitos: 0, horasEstimadas: 0 });
     });
 
-    it('usuario no líder: propaga la excepción de autorización sin ejecutar la consulta', async () => {
+    it('usuario no líder: propaga la excepción de autorización sin ejecutar ninguna consulta', async () => {
       const prisma = makePrisma();
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
@@ -1509,6 +1607,105 @@ describe('SprintsService', () => {
         ForbiddenException,
       );
       expect(prisma.sprint.findMany).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    describe('A10.1 — agregados de tareas/hitos/horas estimadas', () => {
+      it('un Sprint sin tareas (sin fila en el agregado) recibe 0/0/0, nunca se omite de la lista', async () => {
+        const fila = sprintRow({ idSprint: 9 });
+        const prisma = makePrisma();
+        prisma.sprint.findMany.mockResolvedValue([fila]);
+        prisma.$queryRaw.mockResolvedValue([]); // ninguna fila agregada para idSprint 9
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.listSprints(PROJECT_ID, LIDER_ID);
+
+        expect(result[0]).toEqual({ ...fila, tareas: 0, hitos: 0, horasEstimadas: 0 });
+      });
+
+      it('hitos deduplica: varias tareas del mismo hito cuentan una sola vez (ya resuelto por COUNT DISTINCT en SQL, se verifica el paso-through)', async () => {
+        const fila = sprintRow({ idSprint: 1 });
+        const prisma = makePrisma();
+        prisma.sprint.findMany.mockResolvedValue([fila]);
+        // 3 tareas, 2 sobre el mismo Hito 5, 1 sobre el Hito 8 -> hitos = 2 (ya deduplicado por la SQL real).
+        prisma.$queryRaw.mockResolvedValue([agregadoRaw({ idSprint: 1, tareas: 3, hitos: 2, horasEstimadas: 14 })]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.listSprints(PROJECT_ID, LIDER_ID);
+
+        expect(result[0].hitos).toBe(2);
+        expect(result[0].tareas).toBe(3);
+      });
+
+      it('horasEstimadas preserva decimales (2.5 + 4 + 7.5 = 14)', async () => {
+        const fila = sprintRow({ idSprint: 1 });
+        const prisma = makePrisma();
+        prisma.sprint.findMany.mockResolvedValue([fila]);
+        prisma.$queryRaw.mockResolvedValue([agregadoRaw({ idSprint: 1, tareas: 3, hitos: 0, horasEstimadas: 14 })]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.listSprints(PROJECT_ID, LIDER_ID);
+
+        expect(result[0].horasEstimadas).toBe(14);
+      });
+
+      it('varios Sprints del mismo proyecto: cada uno recibe exclusivamente sus propios agregados, sin mezclarse', async () => {
+        const filas = [sprintRow({ idSprint: 1 }), sprintRow({ idSprint: 2 })];
+        const prisma = makePrisma();
+        prisma.sprint.findMany.mockResolvedValue(filas);
+        prisma.$queryRaw.mockResolvedValue([
+          agregadoRaw({ idSprint: 1, tareas: 3, hitos: 1, horasEstimadas: 10 }),
+          agregadoRaw({ idSprint: 2, tareas: 8, hitos: 4, horasEstimadas: 30 }),
+        ]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.listSprints(PROJECT_ID, LIDER_ID);
+
+        const sprint1 = result.find((s) => s.idSprint === 1)!;
+        const sprint2 = result.find((s) => s.idSprint === 2)!;
+        expect(sprint1).toMatchObject({ tareas: 3, hitos: 1, horasEstimadas: 10 });
+        expect(sprint2).toMatchObject({ tareas: 8, hitos: 4, horasEstimadas: 30 });
+      });
+
+      it('aislamiento: la consulta agregada parametriza projectId (sin concatenación de strings)', async () => {
+        const prisma = makePrisma();
+        prisma.sprint.findMany.mockResolvedValue([]);
+        prisma.$queryRaw.mockResolvedValue([]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        await service.listSprints(PROJECT_ID, LIDER_ID);
+
+        const sqlArg = prisma.$queryRaw.mock.calls[0][0] as { values: unknown[]; strings: string[] };
+        expect(Array.isArray(sqlArg.values)).toBe(true);
+        expect(sqlArg.values).toContain(PROJECT_ID);
+        expect(sqlArg.strings.join('')).not.toContain(String(PROJECT_ID));
+      });
+
+      it('query count: exactamente 2 consultas (findMany + $queryRaw agregado), sin crecer con N Sprints', async () => {
+        const filas = Array.from({ length: 6 }, (_, i) => sprintRow({ idSprint: i + 1, numero: i + 1 }));
+        const prisma = makePrisma();
+        prisma.sprint.findMany.mockResolvedValue(filas);
+        prisma.$queryRaw.mockResolvedValue([]);
+        const context = makeSprintsContext();
+        const authorization = makeSprintsAuthorization();
+        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+        const result = await service.listSprints(PROJECT_ID, LIDER_ID);
+
+        expect(result).toHaveLength(6);
+        expect(prisma.sprint.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      });
     });
   });
 
