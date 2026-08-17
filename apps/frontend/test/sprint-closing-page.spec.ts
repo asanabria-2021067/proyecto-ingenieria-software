@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { SprintClosingSummaryDto } from '../lib/types/sprints';
 
@@ -16,6 +16,8 @@ vi.mock('../hooks/use-project-sprints', () => ({
   useAdjustSprintHours: vi.fn(),
   useCloseSprint: vi.fn(),
 }));
+vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 
 vi.mock('@/lib/swal', () => ({
   default: { fire: vi.fn() },
@@ -27,7 +29,21 @@ import {
   useCloseSprint,
   useSprintClosingSummary,
 } from '../hooks/use-project-sprints';
+import { useProjectDetail } from '../hooks/use-project-detail';
+import { useCurrentUser } from '../hooks/use-current-user';
 import uvgSwal from '@/lib/swal';
+
+// GET .../sprints/:sprintId/cierre es exclusivo del líder en backend
+// (assertCanViewClosingSummary) — F17.1 lo gatea también client-side. Todos
+// los tests de este archivo asumen el punto de vista del líder salvo que
+// digan lo contrario explícitamente (Sección "autorización").
+beforeEach(() => {
+  (useProjectDetail as any).mockReturnValue({
+    data: { idProyecto: 42, creador: { idUsuario: 1 } },
+    isLoading: false,
+  });
+  (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 }, isLoading: false });
+});
 
 beforeAllPointerCapturePolyfill();
 function beforeAllPointerCapturePolyfill() {
@@ -288,7 +304,7 @@ describe('SprintClosingPage — submit sin ajustes', () => {
     await waitFor(() => expect(mutateAsyncClose).toHaveBeenCalledTimes(1));
     expect(mutateAsyncAdjust).not.toHaveBeenCalled();
     expect(mutateAsyncClose).toHaveBeenCalledWith(1);
-    expect(push).toHaveBeenCalledWith('/dashboard/proyectos/42');
+    expect(push).toHaveBeenCalledWith('/dashboard/projects/42');
   });
 });
 
@@ -482,6 +498,35 @@ describe('SprintClosingPage — sin contribuciones', () => {
     fireEvent.click(screen.getByRole('button', { name: /confirmar cierre del sprint/i }));
 
     await waitFor(() => expect(mutateAsyncClose).toHaveBeenCalledWith(1));
-    expect(push).toHaveBeenCalledWith('/dashboard/proyectos/42');
+    expect(push).toHaveBeenCalledWith('/dashboard/projects/42');
+  });
+});
+
+describe('SprintClosingPage — autorización', () => {
+  it('un no-líder ve el aviso "¡No eres líder!" en vez del resumen de cierre', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 }, isLoading: false });
+    mockSummary();
+    mockAdjust();
+    mockClose();
+
+    renderPage();
+
+    expect(screen.getByText('¡No eres líder!')).toBeInTheDocument();
+    expect(screen.getByText('No puedes acceder al cierre de este Sprint.')).toBeInTheDocument();
+    expect(screen.queryByText('Cierre de Sprint')).not.toBeInTheDocument();
+  });
+
+  it('un no-líder ve "Volver al proyecto" apuntando a /dashboard/proyectos (vista pública), no a /dashboard/projects (hub del líder)', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 }, isLoading: false });
+    mockSummary();
+    mockAdjust();
+    mockClose();
+
+    renderPage();
+
+    expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42',
+    );
   });
 });

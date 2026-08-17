@@ -1,20 +1,34 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EstadoProyecto } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { ApplicationsService } from '../src/applications/applications.service';
 
 function makePrisma() {
+  const tx = {
+    postulacion: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUniqueOrThrow: vi.fn(),
+    },
+    participacionProyecto: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ idParticipacion: 1 }),
+      update: vi.fn().mockResolvedValue({ idParticipacion: 1 }),
+    },
+  };
   return {
     usuario: { findUnique: vi.fn() },
     rolProyecto: { findUnique: vi.fn() },
-    participacionProyecto: { count: vi.fn() },
+    participacionProyecto: { count: vi.fn(), ...tx.participacionProyecto },
     postulacion: {
       findFirst: vi.fn(),
       create: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
+      ...tx.postulacion,
     },
+    $transaction: vi.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
+    _tx: tx,
   } as any;
 }
 
@@ -84,16 +98,21 @@ describe('ApplicationsService', () => {
     await expect(service.findOne(1)).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('updateEstado valida resolutor y notifica', async () => {
-    const prisma = makePrisma();
+  function mockPostulacionPendiente(prisma: ReturnType<typeof makePrisma>, overrides: Record<string, unknown> = {}) {
     prisma.postulacion.findUnique.mockResolvedValue({
       idPostulacion: 1,
       idRolProyecto: 2,
       idUsuarioPostulante: 4,
       estadoPostulacion: 'PENDIENTE',
       rolProyecto: { nombreRol: 'Backend', proyecto: { creadoPor: 9, idProyecto: 99, tituloProyecto: 'X' } },
+      ...overrides,
     });
-    prisma.postulacion.update.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
+  }
+
+  it('updateEstado (ACEPTADA) valida resolutor, notifica y crea la participación cuando no existe ninguna previa', async () => {
+    const prisma = makePrisma();
+    mockPostulacionPendiente(prisma);
+    prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
     const notifications = { notifyUsers: vi.fn() } as any;
     const service = new ApplicationsService(prisma, notifications, { emit: vi.fn() } as any);
 
@@ -104,7 +123,79 @@ describe('ApplicationsService', () => {
     );
 
     expect(result.estadoPostulacion).toBe('ACEPTADA');
+    expect(prisma._tx.postulacion.updateMany).toHaveBeenCalledWith({
+      where: { idPostulacion: 1, estadoPostulacion: 'PENDIENTE' },
+      data: expect.objectContaining({ estadoPostulacion: 'ACEPTADA', resueltaPor: 9 }),
+    });
+    // Sin participación previa: crea una nueva ACTIVA, enlazada a la postulación.
+    expect(prisma._tx.participacionProyecto.findFirst).toHaveBeenCalledWith({
+      where: { idUsuario: 4, idRolProyecto: 2 },
+      orderBy: { idParticipacion: 'desc' },
+    });
+    expect(prisma._tx.participacionProyecto.create).toHaveBeenCalledWith({
+      data: { idUsuario: 4, idRolProyecto: 2, idPostulacion: 1, estadoParticipacion: 'ACTIVO' },
+    });
+    expect(prisma._tx.participacionProyecto.update).not.toHaveBeenCalled();
     expect(notifications.notifyUsers).toHaveBeenCalled();
+  });
+
+  it('updateEstado (ACEPTADA) reactiva una participación RETIRADO existente en vez de duplicarla', async () => {
+    const prisma = makePrisma();
+    mockPostulacionPendiente(prisma);
+    prisma._tx.participacionProyecto.findFirst.mockResolvedValue({
+      idParticipacion: 77,
+      estadoParticipacion: 'RETIRADO',
+    });
+    prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
+    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, { emit: vi.fn() } as any);
+
+    await service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as any, 9);
+
+    expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
+    expect(prisma._tx.participacionProyecto.update).toHaveBeenCalledWith({
+      where: { idParticipacion: 77 },
+      data: expect.objectContaining({ estadoParticipacion: 'ACTIVO', fechaSalida: null, idPostulacion: 1 }),
+    });
+  });
+
+  it('updateEstado (ACEPTADA) no toca la participación si ya estaba ACTIVO (carrera/reintento)', async () => {
+    const prisma = makePrisma();
+    mockPostulacionPendiente(prisma);
+    prisma._tx.participacionProyecto.findFirst.mockResolvedValue({
+      idParticipacion: 77,
+      estadoParticipacion: 'ACTIVO',
+    });
+    prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
+    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, { emit: vi.fn() } as any);
+
+    await service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as any, 9);
+
+    expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
+    expect(prisma._tx.participacionProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('updateEstado (RECHAZADA) nunca toca ParticipacionProyecto', async () => {
+    const prisma = makePrisma();
+    mockPostulacionPendiente(prisma);
+    prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'RECHAZADA' });
+    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, { emit: vi.fn() } as any);
+
+    await service.updateEstado(1, { estadoPostulacion: 'RECHAZADA' } as any, 9);
+
+    expect(prisma._tx.participacionProyecto.findFirst).not.toHaveBeenCalled();
+    expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
+  });
+
+  it('updateEstado lanza ConflictException si otra resolución concurrente ya la resolvió (updateMany count 0)', async () => {
+    const prisma = makePrisma();
+    mockPostulacionPendiente(prisma);
+    prisma._tx.postulacion.updateMany.mockResolvedValue({ count: 0 });
+    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, { emit: vi.fn() } as any);
+
+    await expect(service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as any, 9)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
   });
 
   it('updateEstado falla si no es creador', async () => {

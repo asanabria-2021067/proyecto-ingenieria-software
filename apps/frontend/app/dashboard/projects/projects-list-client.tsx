@@ -98,7 +98,7 @@ export function ProjectsListClient({ initialData, initialTotalPages, searchQuery
         {projects.map((project, index) => (
           <Link
             key={project.idProyecto}
-            href={`/dashboard/projects/${project.idProyecto}`}
+            href={`/dashboard/proyectos/${project.idProyecto}`}
             className="surface-enter interactive-lift group block bg-white rounded-2xl p-6 shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
           >

@@ -33,6 +33,36 @@ export class SprintsContextService {
   }
 
   /**
+   * Mismo criterio que TasksContextService.assertActiveProjectParticipant:
+   * líder O participante con ParticipacionProyecto ACTIVO en el proyecto.
+   * Usado por lecturas que un miembro (no solo el líder) necesita — p. ej.
+   * saber si hay un Sprint operable para renderizar el tablero Kanban.
+   */
+  async assertActiveProjectParticipant(
+    projectId: number,
+    userId: number,
+    tx?: TxClient,
+  ): Promise<void> {
+    const proyecto = await this.getProjectOrThrow(projectId, tx);
+    if (proyecto.creadoPor === userId) {
+      return;
+    }
+
+    const db = tx ?? this.prisma;
+    const participacion = await db.participacionProyecto.findFirst({
+      where: {
+        idUsuario: userId,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto: projectId },
+      },
+      select: { idParticipacion: true },
+    });
+    if (!participacion) {
+      throw new ForbiddenException('No tienes una participación activa en este proyecto');
+    }
+  }
+
+  /**
    * Sprint operable = ACTIVO o EN_FINALIZACION (Foundation, enum
    * EstadoSprint). CERRADO nunca se considera Sprint actual. Devuelve null
    * si el proyecto no tiene ninguno, sin lanzar excepción, igual que

@@ -15,11 +15,13 @@ vi.mock('../hooks/use-project-sprints', () => ({
   useProjectSprints: vi.fn(),
   useFinalizeSprint: vi.fn(),
 }));
+vi.mock('../lib/swal', () => ({ default: { fire: vi.fn() } }));
 
 import SprintListPage from '../app/dashboard/proyectos/[id]/sprints/page';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useCurrentUser } from '../hooks/use-current-user';
 import { useFinalizeSprint, useProjectSprints } from '../hooks/use-project-sprints';
+import uvgSwal from '../lib/swal';
 
 const proyectoFixture = {
   idProyecto: 42,
@@ -93,9 +95,11 @@ describe('SprintListPage — encabezado', () => {
 
     expect(screen.getByRole('heading', { name: 'Sprints' })).toBeInTheDocument();
     expect(screen.getByText('Resumen de los sprints del proyecto y su progreso.')).toBeInTheDocument();
+    // Debe apuntar al hub real del líder (F17), no a la vista pública/de
+    // postulación de /dashboard/proyectos/[id].
     expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
       'href',
-      '/dashboard/proyectos/42',
+      '/dashboard/projects/42',
     );
   });
 });
@@ -218,14 +222,29 @@ describe('SprintListPage — autorización', () => {
     expect(screen.queryByRole('link', { name: /continuar cierre/i })).not.toBeInTheDocument();
   });
 
-  it('un no-líder sí ve "Ver Detalles" en un Sprint CERRADO', () => {
+  it('un no-líder ve el aviso "¡No eres líder!" en vez de la lista — GET .../sprints es exclusivo del líder en backend', () => {
     mockLeader(false);
     mockSprints({ sprints: [sprint({ estado: 'CERRADO', idSprint: 3 })] });
     mockFinalize();
 
     renderPage();
 
-    expect(screen.getByRole('link', { name: /ver detalles/i })).toBeInTheDocument();
+    expect(screen.getByText('¡No eres líder!')).toBeInTheDocument();
+    expect(screen.getByText('No puedes acceder a los Sprints de este proyecto.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /ver detalles/i })).not.toBeInTheDocument();
+  });
+
+  it('un no-líder ve "Volver al proyecto" apuntando a /dashboard/proyectos (vista pública), no a /dashboard/projects (hub del líder)', () => {
+    mockLeader(false);
+    mockSprints();
+    mockFinalize();
+
+    renderPage();
+
+    expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42',
+    );
   });
 });
 
@@ -240,8 +259,28 @@ describe('SprintListPage — acción Finalizar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Finalizar' }));
 
     expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith(55);
+    expect(mutate).toHaveBeenCalledWith(55, expect.objectContaining({ onError: expect.any(Function) }));
     expect(useFinalizeSprint).toHaveBeenCalledWith(42);
+  });
+
+  it('si backend bloquea por tareas pendientes muestra un aviso claro', () => {
+    mockLeader(true);
+    const mutate = vi.fn((_idSprint: number, options?: { onError?: (error: Error) => void }) => {
+      options?.onError?.(new Error('No se puede finalizar el Sprint mientras existan tareas pendientes'));
+    });
+    mockSprints({ sprints: [sprint({ idSprint: 55, estado: 'ACTIVO' })] });
+    mockFinalize({ mutate });
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar' }));
+
+    expect(uvgSwal.fire).toHaveBeenCalledWith(
+      expect.objectContaining({
+        icon: 'warning',
+        title: 'No se puede finalizar el Sprint',
+        text: 'Aún quedan tareas por realizar. Completa o cierra las tareas pendientes antes de finalizar el Sprint.',
+      }),
+    );
   });
 
   it('mientras está pendiente, el botón queda disabled y un segundo click no dispara dos veces', () => {

@@ -285,7 +285,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link
-                href={`/dashboard/projects/${idProyecto}`}
+                href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}
                 className="max-w-[16rem] truncate text-tertiary hover:text-on-surface"
               >
                 {proyecto.tituloProyecto}
@@ -345,7 +345,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               size="sm"
               className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
             >
-              <Link href={`/dashboard/projects/${idProyecto}`}>
+              <Link href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}>
                 <ArrowLeft className="size-3.5" aria-hidden="true" />
                 Volver al proyecto
               </Link>

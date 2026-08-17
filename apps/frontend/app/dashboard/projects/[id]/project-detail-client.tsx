@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { type RolesSheetIntent } from '@/components/projects/project-roles-sheet';
 import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
 import { ProjectClosureSection } from '@/components/projects/detail/project-closure-section';
+import { ExitRequestSection } from '@/components/projects/detail/exit-request-section';
 import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
 import { ProjectRoleManagementSection } from '@/components/projects/detail/project-role-management-section';
 import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
@@ -18,6 +19,7 @@ import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useCurrentExitRequest } from '@/hooks/use-exit-request';
 import { approveProjectClosure, rejectProjectClosure, requestProjectClosure } from '@/lib/services/projects';
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
@@ -66,6 +68,9 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const queryClient = useQueryClient();
   // Liderazgo determinado exclusivamente por Proyecto.creadoPor.
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
+
+  // F9 — único punto de entrada en la UI hacia /salida/preparacion.
+  const { request: solicitudSalidaAbierta } = useCurrentExitRequest(idProyecto);
 
   const enSolicitudCierre = proyecto.estadoProyecto === 'EN_SOLICITUD_CIERRE';
   const [resolviendoCierre, setResolviendoCierre] = useState(false);
@@ -172,7 +177,11 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     currentUser != null && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeVerKanban = isLeader || esParticipante;
 
-  // Roles enriquecidos (stats + isMine/canLeave) solo para el líder.
+  // Roles enriquecidos (stats + isMine/canLeave): el líder los ve siempre;
+  // un participante activo también los necesita para "Mi rol"/"Salir de este
+  // rol" en su propia tarjeta (el backend acepta ambos casos — 403 solo si
+  // no es líder y no tiene ningún rol activo, caso que `esParticipante` ya
+  // descarta aquí).
   const {
     roles: rolesAdmin,
     crearRol,
@@ -180,7 +189,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     eliminarRol,
     asignarmeRol,
     salirDeRol,
-  } = useProjectRoles(idProyecto, { enabled: isLeader });
+  } = useProjectRoles(idProyecto, { enabled: isLeader || esParticipante });
 
   const [rolesSheetAbierto, setRolesSheetAbierto] = useState(false);
   const [rolesSheetIntent, setRolesSheetIntent] = useState<RolesSheetIntent>({ kind: 'list' });
@@ -235,36 +244,51 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             resolverCierre={resolverCierre}
           />
         )}
+        {solicitudSalidaAbierta && (
+          <ExitRequestSection idProyecto={idProyecto} solicitud={solicitudSalidaAbierta} />
+        )}
       </ProjectSummarySection>
 
       {/* Barra de navegación estilo Jira: "Resumen" es la página actual (siempre
-          activa); el resto son los mismos enlaces/acciones de antes, solo con
-          apariencia de tab en vez de botones sueltos. */}
+          activa). Sprints/Miembros navegan a F3/F12 (rutas reales bajo
+          /dashboard/proyectos/[id], namespace distinto al de esta página mas
+          mismo idProyecto) y se muestran solo al líder porque esos endpoints
+          son exclusivos del líder en backend. */}
       {(isLeader || puedeVerKanban) && (
         <div className="my-5 flex items-center gap-5 overflow-x-auto border-b border-outline-variant/50">
           <span className={TAB_ACTIVE} aria-current="page">
             Resumen
           </span>
           {isLeader && (
+            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Editar Información
+            </Link>
+          )}
+          {isLeader && (
             <Link
               href={`/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`}
               className={TAB_INACTIVE}
             >
               <History className="size-3.5" aria-hidden="true" />
-              Revisiones previas
-            </Link>
-          )}
-          {isLeader && (
-            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
-              <Pencil className="size-3.5" aria-hidden="true" />
-              Editar información
+              Revisiones Pasadas
             </Link>
           )}
           {isLeader && (
             <button type="button" onClick={abrirGestionRoles} className={TAB_INACTIVE}>
               <Settings2 className="size-3.5" aria-hidden="true" />
-              Editar roles
+              Editar Roles
             </button>
+          )}
+          {isLeader && (
+            <Link href={`/dashboard/proyectos/${idProyecto}/miembros`} className={TAB_INACTIVE}>
+              Miembros
+            </Link>
+          )}
+          {isLeader && (
+            <Link href={`/dashboard/proyectos/${idProyecto}/sprints`} className={TAB_INACTIVE}>
+              Sprints
+            </Link>
           )}
           <Link href={kanbanBase} className={TAB_INACTIVE}>
             Tablero

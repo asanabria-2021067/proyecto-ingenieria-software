@@ -16,8 +16,10 @@ import {
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useFinalizeSprint, useProjectSprints } from '@/hooks/use-project-sprints';
+import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import uvgSwal from '@/lib/swal';
 import {
   Empty,
   EmptyContent,
@@ -38,6 +40,14 @@ function formatearFechaHora(iso: string): string {
 
 function formatearHoras(horas: number): string {
   return horas.toLocaleString('es-GT', { maximumFractionDigits: 2 });
+}
+
+function mensajeErrorFinalizarSprint(error: unknown): string {
+  const mensaje = error instanceof Error ? error.message : '';
+  if (/tareas pendientes/i.test(mensaje)) {
+    return 'Aún quedan tareas por realizar. Completa o cierra las tareas pendientes antes de finalizar el Sprint.';
+  }
+  return mensaje || 'No fue posible finalizar el Sprint. Intenta nuevamente.';
 }
 
 /**
@@ -114,7 +124,17 @@ function SprintCard({
           {sprint.estado === 'ACTIVO' && isLeader && (
             <Button
               type="button"
-              onClick={() => finalizeSprint.mutate(sprint.idSprint)}
+              onClick={() =>
+                finalizeSprint.mutate(sprint.idSprint, {
+                  onError: (error) => {
+                    void uvgSwal.fire({
+                      icon: 'warning',
+                      title: 'No se puede finalizar el Sprint',
+                      text: mensajeErrorFinalizarSprint(error),
+                    });
+                  },
+                })
+              }
               disabled={finalizeSprint.isPending}
               className="gap-1.5 rounded-lg bg-primary px-5 text-xs font-bold text-on-primary hover:bg-primary/90"
             >
@@ -171,17 +191,22 @@ export default function SprintListPage() {
   const finalizeSprint = useFinalizeSprint(idProyecto);
 
   const cargando = isLoading || cargandoProyecto || cargandoUsuario;
+  const volverAlProyectoHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
       <Link
-        href={`/dashboard/proyectos/${id}`}
+        href={volverAlProyectoHref}
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
       >
         <ArrowLeft className="h-4 w-4" />
         Volver al proyecto
       </Link>
 
+      {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
+        <LeaderOnlyNotice description="No puedes acceder a los Sprints de este proyecto." />
+      ) : (
+        <>
       <div className="mb-8 flex items-center gap-2">
         <History className="h-6 w-6 text-primary" aria-hidden="true" />
         <h1 className="font-headline text-3xl font-extrabold text-on-surface">Sprints</h1>
@@ -246,6 +271,8 @@ export default function SprintListPage() {
             />
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -299,7 +299,7 @@ export default function DashboardPage() {
                           {p.modalidadProyecto}
                         </div>
                         <Link
-                          href={`/dashboard/projects/${p.idProyecto}`}
+                          href={`/dashboard/proyectos/${p.idProyecto}`}
                           aria-label={`Ver ${p.tituloProyecto}`}
                           className="rounded-xl bg-surface-container-high px-6 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
                         >
@@ -361,7 +361,7 @@ export default function DashboardPage() {
                         {p.modalidadProyecto}
                       </div>
                       <Link
-                        href={`/dashboard/projects/${p.idProyecto}`}
+                        href={`/dashboard/proyectos/${p.idProyecto}`}
                         aria-label={`Ver ${p.tituloProyecto}`}
                         className="rounded-xl bg-surface-container-high px-6 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
                       >

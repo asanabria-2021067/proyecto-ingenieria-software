@@ -64,14 +64,16 @@ export class SprintsAuthorizationService {
   }
 
   /**
-   * Listar histórico de Sprints del proyecto (A10): exclusivo del líder,
-   * misma política de lectura que el resto de `sprints/` (ninguna operación
-   * del módulo es visible para participantes no-líder todavía) — no se
-   * introduce una política funcional nueva. Solo exige liderazgo sobre el
-   * proyecto porque el listado no tiene un Sprint concreto que validar.
+   * Listar Sprints del proyecto (A10): líder o participante activo. El
+   * tablero Kanban (cualquier miembro con un rol activo) depende de este
+   * mismo listado para saber si hay un Sprint operable antes de renderizar
+   * las tareas — restringirlo al líder bloqueaba el tablero para el resto
+   * del equipo. Las acciones de gestión del Sprint (iniciar/finalizar/
+   * cerrar/ajustar horas/resumen de cierre) siguen siendo exclusivas del
+   * líder vía sus propios `assertCan*`.
    */
   async assertCanListSprintHistory(projectId: number, userId: number, tx?: TxClient): Promise<void> {
-    await this.sprintsContext.assertProjectLeader(projectId, userId, tx);
+    await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
   }
 
   /**
