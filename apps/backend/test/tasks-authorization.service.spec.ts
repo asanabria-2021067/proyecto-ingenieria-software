@@ -1,15 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import { TasksContextService } from '../src/tasks/tasks-context.service';
 
 function makeContext() {
-  return {
+  const context = {
     getProjectOrThrow: vi.fn(),
     getTaskInProjectOrThrow: vi.fn(),
     getActiveAssignment: vi.fn(),
     assertProjectLeader: vi.fn(),
     assertActiveProjectParticipant: vi.fn(),
-  } as any;
+  };
+  return context as typeof context & TasksContextService;
 }
 
 const LIDER_ID = 1;
@@ -59,7 +62,7 @@ describe('TasksAuthorizationService', () => {
     it('traslada el cliente transaccional recibido', async () => {
       const ctx = makeContext();
       ctx.assertProjectLeader.mockResolvedValue(undefined);
-      const tx = { marker: 'tx' } as any;
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
       const service = new TasksAuthorizationService(ctx);
 
       await service.assertCanCreateTask(1, LIDER_ID, tx);
@@ -150,7 +153,7 @@ describe('TasksAuthorizationService', () => {
   describe.each([
     ['assertCanAssignTask' as const, 'asignar'],
     ['assertCanUnassignTask' as const, 'desasignar'],
-  ])('%s (%s)', (method) => {
+  ])('%s (%s)', (method, _label) => {
     it('permite al líder y devuelve la tarea validada', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
@@ -427,7 +430,7 @@ describe('TasksAuthorizationService', () => {
     it('traslada el cliente transaccional recibido', async () => {
       const ctx = makeContext();
       ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
-      const tx = { marker: 'tx' } as any;
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
       const service = new TasksAuthorizationService(ctx);
 
       await service.assertCanListProjectTasks(1, LIDER_ID, tx);
@@ -623,7 +626,7 @@ describe('TasksAuthorizationService', () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
       ctx.assertProjectLeader.mockResolvedValue(undefined);
-      const tx = { marker: 'tx' } as any;
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
       const service = new TasksAuthorizationService(ctx);
 
       await service.assertCanDeleteTask(1, 10, LIDER_ID, tx);
@@ -642,7 +645,7 @@ describe('TasksAuthorizationService', () => {
         idUsuario: ASIGNADO_ID,
         desasignadaEn: null,
       });
-      const tx = { marker: 'tx' } as any;
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
       const service = new TasksAuthorizationService(ctx);
 
       await service.assertCanChangeTaskState(1, 10, ASIGNADO_ID, tx);
@@ -656,7 +659,7 @@ describe('TasksAuthorizationService', () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
       ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
-      const tx = { marker: 'tx' } as any;
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
       const service = new TasksAuthorizationService(ctx);
 
       await service.assertCanReadTask(1, 10, PARTICIPANTE_ID, tx);
