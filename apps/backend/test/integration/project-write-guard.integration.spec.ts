@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
-import type { PrismaClient } from '@prisma/client';
+import { Prioridad, type PrismaClient } from '@prisma/client';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
@@ -20,6 +20,9 @@ import { TasksService } from '../../src/tasks/tasks.service';
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
+import type { CreateTaskDto } from '../../src/tasks/dto/create-task.dto';
+import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
 
 /**
  * Integración real A3: demuestra que ProjectWriteGuard (SYNC GATE 2) protege
@@ -56,7 +59,7 @@ function makeFakeNotifications() {
     notifyUsers: async () => undefined,
     notifyRoleMembers: async () => undefined,
     notifyProjectActiveParticipants: async () => undefined,
-  } as any;
+  } as unknown as NotificationsService;
 }
 
 function fakeExecutionContext(params: Record<string, unknown>): ExecutionContext {
@@ -77,11 +80,12 @@ describeIntegration(
       prisma = createIntegrationPrismaClient();
       await prisma.$connect();
 
-      const tasksContext = new TasksContextService(prisma as any);
+      const prismaService = prisma as unknown as PrismaService;
+      const tasksContext = new TasksContextService(prismaService);
       const tasksAuthorization = new TasksAuthorizationService(tasksContext);
-      const tasksRelations = new TasksRelationsService(prisma as any, tasksContext);
+      const tasksRelations = new TasksRelationsService(prismaService, tasksContext);
       const tasksService = new TasksService(
-        prisma as any,
+        prismaService,
         tasksAuthorization,
         tasksRelations,
         makeFakeNotifications(),
@@ -89,7 +93,7 @@ describeIntegration(
       );
       controller = new TasksController(tasksService);
 
-      const sprintsContext = new SprintsContextService(prisma as any);
+      const sprintsContext = new SprintsContextService(prismaService);
       guard = new ProjectWriteGuard(sprintsContext);
     });
 
@@ -116,7 +120,7 @@ describeIntegration(
       projectId: number,
       action: () => Promise<T>,
     ): Promise<T> {
-      const handler = (TasksController.prototype as any)[handlerName];
+      const handler = TasksController.prototype[handlerName];
       const guards = Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
       expect(guards).toContain(ProjectWriteGuard);
 
@@ -132,11 +136,11 @@ describeIntegration(
       scope.sprintIds = [];
       scope.taskIds = [];
 
-      const dto = {
+      const dto: CreateTaskDto = {
         tituloTarea: 'Tarea A3 create',
         fechaLimite: '2099-01-01',
-        prioridad: 'MEDIA',
-      } as any;
+        prioridad: Prioridad.MEDIA,
+      };
 
       // --- SIN SPRINT OPERABLE (ningún Sprint todavía) ---
       let rejection: unknown;
@@ -160,8 +164,8 @@ describeIntegration(
       const creada = await runThroughRealGuard('create', project.idProyecto, () =>
         controller.create(project.idProyecto, { userId: leader.idUsuario }, dto),
       );
-      expect((creada as any).idTarea).toBeTypeOf('number');
-      scope.taskIds!.push((creada as any).idTarea);
+      expect(creada.idTarea).toBeTypeOf('number');
+      scope.taskIds!.push(creada.idTarea);
 
       const countActivo = await prisma.tarea.count({ where: { idProyecto: project.idProyecto } });
       expect(countActivo).toBe(1);
@@ -213,7 +217,7 @@ describeIntegration(
             project.idProyecto,
             task.idTarea,
             { userId: leader.idUsuario },
-            { tituloTarea: 'Editado sin Sprint' } as any,
+            { tituloTarea: 'Editado sin Sprint' },
           ),
         );
       } catch (error) {
@@ -231,7 +235,7 @@ describeIntegration(
           project.idProyecto,
           task.idTarea,
           { userId: leader.idUsuario },
-          { tituloTarea: 'Editado en ACTIVO' } as any,
+          { tituloTarea: 'Editado en ACTIVO' },
         ),
       );
       const editada = await prisma.tarea.findUnique({ where: { idTarea: task.idTarea } });
@@ -250,7 +254,7 @@ describeIntegration(
             project.idProyecto,
             task.idTarea,
             { userId: leader.idUsuario },
-            { tituloTarea: 'Editado en finalizacion' } as any,
+            { tituloTarea: 'Editado en finalizacion' },
           ),
         );
       } catch (error) {
@@ -308,7 +312,7 @@ describeIntegration(
             project.idProyecto,
             task.idTarea,
             { userId: leader.idUsuario },
-            { idUsuario: assignee.idUsuario } as any,
+            { idUsuario: assignee.idUsuario },
           ),
         );
       } catch (error) {
@@ -328,7 +332,7 @@ describeIntegration(
           project.idProyecto,
           task.idTarea,
           { userId: leader.idUsuario },
-          { idUsuario: assignee.idUsuario } as any,
+          { idUsuario: assignee.idUsuario },
         ),
       );
       const asignacionActiva = await prisma.asignacionTarea.findFirst({
@@ -345,7 +349,7 @@ describeIntegration(
           project.idProyecto,
           task.idTarea,
           { userId: leader.idUsuario },
-          { idUsuario: assigneeB.idUsuario } as any,
+          { idUsuario: assigneeB.idUsuario },
         ),
       );
       const asignacionAntigua = await prisma.asignacionTarea.findUniqueOrThrow({
@@ -376,7 +380,7 @@ describeIntegration(
             project.idProyecto,
             task.idTarea,
             { userId: leader.idUsuario },
-            { idUsuario: leader.idUsuario } as any,
+            { idUsuario: leader.idUsuario },
           ),
         );
       } catch (error) {
