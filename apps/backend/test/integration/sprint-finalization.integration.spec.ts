@@ -12,6 +12,8 @@ import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setu
 import { SprintsService } from '../../src/sprints/sprints.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
+import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
 
 /**
  * Integración real A4: SprintsService.finalizeSprint contra PostgreSQL real
@@ -38,10 +40,15 @@ describeIntegration(
     let scope: IntegrationCleanupScope;
 
     function makeService(notifications = makeNotificationsSpy()) {
-      const context = new SprintsContextService(prisma as any);
+      const context = new SprintsContextService(prisma as unknown as PrismaService);
       const authorization = new SprintsAuthorizationService(context);
       return {
-        service: new SprintsService(prisma as any, context, authorization, notifications as any),
+        service: new SprintsService(
+          prisma as unknown as PrismaService,
+          context,
+          authorization,
+          notifications as unknown as NotificationsService,
+        ),
         notifications,
       };
     }
