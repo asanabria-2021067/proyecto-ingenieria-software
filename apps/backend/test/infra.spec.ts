@@ -5,9 +5,12 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 
 describe('Infra', () => {
-  it('JwtStrategy validate mapea payload', () => {
-    const strategy = new JwtStrategy();
-    expect(strategy.validate({ sub: 7, correo: 'a@uvg.edu' })).toEqual({
+  it('JwtStrategy validate mapea payload de usuario activo', async () => {
+    const prisma = {
+      usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }) },
+    };
+    const strategy = new JwtStrategy(prisma as unknown as PrismaService);
+    await expect(strategy.validate({ sub: 7, correo: 'a@uvg.edu' })).resolves.toEqual({
       userId: 7,
       correo: 'a@uvg.edu',
     });
