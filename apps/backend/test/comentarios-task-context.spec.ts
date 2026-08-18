@@ -12,20 +12,22 @@ import { ComentariosService } from '../src/comentarios/comentarios.service';
  * no se debilitan aquí).
  */
 function makePrisma() {
-  return {
+  const prisma = {
     comentario: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     proyecto: { findUnique: vi.fn() },
     tarea: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
     asignacionTarea: { findFirst: vi.fn() },
-  } as any;
+  };
+  return prisma as typeof prisma & ConstructorParameters<typeof ComentariosService>[0];
 }
 
 function makeNotifications() {
-  return {
+  const notifications = {
     notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
     notifyUsers: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+  return notifications as typeof notifications & ConstructorParameters<typeof ComentariosService>[1];
 }
 
 const PROJECT_ID = 5;
@@ -295,7 +297,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
 
       const result = await service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, {
         contenido: 'editado',
-      } as any);
+      });
 
       expect(prisma.comentario.findFirst).toHaveBeenCalledWith({
         where: { idComentario: COMMENT_ID, idTarea: TASK_ID, eliminadoEn: null },
@@ -315,7 +317,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const service = new ComentariosService(prisma, makeNotifications());
 
       await expect(
-        service.updateForTask(PROJECT_ID, TASK_ID, 999999, COMMENT_AUTHOR_ID, { contenido: 'x' } as any),
+        service.updateForTask(PROJECT_ID, TASK_ID, 999999, COMMENT_AUTHOR_ID, { contenido: 'x' }),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.comentario.update).not.toHaveBeenCalled();
     });
@@ -327,7 +329,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const service = new ComentariosService(prisma, makeNotifications());
 
       await expect(
-        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' } as any),
+        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' }),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.comentario.update).not.toHaveBeenCalled();
     });
@@ -338,7 +340,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const service = new ComentariosService(prisma, makeNotifications());
 
       await expect(
-        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' } as any),
+        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' }),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.comentario.findFirst).not.toHaveBeenCalled();
       expect(prisma.comentario.update).not.toHaveBeenCalled();
@@ -350,7 +352,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const service = new ComentariosService(prisma, makeNotifications());
 
       await expect(
-        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' } as any),
+        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' }),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.comentario.findFirst).not.toHaveBeenCalled();
     });
@@ -362,7 +364,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const service = new ComentariosService(prisma, makeNotifications());
 
       await expect(
-        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, EXTERNO_ID, { contenido: 'x' } as any),
+        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, EXTERNO_ID, { contenido: 'x' }),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.proyecto.findUnique).not.toHaveBeenCalled();
       expect(prisma.comentario.update).not.toHaveBeenCalled();
@@ -376,7 +378,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const service = new ComentariosService(prisma, makeNotifications());
 
       await expect(
-        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' } as any),
+        service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' }),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.comentario.update).not.toHaveBeenCalled();
     });
@@ -402,8 +404,8 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
         where: { idComentario: COMMENT_ID },
         data: { eliminadoEn: expect.any(Date) },
       });
-      expect((prisma.comentario as any).delete).toBeUndefined();
-      expect((prisma.comentario as any).deleteMany).toBeUndefined();
+      expect(Reflect.get(prisma.comentario, 'delete')).toBeUndefined();
+      expect(Reflect.get(prisma.comentario, 'deleteMany')).toBeUndefined();
     });
 
     it('comentario cruzado (otra tarea): 404, no se modifica ningún comentario', async () => {
@@ -465,7 +467,9 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       });
       const service = new ComentariosService(prisma, makeNotifications());
 
-      await service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' } as any);
+      await service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, {
+        contenido: 'x',
+      });
 
       expect(orden).toEqual(['contexto', 'comentario_en_tarea', 'autorizacion', 'escritura']);
     });
