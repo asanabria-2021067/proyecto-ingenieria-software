@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, ParseIntPipe } from '@nestjs/common';
+import type { ArgumentMetadata } from '@nestjs/common';
 import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TasksController } from '../src/tasks/tasks.controller';
+import type { TasksService } from '../src/tasks/tasks.service';
 
 function makeService() {
   return {
@@ -13,7 +15,7 @@ function makeService() {
     update: vi.fn(),
     updateEstado: vi.fn(),
     remove: vi.fn(),
-  } as any;
+  };
 }
 
 describe('TasksController.remove (DELETE /proyectos/:projectId/tareas/:taskId)', () => {
@@ -28,7 +30,7 @@ describe('TasksController.remove (DELETE /proyectos/:projectId/tareas/:taskId)',
 
   it('delega en TasksService.remove con projectId, taskId (Param) y userId (CurrentUser)', async () => {
     const service = makeService();
-    const controller = new TasksController(service);
+    const controller = new TasksController(service as unknown as TasksService);
 
     await controller.remove(5, 42, { userId: 9 });
 
@@ -38,7 +40,7 @@ describe('TasksController.remove (DELETE /proyectos/:projectId/tareas/:taskId)',
   it('la respuesta no tiene contenido (resuelve undefined)', async () => {
     const service = makeService();
     service.remove.mockResolvedValue(undefined);
-    const controller = new TasksController(service);
+    const controller = new TasksController(service as unknown as TasksService);
 
     const result = await controller.remove(5, 42, { userId: 9 });
 
@@ -49,7 +51,7 @@ describe('TasksController.remove (DELETE /proyectos/:projectId/tareas/:taskId)',
     const service = makeService();
     const error = new ForbiddenException('No eres el líder de este proyecto');
     service.remove.mockRejectedValue(error);
-    const controller = new TasksController(service);
+    const controller = new TasksController(service as unknown as TasksService);
 
     await expect(controller.remove(5, 42, { userId: 9 })).rejects.toBe(error);
   });
@@ -57,14 +59,14 @@ describe('TasksController.remove (DELETE /proyectos/:projectId/tareas/:taskId)',
   it('projectId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('abc', { type: 'param', data: 'projectId' } as any),
+      pipe.transform('abc', { type: 'param', data: 'projectId' } as ArgumentMetadata),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('taskId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('xyz', { type: 'param', data: 'taskId' } as any),
+      pipe.transform('xyz', { type: 'param', data: 'taskId' } as ArgumentMetadata),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
