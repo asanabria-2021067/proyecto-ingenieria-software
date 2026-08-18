@@ -2,6 +2,8 @@ import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as bcrypt from 'bcryptjs';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsGateway } from '../src/notifications/notifications.gateway';
 import { AuthService } from '../src/auth/auth.service';
 import { AdminService } from '../src/admin/admin.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
@@ -19,46 +21,67 @@ import { NotificationsService } from '../src/notifications/notifications.service
 // incompatibility, not a fluke; the repo's existing test/*.spec.ts files avoid it by
 // never bootstrapping a Nest TestingModule and always instantiating services manually
 // (see auth.service.spec.ts) -- this file follows that same proven approach.
+interface UsuarioRow {
+  idUsuario: number;
+  correo: string;
+  contrasena: string;
+  nombre: string;
+  apellido: string;
+  estado: string;
+}
+
+interface SolicitudRow {
+  idSolicitud: number;
+  idUsuario: number;
+  carneReferencia: string;
+  correoReferencia: string;
+  estado: string;
+  creadaEn: Date;
+  atendidaEn: Date | null;
+  atendidaPor: number | null;
+  tokenUtilizadoEn: Date | null;
+}
+
 function createFakePrisma() {
-  const usuarios = new Map<number, any>();
+  const usuarios = new Map<number, UsuarioRow>();
   const perfiles = new Map<string, number>(); // carne -> idUsuario
   const rolesAdmin = new Set<number>();
-  const solicitudes = new Map<number, any>();
-  const notificaciones: any[] = [];
+  const solicitudes = new Map<number, SolicitudRow>();
+  const notificaciones: Record<string, unknown>[] = [];
   let nextSolicitudId = 1;
 
-  function attachUsuario(row: any, fields: string[]) {
+  function attachUsuario(row: SolicitudRow, fields: (keyof UsuarioRow)[]) {
     const u = usuarios.get(row.idUsuario);
-    const picked: any = {};
+    const picked: Record<string, unknown> = {};
     for (const f of fields) picked[f] = u?.[f];
     return { ...row, usuario: picked };
   }
 
   const prisma = {
     perfilEstudiante: {
-      findUnique: async ({ where }: any) => {
+      findUnique: async ({ where }: { where: { carne: string } }) => {
         const idUsuario = perfiles.get(where.carne);
         if (idUsuario === undefined) return null;
-        const u = usuarios.get(idUsuario);
+        const u = usuarios.get(idUsuario)!;
         return { usuario: { idUsuario: u.idUsuario, nombre: u.nombre, apellido: u.apellido } };
       },
     },
     usuario: {
-      findUnique: async ({ where }: any) => {
+      findUnique: async ({ where }: { where: { idUsuario?: number; correo?: string } }) => {
         if (where.idUsuario !== undefined) return usuarios.get(where.idUsuario) ?? null;
         if (where.correo !== undefined) {
           for (const u of usuarios.values()) if (u.correo === where.correo) return u;
         }
         return null;
       },
-      update: async ({ where, data }: any) => {
-        const u = usuarios.get(where.idUsuario);
+      update: async ({ where, data }: { where: { idUsuario: number }; data: Partial<UsuarioRow> }) => {
+        const u = usuarios.get(where.idUsuario)!;
         Object.assign(u, data);
         return u;
       },
     },
     usuarioRolAcceso: {
-      findFirst: async ({ where }: any) => {
+      findFirst: async ({ where }: { where: { idUsuario: number } }) => {
         if (!rolesAdmin.has(where.idUsuario)) return null;
         return { idUsuarioRolAcceso: where.idUsuario, idUsuario: where.idUsuario, rolAcceso: { nombrePerfil: 'administrador' } };
       },
@@ -67,8 +90,12 @@ function createFakePrisma() {
       },
     },
     solicitudRecuperacion: {
-      create: async ({ data }: any) => {
-        const row = {
+      create: async ({
+        data,
+      }: {
+        data: { idUsuario: number; carneReferencia: string; correoReferencia: string };
+      }) => {
+        const row: SolicitudRow = {
           idSolicitud: nextSolicitudId++,
           idUsuario: data.idUsuario,
           carneReferencia: data.carneReferencia,
@@ -82,26 +109,34 @@ function createFakePrisma() {
         solicitudes.set(row.idSolicitud, row);
         return { ...row };
       },
-      findMany: async ({ where }: any) => {
+      findMany: async ({ where }: { where?: { estado?: string } }) => {
         return [...solicitudes.values()]
           .filter((s) => !where?.estado || s.estado === where.estado)
           .sort((a, b) => b.creadaEn.getTime() - a.creadaEn.getTime())
           .map((s) => attachUsuario(s, ['idUsuario', 'nombre', 'apellido', 'correo']));
       },
-      findUnique: async ({ where, include, select }: any) => {
+      findUnique: async ({
+        where,
+        include,
+        select,
+      }: {
+        where: { idSolicitud: number };
+        include?: { usuario?: boolean };
+        select?: { usuario?: boolean };
+      }) => {
         const row = solicitudes.get(where.idSolicitud);
         if (!row) return null;
         if (include?.usuario || select?.usuario) return attachUsuario(row, ['idUsuario', 'correo']);
         return { ...row };
       },
-      update: async ({ where, data }: any) => {
-        const row = solicitudes.get(where.idSolicitud);
+      update: async ({ where, data }: { where: { idSolicitud: number }; data: Partial<SolicitudRow> }) => {
+        const row = solicitudes.get(where.idSolicitud)!;
         Object.assign(row, data);
         return { ...row };
       },
     },
     notificacion: {
-      createMany: async ({ data }: any) => {
+      createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
         notificaciones.push(...data);
         return { count: data.length };
       },
@@ -140,9 +175,12 @@ describe('HU-14: recuperacion de contrasena via notificacion al admin', () => {
     fake.seedStudent(STUDENT_ID, CARNE, CORREO_INSTITUCIONAL, 'old-hash');
 
     jwtService = new JwtService({ secret: 'test-secret', signOptions: { expiresIn: '1h' } });
-    const notificationsService = new NotificationsService(fake.prisma as any, {} as any);
-    authService = new AuthService(fake.prisma as any, jwtService, notificationsService);
-    adminService = new AdminService(fake.prisma as any, jwtService);
+    const notificationsService = new NotificationsService(
+      fake.prisma as unknown as PrismaService,
+      {} as unknown as NotificationsGateway,
+    );
+    authService = new AuthService(fake.prisma as unknown as PrismaService, jwtService, notificationsService);
+    adminService = new AdminService(fake.prisma as unknown as PrismaService, jwtService);
   });
 
   it('flujo completo: solicitud -> notificacion admin -> lista pendientes -> genera enlace -> atendida -> reset exitoso', async () => {
@@ -185,7 +223,7 @@ describe('HU-14: recuperacion de contrasena via notificacion al admin', () => {
     expect(result.mensaje).toMatch(/actualizada/i);
 
     const usuarioActualizado = await fake.prisma.usuario.findUnique({ where: { idUsuario: STUDENT_ID } });
-    expect(await bcrypt.compare('NuevaClave123', usuarioActualizado.contrasena)).toBe(true);
+    expect(await bcrypt.compare('NuevaClave123', usuarioActualizado!.contrasena)).toBe(true);
   });
 
   it('expiraEn se deriva exactamente del claim exp del resetToken firmado, no de un TTL calculado por separado', async () => {
