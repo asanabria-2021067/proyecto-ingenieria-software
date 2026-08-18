@@ -93,7 +93,7 @@ function makeTx() {
       create: vi.fn(),
       update: vi.fn(),
     },
-  } as any;
+  };
 }
 
 describe('HoursRecognitionService', () => {
@@ -268,7 +268,7 @@ describe('HoursRecognitionService', () => {
       tx.asignacionTarea.findMany.mockResolvedValue([]);
       const service = new HoursRecognitionService(prisma);
 
-      const resultado = await service.recognizeParticipationHours(tx, INPUT);
+      const resultado = await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(resultado).toEqual({
         horasReconocidas: 0,
@@ -290,7 +290,7 @@ describe('HoursRecognitionService', () => {
       tx.horasParticipacion.create.mockResolvedValue(filaCreada);
       const service = new HoursRecognitionService(prisma);
 
-      const resultado = await service.recognizeParticipationHours(tx, INPUT);
+      const resultado = await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(resultado.horasReconocidas).toBe(5);
       expect(resultado.idsAsignacionesReconocidas).toEqual([1, 2]);
@@ -322,7 +322,7 @@ describe('HoursRecognitionService', () => {
       tx.horasParticipacion.update.mockResolvedValue({ ...filaExistente, horasCalculadas: new Prisma.Decimal(14) });
       const service = new HoursRecognitionService(prisma);
 
-      const resultado = await service.recognizeParticipationHours(tx, INPUT);
+      const resultado = await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(resultado.horasReconocidas).toBe(4);
       expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
@@ -342,7 +342,7 @@ describe('HoursRecognitionService', () => {
       tx.horasParticipacion.create.mockResolvedValue({ idRegistroHoras: 1 });
       const service = new HoursRecognitionService(prisma);
 
-      await service.recognizeParticipationHours(tx, INPUT);
+      await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(tx.asignacionTarea.updateMany).toHaveBeenCalledWith({
         where: { idAsignacion: { in: [7, 8] }, reconocidoEn: null },
@@ -358,7 +358,7 @@ describe('HoursRecognitionService', () => {
       tx.asignacionTarea.updateMany.mockResolvedValue({ count: 1 });
       const service = new HoursRecognitionService(prisma);
 
-      await expect(service.recognizeParticipationHours(tx, INPUT)).rejects.toBeInstanceOf(
+      await expect(service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT)).rejects.toBeInstanceOf(
         ConflictException,
       );
       expect(tx.horasParticipacion.findFirst).not.toHaveBeenCalled();
@@ -378,7 +378,7 @@ describe('HoursRecognitionService', () => {
       tx.horasParticipacion.update.mockResolvedValue({ ...filaGanadora, horasCalculadas: new Prisma.Decimal(8) });
       const service = new HoursRecognitionService(prisma);
 
-      const resultado = await service.recognizeParticipationHours(tx, INPUT);
+      const resultado = await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
         where: { idRegistroHoras: 777 },
@@ -395,7 +395,7 @@ describe('HoursRecognitionService', () => {
       tx.horasParticipacion.create.mockResolvedValue({ idRegistroHoras: 1 });
       const service = new HoursRecognitionService(prisma);
 
-      await service.recognizeParticipationHours(tx, INPUT);
+      await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(tx.asignacionTarea.findMany).toHaveBeenCalled();
       expect(tx.asignacionTarea.updateMany).toHaveBeenCalled();
@@ -415,7 +415,7 @@ describe('HoursRecognitionService', () => {
       tx.asignacionTarea.findMany.mockResolvedValue([]);
       const service = new HoursRecognitionService(prisma);
 
-      await service.recognizeParticipationHours(tx, INPUT);
+      await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(transactionSpy).not.toHaveBeenCalled();
     });
@@ -426,7 +426,7 @@ describe('HoursRecognitionService', () => {
       tx.asignacionTarea.findMany.mockResolvedValue([]);
       const service = new HoursRecognitionService(prisma);
 
-      await service.recognizeParticipationHours(tx, { projectId: 7, sprintId: 8, participationId: 9 });
+      await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, { projectId: 7, sprintId: 8, participationId: 9 });
 
       expect(tx.asignacionTarea.findMany).toHaveBeenCalledWith({
         where: {
