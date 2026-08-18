@@ -1,7 +1,23 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EstadoProyecto } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { UpdateEstadoPostulacionDto } from '../src/applications/dto/update-estado-postulacion.dto';
 import { ApplicationsService } from '../src/applications/applications.service';
+
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  notifications: Partial<{ notifyUsers: ReturnType<typeof vi.fn> }> = { notifyUsers: vi.fn() },
+  eventEmitter: Partial<{ emit: ReturnType<typeof vi.fn> }> = { emit: vi.fn() },
+) {
+  return new ApplicationsService(
+    prisma as unknown as PrismaService,
+    notifications as unknown as NotificationsService,
+    eventEmitter as unknown as EventEmitter2,
+  );
+}
 
 function makePrisma() {
   const tx = {
@@ -29,7 +45,7 @@ function makePrisma() {
     },
     $transaction: vi.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
     _tx: tx,
-  } as any;
+  };
 }
 
 describe('ApplicationsService', () => {
@@ -43,8 +59,8 @@ describe('ApplicationsService', () => {
     });
     prisma.postulacion.findFirst.mockResolvedValue(null);
     prisma.postulacion.create.mockResolvedValue({ idPostulacion: 10 });
-    const eventEmitter = { emit: vi.fn() } as any;
-    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, eventEmitter);
+    const eventEmitter = { emit: vi.fn() };
+    const service = makeService(prisma, { notifyUsers: vi.fn() }, eventEmitter);
 
     const result = await service.create(
       { idRolProyecto: 2, justificacion: 'Quiero aportar' },
@@ -61,7 +77,7 @@ describe('ApplicationsService', () => {
   it('create falla si usuario no existe', async () => {
     const prisma = makePrisma();
     prisma.usuario.findUnique.mockResolvedValue(null);
-    const service = new ApplicationsService(prisma, {} as any, { emit: vi.fn() } as any);
+    const service = makeService(prisma);
     await expect(
       service.create({ idRolProyecto: 2, justificacion: '' }, 1),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -76,7 +92,7 @@ describe('ApplicationsService', () => {
       proyecto: { estadoProyecto: EstadoProyecto.EN_PROGRESO },
     });
     prisma.participacionProyecto.count.mockResolvedValue(1);
-    const service = new ApplicationsService(prisma, {} as any, { emit: vi.fn() } as any);
+    const service = makeService(prisma);
     await expect(
       service.create({ idRolProyecto: 2, justificacion: '' }, 1),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -85,7 +101,7 @@ describe('ApplicationsService', () => {
   it('findAll y findMine delegan en prisma', async () => {
     const prisma = makePrisma();
     prisma.postulacion.findMany.mockResolvedValue([]);
-    const service = new ApplicationsService(prisma, {} as any, { emit: vi.fn() } as any);
+    const service = makeService(prisma);
     await service.findAll();
     await service.findMine(1);
     expect(prisma.postulacion.findMany).toHaveBeenCalledTimes(2);
@@ -94,7 +110,7 @@ describe('ApplicationsService', () => {
   it('findOne falla si no existe', async () => {
     const prisma = makePrisma();
     prisma.postulacion.findUnique.mockResolvedValue(null);
-    const service = new ApplicationsService(prisma, {} as any, { emit: vi.fn() } as any);
+    const service = makeService(prisma);
     await expect(service.findOne(1)).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -113,12 +129,12 @@ describe('ApplicationsService', () => {
     const prisma = makePrisma();
     mockPostulacionPendiente(prisma);
     prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
-    const notifications = { notifyUsers: vi.fn() } as any;
-    const service = new ApplicationsService(prisma, notifications, { emit: vi.fn() } as any);
+    const notifications = { notifyUsers: vi.fn() };
+    const service = makeService(prisma, notifications);
 
     const result = await service.updateEstado(
       1,
-      { estadoPostulacion: 'ACEPTADA', comentarioResolucion: '' } as any,
+      { estadoPostulacion: 'ACEPTADA', comentarioResolucion: '' } as UpdateEstadoPostulacionDto,
       9,
     );
 
@@ -147,9 +163,9 @@ describe('ApplicationsService', () => {
       estadoParticipacion: 'RETIRADO',
     });
     prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
-    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, { emit: vi.fn() } as any);
+    const service = makeService(prisma);
 
-    await service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as any, 9);
+    await service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as UpdateEstadoPostulacionDto, 9);
 
     expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
     expect(prisma._tx.participacionProyecto.update).toHaveBeenCalledWith({
@@ -166,9 +182,9 @@ describe('ApplicationsService', () => {
       estadoParticipacion: 'ACTIVO',
     });
     prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
-    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, { emit: vi.fn() } as any);
+    const service = makeService(prisma);
 
-    await service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as any, 9);
+    await service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as UpdateEstadoPostulacionDto, 9);
 
     expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
     expect(prisma._tx.participacionProyecto.update).not.toHaveBeenCalled();
@@ -178,9 +194,9 @@ describe('ApplicationsService', () => {
     const prisma = makePrisma();
     mockPostulacionPendiente(prisma);
     prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'RECHAZADA' });
-    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, { emit: vi.fn() } as any);
+    const service = makeService(prisma);
 
-    await service.updateEstado(1, { estadoPostulacion: 'RECHAZADA' } as any, 9);
+    await service.updateEstado(1, { estadoPostulacion: 'RECHAZADA' } as UpdateEstadoPostulacionDto, 9);
 
     expect(prisma._tx.participacionProyecto.findFirst).not.toHaveBeenCalled();
     expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
@@ -190,9 +206,9 @@ describe('ApplicationsService', () => {
     const prisma = makePrisma();
     mockPostulacionPendiente(prisma);
     prisma._tx.postulacion.updateMany.mockResolvedValue({ count: 0 });
-    const service = new ApplicationsService(prisma, { notifyUsers: vi.fn() } as any, { emit: vi.fn() } as any);
+    const service = makeService(prisma);
 
-    await expect(service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as any, 9)).rejects.toBeInstanceOf(
+    await expect(service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as UpdateEstadoPostulacionDto, 9)).rejects.toBeInstanceOf(
       ConflictException,
     );
     expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
@@ -205,8 +221,8 @@ describe('ApplicationsService', () => {
       estadoPostulacion: 'PENDIENTE',
       rolProyecto: { proyecto: { creadoPor: 99 } },
     });
-    const service = new ApplicationsService(prisma, {} as any, { emit: vi.fn() } as any);
-    await expect(service.updateEstado(1, { estadoPostulacion: 'RECHAZADA' } as any, 1)).rejects.toBeInstanceOf(
+    const service = makeService(prisma);
+    await expect(service.updateEstado(1, { estadoPostulacion: 'RECHAZADA' } as UpdateEstadoPostulacionDto, 1)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
