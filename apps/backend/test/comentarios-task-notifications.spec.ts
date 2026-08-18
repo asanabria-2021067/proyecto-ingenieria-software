@@ -14,20 +14,23 @@ import { ComentariosService } from '../src/comentarios/comentarios.service';
  * proyecto para este propósito.
  */
 function makePrisma() {
-  return {
+  const prisma = {
     comentario: { create: vi.fn() },
     proyecto: { findUnique: vi.fn() },
+    hito: { findUnique: vi.fn() },
     tarea: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn(), findMany: vi.fn() },
     asignacionTarea: { findFirst: vi.fn() },
-  } as any;
+  };
+  return prisma as typeof prisma & ConstructorParameters<typeof ComentariosService>[0];
 }
 
 function makeNotifications() {
-  return {
+  const notifications = {
     notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
     notifyUsers: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+  return notifications as typeof notifications & ConstructorParameters<typeof ComentariosService>[1];
 }
 
 const PROJECT_ID = 5;
@@ -297,7 +300,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       const notifications = makeNotifications();
       const service = new ComentariosService(prisma, notifications);
 
-      await service.create(AUTHOR_ID, { idProyecto: PROJECT_ID, contenido: 'Hola' } as any);
+      await service.create(AUTHOR_ID, { idProyecto: PROJECT_ID, contenido: 'Hola' });
 
       expect(notifications.notifyProjectActiveParticipants).toHaveBeenCalledTimes(1);
       expect(notifications.notifyUsers).not.toHaveBeenCalled();
@@ -311,14 +314,13 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
         estadoProyecto: EstadoProyecto.PUBLICADO,
         creadoPor: LEADER_ID,
       });
-      const hitoPrisma = prisma as any;
-      hitoPrisma.hito = { findUnique: vi.fn().mockResolvedValue({ idProyecto: PROJECT_ID }) };
+      prisma.hito.findUnique.mockResolvedValue({ idProyecto: PROJECT_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
       const service = new ComentariosService(prisma, notifications);
 
-      await service.create(AUTHOR_ID, { idHito: 3, contenido: 'Hola' } as any);
+      await service.create(AUTHOR_ID, { idHito: 3, contenido: 'Hola' });
 
       expect(notifications.notifyProjectActiveParticipants).toHaveBeenCalledTimes(1);
       expect(notifications.notifyUsers).not.toHaveBeenCalled();
@@ -347,7 +349,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       const notifications = {
         ...makeNotifications(),
         notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
-      };
+      } as unknown as ReturnType<typeof makeNotifications>;
       const service = new ComentariosService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
@@ -385,7 +387,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       const notifications = {
         ...makeNotifications(),
         notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
-      };
+      } as unknown as ReturnType<typeof makeNotifications>;
       const service = new ComentariosService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');

@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TasksService } from '../src/tasks/tasks.service';
+import { AssignTaskDto } from '../src/tasks/dto/assign-task.dto';
+import { NotificationsService } from '../src/notifications/notifications.service';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import { TasksContextService } from '../src/tasks/tasks-context.service';
+import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 
 function makeTx() {
   return {
@@ -10,36 +16,41 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
-  return {
+  const prisma = {
     tx,
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
-  } as any;
+    $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+  };
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeAuthorization(overrides: Record<string, unknown> = {}) {
-  return {
+  const authorization = {
     assertCanAssignTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: 5, idRolProyecto: null }),
     ...overrides,
-  } as any;
+  };
+  return authorization as typeof authorization & TasksAuthorizationService;
 }
 
 function makeRelations(overrides: Record<string, unknown> = {}) {
-  return {
+  const relations = {
     assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined),
     validateRelatedResources: vi.fn(),
     ...overrides,
-  } as any;
+  };
+  return relations as typeof relations & TasksRelationsService;
 }
 
 function makeContext(overrides: Record<string, unknown> = {}) {
-  return {
+  const context = {
     getActiveAssignment: vi.fn().mockResolvedValue(null),
     ...overrides,
-  } as any;
+  };
+  return context as typeof context & TasksContextService;
 }
 
 function makeNotifications() {
-  return { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) } as any;
+  const notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
+  return notifications as typeof notifications & NotificationsService;
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {
@@ -67,11 +78,11 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
 }
 
 function makeService(opts: {
-  prisma?: any;
-  auth?: any;
-  relations?: any;
-  notifications?: any;
-  context?: any;
+  prisma?: ReturnType<typeof makePrisma>;
+  auth?: ReturnType<typeof makeAuthorization>;
+  relations?: ReturnType<typeof makeRelations>;
+  notifications?: ReturnType<typeof makeNotifications>;
+  context?: ReturnType<typeof makeContext>;
 } = {}) {
   const tx = makeTx();
   const prisma = opts.prisma ?? makePrisma(tx);
@@ -83,7 +94,7 @@ function makeService(opts: {
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
-const DTO = { idUsuario: 7 } as any;
+const DTO: AssignTaskDto = { idUsuario: 7 };
 
 describe('TasksService.assign', () => {
   describe('autorización', () => {
@@ -299,7 +310,7 @@ describe('TasksService.assign', () => {
         }),
       });
 
-      await expect(service.assign(5, 42, 1, { idUsuario: 1 } as any)).rejects.toBeInstanceOf(
+      await expect(service.assign(5, 42, 1, { idUsuario: 1 } as AssignTaskDto)).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(tx.asignacionTarea.create).not.toHaveBeenCalled();
@@ -335,9 +346,30 @@ describe('TasksService.assign', () => {
 
       expect(tx.asignacionTarea.create).toHaveBeenCalledTimes(1);
       expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
-        data: { idTarea: 42, idUsuario: 7, asignadoPor: 1, desasignadaEn: null },
+        data: { idTarea: 42, idUsuario: 7, idParticipacion: undefined, asignadoPor: 1, desasignadaEn: null },
       });
       expect(tx.asignacionTarea.updateMany).not.toHaveBeenCalled();
+    });
+
+    /**
+     * X1.1: idParticipacion exacto ya resuelto por
+     * assertUserAssignableToProject (misma consulta que ya valida al
+     * candidato — sin segunda consulta) se persiste tal cual en la fila
+     * activa. Necesario para que HoursRecognitionService (B10) pueda
+     * encontrar este tramo como reconocible.
+     */
+    it('el idParticipacion resuelto por assertUserAssignableToProject se persiste en la fila creada', async () => {
+      const relations = makeRelations({
+        assertUserAssignableToProject: vi.fn().mockResolvedValue(55),
+      });
+      const { tx, service } = makeService({ relations });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+
+      await service.assign(5, 42, 1, DTO);
+
+      expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
+        data: { idTarea: 42, idUsuario: 7, idParticipacion: 55, asignadoPor: 1, desasignadaEn: null },
+      });
     });
 
     it('lectura final ocurre después, respuesta pública con el nuevo asignado', async () => {
@@ -491,7 +523,33 @@ describe('TasksService.assign', () => {
       await service.assign(5, 42, 1, DTO);
 
       expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
-        data: { idTarea: 42, idUsuario: 7, asignadoPor: 1, desasignadaEn: null },
+        data: { idTarea: 42, idUsuario: 7, idParticipacion: undefined, asignadoPor: 1, desasignadaEn: null },
+      });
+    });
+
+    it('X1.1: reasignación persiste el idParticipacion exacto resuelto por assertUserAssignableToProject (camino compartido con la asignación inicial vía createActiveAssignment)', async () => {
+      const relations = makeRelations({
+        assertUserAssignableToProject: vi.fn().mockResolvedValue(88),
+      });
+      const { tx, service } = makeService({
+        relations,
+        context: makeContext({
+          getActiveAssignment: vi.fn().mockResolvedValue({
+            idAsignacion: 9,
+            idTarea: 42,
+            idUsuario: 3,
+            asignadoPor: 1,
+            fechaAsignacion: new Date('2026-01-05T00:00:00.000Z'),
+            desasignadaEn: null,
+          }),
+        }),
+      });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+
+      await service.assign(5, 42, 1, DTO);
+
+      expect(tx.asignacionTarea.create).toHaveBeenCalledWith({
+        data: { idTarea: 42, idUsuario: 7, idParticipacion: 88, asignadoPor: 1, desasignadaEn: null },
       });
     });
 
@@ -521,8 +579,8 @@ describe('TasksService.assign', () => {
 
       await service.assign(5, 42, 1, DTO);
 
-      expect((tx.asignacionTarea as any).delete).toBeUndefined();
-      expect((tx.asignacionTarea as any).deleteMany).toBeUndefined();
+      expect((tx.asignacionTarea as Record<string, unknown>).delete).toBeUndefined();
+      expect((tx.asignacionTarea as Record<string, unknown>).deleteMany).toBeUndefined();
     });
   });
 
@@ -536,18 +594,18 @@ describe('TasksService.assign', () => {
           orden.push('autorizacion');
           return { idTarea: 42, idProyecto: 5, idRolProyecto: null };
         }),
-      } as any;
+      } as unknown as TasksAuthorizationService;
       const relations = {
         assertUserAssignableToProject: vi.fn(async () => {
           orden.push('validacion_candidato');
         }),
-      } as any;
+      } as unknown as TasksRelationsService;
       const context = {
         getActiveAssignment: vi.fn(async () => {
           orden.push('asignacion_activa');
           return { idAsignacion: 9, idTarea: 42, idUsuario: 3, asignadoPor: 1, fechaAsignacion: new Date(), desasignadaEn: null };
         }),
-      } as any;
+      } as unknown as TasksContextService;
       tx.asignacionTarea.updateMany.mockImplementation(async () => {
         orden.push('cierre');
       });
@@ -726,10 +784,10 @@ describe('TasksService.assign', () => {
 
       await service.assign(5, 42, 1, DTO);
 
-      expect((tx as any).comentario).toBeUndefined();
-      expect((tx as any).evidencia).toBeUndefined();
-      expect((tx.asignacionTarea as any).delete).toBeUndefined();
-      expect((tx.asignacionTarea as any).deleteMany).toBeUndefined();
+      expect((tx as Record<string, unknown>).comentario).toBeUndefined();
+      expect((tx as Record<string, unknown>).evidencia).toBeUndefined();
+      expect((tx.asignacionTarea as Record<string, unknown>).delete).toBeUndefined();
+      expect((tx.asignacionTarea as Record<string, unknown>).deleteMany).toBeUndefined();
     });
   });
 

@@ -1,0 +1,194 @@
+import 'reflect-metadata';
+import { describe, expect, it, vi } from 'vitest';
+import { HttpStatus } from '@nestjs/common';
+import {
+  GUARDS_METADATA,
+  PATH_METADATA,
+  METHOD_METADATA,
+  HTTP_CODE_METADATA,
+} from '@nestjs/common/constants';
+import { RequestMethod } from '@nestjs/common/enums/request-method.enum';
+import { ExitRequestsController } from '../src/exit-requests/exit-requests.controller';
+import { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
+import { ProjectWriteGuard } from '../src/common/guards/project-write.guard';
+
+function makeController() {
+  const service = {
+    createSolicitudSalida: vi.fn(),
+    approveSolicitudSalida: vi.fn(),
+    rejectSolicitudSalida: vi.fn(),
+    getSolicitudSalidaAbierta: vi.fn(),
+    getExitPreparationSummary: vi.fn(),
+    continueExitPreparation: vi.fn(),
+    cancelExitPreparation: vi.fn(),
+  };
+  return { controller: new ExitRequestsController(service as unknown as ExitRequestsService), service };
+}
+
+function routeMetadata(methodName: keyof ExitRequestsController) {
+  const handler = ExitRequestsController.prototype[methodName];
+  return {
+    path: Reflect.getMetadata(PATH_METADATA, handler),
+    method: Reflect.getMetadata(METHOD_METADATA, handler),
+    status: Reflect.getMetadata(HTTP_CODE_METADATA, handler),
+  };
+}
+
+function guardsOf(methodName: keyof ExitRequestsController): unknown[] {
+  const handler = ExitRequestsController.prototype[methodName];
+  return Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
+}
+
+describe('ExitRequestsController', () => {
+  it('mantiene el prefijo público proyectos/:projectId', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, ExitRequestsController)).toBe('proyectos/:projectId');
+  });
+
+  it('mantiene POST /proyectos/:projectId/solicitudes-salida con 201', () => {
+    expect(routeMetadata('createExitRequest')).toEqual({
+      path: 'solicitudes-salida',
+      method: RequestMethod.POST,
+      status: HttpStatus.CREATED,
+    });
+  });
+
+  it('mantiene POST /proyectos/:projectId/solicitudes-salida/:idSolicitud/aprobar con 200', () => {
+    expect(routeMetadata('approveExitRequest')).toEqual({
+      path: 'solicitudes-salida/:idSolicitud/aprobar',
+      method: RequestMethod.POST,
+      status: HttpStatus.OK,
+    });
+  });
+
+  it('mantiene POST /proyectos/:projectId/solicitudes-salida/:idSolicitud/rechazar con 200', () => {
+    expect(routeMetadata('rejectExitRequest')).toEqual({
+      path: 'solicitudes-salida/:idSolicitud/rechazar',
+      method: RequestMethod.POST,
+      status: HttpStatus.OK,
+    });
+  });
+
+  it('expone GET /proyectos/:projectId/salida/estado con status estándar (F11.1)', () => {
+    expect(routeMetadata('getCurrentExitRequest')).toEqual({
+      path: 'salida/estado',
+      method: RequestMethod.GET,
+      status: undefined,
+    });
+  });
+
+  it('no aplica ProjectWriteGuard al GET de estado (F11.1)', () => {
+    expect(guardsOf('getCurrentExitRequest')).not.toContain(ProjectWriteGuard);
+  });
+
+  it('expone GET /proyectos/:projectId/salida/preparacion con status estándar', () => {
+    expect(routeMetadata('getExitPreparationSummary')).toEqual({
+      path: 'salida/preparacion',
+      method: RequestMethod.GET,
+      status: undefined,
+    });
+  });
+
+  it('expone POST /proyectos/:projectId/salida/preparacion/continuar con 200', () => {
+    expect(routeMetadata('continueExitPreparation')).toEqual({
+      path: 'salida/preparacion/continuar',
+      method: RequestMethod.POST,
+      status: HttpStatus.OK,
+    });
+  });
+
+  it('expone POST /proyectos/:projectId/salida/preparacion/cancelar con 200', () => {
+    expect(routeMetadata('cancelExitPreparation')).toEqual({
+      path: 'salida/preparacion/cancelar',
+      method: RequestMethod.POST,
+      status: HttpStatus.OK,
+    });
+  });
+
+  it.each([
+    'createExitRequest',
+    'approveExitRequest',
+    'rejectExitRequest',
+    'continueExitPreparation',
+    'cancelExitPreparation',
+  ] as const)('%s tiene ProjectWriteGuard aplicado', (methodName) => {
+    expect(guardsOf(methodName)).toContain(ProjectWriteGuard);
+  });
+
+  it('no aplica ProjectWriteGuard al GET de preparación', () => {
+    expect(guardsOf('getExitPreparationSummary')).not.toContain(ProjectWriteGuard);
+  });
+
+  it('delega creación con projectId, userId de CurrentUser y motivo del DTO', async () => {
+    const { controller, service } = makeController();
+    service.createSolicitudSalida.mockResolvedValue({ idSolicitud: 1 });
+
+    const result = await controller.createExitRequest(10, { motivo: 'motivo' }, { userId: 2 });
+
+    expect(service.createSolicitudSalida).toHaveBeenCalledWith(10, 2, 'motivo');
+    expect(result).toEqual({ idSolicitud: 1 });
+  });
+
+  it('delega aprobación con projectId, idSolicitud y userId de CurrentUser', async () => {
+    const { controller, service } = makeController();
+    service.approveSolicitudSalida.mockResolvedValue({ estadoSolicitud: 'APROBADA' });
+
+    const result = await controller.approveExitRequest(10, 55, { userId: 1 });
+
+    expect(service.approveSolicitudSalida).toHaveBeenCalledWith(10, 55, 1);
+    expect(result).toEqual({ estadoSolicitud: 'APROBADA' });
+  });
+
+  it('delega rechazo con projectId, idSolicitud y userId de CurrentUser', async () => {
+    const { controller, service } = makeController();
+    service.rejectSolicitudSalida.mockResolvedValue({ estadoSolicitud: 'RECHAZADA' });
+
+    const result = await controller.rejectExitRequest(10, 55, { userId: 1 });
+
+    expect(service.rejectSolicitudSalida).toHaveBeenCalledWith(10, 55, 1);
+    expect(result).toEqual({ estadoSolicitud: 'RECHAZADA' });
+  });
+
+  it('delega la solicitud abierta con projectId y userId de CurrentUser (F11.1)', async () => {
+    const { controller, service } = makeController();
+    service.getSolicitudSalidaAbierta.mockResolvedValue({ solicitud: null });
+
+    const result = await controller.getCurrentExitRequest(10, { userId: 2 });
+
+    expect(service.getSolicitudSalidaAbierta).toHaveBeenCalledWith(10, 2);
+    expect(result).toEqual({ solicitud: null });
+  });
+
+  it('delega el resumen de preparación con projectId y userId de CurrentUser', async () => {
+    const { controller, service } = makeController();
+    service.getExitPreparationSummary.mockResolvedValue({
+      cantidadBlockers: 0,
+      puedeContinuar: true,
+      blockers: [],
+    });
+
+    const result = await controller.getExitPreparationSummary(10, { userId: 2 });
+
+    expect(service.getExitPreparationSummary).toHaveBeenCalledWith(10, 2);
+    expect(result).toEqual({ cantidadBlockers: 0, puedeContinuar: true, blockers: [] });
+  });
+
+  it('delega continuar preparación con projectId y userId de CurrentUser', async () => {
+    const { controller, service } = makeController();
+    service.continueExitPreparation.mockResolvedValue({ estadoSolicitud: 'PENDIENTE_LIDER' });
+
+    const result = await controller.continueExitPreparation(10, { userId: 2 });
+
+    expect(service.continueExitPreparation).toHaveBeenCalledWith(10, 2);
+    expect(result).toEqual({ estadoSolicitud: 'PENDIENTE_LIDER' });
+  });
+
+  it('delega cancelar preparación con projectId y userId de CurrentUser', async () => {
+    const { controller, service } = makeController();
+    service.cancelExitPreparation.mockResolvedValue({ estadoSolicitud: 'CANCELADA' });
+
+    const result = await controller.cancelExitPreparation(10, { userId: 2 });
+
+    expect(service.cancelExitPreparation).toHaveBeenCalledWith(10, 2);
+    expect(result).toEqual({ estadoSolicitud: 'CANCELADA' });
+  });
+});

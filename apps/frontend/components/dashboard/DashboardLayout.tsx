@@ -11,6 +11,7 @@ import {
   Briefcase,
   FileText,
   ListChecks,
+  Users,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
@@ -21,13 +22,16 @@ import { TokenRefreshManager } from '@/components/TokenRefreshManager';
 import { getAccessToken } from '@/lib/utils/token';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
+import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
 import uvgSwal from '@/lib/swal';
 import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { FontScaleToggle } from '@/components/font-scale-toggle';
 
 const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/personas', label: 'Personas', icon: Users },
   {
     type: 'group',
     label: 'Proyectos',
@@ -146,11 +150,19 @@ export default function DashboardLayout({
           </div>
           <div className="flex items-center gap-3">
             <NotificationsBell onlyIcon />
+            <FontScaleToggle />
             <div id="dashboard-theme-toggle">
               <ThemeToggle />
             </div>
           </div>
         </header>
+
+        {/* F6: franja global de bloqueo por finalización de Sprint — fuera del
+            área con scroll para que no desaparezca al desplazar la página,
+            en flujo normal (no fixed/overlay). Host único: decide por sí
+            mismo si la ruta actual es project-scoped, sin duplicarse por
+            página. */}
+        <ProjectFinalizationBannerHost />
 
         {/* Scrollable page body */}
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain pb-20 md:pb-0">

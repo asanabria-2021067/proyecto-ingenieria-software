@@ -90,7 +90,7 @@ function NewProjectFormContent() {
         })),
       })),
     });
-  }, [proyectoExistente]);
+  }, [proyectoExistente, editId, router]);
 
   const isStep1Complete =
     form.tituloProyecto.trim() !== '' &&

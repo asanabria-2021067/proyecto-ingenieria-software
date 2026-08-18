@@ -113,6 +113,11 @@ function mockTasks(overrides: Record<string, unknown> = {}) {
     cambiarEstadoTarea: mutationStub(),
     asignarTarea: mutationStub(),
     desasignarTarea: mutationStub(),
+    // F10: TaskDetailView ahora monta <CloseAssignmentForm> (Kanban normal),
+    // que llama useProjectTasks(idProyecto) internamente y necesita
+    // `cerrarAsignacion`. Su comportamiento propio ya tiene cobertura
+    // dedicada en close-assignment-form.spec.ts; aquí solo evita el crash.
+    cerrarAsignacion: mutationStub(),
     eliminarTarea: mutationStub(),
     asociarEtiqueta: mutationStub(),
     retirarEtiqueta: mutationStub(),
@@ -262,6 +267,34 @@ describe('TaskDetailPage — acciones y permisos', () => {
     fireEvent.keyDown(mas, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Desasignar tarea Implementar login' }));
     expect(mutate).toHaveBeenCalledWith({ taskId: 5 });
+  });
+
+  // F10 — entry point del Kanban normal: reutiliza el mismo CloseAssignmentForm que F9.
+  it('el asignado activo ve "Cerrar tramo" y abre el mismo formulario compartido con los ids correctos', async () => {
+    mockTasks({
+      tasks: [
+        tarea({
+          asignacionActiva: {
+            idAsignacion: 77,
+            idUsuario: 1,
+            fechaAsignacion: '2026-01-01T00:00:00.000Z',
+            usuario: { idUsuario: 1, nombre: 'Ana', apellido: 'Lopez', fotoUrl: null },
+          },
+        }),
+      ],
+    });
+    renderDetail();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar tramo de Implementar login' }));
+
+    expect(await screen.findByRole('heading', { name: 'Cerrar tramo' })).toBeInTheDocument();
+  });
+
+  it('un usuario sin asignación activa no ve "Cerrar tramo"', () => {
+    mockTasks({ tasks: [tarea({ asignacionActiva: null })] });
+    renderDetail();
+
+    expect(screen.queryByRole('button', { name: /Cerrar tramo/ })).not.toBeInTheDocument();
   });
 
   it('eliminar tarea confirma, llama a la mutation y vuelve al tablero', async () => {

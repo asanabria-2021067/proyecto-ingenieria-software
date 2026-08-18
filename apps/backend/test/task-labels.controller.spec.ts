@@ -12,6 +12,7 @@ import { TaskLabelsController } from '../src/labels/task-labels.controller';
 import { LabelsController } from '../src/labels/labels.controller';
 import { TasksController } from '../src/tasks/tasks.controller';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+import type { LabelsService } from '../src/labels/labels.service';
 
 /**
  * Tarea 32: el proyecto no instala `@nestjs/testing` (ver
@@ -24,7 +25,7 @@ function makeService() {
   return {
     attachToTask: vi.fn(),
     detachFromTask: vi.fn(),
-  } as any;
+  };
 }
 
 const SOURCE = readFileSync(join(__dirname, '../src/labels/task-labels.controller.ts'), 'utf-8');
@@ -85,7 +86,7 @@ describe('TaskLabelsController — delegación exacta en LabelsService (Tarea 32
   it('PUT delega exactamente en attachToTask con projectId, taskId, labelId, userId (en ese orden)', async () => {
     const service = makeService();
     service.attachToTask.mockResolvedValue(undefined);
-    const controller = new TaskLabelsController(service);
+    const controller = new TaskLabelsController(service as unknown as LabelsService);
 
     const respuesta = await controller.attach(5, 42, 7, { userId: 9 });
 
@@ -96,7 +97,7 @@ describe('TaskLabelsController — delegación exacta en LabelsService (Tarea 32
   it('DELETE delega exactamente en detachFromTask con projectId, taskId, labelId, userId (en ese orden)', async () => {
     const service = makeService();
     service.detachFromTask.mockResolvedValue(undefined);
-    const controller = new TaskLabelsController(service);
+    const controller = new TaskLabelsController(service as unknown as LabelsService);
 
     const respuesta = await controller.detach(5, 42, 7, { userId: 9 });
 
@@ -107,7 +108,7 @@ describe('TaskLabelsController — delegación exacta en LabelsService (Tarea 32
   it('propaga ForbiddenException del service sin envolverla (attach)', async () => {
     const service = makeService();
     service.attachToTask.mockRejectedValue(new ForbiddenException('No eres el líder de este proyecto'));
-    const controller = new TaskLabelsController(service);
+    const controller = new TaskLabelsController(service as unknown as LabelsService);
 
     await expect(controller.attach(5, 42, 7, { userId: 9 })).rejects.toBeInstanceOf(ForbiddenException);
   });
@@ -115,7 +116,7 @@ describe('TaskLabelsController — delegación exacta en LabelsService (Tarea 32
   it('propaga NotFoundException del service sin envolverla (detach)', async () => {
     const service = makeService();
     service.detachFromTask.mockRejectedValue(new NotFoundException('Tarea no encontrada'));
-    const controller = new TaskLabelsController(service);
+    const controller = new TaskLabelsController(service as unknown as LabelsService);
 
     await expect(controller.detach(5, 999, 7, { userId: 9 })).rejects.toBeInstanceOf(NotFoundException);
   });
