@@ -1,5 +1,8 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { ApplicationsService } from '../src/applications/applications.service';
+import type { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { TeamService } from '../src/team/team.service';
 
 function makePrisma() {
@@ -8,11 +11,15 @@ function makePrisma() {
     participacionProyecto: { findMany: vi.fn() },
     tarea: { findMany: vi.fn() },
     horasParticipacion: { findMany: vi.fn().mockResolvedValue([]) },
-  } as any;
+  };
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new TeamService(prisma, { findAll: vi.fn() } as any, { getPendingLeaderReviews: vi.fn() } as any);
+  return new TeamService(
+    prisma as unknown as PrismaService,
+    { findAll: vi.fn() } as unknown as ApplicationsService,
+    { getPendingLeaderReviews: vi.fn() } as unknown as ExitRequestsService,
+  );
 }
 
 const USUARIO = {
@@ -173,7 +180,7 @@ describe('TeamService.findTeamMemberDetail', () => {
       { idProyecto: 1, creadoPor: 10 }, // Proyecto A, líder 10
       { idProyecto: 2, creadoPor: 20 }, // Proyecto B, líder 20
     ];
-    prisma.proyecto.findFirst.mockImplementation(async ({ where }: any) =>
+    prisma.proyecto.findFirst.mockImplementation(async ({ where }: { where: { idProyecto: number } }) =>
       PROYECTOS.find((p) => p.idProyecto === where.idProyecto) ?? null,
     );
 
@@ -189,11 +196,13 @@ describe('TeamService.findTeamMemberDetail', () => {
         usuario: USUARIO,
       },
     ];
-    prisma.participacionProyecto.findMany.mockImplementation(async ({ where }: any) => {
-      return PARTICIPACIONES.filter(
-        (p) => p.usuario.idUsuario === where.idUsuario && p.idProyectoReal === where.rolProyecto.idProyecto,
-      ).map(({ idProyectoReal: _idProyectoReal, ...resto }) => resto);
-    });
+    prisma.participacionProyecto.findMany.mockImplementation(
+      async ({ where }: { where: { idUsuario: number; rolProyecto: { idProyecto: number } } }) => {
+        return PARTICIPACIONES.filter(
+          (p) => p.usuario.idUsuario === where.idUsuario && p.idProyectoReal === where.rolProyecto.idProyecto,
+        ).map(({ idProyectoReal: _idProyectoReal, ...resto }) => resto);
+      },
+    );
     prisma.tarea.findMany.mockResolvedValue([]);
     const service = makeService(prisma);
 
@@ -259,10 +268,9 @@ describe('TeamService.findTeamMemberDetail', () => {
         ],
       },
     ];
-    prisma.tarea.findMany.mockImplementation(async ({ where }: any) =>
-      TAREAS_DB.filter(
-        (t) => t.idProyecto === where.idProyecto && t.eliminadoEn === where.eliminadoEn,
-      ),
+    prisma.tarea.findMany.mockImplementation(
+      async ({ where }: { where: { idProyecto: number; eliminadoEn: Date | null } }) =>
+        TAREAS_DB.filter((t) => t.idProyecto === where.idProyecto && t.eliminadoEn === where.eliminadoEn),
     );
     const service = makeService(prisma);
 
@@ -291,7 +299,12 @@ describe('TeamService.findTeamMemberDetail', () => {
       actualizadaEn: null,
       tiempoEstimadoHoras: null,
     };
-    const ASIGNACIONES_POR_USUARIO: Record<number, any> = {
+    interface AsignacionMock {
+      fechaAsignacion: Date;
+      desasignadaEn: Date | null;
+      horasReales: { toNumber: () => number };
+    }
+    const ASIGNACIONES_POR_USUARIO: Record<number, AsignacionMock> = {
       2: {
         fechaAsignacion: new Date('2026-01-01T00:00:00.000Z'),
         desasignadaEn: new Date('2026-01-10T00:00:00.000Z'),
@@ -303,12 +316,14 @@ describe('TeamService.findTeamMemberDetail', () => {
         horasReales: { toNumber: () => 4 },
       },
     };
-    prisma.tarea.findMany.mockImplementation(async ({ where }: any) => {
-      const idUsuario = where.asignaciones.some.idUsuario;
-      const asignacion = ASIGNACIONES_POR_USUARIO[idUsuario];
-      if (!asignacion) return [];
-      return [{ ...TAREA_X_BASE, asignaciones: [asignacion] }];
-    });
+    prisma.tarea.findMany.mockImplementation(
+      async ({ where }: { where: { asignaciones: { some: { idUsuario: number } } } }) => {
+        const idUsuario = where.asignaciones.some.idUsuario;
+        const asignacion = ASIGNACIONES_POR_USUARIO[idUsuario];
+        if (!asignacion) return [];
+        return [{ ...TAREA_X_BASE, asignaciones: [asignacion] }];
+      },
+    );
 
     const participacionDe = (idUsuario: number) => [
       {
