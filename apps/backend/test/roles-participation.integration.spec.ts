@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { RolesService } from '../src/roles/roles.service';
 
 /**
@@ -19,7 +21,7 @@ const suite = DB_URL ? describe : describe.skip;
 const fakeNotifications = {
   notifyUsers: async () => undefined,
   notifyRoleMembers: async () => undefined,
-} as any;
+} as unknown as NotificationsService;
 
 suite('RolesService.leaveRole — integración PostgreSQL real', () => {
   let prisma: PrismaClient;
@@ -37,7 +39,7 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
 
   beforeAll(async () => {
     prisma = new PrismaClient({ datasources: { db: { url: DB_URL } } });
-    service = new RolesService(prisma as any, fakeNotifications);
+    service = new RolesService(prisma as unknown as PrismaService, fakeNotifications);
     await prisma.$connect();
   });
 
