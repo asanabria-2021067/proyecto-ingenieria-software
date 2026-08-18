@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, type ExecutionContext } from '@nestjs/common';
+import type { SprintsContextService } from '../src/sprints/sprints-context.service';
 import {
   ProjectWriteGuard,
   NO_ACTIVE_SPRINT_MESSAGE,
@@ -7,7 +8,9 @@ import {
 } from '../src/common/guards/project-write.guard';
 
 function makeSprintsContext() {
-  return { getCurrentSprint: vi.fn() } as any;
+  return { getCurrentSprint: vi.fn() } as unknown as SprintsContextService & {
+    getCurrentSprint: ReturnType<typeof vi.fn>;
+  };
 }
 
 function makeContext(params: Record<string, unknown>): ExecutionContext {
