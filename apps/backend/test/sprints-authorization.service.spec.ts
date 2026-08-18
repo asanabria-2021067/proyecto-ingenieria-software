@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
+import type { SprintsContextService } from '../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../src/sprints/sprints-authorization.service';
 
 function makeContext() {
@@ -10,7 +12,7 @@ function makeContext() {
     getCurrentSprint: vi.fn(),
     getSprintInProjectOrThrow: vi.fn(),
     getSprintWithProjectOrThrow: vi.fn(),
-  } as any;
+  };
 }
 
 const LIDER_ID = 1;
@@ -29,7 +31,7 @@ describe('SprintsAuthorizationService', () => {
     it('permite al líder del proyecto', async () => {
       const ctx = makeContext();
       ctx.assertProjectLeader.mockResolvedValue(undefined);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service.assertCanStartSprint(1, LIDER_ID)).resolves.toBeUndefined();
     });
@@ -37,7 +39,7 @@ describe('SprintsAuthorizationService', () => {
     it('rechaza a un usuario que no es líder', async () => {
       const ctx = makeContext();
       ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service.assertCanStartSprint(1, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -47,7 +49,7 @@ describe('SprintsAuthorizationService', () => {
     it('propaga NotFoundException si el proyecto no existe', async () => {
       const ctx = makeContext();
       ctx.assertProjectLeader.mockRejectedValue(NOT_FOUND_PROYECTO());
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service.assertCanStartSprint(99, LIDER_ID)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -57,8 +59,8 @@ describe('SprintsAuthorizationService', () => {
     it('traslada el cliente transaccional recibido', async () => {
       const ctx = makeContext();
       ctx.assertProjectLeader.mockResolvedValue(undefined);
-      const tx = { marker: 'tx' } as any;
-      const service = new SprintsAuthorizationService(ctx);
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await service.assertCanStartSprint(1, LIDER_ID, tx);
 
@@ -70,7 +72,7 @@ describe('SprintsAuthorizationService', () => {
     it('permite al líder del proyecto', async () => {
       const ctx = makeContext();
       ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service.assertCanListSprintHistory(1, LIDER_ID)).resolves.toBeUndefined();
     });
@@ -78,7 +80,7 @@ describe('SprintsAuthorizationService', () => {
     it('permite a un participante con rol activo (lo necesita el tablero Kanban)', async () => {
       const ctx = makeContext();
       ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(
         service.assertCanListSprintHistory(1, PARTICIPANTE_ID),
@@ -90,7 +92,7 @@ describe('SprintsAuthorizationService', () => {
       ctx.assertActiveProjectParticipant.mockRejectedValue(
         new ForbiddenException('No tienes una participación activa en este proyecto'),
       );
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service.assertCanListSprintHistory(1, EXTERNO_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -100,7 +102,7 @@ describe('SprintsAuthorizationService', () => {
     it('propaga NotFoundException si el proyecto no existe', async () => {
       const ctx = makeContext();
       ctx.assertActiveProjectParticipant.mockRejectedValue(NOT_FOUND_PROYECTO());
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service.assertCanListSprintHistory(99, LIDER_ID)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -110,8 +112,8 @@ describe('SprintsAuthorizationService', () => {
     it('traslada el cliente transaccional recibido', async () => {
       const ctx = makeContext();
       ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
-      const tx = { marker: 'tx' } as any;
-      const service = new SprintsAuthorizationService(ctx);
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await service.assertCanListSprintHistory(1, LIDER_ID, tx);
 
@@ -129,7 +131,7 @@ describe('SprintsAuthorizationService', () => {
       const ctx = makeContext();
       ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
       ctx.assertProjectLeader.mockResolvedValue(undefined);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       const result = await service[method](1, 10, LIDER_ID);
 
@@ -140,7 +142,7 @@ describe('SprintsAuthorizationService', () => {
       const ctx = makeContext();
       ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
       ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service[method](1, 10, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -151,7 +153,7 @@ describe('SprintsAuthorizationService', () => {
       const ctx = makeContext();
       ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
       ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service[method](1, 10, EXTERNO_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -161,7 +163,7 @@ describe('SprintsAuthorizationService', () => {
     it('propaga NotFoundException si el Sprint no existe, sin evaluar liderazgo', async () => {
       const ctx = makeContext();
       ctx.getSprintInProjectOrThrow.mockRejectedValue(NOT_FOUND_SPRINT());
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service[method](1, 999, LIDER_ID)).rejects.toBeInstanceOf(NotFoundException);
       expect(ctx.assertProjectLeader).not.toHaveBeenCalled();
@@ -170,7 +172,7 @@ describe('SprintsAuthorizationService', () => {
     it('propaga NotFoundException si el sprintId pertenece a otro proyecto (sin filtrar datos de otro proyecto)', async () => {
       const ctx = makeContext();
       ctx.getSprintInProjectOrThrow.mockRejectedValue(NOT_FOUND_SPRINT());
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service[method](1, 10, LIDER_ID)).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -185,7 +187,7 @@ describe('SprintsAuthorizationService', () => {
       ctx.assertProjectLeader.mockImplementation(async () => {
         orden.push('liderazgo');
       });
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await service[method](1, 10, LIDER_ID);
 
@@ -196,8 +198,8 @@ describe('SprintsAuthorizationService', () => {
       const ctx = makeContext();
       ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
       ctx.assertProjectLeader.mockResolvedValue(undefined);
-      const tx = { marker: 'tx' } as any;
-      const service = new SprintsAuthorizationService(ctx);
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await service[method](1, 10, LIDER_ID, tx);
 
@@ -212,7 +214,7 @@ describe('SprintsAuthorizationService', () => {
     it('permite al líder y devuelve el Sprint validado, en UNA sola consulta de contexto (getSprintWithProjectOrThrow)', async () => {
       const ctx = makeContext();
       ctx.getSprintWithProjectOrThrow.mockResolvedValue(SPRINT_CON_PROYECTO);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       const result = await service.assertCanViewClosingSummary(1, 10, LIDER_ID);
 
@@ -229,7 +231,7 @@ describe('SprintsAuthorizationService', () => {
     it('rechaza a un usuario que no es líder con ForbiddenException', async () => {
       const ctx = makeContext();
       ctx.getSprintWithProjectOrThrow.mockResolvedValue(SPRINT_CON_PROYECTO);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(
         service.assertCanViewClosingSummary(1, 10, PARTICIPANTE_ID),
@@ -239,7 +241,7 @@ describe('SprintsAuthorizationService', () => {
     it('rechaza a un usuario externo al proyecto con ForbiddenException', async () => {
       const ctx = makeContext();
       ctx.getSprintWithProjectOrThrow.mockResolvedValue(SPRINT_CON_PROYECTO);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(
         service.assertCanViewClosingSummary(1, 10, EXTERNO_ID),
@@ -249,7 +251,7 @@ describe('SprintsAuthorizationService', () => {
     it('propaga NotFoundException si el Sprint no existe en el proyecto (sin evaluar liderazgo)', async () => {
       const ctx = makeContext();
       ctx.getSprintWithProjectOrThrow.mockRejectedValue(NOT_FOUND_SPRINT());
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await expect(service.assertCanViewClosingSummary(1, 999, LIDER_ID)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -259,8 +261,8 @@ describe('SprintsAuthorizationService', () => {
     it('traslada el cliente transaccional recibido', async () => {
       const ctx = makeContext();
       ctx.getSprintWithProjectOrThrow.mockResolvedValue(SPRINT_CON_PROYECTO);
-      const tx = { marker: 'tx' } as any;
-      const service = new SprintsAuthorizationService(ctx);
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await service.assertCanViewClosingSummary(1, 10, LIDER_ID, tx);
 
@@ -273,7 +275,7 @@ describe('SprintsAuthorizationService', () => {
       const ctx = makeContext();
       ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
       ctx.assertProjectLeader.mockResolvedValue(undefined);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await service.assertCanFinalizeSprint(1, 10, LIDER_ID);
 
@@ -285,7 +287,7 @@ describe('SprintsAuthorizationService', () => {
       const ctx = makeContext();
       ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
       ctx.assertProjectLeader.mockResolvedValue(undefined);
-      const service = new SprintsAuthorizationService(ctx);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
 
       await service.assertCanCloseSprint(1, 10, LIDER_ID);
 
