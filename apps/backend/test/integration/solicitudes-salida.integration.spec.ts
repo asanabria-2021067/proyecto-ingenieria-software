@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { ConflictException } from '@nestjs/common';
+import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import {
   createIntegrationUser,
@@ -29,7 +31,7 @@ import { ExitRequestsService } from '../../src/exit-requests/exit-requests.servi
  * `roles-participation.integration.spec.ts` usa para su propio test
  * "CONCURRENCIA".
  */
-const fakeNotifications = { isAdmin: async () => false } as any;
+const fakeNotifications = { isAdmin: async () => false } as unknown as NotificationsService;
 
 describeIntegration(
   'ExitRequestsService.createSolicitudSalida — concurrencia real contra solicitud_salida_proyecto_pendiente_unique',
@@ -41,10 +43,10 @@ describeIntegration(
 
     beforeAll(async () => {
       prisma = createIntegrationPrismaClient();
-      const context = new ExitRequestsContextService(prisma as any);
+      const context = new ExitRequestsContextService(prisma as unknown as PrismaService);
       service = new ExitRequestsService(
-        prisma as any,
-        fakeNotifications as any,
+        prisma as unknown as PrismaService,
+        fakeNotifications,
         new ExitRequestsAuthorizationService(context),
         context,
       );
