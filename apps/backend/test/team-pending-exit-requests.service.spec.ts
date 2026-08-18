@@ -1,28 +1,35 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { ApplicationsService } from '../src/applications/applications.service';
+import type { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { TeamService } from '../src/team/team.service';
 
 function makePrisma() {
   return {
     solicitudSalidaProyecto: { findMany: vi.fn() },
-  } as any;
+  };
 }
 
 function makeApplications() {
-  return { findAll: vi.fn() } as any;
+  return { findAll: vi.fn() };
 }
 
-function makeExitRequests(solicitudes: any[] = []) {
+function makeExitRequests(solicitudes: unknown[] = []) {
   return {
     getPendingLeaderReviews: vi.fn().mockResolvedValue(solicitudes),
-  } as any;
+  };
 }
 
 function makeService(
   prisma: ReturnType<typeof makePrisma>,
-  exitRequests = makeExitRequests(),
+  exitRequests: ReturnType<typeof makeExitRequests> = makeExitRequests(),
   applications = makeApplications(),
 ) {
-  return new TeamService(prisma, applications, exitRequests);
+  return new TeamService(
+    prisma as unknown as PrismaService,
+    applications as unknown as ApplicationsService,
+    exitRequests as unknown as ExitRequestsService,
+  );
 }
 
 describe('TeamService.getPendingExitRequests', () => {
@@ -52,7 +59,7 @@ describe('TeamService.getPendingExitRequests', () => {
   it('propaga rechazos de autorización de ExitRequestsService sin envolverlos', async () => {
     const prisma = makePrisma();
     const fallo = new Error('No eres el líder de este proyecto');
-    const exitRequests = { getPendingLeaderReviews: vi.fn().mockRejectedValue(fallo) } as any;
+    const exitRequests = { getPendingLeaderReviews: vi.fn().mockRejectedValue(fallo) };
     const service = makeService(prisma, exitRequests);
 
     await expect(service.getPendingExitRequests(1, 10)).rejects.toBe(fallo);
