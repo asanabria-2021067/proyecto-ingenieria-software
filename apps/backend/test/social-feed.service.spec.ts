@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { SocialService } from '../src/social/social.service';
 import { SocialFeedService } from '../src/social/social-feed.service';
 
 function makePrisma(nombresPerfil: string[]) {
@@ -19,11 +21,15 @@ function makeSocial(amigoIds: number[] = [], seguidoIds: number[] = []) {
   };
 }
 
+function makeService(prisma: ReturnType<typeof makePrisma>, social: ReturnType<typeof makeSocial>) {
+  return new SocialFeedService(prisma as unknown as PrismaService, social as unknown as SocialService);
+}
+
 describe('SocialFeedService', () => {
   it('admin: ambas secciones vacías sin consultar proyectos', async () => {
     const prisma = makePrisma(['administrador']);
     const social = makeSocial([1, 2], [3]);
-    const service = new SocialFeedService(prisma as any, social as any);
+    const service = makeService(prisma, social);
 
     const feed = await service.getFeed(10);
 
@@ -34,7 +40,7 @@ describe('SocialFeedService', () => {
   it('estudiante: consulta ambas secciones sin excluir proyectos propios', async () => {
     const prisma = makePrisma(['estudiante']);
     const social = makeSocial([1], [2]);
-    const service = new SocialFeedService(prisma as any, social as any);
+    const service = makeService(prisma, social);
 
     await service.getFeed(10);
 
@@ -47,7 +53,7 @@ describe('SocialFeedService', () => {
   it('lider_asociacion: excluye sus propios proyectos en ambas secciones', async () => {
     const prisma = makePrisma(['lider_asociacion']);
     const social = makeSocial([1], [2]);
-    const service = new SocialFeedService(prisma as any, social as any);
+    const service = makeService(prisma, social);
 
     await service.getFeed(10);
 
@@ -70,7 +76,7 @@ describe('SocialFeedService', () => {
     ]);
     prisma.proyecto.findMany.mockResolvedValueOnce([]);
     const social = makeSocial([1], [2]);
-    const service = new SocialFeedService(prisma as any, social as any);
+    const service = makeService(prisma, social);
 
     await service.getFeed(10);
 
@@ -81,7 +87,7 @@ describe('SocialFeedService', () => {
   it('no consulta proyectos si la persona no tiene amigos ni seguidos', async () => {
     const prisma = makePrisma(['estudiante']);
     const social = makeSocial([], []);
-    const service = new SocialFeedService(prisma as any, social as any);
+    const service = makeService(prisma, social);
 
     const feed = await service.getFeed(10);
 
@@ -107,7 +113,7 @@ describe('SocialFeedService', () => {
     ]);
     prisma.proyecto.findMany.mockResolvedValueOnce([]);
     const social = makeSocial([1, 2, 3, 4], []);
-    const service = new SocialFeedService(prisma as any, social as any);
+    const service = makeService(prisma, social);
 
     const feed = await service.getFeed(10);
 
