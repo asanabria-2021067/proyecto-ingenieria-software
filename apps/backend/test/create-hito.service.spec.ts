@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ProjectsService } from '../src/projects/projects.service';
+import { CreateHitoDto } from '../src/projects/dto/create-hito.dto';
 
-function makeTx(overrides: Record<string, unknown> = {}) {
+type HitoTxOverrides = Partial<{
+  findFirst: ReturnType<typeof vi.fn>;
+  create: ReturnType<typeof vi.fn>;
+}>;
+
+function makeTx(overrides: HitoTxOverrides = {}) {
   return {
     hito: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -16,11 +22,19 @@ function makePrisma(tx = makeTx()) {
   return {
     tx,
     proyecto: { findFirst: vi.fn() },
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
-  } as any;
+    $transaction: vi.fn(async (callback: (transaction: typeof tx) => unknown) => callback(tx)),
+  };
 }
 
-const BASE_DTO = { tituloHito: 'Entrega de MVP' } as any;
+function makeService(prisma: ReturnType<typeof makePrisma>) {
+  return new ProjectsService(
+    prisma as unknown as ConstructorParameters<typeof ProjectsService>[0],
+    {} as ConstructorParameters<typeof ProjectsService>[1],
+    {} as ConstructorParameters<typeof ProjectsService>[2],
+  );
+}
+
+const BASE_DTO = { tituloHito: 'Entrega de MVP' } satisfies CreateHitoDto;
 
 function hitoRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -40,7 +54,7 @@ describe('ProjectsService.createHito', () => {
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
     tx.hito.create.mockResolvedValue(hitoRow());
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     const result = await service.createHito(5, 1, BASE_DTO);
 
@@ -55,7 +69,7 @@ describe('ProjectsService.createHito', () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 99 });
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     await expect(service.createHito(5, 1, BASE_DTO)).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -66,7 +80,7 @@ describe('ProjectsService.createHito', () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue(null);
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     await expect(service.createHito(999, 1, BASE_DTO)).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -77,9 +91,9 @@ describe('ProjectsService.createHito', () => {
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
     tx.hito.create.mockResolvedValue(hitoRow({ orden: 5 }));
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
-    await service.createHito(5, 1, { ...BASE_DTO, orden: 999 } as any);
+    await service.createHito(5, 1, { ...BASE_DTO, orden: 999 } as CreateHitoDto & { orden: number });
 
     expect(tx.hito.create.mock.calls[0][0].data.orden).toBe(5);
   });
@@ -89,7 +103,7 @@ describe('ProjectsService.createHito', () => {
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
     tx.hito.create.mockResolvedValue(hitoRow({ orden: 1 }));
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     await service.createHito(5, 1, BASE_DTO);
 
@@ -101,9 +115,13 @@ describe('ProjectsService.createHito', () => {
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
     tx.hito.create.mockResolvedValue(hitoRow());
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
-    await service.createHito(5, 1, { ...BASE_DTO, estadoHito: 'COMPLETADO' } as any);
+    await service.createHito(
+      5,
+      1,
+      { ...BASE_DTO, estadoHito: 'COMPLETADO' } as CreateHitoDto & { estadoHito: string },
+    );
 
     expect(tx.hito.create.mock.calls[0][0].data.estadoHito).toBe('PENDIENTE');
   });
@@ -113,7 +131,7 @@ describe('ProjectsService.createHito', () => {
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
     tx.hito.create.mockResolvedValue(hitoRow());
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     await service.createHito(5, 1, BASE_DTO);
 
@@ -127,7 +145,7 @@ describe('ProjectsService.createHito', () => {
     tx.hito.create.mockResolvedValue(
       hitoRow({ fechaLimite: new Date('2026-12-25T00:00:00.000Z') }),
     );
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     const result = await service.createHito(5, 1, { ...BASE_DTO, fechaLimite: '2026-12-25' });
 
@@ -141,7 +159,7 @@ describe('ProjectsService.createHito', () => {
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
     tx.hito.create.mockResolvedValue(hitoRow({ fechaLimite: null }));
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     const result = await service.createHito(5, 1, BASE_DTO);
 
@@ -154,7 +172,7 @@ describe('ProjectsService.createHito', () => {
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
     tx.hito.create.mockResolvedValue(hitoRow());
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     const result = await service.createHito(5, 1, BASE_DTO);
 
@@ -168,7 +186,7 @@ describe('ProjectsService.createHito', () => {
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
     tx.hito.create.mockResolvedValue(hitoRow());
-    const service = new ProjectsService(prisma, {} as any);
+    const service = makeService(prisma);
 
     await service.createHito(5, 1, BASE_DTO);
 
