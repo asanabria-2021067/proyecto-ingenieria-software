@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { ArgumentMetadata, BadRequestException, ValidationPipe } from '@nestjs/common';
 import { CreateLabelDto } from '../src/labels/dto/create-label.dto';
 import { UpdateLabelDto } from '../src/labels/dto/update-label.dto';
 
@@ -13,10 +13,10 @@ const pipe = new ValidationPipe({
 });
 
 async function parseCreate(plain: unknown): Promise<CreateLabelDto> {
-  return pipe.transform(plain, { type: 'body', metatype: CreateLabelDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: CreateLabelDto } as ArgumentMetadata);
 }
 async function parseUpdate(plain: unknown): Promise<UpdateLabelDto> {
-  return pipe.transform(plain, { type: 'body', metatype: UpdateLabelDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: UpdateLabelDto } as ArgumentMetadata);
 }
 
 function basePayload(overrides: Record<string, unknown> = {}) {
