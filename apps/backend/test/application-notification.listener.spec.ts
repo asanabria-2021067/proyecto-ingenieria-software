@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
 import { ApplicationNotificationListener } from '../src/notifications/listeners/application-notification.listener';
 import { ApplicationCreatedEvent } from '../src/notifications/events/application-created.event';
 
@@ -6,7 +8,7 @@ function makePrisma() {
   return {
     postulacion: { findUnique: vi.fn() },
     proyecto: { findUnique: vi.fn() },
-  } as any;
+  };
 }
 
 describe('ApplicationNotificationListener', () => {
@@ -22,8 +24,11 @@ describe('ApplicationNotificationListener', () => {
       tituloProyecto: 'Proyecto X',
       creadoPor: 9,
     });
-    const notificationsService = { notifyFromTemplate: vi.fn() } as any;
-    const listener = new ApplicationNotificationListener(notificationsService, prisma);
+    const notificationsService = { notifyFromTemplate: vi.fn() };
+    const listener = new ApplicationNotificationListener(
+      notificationsService as unknown as NotificationsService,
+      prisma as unknown as PrismaService,
+    );
 
     await listener.handleApplicationCreated(
       new ApplicationCreatedEvent(10, 1, 5, 2),
@@ -55,8 +60,11 @@ describe('ApplicationNotificationListener', () => {
       tituloProyecto: 'Proyecto X',
       creadoPor: 9,
     });
-    const notificationsService = { notifyFromTemplate: vi.fn() } as any;
-    const listener = new ApplicationNotificationListener(notificationsService, prisma);
+    const notificationsService = { notifyFromTemplate: vi.fn() };
+    const listener = new ApplicationNotificationListener(
+      notificationsService as unknown as NotificationsService,
+      prisma as unknown as PrismaService,
+    );
 
     await listener.handleApplicationCreated(
       new ApplicationCreatedEvent(10, 9, 5, 2),
@@ -69,8 +77,11 @@ describe('ApplicationNotificationListener', () => {
     const prisma = makePrisma();
     prisma.postulacion.findUnique.mockResolvedValue(null);
     prisma.proyecto.findUnique.mockResolvedValue(null);
-    const notificationsService = { notifyFromTemplate: vi.fn() } as any;
-    const listener = new ApplicationNotificationListener(notificationsService, prisma);
+    const notificationsService = { notifyFromTemplate: vi.fn() };
+    const listener = new ApplicationNotificationListener(
+      notificationsService as unknown as NotificationsService,
+      prisma as unknown as PrismaService,
+    );
 
     await listener.handleApplicationCreated(
       new ApplicationCreatedEvent(10, 1, 5, 2),
