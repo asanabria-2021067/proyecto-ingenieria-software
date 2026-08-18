@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import {
@@ -75,7 +75,7 @@ export function CloseAssignmentForm({
   // close-assignment.dto.ts): el contador SIEMPRE cuenta la longitud
   // recortada, igual que la validación del schema — nunca dos criterios
   // distintos entre lo que el usuario ve y lo que se valida.
-  const contenidoAvance = form.watch('contenidoAvance');
+  const contenidoAvance = useWatch({ control: form.control, name: 'contenidoAvance' });
   const longitudActual = contenidoAvance.trim().length;
 
   const handleOpenChange = (next: boolean) => {
