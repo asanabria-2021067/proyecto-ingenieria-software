@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import type { TeamService } from '../src/team/team.service';
 import { TeamController } from '../src/team/team.controller';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 
@@ -10,7 +11,11 @@ function makeService() {
     getTeamSummary: vi.fn(),
     findTeamMemberDetail: vi.fn(),
     getPendingPostulations: vi.fn(),
-  } as any;
+  };
+}
+
+function makeController(service: ReturnType<typeof makeService>) {
+  return new TeamController(service as unknown as TeamService);
 }
 
 describe('TeamController.findTeam (GET /proyectos/:id/equipo)', () => {
@@ -26,7 +31,7 @@ describe('TeamController.findTeam (GET /proyectos/:id/equipo)', () => {
     const service = makeService();
     const equipo = [{ idParticipacion: 1 }];
     service.findTeam.mockResolvedValue(equipo);
-    const controller = new TeamController(service);
+    const controller = makeController(service);
 
     const result = await controller.findTeam(42);
 
@@ -76,7 +81,7 @@ describe('TeamController.getTeamSummary (GET /proyectos/:id/miembros/resumen)', 
     const service = makeService();
     const resumen = { lider: { idUsuario: 7 }, miembros: [] };
     service.getTeamSummary.mockResolvedValue(resumen);
-    const controller = new TeamController(service);
+    const controller = makeController(service);
 
     const result = await controller.getTeamSummary(42, { userId: 7 });
 
@@ -90,7 +95,7 @@ describe('TeamController.getTeamSummary (GET /proyectos/:id/miembros/resumen)', 
     const service = makeService();
     const error = new ForbiddenException('No eres el líder de este proyecto');
     service.getTeamSummary.mockRejectedValue(error);
-    const controller = new TeamController(service);
+    const controller = makeController(service);
 
     await expect(controller.getTeamSummary(42, { userId: 7 })).rejects.toBe(error);
   });
@@ -100,7 +105,7 @@ describe('TeamController.getTeamSummary (GET /proyectos/:id/miembros/resumen)', 
     const service = makeService();
     const error = new NotFoundException('Proyecto con id 42 no encontrado');
     service.getTeamSummary.mockRejectedValue(error);
-    const controller = new TeamController(service);
+    const controller = makeController(service);
 
     await expect(controller.getTeamSummary(42, { userId: 7 })).rejects.toBe(error);
   });
@@ -137,7 +142,7 @@ describe('TeamController.findTeamMemberDetail (GET /proyectos/:id/equipo/:idUsua
     const service = makeService();
     const detalle = { usuario: { idUsuario: 2 }, participaciones: [], tareas: [] };
     service.findTeamMemberDetail.mockResolvedValue(detalle);
-    const controller = new TeamController(service);
+    const controller = makeController(service);
 
     const result = await controller.findTeamMemberDetail(42, 2, { userId: 7 });
 
