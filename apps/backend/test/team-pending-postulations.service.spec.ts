@@ -1,24 +1,31 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { ApplicationsService } from '../src/applications/applications.service';
+import type { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { TeamService } from '../src/team/team.service';
 
 function makePrisma() {
   return {
     proyecto: { findFirst: vi.fn() },
-  } as any;
+  };
 }
 
-function makeApplications(postulaciones: any[] = []) {
+function makeApplications(postulaciones: unknown[] = []) {
   return {
     findAll: vi.fn().mockResolvedValue(postulaciones),
-  } as any;
+  };
 }
 
 function makeService(
   prisma: ReturnType<typeof makePrisma>,
-  applications = makeApplications(),
+  applications: ReturnType<typeof makeApplications> = makeApplications(),
 ) {
-  return new TeamService(prisma, applications, { getPendingLeaderReviews: vi.fn() } as any);
+  return new TeamService(
+    prisma as unknown as PrismaService,
+    applications as unknown as ApplicationsService,
+    { getPendingLeaderReviews: vi.fn() } as unknown as ExitRequestsService,
+  );
 }
 
 function postulacion(
@@ -88,7 +95,7 @@ describe('TeamService.getPendingPostulations', () => {
         .fn()
         .mockResolvedValueOnce([postulacion(1, 1, 'PENDIENTE')])
         .mockResolvedValueOnce([postulacion(1, 1, 'ACEPTADA')]),
-    } as any;
+    };
     const service = makeService(prisma, applications);
 
     const primeraLectura = await service.getPendingPostulations(1, 10);
