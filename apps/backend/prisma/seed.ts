@@ -534,15 +534,68 @@ async function main() {
     prisma.hito.upsert({ where: { idHito: 6 }, update: {}, create: { idHito: 6, idProyecto: pEmpleo.idProyecto, tituloHito: 'Diseño de base de datos', orden: 1, estadoHito: 'COMPLETADO', fechaLimite: new Date('2026-04-01') } }),
   ]);
 
+  // ─── Sprints (FND-08) ───────────────────────────────────
+  // Tarea.idSprint es obligatoria desde FND-03: todo proyecto de este seed
+  // que crea tareas necesita un Sprint antes. Solo pTutorias, pAmbiental,
+  // pNeural y pEmpleo crean tareas más abajo (pRobot, pRevision, pObservado,
+  // pCierre y pCancelado no lo hacen, así que no reciben Sprint — no se
+  // agrega Sprint a un proyecto solo porque exista).
+  //
+  // resolveSeedSprint() NO asume el estadoProyecto del bloque `create` de
+  // más arriba: como los proyectos se crean con `upsert({ update: {} })`,
+  // si la fila ya existía (ejecución previa de este seed, o datos legacy
+  // reales de la base) su estadoProyecto real puede diferir del declarado
+  // aquí — de hecho ocurre en este mismo entorno (pNeural, idProyecto 3,
+  // está CANCELADO en la base aunque este archivo lo declare EN_PROGRESO).
+  // Por eso siempre relee el estadoProyecto real antes de decidir.
+  //
+  // Tampoco usa upsert por id determinista para el Sprint: el proyecto ya
+  // puede tener un Sprint con OTRO id (autoincrement, del backfill de
+  // FND-02 o de una corrida previa) — un upsert ciego por id crearía un
+  // SEGUNDO Sprint y podría violar sprint_operable_unique. En su lugar:
+  //   - proyecto CERRADO/CANCELADO -> reutiliza un Sprint CERRADO existente,
+  //     o crea uno CERRADO si no hay ninguno (nunca ACTIVO/EN_FINALIZACION
+  //     en un proyecto terminal — invariante 4 de FND-08).
+  //   - cualquier otro estado -> reutiliza un Sprint operable
+  //     (ACTIVO/EN_FINALIZACION) existente, o crea uno ACTIVO si no hay
+  //     ninguno.
+  // Nunca reactiva, cierra ni modifica un Sprint existente.
+  async function resolveSeedSprint(idProyecto: number, numero: number) {
+    const proyecto = await prisma.proyecto.findUniqueOrThrow({
+      where: { idProyecto },
+      select: { estadoProyecto: true },
+    });
+    const esTerminal = proyecto.estadoProyecto === 'CERRADO' || proyecto.estadoProyecto === 'CANCELADO';
+
+    if (esTerminal) {
+      const cerrado = await prisma.sprint.findFirst({ where: { idProyecto, estado: 'CERRADO' } });
+      if (cerrado) return cerrado;
+      return prisma.sprint.create({ data: { idProyecto, numero, estado: 'CERRADO' } });
+    }
+
+    const operable = await prisma.sprint.findFirst({
+      where: { idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
+    });
+    if (operable) return operable;
+    return prisma.sprint.create({ data: { idProyecto, numero, estado: 'ACTIVO' } });
+  }
+
+  const [sprintTutorias, sprintAmbiental, sprintNeural, sprintEmpleo] = await Promise.all([
+    resolveSeedSprint(pTutorias.idProyecto, 1),
+    resolveSeedSprint(pAmbiental.idProyecto, 1),
+    resolveSeedSprint(pNeural.idProyecto, 1),
+    resolveSeedSprint(pEmpleo.idProyecto, 1),
+  ]);
+
   // ─── Tareas ─────────────────────────────────────────────
   const tareas = await Promise.all([
-    prisma.tarea.upsert({ where: { idTarea: 1 }, update: {}, create: { idTarea: 1, idProyecto: pTutorias.idProyecto, idHito: hitos[0].idHito, tituloTarea: 'Crear mockups en Figma', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 2 }, update: {}, create: { idTarea: 2, idProyecto: pTutorias.idProyecto, idHito: hitos[1].idHito, tituloTarea: 'Implementar autenticación', estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 3 }, update: {}, create: { idTarea: 3, idProyecto: pTutorias.idProyecto, idHito: hitos[1].idHito, tituloTarea: 'CRUD de sesiones de tutoría', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: carlos.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 4 }, update: {}, create: { idTarea: 4, idProyecto: pAmbiental.idProyecto, idHito: hitos[2].idHito, tituloTarea: 'Investigar sensores de CO2', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: maria.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 5 }, update: {}, create: { idTarea: 5, idProyecto: pNeural.idProyecto, idHito: hitos[3].idHito, tituloTarea: 'Leer papers sobre transformers', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: luis.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 6 }, update: {}, create: { idTarea: 6, idProyecto: pEmpleo.idProyecto, idHito: hitos[5].idHito, tituloTarea: 'Diseñar schema Prisma', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 7 }, update: {}, create: { idTarea: 7, idProyecto: pEmpleo.idProyecto, tituloTarea: 'Implementar búsqueda de empleos', estadoTarea: 'EN_PROGRESO', prioridad: 'MEDIA', creadaPor: carlos.idUsuario } }),
+    prisma.tarea.upsert({ where: { idTarea: 1 }, update: {}, create: { idTarea: 1, idProyecto: pTutorias.idProyecto, idSprint: sprintTutorias.idSprint, idHito: hitos[0].idHito, tituloTarea: 'Crear mockups en Figma', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
+    prisma.tarea.upsert({ where: { idTarea: 2 }, update: {}, create: { idTarea: 2, idProyecto: pTutorias.idProyecto, idSprint: sprintTutorias.idSprint, idHito: hitos[1].idHito, tituloTarea: 'Implementar autenticación', estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
+    prisma.tarea.upsert({ where: { idTarea: 3 }, update: {}, create: { idTarea: 3, idProyecto: pTutorias.idProyecto, idSprint: sprintTutorias.idSprint, idHito: hitos[1].idHito, tituloTarea: 'CRUD de sesiones de tutoría', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: carlos.idUsuario } }),
+    prisma.tarea.upsert({ where: { idTarea: 4 }, update: {}, create: { idTarea: 4, idProyecto: pAmbiental.idProyecto, idSprint: sprintAmbiental.idSprint, idHito: hitos[2].idHito, tituloTarea: 'Investigar sensores de CO2', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: maria.idUsuario } }),
+    prisma.tarea.upsert({ where: { idTarea: 5 }, update: {}, create: { idTarea: 5, idProyecto: pNeural.idProyecto, idSprint: sprintNeural.idSprint, idHito: hitos[3].idHito, tituloTarea: 'Leer papers sobre transformers', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: luis.idUsuario } }),
+    prisma.tarea.upsert({ where: { idTarea: 6 }, update: {}, create: { idTarea: 6, idProyecto: pEmpleo.idProyecto, idSprint: sprintEmpleo.idSprint, idHito: hitos[5].idHito, tituloTarea: 'Diseñar schema Prisma', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
+    prisma.tarea.upsert({ where: { idTarea: 7 }, update: {}, create: { idTarea: 7, idProyecto: pEmpleo.idProyecto, idSprint: sprintEmpleo.idSprint, tituloTarea: 'Implementar búsqueda de empleos', estadoTarea: 'EN_PROGRESO', prioridad: 'MEDIA', creadaPor: carlos.idUsuario } }),
   ]);
 
   // ─── Asignaciones de tarea ──────────────────────────────
@@ -573,6 +626,7 @@ async function main() {
     create: {
       idTarea: 8,
       idProyecto: pEmpleo.idProyecto,
+      idSprint: sprintEmpleo.idSprint,
       idHito: hitos[5].idHito,
       idRolProyecto: rolFullstack.idRolProyecto,
       tituloTarea: 'Optimizar consultas de búsqueda de empleos',
@@ -590,6 +644,7 @@ async function main() {
     create: {
       idTarea: 9,
       idProyecto: pEmpleo.idProyecto,
+      idSprint: sprintEmpleo.idSprint,
       tituloTarea: 'Escribir documentación de la API pública',
       estadoTarea: 'POR_HACER',
       prioridad: 'BAJA',
@@ -602,6 +657,7 @@ async function main() {
     create: {
       idTarea: 10,
       idProyecto: pEmpleo.idProyecto,
+      idSprint: sprintEmpleo.idSprint,
       idRolProyecto: rolFullstack.idRolProyecto,
       tituloTarea: 'Configurar despliegue en producción',
       estadoTarea: 'EN_PROGRESO',
@@ -1411,6 +1467,39 @@ async function main() {
   });
 
   // Fernando: estudiante "de a pie", sin roles ni proyectos — solo existe.
+  // ─── Reset sequences ──────────────────────────────────
+  // Debe correr ANTES de cualquier create() sin id explícito (Fernando/Camila
+  // más abajo): los bloques anteriores fuerzan idPostulacion/idParticipacion
+  // literales (upsert con id explícito), lo que nunca avanza la secuencia de
+  // Postgres. El primer create() autoincremental pediría nextval() = 1 y
+  // colisionaría con la fila id=1 ya insertada explícitamente (P2002).
+  const sequences = [
+    { table: 'carrera', column: 'id_carrera' },
+    { table: 'habilidad', column: 'id_habilidad' },
+    { table: 'organizacion', column: 'id_organizacion' },
+    { table: 'proyecto', column: 'id_proyecto' },
+    { table: 'rol_proyecto', column: 'id_rol_proyecto' },
+    { table: 'revision_proyecto', column: 'id_revision_proyecto' },
+    { table: 'postulacion', column: 'id_postulacion' },
+    { table: 'participacion_proyecto', column: 'id_participacion' },
+    { table: 'hito', column: 'id_hito' },
+    { table: 'tarea', column: 'id_tarea' },
+    { table: 'asignacion_tarea', column: 'id_asignacion' },
+    { table: 'etiqueta', column: 'id_etiqueta' },
+    { table: 'evidencia', column: 'id_evidencia' },
+    { table: 'revision_evidencia', column: 'id_revision' },
+    { table: 'horas_participacion', column: 'id_registro_horas' },
+    { table: 'notificacion', column: 'id_notificacion' },
+    { table: 'bitacora_auditoria', column: 'id_auditoria' },
+    { table: 'experiencia_previa', column: 'id_experiencia' },
+    { table: 'usuario_telefono', column: 'id_usuario_telefono' },
+  ];
+  for (const { table, column } of sequences) {
+    await prisma.$executeRawUnsafe(
+      `SELECT setval(pg_get_serial_sequence('${table}', '${column}'), COALESCE((SELECT MAX(${column}) FROM ${table}), 0) + 1, false)`,
+    );
+  }
+
   const fernando = await prisma.usuario.upsert({
     where: { correo: 'fernando.castaneda@uvg.edu.gt' },
     update: {},
@@ -1477,34 +1566,6 @@ async function main() {
         estadoParticipacion: 'ACTIVO',
       },
     });
-  }
-
-  // ─── Reset sequences ──────────────────────────────────
-  const sequences = [
-    { table: 'carrera', column: 'id_carrera' },
-    { table: 'habilidad', column: 'id_habilidad' },
-    { table: 'organizacion', column: 'id_organizacion' },
-    { table: 'proyecto', column: 'id_proyecto' },
-    { table: 'rol_proyecto', column: 'id_rol_proyecto' },
-    { table: 'revision_proyecto', column: 'id_revision_proyecto' },
-    { table: 'postulacion', column: 'id_postulacion' },
-    { table: 'participacion_proyecto', column: 'id_participacion' },
-    { table: 'hito', column: 'id_hito' },
-    { table: 'tarea', column: 'id_tarea' },
-    { table: 'asignacion_tarea', column: 'id_asignacion' },
-    { table: 'etiqueta', column: 'id_etiqueta' },
-    { table: 'evidencia', column: 'id_evidencia' },
-    { table: 'revision_evidencia', column: 'id_revision' },
-    { table: 'horas_participacion', column: 'id_registro_horas' },
-    { table: 'notificacion', column: 'id_notificacion' },
-    { table: 'bitacora_auditoria', column: 'id_auditoria' },
-    { table: 'experiencia_previa', column: 'id_experiencia' },
-    { table: 'usuario_telefono', column: 'id_usuario_telefono' },
-  ];
-  for (const { table, column } of sequences) {
-    await prisma.$executeRawUnsafe(
-      `SELECT setval(pg_get_serial_sequence('${table}', '${column}'), COALESCE((SELECT MAX(${column}) FROM ${table}), 0) + 1, false)`,
-    );
   }
 
   console.log('Seed completed successfully');

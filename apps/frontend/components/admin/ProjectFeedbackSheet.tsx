@@ -79,13 +79,19 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
 
   useEffect(() => {
     if (open) {
-      setVisible(true);
-      setSelectedRevision(null);
+      const t = setTimeout(() => {
+        setVisible(true);
+        setSelectedRevision(null);
+      }, 0);
       requestAnimationFrame(() => requestAnimationFrame(() => setAnimating(true)));
-    } else {
-      setAnimating(false);
-      const t = setTimeout(() => setVisible(false), 350);
       return () => clearTimeout(t);
+    } else {
+      const t = setTimeout(() => setAnimating(false), 0);
+      const t2 = setTimeout(() => setVisible(false), 350);
+      return () => {
+        clearTimeout(t);
+        clearTimeout(t2);
+      };
     }
   }, [open]);
 

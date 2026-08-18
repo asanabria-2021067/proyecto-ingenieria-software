@@ -11,7 +11,7 @@ const pipe = new ValidationPipe({
 });
 
 async function parse(plain: unknown): Promise<AssignTaskDto> {
-  return pipe.transform(plain, { type: 'body', metatype: AssignTaskDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: AssignTaskDto });
 }
 
 describe('AssignTaskDto', () => {

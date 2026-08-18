@@ -3,7 +3,10 @@ import { BadRequestException, ForbiddenException, ParseIntPipe } from '@nestjs/c
 import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { EstadoTarea } from '@prisma/client';
 import { TasksController } from '../src/tasks/tasks.controller';
+import { TasksService } from '../src/tasks/tasks.service';
+import { UpdateTaskEstadoDto } from '../src/tasks/dto/update-task-estado.dto';
 
 function makeService() {
   return {
@@ -12,7 +15,11 @@ function makeService() {
     create: vi.fn(),
     update: vi.fn(),
     updateEstado: vi.fn(),
-  } as any;
+  };
+}
+
+function makeController(service: ReturnType<typeof makeService>) {
+  return new TasksController(service as unknown as TasksService);
 }
 
 describe('TasksController.updateEstado (PATCH /proyectos/:projectId/tareas/:taskId/estado)', () => {
@@ -31,8 +38,8 @@ describe('TasksController.updateEstado (PATCH /proyectos/:projectId/tareas/:task
 
   it('delega en TasksService.updateEstado con projectId, taskId, userId (CurrentUser) y el dto', () => {
     const service = makeService();
-    const controller = new TasksController(service);
-    const dto = { estadoTarea: 'EN_PROGRESO' } as any;
+    const controller = makeController(service);
+    const dto: UpdateTaskEstadoDto = { estadoTarea: EstadoTarea.EN_PROGRESO };
 
     controller.updateEstado(5, 42, { userId: 9 }, dto);
 
@@ -43,9 +50,11 @@ describe('TasksController.updateEstado (PATCH /proyectos/:projectId/tareas/:task
     const service = makeService();
     const tareaActualizada = { idTarea: 42, estadoTarea: 'HECHO' };
     service.updateEstado.mockResolvedValue(tareaActualizada);
-    const controller = new TasksController(service);
+    const controller = makeController(service);
 
-    const result = await controller.updateEstado(5, 42, { userId: 9 }, {} as any);
+    const result = await controller.updateEstado(5, 42, { userId: 9 }, {
+      estadoTarea: EstadoTarea.EN_PROGRESO,
+    });
 
     expect(result).toBe(tareaActualizada);
   });
@@ -54,22 +63,26 @@ describe('TasksController.updateEstado (PATCH /proyectos/:projectId/tareas/:task
     const service = makeService();
     const error = new ForbiddenException('No tienes permiso para realizar esta acción sobre la tarea');
     service.updateEstado.mockRejectedValue(error);
-    const controller = new TasksController(service);
+    const controller = makeController(service);
 
-    await expect(controller.updateEstado(5, 42, { userId: 9 }, {} as any)).rejects.toBe(error);
+    await expect(
+      controller.updateEstado(5, 42, { userId: 9 }, {
+        estadoTarea: EstadoTarea.EN_PROGRESO,
+      }),
+    ).rejects.toBe(error);
   });
 
   it('projectId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('abc', { type: 'param', data: 'projectId' } as any),
+      pipe.transform('abc', { type: 'param', data: 'projectId' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('taskId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('xyz', { type: 'param', data: 'taskId' } as any),
+      pipe.transform('xyz', { type: 'param', data: 'taskId' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 

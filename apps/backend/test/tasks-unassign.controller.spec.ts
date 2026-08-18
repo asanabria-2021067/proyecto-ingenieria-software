@@ -4,6 +4,7 @@ import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/comm
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TasksController } from '../src/tasks/tasks.controller';
+import { TasksService } from '../src/tasks/tasks.service';
 
 function makeService() {
   return {
@@ -15,7 +16,11 @@ function makeService() {
     remove: vi.fn(),
     assign: vi.fn(),
     unassign: vi.fn(),
-  } as any;
+  };
+}
+
+function makeController(service: ReturnType<typeof makeService>) {
+  return new TasksController(service as unknown as TasksService);
 }
 
 describe('TasksController.unassign (DELETE /proyectos/:projectId/tareas/:taskId/asignar)', () => {
@@ -32,7 +37,7 @@ describe('TasksController.unassign (DELETE /proyectos/:projectId/tareas/:taskId/
 
   it('delega en TasksService.unassign con projectId, taskId (Param) y userId (CurrentUser)', async () => {
     const service = makeService();
-    const controller = new TasksController(service);
+    const controller = makeController(service);
 
     await controller.unassign(5, 42, { userId: 9 });
 
@@ -42,7 +47,7 @@ describe('TasksController.unassign (DELETE /proyectos/:projectId/tareas/:taskId/
   it('la respuesta no tiene contenido (resuelve undefined)', async () => {
     const service = makeService();
     service.unassign.mockResolvedValue(undefined);
-    const controller = new TasksController(service);
+    const controller = makeController(service);
 
     const result = await controller.unassign(5, 42, { userId: 9 });
 
@@ -53,7 +58,7 @@ describe('TasksController.unassign (DELETE /proyectos/:projectId/tareas/:taskId/
     const service = makeService();
     const error = new ForbiddenException('No eres el líder de este proyecto');
     service.unassign.mockRejectedValue(error);
-    const controller = new TasksController(service);
+    const controller = makeController(service);
 
     await expect(controller.unassign(5, 42, { userId: 9 })).rejects.toBe(error);
   });
@@ -61,14 +66,14 @@ describe('TasksController.unassign (DELETE /proyectos/:projectId/tareas/:taskId/
   it('projectId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('abc', { type: 'param', data: 'projectId' } as any),
+      pipe.transform('abc', { type: 'param', data: 'projectId' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('taskId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('xyz', { type: 'param', data: 'taskId' } as any),
+      pipe.transform('xyz', { type: 'param', data: 'taskId' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 

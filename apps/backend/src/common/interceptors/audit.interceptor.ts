@@ -3,16 +3,20 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  Logger,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(AuditInterceptor.name);
+
   constructor(private prisma: PrismaService) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const { method, url, user, ip, body } = request;
     const controller = context.getClass().name;
@@ -38,19 +42,20 @@ export class AuditInterceptor implements NestInterceptor {
                 url,
                 body: this.sanitizeResponse(body),
                 response: this.sanitizeResponse(data),
-              },
+              } as Prisma.InputJsonValue,
               ipOrigen: ip || request.headers['x-forwarded-for'] || 'unknown',
             },
           });
         } catch (error) {
-          console.error('Audit logging failed:', error);
+          this.logger.error('Audit logging failed', error);
         }
       }),
     );
   }
 
-  private extractIdFromData(data: any): string | null {
-    if (!data) return null;
+  private extractIdFromData(data: unknown): string | null {
+    if (!data || typeof data !== 'object') return null;
+    const record = data as Record<string, unknown>;
 
     const idFields = [
       'idProyecto',
@@ -62,16 +67,17 @@ export class AuditInterceptor implements NestInterceptor {
     ];
 
     for (const field of idFields) {
-      if (data[field]) {
-        return String(data[field]);
+      if (record[field]) {
+        return String(record[field]);
       }
     }
 
     return null;
   }
 
-  private sanitizeResponse(data: any): any {
+  private sanitizeResponse(data: unknown): unknown {
     if (!data) return null;
+    if (typeof data !== 'object') return data;
 
     const sensitiveFields = [
       'contrasena',
@@ -83,9 +89,7 @@ export class AuditInterceptor implements NestInterceptor {
       'secret',
     ];
 
-    if (typeof data !== 'object') return data;
-
-    const sanitized = { ...data };
+    const sanitized = { ...data } as Record<string, unknown>;
 
     for (const field of sensitiveFields) {
       if (sanitized[field]) {
