@@ -1,20 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { LabelsService } from '../src/labels/labels.service';
+import { CreateLabelDto } from '../src/labels/dto/create-label.dto';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function makePrisma() {
   const tx = {
     tareaEtiqueta: { deleteMany: vi.fn() },
     etiqueta: { delete: vi.fn() },
   };
-  return {
+  const prisma = {
     proyecto: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
     etiqueta: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     tareaEtiqueta: { deleteMany: vi.fn() },
-    $transaction: vi.fn(async (fn: any) => fn(tx)),
+    $transaction: vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
     __tx: tx,
-  } as any;
+  };
+  return prisma as typeof prisma & PrismaService;
 }
 
 const LEADER_ID = 1;
@@ -155,7 +158,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
 });
 
 describe('LabelsService — creación (POST, Tarea 31)', () => {
-  function dto(overrides: Record<string, unknown> = {}) {
+  function dto(overrides: Partial<CreateLabelDto> = {}): CreateLabelDto {
     return { nombreEtiqueta: 'Backend', color: '#10B981', ...overrides };
   }
 
@@ -165,7 +168,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'Backend', color: '#10B981' });
     const service = new LabelsService(prisma);
 
-    const resultado = await service.create(PROJECT_ID, LEADER_ID, dto() as any);
+    const resultado = await service.create(PROJECT_ID, LEADER_ID, dto());
 
     expect(resultado).toEqual({ idEtiqueta: 1, nombreEtiqueta: 'Backend', color: '#10B981' });
   });
@@ -175,7 +178,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     const service = new LabelsService(prisma);
 
-    await expect(service.create(PROJECT_ID, PARTICIPANT_ID, dto() as any)).rejects.toBeInstanceOf(
+    await expect(service.create(PROJECT_ID, PARTICIPANT_ID, dto())).rejects.toBeInstanceOf(
       ForbiddenException,
     );
     expect(prisma.etiqueta.create).not.toHaveBeenCalled();
@@ -186,7 +189,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     const service = new LabelsService(prisma);
 
-    await expect(service.create(PROJECT_ID, EXTERNO_ID, dto() as any)).rejects.toBeInstanceOf(
+    await expect(service.create(PROJECT_ID, EXTERNO_ID, dto())).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
@@ -196,7 +199,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(null);
     const service = new LabelsService(prisma);
 
-    await expect(service.create(PROJECT_ID, LEADER_ID, dto() as any)).rejects.toBeInstanceOf(
+    await expect(service.create(PROJECT_ID, LEADER_ID, dto())).rejects.toBeInstanceOf(
       NotFoundException,
     );
     expect(prisma.etiqueta.create).not.toHaveBeenCalled();
@@ -208,7 +211,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'Diseño Frontend', color: '#10B981' });
     const service = new LabelsService(prisma);
 
-    await service.create(PROJECT_ID, LEADER_ID, dto({ nombreEtiqueta: 'Diseño Frontend' }) as any);
+    await service.create(PROJECT_ID, LEADER_ID, dto({ nombreEtiqueta: 'Diseño Frontend' }));
 
     expect(prisma.etiqueta.create).toHaveBeenCalledWith({
       data: {
@@ -227,7 +230,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'ＦＲＯＮＴＥＮＤ', color: '#10B981' });
     const service = new LabelsService(prisma);
 
-    await service.create(PROJECT_ID, LEADER_ID, dto({ nombreEtiqueta: 'ＦＲＯＮＴＥＮＤ' }) as any);
+    await service.create(PROJECT_ID, LEADER_ID, dto({ nombreEtiqueta: 'ＦＲＯＮＴＥＮＤ' }));
 
     const data = prisma.etiqueta.create.mock.calls[0][0].data;
     expect(data.nombreNormalizado).toBe('frontend');
@@ -239,7 +242,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'Backend', color: '#a1B2c3' });
     const service = new LabelsService(prisma);
 
-    await service.create(PROJECT_ID, LEADER_ID, dto({ color: '#a1B2c3' }) as any);
+    await service.create(PROJECT_ID, LEADER_ID, dto({ color: '#a1B2c3' }));
 
     expect(prisma.etiqueta.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ color: '#a1B2c3' }) }),
@@ -252,7 +255,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'Backend', color: '#10B981' });
     const service = new LabelsService(prisma);
 
-    const resultado = await service.create(PROJECT_ID, LEADER_ID, dto() as any);
+    const resultado = await service.create(PROJECT_ID, LEADER_ID, dto());
 
     expect(resultado).not.toHaveProperty('nombreNormalizado');
     expect(resultado).not.toHaveProperty('idProyecto');
@@ -265,7 +268,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.etiqueta.create.mockRejectedValue(errorGenerico);
     const service = new LabelsService(prisma);
 
-    await expect(service.create(PROJECT_ID, LEADER_ID, dto() as any)).rejects.toBe(errorGenerico);
+    await expect(service.create(PROJECT_ID, LEADER_ID, dto())).rejects.toBe(errorGenerico);
   });
 });
 
@@ -281,7 +284,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Front', color: '#10B981' });
     const service = new LabelsService(prisma);
 
-    await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front' } as any);
+    await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front' });
 
     expect(prisma.etiqueta.update).toHaveBeenCalledWith({
       where: { idEtiqueta: LABEL_ID },
@@ -297,7 +300,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Backend', color: '#000000' });
     const service = new LabelsService(prisma);
 
-    await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' } as any);
+    await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' });
 
     expect(prisma.etiqueta.update).toHaveBeenCalledWith({
       where: { idEtiqueta: LABEL_ID },
@@ -313,7 +316,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Front', color: '#000000' });
     const service = new LabelsService(prisma);
 
-    await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front', color: '#000000' } as any);
+    await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front', color: '#000000' });
 
     expect(prisma.etiqueta.update).toHaveBeenCalledWith({
       where: { idEtiqueta: LABEL_ID },
@@ -328,7 +331,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.etiqueta.findFirst.mockResolvedValue(etiquetaActual());
     const service = new LabelsService(prisma);
 
-    const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, {} as any);
+    const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, {});
 
     expect(prisma.etiqueta.update).not.toHaveBeenCalled();
     expect(resultado).toEqual(etiquetaActual());
@@ -341,7 +344,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Frontend', color: '#10B981' });
     const service = new LabelsService(prisma);
 
-    const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Frontend' } as any);
+    const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Frontend' });
 
     expect(resultado.nombreEtiqueta).toBe('Frontend');
   });
@@ -361,7 +364,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' } as any),
+      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -372,7 +375,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, 999999, LEADER_ID, { color: '#000000' } as any),
+      service.update(PROJECT_ID, 999999, LEADER_ID, { color: '#000000' }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -383,7 +386,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' } as any),
+      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.etiqueta.findFirst).toHaveBeenCalledWith({
       where: { idEtiqueta: LABEL_ID, idProyecto: PROJECT_ID },
@@ -397,7 +400,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, LABEL_ID, PARTICIPANT_ID, { color: '#000000' } as any),
+      service.update(PROJECT_ID, LABEL_ID, PARTICIPANT_ID, { color: '#000000' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.etiqueta.findFirst).not.toHaveBeenCalled();
   });
@@ -408,7 +411,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' } as any),
+      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -421,7 +424,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' } as any),
+      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' }),
     ).rejects.toBe(errorGenerico);
   });
 
@@ -432,7 +435,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Front', color: '#10B981' });
     const service = new LabelsService(prisma);
 
-    const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front' } as any);
+    const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front' });
 
     expect(Object.keys(resultado).sort()).toEqual(['color', 'idEtiqueta', 'nombreEtiqueta']);
   });
@@ -460,8 +463,8 @@ describe('LabelsService — eliminación (DELETE, Tarea 31)', () => {
 
     await service.remove(PROJECT_ID, LABEL_ID, LEADER_ID);
 
-    expect((prisma as any).tarea).toBeUndefined();
-    expect((prisma.__tx as any).tarea).toBeUndefined();
+    expect(Reflect.get(prisma, 'tarea')).toBeUndefined();
+    expect(Reflect.get(prisma.__tx, 'tarea')).toBeUndefined();
   });
 
   it('etiqueta de otro proyecto produce 404, sin transacción', async () => {
@@ -518,10 +521,8 @@ describe('LabelsService — eliminación (DELETE, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Backend', color: '#10B981' });
     const errorFallo = new Error('fallo al eliminar etiqueta');
-    prisma.$transaction = vi.fn(async (fn: any) => {
-      const tx = { tareaEtiqueta: { deleteMany: vi.fn() }, etiqueta: { delete: vi.fn().mockRejectedValue(errorFallo) } };
-      return fn(tx);
-    });
+    const tx = { tareaEtiqueta: { deleteMany: vi.fn() }, etiqueta: { delete: vi.fn().mockRejectedValue(errorFallo) } };
+    prisma.$transaction = vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) as typeof prisma.$transaction;
     const service = new LabelsService(prisma);
 
     await expect(service.remove(PROJECT_ID, LABEL_ID, LEADER_ID)).rejects.toBe(errorFallo);
