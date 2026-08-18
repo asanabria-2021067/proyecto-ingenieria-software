@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, expect } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { EstadoParticipacion, EstadoSprint, EstadoTarea, type PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import {
@@ -12,6 +12,9 @@ import {
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { TeamService } from '../../src/team/team.service';
+import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { ApplicationsService } from '../../src/applications/applications.service';
+import type { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
 
 describeIntegration('TeamService.findTeamMemberDetail — agrupación por Sprint PostgreSQL real', () => {
   let prisma: PrismaClient;
@@ -21,7 +24,11 @@ describeIntegration('TeamService.findTeamMemberDetail — agrupación por Sprint
 
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
-    service = new TeamService(prisma as any, { findAll: async () => [] } as any, { getPendingLeaderReviews: async () => [] } as any);
+    service = new TeamService(
+      prisma as unknown as PrismaService,
+      { findAll: async () => [] } as unknown as ApplicationsService,
+      { getPendingLeaderReviews: async () => [] } as unknown as ExitRequestsService,
+    );
     await prisma.$connect();
   });
 
