@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { TasksController } from '../src/tasks/tasks.controller';
+import type { TasksService } from '../src/tasks/tasks.service';
+import type { CreateTaskDto } from '../src/tasks/dto/create-task.dto';
 
 function makeService() {
-  return { findAll: vi.fn(), findOne: vi.fn(), create: vi.fn() } as any;
+  return { findAll: vi.fn(), findOne: vi.fn(), create: vi.fn() };
 }
 
 describe('TasksController.create (POST /proyectos/:projectId/tareas)', () => {
@@ -18,8 +20,8 @@ describe('TasksController.create (POST /proyectos/:projectId/tareas)', () => {
 
   it('delega en TasksService.create con projectId, userId (CurrentUser) y el dto', () => {
     const service = makeService();
-    const controller = new TasksController(service);
-    const dto = { tituloTarea: 'Nueva tarea', fechaLimite: '2026-12-25', prioridad: 'MEDIA' } as any;
+    const controller = new TasksController(service as unknown as TasksService);
+    const dto = { tituloTarea: 'Nueva tarea', fechaLimite: '2026-12-25', prioridad: 'MEDIA' } as unknown as CreateTaskDto;
 
     controller.create(5, { userId: 9 }, dto);
 
@@ -30,9 +32,9 @@ describe('TasksController.create (POST /proyectos/:projectId/tareas)', () => {
     const service = makeService();
     const tareaCreada = { idTarea: 100, tituloTarea: 'Nueva tarea' };
     service.create.mockResolvedValue(tareaCreada);
-    const controller = new TasksController(service);
+    const controller = new TasksController(service as unknown as TasksService);
 
-    const result = await controller.create(5, { userId: 9 }, {} as any);
+    const result = await controller.create(5, { userId: 9 }, {} as unknown as CreateTaskDto);
 
     expect(result).toBe(tareaCreada);
   });
@@ -41,8 +43,8 @@ describe('TasksController.create (POST /proyectos/:projectId/tareas)', () => {
     const service = makeService();
     const error = new Error('no autorizado');
     service.create.mockRejectedValue(error);
-    const controller = new TasksController(service);
+    const controller = new TasksController(service as unknown as TasksService);
 
-    await expect(controller.create(5, { userId: 9 }, {} as any)).rejects.toBe(error);
+    await expect(controller.create(5, { userId: 9 }, {} as unknown as CreateTaskDto)).rejects.toBe(error);
   });
 });
