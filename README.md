@@ -199,10 +199,17 @@ Todo el entorno (DB + Backend + Frontend):
 docker compose --profile app up -d --build
 ```
 
-Solo base de datos + pgAdmin:
+Solo base de datos:
 
 ```bash
 docker compose up -d
+```
+
+pgAdmin es una herramienta de desarrollo y queda detras de su propio perfil
+(no se levanta con `up -d` ni con `--profile app`):
+
+```bash
+docker compose --profile tools up -d pgadmin
 ```
 
 Modo desarrollo con hot reload (backend + frontend):
