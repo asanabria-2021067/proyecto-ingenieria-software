@@ -89,24 +89,16 @@ export class SocialFeedService {
       select: PROYECTO_FEED_SELECT,
     });
 
-    const personIdsSet = new Set(personIds);
-
     return proyectos.map((proyecto) => {
       const participantes = proyecto.roles.flatMap((rol) => rol.participaciones.map((p) => p.usuario));
-      const candidatos = personIdsSet.has(proyecto.creadoPor) ? [proyecto.creador, ...participantes] : participantes;
-
-      const amigosVistos = new Map<number, (typeof candidatos)[number]>();
-      for (const candidato of candidatos) {
-        if (!amigosVistos.has(candidato.idUsuario)) {
-          amigosVistos.set(candidato.idUsuario, candidato);
-        }
-      }
+      const candidatos = personIds.includes(proyecto.creadoPor) ? [proyecto.creador, ...participantes] : participantes;
+      const amigosVistos = new Map(candidatos.map((c) => [c.idUsuario, c]));
 
       return {
         idProyecto: proyecto.idProyecto,
         tituloProyecto: proyecto.tituloProyecto,
         estadoProyecto: proyecto.estadoProyecto,
-        amigosParticipantes: Array.from(amigosVistos.values()).slice(0, MAX_AMIGOS_POR_PROYECTO),
+        amigosParticipantes: [...amigosVistos.values()].slice(0, MAX_AMIGOS_POR_PROYECTO),
       };
     });
   }
