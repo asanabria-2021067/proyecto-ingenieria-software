@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { Cache } from 'cache-manager';
 import { ProjectsService } from '../src/projects/projects.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 
 /**
  * Tarea 23: las tareas con soft delete (Tarea 22, `eliminadoEn !== null`) no
@@ -34,12 +37,16 @@ function filtrarComoPrisma(tareas: TareaFixture[], whereArg: unknown) {
   return filas.map((t) => ({ estadoTarea: t.estadoTarea, idHito: t.idHito ?? null }));
 }
 
+interface FindArgs {
+  select: { tareas: { where: unknown }; hitos: unknown };
+}
+
 function makePrismaGetAvance(
   tareasFixture: TareaFixture[],
   hitosFixture: { idHito: number }[] = [],
   creadoPor = 1,
 ) {
-  const findFirst = vi.fn(async (args: any) => ({
+  const findFirst = vi.fn(async (args: FindArgs) => ({
     creadoPor,
     tareas: filtrarComoPrisma(tareasFixture, args?.select?.tareas?.where),
     hitos: hitosFixture,
@@ -47,22 +54,26 @@ function makePrismaGetAvance(
   return {
     proyecto: { findFirst },
     participacionProyecto: { findFirst: vi.fn().mockResolvedValue(null) },
-  } as any;
+  };
 }
 
 function makePrismaFindMine(tareasFixture: TareaFixture[], hitosFixture: { idHito: number }[] = []) {
-  const findMany = vi.fn(async (args: any) => [
+  const findMany = vi.fn(async (args: FindArgs) => [
     {
       roles: [],
       tareas: filtrarComoPrisma(tareasFixture, args?.select?.tareas?.where),
       hitos: hitosFixture,
     },
   ]);
-  return { proyecto: { findMany } } as any;
+  return { proyecto: { findMany } };
 }
 
-function makeService(prisma: any) {
-  return new ProjectsService(prisma, {} as any);
+function makeService(prisma: unknown) {
+  return new ProjectsService(
+    prisma as unknown as PrismaService,
+    {} as unknown as NotificationsService,
+    {} as unknown as Cache,
+  );
 }
 
 const LIDER_ID = 1;
