@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, NotFoundException } from '@nestjs/common';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { UpdateTaskDto } from '../src/tasks/dto/update-task.dto';
 import { TasksService } from '../src/tasks/tasks.service';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
@@ -149,6 +152,8 @@ function buildTaskSelectShape(row: Fixture['tareas'][number], state: Fixture) {
   };
 }
 
+type Where = Record<string, unknown>;
+
 function makeFakeDb(state: Fixture) {
   const asignacionTareaEscrituraProhibida = {
     create: vi.fn(),
@@ -156,7 +161,7 @@ function makeFakeDb(state: Fixture) {
     updateMany: vi.fn(),
     delete: vi.fn(),
     deleteMany: vi.fn(),
-    findFirst: vi.fn(async ({ where }: any) =>
+    findFirst: vi.fn(async ({ where }: { where: Where }) =>
       state.asignaciones.find(
         (a) =>
           a.idTarea === where.idTarea &&
@@ -165,16 +170,16 @@ function makeFakeDb(state: Fixture) {
     ),
   };
 
-  const db: any = {
+  const db = {
     proyecto: {
-      findFirst: vi.fn(async ({ where }: any) =>
+      findFirst: vi.fn(async ({ where }: { where: Where }) =>
         state.proyectos.find(
           (p) => p.idProyecto === where.idProyecto && (where.eliminadoEn === undefined || p.eliminadoEn === where.eliminadoEn),
         ) ?? null,
       ),
     },
     tarea: {
-      findFirst: vi.fn(async ({ where, select }: any) => {
+      findFirst: vi.fn(async ({ where, select }: { where: Where; select?: unknown }) => {
         const row = state.tareas.find(
           (t) =>
             t.idTarea === where.idTarea &&
@@ -184,20 +189,20 @@ function makeFakeDb(state: Fixture) {
         if (!row) return null;
         return select ? buildTaskSelectShape(row, state) : row;
       }),
-      update: vi.fn(async ({ where, data }: any) => {
+      update: vi.fn(async ({ where, data }: { where: Where; data: Record<string, unknown> }) => {
         const row = state.tareas.find((t) => t.idTarea === where.idTarea)!;
         Object.assign(row, data);
         return row;
       }),
     },
     rolProyecto: {
-      findUnique: vi.fn(async ({ where }: any) => state.roles.find((r) => r.idRolProyecto === where.idRolProyecto) ?? null),
+      findUnique: vi.fn(async ({ where }: { where: Where }) => state.roles.find((r) => r.idRolProyecto === where.idRolProyecto) ?? null),
     },
     usuario: {
-      findUnique: vi.fn(async ({ where }: any) => state.usuarios.find((u) => u.idUsuario === where.idUsuario) ?? null),
+      findUnique: vi.fn(async ({ where }: { where: Where }) => state.usuarios.find((u) => u.idUsuario === where.idUsuario) ?? null),
     },
     participacionProyecto: {
-      findFirst: vi.fn(async ({ where }: any) => {
+      findFirst: vi.fn(async ({ where }: { where: Where }) => {
         return (
           state.participaciones.find((p) => {
             if (p.idUsuario !== where.idUsuario) return false;
@@ -205,9 +210,10 @@ function makeFakeDb(state: Fixture) {
             if (where.estadoParticipacion !== undefined && p.estadoParticipacion !== where.estadoParticipacion) {
               return false;
             }
-            if (where.rolProyecto?.idProyecto !== undefined) {
+            const rolProyectoFiltro = where.rolProyecto as Where | undefined;
+            if (rolProyectoFiltro?.idProyecto !== undefined) {
               const rol = state.roles.find((r) => r.idRolProyecto === p.idRolProyecto);
-              if (!rol || rol.idProyecto !== where.rolProyecto.idProyecto) return false;
+              if (!rol || rol.idProyecto !== rolProyectoFiltro.idProyecto) return false;
             }
             return true;
           }) ?? null
@@ -215,37 +221,38 @@ function makeFakeDb(state: Fixture) {
       }),
     },
     etiqueta: {
-      findMany: vi.fn(async ({ where }: any) =>
-        state.etiquetas.filter((e) => (where.idEtiqueta.in as number[]).includes(e.idEtiqueta)),
+      findMany: vi.fn(async ({ where }: { where: Where }) =>
+        state.etiquetas.filter((e) => ((where.idEtiqueta as Where).in as number[]).includes(e.idEtiqueta)),
       ),
     },
     tareaEtiqueta: {
-      deleteMany: vi.fn(async ({ where }: any) => {
+      deleteMany: vi.fn(async ({ where }: { where: Where }) => {
         state.tareaEtiquetas = state.tareaEtiquetas.filter((te) => te.idTarea !== where.idTarea);
       }),
-      createMany: vi.fn(async ({ data }: any) => {
+      createMany: vi.fn(async ({ data }: { data: Fixture['tareaEtiquetas'] }) => {
         state.tareaEtiquetas.push(...data);
       }),
     },
     asignacionTarea: asignacionTareaEscrituraProhibida,
+    $transaction: vi.fn(),
   };
 
-  db.$transaction = vi.fn(async (callback: any) => callback(db));
+  db.$transaction.mockImplementation(async (callback: (db: unknown) => unknown) => callback(db));
 
   return db;
 }
 
 function makeService(state: Fixture) {
   const db = makeFakeDb(state);
-  const tasksContext = new TasksContextService(db);
+  const tasksContext = new TasksContextService(db as unknown as PrismaService);
   const tasksAuthorization = new TasksAuthorizationService(tasksContext);
-  const tasksRelations = new TasksRelationsService(db, tasksContext);
-  const notifications = {} as any;
-  const service = new TasksService(db, tasksAuthorization, tasksRelations, notifications, tasksContext);
+  const tasksRelations = new TasksRelationsService(db as unknown as PrismaService, tasksContext);
+  const notifications = {} as unknown as NotificationsService;
+  const service = new TasksService(db as unknown as PrismaService, tasksAuthorization, tasksRelations, notifications, tasksContext);
   return { db, service };
 }
 
-function expectNoAssignmentWrites(db: any) {
+function expectNoAssignmentWrites(db: ReturnType<typeof makeFakeDb>) {
   expect(db.asignacionTarea.create).not.toHaveBeenCalled();
   expect(db.asignacionTarea.update).not.toHaveBeenCalled();
   expect(db.asignacionTarea.updateMany).not.toHaveBeenCalled();
@@ -267,7 +274,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
 
       const resultado = await service.update(PROJECT_ID, TASK_ID, LEADER_ID, {
         idRolProyecto: ROL_NUEVO,
-      } as any);
+      } as UpdateTaskDto);
 
       expect(resultado.idRolProyecto).toBe(ROL_NUEVO);
       expect(fixture.asignaciones[0]).toEqual({
@@ -292,13 +299,13 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       const { db, service } = makeService(fixture);
 
       try {
-        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as any);
+        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as UpdateTaskDto);
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(BadRequestException);
         expect(e).not.toBeInstanceOf(ConflictException);
-        expect(e.getStatus()).toBe(400);
-        expect(e.message).toBe('El usuario no tiene una participación activa en el rol de la tarea');
+        expect((e as HttpException).getStatus()).toBe(400);
+        expect((e as HttpException).message).toBe('El usuario no tiene una participación activa en el rol de la tarea');
       }
       expect(fixture.tareas[0].idRolProyecto).toBe(ROL_ACTUAL);
       expect(db.tarea.update).not.toHaveBeenCalled();
@@ -316,11 +323,11 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       const { db, service } = makeService(fixture);
 
       try {
-        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as any);
+        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as UpdateTaskDto);
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(BadRequestException);
-        expect(e.getStatus()).toBe(400);
+        expect((e as HttpException).getStatus()).toBe(400);
       }
       expect(db.tarea.update).not.toHaveBeenCalled();
     });
@@ -336,7 +343,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       const { db, service } = makeService(fixture);
 
       await expect(
-        service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as any),
+        service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as UpdateTaskDto),
       ).rejects.toMatchObject({ status: 400 });
       expect(db.tarea.update).not.toHaveBeenCalled();
     });
@@ -348,7 +355,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       const { db, service } = makeService(fixture);
 
       await expect(
-        service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as any),
+        service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as UpdateTaskDto),
       ).rejects.toMatchObject({ status: 400 });
       expect(db.tarea.update).not.toHaveBeenCalled();
     });
@@ -358,11 +365,11 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       const { db, service } = makeService(fixture);
 
       try {
-        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: 999 } as any);
+        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: 999 } as UpdateTaskDto);
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(NotFoundException);
-        expect(e.getStatus()).toBe(404);
+        expect((e as HttpException).getStatus()).toBe(404);
       }
       expect(db.asignacionTarea.findFirst).not.toHaveBeenCalled();
       expect(db.tarea.update).not.toHaveBeenCalled();
@@ -373,12 +380,12 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       const { db, service } = makeService(fixture);
 
       try {
-        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_OTRO_PROYECTO } as any);
+        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_OTRO_PROYECTO } as UpdateTaskDto);
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(BadRequestException);
-        expect(e.getStatus()).toBe(400);
-        expect(e.message).toContain('pertenece a otro proyecto');
+        expect((e as HttpException).getStatus()).toBe(400);
+        expect((e as HttpException).message).toContain('pertenece a otro proyecto');
       }
       expect(db.asignacionTarea.findFirst).not.toHaveBeenCalled();
       expect(db.tarea.update).not.toHaveBeenCalled();
@@ -398,7 +405,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
 
       const resultado = await service.update(PROJECT_ID, TASK_ID, LEADER_ID, {
         idRolProyecto: null,
-      } as any);
+      } as UpdateTaskDto);
 
       expect(resultado.idRolProyecto).toBeNull();
       expect(fixture.asignaciones[0]).toEqual({
@@ -423,12 +430,12 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       const { db, service } = makeService(fixture);
 
       try {
-        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: null } as any);
+        await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: null } as UpdateTaskDto);
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(BadRequestException);
-        expect(e.getStatus()).toBe(400);
-        expect(e.message).toBe('El usuario no tiene una participación activa en el proyecto');
+        expect((e as HttpException).getStatus()).toBe(400);
+        expect((e as HttpException).message).toBe('El usuario no tiene una participación activa en el proyecto');
       }
       expect(db.tarea.update).not.toHaveBeenCalled();
     });
@@ -444,7 +451,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       const { db, service } = makeService(fixture);
 
       await expect(
-        service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: null } as any),
+        service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: null } as UpdateTaskDto),
       ).rejects.toMatchObject({ status: 400 });
       expect(db.tarea.update).not.toHaveBeenCalled();
     });
@@ -457,7 +464,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
 
       const resultado = await service.update(PROJECT_ID, TASK_ID, LEADER_ID, {
         tituloTarea: 'Nuevo título',
-      } as any);
+      } as UpdateTaskDto);
 
       expect(resultado.tituloTarea).toBe('Nuevo título');
       expect(resultado.idRolProyecto).toBe(ROL_ACTUAL);
@@ -471,7 +478,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
 
       const resultado = await service.update(PROJECT_ID, TASK_ID, LEADER_ID, {
         idRolProyecto: ROL_NUEVO,
-      } as any);
+      } as UpdateTaskDto);
 
       expect(resultado.idRolProyecto).toBe(ROL_NUEVO);
       expect(db.participacionProyecto.findFirst).not.toHaveBeenCalled();
@@ -487,7 +494,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
       });
       const { db, service } = makeService(fixture);
 
-      await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as any);
+      await service.update(PROJECT_ID, TASK_ID, LEADER_ID, { idRolProyecto: ROL_NUEVO } as UpdateTaskDto);
 
       expect(db.$transaction).toHaveBeenCalledTimes(1);
       expect(db.asignacionTarea.findFirst).toHaveBeenCalledTimes(1);
@@ -508,7 +515,7 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
         service.update(PROJECT_ID, TASK_ID, LEADER_ID, {
           idRolProyecto: ROL_NUEVO,
           idsEtiquetas: [3],
-        } as any),
+        } as UpdateTaskDto),
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(db.tarea.update).not.toHaveBeenCalled();
@@ -534,11 +541,11 @@ describe('Compatibilidad real del asignado activo al cambiar idRolProyecto (Tare
           tituloTarea: 'Título que no debe persistir',
           idRolProyecto: ROL_NUEVO,
           idsEtiquetas: [2, 3],
-        } as any);
+        } as UpdateTaskDto);
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(BadRequestException);
-        expect(e.getStatus()).toBe(400);
+        expect((e as HttpException).getStatus()).toBe(400);
       }
 
       expect(fixture.tareas[0]).toEqual(estadoOriginal);
