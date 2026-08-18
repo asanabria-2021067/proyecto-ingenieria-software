@@ -1,10 +1,11 @@
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { describe, expect, it, vi } from 'vitest';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+import type { TeamService } from '../src/team/team.service';
 import { TeamController } from '../src/team/team.controller';
 
 function makeService() {
-  return { getPendingExitRequests: vi.fn() } as any;
+  return { getPendingExitRequests: vi.fn() };
 }
 
 describe('TeamController.getPendingExitRequests', () => {
@@ -27,7 +28,7 @@ describe('TeamController.getPendingExitRequests', () => {
     const service = makeService();
     const solicitudes = [{ idSolicitud: 1, idUsuario: 5, estadoSolicitud: 'PENDIENTE_LIDER' }];
     service.getPendingExitRequests.mockResolvedValue(solicitudes);
-    const controller = new TeamController(service);
+    const controller = new TeamController(service as unknown as TeamService);
 
     const result = await controller.getPendingExitRequests(42, { userId: 7 });
 
