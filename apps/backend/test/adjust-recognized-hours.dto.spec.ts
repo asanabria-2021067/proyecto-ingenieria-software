@@ -11,7 +11,7 @@ const pipe = new ValidationPipe({
 });
 
 async function parse(plain: unknown): Promise<AdjustRecognizedHoursDto> {
-  return pipe.transform(plain, { type: 'body', metatype: AdjustRecognizedHoursDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: AdjustRecognizedHoursDto });
 }
 
 describe('AdjustRecognizedHoursDto', () => {
