@@ -43,7 +43,7 @@ export class NotificationsGateway
 
       this.logger.log(`Client ${client.id} connected as user ${userId}`);
       client.emit('connected', { userId });
-    } catch (error) {
+    } catch {
       this.logger.warn(`Client ${client.id} rejected: invalid token`);
       client.disconnect();
     }
@@ -54,11 +54,11 @@ export class NotificationsGateway
     this.logger.log(`Client ${client.id} (user ${userId}) disconnected`);
   }
 
-  async notifyUser(userId: number, notification: any) {
+  async notifyUser(userId: number, notification: unknown) {
     this.server.to(`user:${userId}`).emit('notification', notification);
   }
 
-  async notifyUsers(userIds: number[], notification: any) {
+  async notifyUsers(userIds: number[], notification: unknown) {
     for (const userId of userIds) {
       this.server.to(`user:${userId}`).emit('notification', notification);
     }
