@@ -111,7 +111,14 @@ jobs:
     runs-on: ubuntu-latest
     # A diferencia de los jobs backend/frontend (que usan mocks), este job
     # necesita una base de datos y un Redis reales: arranca el backend de
-    # verdad y navega la app de verdad con un navegador.
+    # verdad y navega la app de verdad con un navegador. Es lento (~10min+)
+    # aun con cache, asi que NO corre en cada push/PR a develop: solo en PR
+    # hacia main, manualmente (workflow_dispatch), o cuando deploy.yml
+    # reusa este workflow antes de desplegar (workflow_call).
+    if: >-
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
     services:
       postgres:
         image: postgres:17-alpine
@@ -152,6 +159,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/backend/package-lock.json
+            apps/frontend/package-lock.json
 
       - name: Instalar dependencias del backend
         working-directory: apps/backend
@@ -187,9 +198,22 @@ jobs:
         working-directory: apps/frontend
         run: npm ci
 
-      - name: Instalar navegador de Playwright
+      - name: Cache de navegadores de Playwright
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('apps/frontend/package-lock.json') }}
+
+      - name: Instalar navegador y dependencias de Playwright
         working-directory: apps/frontend
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Instalar solo dependencias del sistema de Playwright (navegador ya en cache)
+        working-directory: apps/frontend
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: Ejecutar suite de humo E2E
         working-directory: apps/frontend
