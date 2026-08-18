@@ -9,11 +9,16 @@ import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TasksController } from '../src/tasks/tasks.controller';
+import { TasksService } from '../src/tasks/tasks.service';
 import { TareaComentariosController } from '../src/tasks/tarea-comentarios.controller';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 
 function makeService() {
-  return { findAll: vi.fn(), findOne: vi.fn() } as any;
+  return { findAll: vi.fn(), findOne: vi.fn() };
+}
+
+function makeController(service: ReturnType<typeof makeService>) {
+  return new TasksController(service as unknown as TasksService);
 }
 
 describe('TasksController - rutas, guard y códigos HTTP', () => {
@@ -108,7 +113,7 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
   describe('delegación en TasksService', () => {
     it('findAll delega con projectId (Param) y userId (CurrentUser)', () => {
       const service = makeService();
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       controller.findAll(5, { userId: 9 });
 
@@ -117,7 +122,7 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
 
     it('findOne delega con projectId, taskId (Param) y userId (CurrentUser)', () => {
       const service = makeService();
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       controller.findOne(5, 42, { userId: 9 });
 
@@ -128,7 +133,7 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
       const service = makeService();
       const publicShape = [{ idTarea: 1, cantidadComentarios: 3 }];
       service.findAll.mockResolvedValue(publicShape);
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       const result = await controller.findAll(5, { userId: 9 });
 
@@ -140,7 +145,7 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
     it('listado autorizado responde 200 (resuelve sin lanzar)', async () => {
       const service = makeService();
       service.findAll.mockResolvedValue([]);
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       await expect(controller.findAll(5, { userId: 9 })).resolves.toEqual([]);
     });
@@ -148,36 +153,39 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
     it('listado con autorización rechazada propaga ForbiddenException (403)', async () => {
       const service = makeService();
       service.findAll.mockRejectedValue(new ForbiddenException('No tienes una participación activa en este proyecto'));
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       await expect(controller.findAll(5, { userId: 9 })).rejects.toMatchObject({
         constructor: ForbiddenException,
       });
       try {
         await controller.findAll(5, { userId: 9 });
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(403);
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(ForbiddenException);
+        if (!(error instanceof ForbiddenException)) throw error;
+        expect(error.getStatus()).toBe(403);
       }
     });
 
     it('listado de proyecto inexistente propaga NotFoundException (404)', async () => {
       const service = makeService();
       service.findAll.mockRejectedValue(new NotFoundException('Proyecto con id 5 no encontrado'));
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       try {
         await controller.findAll(5, { userId: 9 });
         throw new Error('no debía resolver');
-      } catch (e: any) {
-        expect(e).toBeInstanceOf(NotFoundException);
-        expect(e.getStatus()).toBe(404);
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(NotFoundException);
+        if (!(error instanceof NotFoundException)) throw error;
+        expect(error.getStatus()).toBe(404);
       }
     });
 
     it('detalle autorizado responde 200', async () => {
       const service = makeService();
       service.findOne.mockResolvedValue({ idTarea: 8 });
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       await expect(controller.findOne(5, 8, { userId: 9 })).resolves.toEqual({ idTarea: 8 });
     });
@@ -185,28 +193,30 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
     it('detalle con usuario externo propaga ForbiddenException (403)', async () => {
       const service = makeService();
       service.findOne.mockRejectedValue(new ForbiddenException('No tienes permiso'));
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       try {
         await controller.findOne(5, 8, { userId: 9 });
         throw new Error('no debía resolver');
-      } catch (e: any) {
-        expect(e).toBeInstanceOf(ForbiddenException);
-        expect(e.getStatus()).toBe(403);
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(ForbiddenException);
+        if (!(error instanceof ForbiddenException)) throw error;
+        expect(error.getStatus()).toBe(403);
       }
     });
 
     it('detalle de tarea inexistente propaga NotFoundException (404)', async () => {
       const service = makeService();
       service.findOne.mockRejectedValue(new NotFoundException('Tarea con id 999 no encontrada'));
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       try {
         await controller.findOne(5, 999, { userId: 9 });
         throw new Error('no debía resolver');
-      } catch (e: any) {
-        expect(e).toBeInstanceOf(NotFoundException);
-        expect(e.getStatus()).toBe(404);
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(NotFoundException);
+        if (!(error instanceof NotFoundException)) throw error;
+        expect(error.getStatus()).toBe(404);
       }
     });
 
@@ -215,14 +225,15 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
       service.findOne.mockRejectedValue(
         new NotFoundException('Tarea con id 50 no encontrada en el proyecto 1'),
       );
-      const controller = new TasksController(service);
+      const controller = makeController(service);
 
       try {
         await controller.findOne(1, 50, { userId: 9 });
         throw new Error('no debía resolver');
-      } catch (e: any) {
-        expect(e).toBeInstanceOf(NotFoundException);
-        expect(e.getStatus()).toBe(404);
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(NotFoundException);
+        if (!(error instanceof NotFoundException)) throw error;
+        expect(error.getStatus()).toBe(404);
       }
     });
   });
@@ -231,32 +242,34 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
     it('projectId no numérico produce BadRequestException (400)', async () => {
       const pipe = new ParseIntPipe();
       try {
-        await pipe.transform('abc', { type: 'param', data: 'projectId' } as any);
+        await pipe.transform('abc', { type: 'param', data: 'projectId' });
         throw new Error('no debía resolver');
-      } catch (e: any) {
-        expect(e).toBeInstanceOf(BadRequestException);
-        expect(e.getStatus()).toBe(400);
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(BadRequestException);
+        if (!(error instanceof BadRequestException)) throw error;
+        expect(error.getStatus()).toBe(400);
       }
     });
 
     it('taskId no numérico produce BadRequestException (400)', async () => {
       const pipe = new ParseIntPipe();
       try {
-        await pipe.transform('xyz', { type: 'param', data: 'taskId' } as any);
+        await pipe.transform('xyz', { type: 'param', data: 'taskId' });
         throw new Error('no debía resolver');
-      } catch (e: any) {
-        expect(e).toBeInstanceOf(BadRequestException);
-        expect(e.getStatus()).toBe(400);
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(BadRequestException);
+        if (!(error instanceof BadRequestException)) throw error;
+        expect(error.getStatus()).toBe(400);
       }
     });
 
     it('projectId y taskId numéricos como string se convierten a number', async () => {
       const pipe = new ParseIntPipe();
       await expect(
-        pipe.transform('5', { type: 'param', data: 'projectId' } as any),
+        pipe.transform('5', { type: 'param', data: 'projectId' }),
       ).resolves.toBe(5);
       await expect(
-        pipe.transform('42', { type: 'param', data: 'taskId' } as any),
+        pipe.transform('42', { type: 'param', data: 'taskId' }),
       ).resolves.toBe(42);
     });
   });
