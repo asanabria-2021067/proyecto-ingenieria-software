@@ -13,18 +13,27 @@ function makePrisma() {
   return {
     proyecto: { findFirst: vi.fn() },
     solicitudSalidaProyecto: { findMany: vi.fn() },
-  } as any;
+  };
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  const context = new ExitRequestsContextService(prisma);
+  const prismaService = prisma as unknown as ConstructorParameters<
+    typeof ExitRequestsContextService
+  >[0];
+  const context = new ExitRequestsContextService(prismaService);
   return new ExitRequestsService(
-    prisma,
-    { notifyFromTemplate: vi.fn() } as any,
+    prismaService,
+    { notifyFromTemplate: vi.fn() } as unknown as ConstructorParameters<
+      typeof ExitRequestsService
+    >[1],
     new ExitRequestsAuthorizationService(context),
     context,
   );
 }
+
+type PendingLeaderReviewsArgs = {
+  where: { idProyecto: number; estadoSolicitud: string };
+};
 
 function solicitud(
   idSolicitud: number,
@@ -144,7 +153,7 @@ describe('ExitRequestsService.getPendingLeaderReviews — aislamiento', () => {
     // Un `where` correcto (estadoSolicitud: 'PENDIENTE_LIDER') nunca
     // devolvería esta fila; se simula aquí solo para demostrar que, si el
     // filtro se relajara por error, el test lo detectaría.
-    prisma.solicitudSalidaProyecto.findMany.mockImplementation((args: any) => {
+    prisma.solicitudSalidaProyecto.findMany.mockImplementation((args: PendingLeaderReviewsArgs) => {
       const filas = [solicitud(1, PROYECTO_ID, 50, estado)];
       return Promise.resolve(filas.filter((f) => f.estadoSolicitud === args.where.estadoSolicitud));
     });
@@ -156,7 +165,7 @@ describe('ExitRequestsService.getPendingLeaderReviews — aislamiento', () => {
   it('excluye solicitudes PENDIENTE_LIDER de otro proyecto', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
-    prisma.solicitudSalidaProyecto.findMany.mockImplementation((args: any) => {
+    prisma.solicitudSalidaProyecto.findMany.mockImplementation((args: PendingLeaderReviewsArgs) => {
       const filas = [solicitud(1, OTRO_PROYECTO_ID, 50, 'PENDIENTE_LIDER')];
       return Promise.resolve(filas.filter((f) => f.idProyecto === args.where.idProyecto));
     });
