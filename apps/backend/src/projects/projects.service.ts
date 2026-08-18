@@ -525,7 +525,7 @@ export class ProjectsService {
   }
 
   async findFeatured() {
-    const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
+    const cached = await this.cacheManager.get<Record<string, unknown>[]>(FEATURED_CACHE_KEY).catch(() => null);
     if (cached) return cached;
 
     const proyectos = await this.prisma.proyecto.findMany({
