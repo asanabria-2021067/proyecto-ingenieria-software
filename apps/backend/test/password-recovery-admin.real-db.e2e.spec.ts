@@ -3,6 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as bcrypt from 'bcryptjs';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsGateway } from '../src/notifications/notifications.gateway';
 import { AuthService } from '../src/auth/auth.service';
 import { AdminService } from '../src/admin/admin.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
@@ -52,9 +54,12 @@ describe.skipIf(!process.env.RUN_REAL_DB_TESTS)('HU-14 contra Postgres real (loc
     studentId = student.idUsuario;
     await prisma.perfilEstudiante.create({ data: { idUsuario: studentId, carne: CARNE } });
 
-    const notificationsService = new NotificationsService(prisma as any, {} as any);
-    authService = new AuthService(prisma as any, jwtService, notificationsService);
-    adminService = new AdminService(prisma as any, jwtService);
+    const notificationsService = new NotificationsService(
+      prisma as unknown as PrismaService,
+      {} as unknown as NotificationsGateway,
+    );
+    authService = new AuthService(prisma as unknown as PrismaService, jwtService, notificationsService);
+    adminService = new AdminService(prisma as unknown as PrismaService, jwtService);
   });
 
   afterEach(async () => {
