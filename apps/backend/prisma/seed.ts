@@ -1467,6 +1467,39 @@ async function main() {
   });
 
   // Fernando: estudiante "de a pie", sin roles ni proyectos — solo existe.
+  // ─── Reset sequences ──────────────────────────────────
+  // Debe correr ANTES de cualquier create() sin id explícito (Fernando/Camila
+  // más abajo): los bloques anteriores fuerzan idPostulacion/idParticipacion
+  // literales (upsert con id explícito), lo que nunca avanza la secuencia de
+  // Postgres. El primer create() autoincremental pediría nextval() = 1 y
+  // colisionaría con la fila id=1 ya insertada explícitamente (P2002).
+  const sequences = [
+    { table: 'carrera', column: 'id_carrera' },
+    { table: 'habilidad', column: 'id_habilidad' },
+    { table: 'organizacion', column: 'id_organizacion' },
+    { table: 'proyecto', column: 'id_proyecto' },
+    { table: 'rol_proyecto', column: 'id_rol_proyecto' },
+    { table: 'revision_proyecto', column: 'id_revision_proyecto' },
+    { table: 'postulacion', column: 'id_postulacion' },
+    { table: 'participacion_proyecto', column: 'id_participacion' },
+    { table: 'hito', column: 'id_hito' },
+    { table: 'tarea', column: 'id_tarea' },
+    { table: 'asignacion_tarea', column: 'id_asignacion' },
+    { table: 'etiqueta', column: 'id_etiqueta' },
+    { table: 'evidencia', column: 'id_evidencia' },
+    { table: 'revision_evidencia', column: 'id_revision' },
+    { table: 'horas_participacion', column: 'id_registro_horas' },
+    { table: 'notificacion', column: 'id_notificacion' },
+    { table: 'bitacora_auditoria', column: 'id_auditoria' },
+    { table: 'experiencia_previa', column: 'id_experiencia' },
+    { table: 'usuario_telefono', column: 'id_usuario_telefono' },
+  ];
+  for (const { table, column } of sequences) {
+    await prisma.$executeRawUnsafe(
+      `SELECT setval(pg_get_serial_sequence('${table}', '${column}'), COALESCE((SELECT MAX(${column}) FROM ${table}), 0) + 1, false)`,
+    );
+  }
+
   const fernando = await prisma.usuario.upsert({
     where: { correo: 'fernando.castaneda@uvg.edu.gt' },
     update: {},
@@ -1533,34 +1566,6 @@ async function main() {
         estadoParticipacion: 'ACTIVO',
       },
     });
-  }
-
-  // ─── Reset sequences ──────────────────────────────────
-  const sequences = [
-    { table: 'carrera', column: 'id_carrera' },
-    { table: 'habilidad', column: 'id_habilidad' },
-    { table: 'organizacion', column: 'id_organizacion' },
-    { table: 'proyecto', column: 'id_proyecto' },
-    { table: 'rol_proyecto', column: 'id_rol_proyecto' },
-    { table: 'revision_proyecto', column: 'id_revision_proyecto' },
-    { table: 'postulacion', column: 'id_postulacion' },
-    { table: 'participacion_proyecto', column: 'id_participacion' },
-    { table: 'hito', column: 'id_hito' },
-    { table: 'tarea', column: 'id_tarea' },
-    { table: 'asignacion_tarea', column: 'id_asignacion' },
-    { table: 'etiqueta', column: 'id_etiqueta' },
-    { table: 'evidencia', column: 'id_evidencia' },
-    { table: 'revision_evidencia', column: 'id_revision' },
-    { table: 'horas_participacion', column: 'id_registro_horas' },
-    { table: 'notificacion', column: 'id_notificacion' },
-    { table: 'bitacora_auditoria', column: 'id_auditoria' },
-    { table: 'experiencia_previa', column: 'id_experiencia' },
-    { table: 'usuario_telefono', column: 'id_usuario_telefono' },
-  ];
-  for (const { table, column } of sequences) {
-    await prisma.$executeRawUnsafe(
-      `SELECT setval(pg_get_serial_sequence('${table}', '${column}'), COALESCE((SELECT MAX(${column}) FROM ${table}), 0) + 1, false)`,
-    );
   }
 
   console.log('Seed completed successfully');
