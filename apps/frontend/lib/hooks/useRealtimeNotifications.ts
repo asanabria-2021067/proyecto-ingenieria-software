@@ -72,9 +72,10 @@ export function useRealtimeNotifications(token: string | null) {
     newSocket.on('SPRINT_FINALIZATION_STARTED', handleSprintFinalizationStarted);
     newSocket.on('SPRINT_CLOSED', handleSprintClosed);
 
-    setSocket(newSocket);
+    const timeoutId = window.setTimeout(() => setSocket(newSocket), 0);
 
     return () => {
+      window.clearTimeout(timeoutId);
       newSocket.off('connect', handleConnect);
       newSocket.off('disconnect', handleDisconnect);
       newSocket.off('connected', handleConnected);
