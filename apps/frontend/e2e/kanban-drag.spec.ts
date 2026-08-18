@@ -16,16 +16,31 @@ function siguienteEstado(actual: Estado): Estado {
 }
 
 // No asumimos en qué columna empieza: si una corrida anterior quedó a
-// medias, esto sigue encontrando la tarea donde de verdad está.
+// medias, esto sigue encontrando la tarea donde de verdad está. Con poll:
+// justo tras el goto el tablero puede seguir en su ColumnasSkeleton (fetch
+// de tareas todavía en curso), así que una sola pasada síncrona puede no
+// encontrar nada aunque la tarea sí esté ahí una vez cargue.
 async function columnaActual(page: Page, handleName: string): Promise<Estado> {
-  for (const estado of ESTADOS) {
-    const count = await page
-      .locator(`[data-column-estado="${estado}"]`)
-      .getByRole('button', { name: handleName })
-      .count();
-    if (count > 0) return estado;
-  }
-  throw new Error(`No se encontró la tarea "${handleName}" en ninguna columna`);
+  let encontrada: Estado | null = null;
+  await expect
+    .poll(
+      async () => {
+        for (const estado of ESTADOS) {
+          const count = await page
+            .locator(`[data-column-estado="${estado}"]`)
+            .getByRole('button', { name: handleName })
+            .count();
+          if (count > 0) {
+            encontrada = estado;
+            return true;
+          }
+        }
+        return false;
+      },
+      { timeout: 15000 },
+    )
+    .toBe(true);
+  return encontrada as unknown as Estado;
 }
 
 // Drag real con mouse (no simulación de API): @dnd-kit activa su
