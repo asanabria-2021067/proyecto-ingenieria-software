@@ -22,7 +22,7 @@ const WRITE_HANDLERS = [
 ] as const;
 
 function guardsOf(handlerName: string): unknown[] {
-  const handler = (TasksController.prototype as any)[handlerName];
+  const handler = (TasksController.prototype as unknown as Record<string, object>)[handlerName];
   return Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
 }
 
