@@ -104,6 +104,12 @@ jobs:
         continue-on-error: true
 
       - name: Pruebas unitarias con cobertura (Vitest)
+        env:
+          # jsdom + coverage v8 sobre ~70 archivos de test acumula memoria
+          # por encima del heap por defecto de V8 (~4GB) y el proceso muere
+          # con OOM cerca del final de la corrida. Se sube el limite en vez
+          # de reducir cobertura o dividir la suite.
+          NODE_OPTIONS: --max-old-space-size=8192
         run: npm run test:coverage
 
   e2e:
