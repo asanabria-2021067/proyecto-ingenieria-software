@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { UpdateTaskDto } from '../src/tasks/dto/update-task.dto';
 import { TasksService } from '../src/tasks/tasks.service';
 
 function makeTx() {
@@ -10,21 +16,24 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
-  return {
+  const prisma = {
     tx,
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
-  } as any;
+    $transaction: vi.fn(),
+  };
+  prisma.$transaction.mockImplementation(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx));
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeAuthorization(overrides: Record<string, unknown> = {}) {
-  return {
+  const authorization = {
     assertCanEditTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: 5 }),
     ...overrides,
-  } as any;
+  };
+  return authorization as typeof authorization & TasksAuthorizationService;
 }
 
 function makeRelations(overrides: Record<string, unknown> = {}) {
-  return {
+  const relations = {
     validateRelatedResources: vi.fn().mockResolvedValue({
       hito: undefined,
       rolProyecto: undefined,
@@ -32,18 +41,21 @@ function makeRelations(overrides: Record<string, unknown> = {}) {
     }),
     assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined),
     ...overrides,
-  } as any;
+  };
+  return relations as typeof relations & TasksRelationsService;
 }
 
 function makeContext(overrides: Record<string, unknown> = {}) {
-  return {
+  const context = {
     getActiveAssignment: vi.fn().mockResolvedValue(null),
     ...overrides,
-  } as any;
+  };
+  return context as typeof context & TasksContextService;
 }
 
 function makeNotifications() {
-  return { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) } as any;
+  const notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
+  return notifications as typeof notifications & NotificationsService;
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {
@@ -71,11 +83,11 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
 }
 
 function makeService(opts: {
-  prisma?: any;
-  auth?: any;
-  relations?: any;
-  notifications?: any;
-  context?: any;
+  prisma?: ReturnType<typeof makePrisma>;
+  auth?: ReturnType<typeof makeAuthorization>;
+  relations?: ReturnType<typeof makeRelations>;
+  notifications?: ReturnType<typeof makeNotifications>;
+  context?: ReturnType<typeof makeContext>;
 } = {}) {
   const tx = makeTx();
   const prisma = opts.prisma ?? makePrisma(tx);
@@ -92,7 +104,7 @@ describe('TasksService.update', () => {
     it('{} lanza BadRequestException y no abre una transacción', async () => {
       const { prisma, service } = makeService();
 
-      await expect(service.update(5, 42, 1, {} as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, {})).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -102,7 +114,7 @@ describe('TasksService.update', () => {
       const { prisma, service } = makeService();
 
       await expect(
-        service.update(5, 42, 1, { algoDesconocido: 1 } as any),
+        service.update(5, 42, 1, { algoDesconocido: 1 } as unknown as UpdateTaskDto),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
@@ -113,7 +125,7 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ tituloTarea: 'Nuevo título' }));
 
-      await service.update(5, 42, 1, { tituloTarea: 'Nuevo título' } as any);
+      await service.update(5, 42, 1, { tituloTarea: 'Nuevo título' });
 
       expect(tx.tarea.update).toHaveBeenCalledWith({
         where: { idTarea: 42 },
@@ -125,7 +137,7 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ descripcionTarea: '' }));
 
-      await service.update(5, 42, 1, { descripcionTarea: '' } as any);
+      await service.update(5, 42, 1, { descripcionTarea: '' });
 
       expect(tx.tarea.update).toHaveBeenCalledWith({
         where: { idTarea: 42 },
@@ -137,7 +149,7 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ prioridad: 'ALTA' }));
 
-      await service.update(5, 42, 1, { prioridad: 'ALTA' } as any);
+      await service.update(5, 42, 1, { prioridad: 'ALTA' });
 
       expect(tx.tarea.update).toHaveBeenCalledWith({
         where: { idTarea: 42 },
@@ -149,7 +161,7 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ tiempoEstimadoHoras: 12 }));
 
-      await service.update(5, 42, 1, { tiempoEstimadoHoras: 12 } as any);
+      await service.update(5, 42, 1, { tiempoEstimadoHoras: 12 });
 
       expect(tx.tarea.update).toHaveBeenCalledWith({
         where: { idTarea: 42 },
@@ -165,7 +177,7 @@ describe('TasksService.update', () => {
         tituloTarea: 'T',
         prioridad: 'BAJA',
         tiempoEstimadoHoras: 3,
-      } as any);
+      });
 
       const data = tx.tarea.update.mock.calls[0][0].data;
       expect(Object.keys(data).sort()).toEqual(['prioridad', 'tiempoEstimadoHoras', 'tituloTarea'].sort());
@@ -179,7 +191,7 @@ describe('TasksService.update', () => {
         tareaRow({ fechaLimite: new Date('2027-04-15T00:00:00.000Z') }),
       );
 
-      const result = await service.update(5, 42, 1, { fechaLimite: '2027-04-15' } as any);
+      const result = await service.update(5, 42, 1, { fechaLimite: '2027-04-15' });
 
       const fechaEnviada: Date = tx.tarea.update.mock.calls[0][0].data.fechaLimite;
       expect(fechaEnviada.toISOString()).toBe('2027-04-15T00:00:00.000Z');
@@ -190,7 +202,7 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(tx.tarea.update.mock.calls[0][0].data).not.toHaveProperty('fechaLimite');
     });
@@ -201,7 +213,7 @@ describe('TasksService.update', () => {
       const { tx, relations, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(relations.validateRelatedResources.mock.calls[0][1]).not.toHaveProperty('idHito');
       expect(tx.tarea.update.mock.calls[0][0].data).not.toHaveProperty('idHito');
@@ -219,7 +231,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: null }));
 
-      await service.update(5, 42, 1, { idHito: null } as any);
+      await service.update(5, 42, 1, { idHito: null });
 
       expect(relations.validateRelatedResources).toHaveBeenCalledWith(5, { idHito: null }, tx);
       expect(tx.tarea.update.mock.calls[0][0].data.idHito).toBeNull();
@@ -238,7 +250,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 4 }));
 
-      await service.update(5, 42, 1, { idHito: 4 } as any);
+      await service.update(5, 42, 1, { idHito: 4 });
 
       expect(tx.tarea.update.mock.calls[0][0].data.idHito).toBe(4);
     });
@@ -252,7 +264,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { idHito: 4 } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { idHito: 4 })).rejects.toBeInstanceOf(
         NotFoundException,
       );
       expect(tx.tarea.update).not.toHaveBeenCalled();
@@ -264,7 +276,7 @@ describe('TasksService.update', () => {
       const { tx, relations, context, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(relations.validateRelatedResources.mock.calls[0][1]).not.toHaveProperty(
         'idRolProyecto',
@@ -285,7 +297,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idRolProyecto: null }));
 
-      await service.update(5, 42, 1, { idRolProyecto: null } as any);
+      await service.update(5, 42, 1, { idRolProyecto: null });
 
       expect(relations.validateRelatedResources).toHaveBeenCalledWith(
         5,
@@ -308,7 +320,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idRolProyecto: 6 }));
 
-      await service.update(5, 42, 1, { idRolProyecto: 6 } as any);
+      await service.update(5, 42, 1, { idRolProyecto: 6 });
 
       expect(tx.tarea.update.mock.calls[0][0].data.idRolProyecto).toBe(6);
     });
@@ -322,7 +334,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { idRolProyecto: 6 } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { idRolProyecto: 6 })).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(tx.tarea.update).not.toHaveBeenCalled();
@@ -334,7 +346,7 @@ describe('TasksService.update', () => {
       const { tx, relations, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(relations.validateRelatedResources.mock.calls[0][1]).not.toHaveProperty(
         'idsEtiquetas',
@@ -355,7 +367,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ etiquetas: [] }));
 
-      await service.update(5, 42, 1, { idsEtiquetas: [] } as any);
+      await service.update(5, 42, 1, { idsEtiquetas: [] });
 
       expect(relations.validateRelatedResources).toHaveBeenCalledWith(5, { idsEtiquetas: [] }, tx);
       expect(tx.tareaEtiqueta.deleteMany).toHaveBeenCalledWith({ where: { idTarea: 42 } });
@@ -378,7 +390,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { idsEtiquetas: [1, 2] } as any);
+      await service.update(5, 42, 1, { idsEtiquetas: [1, 2] });
 
       expect(tx.tareaEtiqueta.deleteMany).toHaveBeenCalledWith({ where: { idTarea: 42 } });
       expect(tx.tareaEtiqueta.createMany).toHaveBeenCalledWith({
@@ -406,7 +418,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { idsEtiquetas: [9] } as any);
+      await service.update(5, 42, 1, { idsEtiquetas: [9] });
 
       expect(tx.tareaEtiqueta.createMany).toHaveBeenCalledWith({
         data: [{ idTarea: 42, idEtiqueta: 9 }],
@@ -429,7 +441,7 @@ describe('TasksService.update', () => {
       tx.tareaEtiqueta.createMany.mockRejectedValue(new Error('fallo al crear etiquetas'));
 
       await expect(
-        service.update(5, 42, 1, { idsEtiquetas: [1] } as any),
+        service.update(5, 42, 1, { idsEtiquetas: [1] }),
       ).rejects.toThrow('fallo al crear etiquetas');
 
       expect(tx.tareaEtiqueta.deleteMany).toHaveBeenCalledTimes(1);
@@ -444,7 +456,7 @@ describe('TasksService.update', () => {
       const { context, service, tx } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(context.getActiveAssignment).not.toHaveBeenCalled();
     });
@@ -462,7 +474,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idRolProyecto: 6 }));
 
-      await service.update(5, 42, 1, { idRolProyecto: 6 } as any);
+      await service.update(5, 42, 1, { idRolProyecto: 6 });
 
       expect(context.getActiveAssignment).toHaveBeenCalledWith(42, tx);
       expect(relations.assertUserAssignableToProject).not.toHaveBeenCalled();
@@ -485,7 +497,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idRolProyecto: 6 }));
 
-      await service.update(5, 42, 1, { idRolProyecto: 6 } as any);
+      await service.update(5, 42, 1, { idRolProyecto: 6 });
 
       expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 3, 6, tx);
       expect(tx.tarea.update).toHaveBeenCalled();
@@ -509,7 +521,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { idRolProyecto: 6 } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { idRolProyecto: 6 })).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(tx.tarea.update).not.toHaveBeenCalled();
@@ -530,7 +542,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idRolProyecto: null }));
 
-      await service.update(5, 42, 1, { idRolProyecto: null } as any);
+      await service.update(5, 42, 1, { idRolProyecto: null });
 
       expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 3, null, tx);
       expect(tx.tarea.update).toHaveBeenCalled();
@@ -553,7 +565,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { idRolProyecto: null } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { idRolProyecto: null })).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(tx.tarea.update).not.toHaveBeenCalled();
@@ -574,9 +586,9 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idRolProyecto: 6 }));
 
-      await service.update(5, 42, 1, { idRolProyecto: 6 } as any);
+      await service.update(5, 42, 1, { idRolProyecto: 6 });
 
-      expect((tx as any).asignacionTarea).toBeUndefined();
+      expect((tx as unknown as Record<string, unknown>).asignacionTarea).toBeUndefined();
     });
 
     it('el rechazo por incompatibilidad tiene status 400 exacto, nunca 409/ConflictException', async () => {
@@ -599,13 +611,13 @@ describe('TasksService.update', () => {
       });
 
       try {
-        await service.update(5, 42, 1, { idRolProyecto: 7 } as any);
+        await service.update(5, 42, 1, { idRolProyecto: 7 });
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(BadRequestException);
         expect(e).not.toBeInstanceOf(ConflictException);
-        expect(e.getStatus()).toBe(400);
-        expect(e.getStatus()).not.toBe(409);
+        expect((e as BadRequestException).getStatus()).toBe(400);
+        expect((e as BadRequestException).getStatus()).not.toBe(409);
       }
     });
 
@@ -634,13 +646,13 @@ describe('TasksService.update', () => {
           tituloTarea: 'Título que no debe persistir',
           idRolProyecto: 7,
           idsEtiquetas: [2, 3],
-        } as any),
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(tx.tarea.update).not.toHaveBeenCalled();
       expect(tx.tareaEtiqueta.deleteMany).not.toHaveBeenCalled();
       expect(tx.tareaEtiqueta.createMany).not.toHaveBeenCalled();
-      expect((tx as any).asignacionTarea).toBeUndefined();
+      expect((tx as unknown as Record<string, unknown>).asignacionTarea).toBeUndefined();
     });
   });
 
@@ -649,13 +661,14 @@ describe('TasksService.update', () => {
       const orden: string[] = [];
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const auth = {
+      const authLiteral = {
         assertCanEditTask: vi.fn(async () => {
           orden.push('autorizacion');
           return { idTarea: 42, idProyecto: 5 };
         }),
-      } as any;
-      const relations = {
+      };
+      const auth = authLiteral as typeof authLiteral & TasksAuthorizationService;
+      const relationsLiteral = {
         validateRelatedResources: vi.fn(async () => {
           orden.push('relaciones');
           return {
@@ -667,13 +680,15 @@ describe('TasksService.update', () => {
         assertUserAssignableToProject: vi.fn(async () => {
           orden.push('compatibilidad_asignado');
         }),
-      } as any;
-      const context = {
+      };
+      const relations = relationsLiteral as typeof relationsLiteral & TasksRelationsService;
+      const contextLiteral = {
         getActiveAssignment: vi.fn(async () => {
           orden.push('asignacion_activa');
           return { idAsignacion: 1, idUsuario: 3, idTarea: 42 };
         }),
-      } as any;
+      };
+      const context = contextLiteral as typeof contextLiteral & TasksContextService;
       tx.tarea.update.mockImplementation(async () => {
         orden.push('tarea_update');
       });
@@ -689,7 +704,7 @@ describe('TasksService.update', () => {
       });
       const service = new TasksService(prisma, auth, relations, makeNotifications(), context);
 
-      await service.update(5, 42, 1, { idRolProyecto: 6, idsEtiquetas: [1] } as any);
+      await service.update(5, 42, 1, { idRolProyecto: 6, idsEtiquetas: [1] });
 
       expect(orden).toEqual([
         'autorizacion',
@@ -718,7 +733,7 @@ describe('TasksService.update', () => {
       });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idRolProyecto: 6 }));
 
-      await service.update(5, 42, 1, { idRolProyecto: 6 } as any);
+      await service.update(5, 42, 1, { idRolProyecto: 6 });
 
       expect(auth.assertCanEditTask).toHaveBeenCalledWith(5, 42, 1, tx);
       expect(relations.validateRelatedResources).toHaveBeenCalledWith(5, { idRolProyecto: 6 }, tx);
@@ -736,7 +751,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { tituloTarea: 'T' } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { tituloTarea: 'T' })).rejects.toBeInstanceOf(
         NotFoundException,
       );
       expect(relations.validateRelatedResources).not.toHaveBeenCalled();
@@ -749,7 +764,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { tituloTarea: 'T' } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { tituloTarea: 'T' })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
       expect(tx.tarea.update).not.toHaveBeenCalled();
@@ -764,7 +779,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { tituloTarea: 'T' } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { tituloTarea: 'T' })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
       expect(relations.validateRelatedResources).not.toHaveBeenCalled();
@@ -779,7 +794,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { idHito: 4 } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { idHito: 4 })).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(tx.tarea.update).not.toHaveBeenCalled();
@@ -801,7 +816,7 @@ describe('TasksService.update', () => {
         }),
       });
 
-      await expect(service.update(5, 42, 1, { idRolProyecto: 6 } as any)).rejects.toBeInstanceOf(
+      await expect(service.update(5, 42, 1, { idRolProyecto: 6 })).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(tx.tarea.update).not.toHaveBeenCalled();
@@ -821,7 +836,7 @@ describe('TasksService.update', () => {
       tx.tarea.update.mockRejectedValue(new Error('fallo de escritura'));
 
       await expect(
-        service.update(5, 42, 1, { tituloTarea: 'T', idsEtiquetas: [1] } as any),
+        service.update(5, 42, 1, { tituloTarea: 'T', idsEtiquetas: [1] }),
       ).rejects.toThrow('fallo de escritura');
       expect(tx.tareaEtiqueta.deleteMany).not.toHaveBeenCalled();
       expect(tx.tarea.findFirst).not.toHaveBeenCalled();
@@ -840,7 +855,7 @@ describe('TasksService.update', () => {
       tx.tareaEtiqueta.deleteMany.mockRejectedValue(new Error('fallo al eliminar etiquetas'));
 
       await expect(
-        service.update(5, 42, 1, { idsEtiquetas: [1] } as any),
+        service.update(5, 42, 1, { idsEtiquetas: [1] }),
       ).rejects.toThrow('fallo al eliminar etiquetas');
       expect(tx.tareaEtiqueta.createMany).not.toHaveBeenCalled();
       expect(tx.tarea.findFirst).not.toHaveBeenCalled();
@@ -850,14 +865,14 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(null);
 
-      await expect(service.update(5, 42, 1, { tituloTarea: 'T' } as any)).rejects.toThrow();
+      await expect(service.update(5, 42, 1, { tituloTarea: 'T' })).rejects.toThrow();
     });
 
     it('ninguna escritura del update usa PrismaService fuera de tx', async () => {
       const { prisma, service } = makeService();
-      (prisma as any).tx.tarea.update.mockRejectedValue(new Error('fallo'));
+      prisma.tx.tarea.update.mockRejectedValue(new Error('fallo'));
 
-      await expect(service.update(5, 42, 1, { tituloTarea: 'T' } as any)).rejects.toThrow('fallo');
+      await expect(service.update(5, 42, 1, { tituloTarea: 'T' })).rejects.toThrow('fallo');
 
       expect(prisma.tarea).toBeUndefined();
       expect(prisma.tareaEtiqueta).toBeUndefined();
@@ -870,7 +885,7 @@ describe('TasksService.update', () => {
       const { tx, notifications, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
     });
@@ -881,7 +896,7 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      const result = await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      const result = await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(Object.keys(result).sort()).toEqual(
         [
@@ -911,7 +926,7 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      const result = await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      const result = await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(result).not.toHaveProperty('eliminadoEn');
       expect(result).not.toHaveProperty('_count');
@@ -921,7 +936,7 @@ describe('TasksService.update', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.update(5, 42, 1, { tituloTarea: 'T' } as any);
+      await service.update(5, 42, 1, { tituloTarea: 'T' });
 
       expect(tx.tarea.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
