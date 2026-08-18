@@ -12,6 +12,15 @@ export default defineConfig({
     include: ['test/**/*.spec.ts', 'test/**/*.spec.tsx'],
     globals: true,
     clearMocks: true,
+    // jsdom + coverage v8 por worker consume bastante memoria; sin este tope
+    // el pool por defecto (threads, uno por core) llegó a agotar la heap en
+    // el runner de CI (JS heap out of memory) con ~70 archivos de test.
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        maxForks: 2,
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov', 'json-summary'],
