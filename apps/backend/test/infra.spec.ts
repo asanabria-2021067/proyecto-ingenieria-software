@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { JwtStrategy } from '../src/auth/jwt.strategy';
 import { DraftInactivityService } from '../src/projects/draft-inactivity.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 
 describe('Infra', () => {
   it('JwtStrategy validate mapea payload', () => {
@@ -39,9 +40,12 @@ describe('Infra', () => {
       },
     };
     const notifications = { notifyFromTemplate: vi.fn() };
-    const service = new DraftInactivityService(prisma as any, notifications as any);
+    const service = new DraftInactivityService(
+      prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
+    );
 
-    await (service as any).runDailyCheck();
+    await (service as unknown as { runDailyCheck: () => Promise<void> }).runDailyCheck();
 
     expect(prisma.proyecto.update).toHaveBeenCalled();
     expect(notifications.notifyFromTemplate).toHaveBeenCalled();
