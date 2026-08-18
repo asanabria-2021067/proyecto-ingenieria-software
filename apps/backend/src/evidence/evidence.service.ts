@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EvidenceService {
   constructor(private prisma: PrismaService) {}
 
-  create(_data: any) {
+  create(_data: unknown) {
     return { message: 'Not implemented yet' };
   }
 
