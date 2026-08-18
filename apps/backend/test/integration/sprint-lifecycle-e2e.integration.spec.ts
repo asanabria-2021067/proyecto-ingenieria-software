@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import type { PrismaClient } from '@prisma/client';
+import { Prioridad, type PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import {
   createIntegrationParticipation,
@@ -227,15 +227,15 @@ describeIntegration(
       const taskDto = {
         tituloTarea: 'X3 tarea del Hito',
         fechaLimite: '2099-01-01',
-        prioridad: 'MEDIA',
+        prioridad: Prioridad.MEDIA,
         idHito: hito.idHito,
         idRolProyecto: role.idRolProyecto,
-      } as any;
+      };
 
       const tareaCreada = await runThroughRealGuard(tasksController, 'create', project.idProyecto, () =>
         tasksController.create(project.idProyecto, { userId: leader.idUsuario }, taskDto),
       );
-      const taskId = (tareaCreada as any).idTarea;
+      const taskId = tareaCreada.idTarea;
       scope.taskIds = [taskId];
 
       await runThroughRealGuard(tasksController, 'assign', project.idProyecto, () =>
@@ -243,7 +243,7 @@ describeIntegration(
           project.idProyecto,
           taskId,
           { userId: leader.idUsuario },
-          { idUsuario: collaborator.idUsuario } as any,
+          { idUsuario: collaborator.idUsuario },
         ),
       );
 
@@ -265,7 +265,7 @@ describeIntegration(
             horasReales: HORAS_REALES,
             contenidoAvance: longProgressContent('X3 cierre de tramo en ACTIVO'),
             marcarComoHecha: true,
-          } as any,
+          },
         ),
       );
 
@@ -292,10 +292,10 @@ describeIntegration(
           taskId,
           asignacion.idAsignacion,
           { userId: collaborator.idUsuario },
-          { contenido: longProgressContent('X3 avance adicional en ACTIVO') } as any,
+          { contenido: longProgressContent('X3 avance adicional en ACTIVO') },
         ),
       );
-      scope.progressRecordIds = [(avanceEnActivo as any).idRegistroAvance];
+      scope.progressRecordIds = [avanceEnActivo.idRegistroAvance];
 
       // Solicitud de salida creada MIENTRAS el Sprint está ACTIVO — el
       // colaborador ya no tiene tramos activos, así que quedará en
@@ -304,12 +304,12 @@ describeIntegration(
       const solicitud = await runThroughRealGuard(exitController, 'createExitRequest', project.idProyecto, () =>
         exitController.createExitRequest(
           project.idProyecto,
-          { motivo: 'X3: checkpoint de bloqueo de exit-requests durante EN_FINALIZACION' } as any,
+          { motivo: 'X3: checkpoint de bloqueo de exit-requests durante EN_FINALIZACION' },
           { userId: collaborator.idUsuario },
         ),
       );
-      scope.exitRequestIds = [(solicitud as any).idSolicitud];
-      expect((solicitud as any).estadoSolicitud).toBe('PREPARACION');
+      scope.exitRequestIds = [solicitud.idSolicitud];
+      expect(solicitud.estadoSolicitud).toBe('PREPARACION');
 
       // --- D. A4: ACTIVO -> EN_FINALIZACION (todas las tareas del Sprint HECHO) ---
       const enFinalizacion = await sprintsService.finalizeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
@@ -326,7 +326,7 @@ describeIntegration(
             project.idProyecto,
             taskId,
             { userId: leader.idUsuario },
-            { tituloTarea: 'Editado durante EN_FINALIZACION' } as any,
+            { tituloTarea: 'Editado durante EN_FINALIZACION' },
           ),
         );
       } catch (error) {
@@ -349,7 +349,7 @@ describeIntegration(
             taskId,
             asignacion.idAsignacion,
             { userId: collaborator.idUsuario },
-            { contenido: longProgressContent('X3 avance rechazado en EN_FINALIZACION') } as any,
+            { contenido: longProgressContent('X3 avance rechazado en EN_FINALIZACION') },
           ),
         );
       } catch (error) {
@@ -383,7 +383,7 @@ describeIntegration(
       expect(exitRejection).toBeInstanceOf(ConflictException);
       expect((exitRejection as ConflictException).message).toBe(FINALIZING_SPRINT_MESSAGE);
       const solicitudSinCambios = await prisma.solicitudSalidaProyecto.findUniqueOrThrow({
-        where: { idSolicitud: (solicitud as any).idSolicitud },
+        where: { idSolicitud: solicitud.idSolicitud },
         select: { estadoSolicitud: true },
       });
       expect(solicitudSinCambios.estadoSolicitud).toBe('PREPARACION');
@@ -412,7 +412,7 @@ describeIntegration(
         sprint.idSprint,
         participation.idParticipacion,
         leader.idUsuario,
-        { horasAprobadas: HORAS_REALES } as any,
+        { horasAprobadas: HORAS_REALES },
       );
       expect(Number(ajustada.horasAprobadas)).toBe(HORAS_REALES);
 
