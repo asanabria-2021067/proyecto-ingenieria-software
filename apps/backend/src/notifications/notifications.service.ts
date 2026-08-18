@@ -101,8 +101,13 @@ export class NotificationsService {
     tx?: TxClient,
   ) {
     const template = NOTIFICATION_TEMPLATES[templateKey];
-    const title = typeof template.title === 'function' ? template.title(data as any) : template.title;
-    const message = template.message(data as any);
+    // K liga templateKey con NotificationTemplateData[K] en la firma publica,
+    // pero NOTIFICATION_TEMPLATES no es un objeto indexado genericamente, asi
+    // que TS no puede correlacionar la rama de `template` con `data` aqui
+    // dentro. `never` es asignable a cualquier parametro sin usar `any`.
+    const title =
+      typeof template.title === 'function' ? template.title(data as unknown as never) : template.title;
+    const message = template.message(data as unknown as never);
     const datosJson = JSON.parse(JSON.stringify(data)) as Prisma.InputJsonValue;
 
     await this.notifyUsers(
