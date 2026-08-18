@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GUARDS_METADATA, HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import type { SprintsService } from '../src/sprints/sprints.service';
 import { SprintsController } from '../src/sprints/sprints.controller';
 import { ProjectWriteGuard } from '../src/common/guards/project-write.guard';
 
@@ -12,7 +13,11 @@ function makeService() {
     closeSprint: vi.fn(),
     listSprints: vi.fn(),
     getSprintDetail: vi.fn(),
-  } as any;
+  };
+}
+
+function makeController(service: ReturnType<typeof makeService>) {
+  return new SprintsController(service as unknown as SprintsService);
 }
 
 describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
@@ -27,7 +32,7 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
 
   it('delega en SprintsService.startSprint con projectId y userId (CurrentUser)', () => {
     const service = makeService();
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     controller.start(5, { userId: 9 });
 
@@ -39,7 +44,7 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     const service = makeService();
     const sprintCreado = { idSprint: 1, idProyecto: 5, numero: 1, estado: 'ACTIVO' };
     service.startSprint.mockResolvedValue(sprintCreado);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     const result = await controller.start(5, { userId: 9 });
 
@@ -50,7 +55,7 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     const service = makeService();
     const error = new Error('no autorizado');
     service.startSprint.mockRejectedValue(error);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     await expect(controller.start(5, { userId: 9 })).rejects.toBe(error);
   });
@@ -77,7 +82,7 @@ describe('SprintsController.finalize (POST /proyectos/:projectId/sprints/:sprint
 
   it('delega en SprintsService.finalizeSprint con projectId, sprintId y userId (CurrentUser)', () => {
     const service = makeService();
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     controller.finalize(5, 12, { userId: 9 });
 
@@ -89,7 +94,7 @@ describe('SprintsController.finalize (POST /proyectos/:projectId/sprints/:sprint
     const service = makeService();
     const sprintFinalizado = { idSprint: 12, idProyecto: 5, estado: 'EN_FINALIZACION' };
     service.finalizeSprint.mockResolvedValue(sprintFinalizado);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     const result = await controller.finalize(5, 12, { userId: 9 });
 
@@ -100,7 +105,7 @@ describe('SprintsController.finalize (POST /proyectos/:projectId/sprints/:sprint
     const service = makeService();
     const error = new Error('conflicto');
     service.finalizeSprint.mockRejectedValue(error);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     await expect(controller.finalize(5, 12, { userId: 9 })).rejects.toBe(error);
   });
@@ -120,7 +125,7 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
 
   it('delega en SprintsService.closeSprint con projectId, sprintId y userId (CurrentUser)', () => {
     const service = makeService();
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     controller.close(5, 12, { userId: 9 });
 
@@ -132,7 +137,7 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     const service = makeService();
     const sprintCerrado = { idSprint: 12, idProyecto: 5, estado: 'CERRADO' };
     service.closeSprint.mockResolvedValue(sprintCerrado);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     const result = await controller.close(5, 12, { userId: 9 });
 
@@ -143,7 +148,7 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     const service = makeService();
     const error = new Error('conflicto');
     service.closeSprint.mockRejectedValue(error);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     await expect(controller.close(5, 12, { userId: 9 })).rejects.toBe(error);
   });
@@ -165,7 +170,7 @@ describe('SprintsController.adjustHours (PATCH /proyectos/:projectId/sprints/:sp
 
   it('delega en SprintsService.adjustRecognizedHours con projectId, sprintId, participacionId, userId y el body', () => {
     const service = makeService();
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
     const dto = { horasAprobadas: 8, justificacionAjuste: 'ajuste válido' };
 
     controller.adjustHours(5, 12, 30, dto, { userId: 9 });
@@ -178,7 +183,7 @@ describe('SprintsController.adjustHours (PATCH /proyectos/:projectId/sprints/:sp
     const service = makeService();
     const registroActualizado = { idRegistroHoras: 100, horasAprobadas: 8 };
     service.adjustRecognizedHours.mockResolvedValue(registroActualizado);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     const result = await controller.adjustHours(5, 12, 30, { horasAprobadas: 8 }, { userId: 9 });
 
@@ -189,7 +194,7 @@ describe('SprintsController.adjustHours (PATCH /proyectos/:projectId/sprints/:sp
     const service = makeService();
     const error = new Error('justificación requerida');
     service.adjustRecognizedHours.mockRejectedValue(error);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     await expect(
       controller.adjustHours(5, 12, 30, { horasAprobadas: 8 }, { userId: 9 }),
@@ -215,7 +220,7 @@ describe('SprintsController.getClosingSummary (GET /proyectos/:projectId/sprints
 
   it('delega en SprintsService.getSprintClosingSummary con projectId, sprintId y userId (CurrentUser)', () => {
     const service = makeService();
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     controller.getClosingSummary(5, 12, { userId: 9 });
 
@@ -227,7 +232,7 @@ describe('SprintsController.getClosingSummary (GET /proyectos/:projectId/sprints
     const service = makeService();
     const summary = { idProyecto: 5, idSprint: 12, participantes: [] };
     service.getSprintClosingSummary.mockResolvedValue(summary);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     const result = await controller.getClosingSummary(5, 12, { userId: 9 });
 
@@ -238,7 +243,7 @@ describe('SprintsController.getClosingSummary (GET /proyectos/:projectId/sprints
     const service = makeService();
     const error = new Error('no autorizado');
     service.getSprintClosingSummary.mockRejectedValue(error);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     await expect(controller.getClosingSummary(5, 12, { userId: 9 })).rejects.toBe(error);
   });
@@ -256,7 +261,7 @@ describe('SprintsController.list (GET /proyectos/:projectId/sprints)', () => {
 
   it('delega en SprintsService.listSprints con projectId y userId (CurrentUser)', () => {
     const service = makeService();
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     controller.list(5, { userId: 9 });
 
@@ -268,7 +273,7 @@ describe('SprintsController.list (GET /proyectos/:projectId/sprints)', () => {
     const service = makeService();
     const lista = [{ idSprint: 1, idProyecto: 5, numero: 1, estado: 'CERRADO' }];
     service.listSprints.mockResolvedValue(lista);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     const result = await controller.list(5, { userId: 9 });
 
@@ -279,7 +284,7 @@ describe('SprintsController.list (GET /proyectos/:projectId/sprints)', () => {
     const service = makeService();
     const error = new Error('no autorizado');
     service.listSprints.mockRejectedValue(error);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     await expect(controller.list(5, { userId: 9 })).rejects.toBe(error);
   });
@@ -297,7 +302,7 @@ describe('SprintsController.detail (GET /proyectos/:projectId/sprints/:sprintId)
 
   it('delega en SprintsService.getSprintDetail con projectId, sprintId y userId (CurrentUser)', () => {
     const service = makeService();
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     controller.detail(5, 12, { userId: 9 });
 
@@ -309,7 +314,7 @@ describe('SprintsController.detail (GET /proyectos/:projectId/sprints/:sprintId)
     const service = makeService();
     const detalle = { idSprint: 12, idProyecto: 5, tareas: [], hitos: [] };
     service.getSprintDetail.mockResolvedValue(detalle);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     const result = await controller.detail(5, 12, { userId: 9 });
 
@@ -320,7 +325,7 @@ describe('SprintsController.detail (GET /proyectos/:projectId/sprints/:sprintId)
     const service = makeService();
     const error = new Error('no encontrado');
     service.getSprintDetail.mockRejectedValue(error);
-    const controller = new SprintsController(service);
+    const controller = makeController(service);
 
     await expect(controller.detail(5, 12, { userId: 9 })).rejects.toBe(error);
   });
