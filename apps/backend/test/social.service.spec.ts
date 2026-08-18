@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { EstadoAmistad } from '@prisma/client';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { SocialService } from '../src/social/social.service';
 
 function makePrisma() {
@@ -27,7 +29,10 @@ function makePrisma() {
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
   const notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
-  const service = new SocialService(prisma as any, notifications as any);
+  const service = new SocialService(
+    prisma as unknown as PrismaService,
+    notifications as unknown as NotificationsService,
+  );
   return { service, notifications };
 }
 
