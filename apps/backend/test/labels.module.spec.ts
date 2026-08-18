@@ -66,7 +66,9 @@ describe('LabelsModule (Tarea 32: estructura, wiring, persistencia y asociación
 
   it('LabelsModule no importa NotificationsModule/TasksModule/ComentariosModule', () => {
     const imports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, LabelsModule) as unknown[]) ?? [];
-    const nombres = imports.map((m: any) => m?.name);
+    const nombres = imports.map((module) =>
+      typeof module === 'function' ? module.name : undefined,
+    );
     expect(nombres).not.toContain('NotificationsModule');
     expect(nombres).not.toContain('TasksModule');
     expect(nombres).not.toContain('ComentariosModule');
