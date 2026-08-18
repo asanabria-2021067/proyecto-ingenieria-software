@@ -18,6 +18,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 
+const RESET_TOKEN_TTL = '1h';
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -663,8 +665,16 @@ export class AdminService {
         tipo: 'reset',
         idSolicitud: solicitud.idSolicitud,
       },
-      { expiresIn: '1h' },
+      { expiresIn: RESET_TOKEN_TTL },
     );
+    // Vigencia real del token para mostrarla al admin (Sección: HU-14 fix
+    // extremo a extremo). No se recalcula con una segunda constante de TTL
+    // (Date.now() + TTL_MS): esa fuente independiente podía divergir del
+    // vencimiento real firmado en el JWT si alguna vez cambiaban por
+    // separado. El propio claim `exp` del token recién emitido es la única
+    // fuente de verdad de su expiración efectiva.
+    const { exp } = this.jwtService.decode(resetToken) as { exp: number };
+    const expiraEn = new Date(exp * 1000).toISOString();
 
     const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '') || 'https://uvgenius.com';
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
@@ -678,6 +688,6 @@ export class AdminService {
       },
     });
 
-    return { resetUrl, resetToken, expiraEn: '1h' };
+    return { resetUrl, resetToken, expiraEn };
   }
 }

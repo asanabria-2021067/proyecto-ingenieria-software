@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ComentariosService } from '../src/comentarios/comentarios.service';
 import { ComentariosController } from '../src/comentarios/comentarios.controller';
 
 function makeService() {
@@ -8,14 +9,18 @@ function makeService() {
     findByHito: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
-  } as any;
+  };
+}
+
+function makeController(service: ReturnType<typeof makeService>) {
+  return new ComentariosController(service as unknown as ComentariosService);
 }
 
 describe('ComentariosController - lectura', () => {
   it('findByProyecto recibe el idProyecto de la ruta, propaga exactamente user.userId y devuelve el resultado del servicio', async () => {
     const service = makeService();
     service.findByProyecto.mockResolvedValue([{ idComentario: 1 }]);
-    const controller = new ComentariosController(service);
+    const controller = makeController(service);
 
     const result = await controller.findByProyecto(10, { userId: 7 });
 
@@ -27,7 +32,7 @@ describe('ComentariosController - lectura', () => {
   it('findByHito recibe el idHito de la ruta, propaga exactamente user.userId y devuelve el resultado del servicio', async () => {
     const service = makeService();
     service.findByHito.mockResolvedValue([{ idComentario: 3 }]);
-    const controller = new ComentariosController(service);
+    const controller = makeController(service);
 
     const result = await controller.findByHito(30, { userId: 9 });
 
@@ -38,7 +43,7 @@ describe('ComentariosController - lectura', () => {
 
   it('propaga el userId de cada solicitud sin reutilizar el de una llamada anterior', async () => {
     const service = makeService();
-    const controller = new ComentariosController(service);
+    const controller = makeController(service);
 
     await controller.findByProyecto(10, { userId: 1 });
     await controller.findByProyecto(10, { userId: 2 });
@@ -51,13 +56,13 @@ describe('ComentariosController - lectura', () => {
     const service = makeService();
     const forbidden = new Error('sin acceso');
     service.findByHito.mockRejectedValue(forbidden);
-    const controller = new ComentariosController(service);
+    const controller = makeController(service);
 
     await expect(controller.findByHito(30, { userId: 8 })).rejects.toBe(forbidden);
   });
 
   it('Tarea 28.C: ya no existe un handler findByTarea en el controller genérico', () => {
-    const controller = new ComentariosController(makeService());
-    expect((controller as any).findByTarea).toBeUndefined();
+    const controller = makeController(makeService());
+    expect((controller as unknown as Record<string, unknown>).findByTarea).toBeUndefined();
   });
 });
