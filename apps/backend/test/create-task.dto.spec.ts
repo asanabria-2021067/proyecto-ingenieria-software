@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { ArgumentMetadata, BadRequestException, ValidationPipe } from '@nestjs/common';
 import { CreateTaskDto } from '../src/tasks/dto/create-task.dto';
 
 // Misma configuración que apps/backend/src/main.ts, para ejercer el
@@ -12,7 +12,8 @@ const pipe = new ValidationPipe({
 });
 
 async function parse(plain: unknown): Promise<CreateTaskDto> {
-  return pipe.transform(plain, { type: 'body', metatype: CreateTaskDto } as any);
+  const metadata: ArgumentMetadata = { type: 'body', metatype: CreateTaskDto };
+  return pipe.transform(plain, metadata);
 }
 
 function todayInGuatemala(): string {
@@ -142,10 +143,10 @@ describe('CreateTaskDto', () => {
     },
   );
 
-  it.each(['idHito', 'idRolProyecto', 'idUsuarioAsignado'])(
+  it.each(['idHito', 'idRolProyecto', 'idUsuarioAsignado'] as const)(
     'acepta %s como entero positivo',
     async (field) => {
-      const dto: any = await parse(basePayload({ [field]: 3 }));
+      const dto = await parse(basePayload({ [field]: 3 }));
       expect(dto[field]).toBe(3);
     },
   );
