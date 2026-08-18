@@ -14,6 +14,7 @@ import { SprintsService } from '../../src/sprints/sprints.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
 
 /**
  * Integración real A9: SprintsService.closeSprint (EN_FINALIZACION ->
@@ -87,13 +88,13 @@ describeIntegration(
     let horasIds: number[];
 
     function makeService(prismaParaTransaccion: PrismaClient = prisma) {
-      const context = new SprintsContextService(prisma as any);
+      const context = new SprintsContextService(prisma as unknown as PrismaService);
       const authorization = new SprintsAuthorizationService(context);
       return new SprintsService(
-        prismaParaTransaccion as any,
+        prismaParaTransaccion as unknown as PrismaService,
         context,
         authorization,
-        makeNotificationsSpy() as any,
+        makeNotificationsSpy() as unknown as NotificationsService,
       );
     }
 
@@ -266,9 +267,14 @@ describeIntegration(
           return notifySprintClosed();
         },
       };
-      const context = new SprintsContextService(prisma as any);
+      const context = new SprintsContextService(prisma as unknown as PrismaService);
       const authorization = new SprintsAuthorizationService(context);
-      const service = new SprintsService(prisma as any, context, authorization, notifications as any);
+      const service = new SprintsService(
+        prisma as unknown as PrismaService,
+        context,
+        authorization,
+        notifications as unknown as NotificationsService,
+      );
 
       await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
 
@@ -298,13 +304,13 @@ describeIntegration(
       };
       const injectedError = new Error('A9.1 rollback test: fallo inyectado DESPUÉS de la escritura real');
       const rollbackPrisma = wrapWithRollbackAfterRealWrite(prisma, injectedError);
-      const context = new SprintsContextService(prisma as any);
+      const context = new SprintsContextService(prisma as unknown as PrismaService);
       const authorization = new SprintsAuthorizationService(context);
       const service = new SprintsService(
-        rollbackPrisma as unknown as PrismaClient as any,
+        rollbackPrisma,
         context,
         authorization,
-        notifications as any,
+        notifications as unknown as NotificationsService,
       );
 
       await expect(
