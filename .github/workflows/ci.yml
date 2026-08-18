@@ -112,18 +112,15 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
-      # Cobertura completa (mas lenta, jsdom+v8 consume bastante memoria)
-      # solo en PR; en push/deploy corren las pruebas sin cobertura para que
-      # el pipeline de deploy sea rapido y no dependa de un heap grande.
+      # La suite de vitest+jsdom (~70 archivos) es pesada en memoria (ver
+      # vitest.config.ts) y no debe bloquear la velocidad del pipeline de
+      # deploy. Corre completa solo en PR (el gate real antes de mergear);
+      # en push/deploy el pipeline queda rapido con lint + el build de
+      # Next.js (ya corre en build-frontend de deploy.yml) como red de
+      # seguridad.
       - name: Pruebas unitarias con cobertura (Vitest)
         if: github.event_name == 'pull_request'
-        env:
-          NODE_OPTIONS: --max-old-space-size=8192
         run: npm run test:coverage
-
-      - name: Pruebas unitarias (Vitest, sin cobertura)
-        if: github.event_name != 'pull_request'
-        run: npm run test
 
   e2e:
     name: E2E - suite de humo (Playwright)
