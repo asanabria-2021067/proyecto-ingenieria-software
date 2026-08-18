@@ -6,7 +6,7 @@ export class ValidationController {
   constructor(private validationService: ValidationService) {}
 
   @Post()
-  create(@Body() data: any) {
+  create(@Body() data: unknown) {
     return this.validationService.create(data);
   }
 
