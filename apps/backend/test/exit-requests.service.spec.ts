@@ -1,6 +1,8 @@
 import { ForbiddenException, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
 import { ExitRequestsAuthorizationService } from '../src/exit-requests/exit-requests.authorization.service';
 import { ExitRequestsContextService } from '../src/exit-requests/exit-requests.context.service';
 import { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
@@ -57,7 +59,7 @@ function makePrisma() {
     deleteMany: vi.fn(),
     upsert: vi.fn(),
   });
-  const prisma: any = {
+  const prisma = {
     proyecto: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn(), findMany: vi.fn(), ...writeSpies() },
     asignacionTarea: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), ...writeSpies() },
@@ -66,11 +68,12 @@ function makePrisma() {
     tarea: { ...writeSpies() },
     registroAvanceAsignacion: { ...writeSpies() },
     solicitudSalidaProyecto: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    $transaction: vi.fn(),
   };
   // approveSolicitudSalida corre en $transaction; reusar el mismo objeto
   // prisma como tx deja las aserciones sobre solicitudSalidaProyecto.updateMany /
   // participacionProyecto.updateMany apuntando a los mismos spies de arriba.
-  prisma.$transaction = vi.fn(async (cb: (tx: any) => unknown) => cb(prisma));
+  prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb(prisma));
   return prisma;
 }
 
@@ -83,7 +86,7 @@ function makeService(
     recognizeParticipationHours: ReturnType<typeof vi.fn>;
   }> = {},
 ) {
-  const context = new ExitRequestsContextService(prisma);
+  const context = new ExitRequestsContextService(prisma as unknown as PrismaService);
   const hoursRecognition = {
     recognizeParticipationHours: vi.fn().mockResolvedValue({
       horasReconocidas: 0,
@@ -93,17 +96,17 @@ function makeService(
     ...hoursRecognitionOverride,
   } as unknown as HoursRecognitionService;
   return new ExitRequestsService(
-    prisma,
+    prisma as unknown as PrismaService,
     {
       isAdmin: vi.fn(),
       notifyAdminsFromTemplate: vi.fn(),
       notifyFromTemplate: vi.fn(),
       ...notificationsOverride,
-    } as any,
+    } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
     hoursRecognition,
-    new SprintsContextService(prisma),
+    new SprintsContextService(prisma as unknown as PrismaService),
   );
 }
 
@@ -347,15 +350,15 @@ describe('ExitRequestsService.createSolicitudSalida', () => {
     const PROYECTO_A = 10;
     const PROYECTO_B = 20;
     const prisma = makePrisma();
-    prisma.proyecto.findFirst.mockImplementation(async ({ where }: any) =>
+    prisma.proyecto.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
       where.idProyecto === PROYECTO_A
         ? { idProyecto: PROYECTO_A, creadoPor: LIDER_ID }
         : { idProyecto: PROYECTO_B, creadoPor: 999 },
     );
     // El mock respeta el filtro real (rolProyecto.idProyecto): el usuario
     // solo tiene participación ACTIVO ligada al Proyecto B.
-    prisma.participacionProyecto.findFirst.mockImplementation(async ({ where }: any) =>
-      where.rolProyecto.idProyecto === PROYECTO_B ? { idParticipacion: 1 } : null,
+    prisma.participacionProyecto.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+      (where.rolProyecto as Record<string, unknown>).idProyecto === PROYECTO_B ? { idParticipacion: 1 } : null,
     );
     const service = makeService(prisma);
 
@@ -390,9 +393,9 @@ describe('ExitRequestsService.createSolicitudSalida', () => {
       try {
         await service.createSolicitudSalida(PROYECTO_ID, MIEMBRO_ID, 'motivo válido');
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(ConflictException);
-        expect(e.getStatus()).toBe(409);
+        expect((e as ConflictException).getStatus()).toBe(409);
       }
     });
 
@@ -692,7 +695,7 @@ describe('ExitRequestsService.getSolicitudSalidaAbierta', () => {
   it('no devuelve la solicitud abierta de otro usuario', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: PROYECTO_ID, creadoPor: LIDER_ID });
-    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: any) =>
+    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
       where.idUsuario === MIEMBRO_ID ? SOLICITUD_PREPARACION : null,
     );
     const service = makeService(prisma);
@@ -708,7 +711,7 @@ describe('ExitRequestsService.getSolicitudSalidaAbierta', () => {
     const OTRO_PROYECTO = PROYECTO_ID + 1;
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: OTRO_PROYECTO, creadoPor: 999 });
-    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: any) =>
+    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
       where.idProyecto === PROYECTO_ID ? SOLICITUD_PREPARACION : null,
     );
     const service = makeService(prisma);
@@ -1080,9 +1083,9 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     try {
       await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
       throw new Error('no debía resolver');
-    } catch (e: any) {
+    } catch (e) {
       expect(e).toBeInstanceOf(BadRequestException);
-      expect(e.message).toContain('1 tarea(s) pendiente(s)');
+      expect((e as BadRequestException).message).toContain('1 tarea(s) pendiente(s)');
     }
     expect(prisma.solicitudSalidaProyecto.updateMany).not.toHaveBeenCalled();
     expect(prisma.participacionProyecto.updateMany).not.toHaveBeenCalled();
@@ -1099,9 +1102,9 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     try {
       await service.approveSolicitudSalida(PROYECTO_ID, SOLICITUD_ID, LIDER_ID);
       throw new Error('no debía resolver');
-    } catch (e: any) {
+    } catch (e) {
       expect(e).toBeInstanceOf(BadRequestException);
-      expect(e.message).toContain('5 tarea(s) pendiente(s)');
+      expect((e as BadRequestException).message).toContain('5 tarea(s) pendiente(s)');
     }
     expect(prisma.solicitudSalidaProyecto.updateMany).not.toHaveBeenCalled();
   });
@@ -1296,14 +1299,14 @@ describe('ExitRequestsService.approveSolicitudSalida — aislamiento cross-proje
     const PROYECTO_B = 20;
     const SOLICITUD_DE_B = 55;
     const prisma = makePrisma();
-    prisma.proyecto.findFirst.mockImplementation(async ({ where }: any) =>
+    prisma.proyecto.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
       where.idProyecto === PROYECTO_A
         ? { idProyecto: PROYECTO_A, creadoPor: LIDER_ID, tituloProyecto: 'Proyecto A' }
         : null,
     );
     // La solicitud 55 pertenece al Proyecto B: el filtro compuesto
     // { idSolicitud, idProyecto } no debe encontrarla al resolver bajo A.
-    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: any) =>
+    prisma.solicitudSalidaProyecto.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
       where.idProyecto === PROYECTO_B && where.idSolicitud === SOLICITUD_DE_B
         ? { ...SOLICITUD_PENDIENTE, idSolicitud: SOLICITUD_DE_B, idProyecto: PROYECTO_B }
         : null,
