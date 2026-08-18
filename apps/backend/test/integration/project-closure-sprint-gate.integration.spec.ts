@@ -9,6 +9,7 @@ import {
   createIntegrationUser,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
+import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { ProjectsService } from '../../src/projects/projects.service';
@@ -47,7 +48,7 @@ function makeFakeNotifications(): NotificationsService {
 }
 
 function makeFakeCacheManager() {
-  return { get: async () => null, set: async () => undefined, del: async () => undefined } as any;
+  return { get: async () => null, set: async () => undefined, del: async () => undefined } as unknown as Cache;
 }
 
 async function markProjectInProgress(prisma: PrismaClient, idProyecto: number) {
