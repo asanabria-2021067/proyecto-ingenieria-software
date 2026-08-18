@@ -111,7 +111,9 @@ export default function RegistroPage() {
   useEffect(() => {
     if (correoEditadoManualmente) return;
     if (apellido.trim() && carne.trim()) {
-      setCorreo(generarCorreoSugerido(apellido, carne));
+      const correoSugerido = generarCorreoSugerido(apellido, carne);
+      const timeoutId = window.setTimeout(() => setCorreo(correoSugerido), 0);
+      return () => window.clearTimeout(timeoutId);
     }
   }, [apellido, carne, correoEditadoManualmente]);
 
