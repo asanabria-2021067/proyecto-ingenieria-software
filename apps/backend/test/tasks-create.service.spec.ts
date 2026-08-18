@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Prioridad } from '@prisma/client';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
 
 function makeTx() {
@@ -21,42 +27,60 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
-  return {
+  const prisma = {
     tx,
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
+    $transaction: vi.fn(),
     usuario: { findUnique: vi.fn() },
     proyecto: { findUnique: vi.fn() },
-  } as any;
+  };
+  prisma.$transaction.mockImplementation(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx));
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeAuthorization() {
-  return { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) } as any;
+  const authorization = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) };
+  return authorization as typeof authorization & TasksAuthorizationService;
 }
 
 function makeRelations(overrides: Record<string, unknown> = {}) {
-  return {
+  const relations = {
     validateCreateTaskRelations: vi.fn().mockResolvedValue({
       hito: undefined,
       rolProyecto: undefined,
       etiquetas: undefined,
       ...overrides,
     }),
-  } as any;
+  };
+  return relations as typeof relations & TasksRelationsService;
+}
+
+function makeContext() {
+  return {} as unknown as TasksContextService;
 }
 
 function makeNotifications() {
-  return {
+  const notifications = {
     notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
     notifyUsers: vi.fn().mockResolvedValue(undefined),
     notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+  return notifications as typeof notifications & NotificationsService;
+}
+
+function makeService(
+  prisma: PrismaService,
+  auth: TasksAuthorizationService,
+  relations: TasksRelationsService,
+  notifications: NotificationsService,
+) {
+  return new TasksService(prisma, auth, relations, notifications, makeContext());
 }
 
 const BASE_DTO = {
   tituloTarea: 'Nueva tarea',
   fechaLimite: '2026-12-25',
-  prioridad: 'MEDIA',
-} as any;
+  prioridad: Prioridad.MEDIA,
+};
 
 function tareaRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -92,7 +116,7 @@ describe('TasksService.create', () => {
       const notifications = makeNotifications();
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
-      const service = new TasksService(prisma, auth, relations, notifications);
+      const service = makeService(prisma, auth, relations, notifications);
 
       const result = await service.create(5, 1, BASE_DTO);
 
@@ -110,7 +134,7 @@ describe('TasksService.create', () => {
     it('el estado inicial es POR_HACER, establecido explícitamente', async () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
@@ -122,7 +146,7 @@ describe('TasksService.create', () => {
     it('descripcionTarea omitida se convierte en null; enviada como cadena vacía se conserva', async () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
@@ -137,7 +161,7 @@ describe('TasksService.create', () => {
     it('tiempoEstimadoHoras omitido se convierte en null', async () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
@@ -149,7 +173,7 @@ describe('TasksService.create', () => {
     it('sin hito/rol validados, idHito e idRolProyecto se envían como null', async () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
@@ -166,7 +190,7 @@ describe('TasksService.create', () => {
       const tx = makeTx();
       tx.sprint.findFirst.mockResolvedValue({ idSprint: 77 });
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
@@ -183,7 +207,7 @@ describe('TasksService.create', () => {
       const tx = makeTx();
       tx.sprint.findFirst.mockResolvedValue(null);
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
 
       await expect(service.create(5, 1, BASE_DTO)).rejects.toThrow(
         'No se pueden crear tareas porque el proyecto no tiene un Sprint activo.',
@@ -196,11 +220,11 @@ describe('TasksService.create', () => {
       // Sprint ACTIVO real, pero de un proyecto distinto: el mock simula
       // exactamente lo que Postgres devolvería para ese WHERE (nada), ya
       // que la query siempre incluye idProyecto = projectId.
-      tx.sprint.findFirst.mockImplementation(({ where }: any) =>
+      tx.sprint.findFirst.mockImplementation(({ where }: { where: { idProyecto: number } }) =>
         Promise.resolve(where.idProyecto === 999 ? { idSprint: 77 } : null),
       );
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
 
       await expect(service.create(5, 1, BASE_DTO)).rejects.toThrow(
         'No se pueden crear tareas porque el proyecto no tiene un Sprint activo.',
@@ -267,7 +291,7 @@ describe('TasksService.create', () => {
       );
       prisma.usuario.findUnique.mockResolvedValue({ nombre: 'Carlos', apellido: 'Mendoza' });
       prisma.proyecto.findUnique.mockResolvedValue({ tituloProyecto: 'Portal de Empleo UVG' });
-      const service = new TasksService(prisma, auth, relations, notifications);
+      const service = makeService(prisma, auth, relations, notifications);
       return { tx, prisma, auth, relations, notifications, service };
     }
 
@@ -331,7 +355,7 @@ describe('TasksService.create', () => {
       );
       prisma.usuario.findUnique.mockResolvedValue({ nombre: 'Carlos', apellido: 'Mendoza' });
       prisma.proyecto.findUnique.mockResolvedValue({ tituloProyecto: 'Portal de Empleo UVG' });
-      const service = new TasksService(prisma, auth, relations, notifications);
+      const service = makeService(prisma, auth, relations, notifications);
 
       await service.create(5, 1, DTO_COMPLETO);
 
@@ -373,13 +397,15 @@ describe('TasksService.create', () => {
       const orden: string[] = [];
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const auth = { assertCanCreateTask: vi.fn(async () => { orden.push('autorizacion'); }) } as any;
-      const relations = {
+      const authLiteral = { assertCanCreateTask: vi.fn(async () => { orden.push('autorizacion'); }) };
+      const auth = authLiteral as typeof authLiteral & TasksAuthorizationService;
+      const relationsLiteral = {
         validateCreateTaskRelations: vi.fn(async () => {
           orden.push('relaciones');
           return { hito: HITO_VALIDADO, rolProyecto: ROL_VALIDADO, etiquetas: ETIQUETAS_VALIDADAS };
         }),
-      } as any;
+      };
+      const relations = relationsLiteral as typeof relationsLiteral & TasksRelationsService;
       tx.tarea.create.mockImplementation(async () => {
         orden.push('tarea');
         return { idTarea: 100 };
@@ -395,7 +421,7 @@ describe('TasksService.create', () => {
         return tareaRow();
       });
       const notifications = makeNotifications();
-      const service = new TasksService(prisma, auth, relations, notifications);
+      const service = makeService(prisma, auth, relations, notifications);
 
       await service.create(5, 1, DTO_COMPLETO);
 
@@ -422,7 +448,7 @@ describe('TasksService.create', () => {
       const orden: string[] = [];
       const { tx, prisma, service, notifications } = makeFullSetup();
       const originalTransaction = prisma.$transaction.getMockImplementation()!;
-      prisma.$transaction.mockImplementation(async (cb: any) => {
+      prisma.$transaction.mockImplementation(async (cb: Parameters<typeof originalTransaction>[0]) => {
         const result = await originalTransaction(cb);
         orden.push('fin_transaction');
         return result;
@@ -461,10 +487,11 @@ describe('TasksService.create', () => {
     it('autorización rechazada: create() se rechaza, no se crea nada, no se notifica', async () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const auth = { assertCanCreateTask: vi.fn().mockRejectedValue(new ForbiddenException('No eres el líder')) } as any;
+      const authLiteral = { assertCanCreateTask: vi.fn().mockRejectedValue(new ForbiddenException('No eres el líder')) };
+      const auth = authLiteral as typeof authLiteral & TasksAuthorizationService;
       const relations = makeRelations();
       const notifications = makeNotifications();
-      const service = new TasksService(prisma, auth, relations, notifications);
+      const service = makeService(prisma, auth, relations, notifications);
 
       await expect(service.create(5, 1, BASE_DTO)).rejects.toBeInstanceOf(ForbiddenException);
 
@@ -477,11 +504,12 @@ describe('TasksService.create', () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
       const auth = makeAuthorization();
-      const relations = {
+      const relationsLiteral = {
         validateCreateTaskRelations: vi.fn().mockRejectedValue(new BadRequestException('Hito inválido')),
-      } as any;
+      };
+      const relations = relationsLiteral as typeof relationsLiteral & TasksRelationsService;
       const notifications = makeNotifications();
-      const service = new TasksService(prisma, auth, relations, notifications);
+      const service = makeService(prisma, auth, relations, notifications);
 
       await expect(service.create(5, 1, BASE_DTO)).rejects.toBeInstanceOf(BadRequestException);
 
@@ -495,7 +523,7 @@ describe('TasksService.create', () => {
       const relations = makeRelations({ etiquetas: [] });
       const notifications = makeNotifications();
       tx.tarea.create.mockRejectedValue(new Error('fallo de escritura'));
-      const service = new TasksService(prisma, makeAuthorization(), relations, notifications);
+      const service = makeService(prisma, makeAuthorization(), relations, notifications);
 
       await expect(
         service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3 }),
@@ -515,7 +543,7 @@ describe('TasksService.create', () => {
       const notifications = makeNotifications();
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.asignacionTarea.create.mockRejectedValue(new Error('fallo de asignación'));
-      const service = new TasksService(prisma, makeAuthorization(), relations, notifications);
+      const service = makeService(prisma, makeAuthorization(), relations, notifications);
 
       await expect(
         service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3, idsEtiquetas: [1] }),
@@ -535,7 +563,7 @@ describe('TasksService.create', () => {
       const notifications = makeNotifications();
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tareaEtiqueta.createMany.mockRejectedValue(new Error('fallo de etiquetas'));
-      const service = new TasksService(prisma, makeAuthorization(), relations, notifications);
+      const service = makeService(prisma, makeAuthorization(), relations, notifications);
 
       await expect(
         service.create(5, 1, { ...BASE_DTO, idsEtiquetas: [1] }),
@@ -552,7 +580,7 @@ describe('TasksService.create', () => {
       const notifications = makeNotifications();
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(null);
-      const service = new TasksService(prisma, makeAuthorization(), relations, notifications);
+      const service = makeService(prisma, makeAuthorization(), relations, notifications);
 
       await expect(service.create(5, 1, BASE_DTO)).rejects.toThrow();
 
@@ -563,7 +591,7 @@ describe('TasksService.create', () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
       tx.tarea.create.mockRejectedValue(new Error('fallo'));
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
 
       await expect(service.create(5, 1, BASE_DTO)).rejects.toThrow('fallo');
 
@@ -584,7 +612,7 @@ describe('TasksService.create', () => {
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
       prisma.usuario.findUnique.mockResolvedValue({ nombre: 'Carlos', apellido: 'Mendoza' });
       prisma.proyecto.findUnique.mockResolvedValue({ tituloProyecto: 'Portal de Empleo UVG' });
-      const service = new TasksService(prisma, makeAuthorization(), relations, notifications);
+      const service = makeService(prisma, makeAuthorization(), relations, notifications);
 
       await service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3 });
 
@@ -608,7 +636,7 @@ describe('TasksService.create', () => {
       const notifications = makeNotifications();
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), notifications);
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), notifications);
 
       await service.create(5, 1, BASE_DTO);
 
@@ -618,10 +646,11 @@ describe('TasksService.create', () => {
     it('un error al notificar no falla la creación: create() resuelve con la tarea', async () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const notifications = { notifyFromTemplate: vi.fn().mockRejectedValue(new Error('gateway caído')) } as any;
+      const notificationsLiteral = { notifyFromTemplate: vi.fn().mockRejectedValue(new Error('gateway caído')) };
+      const notifications = notificationsLiteral as typeof notificationsLiteral & NotificationsService;
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), notifications);
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), notifications);
 
       const result = await service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3 });
 
@@ -631,11 +660,14 @@ describe('TasksService.create', () => {
     it('el error de notificación se registra vía Logger y no se relanza', async () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const notifications = { notifyFromTemplate: vi.fn().mockRejectedValue(new Error('gateway caído')) } as any;
+      const notificationsLiteral = { notifyFromTemplate: vi.fn().mockRejectedValue(new Error('gateway caído')) };
+      const notifications = notificationsLiteral as typeof notificationsLiteral & NotificationsService;
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), notifications);
-      const loggerSpy = vi.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), notifications);
+      const loggerSpy = vi
+        .spyOn((service as unknown as { logger: { error: (...args: unknown[]) => void } }).logger, 'error')
+        .mockImplementation(() => undefined);
 
       await expect(
         service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3 }),
@@ -649,7 +681,7 @@ describe('TasksService.create', () => {
       const prisma = makePrisma(tx);
       const notifications = makeNotifications();
       tx.tarea.create.mockRejectedValue(new Error('fallo de escritura'));
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), notifications);
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), notifications);
 
       await expect(
         service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3 }),
@@ -667,7 +699,7 @@ describe('TasksService.create', () => {
       tx.tarea.findFirst.mockResolvedValue(
         tareaRow({ fechaLimite: new Date('2026-12-25T00:00:00.000Z') }),
       );
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
 
       const result = await service.create(5, 1, { ...BASE_DTO, fechaLimite: '2026-12-25' });
 
@@ -701,7 +733,7 @@ describe('TasksService.create', () => {
           ],
         }),
       );
-      const service = new TasksService(prisma, makeAuthorization(), relations, makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), relations, makeNotifications());
 
       const result = await service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3, idsEtiquetas: [1] });
 
@@ -722,7 +754,7 @@ describe('TasksService.create', () => {
       const prisma = makePrisma(tx);
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
-      const service = new TasksService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
+      const service = makeService(prisma, makeAuthorization(), makeRelations(), makeNotifications());
 
       const result = await service.create(5, 1, BASE_DTO);
 
@@ -761,7 +793,7 @@ describe('TasksService.create', () => {
       const notifications = makeNotifications();
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito }));
-      const service = new TasksService(prisma, auth, relations, notifications);
+      const service = makeService(prisma, auth, relations, notifications);
       return { tx, service };
     }
 
@@ -810,7 +842,7 @@ describe('TasksService.create', () => {
       const notifications = makeNotifications();
       tx.tarea.create.mockResolvedValue({ idTarea: 100 });
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: null }));
-      const service = new TasksService(prisma, auth, relations, notifications);
+      const service = makeService(prisma, auth, relations, notifications);
 
       await service.create(5, 1, BASE_DTO);
 
