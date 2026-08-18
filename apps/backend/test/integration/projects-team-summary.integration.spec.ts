@@ -12,6 +12,9 @@ import {
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { TeamService } from '../../src/team/team.service';
+import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { ApplicationsService } from '../../src/applications/applications.service';
+import type { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
 
 /**
  * Integración real T-106 (Tarea 4) contra PostgreSQL: getTeamSummary
@@ -34,7 +37,11 @@ describeIntegration('TeamService.getTeamSummary — integración PostgreSQL real
 
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
-    service = new TeamService(prisma as any, { findAll: async () => [] } as any, { getPendingLeaderReviews: async () => [] } as any);
+    service = new TeamService(
+      prisma as unknown as PrismaService,
+      { findAll: async () => [] } as unknown as ApplicationsService,
+      { getPendingLeaderReviews: async () => [] } as unknown as ExitRequestsService,
+    );
     await prisma.$connect();
   });
 
