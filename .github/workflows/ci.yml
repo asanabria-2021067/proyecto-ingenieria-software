@@ -71,8 +71,17 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
+      # Cobertura completa solo en PR (gate antes de mergear); en push/deploy
+      # (workflow_call) corren las pruebas sin instrumentar cobertura para
+      # que el pipeline de deploy sea rapido — la validacion fuerte ya paso
+      # en el PR que se mergeo.
       - name: Pruebas unitarias con cobertura (Vitest)
+        if: github.event_name == 'pull_request'
         run: npm run test:coverage
+
+      - name: Pruebas unitarias (Vitest, sin cobertura)
+        if: github.event_name != 'pull_request'
+        run: npm run test
 
       - name: Pruebas de integracion en serie contra Postgres efimero (Vitest)
         run: npm run test:integration
@@ -103,14 +112,18 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
+      # Cobertura completa (mas lenta, jsdom+v8 consume bastante memoria)
+      # solo en PR; en push/deploy corren las pruebas sin cobertura para que
+      # el pipeline de deploy sea rapido y no dependa de un heap grande.
       - name: Pruebas unitarias con cobertura (Vitest)
+        if: github.event_name == 'pull_request'
         env:
-          # jsdom + coverage v8 sobre ~70 archivos de test acumula memoria
-          # por encima del heap por defecto de V8 (~4GB) y el proceso muere
-          # con OOM cerca del final de la corrida. Se sube el limite en vez
-          # de reducir cobertura o dividir la suite.
           NODE_OPTIONS: --max-old-space-size=8192
         run: npm run test:coverage
+
+      - name: Pruebas unitarias (Vitest, sin cobertura)
+        if: github.event_name != 'pull_request'
+        run: npm run test
 
   e2e:
     name: E2E - suite de humo (Playwright)
