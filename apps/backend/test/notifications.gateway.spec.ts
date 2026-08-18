@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GATEWAY_OPTIONS } from '@nestjs/websockets/constants';
+import { JwtService } from '@nestjs/jwt';
 import { NotificationsGateway } from '../src/notifications/notifications.gateway';
 
 function makeGateway() {
-  const gateway = new NotificationsGateway({} as any);
+  const gateway = new NotificationsGateway(new JwtService());
   const emit = vi.fn();
   const to = vi.fn(() => ({ emit }));
-  (gateway as any).server = { to };
+  Reflect.set(gateway, 'server', { to });
   return { gateway, to, emit };
 }
 
