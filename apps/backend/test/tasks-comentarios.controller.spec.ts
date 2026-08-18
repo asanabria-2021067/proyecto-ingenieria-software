@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException, ForbiddenException, NotFoundException, ParseIntPipe } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, ParseIntPipe, type ArgumentMetadata } from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ComentariosService } from '../src/comentarios/comentarios.service';
 import { TareaComentariosController } from '../src/tasks/tarea-comentarios.controller';
 import { ComentariosController } from '../src/comentarios/comentarios.controller';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
@@ -15,12 +16,13 @@ import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
  * tasks-queries.controller.spec.ts).
  */
 function makeService() {
-  return {
+  const service = {
     findByTareaEnProyecto: vi.fn(),
     createForTask: vi.fn(),
     updateForTask: vi.fn(),
     removeForTask: vi.fn(),
-  } as any;
+  };
+  return service as typeof service & ComentariosService;
 }
 
 describe('TareaComentariosController - comentarios de tarea (rutas anidadas, Tarea 28)', () => {
@@ -104,8 +106,8 @@ describe('TareaComentariosController - comentarios de tarea (rutas anidadas, Tar
 
       // GET genérico por tarea: ausente. El controller genérico ya no expone
       // ningún método findByTarea/findByTareaDesc ni ruta 'tarea/:idTarea'.
-      expect((ComentariosController.prototype as any).findByTarea).toBeUndefined();
-      expect((ComentariosController.prototype as any).findByTareaDesc).toBeUndefined();
+      expect((ComentariosController.prototype as unknown as Record<string, unknown>).findByTarea).toBeUndefined();
+      expect((ComentariosController.prototype as unknown as Record<string, unknown>).findByTareaDesc).toBeUndefined();
       const genericSource = readFileSync(
         join(__dirname, '../src/comentarios/comentarios.controller.ts'),
         'utf-8',
@@ -156,7 +158,7 @@ describe('TareaComentariosController - comentarios de tarea (rutas anidadas, Tar
       service.createForTask.mockResolvedValue({ idComentario: 9 });
       const controller = new TareaComentariosController(service);
 
-      const result = await controller.createComentario(5, 42, { userId: 1 }, { contenido: 'Hola equipo' } as any);
+      const result = await controller.createComentario(5, 42, { userId: 1 }, { contenido: 'Hola equipo' });
 
       expect(service.createForTask).toHaveBeenCalledWith(5, 42, 1, 'Hola equipo');
       expect(result).toEqual({ idComentario: 9 });
@@ -178,7 +180,7 @@ describe('TareaComentariosController - comentarios de tarea (rutas anidadas, Tar
       const controller = new TareaComentariosController(service);
 
       await expect(
-        controller.createComentario(5, 42, { userId: 7 }, { contenido: 'x' } as any),
+        controller.createComentario(5, 42, { userId: 7 }, { contenido: 'x' }),
       ).rejects.toBe(error);
     });
   });
@@ -189,7 +191,7 @@ describe('TareaComentariosController - comentarios de tarea (rutas anidadas, Tar
       service.updateForTask.mockResolvedValue({ idComentario: 9, contenido: 'editado' });
       const controller = new TareaComentariosController(service);
 
-      const result = await controller.updateComentario(5, 42, 9, { userId: 1 }, { contenido: 'editado' } as any);
+      const result = await controller.updateComentario(5, 42, 9, { userId: 1 }, { contenido: 'editado' });
 
       expect(service.updateForTask).toHaveBeenCalledWith(5, 42, 9, 1, { contenido: 'editado' });
       expect(result).toEqual({ idComentario: 9, contenido: 'editado' });
@@ -202,7 +204,7 @@ describe('TareaComentariosController - comentarios de tarea (rutas anidadas, Tar
       const controller = new TareaComentariosController(service);
 
       await expect(
-        controller.updateComentario(5, 42, 9, { userId: 1 }, { contenido: 'x' } as any),
+        controller.updateComentario(5, 42, 9, { userId: 1 }, { contenido: 'x' }),
       ).rejects.toBe(error);
     });
   });
@@ -232,21 +234,21 @@ describe('TareaComentariosController - comentarios de tarea (rutas anidadas, Tar
     it('projectId no numérico produce BadRequestException (400)', async () => {
       const pipe = new ParseIntPipe();
       await expect(
-        pipe.transform('abc', { type: 'param', data: 'projectId' } as any),
+        pipe.transform('abc', { type: 'param', data: 'projectId' } as ArgumentMetadata),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('taskId no numérico produce BadRequestException (400)', async () => {
       const pipe = new ParseIntPipe();
       await expect(
-        pipe.transform('xyz', { type: 'param', data: 'taskId' } as any),
+        pipe.transform('xyz', { type: 'param', data: 'taskId' } as ArgumentMetadata),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('commentId no numérico produce BadRequestException (400)', async () => {
       const pipe = new ParseIntPipe();
       await expect(
-        pipe.transform('nope', { type: 'param', data: 'commentId' } as any),
+        pipe.transform('nope', { type: 'param', data: 'commentId' } as ArgumentMetadata),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

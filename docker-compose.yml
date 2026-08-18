@@ -7,8 +7,6 @@ services:
     image: redis:7-alpine
     container_name: uvg-collab-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     networks:
@@ -18,6 +16,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/asanabria-2021067/proyecto-ingenieria-software-backend:latest}
@@ -47,6 +50,11 @@ services:
         condition: service_healthy
     networks:
       - uvg-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/asanabria-2021067/proyecto-ingenieria-software-frontend:latest}
@@ -68,6 +76,11 @@ services:
       - backend
     networks:
       - uvg-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   redis-data:

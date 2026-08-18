@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
 
 /**
@@ -77,36 +82,44 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
-  return {
+  const prisma = {
     tx,
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
-  } as any;
+    $transaction: vi.fn(),
+  };
+  prisma.$transaction.mockImplementation(
+    async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx),
+  );
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeAuthorization(overrides: Record<string, unknown> = {}) {
-  return {
+  const authorization = {
     assertCanAssignTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: 5, idRolProyecto: null }),
     ...overrides,
-  } as any;
+  };
+  return authorization as typeof authorization & TasksAuthorizationService;
 }
 
 function makeRelations(overrides: Record<string, unknown> = {}) {
-  return {
+  const relations = {
     assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined),
     validateRelatedResources: vi.fn(),
     ...overrides,
-  } as any;
+  };
+  return relations as typeof relations & TasksRelationsService;
 }
 
 function makeContext(overrides: Record<string, unknown> = {}) {
-  return {
+  const context = {
     getActiveAssignment: vi.fn().mockResolvedValue(null),
     ...overrides,
-  } as any;
+  };
+  return context as typeof context & TasksContextService;
 }
 
 function makeNotifications() {
-  return { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) } as any;
+  const notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
+  return notifications as typeof notifications & NotificationsService;
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {
@@ -134,11 +147,11 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
 }
 
 function makeService(opts: {
-  prisma?: any;
-  auth?: any;
-  relations?: any;
-  notifications?: any;
-  context?: any;
+  prisma?: ReturnType<typeof makePrisma>;
+  auth?: ReturnType<typeof makeAuthorization>;
+  relations?: ReturnType<typeof makeRelations>;
+  notifications?: ReturnType<typeof makeNotifications>;
+  context?: ReturnType<typeof makeContext>;
 } = {}) {
   const tx = makeTx();
   const prisma = opts.prisma ?? makePrisma(tx);
@@ -150,7 +163,7 @@ function makeService(opts: {
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
-const DTO = { idUsuario: 7 } as any;
+const DTO = { idUsuario: 7 };
 
 describe('TasksService.assign — colisión concurrente de asignación activa (Tarea 26)', () => {
   describe('detector: solo la colisión reconocida produce 409', () => {
@@ -161,13 +174,13 @@ describe('TasksService.assign — colisión concurrente de asignación activa (T
       try {
         await service.assign(5, 42, 1, DTO);
         throw new Error('no debía resolver');
-      } catch (e: any) {
+      } catch (e) {
         expect(e).toBeInstanceOf(ConflictException);
-        expect(e.getStatus()).toBe(409);
-        expect(e.message).toBe('La tarea ya tiene una asignación activa');
-        expect(e.message).not.toMatch(/asignacion_tarea_activa_unique/i);
-        expect(e.message).not.toMatch(/P2002/);
-        expect(e.message).not.toMatch(/id_tarea/);
+        expect((e as ConflictException).getStatus()).toBe(409);
+        expect((e as ConflictException).message).toBe('La tarea ya tiene una asignación activa');
+        expect((e as ConflictException).message).not.toMatch(/asignacion_tarea_activa_unique/i);
+        expect((e as ConflictException).message).not.toMatch(/P2002/);
+        expect((e as ConflictException).message).not.toMatch(/id_tarea/);
       }
     });
 
@@ -365,8 +378,8 @@ describe('TasksService.assign — colisión concurrente de asignación activa (T
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
       const [resultadoA, resultadoB] = await Promise.allSettled([
-        service.assign(5, 42, 1, { idUsuario: 7 } as any),
-        service.assign(5, 42, 1, { idUsuario: 9 } as any),
+        service.assign(5, 42, 1, { idUsuario: 7 }),
+        service.assign(5, 42, 1, { idUsuario: 9 }),
       ]);
 
       const exitos = [resultadoA, resultadoB].filter((r) => r.status === 'fulfilled');

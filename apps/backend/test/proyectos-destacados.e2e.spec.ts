@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { EstadoProyecto } from '@prisma/client';
+import type { Cache } from 'cache-manager';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { ProjectsController } from '../src/projects/projects.controller';
 import { ProjectsService } from '../src/projects/projects.service';
 
@@ -9,7 +12,21 @@ import { ProjectsService } from '../src/projects/projects.service';
 // pattern as password-recovery-admin.e2e.spec.ts (see that file's note on why
 // a real Nest TestingModule + supertest is avoided under Vitest).
 
-function proyecto(overrides: Partial<any> = {}) {
+interface ProyectoRow {
+  idProyecto: number;
+  tituloProyecto: string;
+  descripcionProyecto: string;
+  tipoProyecto: string;
+  estadoProyecto: EstadoProyecto;
+  modalidadProyecto: string;
+  fechaPublicacion: Date;
+  organizaciones: unknown[];
+  intereses: unknown[];
+  eliminadoEn: Date | null;
+  roles: { _count: { postulaciones: number } }[];
+}
+
+function proyecto(overrides: Partial<ProyectoRow> = {}): ProyectoRow {
   return {
     idProyecto: 1,
     tituloProyecto: 'Proyecto',
@@ -30,17 +47,17 @@ function rolesConPostulaciones(...cantidades: number[]) {
   return cantidades.map((n) => ({ _count: { postulaciones: n } }));
 }
 
-function makeFakePrisma(dataset: any[]) {
+function makeFakePrisma(dataset: ProyectoRow[]) {
   return {
     proyecto: {
-      findMany: async ({ where }: any) => {
-        const estadosPermitidos: EstadoProyecto[] = where.estadoProyecto.in;
+      findMany: async ({ where }: { where: { estadoProyecto: { in: EstadoProyecto[] }; eliminadoEn: Date | null } }) => {
+        const estadosPermitidos = where.estadoProyecto.in;
         return dataset.filter(
           (p) => estadosPermitidos.includes(p.estadoProyecto) && p.eliminadoEn === where.eliminadoEn,
         );
       },
     },
-  } as any;
+  };
 }
 
 function makeFakeCache() {
@@ -53,11 +70,15 @@ function makeFakeCache() {
     del: async (key: string) => {
       store.delete(key);
     },
-  } as any;
+  };
 }
 
-function makeController(dataset: any[]) {
-  const service = new ProjectsService(makeFakePrisma(dataset), {} as any, makeFakeCache());
+function makeController(dataset: ProyectoRow[]) {
+  const service = new ProjectsService(
+    makeFakePrisma(dataset) as unknown as PrismaService,
+    {} as unknown as NotificationsService,
+    makeFakeCache() as unknown as Cache,
+  );
   return new ProjectsController(service);
 }
 
@@ -74,7 +95,7 @@ describe('GET /proyectos/destacados (HU-59)', () => {
 
     const result = await makeController(dataset).findFeatured();
 
-    expect(result.map((p: any) => p.idProyecto).sort()).toEqual([1, 2]);
+    expect(result.map((p) => p.idProyecto).sort()).toEqual([1, 2]);
   });
 
   it('limita el resultado a un maximo de 6 proyectos destacados', async () => {
@@ -96,7 +117,7 @@ describe('GET /proyectos/destacados (HU-59)', () => {
 
     const result = await makeController(dataset).findFeatured();
 
-    expect(result.map((p: any) => p.idProyecto)).toEqual([2, 3, 1]);
+    expect(result.map((p) => p.idProyecto)).toEqual([2, 3, 1]);
   });
 
   it('no expone el conteo interno de postulaciones usado para ordenar', async () => {

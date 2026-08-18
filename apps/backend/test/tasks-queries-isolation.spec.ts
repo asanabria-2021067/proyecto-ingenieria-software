@@ -3,6 +3,9 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TasksService } from '../src/tasks/tasks.service';
 import { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
+import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import { NotificationsService } from '../src/notifications/notifications.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * Integración de las tres capas reales (TasksService + TasksAuthorizationService
@@ -14,7 +17,13 @@ import { TasksContextService } from '../src/tasks/tasks-context.service';
  * cual para construir un escenario de aislamiento realista.
  */
 
-function whereMatches(row: any, where: Record<string, unknown>): boolean {
+type MemoryRow = Record<string, unknown>;
+
+interface FindWhereArgs {
+  where: Record<string, unknown>;
+}
+
+function whereMatches(row: MemoryRow, where: Record<string, unknown>): boolean {
   return Object.entries(where).every(([key, value]) => {
     if (key === 'rolProyecto' && value && typeof value === 'object') {
       const nested = value as { idProyecto?: number };
@@ -25,24 +34,33 @@ function whereMatches(row: any, where: Record<string, unknown>): boolean {
 }
 
 function makeIsolatedPrisma(data: {
-  proyectos: any[];
-  tareas: any[];
-  participaciones: any[];
+  proyectos: MemoryRow[];
+  tareas: MemoryRow[];
+  participaciones: MemoryRow[];
 }) {
   return {
     proyecto: {
-      findFirst: vi.fn(async ({ where }: any) => data.proyectos.find((p) => whereMatches(p, where)) ?? null),
+      findFirst: vi.fn(
+        async ({ where }: FindWhereArgs) =>
+          data.proyectos.find((project) => whereMatches(project, where)) ?? null,
+      ),
     },
     tarea: {
-      findFirst: vi.fn(async ({ where }: any) => data.tareas.find((t) => whereMatches(t, where)) ?? null),
-      findMany: vi.fn(async ({ where }: any) => data.tareas.filter((t) => whereMatches(t, where))),
+      findFirst: vi.fn(
+        async ({ where }: FindWhereArgs) =>
+          data.tareas.find((task) => whereMatches(task, where)) ?? null,
+      ),
+      findMany: vi.fn(async ({ where }: FindWhereArgs) =>
+        data.tareas.filter((task) => whereMatches(task, where)),
+      ),
     },
     participacionProyecto: {
       findFirst: vi.fn(
-        async ({ where }: any) => data.participaciones.find((p) => whereMatches(p, where)) ?? null,
+        async ({ where }: FindWhereArgs) =>
+          data.participaciones.find((participation) => whereMatches(participation, where)) ?? null,
       ),
     },
-  } as any;
+  };
 }
 
 function tareaRow(overrides: Record<string, unknown>) {
@@ -70,10 +88,17 @@ function tareaRow(overrides: Record<string, unknown>) {
   };
 }
 
-function makeStack(prisma: any) {
-  const context = new TasksContextService(prisma);
+function makeStack(prisma: ReturnType<typeof makeIsolatedPrisma>) {
+  const prismaService = prisma as unknown as PrismaService;
+  const context = new TasksContextService(prismaService);
   const authorization = new TasksAuthorizationService(context);
-  const service = new TasksService(prisma, authorization);
+  const service = new TasksService(
+    prismaService,
+    authorization,
+    {} as unknown as TasksRelationsService,
+    {} as unknown as NotificationsService,
+    context,
+  );
   return service;
 }
 
@@ -92,7 +117,7 @@ describe('Aislamiento entre proyectos (integración con implementaciones reales)
     });
     const service = makeStack(prisma);
 
-    let caught: any;
+    let caught: unknown;
     try {
       await service.findOne(1, 50, LIDER_A);
     } catch (e) {
@@ -100,6 +125,7 @@ describe('Aislamiento entre proyectos (integración con implementaciones reales)
     }
 
     expect(caught).toBeInstanceOf(NotFoundException);
+    if (!(caught instanceof NotFoundException)) throw caught;
     expect(caught.getStatus()).toBe(404);
   });
 
@@ -111,14 +137,16 @@ describe('Aislamiento entre proyectos (integración con implementaciones reales)
     });
     const service = makeStack(prisma);
 
-    let caught: any;
+    let caught: unknown;
     try {
       await service.findOne(1, 50, LIDER_A);
     } catch (e) {
       caught = e;
     }
 
-    const serialized = JSON.stringify(caught?.getResponse ? caught.getResponse() : caught?.message);
+    expect(caught).toBeInstanceOf(NotFoundException);
+    if (!(caught instanceof NotFoundException)) throw caught;
+    const serialized = JSON.stringify(caught.getResponse());
     expect(serialized).not.toContain('Secreta de B');
     expect(serialized).not.toContain(String(LIDER_B));
   });
@@ -138,8 +166,8 @@ describe('Aislamiento entre proyectos (integración con implementaciones reales)
     const servicioInexistente = makeStack(prismaInexistente);
     const servicioOtroProyecto = makeStack(prismaOtroProyecto);
 
-    let errorInexistente: any;
-    let errorOtroProyecto: any;
+    let errorInexistente: unknown;
+    let errorOtroProyecto: unknown;
     try {
       await servicioInexistente.findOne(1, 50, LIDER_A);
     } catch (e) {
@@ -153,6 +181,8 @@ describe('Aislamiento entre proyectos (integración con implementaciones reales)
 
     expect(errorInexistente).toBeInstanceOf(NotFoundException);
     expect(errorOtroProyecto).toBeInstanceOf(NotFoundException);
+    if (!(errorInexistente instanceof NotFoundException)) throw errorInexistente;
+    if (!(errorOtroProyecto instanceof NotFoundException)) throw errorOtroProyecto;
     expect(errorInexistente.getStatus()).toBe(errorOtroProyecto.getStatus());
     expect(errorInexistente.message).toBe(errorOtroProyecto.message);
   });
@@ -217,7 +247,7 @@ describe('Aislamiento entre proyectos (integración con implementaciones reales)
     });
     const service = makeStack(prisma);
 
-    let caught: any;
+    let caught: unknown;
     try {
       await service.findOne(1, 62, 999);
     } catch (e) {
@@ -225,6 +255,7 @@ describe('Aislamiento entre proyectos (integración con implementaciones reales)
     }
 
     expect(caught).toBeInstanceOf(ForbiddenException);
+    if (!(caught instanceof ForbiddenException)) throw caught;
     expect(caught.getStatus()).toBe(403);
   });
 

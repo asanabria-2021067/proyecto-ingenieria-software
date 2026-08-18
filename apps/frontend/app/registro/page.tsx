@@ -111,7 +111,9 @@ export default function RegistroPage() {
   useEffect(() => {
     if (correoEditadoManualmente) return;
     if (apellido.trim() && carne.trim()) {
-      setCorreo(generarCorreoSugerido(apellido, carne));
+      const correoSugerido = generarCorreoSugerido(apellido, carne);
+      const timeoutId = window.setTimeout(() => setCorreo(correoSugerido), 0);
+      return () => window.clearTimeout(timeoutId);
     }
   }, [apellido, carne, correoEditadoManualmente]);
 
@@ -292,6 +294,7 @@ export default function RegistroPage() {
                 <div className="space-y-1.5 md:col-span-2">
                   <label className={labelClass}>Carrera</label>
                   <select
+                    data-testid="registro-carrera-select"
                     required
                     value={idCarrera}
                     onChange={(e) => {
