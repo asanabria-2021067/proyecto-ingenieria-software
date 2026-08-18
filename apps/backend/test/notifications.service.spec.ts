@@ -1,11 +1,13 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { JwtService } from '@nestjs/jwt';
+import { TipoNotificacion } from '@prisma/client';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { NotificationsGateway } from '../src/notifications/notifications.gateway';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function makePrisma() {
-  return {
+  const prisma = {
     notificacion: {
       findMany: vi.fn(),
       count: vi.fn(),
@@ -16,7 +18,8 @@ function makePrisma() {
     },
     usuarioRolAcceso: { findFirst: vi.fn(), findMany: vi.fn() },
     participacionProyecto: { findMany: vi.fn() },
-  } as any;
+  };
+  return prisma as typeof prisma & PrismaService;
 }
 
 describe('NotificationsService', () => {
@@ -60,7 +63,10 @@ describe('NotificationsService', () => {
     const prisma = makePrisma();
     prisma.usuarioRolAcceso.findMany.mockResolvedValue([{ idUsuario: 1 }, { idUsuario: 2 }]);
     const service = new NotificationsService(prisma);
-    await service.notifyAdmins({ tipoNotificacion: 'PROYECTO_ACTUALIZADO' as any, tituloNotificacion: 't' });
+    await service.notifyAdmins({
+      tipoNotificacion: TipoNotificacion.PROYECTO_ACTUALIZADO,
+      tituloNotificacion: 't',
+    });
     expect(prisma.notificacion.createMany).toHaveBeenCalled();
   });
 
@@ -94,7 +100,7 @@ describe('NotificationsService', () => {
     await service.notifyProjectActiveParticipants(
       1,
       2,
-      { tipoNotificacion: 'COMENTARIO_PROYECTO' as any, tituloNotificacion: 'x' },
+      { tipoNotificacion: TipoNotificacion.COMENTARIO_PROYECTO, tituloNotificacion: 'x' },
     );
     expect(prisma.notificacion.createMany).toHaveBeenCalled();
   });
