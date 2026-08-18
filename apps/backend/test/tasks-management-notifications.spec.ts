@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { CreateTaskDto } from '../src/tasks/dto/create-task.dto';
+import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
+import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import { TasksService } from '../src/tasks/tasks.service';
 
 /**
@@ -40,8 +46,8 @@ function makePrisma(tx = makeTx()) {
     tx,
     usuario: { findUnique: vi.fn().mockResolvedValue({ nombre: 'Actor', apellido: 'Prueba' }) },
     proyecto: { findUnique: vi.fn().mockResolvedValue({ tituloProyecto: 'Proyecto X' }) },
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
-  } as any;
+    $transaction: vi.fn(async (callback: (transaction: ReturnType<typeof makeTx>) => unknown) => callback(tx)),
+  };
 }
 
 function makeNotifications() {
@@ -49,7 +55,23 @@ function makeNotifications() {
     notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
     notifyUsers: vi.fn().mockResolvedValue(undefined),
     notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+}
+
+function makeService(
+  prisma: unknown,
+  authorization: unknown,
+  relations: unknown,
+  notifications: unknown,
+  context: unknown,
+) {
+  return new TasksService(
+    prisma as PrismaService,
+    authorization as TasksAuthorizationService,
+    relations as TasksRelationsService,
+    notifications as NotificationsService,
+    context as TasksContextService,
+  );
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {
@@ -95,14 +117,14 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
   function makeCreateSetup(opts: { rowOverrides?: Record<string, unknown>; dto?: Record<string, unknown> } = {}) {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) } as any;
+    const auth = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) };
     const relations = {
       validateCreateTaskRelations: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
-    } as any;
+    };
     const notifications = makeNotifications();
     tx.tarea.create.mockResolvedValue({ idTarea: 42 });
     tx.tarea.findFirst.mockResolvedValue(tareaRow(opts.rowOverrides));
-    const service = new TasksService(prisma, auth, relations, notifications, {} as any);
+    const service = makeService(prisma, auth, relations, notifications, {});
     const dto = { tituloTarea: 'Tarea de prueba', fechaLimite: '2026-12-25', prioridad: 'MEDIA', ...opts.dto };
     return { tx, prisma, notifications, service, dto };
   }
@@ -113,7 +135,7 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
       dto: { idRolProyecto: ROLE_ID, idUsuarioAsignado: 3 },
     });
 
-    await service.create(PROJECT_ID, ACTOR_ID, dto as any);
+    await service.create(PROJECT_ID, ACTOR_ID, dto as unknown as CreateTaskDto);
 
     expect(notifications.notifyRoleMembers).toHaveBeenCalledTimes(1);
     expect(notifications.notifyRoleMembers).toHaveBeenCalledWith(
@@ -131,7 +153,7 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
       dto: { idRolProyecto: ROLE_ID },
     });
 
-    await service.create(PROJECT_ID, ACTOR_ID, dto as any);
+    await service.create(PROJECT_ID, ACTOR_ID, dto as unknown as CreateTaskDto);
 
     expect(notifications.notifyRoleMembers).toHaveBeenCalledTimes(1);
   });
@@ -142,7 +164,7 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
       dto: { idUsuarioAsignado: 3 },
     });
 
-    await service.create(PROJECT_ID, ACTOR_ID, dto as any);
+    await service.create(PROJECT_ID, ACTOR_ID, dto as unknown as CreateTaskDto);
 
     expect(notifications.notifyFromTemplate).toHaveBeenCalledTimes(1);
     expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([3], 'TAREA_ASIGNADA', expect.any(Object));
@@ -152,7 +174,7 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
   it('sin rol sin asignado: ninguna notificación', async () => {
     const { notifications, service, dto } = makeCreateSetup();
 
-    await service.create(PROJECT_ID, ACTOR_ID, dto as any);
+    await service.create(PROJECT_ID, ACTOR_ID, dto as unknown as CreateTaskDto);
 
     expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
@@ -165,7 +187,7 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
       dto: { idUsuarioAsignado: ACTOR_ID },
     });
 
-    await service.create(PROJECT_ID, ACTOR_ID, dto as any);
+    await service.create(PROJECT_ID, ACTOR_ID, dto as unknown as CreateTaskDto);
 
     expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
   });
@@ -173,13 +195,17 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
   it('fallo transaccional: ninguna notificación', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanCreateTask: vi.fn().mockRejectedValue(new ForbiddenException('no autorizado')) } as any;
-    const relations = { validateCreateTaskRelations: vi.fn() } as any;
+    const auth = { assertCanCreateTask: vi.fn().mockRejectedValue(new ForbiddenException('no autorizado')) };
+    const relations = { validateCreateTaskRelations: vi.fn() };
     const notifications = makeNotifications();
-    const service = new TasksService(prisma, auth, relations, notifications, {} as any);
+    const service = makeService(prisma, auth, relations, notifications, {});
 
     await expect(
-      service.create(PROJECT_ID, ACTOR_ID, { tituloTarea: 'x', fechaLimite: '2026-12-25', prioridad: 'MEDIA' } as any),
+      service.create(PROJECT_ID, ACTOR_ID, {
+        tituloTarea: 'x',
+        fechaLimite: '2026-12-25',
+        prioridad: 'MEDIA',
+      }),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
@@ -193,7 +219,7 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
     });
     notifications.notifyRoleMembers.mockRejectedValue(new Error('fallo de notificación'));
 
-    const resultado = await service.create(PROJECT_ID, ACTOR_ID, dto as any);
+    const resultado = await service.create(PROJECT_ID, ACTOR_ID, dto as unknown as CreateTaskDto);
 
     expect(resultado.idTarea).toBe(42);
   });
@@ -203,21 +229,21 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
   function makeUpdateSetup(rowOverrides: Record<string, unknown> = {}) {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanEditTask: vi.fn().mockResolvedValue(undefined) } as any;
+    const auth = { assertCanEditTask: vi.fn().mockResolvedValue(undefined) };
     const relations = {
       validateRelatedResources: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
-    } as any;
-    const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) } as any;
+    };
+    const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) };
     const notifications = makeNotifications();
     tx.tarea.findFirst.mockResolvedValue(tareaRow(rowOverrides));
-    const service = new TasksService(prisma, auth, relations, notifications, context);
+    const service = makeService(prisma, auth, relations, notifications, context);
     return { tx, prisma, notifications, service };
   }
 
   it('conserva rol: notifica a notifyRoleMembers con el rol final', async () => {
     const { notifications, service } = makeUpdateSetup({ idRolProyecto: ROLE_ID });
 
-    await service.update(PROJECT_ID, 42, ACTOR_ID, { tituloTarea: 'Nuevo título' } as any);
+    await service.update(PROJECT_ID, 42, ACTOR_ID, { tituloTarea: 'Nuevo título' });
 
     expect(notifications.notifyRoleMembers).toHaveBeenCalledWith(
       PROJECT_ID,
@@ -231,7 +257,7 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
     const ROLE_B = 9;
     const { notifications, service } = makeUpdateSetup({ idRolProyecto: ROLE_B });
 
-    await service.update(PROJECT_ID, 42, ACTOR_ID, { idRolProyecto: ROLE_B } as any);
+    await service.update(PROJECT_ID, 42, ACTOR_ID, { idRolProyecto: ROLE_B });
 
     expect(notifications.notifyRoleMembers).toHaveBeenCalledTimes(1);
     expect(notifications.notifyRoleMembers).toHaveBeenCalledWith(PROJECT_ID, ROLE_B, ACTOR_ID, expect.anything());
@@ -240,7 +266,7 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
   it('elimina el rol pero conserva asignado activo: notifica solo al asignado', async () => {
     const { notifications, service } = makeUpdateSetup({ idRolProyecto: null, asignaciones: asignacionActiva(3) });
 
-    await service.update(PROJECT_ID, 42, ACTOR_ID, { idRolProyecto: null } as any);
+    await service.update(PROJECT_ID, 42, ACTOR_ID, { idRolProyecto: null });
 
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
     expect(notifications.notifyUsers).toHaveBeenCalledWith([3], expect.objectContaining({ tipoNotificacion: 'TAREA_ACTUALIZADA' }));
@@ -249,7 +275,7 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
   it('elimina el rol sin asignado: ninguna notificación', async () => {
     const { notifications, service } = makeUpdateSetup({ idRolProyecto: null });
 
-    await service.update(PROJECT_ID, 42, ACTOR_ID, { idRolProyecto: null } as any);
+    await service.update(PROJECT_ID, 42, ACTOR_ID, { idRolProyecto: null });
 
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
     expect(notifications.notifyUsers).not.toHaveBeenCalled();
@@ -258,16 +284,16 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
   it('error de update: ninguna notificación', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanEditTask: vi.fn().mockResolvedValue(undefined) } as any;
+    const auth = { assertCanEditTask: vi.fn().mockResolvedValue(undefined) };
     const relations = {
       validateRelatedResources: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
-    } as any;
+    };
     const notifications = makeNotifications();
     tx.tarea.update.mockRejectedValue(new Error('fallo de escritura'));
-    const service = new TasksService(prisma, auth, relations, notifications, { getActiveAssignment: vi.fn() } as any);
+    const service = makeService(prisma, auth, relations, notifications, { getActiveAssignment: vi.fn() });
 
     await expect(
-      service.update(PROJECT_ID, 42, ACTOR_ID, { tituloTarea: 'x' } as any),
+      service.update(PROJECT_ID, 42, ACTOR_ID, { tituloTarea: 'x' }),
     ).rejects.toThrow('fallo de escritura');
 
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
@@ -278,7 +304,7 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
     const { notifications, service } = makeUpdateSetup({ idRolProyecto: ROLE_ID });
     notifications.notifyRoleMembers.mockRejectedValue(new Error('fallo'));
 
-    const resultado = await service.update(PROJECT_ID, 42, ACTOR_ID, { tituloTarea: 'x' } as any);
+    const resultado = await service.update(PROJECT_ID, 42, ACTOR_ID, { tituloTarea: 'x' });
 
     expect(resultado.idTarea).toBe(42);
   });
@@ -288,17 +314,17 @@ describe('TasksService — notificaciones de cambio de estado (Tarea 34)', () =>
   function makeEstadoSetup(rowOverrides: Record<string, unknown> = {}) {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanChangeTaskState: vi.fn().mockResolvedValue(undefined) } as any;
+    const auth = { assertCanChangeTaskState: vi.fn().mockResolvedValue(undefined) };
     const notifications = makeNotifications();
     tx.tarea.findFirst.mockResolvedValue(tareaRow(rowOverrides));
-    const service = new TasksService(prisma, auth, {} as any, notifications, {} as any);
+    const service = makeService(prisma, auth, {}, notifications, {});
     return { tx, notifications, service };
   }
 
   it('tarea con rol: notifica a notifyRoleMembers', async () => {
     const { notifications, service } = makeEstadoSetup({ idRolProyecto: ROLE_ID, estadoTarea: 'HECHO' });
 
-    await service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'HECHO' } as any);
+    await service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'HECHO' });
 
     expect(notifications.notifyRoleMembers).toHaveBeenCalledWith(
       PROJECT_ID,
@@ -311,7 +337,7 @@ describe('TasksService — notificaciones de cambio de estado (Tarea 34)', () =>
   it('tarea sin rol, asignada: notifica al asignado', async () => {
     const { notifications, service } = makeEstadoSetup({ asignaciones: asignacionActiva(3) });
 
-    await service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'HECHO' } as any);
+    await service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'HECHO' });
 
     expect(notifications.notifyUsers).toHaveBeenCalledWith([3], expect.anything());
   });
@@ -319,7 +345,7 @@ describe('TasksService — notificaciones de cambio de estado (Tarea 34)', () =>
   it('el propio asignado cambia su estado: se excluye a sí mismo, cero notificaciones', async () => {
     const { notifications, service } = makeEstadoSetup({ asignaciones: asignacionActiva(ACTOR_ID) });
 
-    await service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'HECHO' } as any);
+    await service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'HECHO' });
 
     expect(notifications.notifyUsers).not.toHaveBeenCalled();
   });
@@ -327,13 +353,13 @@ describe('TasksService — notificaciones de cambio de estado (Tarea 34)', () =>
   it('error al cambiar estado: ninguna notificación', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanChangeTaskState: vi.fn().mockResolvedValue(undefined) } as any;
+    const auth = { assertCanChangeTaskState: vi.fn().mockResolvedValue(undefined) };
     const notifications = makeNotifications();
     tx.tarea.update.mockRejectedValue(new Error('fallo'));
-    const service = new TasksService(prisma, auth, {} as any, notifications, {} as any);
+    const service = makeService(prisma, auth, {}, notifications, {});
 
     await expect(
-      service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'HECHO' } as any),
+      service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'HECHO' }),
     ).rejects.toThrow('fallo');
 
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
@@ -343,7 +369,7 @@ describe('TasksService — notificaciones de cambio de estado (Tarea 34)', () =>
   it('mismo estado: el método sigue escribiendo siempre (sin atajo de idempotencia), así que también notifica — comportamiento documentado, no una regla nueva', async () => {
     const { tx, notifications, service } = makeEstadoSetup({ estadoTarea: 'POR_HACER', asignaciones: asignacionActiva(3) });
 
-    await service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'POR_HACER' } as any);
+    await service.updateEstado(PROJECT_ID, 42, ACTOR_ID, { estadoTarea: 'POR_HACER' });
 
     expect(tx.tarea.update).toHaveBeenCalledTimes(1);
     expect(notifications.notifyUsers).toHaveBeenCalledTimes(1);
@@ -360,12 +386,12 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
     const prisma = makePrisma(tx);
     const auth = {
       assertCanAssignTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: PROJECT_ID, idRolProyecto: null, ...opts.tareaAutorizada }),
-    } as any;
-    const relations = { assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined) } as any;
-    const context = { getActiveAssignment: vi.fn().mockResolvedValue(opts.asignacionActivaPrevia ?? null) } as any;
+    };
+    const relations = { assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined) };
+    const context = { getActiveAssignment: vi.fn().mockResolvedValue(opts.asignacionActivaPrevia ?? null) };
     const notifications = makeNotifications();
     tx.tarea.findFirst.mockResolvedValue(tareaRow(opts.filaFinal));
-    const service = new TasksService(prisma, auth, relations, notifications, context);
+    const service = makeService(prisma, auth, relations, notifications, context);
     return { tx, prisma, notifications, service };
   }
 
@@ -375,7 +401,7 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
       filaFinal: { idRolProyecto: ROLE_ID },
     });
 
-    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 } as any);
+    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 });
 
     expect(notifications.notifyRoleMembers).toHaveBeenCalledWith(
       PROJECT_ID,
@@ -389,7 +415,7 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
   it('tarea sin rol: notifica únicamente al nuevo asignado', async () => {
     const { notifications, service } = makeAssignSetup({ filaFinal: { asignaciones: asignacionActiva(3) } });
 
-    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 } as any);
+    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 });
 
     expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([3], 'TAREA_ASIGNADA', expect.any(Object));
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
@@ -400,7 +426,7 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
       asignacionActivaPrevia: { idAsignacion: 1, idUsuario: 3 },
     });
 
-    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 } as any);
+    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 });
 
     expect(tx.asignacionTarea.create).not.toHaveBeenCalled();
     expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
@@ -410,7 +436,7 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
   it('actor igual al nuevo asignado (sin rol): cero notificaciones', async () => {
     const { notifications, service } = makeAssignSetup({ filaFinal: { asignaciones: asignacionActiva(ACTOR_ID) } });
 
-    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: ACTOR_ID } as any);
+    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: ACTOR_ID });
 
     expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
   });
@@ -421,7 +447,7 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
       filaFinal: { asignaciones: asignacionActiva(3) },
     });
 
-    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 } as any);
+    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 });
 
     expect(notifications.notifyFromTemplate).toHaveBeenCalledTimes(1);
     expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([3], 'TAREA_ASIGNADA', expect.any(Object));
@@ -436,7 +462,7 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
       filaFinal: { idRolProyecto: ROLE_ID },
     });
 
-    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 } as any);
+    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 });
 
     expect(notifications.notifyRoleMembers).toHaveBeenCalledTimes(1);
     expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
@@ -445,13 +471,15 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
   it('fallo transaccional (candidato no asignable): ninguna notificación', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanAssignTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: PROJECT_ID, idRolProyecto: null }) } as any;
-    const relations = { assertUserAssignableToProject: vi.fn().mockRejectedValue(new Error('no asignable')) } as any;
+    const auth = { assertCanAssignTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: PROJECT_ID, idRolProyecto: null }) };
+    const relations = { assertUserAssignableToProject: vi.fn().mockRejectedValue(new Error('no asignable')) };
     const notifications = makeNotifications();
-    const context = { getActiveAssignment: vi.fn() } as any;
-    const service = new TasksService(prisma, auth, relations, notifications, context);
+    const context = { getActiveAssignment: vi.fn() };
+    const service = makeService(prisma, auth, relations, notifications, context);
 
-    await expect(service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 } as any)).rejects.toThrow('no asignable');
+    await expect(service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 })).rejects.toThrow(
+      'no asignable',
+    );
 
     expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
@@ -460,10 +488,10 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
   it('colisión 409 (operación perdedora): ninguna notificación', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanAssignTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: PROJECT_ID, idRolProyecto: null }) } as any;
-    const relations = { assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined) } as any;
+    const auth = { assertCanAssignTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: PROJECT_ID, idRolProyecto: null }) };
+    const relations = { assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined) };
     const notifications = makeNotifications();
-    const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) } as any;
+    const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) };
     const { Prisma } = await import('@prisma/client');
     tx.asignacionTarea.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -472,9 +500,9 @@ describe('TasksService — notificaciones de asignación y reasignación (Tarea 
         meta: { modelName: 'AsignacionTarea', target: ['id_tarea'] },
       }),
     );
-    const service = new TasksService(prisma, auth, relations, notifications, context);
+    const service = makeService(prisma, auth, relations, notifications, context);
 
-    await expect(service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 } as any)).rejects.toThrow();
+    await expect(service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 })).rejects.toThrow();
 
     expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
@@ -497,11 +525,11 @@ describe('TasksService — desasignación conserva su regla específica (Tarea 3
         idRolProyecto: null,
         ...opts.tareaAutorizada,
       }),
-    } as any;
-    const context = { getActiveAssignment: vi.fn().mockResolvedValue(opts.asignacionActiva ?? null) } as any;
+    };
+    const context = { getActiveAssignment: vi.fn().mockResolvedValue(opts.asignacionActiva ?? null) };
     const notifications = makeNotifications();
     tx.asignacionTarea.updateMany.mockResolvedValue({ count: opts.closedCount ?? 1 });
-    const service = new TasksService(prisma, auth, {} as any, notifications, context);
+    const service = makeService(prisma, auth, {}, notifications, context);
     return { tx, notifications, service };
   }
 
@@ -578,10 +606,10 @@ describe('TasksService — notificaciones de soft delete (Tarea 34)', () => {
         idHito: null,
         ...opts.tareaAutorizada,
       }),
-    } as any;
-    const context = { getActiveAssignment: vi.fn().mockResolvedValue(opts.asignacionActiva ?? null) } as any;
+    };
+    const context = { getActiveAssignment: vi.fn().mockResolvedValue(opts.asignacionActiva ?? null) };
     const notifications = makeNotifications();
-    const service = new TasksService(prisma, auth, {} as any, notifications, context);
+    const service = makeService(prisma, auth, {}, notifications, context);
     return { tx, notifications, service };
   }
 
@@ -626,10 +654,10 @@ describe('TasksService — notificaciones de soft delete (Tarea 34)', () => {
   it('fallo transaccional: ninguna notificación', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanDeleteTask: vi.fn().mockRejectedValue(new ForbiddenException('no autorizado')) } as any;
+    const auth = { assertCanDeleteTask: vi.fn().mockRejectedValue(new ForbiddenException('no autorizado')) };
     const notifications = makeNotifications();
-    const context = { getActiveAssignment: vi.fn() } as any;
-    const service = new TasksService(prisma, auth, {} as any, notifications, context);
+    const context = { getActiveAssignment: vi.fn() };
+    const service = makeService(prisma, auth, {}, notifications, context);
 
     await expect(service.remove(PROJECT_ID, 42, ACTOR_ID)).rejects.toBeInstanceOf(ForbiddenException);
 
@@ -652,16 +680,18 @@ describe('TasksService — orden verificable: nunca se notifica mientras la tran
     const tx = makeTx();
     const prisma = makePrisma(tx);
     let dentroDeTransaccion = true;
-    prisma.$transaction = vi.fn(async (callback: any) => {
+    prisma.$transaction = vi.fn(
+      async (callback: (transaction: ReturnType<typeof makeTx>) => unknown) => {
       const resultado = await callback(tx);
       dentroDeTransaccion = false;
       orden.push('transaccion_resuelta');
       return resultado;
-    });
-    const auth = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) } as any;
+      },
+    );
+    const auth = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) };
     const relations = {
       validateCreateTaskRelations: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
-    } as any;
+    };
     const notifications = makeNotifications();
     notifications.notifyRoleMembers.mockImplementation(async () => {
       if (dentroDeTransaccion) {
@@ -671,14 +701,14 @@ describe('TasksService — orden verificable: nunca se notifica mientras la tran
     });
     tx.tarea.create.mockResolvedValue({ idTarea: 42 });
     tx.tarea.findFirst.mockResolvedValue(tareaRow({ idRolProyecto: ROLE_ID }));
-    const service = new TasksService(prisma, auth, relations, notifications, {} as any);
+    const service = makeService(prisma, auth, relations, notifications, {});
 
     await service.create(PROJECT_ID, ACTOR_ID, {
       tituloTarea: 'x',
       fechaLimite: '2026-12-25',
       prioridad: 'MEDIA',
       idRolProyecto: ROLE_ID,
-    } as any);
+    });
 
     expect(orden).toEqual(['transaccion_resuelta', 'notificacion']);
   });
@@ -688,17 +718,19 @@ describe('TasksService — orden verificable: nunca se notifica mientras la tran
     const tx = makeTx();
     const prisma = makePrisma(tx);
     let dentroDeTransaccion = true;
-    prisma.$transaction = vi.fn(async (callback: any) => {
+    prisma.$transaction = vi.fn(
+      async (callback: (transaction: ReturnType<typeof makeTx>) => unknown) => {
       const resultado = await callback(tx);
       dentroDeTransaccion = false;
       orden.push('transaccion_resuelta');
       return resultado;
-    });
+      },
+    );
     const auth = {
       assertCanAssignTask: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: PROJECT_ID, idRolProyecto: null }),
-    } as any;
-    const relations = { assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined) } as any;
-    const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) } as any;
+    };
+    const relations = { assertUserAssignableToProject: vi.fn().mockResolvedValue(undefined) };
+    const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) };
     const notifications = makeNotifications();
     notifications.notifyFromTemplate.mockImplementation(async () => {
       if (dentroDeTransaccion) {
@@ -707,9 +739,9 @@ describe('TasksService — orden verificable: nunca se notifica mientras la tran
       orden.push('notificacion');
     });
     tx.tarea.findFirst.mockResolvedValue(tareaRow({ asignaciones: asignacionActiva(3) }));
-    const service = new TasksService(prisma, auth, relations, notifications, context);
+    const service = makeService(prisma, auth, relations, notifications, context);
 
-    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 } as any);
+    await service.assign(PROJECT_ID, 42, ACTOR_ID, { idUsuario: 3 });
 
     expect(orden).toEqual(['transaccion_resuelta', 'notificacion']);
   });
