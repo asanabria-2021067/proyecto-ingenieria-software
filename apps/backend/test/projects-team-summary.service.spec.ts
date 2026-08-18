@@ -1,5 +1,8 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { ApplicationsService } from '../src/applications/applications.service';
+import type { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { TeamService } from '../src/team/team.service';
 
 function makePrisma() {
@@ -10,11 +13,15 @@ function makePrisma() {
     asignacionTarea: { findMany: vi.fn().mockResolvedValue([]) },
     tarea: { findMany: vi.fn() },
     horasParticipacion: { findMany: vi.fn() },
-  } as any;
+  };
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new TeamService(prisma, { findAll: vi.fn() } as any, { getPendingLeaderReviews: vi.fn() } as any);
+  return new TeamService(
+    prisma as unknown as PrismaService,
+    { findAll: vi.fn() } as unknown as ApplicationsService,
+    { getPendingLeaderReviews: vi.fn() } as unknown as ExitRequestsService,
+  );
 }
 
 const LIDER = {
@@ -338,8 +345,9 @@ describe('TeamService.getTeamSummary', () => {
     prisma.participacionProyecto.findMany.mockResolvedValue([
       participacion(5, 10, 'Desarrollador', 'RETIRADO'),
     ]);
-    prisma.asignacionTarea.findMany.mockImplementation(async ({ where }: any) =>
-      where.tarea.idProyecto === 1 ? [] : [{ idUsuario: 5 }],
+    prisma.asignacionTarea.findMany.mockImplementation(
+      async ({ where }: { where: { tarea: { idProyecto: number } } }) =>
+        where.tarea.idProyecto === 1 ? [] : [{ idUsuario: 5 }],
     );
     prisma.tarea.findMany.mockResolvedValue([]);
     prisma.horasParticipacion.findMany.mockResolvedValue([]);
@@ -507,24 +515,26 @@ describe('TeamService.getTeamSummary', () => {
 
   it('datos de un Proyecto B no afectan el resumen del Proyecto A (mock simula ambas bases en memoria)', async () => {
     const prisma = makePrisma();
-    prisma.proyecto.findFirst.mockImplementation(async ({ where }: any) =>
+    prisma.proyecto.findFirst.mockImplementation(async ({ where }: { where: { idProyecto: number } }) =>
       where.idProyecto === 1 ? { idProyecto: 1, creadoPor: 1 } : { idProyecto: 2, creadoPor: 1 },
     );
     prisma.usuario.findUnique.mockResolvedValue(LIDER);
     // El mock respeta el filtro real (rolProyecto.idProyecto), igual que la
     // base de datos: proyectoB con su propio miembro nunca contamina A.
-    prisma.participacionProyecto.findMany.mockImplementation(async ({ where }: any) =>
-      where.rolProyecto.idProyecto === 1 ? [participacion(2, 10)] : [participacion(3, 20)],
+    prisma.participacionProyecto.findMany.mockImplementation(
+      async ({ where }: { where: { rolProyecto: { idProyecto: number } } }) =>
+        where.rolProyecto.idProyecto === 1 ? [participacion(2, 10)] : [participacion(3, 20)],
     );
-    prisma.tarea.findMany.mockImplementation(async ({ where }: any) =>
+    prisma.tarea.findMany.mockImplementation(async ({ where }: { where: { idProyecto: number } }) =>
       where.idProyecto === 1
         ? [{ idTarea: 100, estadoTarea: 'HECHO', asignaciones: [{ idUsuario: 2 }] }]
         : [{ idTarea: 200, estadoTarea: 'HECHO', asignaciones: [{ idUsuario: 3 }] }],
     );
-    prisma.horasParticipacion.findMany.mockImplementation(async ({ where }: any) =>
-      where.participacion.rolProyecto.idProyecto === 1
-        ? [{ horasAprobadas: decimal(5), participacion: { idUsuario: 2 } }]
-        : [{ horasAprobadas: decimal(99), participacion: { idUsuario: 3 } }],
+    prisma.horasParticipacion.findMany.mockImplementation(
+      async ({ where }: { where: { participacion: { rolProyecto: { idProyecto: number } } } }) =>
+        where.participacion.rolProyecto.idProyecto === 1
+          ? [{ horasAprobadas: decimal(5), participacion: { idUsuario: 2 } }]
+          : [{ horasAprobadas: decimal(99), participacion: { idUsuario: 3 } }],
     );
     const service = makeService(prisma);
 
