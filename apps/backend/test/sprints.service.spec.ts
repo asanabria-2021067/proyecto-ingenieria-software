@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { SprintsService } from '../src/sprints/sprints.service';
 import { SprintsContextService } from '../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../src/sprints/sprints-authorization.service';
@@ -61,9 +63,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
-  return {
+  const prisma = {
     tx,
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
+    $transaction: vi.fn(),
     $queryRaw: vi.fn(),
     sprint: { findFirst: vi.fn(), findMany: vi.fn() },
     hito: { findMany: vi.fn() },
@@ -72,15 +74,18 @@ function makePrisma(tx = makeTx()) {
     // para no romper los tests preexistentes de getSprintDetail que nunca
     // configuran este mock explícitamente.
     tarea: { findMany: vi.fn().mockResolvedValue([]) },
-  } as any;
+  };
+  prisma.$transaction.mockImplementation(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx));
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeSprintsContext() {
-  return { getCurrentSprint: vi.fn() } as any;
+  const context = { getCurrentSprint: vi.fn() };
+  return context as typeof context & SprintsContextService;
 }
 
 function makeSprintsAuthorization() {
-  return {
+  const authorization = {
     assertCanStartSprint: vi.fn().mockResolvedValue(undefined),
     assertCanFinalizeSprint: vi.fn(),
     assertCanCloseSprint: vi.fn(),
@@ -88,15 +93,17 @@ function makeSprintsAuthorization() {
     assertCanViewClosingSummary: vi.fn().mockResolvedValue(undefined),
     assertCanListSprintHistory: vi.fn().mockResolvedValue(undefined),
     assertCanViewSprintHistory: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+  return authorization as typeof authorization & SprintsAuthorizationService;
 }
 
 function makeNotifications() {
-  return {
+  const notifications = {
     notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
     notifySprintFinalizationStarted: vi.fn().mockResolvedValue(undefined),
     notifySprintClosed: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+  return notifications as typeof notifications & NotificationsService;
 }
 
 const LIDER_ID = 1;
@@ -546,12 +553,12 @@ describe('SprintsService', () => {
 
       const orden: string[] = [];
       const prisma = {
-        $transaction: vi.fn(async (callback: any) => {
+        $transaction: vi.fn(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => {
           const resultado = await callback(tx);
           orden.push('transaction-resuelta');
           return resultado;
         }),
-      } as any;
+      } as unknown as PrismaService;
       const context = makeSprintsContext();
       const notifications = makeNotifications();
       notifications.notifyProjectActiveParticipants.mockImplementation(async () => {
@@ -581,11 +588,11 @@ describe('SprintsService', () => {
       // ej. la relectura final falla) — el callback de $transaction
       // propaga el rechazo tal como Prisma haría en un rollback real.
       const prisma = {
-        $transaction: vi.fn(async (callback: any) => {
+        $transaction: vi.fn(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => {
           tx.sprint.findFirst.mockResolvedValue(null);
           return callback(tx);
         }),
-      } as any;
+      } as unknown as PrismaService;
       const context = makeSprintsContext();
       const notifications = makeNotifications();
       const service = new SprintsService(prisma, context, authorization, notifications);
@@ -779,16 +786,20 @@ describe('SprintsService', () => {
         horasCalculadas: new Prisma.Decimal(8),
         horasAprobadas: new Prisma.Decimal(8),
       });
-      tx.horasParticipacion.findFirst.mockImplementation(async ({ where }: any) => {
-        if (where.idParticipacion === 51) return registro51;
-        if (where.idParticipacion === 87) return registro87;
-        return null;
-      });
-      tx.horasParticipacion.update.mockImplementation(async ({ where, data }: any) => {
-        if (where.idRegistroHoras === 501) return { ...registro51, ...data };
-        if (where.idRegistroHoras === 870) return { ...registro87, ...data };
-        throw new Error(`update dirigido a un idRegistroHoras inesperado: ${where.idRegistroHoras}`);
-      });
+      tx.horasParticipacion.findFirst.mockImplementation(
+        async ({ where }: { where: { idParticipacion: number } }) => {
+          if (where.idParticipacion === 51) return registro51;
+          if (where.idParticipacion === 87) return registro87;
+          return null;
+        },
+      );
+      tx.horasParticipacion.update.mockImplementation(
+        async ({ where, data }: { where: { idRegistroHoras: number }; data: Record<string, unknown> }) => {
+          if (where.idRegistroHoras === 501) return { ...registro51, ...data };
+          if (where.idRegistroHoras === 870) return { ...registro87, ...data };
+          throw new Error(`update dirigido a un idRegistroHoras inesperado: ${where.idRegistroHoras}`);
+        },
+      );
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
@@ -881,12 +892,15 @@ describe('SprintsService', () => {
       // sin compartir referencia con `asignacionesAntes`.
       const asignacionTareaStore = asignacionesAntes.map((a) => ({ ...a, horasReales: new Prisma.Decimal(a.horasReales) }));
 
-      const tx = makeTx();
+      const txBase = makeTx();
       // AsignacionTarea SÍ está disponible en este tx (a diferencia de otros
       // casos de este describe), precisamente para poder leerla antes y
       // después y comparar valores reales, no solo ausencia de llamadas.
-      (tx as any).asignacionTarea = {
-        findMany: vi.fn(async () => asignacionTareaStore.map((a) => ({ ...a }))),
+      const tx = {
+        ...txBase,
+        asignacionTarea: {
+          findMany: vi.fn(async () => asignacionTareaStore.map((a) => ({ ...a }))),
+        },
       };
       tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: new Prisma.Decimal(10) }));
       tx.horasParticipacion.update.mockResolvedValue(registroHoras({ horasAprobadas: new Prisma.Decimal(10) }));
@@ -895,11 +909,11 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications());
 
-      const antes = await (tx as any).asignacionTarea.findMany();
+      const antes = await tx.asignacionTarea.findMany();
 
       await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 10 });
 
-      const despues = await (tx as any).asignacionTarea.findMany();
+      const despues = await tx.asignacionTarea.findMany();
 
       expect(despues).toHaveLength(antes.length);
       antes.forEach((asignacionAntes: { idAsignacion: number; horasReales: Prisma.Decimal }, index: number) => {
@@ -914,7 +928,7 @@ describe('SprintsService', () => {
       // adjustRecognizedHours nunca invoca asignacionTarea: la única
       // llamada registrada es la del propio test (antes/después), no del
       // servicio.
-      expect((tx as any).asignacionTarea.findMany).toHaveBeenCalledTimes(2);
+      expect(tx.asignacionTarea.findMany).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -1225,7 +1239,10 @@ describe('SprintsService', () => {
           proyecto: { creadoPor: LIDER_ID, eliminadoEn: null },
         });
         const queryRaw = vi.fn().mockResolvedValue(sprintFilas);
-        const prisma = { sprint: { findFirst: sprintFindFirst }, $queryRaw: queryRaw } as any;
+        const prisma = {
+          sprint: { findFirst: sprintFindFirst },
+          $queryRaw: queryRaw,
+        } as unknown as PrismaService;
 
         // Servicios reales (no mocks de conveniencia) para que el conteo
         // refleje exactamente las llamadas a Prisma que la cadena
@@ -1478,7 +1495,7 @@ describe('SprintsService', () => {
       expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
       // makeTx() tampoco expone asignacionTarea: si closeSprint intentara
       // tocarla, la llamada fallaría con TypeError antes de llegar aquí.
-      expect((tx as any).asignacionTarea).toBeUndefined();
+      expect((tx as unknown as Record<string, unknown>).asignacionTarea).toBeUndefined();
     });
 
     it('terminalidad: una segunda llamada a closeSprint sobre un Sprint ya CERRADO se rechaza (mismo caso 3, verificado explícitamente como "terminal")', async () => {
@@ -1710,8 +1727,6 @@ describe('SprintsService', () => {
   });
 
   describe('getSprintDetail', () => {
-    const AUTOR_SELECT = { idUsuario: true, nombre: true, apellido: true, fotoUrl: true };
-
     function usuarioPublico(overrides: Record<string, unknown> = {}) {
       return { idUsuario: 40, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null, ...overrides };
     }
