@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import type { ArgumentMetadata } from '@nestjs/common';
 import { EstadoTarea } from '@prisma/client';
 import { UpdateTaskEstadoDto } from '../src/tasks/dto/update-task-estado.dto';
 
@@ -12,7 +13,7 @@ const pipe = new ValidationPipe({
 });
 
 async function parse(plain: unknown): Promise<UpdateTaskEstadoDto> {
-  return pipe.transform(plain, { type: 'body', metatype: UpdateTaskEstadoDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: UpdateTaskEstadoDto } as ArgumentMetadata);
 }
 
 describe('UpdateTaskEstadoDto', () => {
