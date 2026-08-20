@@ -218,6 +218,20 @@ Modo desarrollo con hot reload (backend + frontend):
 docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile app up -d --build
 ```
 
+### 2.1) Puertos de PostgreSQL y pgAdmin (solo loopback)
+
+`postgres` (5432) y `pgadmin` (5050) publican únicamente en `127.0.0.1`, no en
+todas las interfaces: no son accesibles desde fuera de la máquina/VM donde
+corre Docker. Para administrarlos de forma remota (por ejemplo, en la VM de
+Azure), usá un túnel SSH:
+
+```bash
+ssh -i uvg-collab-server_key.pem -L 5432:localhost:5432 azureuser@158.23.57.118
+```
+
+Con el túnel activo, `localhost:5432` en tu máquina local apunta al Postgres
+de la VM.
+
 ### 3) URLs locales
 
 | Servicio | URL |
