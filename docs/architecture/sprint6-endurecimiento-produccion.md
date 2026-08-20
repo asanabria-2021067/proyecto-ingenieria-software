@@ -32,26 +32,54 @@ alcanzables desde Internet, no solo desde `localhost`.
   datos + pgAdmin" (ahora es solo base de datos; pgAdmin requiere
   `--profile tools`), y se documento el acceso remoto via tunel SSH.
 
+### Redis (6379) - investigacion, sin cambio en el repositorio
+
+`docker-compose.yml` (raiz) no declara bloque `ports` para `redis` desde el
+commit `bb23fc2` ("chore: quita puerto expuesto de redis y agrega logging
+acotado"), previo a este ticket. El backend se conecta a Redis por el
+hostname interno (`REDIS_HOST=redis`) dentro de `uvg-network`, asi que el
+mapeo al host nunca hizo falta.
+
+El `0.0.0.0:6379->6379/tcp` que muestra `docker compose ps` en la VM no viene
+del repositorio: es un contenedor `uvg-collab-redis` mas viejo que ese
+commit y que nunca se recreo (los `up -d` posteriores no tocan un servicio
+cuya definicion no cambio en las capas que Compose compara). No hay archivo
+de override en la VM que lo explique; ver "Comandos para aplicar en la VM"
+para el procedimiento de recreacion.
+
 ### Verificacion — desde dentro de la VM
 
 ```bash
-ss -tlnp | grep -E ':5432|:5050'
+ss -tlnp | grep -E ':5432|:5050|:6379'
 ```
 
-Resultado esperado: ambos puertos con `127.0.0.1:5432` / `127.0.0.1:5050`
-como direccion local, nunca `0.0.0.0:*` ni `[::]:*`.
+Resultado esperado: los tres puertos con `127.0.0.1:5432` / `127.0.0.1:5050`
+como direccion local (nunca `0.0.0.0:*` ni `[::]:*`), y sin listener publico
+en `:6379` una vez recreado el contenedor de Redis.
 
 `[Completar]`: captura de `ss -tlnp` en la VM tras el despliegue.
 
 ### Verificacion — desde fuera de la VM
 
+Estado previo a este ticket (Network Security Group de Azure ya bloqueaba
+5432 y 6379, pero como unica capa de control, fuera del repositorio):
+
+```
+nc -zv -w 5 158.23.57.118 5432   ->  timed out
+nc -zv -w 5 158.23.57.118 6379   ->  timed out
+nc -zv -w 5 158.23.57.118 80     ->  succeeded
+```
+
+Repetir tras el despliegue (agrega 5050, sin cambios esperados en 5432/6379):
+
 ```bash
 nc -zv -w3 158.23.57.118 5432
 nc -zv -w3 158.23.57.118 5050
+nc -zv -w3 158.23.57.118 6379
 ```
 
-Resultado esperado: conexion rechazada/timeout en ambos puertos (ya no hay
-listener en la interfaz publica).
+Resultado esperado: conexion rechazada/timeout en los tres (ya no hay
+listener en la interfaz publica, y el NSG los sigue bloqueando).
 
 Acceso legitimo para administracion remota, via tunel SSH:
 
