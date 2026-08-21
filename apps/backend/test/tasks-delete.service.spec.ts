@@ -1,48 +1,73 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
 
 function makeTx() {
   return {
-    tarea: { update: vi.fn() },
+    // A12.1: findMany se usa exclusivamente por syncHitoEstado cuando la
+    // tarea eliminada tiene idHito != null. Por defecto [] para no romper
+    // los tests preexistentes.
+    tarea: { update: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     asignacionTarea: { updateMany: vi.fn() },
+    // A12.1: presente únicamente en los tests que eliminan una tarea con
+    // idHito != null; ausente (undefined) en el resto.
+    hito: undefined as { update: ReturnType<typeof vi.fn> } | undefined,
   };
 }
 
 function makePrisma(tx = makeTx()) {
-  return {
+  const prisma = {
     tx,
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
-  } as any;
+    $transaction: vi.fn(),
+  };
+  prisma.$transaction.mockImplementation(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx));
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeAuthorization(overrides: Record<string, unknown> = {}) {
-  return {
-    assertCanDeleteTask: vi
-      .fn()
-      .mockResolvedValue({ idTarea: 42, idProyecto: 5, idRolProyecto: null, tituloTarea: 'Tarea de prueba' }),
+  const authorization = {
+    assertCanDeleteTask: vi.fn().mockResolvedValue({
+      idTarea: 42,
+      idProyecto: 5,
+      idRolProyecto: null,
+      idHito: null,
+      tituloTarea: 'Tarea de prueba',
+    }),
     ...overrides,
-  } as any;
+  };
+  return authorization as typeof authorization & TasksAuthorizationService;
 }
 
 function makeNotifications() {
-  return {
+  const notifications = {
     notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
     notifyUsers: vi.fn().mockResolvedValue(undefined),
     notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+  return notifications as typeof notifications & NotificationsService;
 }
 
-function makeService(opts: { prisma?: any; auth?: any; notifications?: any } = {}) {
+function makeService(opts: {
+  prisma?: ReturnType<typeof makePrisma>;
+  auth?: ReturnType<typeof makeAuthorization>;
+  notifications?: ReturnType<typeof makeNotifications>;
+} = {}) {
   const tx = makeTx();
   const prisma = opts.prisma ?? makePrisma(tx);
   const auth = opts.auth ?? makeAuthorization();
-  const relations = { validateRelatedResources: vi.fn(), assertUserAssignableToProject: vi.fn() } as any;
+  const relationsLiteral = { validateRelatedResources: vi.fn(), assertUserAssignableToProject: vi.fn() };
+  const relations = relationsLiteral as typeof relationsLiteral & TasksRelationsService;
   const notifications = opts.notifications ?? makeNotifications();
   // Tarea 34: remove() ahora consulta la asignación activa DENTRO de la
   // transacción (antes de cerrarla) para poder notificar al asignado
   // previo cuando la tarea no tiene rol; por defecto, sin asignación.
-  const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) } as any;
+  const contextLiteral = { getActiveAssignment: vi.fn().mockResolvedValue(null) };
+  const context = contextLiteral as typeof contextLiteral & TasksContextService;
   const service = new TasksService(prisma, auth, relations, notifications, context);
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
@@ -201,10 +226,10 @@ describe('TasksService.remove', () => {
 
       await service.remove(5, 42, 1);
 
-      expect((tx.asignacionTarea as any).create).toBeUndefined();
-      expect((tx.asignacionTarea as any).delete).toBeUndefined();
-      expect((tx.asignacionTarea as any).deleteMany).toBeUndefined();
-      expect((tx.asignacionTarea as any).update).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).create).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).delete).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).deleteMany).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).update).toBeUndefined();
     });
   });
 
@@ -263,19 +288,20 @@ describe('TasksService.remove', () => {
       const orden: string[] = [];
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const auth = {
+      const authLiteral = {
         assertCanDeleteTask: vi.fn(async () => {
           orden.push('autorizacion');
-          return { idTarea: 42, idProyecto: 5, idRolProyecto: null, tituloTarea: 'Tarea de prueba' };
+          return { idTarea: 42, idProyecto: 5, idRolProyecto: null, idHito: null, tituloTarea: 'Tarea de prueba' };
         }),
-      } as any;
+      };
+      const auth = authLiteral as typeof authLiteral & TasksAuthorizationService;
       tx.asignacionTarea.updateMany.mockImplementation(async () => {
         orden.push('updateMany_asignacion');
       });
       tx.tarea.update.mockImplementation(async () => {
         orden.push('update_tarea');
       });
-      const relations = {} as any;
+      const relations = {} as unknown as TasksRelationsService;
       const notifications = makeNotifications();
       notifications.notifyUsers.mockImplementation(async () => {
         orden.push('notificacion');
@@ -284,12 +310,13 @@ describe('TasksService.remove', () => {
       // antes de cerrar la asignación (snapshot previo al cierre); aquí
       // devuelve un asignado activo para poder observar la notificación
       // posterior al commit (audiencia sin rol -> asignado previo).
-      const context = {
+      const contextLiteral = {
         getActiveAssignment: vi.fn(async () => {
           orden.push('snapshot_asignacion');
           return { idUsuario: 7 };
         }),
-      } as any;
+      };
+      const context = contextLiteral as typeof contextLiteral & TasksContextService;
       const service = new TasksService(prisma, auth, relations, notifications, context);
 
       await service.remove(5, 42, 1);
@@ -358,13 +385,56 @@ describe('TasksService.remove', () => {
 
       await service.remove(5, 42, 1);
 
-      expect((tx as any).comentario).toBeUndefined();
-      expect((tx as any).evidencia).toBeUndefined();
-      expect((tx as any).tareaEtiqueta).toBeUndefined();
-      expect((tx.tarea as any).delete).toBeUndefined();
-      expect((tx.tarea as any).deleteMany).toBeUndefined();
-      expect((tx.asignacionTarea as any).delete).toBeUndefined();
-      expect((tx.asignacionTarea as any).deleteMany).toBeUndefined();
+      expect((tx as unknown as Record<string, unknown>).comentario).toBeUndefined();
+      expect((tx as unknown as Record<string, unknown>).evidencia).toBeUndefined();
+      expect((tx as unknown as Record<string, unknown>).tareaEtiqueta).toBeUndefined();
+      expect((tx.tarea as unknown as Record<string, unknown>).delete).toBeUndefined();
+      expect((tx.tarea as unknown as Record<string, unknown>).deleteMany).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).delete).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).deleteMany).toBeUndefined();
+    });
+  });
+
+  describe('A12.1 — sincronización de Hito.estadoHito al eliminar (soft-delete) una tarea', () => {
+    it('eliminar una tarea con idHito resincroniza el Hito: el conjunto vigente ya excluye la tarea eliminada', async () => {
+      const { tx, service } = makeService({
+        auth: makeAuthorization({
+          assertCanDeleteTask: vi.fn().mockResolvedValue({
+            idTarea: 42,
+            idProyecto: 5,
+            idRolProyecto: null,
+            idHito: 9,
+            tituloTarea: 'Tarea con hito',
+          }),
+        }),
+      });
+      tx.hito = { update: vi.fn() };
+      // La consulta de progreso, tras el soft-delete, ya filtra
+      // eliminadoEn: null — la tarea recién eliminada no aparece aquí
+      // (simulado directamente: solo queda 1 tarea restante, HECHO).
+      tx.tarea.findMany.mockResolvedValue([{ idHito: 9, estadoTarea: 'HECHO' }]);
+
+      await service.remove(5, 42, 1);
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 9 },
+        data: { estadoHito: 'COMPLETADO' },
+      });
+      expect(tx.tarea.findMany).toHaveBeenCalledWith({
+        where: { idHito: 9, eliminadoEn: null },
+        select: { estadoTarea: true },
+      });
+    });
+
+    it('eliminar una tarea SIN Hito: no intenta sincronizar ningún Hito', async () => {
+      // idHito: null por defecto en makeAuthorization() — tx.hito
+      // permanece undefined; si el código intentara sincronizar, esta
+      // prueba fallaría con TypeError antes de completarse.
+      const { tx, service } = makeService();
+
+      await service.remove(5, 42, 1);
+
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,9 +1,13 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { JwtService } from '@nestjs/jwt';
+import { TipoNotificacion } from '@prisma/client';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { NotificationsGateway } from '../src/notifications/notifications.gateway';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function makePrisma() {
-  return {
+  const prisma = {
     notificacion: {
       findMany: vi.fn(),
       count: vi.fn(),
@@ -14,7 +18,8 @@ function makePrisma() {
     },
     usuarioRolAcceso: { findFirst: vi.fn(), findMany: vi.fn() },
     participacionProyecto: { findMany: vi.fn() },
-  } as any;
+  };
+  return prisma as typeof prisma & PrismaService;
 }
 
 describe('NotificationsService', () => {
@@ -58,7 +63,10 @@ describe('NotificationsService', () => {
     const prisma = makePrisma();
     prisma.usuarioRolAcceso.findMany.mockResolvedValue([{ idUsuario: 1 }, { idUsuario: 2 }]);
     const service = new NotificationsService(prisma);
-    await service.notifyAdmins({ tipoNotificacion: 'PROYECTO_ACTUALIZADO' as any, tituloNotificacion: 't' });
+    await service.notifyAdmins({
+      tipoNotificacion: TipoNotificacion.PROYECTO_ACTUALIZADO,
+      tituloNotificacion: 't',
+    });
     expect(prisma.notificacion.createMany).toHaveBeenCalled();
   });
 
@@ -92,8 +100,136 @@ describe('NotificationsService', () => {
     await service.notifyProjectActiveParticipants(
       1,
       2,
-      { tipoNotificacion: 'COMENTARIO_PROYECTO' as any, tituloNotificacion: 'x' },
+      { tipoNotificacion: TipoNotificacion.COMENTARIO_PROYECTO, tituloNotificacion: 'x' },
     );
     expect(prisma.notificacion.createMany).toHaveBeenCalled();
+  });
+
+  describe('notifySprintFinalizationStarted (A4)', () => {
+    /**
+     * NotificationsService exige un NotificationsGateway real (clase con
+     * campos privados: un objeto literal nunca es estructuralmente
+     * compatible con ese tipo, de ahí el `any` original). En vez de
+     * falsear el tipo, se instancia el gateway real — JwtService también
+     * se construye real, su constructor no exige configuración para estos
+     * tests — y se espía notifySprintFinalizationStarted con vi.spyOn
+     * (completamente tipado). El único campo que Nest solo asigna en
+     * arranque real es `server` (un Server de socket.io); para simular
+     * "socket conectado" sin construir un Server real se usa
+     * `Reflect.set`, que no requiere anotar `any` en ningún punto de este
+     * archivo — cero `any` nuevos.
+     */
+    function makeConnectedGateway() {
+      const gateway = new NotificationsGateway(new JwtService());
+      Reflect.set(gateway, 'server', {});
+      vi.spyOn(gateway, 'notifySprintFinalizationStarted').mockResolvedValue(undefined);
+      return gateway;
+    }
+
+    function makeDisconnectedGateway() {
+      // Instancia real sin `server` asignado (tal como queda antes de que
+      // Nest complete el arranque real): this.gateway?.server es undefined.
+      return new NotificationsGateway(new JwtService());
+    }
+
+    it('destinatarios = participantes ACTIVO del proyecto, excluyendo al autor', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }, { idUsuario: 9 }]);
+      const gateway = makeConnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await service.notifySprintFinalizationStarted(1, 2, { projectId: 1, sprintId: 5 });
+
+      expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith({
+        where: {
+          estadoParticipacion: 'ACTIVO',
+          idUsuario: { not: 2 },
+          rolProyecto: { idProyecto: 1 },
+        },
+        distinct: ['idUsuario'],
+        select: { idUsuario: true },
+      });
+      expect(gateway.notifySprintFinalizationStarted).toHaveBeenCalledWith(
+        [8, 9],
+        { projectId: 1, sprintId: 5 },
+      );
+    });
+
+    it('no persiste ninguna fila de Notificacion (señal realtime pura, no bandeja)', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }]);
+      const gateway = makeConnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await service.notifySprintFinalizationStarted(1, 2, { projectId: 1, sprintId: 5 });
+
+      expect(prisma.notificacion.createMany).not.toHaveBeenCalled();
+    });
+
+    it('sin gateway.server disponible, no intenta emitir', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }]);
+      const gateway = makeDisconnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await expect(
+        service.notifySprintFinalizationStarted(1, 2, { projectId: 1, sprintId: 5 }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('notifySprintClosed (A9.1)', () => {
+    function makeConnectedGateway() {
+      const gateway = new NotificationsGateway(new JwtService());
+      Reflect.set(gateway, 'server', {});
+      vi.spyOn(gateway, 'notifySprintClosed').mockResolvedValue(undefined);
+      return gateway;
+    }
+
+    function makeDisconnectedGateway() {
+      return new NotificationsGateway(new JwtService());
+    }
+
+    it('destinatarios = participantes ACTIVO del proyecto, excluyendo al autor (mismo criterio que START)', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }, { idUsuario: 9 }]);
+      const gateway = makeConnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await service.notifySprintClosed(1, 2, { projectId: 1, sprintId: 5 });
+
+      expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith({
+        where: {
+          estadoParticipacion: 'ACTIVO',
+          idUsuario: { not: 2 },
+          rolProyecto: { idProyecto: 1 },
+        },
+        distinct: ['idUsuario'],
+        select: { idUsuario: true },
+      });
+      expect(gateway.notifySprintClosed).toHaveBeenCalledWith([8, 9], { projectId: 1, sprintId: 5 });
+    });
+
+    it('no persiste ninguna fila de Notificacion (señal realtime pura, no bandeja)', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }]);
+      const gateway = makeConnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await service.notifySprintClosed(1, 2, { projectId: 1, sprintId: 5 });
+
+      expect(prisma.notificacion.createMany).not.toHaveBeenCalled();
+    });
+
+    it('sin gateway.server disponible, no intenta emitir', async () => {
+      const prisma = makePrisma();
+      prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 8 }]);
+      const gateway = makeDisconnectedGateway();
+      const service = new NotificationsService(prisma, gateway);
+
+      await expect(
+        service.notifySprintClosed(1, 2, { projectId: 1, sprintId: 5 }),
+      ).resolves.toBeUndefined();
+    });
   });
 });

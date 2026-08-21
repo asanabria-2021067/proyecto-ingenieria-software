@@ -12,6 +12,7 @@ import { LabelsController } from '../src/labels/labels.controller';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { CreateLabelDto } from '../src/labels/dto/create-label.dto';
 import { UpdateLabelDto } from '../src/labels/dto/update-label.dto';
+import { LabelsService } from '../src/labels/labels.service';
 
 /**
  * Tarea 31: el proyecto no instala `@nestjs/testing` (ver
@@ -21,12 +22,13 @@ import { UpdateLabelDto } from '../src/labels/dto/update-label.dto';
  * LabelsService simulado para verificar delegación.
  */
 function makeService() {
-  return {
+  const service = {
     findAllForProject: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
-  } as any;
+  };
+  return service as typeof service & LabelsService;
 }
 
 const SOURCE = readFileSync(join(__dirname, '../src/labels/labels.controller.ts'), 'utf-8');

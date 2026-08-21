@@ -1,12 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException, ForbiddenException, ParseIntPipe } from '@nestjs/common';
+import {
+  ArgumentMetadata,
+  BadRequestException,
+  ForbiddenException,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TasksController } from '../src/tasks/tasks.controller';
+import { AssignTaskDto } from '../src/tasks/dto/assign-task.dto';
+import { TasksService } from '../src/tasks/tasks.service';
 
 function makeService() {
-  return {
+  const service = {
     findAll: vi.fn(),
     findOne: vi.fn(),
     create: vi.fn(),
@@ -14,7 +21,8 @@ function makeService() {
     updateEstado: vi.fn(),
     remove: vi.fn(),
     assign: vi.fn(),
-  } as any;
+  };
+  return service as typeof service & TasksService;
 }
 
 describe('TasksController.assign (POST /proyectos/:projectId/tareas/:taskId/asignar)', () => {
@@ -32,7 +40,7 @@ describe('TasksController.assign (POST /proyectos/:projectId/tareas/:taskId/asig
   it('delega en TasksService.assign con projectId, taskId, userId (CurrentUser) y el dto', () => {
     const service = makeService();
     const controller = new TasksController(service);
-    const dto = { idUsuario: 7 } as any;
+    const dto: AssignTaskDto = { idUsuario: 7 };
 
     controller.assign(5, 42, { userId: 9 }, dto);
 
@@ -45,7 +53,7 @@ describe('TasksController.assign (POST /proyectos/:projectId/tareas/:taskId/asig
     service.assign.mockResolvedValue(tareaAsignada);
     const controller = new TasksController(service);
 
-    const result = await controller.assign(5, 42, { userId: 9 }, { idUsuario: 7 } as any);
+    const result = await controller.assign(5, 42, { userId: 9 }, { idUsuario: 7 });
 
     expect(result).toBe(tareaAsignada);
   });
@@ -56,7 +64,7 @@ describe('TasksController.assign (POST /proyectos/:projectId/tareas/:taskId/asig
     service.assign.mockRejectedValue(error);
     const controller = new TasksController(service);
 
-    await expect(controller.assign(5, 42, { userId: 9 }, { idUsuario: 7 } as any)).rejects.toBe(
+    await expect(controller.assign(5, 42, { userId: 9 }, { idUsuario: 7 })).rejects.toBe(
       error,
     );
   });
@@ -64,14 +72,14 @@ describe('TasksController.assign (POST /proyectos/:projectId/tareas/:taskId/asig
   it('projectId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('abc', { type: 'param', data: 'projectId' } as any),
+      pipe.transform('abc', { type: 'param', data: 'projectId' } as ArgumentMetadata),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('taskId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('xyz', { type: 'param', data: 'taskId' } as any),
+      pipe.transform('xyz', { type: 'param', data: 'taskId' } as ArgumentMetadata),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 

@@ -2,21 +2,27 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { EstadoProyecto } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { MensajesRevisionService } from '../src/mensajes-revision/mensajes-revision.service';
+import { NotificationsService } from '../src/notifications/notifications.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function makePrisma() {
-  return {
+  const prisma = {
     proyecto: { findUnique: vi.fn() },
     mensajeRevisionProyecto: { findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
     revisionProyecto: { findFirst: vi.fn() },
     usuarioRolAcceso: { findMany: vi.fn() },
-  } as any;
+  };
+  return prisma as typeof prisma & PrismaService;
 }
 
 describe('MensajesRevisionService', () => {
   it('findByProyecto falla si proyecto no existe', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findUnique.mockResolvedValue(null);
-    const service = new MensajesRevisionService(prisma, { isAdmin: vi.fn() } as any);
+    const service = new MensajesRevisionService(
+      prisma,
+      { isAdmin: vi.fn() } as unknown as NotificationsService,
+    );
     await expect(service.findByProyecto(1, 1)).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -28,7 +34,10 @@ describe('MensajesRevisionService', () => {
       estadoProyecto: EstadoProyecto.EN_REVISION,
     });
     prisma.mensajeRevisionProyecto.findMany.mockResolvedValue([{ idMensaje: 1 }]);
-    const service = new MensajesRevisionService(prisma, { isAdmin: vi.fn().mockResolvedValue(true) } as any);
+    const service = new MensajesRevisionService(
+      prisma,
+      { isAdmin: vi.fn().mockResolvedValue(true) } as unknown as NotificationsService,
+    );
     const result = await service.findByProyecto(1, 99);
     expect(result).toEqual([{ idMensaje: 1 }]);
   });
@@ -42,7 +51,13 @@ describe('MensajesRevisionService', () => {
       estadoProyecto: EstadoProyecto.EN_REVISION,
     });
     prisma.revisionProyecto.findFirst.mockResolvedValue(null);
-    const service = new MensajesRevisionService(prisma, { isAdmin: vi.fn().mockResolvedValue(true), notifyUsers: vi.fn() } as any);
+    const service = new MensajesRevisionService(
+      prisma,
+      {
+        isAdmin: vi.fn().mockResolvedValue(true),
+        notifyUsers: vi.fn(),
+      } as unknown as NotificationsService,
+    );
     await expect(
       service.create(1, 2, { contenido: 'hola', idRevision: 99 }),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -58,8 +73,11 @@ describe('MensajesRevisionService', () => {
     });
     prisma.mensajeRevisionProyecto.create.mockResolvedValue({ idMensaje: 5 });
     prisma.usuarioRolAcceso.findMany.mockResolvedValue([{ idUsuario: 10 }]);
-    const notifications = { isAdmin: vi.fn().mockResolvedValue(true), notifyUsers: vi.fn() } as any;
-    const service = new MensajesRevisionService(prisma, notifications);
+    const notifications = { isAdmin: vi.fn().mockResolvedValue(true), notifyUsers: vi.fn() };
+    const service = new MensajesRevisionService(
+      prisma,
+      notifications as unknown as NotificationsService,
+    );
 
     const result = await service.create(1, 2, { contenido: ' hola ' });
 
@@ -74,7 +92,10 @@ describe('MensajesRevisionService', () => {
       creadoPor: 2,
       estadoProyecto: EstadoProyecto.BORRADOR,
     });
-    const service = new MensajesRevisionService(prisma, { isAdmin: vi.fn().mockResolvedValue(false) } as any);
+    const service = new MensajesRevisionService(
+      prisma,
+      { isAdmin: vi.fn().mockResolvedValue(false) } as unknown as NotificationsService,
+    );
     await expect(service.markAsRead(1, 3)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

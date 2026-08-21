@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectAvanceQueryKey, projectTasksQueryKey } from '@/lib/query-keys/tasks';
 import {
   assignTask,
+  closeAssignment,
   createTask,
   deleteTask,
   getProjectTasks,
@@ -14,6 +15,7 @@ import {
 import { attachLabelToTask, detachLabelFromTask } from '@/lib/services/labels';
 import type {
   AssignTaskInput,
+  CloseAssignmentInput,
   CreateTaskInput,
   TareaPublicaDTO,
   UpdateTaskInput,
@@ -113,6 +115,34 @@ export function useProjectTasks(idProyecto: number) {
     onSuccess: invalidateTasks,
   });
 
+  /**
+   * B2 (F10) — cierra la `AsignacionTarea` activa del actor en una única
+   * transacción atómica del backend (horas reales + registro de avance +
+   * `desasignadaEn` + `HECHO` opcional): el frontend nunca la divide en
+   * varios requests. Invalida `project-tasks` (la tarea deja de tener
+   * `asignacionActiva` y puede cambiar `estadoTarea`) y `project-avance`
+   * (mismo criterio que `crearTarea`/`editarTarea`/`eliminarTarea`, porque
+   * un cierre con `marcarComoHecha` mueve el conteo HECHO). No conoce el
+   * dominio `exit-requests`: el wiring cross-domain con
+   * `exit-preparation-summary` vive en el componente consumidor (F9), vía
+   * `onSuccess`, para no acoplar este hook de tareas a otro dominio.
+   */
+  const cerrarAsignacion = useMutation({
+    mutationFn: ({
+      taskId,
+      assignmentId,
+      input,
+    }: {
+      taskId: number;
+      assignmentId: number;
+      input: CloseAssignmentInput;
+    }) => closeAssignment(idProyecto, taskId, assignmentId, input),
+    onSuccess: () => {
+      invalidateTasks();
+      invalidateAvance();
+    },
+  });
+
   const eliminarTarea = useMutation({
     mutationFn: ({ taskId }: { taskId: number }) => deleteTask(idProyecto, taskId),
     onSuccess: () => {
@@ -145,6 +175,7 @@ export function useProjectTasks(idProyecto: number) {
     cambiarEstadoTarea,
     asignarTarea,
     desasignarTarea,
+    cerrarAsignacion,
     eliminarTarea,
     asociarEtiqueta,
     retirarEtiqueta,

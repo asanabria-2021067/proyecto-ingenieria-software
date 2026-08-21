@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
 
 function makeClient() {
   return {
@@ -11,7 +13,7 @@ function makeClient() {
     hito: { findUnique: vi.fn() },
     rolProyecto: { findUnique: vi.fn() },
     etiqueta: { findMany: vi.fn() },
-  } as any;
+  };
 }
 
 describe('TasksContextService', () => {
@@ -20,7 +22,7 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       const proyecto = { idProyecto: 1, creadoPor: 5, eliminadoEn: null };
       prisma.proyecto.findFirst.mockResolvedValue(proyecto);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getProjectOrThrow(1);
 
@@ -33,7 +35,7 @@ describe('TasksContextService', () => {
     it('lanza NotFoundException si el proyecto no existe', async () => {
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getProjectOrThrow(99)).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -44,7 +46,7 @@ describe('TasksContextService', () => {
       // no existiera; se verifica que el filtro se envía en la consulta.
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getProjectOrThrow(7)).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.proyecto.findFirst).toHaveBeenCalledWith(
@@ -57,9 +59,9 @@ describe('TasksContextService', () => {
       const tx = makeClient();
       const proyecto = { idProyecto: 1, creadoPor: 5 };
       tx.proyecto.findFirst.mockResolvedValue(proyecto);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
-      const result = await service.getProjectOrThrow(1, tx);
+      const result = await service.getProjectOrThrow(1, tx as unknown as Prisma.TransactionClient);
 
       expect(result).toBe(proyecto);
       expect(tx.proyecto.findFirst).toHaveBeenCalledTimes(1);
@@ -72,7 +74,7 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       const tarea = { idTarea: 10, idProyecto: 1, eliminadoEn: null };
       prisma.tarea.findFirst.mockResolvedValue(tarea);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getTaskInProjectOrThrow(1, 10);
 
@@ -86,7 +88,7 @@ describe('TasksContextService', () => {
     it('lanza NotFoundException si la tarea no existe', async () => {
       const prisma = makeClient();
       prisma.tarea.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getTaskInProjectOrThrow(1, 999)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -99,7 +101,7 @@ describe('TasksContextService', () => {
       // proyecto, exactamente igual que si no existiera.
       const prisma = makeClient();
       prisma.tarea.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getTaskInProjectOrThrow(1, 10)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -113,7 +115,7 @@ describe('TasksContextService', () => {
     it('lanza NotFoundException si la tarea está eliminada', async () => {
       const prisma = makeClient();
       prisma.tarea.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getTaskInProjectOrThrow(1, 10)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -125,9 +127,9 @@ describe('TasksContextService', () => {
       const tx = makeClient();
       const tarea = { idTarea: 10, idProyecto: 1 };
       tx.tarea.findFirst.mockResolvedValue(tarea);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
-      const result = await service.getTaskInProjectOrThrow(1, 10, tx);
+      const result = await service.getTaskInProjectOrThrow(1, 10, tx as unknown as Prisma.TransactionClient);
 
       expect(result).toBe(tarea);
       expect(tx.tarea.findFirst).toHaveBeenCalledTimes(1);
@@ -140,7 +142,7 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       const asignacion = { idAsignacion: 1, idTarea: 10, desasignadaEn: null };
       prisma.asignacionTarea.findFirst.mockResolvedValue(asignacion);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getActiveAssignment(10);
 
@@ -150,7 +152,7 @@ describe('TasksContextService', () => {
     it('devuelve null cuando la tarea no tiene asignación activa (sin lanzar NotFoundException)', async () => {
       const prisma = makeClient();
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getActiveAssignment(10);
 
@@ -160,7 +162,7 @@ describe('TasksContextService', () => {
     it('filtra exactamente por desasignadaEn: null, sin asumir la fila más reciente', async () => {
       const prisma = makeClient();
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await service.getActiveAssignment(10);
 
@@ -174,9 +176,9 @@ describe('TasksContextService', () => {
       const tx = makeClient();
       const asignacion = { idAsignacion: 1, idTarea: 10, desasignadaEn: null };
       tx.asignacionTarea.findFirst.mockResolvedValue(asignacion);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
-      const result = await service.getActiveAssignment(10, tx);
+      const result = await service.getActiveAssignment(10, tx as unknown as Prisma.TransactionClient);
 
       expect(result).toBe(asignacion);
       expect(tx.asignacionTarea.findFirst).toHaveBeenCalledTimes(1);
@@ -188,7 +190,7 @@ describe('TasksContextService', () => {
     it('completa sin error cuando el usuario es el líder (creadoPor) vigente', async () => {
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 5 });
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.assertProjectLeader(1, 5)).resolves.toBeUndefined();
     });
@@ -196,7 +198,7 @@ describe('TasksContextService', () => {
     it('lanza ForbiddenException cuando el proyecto existe pero el usuario no es líder', async () => {
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 5 });
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.assertProjectLeader(1, 999)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -206,7 +208,7 @@ describe('TasksContextService', () => {
     it('consulta el estado actual en la base de datos (no confía en un valor precomputado)', async () => {
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 5 });
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await service.assertProjectLeader(1, 5);
 
@@ -216,7 +218,7 @@ describe('TasksContextService', () => {
     it('propaga NotFoundException si el proyecto no existe', async () => {
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.assertProjectLeader(1, 5)).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -227,7 +229,7 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 999 });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.assertActiveProjectParticipant(1, 5)).resolves.toBeUndefined();
       expect(prisma.participacionProyecto.findFirst).toHaveBeenCalledWith({
@@ -244,7 +246,7 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 999 });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.assertActiveProjectParticipant(1, 5)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -257,7 +259,7 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 999 });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.assertActiveProjectParticipant(1, 5)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -274,7 +276,7 @@ describe('TasksContextService', () => {
       // requiere ninguna fila en ParticipacionProyecto.
       const prisma = makeClient();
       prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 5 });
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.assertActiveProjectParticipant(1, 5)).resolves.toBeUndefined();
       expect(prisma.participacionProyecto.findFirst).not.toHaveBeenCalled();
@@ -286,7 +288,7 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       const hito = { idHito: 3, idProyecto: 1 };
       prisma.hito.findUnique.mockResolvedValue(hito);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getMilestoneInProjectOrThrow(1, 3);
 
@@ -296,7 +298,7 @@ describe('TasksContextService', () => {
     it('lanza NotFoundException si el hito no existe', async () => {
       const prisma = makeClient();
       prisma.hito.findUnique.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getMilestoneInProjectOrThrow(1, 999)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -306,7 +308,7 @@ describe('TasksContextService', () => {
     it('lanza BadRequestException si el hito pertenece a otro proyecto', async () => {
       const prisma = makeClient();
       prisma.hito.findUnique.mockResolvedValue({ idHito: 3, idProyecto: 2 });
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getMilestoneInProjectOrThrow(1, 3)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -316,7 +318,7 @@ describe('TasksContextService', () => {
     it('no aplica ningún filtro de eliminación (Hito no tiene soft delete en el schema actual)', async () => {
       const prisma = makeClient();
       prisma.hito.findUnique.mockResolvedValue({ idHito: 3, idProyecto: 1 });
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await service.getMilestoneInProjectOrThrow(1, 3);
 
@@ -330,7 +332,7 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       const rol = { idRolProyecto: 4, idProyecto: 1 };
       prisma.rolProyecto.findUnique.mockResolvedValue(rol);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getRoleInProjectOrThrow(1, 4);
 
@@ -340,7 +342,7 @@ describe('TasksContextService', () => {
     it('lanza NotFoundException si el rol no existe', async () => {
       const prisma = makeClient();
       prisma.rolProyecto.findUnique.mockResolvedValue(null);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getRoleInProjectOrThrow(1, 999)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -350,7 +352,7 @@ describe('TasksContextService', () => {
     it('lanza BadRequestException si el rol pertenece a otro proyecto', async () => {
       const prisma = makeClient();
       prisma.rolProyecto.findUnique.mockResolvedValue({ idRolProyecto: 4, idProyecto: 2 });
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getRoleInProjectOrThrow(1, 4)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -361,7 +363,7 @@ describe('TasksContextService', () => {
   describe('getLabelsInProjectOrThrow', () => {
     it('devuelve [] inmediatamente para un array vacío, sin consultar Prisma', async () => {
       const prisma = makeClient();
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getLabelsInProjectOrThrow(1, []);
 
@@ -375,7 +377,7 @@ describe('TasksContextService', () => {
         { idEtiqueta: 1, idProyecto: 1 },
         { idEtiqueta: 2, idProyecto: 1 },
       ]);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getLabelsInProjectOrThrow(1, [1, 2]);
 
@@ -392,16 +394,16 @@ describe('TasksContextService', () => {
         { idEtiqueta: 1, idProyecto: 1 },
         { idEtiqueta: 3, idProyecto: 1 },
       ]);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       const result = await service.getLabelsInProjectOrThrow(1, [1, 2, 3]);
 
-      expect(result.map((e: any) => e.idEtiqueta)).toEqual([1, 2, 3]);
+      expect(result.map((e: { idEtiqueta: number }) => e.idEtiqueta)).toEqual([1, 2, 3]);
     });
 
     it('lanza BadRequestException si labelIds contiene un ID duplicado, sin consultar Prisma', async () => {
       const prisma = makeClient();
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getLabelsInProjectOrThrow(1, [1, 2, 1])).rejects.toBeInstanceOf(
         BadRequestException,
@@ -412,7 +414,7 @@ describe('TasksContextService', () => {
     it('lanza NotFoundException si una etiqueta no existe', async () => {
       const prisma = makeClient();
       prisma.etiqueta.findMany.mockResolvedValue([{ idEtiqueta: 1, idProyecto: 1 }]);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getLabelsInProjectOrThrow(1, [1, 999])).rejects.toBeInstanceOf(
         NotFoundException,
@@ -425,7 +427,7 @@ describe('TasksContextService', () => {
         { idEtiqueta: 1, idProyecto: 1 },
         { idEtiqueta: 2, idProyecto: 2 },
       ]);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await expect(service.getLabelsInProjectOrThrow(1, [1, 2])).rejects.toBeInstanceOf(
         BadRequestException,
@@ -439,7 +441,7 @@ describe('TasksContextService', () => {
         { idEtiqueta: 2, idProyecto: 1 },
         { idEtiqueta: 3, idProyecto: 1 },
       ]);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
       await service.getLabelsInProjectOrThrow(1, [1, 2, 3]);
 
@@ -453,9 +455,9 @@ describe('TasksContextService', () => {
       const prisma = makeClient();
       const tx = makeClient();
       tx.etiqueta.findMany.mockResolvedValue([{ idEtiqueta: 1, idProyecto: 1 }]);
-      const service = new TasksContextService(prisma);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
 
-      await service.getLabelsInProjectOrThrow(1, [1], tx);
+      await service.getLabelsInProjectOrThrow(1, [1], tx as unknown as Prisma.TransactionClient);
 
       expect(tx.etiqueta.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.etiqueta.findMany).not.toHaveBeenCalled();

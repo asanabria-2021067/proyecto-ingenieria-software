@@ -3,16 +3,25 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Plus, Tags } from 'lucide-react';
+import { ArrowLeft, Kanban, Plus, Tags } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
 import { useProjectMilestones } from '@/hooks/use-project-milestones';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectAvance } from '@/hooks/use-project-avance';
+import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -23,6 +32,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskBoard } from '@/components/projects/task-board';
+import { StartSprintButton } from '@/components/projects/start-sprint-button';
 import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
@@ -198,6 +208,25 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
 
   const { data: avance, isSuccess: puedeVerAvance } = useProjectAvance(idProyecto);
+  // Sprint de trabajo disponible (F2): la lista viene ordenada por
+  // `numero: desc` (SprintsService.listSprints), y el backend garantiza a lo
+  // sumo un Sprint operable (ACTIVO o EN_FINALIZACION) por proyecto vía
+  // `sprint_operable_unique` — por eso el primer elemento es siempre el
+  // Sprint vigente si existe uno operable; si el primero está CERRADO (o no
+  // hay ninguno), no hay Sprint disponible para trabajo normal.
+  // EN_FINALIZACION se trata igual que ACTIVO aquí a propósito: ese estado
+  // es responsabilidad visual de F6 (banner/lock), F2 solo debe evitar
+  // clasificarlo erróneamente como "todavía no existe Sprint".
+  const {
+    sprints,
+    isLoading: isLoadingSprints,
+    isError: isErrorSprints,
+    refetch: refetchSprints,
+  } = useProjectSprints(idProyecto);
+  const sprintActual = sprints[0] ?? null;
+  const haySprintDeTrabajo =
+    sprintActual !== null &&
+    (sprintActual.estado === 'ACTIVO' || sprintActual.estado === 'EN_FINALIZACION');
   const {
     tasks,
     isLoading: isLoadingTasks,
@@ -256,7 +285,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link
-                href={`/dashboard/projects/${idProyecto}`}
+                href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}
                 className="max-w-[16rem] truncate text-tertiary hover:text-on-surface"
               >
                 {proyecto.tituloProyecto}
@@ -316,7 +345,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               size="sm"
               className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
             >
-              <Link href={`/dashboard/projects/${idProyecto}`}>
+              <Link href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}>
                 <ArrowLeft className="size-3.5" aria-hidden="true" />
                 Volver al proyecto
               </Link>
@@ -428,63 +457,105 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               )}
 
               {isLeader && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEtiquetasAbierto(true)}
-                    className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 bg-surface-container-lowest sm:w-auto md:min-w-40`}
-                  >
-                    <Tags className="size-3.5" aria-hidden="true" />
-                    Gestionar etiquetas
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setCrearAbierto(true)}
-                    className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
-                  >
-                    <Plus className="size-3.5" aria-hidden="true" />
-                    Nueva tarea
-                  </Button>
-                </>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEtiquetasAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 bg-surface-container-lowest sm:w-auto md:min-w-40`}
+                >
+                  <Tags className="size-3.5" aria-hidden="true" />
+                  Gestionar etiquetas
+                </Button>
+              )}
+              {/* Sin Sprint de trabajo (F2), la creación de tareas queda
+                  bloqueada: este botón es la única entrada que abre
+                  TaskFormDialog en modo creación (`setCrearAbierto`), así
+                  que ocultarlo cierra por completo esa vía. */}
+              {isLeader && haySprintDeTrabajo && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setCrearAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Nueva tarea
+                </Button>
               )}
             </div>
           </div>
 
           <TabsContent value="tablero" className="mt-0 min-h-0">
-            <TaskBoard
-              idProyecto={idProyecto}
-              tasks={tasks}
-              isLoading={isLoadingTasks}
-              isFetching={isFetchingTasks}
-              isError={isErrorTasks}
-              onRetry={() => refetchTasks()}
-              isLeader={isLeader}
-              currentUserId={currentUser?.idUsuario ?? null}
-              cambiarEstadoTarea={cambiarEstadoTarea}
-              eliminarTarea={eliminarTarea}
-              crearTarea={crearTarea}
-              editarTarea={editarTarea}
-              asignarTarea={asignarTarea}
-              desasignarTarea={desasignarTarea}
-              roles={proyecto.roles}
-              milestones={proyecto.hitos}
-              members={members}
-              labels={labels}
-              labelsLoading={isLoadingLabels}
-              labelsError={isErrorLabels}
-              onRetryLabels={() => refetchLabels()}
-              createLabel={createLabel}
-              updateLabel={updateLabel}
-              deleteLabel={deleteLabel}
-              filtroRolExterno={filtroRol}
-              filtroHitoExterno={filtroHito}
-              onFiltroRolChange={setFiltroRol}
-              onFiltroHitoChange={setFiltroHito}
-              mostrarToolbar={false}
-            />
+            {isLoadingSprints ? (
+              <div className="space-y-3">
+                <Skeleton className="h-9 w-48" />
+                <Skeleton className="h-[420px] w-full rounded-xl" />
+              </div>
+            ) : isErrorSprints ? (
+              <div role="alert" className="space-y-3 py-10 text-center">
+                <p className="text-sm font-medium text-red-600">
+                  No se pudo verificar el estado del Sprint. Intenta nuevamente.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchSprints()}
+                  className="rounded-lg border-primary text-xs font-bold text-primary hover:bg-primary/10"
+                >
+                  Reintentar
+                </Button>
+              </div>
+            ) : haySprintDeTrabajo ? (
+              <TaskBoard
+                idProyecto={idProyecto}
+                tasks={tasks}
+                isLoading={isLoadingTasks}
+                isFetching={isFetchingTasks}
+                isError={isErrorTasks}
+                onRetry={() => refetchTasks()}
+                isLeader={isLeader}
+                currentUserId={currentUser?.idUsuario ?? null}
+                cambiarEstadoTarea={cambiarEstadoTarea}
+                eliminarTarea={eliminarTarea}
+                crearTarea={crearTarea}
+                editarTarea={editarTarea}
+                asignarTarea={asignarTarea}
+                desasignarTarea={desasignarTarea}
+                roles={proyecto.roles}
+                milestones={proyecto.hitos}
+                members={members}
+                labels={labels}
+                labelsLoading={isLoadingLabels}
+                labelsError={isErrorLabels}
+                onRetryLabels={() => refetchLabels()}
+                createLabel={createLabel}
+                updateLabel={updateLabel}
+                deleteLabel={deleteLabel}
+                filtroRolExterno={filtroRol}
+                filtroHitoExterno={filtroHito}
+                onFiltroRolChange={setFiltroRol}
+                onFiltroHitoChange={setFiltroHito}
+                mostrarToolbar={false}
+              />
+            ) : (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Kanban aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle>Todavía no hay un Sprint activo en este proyecto</EmptyTitle>
+                  <EmptyDescription>
+                    Cuando se cree un Sprint, el tablero y las tareas aparecerán aquí.
+                  </EmptyDescription>
+                </EmptyHeader>
+                {isLeader && (
+                  <EmptyContent>
+                    <StartSprintButton idProyecto={idProyecto} />
+                  </EmptyContent>
+                )}
+              </Empty>
+            )}
           </TabsContent>
 
           <TabsContent value="hitos" className="mt-5">

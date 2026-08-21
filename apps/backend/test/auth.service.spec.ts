@@ -1,5 +1,8 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
+import type { JwtService } from '@nestjs/jwt';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { AuthService } from '../src/auth/auth.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -12,11 +15,15 @@ describe('AuthService', () => {
   it('login retorna token cuando credenciales son validas', async () => {
     const prisma = {
       usuario: { findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', contrasena: 'hash' }) },
-    } as any;
-    const jwtService = { sign: vi.fn().mockReturnValue('jwt-token') } as any;
-    (bcrypt.compare as any).mockResolvedValue(true);
-    const notificationsService = { notifyAdminsFromTemplate: vi.fn() } as any;
-    const service = new AuthService(prisma, jwtService, notificationsService);
+    };
+    const jwtService = { sign: vi.fn().mockReturnValue('jwt-token') };
+    (bcrypt.compare as Mock).mockResolvedValue(true);
+    const notificationsService = { notifyAdminsFromTemplate: vi.fn() };
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      jwtService as unknown as JwtService,
+      notificationsService as unknown as NotificationsService,
+    );
 
     const result = await service.login({ correo: 'a@uvg.edu', contrasena: '123456' });
 
@@ -25,9 +32,9 @@ describe('AuthService', () => {
 
   it('login falla si usuario no existe', async () => {
     const service = new AuthService(
-      { usuario: { findUnique: vi.fn().mockResolvedValue(null) } } as any,
-      { sign: vi.fn() } as any,
-      { notifyAdminsFromTemplate: vi.fn() } as any,
+      { usuario: { findUnique: vi.fn().mockResolvedValue(null) } } as unknown as PrismaService,
+      { sign: vi.fn() } as unknown as JwtService,
+      { notifyAdminsFromTemplate: vi.fn() } as unknown as NotificationsService,
     );
 
     await expect(service.login({ correo: 'x@x.com', contrasena: 'x' })).rejects.toBeInstanceOf(
@@ -42,12 +49,16 @@ describe('AuthService', () => {
     };
     const prisma = {
       usuario: { findUnique: vi.fn().mockResolvedValue(null) },
-      $transaction: vi.fn(async (cb: (client: any) => unknown) => cb(tx)),
-    } as any;
-    const jwtService = { sign: vi.fn().mockReturnValue('token-register') } as any;
-    (bcrypt.hash as any).mockResolvedValue('hashed');
-    const notificationsService = { notifyAdminsFromTemplate: vi.fn() } as any;
-    const service = new AuthService(prisma, jwtService, notificationsService);
+      $transaction: vi.fn(async (cb: (client: unknown) => unknown) => cb(tx)),
+    };
+    const jwtService = { sign: vi.fn().mockReturnValue('token-register') };
+    (bcrypt.hash as Mock).mockResolvedValue('hashed');
+    const notificationsService = { notifyAdminsFromTemplate: vi.fn() };
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      jwtService as unknown as JwtService,
+      notificationsService as unknown as NotificationsService,
+    );
 
     const result = await service.register({
       correo: 'n@uvg.edu',
@@ -66,9 +77,9 @@ describe('AuthService', () => {
 
   it('register falla si correo ya existe', async () => {
     const service = new AuthService(
-      { usuario: { findUnique: vi.fn().mockResolvedValue({ idUsuario: 1 }) } } as any,
-      { sign: vi.fn() } as any,
-      { notifyAdminsFromTemplate: vi.fn() } as any,
+      { usuario: { findUnique: vi.fn().mockResolvedValue({ idUsuario: 1 }) } } as unknown as PrismaService,
+      { sign: vi.fn() } as unknown as JwtService,
+      { notifyAdminsFromTemplate: vi.fn() } as unknown as NotificationsService,
     );
 
     await expect(
