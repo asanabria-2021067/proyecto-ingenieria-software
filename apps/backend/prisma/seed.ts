@@ -1435,9 +1435,9 @@ async function main() {
 
   // ─── Usuarios adicionales ───────────────────────────────
   // Vernel: cuenta real de equipo (igual que san24725/Angel arriba). Se crea
-  // aquí porque seed-vernel-states.ts y seed-tutoring-workspace-demo.ts la
-  // dan por existente (findUniqueOrThrow / abort si falta) — sin este bloque
-  // ninguno de los dos puede correr contra una base recién sembrada.
+  // aquí porque seed-demo.ts la da por existente (findUniqueOrThrow / abort
+  // si falta) — sin este bloque esa fase no puede correr contra una base
+  // recién sembrada.
   const vernelUser = await prisma.usuario.upsert({
     where: { correo: 'vernel@uvg.edu.gt' },
     update: {},
@@ -1535,9 +1535,9 @@ async function main() {
   });
   // Postulacion/ParticipacionProyecto no tienen llave natural única en el
   // schema (solo índices), así que se buscan por (usuario, rol) antes de
-  // crear — mismo criterio que ensureRol/ensureRevision en
-  // seed-vernel-states.ts: este script no asume ser la única fuente de la
-  // fila, así que nunca fija un id explícito para estas dos tablas.
+  // crear — mismo criterio que ensureRolEstados/ensureRevisionEstados en
+  // seed-demo.ts: este script no asume ser la única fuente de la fila, así
+  // que nunca fija un id explícito para estas dos tablas.
   const postCamilaExistente = await prisma.postulacion.findFirst({
     where: { idUsuarioPostulante: camila.idUsuario, idRolProyecto: rolFullstack.idRolProyecto },
   });
