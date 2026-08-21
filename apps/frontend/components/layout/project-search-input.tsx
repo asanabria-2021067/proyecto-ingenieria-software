@@ -27,7 +27,7 @@ export function ProjectSearchInput() {
   function handleSelect(id: number) {
     setQuery('');
     setOpen(false);
-    router.push(`/dashboard/projects/${id}`);
+    router.push(`/dashboard/proyectos/${id}`);
   }
 
   const showDropdown = open && query.trim().length > 0;

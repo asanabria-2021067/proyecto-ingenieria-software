@@ -2,7 +2,13 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm install
+RUN npm ci
+
+FROM node:22-alpine AS prod-deps
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 FROM node:22-alpine AS build
 WORKDIR /app
@@ -22,7 +28,9 @@ RUN addgroup -g 1001 -S nodejs && \
 ENV NODE_ENV=production
 
 COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=build --chown=nestjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build --chown=nestjs:nodejs /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY --from=build --chown=nestjs:nodejs /app/package.json ./
 COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
 

@@ -1,31 +1,50 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { EstadoTarea } from '@prisma/client';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { UpdateTaskEstadoDto } from '../src/tasks/dto/update-task-estado.dto';
 import { TasksService } from '../src/tasks/tasks.service';
+
+function estadoDto(estadoTarea: string): UpdateTaskEstadoDto {
+  return { estadoTarea: estadoTarea as EstadoTarea };
+}
 
 function makeTx() {
   return {
-    tarea: { update: vi.fn(), findFirst: vi.fn() },
+    tarea: { update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     tareaEtiqueta: { deleteMany: vi.fn(), createMany: vi.fn() },
     asignacionTarea: undefined,
+    // A12: usado exclusivamente por syncHitoEstado cuando la tarea tiene
+    // idHito. Por defecto ausente para no romper los tests preexistentes
+    // que usan `idHito: null`; cada test A12 lo añade explícitamente.
+    hito: undefined as { update: ReturnType<typeof vi.fn> } | undefined,
   };
 }
 
 function makePrisma(tx = makeTx()) {
-  return {
+  const prisma = {
     tx,
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
-  } as any;
+    $transaction: vi.fn(),
+  };
+  prisma.$transaction.mockImplementation(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx));
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeAuthorization(overrides: Record<string, unknown> = {}) {
-  return {
+  const authorization = {
     assertCanChangeTaskState: vi.fn().mockResolvedValue({ idTarea: 42, idProyecto: 5 }),
     ...overrides,
-  } as any;
+  };
+  return authorization as typeof authorization & TasksAuthorizationService;
 }
 
 function makeNotifications() {
-  return { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) } as any;
+  const notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
+  return notifications as typeof notifications & NotificationsService;
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {
@@ -52,13 +71,19 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeService(opts: { prisma?: any; auth?: any; notifications?: any } = {}) {
+function makeService(opts: {
+  prisma?: ReturnType<typeof makePrisma>;
+  auth?: ReturnType<typeof makeAuthorization>;
+  notifications?: ReturnType<typeof makeNotifications>;
+} = {}) {
   const tx = makeTx();
   const prisma = opts.prisma ?? makePrisma(tx);
   const auth = opts.auth ?? makeAuthorization();
-  const relations = { validateRelatedResources: vi.fn(), assertUserAssignableToProject: vi.fn() } as any;
+  const relationsLiteral = { validateRelatedResources: vi.fn(), assertUserAssignableToProject: vi.fn() };
+  const relations = relationsLiteral as typeof relationsLiteral & TasksRelationsService;
   const notifications = opts.notifications ?? makeNotifications();
-  const context = { getActiveAssignment: vi.fn() } as any;
+  const contextLiteral = { getActiveAssignment: vi.fn() };
+  const context = contextLiteral as typeof contextLiteral & TasksContextService;
   const service = new TasksService(prisma, auth, relations, notifications, context);
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
@@ -69,7 +94,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, auth, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'EN_PROGRESO' }));
 
-      const result = await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      const result = await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
       expect(auth.assertCanChangeTaskState).toHaveBeenCalledWith(5, 42, 1, tx);
       expect(result.estadoTarea).toBe('EN_PROGRESO');
@@ -79,7 +104,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'HECHO' }));
 
-      const result = await service.updateEstado(5, 42, 3, { estadoTarea: 'HECHO' } as any);
+      const result = await service.updateEstado(5, 42, 3, estadoDto('HECHO'));
 
       expect(result.estadoTarea).toBe('HECHO');
     });
@@ -94,7 +119,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 42, 7, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 7, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -107,7 +132,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 42, 999, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 999, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -120,7 +145,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -133,7 +158,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 42, 3, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 3, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -146,7 +171,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 42, 4, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 4, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -159,7 +184,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 42, 3, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 3, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -174,7 +199,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 999, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 999, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -189,7 +214,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -204,7 +229,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(1, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(1, 42, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
     });
@@ -213,7 +238,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, auth, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
       expect(auth.assertCanChangeTaskState).toHaveBeenCalledWith(5, 42, 1, tx);
       expect(tx.tarea.update).toHaveBeenCalledWith(
@@ -246,7 +271,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: hacia }));
 
-      const result = await service.updateEstado(5, 42, 1, { estadoTarea: hacia } as any);
+      const result = await service.updateEstado(5, 42, 1, estadoDto(hacia));
 
       expect(tx.tarea.update).toHaveBeenCalledWith({
         where: { idTarea: 42 },
@@ -260,7 +285,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'POR_HACER' }));
 
-      const result = await service.updateEstado(5, 42, 1, { estadoTarea: 'POR_HACER' } as any);
+      const result = await service.updateEstado(5, 42, 1, estadoDto('POR_HACER'));
 
       expect(tx.tarea.update).toHaveBeenCalledWith({
         where: { idTarea: 42 },
@@ -273,7 +298,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'HECHO' }));
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'HECHO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('HECHO'));
 
       expect(tx.tarea.update).toHaveBeenCalledWith({
         where: { idTarea: 42 },
@@ -285,7 +310,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'EN_REVISION' }));
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_REVISION' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_REVISION'));
 
       expect(tx.tarea.update).toHaveBeenCalledWith({
         where: { idTarea: 42 },
@@ -299,7 +324,7 @@ describe('TasksService.updateEstado', () => {
       const { prisma, tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
@@ -308,7 +333,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
       const data = tx.tarea.update.mock.calls[0][0].data;
       expect(Object.keys(data)).toEqual(['estadoTarea']);
@@ -318,7 +343,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
       expect(tx.tareaEtiqueta.deleteMany).not.toHaveBeenCalled();
       expect(tx.tareaEtiqueta.createMany).not.toHaveBeenCalled();
@@ -328,16 +353,16 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
-      expect((tx as any).asignacionTarea).toBeUndefined();
+      expect((tx as unknown as Record<string, unknown>).asignacionTarea).toBeUndefined();
     });
 
     it('no llama a NotificationsService.notifyFromTemplate', async () => {
       const { tx, notifications, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
       expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
     });
@@ -346,7 +371,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow());
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
       expect(tx.tarea.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { idTarea: 42, idProyecto: 5, eliminadoEn: null } }),
@@ -357,7 +382,7 @@ describe('TasksService.updateEstado', () => {
       const { tx, service } = makeService();
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'HECHO' }));
 
-      const result = await service.updateEstado(5, 42, 1, { estadoTarea: 'HECHO' } as any);
+      const result = await service.updateEstado(5, 42, 1, estadoDto('HECHO'));
 
       expect(Object.keys(result).sort()).toEqual(
         [
@@ -392,12 +417,13 @@ describe('TasksService.updateEstado', () => {
       const orden: string[] = [];
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const auth = {
+      const authLiteral = {
         assertCanChangeTaskState: vi.fn(async () => {
           orden.push('autorizacion');
           return { idTarea: 42, idProyecto: 5 };
         }),
-      } as any;
+      };
+      const auth = authLiteral as typeof authLiteral & TasksAuthorizationService;
       tx.tarea.update.mockImplementation(async () => {
         orden.push('update');
       });
@@ -405,12 +431,12 @@ describe('TasksService.updateEstado', () => {
         orden.push('lectura_final');
         return tareaRow();
       });
-      const relations = {} as any;
+      const relations = {} as unknown as TasksRelationsService;
       const notifications = makeNotifications();
-      const context = {} as any;
+      const context = {} as unknown as TasksContextService;
       const service = new TasksService(prisma, auth, relations, notifications, context);
 
-      await service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any);
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
       orden.push('fin_transaccion');
 
       expect(orden).toEqual(['autorizacion', 'update', 'lectura_final', 'fin_transaccion']);
@@ -426,7 +452,7 @@ describe('TasksService.updateEstado', () => {
       });
 
       await expect(
-        service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toBeInstanceOf(ForbiddenException);
 
       expect(tx.tarea.update).not.toHaveBeenCalled();
@@ -438,7 +464,7 @@ describe('TasksService.updateEstado', () => {
       tx.tarea.update.mockRejectedValue(new Error('fallo de escritura'));
 
       await expect(
-        service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toThrow('fallo de escritura');
 
       expect(tx.tarea.findFirst).not.toHaveBeenCalled();
@@ -449,7 +475,7 @@ describe('TasksService.updateEstado', () => {
       tx.tarea.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toThrow();
     });
 
@@ -458,7 +484,7 @@ describe('TasksService.updateEstado', () => {
       tx.tarea.findFirst.mockRejectedValue(new Error('fallo de lectura'));
 
       await expect(
-        service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toThrow('fallo de lectura');
 
       expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
@@ -469,7 +495,7 @@ describe('TasksService.updateEstado', () => {
       tx.tarea.update.mockRejectedValue(new Error('fallo'));
 
       await expect(
-        service.updateEstado(5, 42, 1, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO')),
       ).rejects.toThrow('fallo');
 
       expect(prisma.tarea).toBeUndefined();
@@ -485,7 +511,7 @@ describe('TasksService.updateEstado', () => {
       auth.assertCanChangeTaskState.mockResolvedValueOnce({ idTarea: 42, idProyecto: 5 });
 
       await expect(
-        service.updateEstado(5, 42, 3, { estadoTarea: 'EN_PROGRESO' } as any),
+        service.updateEstado(5, 42, 3, estadoDto('EN_PROGRESO')),
       ).resolves.toBeDefined();
 
       auth.assertCanChangeTaskState.mockRejectedValueOnce(
@@ -494,9 +520,86 @@ describe('TasksService.updateEstado', () => {
       tx.tarea.update.mockClear();
 
       await expect(
-        service.updateEstado(5, 42, 3, { estadoTarea: 'HECHO' } as any),
+        service.updateEstado(5, 42, 3, estadoDto('HECHO')),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(tx.tarea.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('A12 — sincronización de Hito.estadoHito tras updateEstado', () => {
+    it('tarea con idHito: persiste Hito.estadoHito=COMPLETADO cuando todas sus tareas quedan HECHO, dentro de la MISMA transacción', async () => {
+      const tx = makeTx();
+      tx.hito = { update: vi.fn() };
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'HECHO' }));
+      // Progreso real del Hito tras el cambio: 1 sola tarea, ya HECHO -> 100%.
+      tx.tarea.findMany.mockResolvedValue([{ idHito: 7, estadoTarea: 'HECHO' }]);
+      const prisma = makePrisma(tx);
+      const auth = makeAuthorization();
+      const notifications = makeNotifications();
+      const relations = {} as unknown as TasksRelationsService;
+      const context = {} as unknown as TasksContextService;
+      const service = new TasksService(prisma, auth, relations, notifications, context);
+
+      await service.updateEstado(5, 42, 1, estadoDto('HECHO'));
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 7 },
+        data: { estadoHito: 'COMPLETADO' },
+      });
+      // La consulta que alimenta el cálculo está acotada por idHito
+      // (nunca todos los Hitos del proyecto/base) + eliminadoEn: null.
+      expect(tx.tarea.findMany).toHaveBeenCalledWith({
+        where: { idHito: 7, eliminadoEn: null },
+        select: { estadoTarea: true },
+      });
+    });
+
+    it('tarea con idHito: persiste EN_PROGRESO cuando el progreso del Hito es parcial', async () => {
+      const tx = makeTx();
+      tx.hito = { update: vi.fn() };
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'EN_PROGRESO' }));
+      tx.tarea.findMany.mockResolvedValue([
+        { idHito: 7, estadoTarea: 'HECHO' },
+        { idHito: 7, estadoTarea: 'EN_PROGRESO' },
+      ]);
+      const prisma = makePrisma(tx);
+      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService);
+
+      await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 7 },
+        data: { estadoHito: 'EN_PROGRESO' },
+      });
+    });
+
+    it('tarea con idHito: persiste PENDIENTE cuando ninguna tarea del Hito está HECHO', async () => {
+      const tx = makeTx();
+      tx.hito = { update: vi.fn() };
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'POR_HACER' }));
+      tx.tarea.findMany.mockResolvedValue([{ idHito: 7, estadoTarea: 'POR_HACER' }]);
+      const prisma = makePrisma(tx);
+      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService);
+
+      await service.updateEstado(5, 42, 1, estadoDto('POR_HACER'));
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 7 },
+        data: { estadoHito: 'PENDIENTE' },
+      });
+    });
+
+    it('tarea SIN Hito (idHito: null): la mutación de estado funciona normalmente y nunca intenta hito.update', async () => {
+      const { tx, service } = makeService();
+      // tx.hito permanece undefined (default de makeTx()): si el código
+      // intentara sincronizar un Hito aquí, esta llamada fallaría con
+      // TypeError antes de completarse.
+      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: null, estadoTarea: 'EN_PROGRESO' }));
+
+      const result = await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
+
+      expect(result.estadoTarea).toBe('EN_PROGRESO');
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
     });
   });
 });
