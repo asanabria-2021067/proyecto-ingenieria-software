@@ -125,7 +125,7 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
     expect(screen.queryByRole('tab', { name: 'Tablero' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Por hacer' })).not.toBeInTheDocument();
 
-    expect(screen.getByRole('link', { name: /revisiones previas/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /revisiones pasadas/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/mine/42?returnTo=/dashboard/projects/42',
     );
@@ -191,6 +191,17 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
     expect(filaValor('Participantes confirmados')).toBe('2');
     expect(filaValor('Roles disponibles')).toBe('1');
     expect(filaValor('Cupos totales')).toBe('5');
+  });
+
+  it('"Editar roles" abre el Sheet en modo listado con los roles reales', () => {
+    mockRoles([rol({ idRolProyecto: 1, nombreRol: 'Frontend' })]);
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /editar roles/i }));
+
+    expect(screen.getByRole('heading', { name: 'Gestionar roles' })).toBeInTheDocument();
+    expect(screen.getByText('Roles existentes')).toBeInTheDocument();
+    expect(screen.getAllByTestId('role-list-card')).toHaveLength(1);
   });
 
   it('"Agregar rol" abre el Sheet en modo creación', () => {

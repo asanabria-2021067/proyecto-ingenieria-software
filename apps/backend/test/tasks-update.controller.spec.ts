@@ -4,9 +4,15 @@ import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/comm
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TasksController } from '../src/tasks/tasks.controller';
+import { TasksService } from '../src/tasks/tasks.service';
+import { UpdateTaskDto } from '../src/tasks/dto/update-task.dto';
 
 function makeService() {
-  return { findAll: vi.fn(), findOne: vi.fn(), create: vi.fn(), update: vi.fn() } as any;
+  return { findAll: vi.fn(), findOne: vi.fn(), create: vi.fn(), update: vi.fn() };
+}
+
+function makeController(service: ReturnType<typeof makeService>) {
+  return new TasksController(service as unknown as TasksService);
 }
 
 describe('TasksController.update (PATCH /proyectos/:projectId/tareas/:taskId)', () => {
@@ -21,8 +27,8 @@ describe('TasksController.update (PATCH /proyectos/:projectId/tareas/:taskId)', 
 
   it('delega en TasksService.update con projectId, taskId, userId (CurrentUser) y el dto', () => {
     const service = makeService();
-    const controller = new TasksController(service);
-    const dto = { tituloTarea: 'Título editado' } as any;
+    const controller = makeController(service);
+    const dto: UpdateTaskDto = { tituloTarea: 'Título editado' };
 
     controller.update(5, 42, { userId: 9 }, dto);
 
@@ -33,9 +39,9 @@ describe('TasksController.update (PATCH /proyectos/:projectId/tareas/:taskId)', 
     const service = makeService();
     const tareaActualizada = { idTarea: 42, tituloTarea: 'Título editado' };
     service.update.mockResolvedValue(tareaActualizada);
-    const controller = new TasksController(service);
+    const controller = makeController(service);
 
-    const result = await controller.update(5, 42, { userId: 9 }, {} as any);
+    const result = await controller.update(5, 42, { userId: 9 }, {});
 
     expect(result).toBe(tareaActualizada);
   });
@@ -44,22 +50,22 @@ describe('TasksController.update (PATCH /proyectos/:projectId/tareas/:taskId)', 
     const service = makeService();
     const error = new BadRequestException('Debe enviar al menos un campo para actualizar la tarea');
     service.update.mockRejectedValue(error);
-    const controller = new TasksController(service);
+    const controller = makeController(service);
 
-    await expect(controller.update(5, 42, { userId: 9 }, {} as any)).rejects.toBe(error);
+    await expect(controller.update(5, 42, { userId: 9 }, {})).rejects.toBe(error);
   });
 
   it('projectId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('abc', { type: 'param', data: 'projectId' } as any),
+      pipe.transform('abc', { type: 'param', data: 'projectId' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('taskId no numérico produce BadRequestException (400) vía ParseIntPipe real', async () => {
     const pipe = new ParseIntPipe();
     await expect(
-      pipe.transform('xyz', { type: 'param', data: 'taskId' } as any),
+      pipe.transform('xyz', { type: 'param', data: 'taskId' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 

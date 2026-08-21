@@ -1,32 +1,44 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EstadoProyecto } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
 import { ComentariosService } from '../src/comentarios/comentarios.service';
 
 function makePrisma() {
   return {
-    comentario: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+    comentario: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), findFirst: vi.fn() },
     proyecto: { findUnique: vi.fn() },
     tarea: { findUnique: vi.fn(), findFirst: vi.fn() },
     hito: { findUnique: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
     asignacionTarea: { findFirst: vi.fn() },
-  } as any;
+  };
+}
+
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  notifications: Partial<NotificationsService> = {},
+) {
+  return new ComentariosService(
+    prisma as unknown as PrismaService,
+    notifications as unknown as NotificationsService,
+  );
 }
 
 describe('ComentariosService', () => {
   it('create requiere solo una entidad destino', async () => {
-    const service = new ComentariosService(makePrisma(), { notifyProjectActiveParticipants: vi.fn() } as any);
-    await expect(service.create(1, { idProyecto: 1, idTarea: 2, contenido: 'x' } as any)).rejects.toBeInstanceOf(
+    const service = makeService(makePrisma(), { notifyProjectActiveParticipants: vi.fn() });
+    await expect(service.create(1, { idProyecto: 1, idTarea: 2, contenido: 'x' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
 
   it('create con idTarea: BadRequestException inmediata, sin consultar nada (Tarea 28: creación de comentarios de tarea migrada a createForTask)', async () => {
     const prisma = makePrisma();
-    const service = new ComentariosService(prisma, { notifyProjectActiveParticipants: vi.fn() } as any);
+    const service = makeService(prisma, { notifyProjectActiveParticipants: vi.fn() });
 
-    await expect(service.create(2, { idTarea: 7, contenido: 'Hola' } as any)).rejects.toBeInstanceOf(
+    await expect(service.create(2, { idTarea: 7, contenido: 'Hola' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
 
@@ -45,7 +57,7 @@ describe('ComentariosService', () => {
     prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
     prisma.asignacionTarea.findFirst.mockResolvedValue(null);
     prisma.comentario.create.mockResolvedValue({ idComentario: 9 });
-    const service = new ComentariosService(prisma, { notifyUsers: vi.fn() } as any);
+    const service = makeService(prisma, { notifyUsers: vi.fn() });
 
     await service.createForTask(1, 7, 2, 'Hola');
 
@@ -60,7 +72,7 @@ describe('ComentariosService', () => {
     // findFirst con eliminadoEn: null no encuentra nada porque la tarea está eliminada lógicamente
     // o no pertenece al proyecto indicado.
     prisma.tarea.findFirst.mockResolvedValue(null);
-    const service = new ComentariosService(prisma, { notifyUsers: vi.fn() } as any);
+    const service = makeService(prisma, { notifyUsers: vi.fn() });
 
     await expect(
       service.createForTask(1, 7, 2, 'no debería crearse'),
@@ -76,10 +88,10 @@ describe('ComentariosService', () => {
       .mockResolvedValueOnce({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: 2 });
     prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
     prisma.comentario.create.mockResolvedValue({ idComentario: 5 });
-    const notifications = { notifyProjectActiveParticipants: vi.fn() } as any;
-    const service = new ComentariosService(prisma, notifications);
+    const notifications = { notifyProjectActiveParticipants: vi.fn() };
+    const service = makeService(prisma, notifications);
 
-    const result = await service.create(2, { idProyecto: 1, contenido: 'Hola' } as any);
+    const result = await service.create(2, { idProyecto: 1, contenido: 'Hola' });
 
     expect(result.idComentario).toBe(5);
     expect(notifications.notifyProjectActiveParticipants).toHaveBeenCalled();
@@ -90,7 +102,7 @@ describe('ComentariosService', () => {
     prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: 1 });
     prisma.hito.findUnique.mockResolvedValue({ idProyecto: 1 });
     prisma.comentario.findMany.mockResolvedValue([]);
-    const service = new ComentariosService(prisma, {} as any);
+    const service = makeService(prisma);
     await service.findByProyecto(1, 1);
     await service.findByHito(1, 1);
     expect(prisma.comentario.findMany).toHaveBeenCalledTimes(2);
@@ -98,15 +110,15 @@ describe('ComentariosService', () => {
 
   it('Tarea 28.C: findByTarea y findByTareaDesc ya no existen en el service (retirados con la ruta genérica)', () => {
     const prisma = makePrisma();
-    const service = new ComentariosService(prisma, {} as any);
-    expect((service as any).findByTarea).toBeUndefined();
-    expect((service as any).findByTareaDesc).toBeUndefined();
+    const service = makeService(prisma);
+    expect((service as unknown as Record<string, unknown>).findByTarea).toBeUndefined();
+    expect((service as unknown as Record<string, unknown>).findByTareaDesc).toBeUndefined();
   });
 
   it('update falla si comentario no existe', async () => {
     const prisma = makePrisma();
     prisma.comentario.findUnique.mockResolvedValue(null);
-    const service = new ComentariosService(prisma, {} as any);
+    const service = makeService(prisma);
     await expect(service.update(1, 1, { contenido: 'x' })).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -119,7 +131,7 @@ describe('ComentariosService', () => {
       idProyecto: 1,
       idTarea: null,
     });
-    const service = new ComentariosService(prisma, {} as any);
+    const service = makeService(prisma);
     await expect(service.update(1, 1, { contenido: 'x' })).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -138,7 +150,7 @@ describe('ComentariosService', () => {
       creadoPor: 2,
     });
     prisma.comentario.update.mockResolvedValue({ idComentario: 1 });
-    const service = new ComentariosService(prisma, {} as any);
+    const service = makeService(prisma);
     const result = await service.remove(1, 2);
     expect(result.idComentario).toBe(1);
   });
@@ -154,7 +166,7 @@ describe('ComentariosService', () => {
         idTarea: 7,
         hito: null,
       });
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.update(1, 2, { contenido: 'x' })).rejects.toBeInstanceOf(NotFoundException);
 
@@ -172,7 +184,7 @@ describe('ComentariosService', () => {
         idTarea: 7,
         hito: null,
       });
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.update(1, 1, { contenido: 'x' })).rejects.toBeInstanceOf(NotFoundException);
 
@@ -190,14 +202,14 @@ describe('ComentariosService', () => {
         idTarea: 7,
         hito: null,
       });
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.remove(1, 2)).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.proyecto.findUnique).not.toHaveBeenCalled();
       expect(prisma.comentario.update).not.toHaveBeenCalled();
-      expect((prisma.comentario as any).delete).toBeUndefined();
-      expect((prisma.comentario as any).deleteMany).toBeUndefined();
+      expect((prisma.comentario as unknown as Record<string, unknown>).delete).toBeUndefined();
+      expect((prisma.comentario as unknown as Record<string, unknown>).deleteMany).toBeUndefined();
     });
 
     it('remove de un comentario de tarea vía ruta genérica: NotFoundException aunque el actor sea el líder del proyecto (nunca llega a evaluar liderazgo)', async () => {
@@ -210,7 +222,7 @@ describe('ComentariosService', () => {
         idTarea: 7,
         hito: null,
       });
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.remove(1, 1)).rejects.toBeInstanceOf(NotFoundException);
 
@@ -233,7 +245,7 @@ describe('ComentariosService', () => {
         creadoPor: 2,
       });
       prisma.comentario.update.mockResolvedValue({ idComentario: 1, contenido: 'editado' });
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       const result = await service.update(1, 2, { contenido: 'editado' });
 
@@ -256,7 +268,7 @@ describe('ComentariosService', () => {
         creadoPor: 2,
       });
       prisma.comentario.update.mockResolvedValue({ idComentario: 1, contenido: 'editado' });
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       const result = await service.update(1, 2, { contenido: 'editado' });
 
@@ -279,7 +291,7 @@ describe('ComentariosService', () => {
         creadoPor: 2,
       });
       prisma.comentario.update.mockResolvedValue({ idComentario: 1, eliminadoEn: new Date() });
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       const result = await service.remove(1, 2);
 
@@ -304,22 +316,22 @@ describe('ComentariosService', () => {
         idTarea: TASK_ID,
         hito: null,
       });
-      const service = new ComentariosService(prisma, { notifyProjectActiveParticipants: vi.fn() } as any);
-      await expect(service.update(COMMENT_ID, AUTHOR_ID, { contenido: 'y' } as any)).rejects.toBeInstanceOf(
+      const service = makeService(prisma, { notifyProjectActiveParticipants: vi.fn() });
+      await expect(service.update(COMMENT_ID, AUTHOR_ID, { contenido: 'y' })).rejects.toBeInstanceOf(
         NotFoundException,
       );
       expect(prisma.comentario.update).not.toHaveBeenCalled();
 
       // Vía anidada, con projectId+taskId correctos: el mismo autor sí puede operarlo.
       prisma.tarea.findFirst.mockResolvedValue({ idTarea: TASK_ID, idProyecto: PROJECT_ID });
-      (prisma.comentario.findFirst as any).mockResolvedValue({ idComentario: COMMENT_ID, idAutor: AUTHOR_ID });
+      prisma.comentario.findFirst.mockResolvedValue({ idComentario: COMMENT_ID, idAutor: AUTHOR_ID });
       prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: 1 });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.update.mockResolvedValue({ idComentario: COMMENT_ID, contenido: 'y' });
 
       const result = await service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, AUTHOR_ID, {
         contenido: 'y',
-      } as any);
+      });
       expect(result.idComentario).toBe(COMMENT_ID);
       expect(prisma.comentario.update).toHaveBeenCalled();
     });

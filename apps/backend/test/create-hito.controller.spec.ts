@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ProjectsController } from '../src/projects/projects.controller';
+import { CreateHitoDto } from '../src/projects/dto/create-hito.dto';
 
 function makeService() {
-  return { createHito: vi.fn() } as any;
+  return { createHito: vi.fn() };
+}
+
+function makeController(service: ReturnType<typeof makeService>) {
+  return new ProjectsController(
+    service as unknown as ConstructorParameters<typeof ProjectsController>[0],
+  );
 }
 
 describe('ProjectsController.createHito (POST /proyectos/:id/hitos)', () => {
@@ -22,8 +29,8 @@ describe('ProjectsController.createHito (POST /proyectos/:id/hitos)', () => {
 
   it('delega en ProjectsService.createHito con id, userId (CurrentUser) y el dto', () => {
     const service = makeService();
-    const controller = new ProjectsController(service);
-    const dto = { tituloHito: 'Entrega de MVP' } as any;
+    const controller = makeController(service);
+    const dto: CreateHitoDto = { tituloHito: 'Entrega de MVP' };
 
     controller.createHito(5, dto, { userId: 9 });
 
@@ -34,9 +41,9 @@ describe('ProjectsController.createHito (POST /proyectos/:id/hitos)', () => {
     const service = makeService();
     const hitoCreado = { idHito: 10, tituloHito: 'Entrega de MVP' };
     service.createHito.mockResolvedValue(hitoCreado);
-    const controller = new ProjectsController(service);
+    const controller = makeController(service);
 
-    const result = await controller.createHito(5, {} as any, { userId: 9 });
+    const result = await controller.createHito(5, {} as CreateHitoDto, { userId: 9 });
 
     expect(result).toBe(hitoCreado);
   });
@@ -45,8 +52,8 @@ describe('ProjectsController.createHito (POST /proyectos/:id/hitos)', () => {
     const service = makeService();
     const error = new Error('no eres el líder');
     service.createHito.mockRejectedValue(error);
-    const controller = new ProjectsController(service);
+    const controller = makeController(service);
 
-    await expect(controller.createHito(5, {} as any, { userId: 9 })).rejects.toBe(error);
+    await expect(controller.createHito(5, {} as CreateHitoDto, { userId: 9 })).rejects.toBe(error);
   });
 });
