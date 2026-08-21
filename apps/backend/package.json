@@ -17,7 +17,11 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:push": "prisma db push",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "k6:project-listing": "node scripts/run-k6.js project-listing",
+    "k6:kanban": "node scripts/run-k6.js kanban-operations",
+    "k6:socket-io": "node scripts/run-k6.js socket-io",
+    "k6:socket-io:trigger": "node scripts/run-k6.js socket-io --trigger"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
