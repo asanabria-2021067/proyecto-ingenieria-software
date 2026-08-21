@@ -8,7 +8,14 @@ function makePrisma() {
     proyecto: { findUnique: vi.fn() },
     hito: { findUnique: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
-  } as any;
+  };
+}
+
+function makeService(prisma: ReturnType<typeof makePrisma>) {
+  return new ComentariosService(
+    prisma as unknown as ConstructorParameters<typeof ComentariosService>[0],
+    {} as ConstructorParameters<typeof ComentariosService>[1],
+  );
 }
 
 const AUTOR_SELECT = {
@@ -27,7 +34,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       const prisma = makePrisma();
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
       prisma.comentario.findMany.mockResolvedValue([{ idComentario: 1 }]);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       const result = await service.findByProyecto(ID_PROYECTO, LIDER_ID);
 
@@ -46,7 +53,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 5 });
       prisma.comentario.findMany.mockResolvedValue([]);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await service.findByProyecto(ID_PROYECTO, PARTICIPANTE_ACTIVO_ID);
 
@@ -65,7 +72,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       const prisma = makePrisma();
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.findByProyecto(ID_PROYECTO, EXTERNO_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -82,7 +89,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
         const prisma = makePrisma();
         prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
         prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-        const service = new ComentariosService(prisma, {} as any);
+        const service = makeService(prisma);
 
         await expect(service.findByProyecto(ID_PROYECTO, userId)).rejects.toBeInstanceOf(
           ForbiddenException,
@@ -99,7 +106,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
     it('lanza NotFoundException si el proyecto no existe y no consulta participación ni comentarios', async () => {
       const prisma = makePrisma();
       prisma.proyecto.findUnique.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.findByProyecto(999, LIDER_ID)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -117,7 +124,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       prisma.hito.findUnique.mockResolvedValue({ idProyecto: ID_PROYECTO });
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
       prisma.comentario.findMany.mockResolvedValue([{ idComentario: 4 }]);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       const result = await service.findByHito(ID_HITO, LIDER_ID);
 
@@ -135,7 +142,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.findMany.mockResolvedValue([]);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await service.findByHito(ID_HITO, PARTICIPANTE_ACTIVO_ID);
 
@@ -147,7 +154,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       prisma.hito.findUnique.mockResolvedValue({ idProyecto: ID_PROYECTO });
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.findByHito(ID_HITO, EXTERNO_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -160,7 +167,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       prisma.hito.findUnique.mockResolvedValue({ idProyecto: ID_PROYECTO });
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.findByHito(ID_HITO, 3)).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.comentario.findMany).not.toHaveBeenCalled();
@@ -169,7 +176,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
     it('lanza NotFoundException si el hito no existe y no continúa con la autorización', async () => {
       const prisma = makePrisma();
       prisma.hito.findUnique.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(service.findByHito(999, LIDER_ID)).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.proyecto.findUnique).not.toHaveBeenCalled();
@@ -181,7 +188,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       prisma.hito.findUnique.mockResolvedValue({ idProyecto: OTRO_PROYECTO_ID });
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LIDER_ID });
       prisma.comentario.findMany.mockResolvedValue([]);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await service.findByHito(ID_HITO, LIDER_ID);
 
@@ -200,7 +207,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       prisma.hito.findUnique.mockResolvedValue({ idProyecto: OTRO_PROYECTO_ID });
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: 555 });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, {} as any);
+      const service = makeService(prisma);
 
       await expect(
         service.findByHito(ID_HITO, PARTICIPANTE_ACTIVO_ID),

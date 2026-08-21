@@ -19,8 +19,8 @@ jobs:
     name: Pruebas antes de desplegar
     uses: ./.github/workflows/ci.yml
 
-  deploy:
-    needs: test
+  build-frontend:
+    name: Build y push imagen frontend
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,18 +39,14 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare image names
+      - name: Prepare image name
         id: vars
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          frontend_image="ghcr.io/${owner}/${repo_name}-frontend"
-          backend_image="ghcr.io/${owner}/${repo_name}-backend"
-          echo "frontend_image=${frontend_image}" >> "$GITHUB_OUTPUT"
-          echo "backend_image=${backend_image}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend" >> "$GITHUB_OUTPUT"
 
       - name: Build and push frontend image
-        id: build_frontend
         uses: docker/build-push-action@v5
         with:
           context: ./apps/frontend
@@ -65,11 +61,37 @@ jobs:
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+  build-backend:
+    name: Build y push imagen backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare image name
+        id: vars
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
+          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend" >> "$GITHUB_OUTPUT"
 
       - name: Build and push backend image
-        id: build_backend
         uses: docker/build-push-action@v5
         with:
           context: ./apps/backend
@@ -77,14 +99,21 @@ jobs:
           tags: |
             ${{ steps.vars.outputs.backend_image }}:${{ github.sha }}
             ${{ steps.vars.outputs.backend_image }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
 
-      - name: Export image tags
-        id: images
+  deploy:
+    name: Desplegar en la VM
+    needs: [test, build-frontend, build-backend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare image names
+        id: vars
         run: |
-          echo "frontend_image=${{ steps.vars.outputs.frontend_image }}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "backend_image=${{ steps.vars.outputs.backend_image }}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
+          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -102,8 +131,8 @@ jobs:
             if ! git diff --quiet || ! git diff --cached --quiet; then
               git stash push --include-untracked -m "auto-deploy-$(date +%Y%m%d-%H%M%S)" || true
             fi
-            git fetch --prune origin main
-            git reset --hard origin/main
+            git fetch --depth=1 --prune origin main
+            git reset --hard FETCH_HEAD
             AUTO_STASHES=$(git stash list | grep "auto-deploy-" | tail -n +6 | cut -d: -f1 || true)
             if [ -n "$AUTO_STASHES" ]; then
               echo "$AUTO_STASHES" | while read -r STASH_REF; do
@@ -125,39 +154,47 @@ jobs:
             RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
             MAIL_FROM=${{ secrets.MAIL_FROM }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-            BACKEND_IMAGE=${{ steps.images.outputs.backend_image }}
-            FRONTEND_IMAGE=${{ steps.images.outputs.frontend_image }}
+            BACKEND_IMAGE=${{ steps.vars.outputs.backend_image }}
+            FRONTEND_IMAGE=${{ steps.vars.outputs.frontend_image }}
             ENVEOF
 
-            docker compose --profile app down
-
+            # Solo backend/frontend viven en GHCR y cambian en cada deploy.
+            # postgres/redis son imagenes fijas que ya estan en la VM: pedirlas
+            # de nuevo en cada deploy las manda a Docker Hub sin necesidad, y
+            # un Docker Hub caido (TLS handshake timeout) alargaba el fallo.
             n=0
-            until docker compose --profile app pull; do
+            until docker compose pull backend frontend; do
               n=$((n+1))
-              if [ "$n" -ge 5 ]; then
-                echo "Image pull failed after 5 attempts"
+              if [ "$n" -ge 2 ]; then
+                echo "Fallo de red: no se pudo descargar backend/frontend desde GHCR tras $n intentos"
                 exit 1
               fi
-              echo "Pull failed (attempt $n/5), retrying in 15s..."
+              echo "Pull failed (attempt $n/2), retrying in 15s..."
               sleep 15
             done
-            docker compose --profile app up -d --remove-orphans
+
+            # --no-deps: no toca postgres/redis (evita un reinicio innecesario
+            # de la base de datos en cada deploy). --no-build: si alguna vez
+            # Compose intentara construir en la VM (2GB RAM, inviable para
+            # Next.js), esto falla explicito en vez de intentarlo.
+            docker compose --profile app up -d --no-deps --no-build --remove-orphans backend frontend
 
             echo "Waiting for backend to be healthy..."
+            BACKEND_READY=0
             for i in $(seq 1 60); do
-              if curl -fsS http://127.0.0.1:3001/api >/dev/null; then
+              if curl -fsS --max-time 5 http://127.0.0.1:3001/api >/dev/null; then
                 echo "Backend is healthy."
+                BACKEND_READY=1
                 break
               fi
-              if [ "$i" -eq 60 ]; then
-                echo "Backend did not become healthy in time"
-                docker compose --profile app ps
-                docker compose logs --tail=120 backend || true
-                exit 1
-              fi
-              sleep 5
+              sleep 3
             done
+            if [ "$BACKEND_READY" -ne 1 ]; then
+              echo "Fallo de arranque: el backend no respondio a tiempo (la imagen ya se descargo, no es un problema de red)"
+              docker compose --profile app ps
+              docker compose logs --tail=120 backend || true
+              exit 1
+            fi
 
-            docker compose exec -T backend npx prisma db seed
             docker compose --profile app ps
-            docker image prune -f
+            docker image prune -f --filter "until=168h"

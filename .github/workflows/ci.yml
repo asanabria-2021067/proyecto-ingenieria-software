@@ -20,7 +20,9 @@ concurrency:
 
 env:
   # Prisma exige que la variable exista para generar el cliente.
-  # No se conecta a ninguna base de datos real: las pruebas usan mocks.
+  # Apunta al servicio postgres efimero del job backend (ver abajo).
+  # Las pruebas unitarias siguen usando mocks (nunca tocan esta base); las
+  # de integracion si se conectan realmente via INTEGRATION_DATABASE_URL.
   DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
   DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
 
@@ -31,6 +33,20 @@ jobs:
     defaults:
       run:
         working-directory: apps/backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -48,12 +64,29 @@ jobs:
       - name: Generar cliente Prisma
         run: npx prisma generate
 
+      - name: Aplicar migraciones Prisma
+        run: npx prisma migrate deploy
+
       - name: Lint
         run: npm run lint
         continue-on-error: true
 
-      - name: Pruebas unitarias y de integracion (Vitest)
+      # Cobertura completa solo en PR (gate antes de mergear); en push/deploy
+      # (workflow_call) corren las pruebas sin instrumentar cobertura para
+      # que el pipeline de deploy sea rapido — la validacion fuerte ya paso
+      # en el PR que se mergeo.
+      - name: Pruebas unitarias con cobertura (Vitest)
+        if: github.event_name == 'pull_request'
+        run: npm run test:coverage
+
+      - name: Pruebas unitarias (Vitest, sin cobertura)
+        if: github.event_name != 'pull_request'
         run: npm run test
+
+      - name: Pruebas de integracion en serie contra Postgres efimero (Vitest)
+        run: npm run test:integration
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
 
   frontend:
     name: Frontend - lint y pruebas
@@ -79,5 +112,133 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
-      - name: Pruebas (Vitest)
-        run: npm run test
+      # La suite de vitest+jsdom (~70 archivos) es pesada en memoria (ver
+      # vitest.config.ts) y no debe bloquear la velocidad del pipeline de
+      # deploy. Corre completa solo en PR (el gate real antes de mergear);
+      # en push/deploy el pipeline queda rapido con lint + el build de
+      # Next.js (ya corre en build-frontend de deploy.yml) como red de
+      # seguridad.
+      - name: Pruebas unitarias con cobertura (Vitest)
+        if: github.event_name == 'pull_request'
+        run: npm run test:coverage
+
+  e2e:
+    name: E2E - suite de humo (Playwright)
+    runs-on: ubuntu-latest
+    # A diferencia de los jobs backend/frontend (que usan mocks), este job
+    # necesita una base de datos y un Redis reales: arranca el backend de
+    # verdad y navega la app de verdad con un navegador. Es lento (~10min+)
+    # aun con cache, asi que NO corre en cada push/PR a develop: solo en PR
+    # hacia main, manualmente (workflow_dispatch), o cuando deploy.yml
+    # reusa este workflow antes de desplegar (workflow_call).
+    if: >-
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: uvg_collab_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d uvg_collab_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
+      JWT_SECRET: e2e-ci-secret
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      FRONTEND_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/backend/package-lock.json
+            apps/frontend/package-lock.json
+
+      - name: Instalar dependencias del backend
+        working-directory: apps/backend
+        run: npm ci
+
+      - name: Preparar base de datos (schema + seed)
+        working-directory: apps/backend
+        run: |
+          npx prisma db push
+          npx prisma db seed
+
+      - name: Compilar y levantar el backend en segundo plano
+        working-directory: apps/backend
+        env:
+          PORT: 3001
+        run: |
+          npm run build
+          npm run start:prod &
+
+      - name: Esperar a que el backend responda
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/api > /dev/null; then
+              echo "Backend listo"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "El backend no respondió a tiempo"
+          exit 1
+
+      - name: Instalar dependencias del frontend
+        working-directory: apps/frontend
+        run: npm ci
+
+      - name: Cache de navegadores de Playwright
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('apps/frontend/package-lock.json') }}
+
+      - name: Instalar navegador y dependencias de Playwright
+        working-directory: apps/frontend
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Instalar solo dependencias del sistema de Playwright (navegador ya en cache)
+        working-directory: apps/frontend
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Ejecutar suite de humo E2E
+        working-directory: apps/frontend
+        run: npm run test:e2e
+
+      - name: Subir reporte de Playwright (solo si falla)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/frontend/playwright-report/
+          retention-days: 7

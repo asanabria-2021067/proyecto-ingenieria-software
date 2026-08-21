@@ -12,6 +12,13 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 
+interface ResetTokenPayload {
+  tipo: string;
+  idSolicitud: number;
+  sub: number;
+  correo: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -129,9 +136,9 @@ export class AuthService {
   }
 
   async resetPassword(token: string, nuevaContrasena: string) {
-    let payload: any;
+    let payload: ResetTokenPayload;
     try {
-      payload = this.jwtService.verify(token);
+      payload = this.jwtService.verify<ResetTokenPayload>(token);
     } catch {
       throw new BadRequestException("Token inválido o expirado");
     }
