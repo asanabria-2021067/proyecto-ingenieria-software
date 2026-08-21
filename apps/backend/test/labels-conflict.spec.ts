@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { LabelsService } from '../src/labels/labels.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * Tarea 31: el índice único compuesto `Etiqueta(idProyecto,
@@ -76,13 +77,14 @@ const LEADER_ID = 1;
 const LABEL_ID = 10;
 
 function makePrisma() {
-  return {
+  const prisma = {
     proyecto: { findFirst: vi.fn().mockResolvedValue({ idProyecto: PROJECT_ID, creadoPor: LEADER_ID }) },
     participacionProyecto: { findFirst: vi.fn() },
     etiqueta: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     tareaEtiqueta: { deleteMany: vi.fn() },
     $transaction: vi.fn(),
-  } as any;
+  };
+  return prisma as typeof prisma & PrismaService;
 }
 
 describe('LabelsService — detección de conflicto Prisma en creación (Tarea 31)', () => {
@@ -92,7 +94,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -102,9 +104,10 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     try {
-      await service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any);
+      await service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' });
       throw new Error('no debía resolver');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if (!(error instanceof ConflictException)) throw error;
       const mensaje = JSON.stringify(error.getResponse());
       expect(mensaje).not.toMatch(/P2002/);
       expect(mensaje).not.toMatch(/nombre_normalizado/);
@@ -120,7 +123,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
     ).rejects.toBe(error);
   });
 
@@ -131,7 +134,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
     ).rejects.toBe(error);
   });
 
@@ -142,7 +145,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
     ).rejects.toBe(error);
   });
 
@@ -153,7 +156,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
     ).rejects.toBe(error);
   });
 
@@ -164,7 +167,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
     ).rejects.toBe(error);
   });
 
@@ -175,7 +178,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
     ).rejects.toBe(error);
   });
 
@@ -186,7 +189,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const service = new LabelsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
     ).rejects.toBe(error);
   });
 
@@ -198,7 +201,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
       const service = new LabelsService(prisma);
 
       await expect(
-        service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' } as any),
+        service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
       ).rejects.toBe(valorLanzado);
     },
   );
@@ -220,7 +223,7 @@ describe('LabelsService — detección de conflicto Prisma en edición (Tarea 31
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' } as any),
+      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -232,7 +235,7 @@ describe('LabelsService — detección de conflicto Prisma en edición (Tarea 31
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' } as any),
+      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' }),
     ).rejects.toBe(error);
   });
 
@@ -244,7 +247,7 @@ describe('LabelsService — detección de conflicto Prisma en edición (Tarea 31
     const service = new LabelsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' } as any),
+      service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' }),
     ).rejects.toBe(errorFk);
   });
 });
@@ -267,8 +270,8 @@ describe('LabelsService — carrera concurrente (Tarea 31)', () => {
     const service = new LabelsService(prisma);
 
     const [resultadoA, resultadoB] = await Promise.allSettled([
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' } as any),
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: ' frontend ', color: '#000000' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' }),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: ' frontend ', color: '#000000' }),
     ]);
 
     const exitosas = [resultadoA, resultadoB].filter((r) => r.status === 'fulfilled');
@@ -286,9 +289,9 @@ describe('LabelsService — carrera concurrente (Tarea 31)', () => {
     prisma.etiqueta.create.mockResolvedValueOnce(ganadora).mockRejectedValueOnce(makeLabelNameCollisionError());
     const service = new LabelsService(prisma);
 
-    await service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' } as any);
+    await service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' });
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'FRONTEND', color: '#000000' } as any),
+      service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'FRONTEND', color: '#000000' }),
     ).rejects.toBeInstanceOf(ConflictException);
 
     // Ninguna llamada adicional (sin reintento automático) más allá de las 2 explícitas.
@@ -303,8 +306,8 @@ describe('LabelsService — carrera concurrente (Tarea 31)', () => {
     const service = new LabelsService(prisma);
 
     const [a, b] = await Promise.all([
-      service.create(5, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' } as any),
-      service.create(6, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#000000' } as any),
+      service.create(5, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' }),
+      service.create(6, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#000000' }),
     ]);
 
     expect(a.idEtiqueta).toBe(1);

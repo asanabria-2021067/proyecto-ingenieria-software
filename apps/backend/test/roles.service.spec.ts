@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { RolesService } from '../src/roles/roles.service';
 
 const LEADER_ID = 1;
@@ -42,7 +44,7 @@ function rolConStats(overrides: Record<string, unknown> = {}) {
 }
 
 function makePrisma() {
-  const prisma: any = {
+  const prisma = {
     proyecto: { findFirst: vi.fn() },
     rolProyecto: {
       findFirst: vi.fn(),
@@ -68,17 +70,19 @@ function makePrisma() {
     postulacion: { count: vi.fn(), create: vi.fn() },
     asignacionTarea: { findMany: vi.fn(), updateMany: vi.fn() },
     usuario: { findUnique: vi.fn() },
+    $transaction: vi.fn(),
   };
   // El tx comparte los mismos mocks (los tests controlan los retornos).
-  prisma.$transaction = vi.fn(async (fn: any) => fn(prisma));
-  return prisma;
+  prisma.$transaction.mockImplementation(async (fn: (tx: typeof prisma) => unknown) => fn(prisma));
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeNotifications() {
-  return {
+  const notifications = {
     notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
     notifyUsers: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+  return notifications as typeof notifications & NotificationsService;
 }
 
 function knownError(code: string) {
@@ -249,7 +253,7 @@ describe('RolesService.updateRole', () => {
 
 // ─────────────────────── deleteRole (Sección 9) ───────────────────────
 describe('RolesService.deleteRole', () => {
-  function armarVacio(prisma: any) {
+  function armarVacio(prisma: ReturnType<typeof makePrisma>) {
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase());
     prisma.participacionProyecto.count.mockResolvedValue(0);
@@ -292,18 +296,21 @@ describe('RolesService.deleteRole', () => {
     ['participación', 'participacionProyecto'],
     ['tarea', 'tarea'],
     ['postulación', 'postulacion'],
-  ])('rechaza (400) si tiene %s (historial externo)', async (_label, modelo) => {
-    const prisma = makePrisma();
-    armarVacio(prisma);
-    prisma[modelo].count.mockResolvedValue(1);
-    const service = new RolesService(prisma, makeNotifications());
+  ] as [string, 'participacionProyecto' | 'tarea' | 'postulacion'][])(
+    'rechaza (400) si tiene %s (historial externo)',
+    async (_label, modelo) => {
+      const prisma = makePrisma();
+      armarVacio(prisma);
+      prisma[modelo].count.mockResolvedValue(1);
+      const service = new RolesService(prisma, makeNotifications());
 
-    await expect(service.deleteRole(PROJECT_ID, ROLE_ID, LEADER_ID)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.rolProyecto.delete).not.toHaveBeenCalled();
-  });
+      await expect(service.deleteRole(PROJECT_ID, ROLE_ID, LEADER_ID)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.rolProyecto.delete).not.toHaveBeenCalled();
+    },
+  );
 
   it('rollback completo: si falla el delete del rol, la transacción propaga el error', async () => {
     const prisma = makePrisma();
@@ -332,7 +339,7 @@ describe('RolesService.deleteRole', () => {
 
 // ─────────────────── selfAssign / autoasignación líder (Sección 6) ───────────────────
 describe('RolesService.selfAssign', () => {
-  function armar(prisma: any, overrides: Record<string, unknown> = {}) {
+  function armar(prisma: ReturnType<typeof makePrisma>, overrides: Record<string, unknown> = {}) {
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase(overrides));
   }
@@ -456,7 +463,7 @@ describe('RolesService.selfAssign', () => {
 
 // ─────────────────── leaveRole / retiro limitado (Secciones 10-16) ───────────────────
 describe('RolesService.leaveRole', () => {
-  function armarConDosRoles(prisma: any, tareasDelRol: number[] = []) {
+  function armarConDosRoles(prisma: ReturnType<typeof makePrisma>, tareasDelRol: number[] = []) {
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase());
     prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 900 });

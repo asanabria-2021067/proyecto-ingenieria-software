@@ -24,6 +24,11 @@ services:
         condition: service_healthy
     networks:
       - uvg-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     build:
@@ -43,3 +48,8 @@ services:
       - backend
     networks:
       - uvg-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

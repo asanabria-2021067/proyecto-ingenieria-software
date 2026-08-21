@@ -1,11 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AsignacionTarea, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
+import {
+  AsignacionTarea,
+  EstadoSprint,
+  EstadoTarea,
+  Prioridad,
+  Prisma,
+  TipoNotificacion,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
 import { TasksContextService } from './tasks-context.service';
@@ -15,6 +23,8 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
+import { CloseAssignmentDto } from './dto/close-assignment.dto';
+import { calcularProgresoHito } from '../common/hito-progreso';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -84,6 +94,8 @@ const UPDATE_TASK_FIELDS = [
   'idRolProyecto',
   'idsEtiquetas',
 ] as const;
+
+const MIN_PROGRESS_CONTENT_LENGTH = 200;
 
 interface UsuarioResumenPublico {
   idUsuario: number;
@@ -288,11 +300,27 @@ export class TasksService {
     const row = await this.prisma.$transaction(async (tx) => {
       await this.tasksAuthorization.assertCanCreateTask(projectId, userId, tx);
 
+      // El proyecto solo admite tareas nuevas mientras tenga un Sprint
+      // ACTIVO (contrato Sprint 6): EN_FINALIZACION, CERRADO o la ausencia
+      // de Sprint bloquean la creación. El Sprint nunca se crea aquí — el
+      // primer Sprint y los siguientes los inicia el líder manualmente
+      // (fuera de este flujo).
+      const sprintActivo = await tx.sprint.findFirst({
+        where: { idProyecto: projectId, estado: EstadoSprint.ACTIVO },
+        select: { idSprint: true },
+      });
+      if (!sprintActivo) {
+        throw new ConflictException(
+          'No se pueden crear tareas porque el proyecto no tiene un Sprint activo.',
+        );
+      }
+
       const recursos = await this.tasksRelations.validateCreateTaskRelations(projectId, dto, tx);
 
       const tarea = await tx.tarea.create({
         data: {
           idProyecto: projectId,
+          idSprint: sprintActivo.idSprint,
           creadaPor: userId,
           tituloTarea: dto.tituloTarea,
           // Conserva '' si se envió explícitamente; solo el omitido se
@@ -321,6 +349,12 @@ export class TasksService {
           data: {
             idTarea: tarea.idTarea,
             idUsuario: dto.idUsuarioAsignado,
+            // X1.1: participación exacta ya resuelta por
+            // validateCreateTaskRelations (misma fila validada, sin
+            // segunda consulta) — nunca queda NULL para una asignación
+            // inicial real, condición que HoursRecognitionService (B10)
+            // exige para poder reconocer horas de este tramo.
+            idParticipacion: recursos.idParticipacionAsignado ?? null,
             asignadoPor: userId,
             desasignadaEn: null,
           },
@@ -350,6 +384,15 @@ export class TasksService {
         throw new Error(
           `No se pudo leer la tarea con id ${tarea.idTarea} recién creada dentro de la transacción`,
         );
+      }
+
+      // A12.1: una tarea nueva con idHito != null cambia el conjunto de
+      // tareas vigentes que determina el progreso de ese Hito (nace
+      // POR_HACER, así que puede degradar un Hito antes COMPLETADO) —
+      // mismo mecanismo de sincronización que updateEstado/closeAssignment
+      // (A12), reutilizado sin duplicar la fórmula.
+      if (filaFinal.idHito !== null) {
+        await this.syncHitoEstado(tx, filaFinal.idHito);
       }
 
       return filaFinal;
@@ -557,6 +600,14 @@ export class TasksService {
         );
       }
 
+      // A12: updateEstado escribe estadoTarea incondicionalmente (sin
+      // atajo de idempotencia, ver docstring de este método) — si la
+      // tarea pertenece a un Hito, su progreso persistido puede haber
+      // cambiado.
+      if (filaFinal.idHito !== null) {
+        await this.syncHitoEstado(tx, filaFinal.idHito);
+      }
+
       return filaFinal;
     });
 
@@ -623,6 +674,14 @@ export class TasksService {
         data: { eliminadoEn },
       });
 
+      // A12.1: el soft-delete saca la tarea del conjunto vigente
+      // (`eliminadoEn: null`) que determina el progreso de su Hito — la
+      // misma invariante que corrige la creación; se resincroniza con el
+      // mismo mecanismo (A12), dentro de esta misma transacción.
+      if (tarea.idHito !== null) {
+        await this.syncHitoEstado(tx, tarea.idHito);
+      }
+
       return {
         taskId: tarea.idTarea,
         projectId: tarea.idProyecto,
@@ -687,7 +746,12 @@ export class TasksService {
       );
 
       const rolEfectivo = tarea.idRolProyecto ?? null;
-      await this.tasksRelations.assertUserAssignableToProject(
+      // X1.1: idParticipacion exacto ya resuelto por esta misma validación
+      // (rol exacto si la tarea tiene idRolProyecto, participación ACTIVO
+      // del proyecto si no) — se reutiliza tal cual al crear la fila
+      // activa, sin una segunda consulta y sin adivinar entre varias
+      // participaciones del mismo usuario (multirol).
+      const idParticipacionResuelta = await this.tasksRelations.assertUserAssignableToProject(
         projectId,
         dto.idUsuario,
         rolEfectivo,
@@ -701,6 +765,7 @@ export class TasksService {
         await this.createActiveAssignment(tx, {
           idTarea: taskId,
           idUsuario: dto.idUsuario,
+          idParticipacion: idParticipacionResuelta,
           asignadoPor: actorUserId,
           desasignadaEn: null,
         });
@@ -720,6 +785,7 @@ export class TasksService {
         await this.createActiveAssignment(tx, {
           idTarea: taskId,
           idUsuario: dto.idUsuario,
+          idParticipacion: idParticipacionResuelta,
           asignadoPor: actorUserId,
           desasignadaEn: null,
         });
@@ -782,7 +848,13 @@ export class TasksService {
    */
   private async createActiveAssignment(
     tx: Prisma.TransactionClient,
-    data: { idTarea: number; idUsuario: number; asignadoPor: number; desasignadaEn: null },
+    data: {
+      idTarea: number;
+      idUsuario: number;
+      idParticipacion: number;
+      asignadoPor: number;
+      desasignadaEn: null;
+    },
   ): Promise<AsignacionTarea> {
     try {
       return await tx.asignacionTarea.create({ data });
@@ -885,6 +957,134 @@ export class TasksService {
         resultado.taskTitle,
         actorUserId,
         resultado.previousUserId,
+      );
+    }
+  }
+
+  async closeAssignment(
+    projectId: number,
+    taskId: number,
+    assignmentId: number,
+    actorUserId: number,
+    dto: CloseAssignmentDto,
+  ): Promise<TareaPublica> {
+    this.assertValidAssignmentClosureInput(dto);
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
+
+      const asignacion = await tx.asignacionTarea.findFirst({
+        where: { idAsignacion: assignmentId, idTarea: taskId },
+        select: {
+          idAsignacion: true,
+          idTarea: true,
+          idUsuario: true,
+          desasignadaEn: true,
+        },
+      });
+      if (!asignacion) {
+        throw new NotFoundException(
+          `Asignación con id ${assignmentId} no encontrada en la tarea ${taskId}`,
+        );
+      }
+
+      if (asignacion.idUsuario !== actorUserId) {
+        throw new ForbiddenException('Solo el usuario asignado puede cerrar este tramo');
+      }
+
+      await this.tasksContext.assertActiveProjectParticipant(projectId, actorUserId, tx);
+
+      const desasignadaEn = new Date();
+      const closed = await tx.asignacionTarea.updateMany({
+        where: {
+          idAsignacion: assignmentId,
+          idTarea: taskId,
+          idUsuario: actorUserId,
+          desasignadaEn: null,
+        },
+        data: {
+          horasReales: dto.horasReales,
+          desasignadaEn,
+        },
+      });
+
+      if (closed.count !== 1) {
+        throw new ConflictException('La asignación ya fue cerrada');
+      }
+
+      await tx.registroAvanceAsignacion.create({
+        data: {
+          idAsignacion: assignmentId,
+          idAutor: actorUserId,
+          contenido: dto.contenidoAvance,
+        },
+      });
+
+      if (dto.marcarComoHecha === true) {
+        await tx.tarea.update({
+          where: { idTarea: taskId },
+          data: { estadoTarea: EstadoTarea.HECHO },
+        });
+      }
+
+      const filaFinal = await tx.tarea.findFirst({
+        where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
+        select: TASK_SELECT,
+      });
+
+      if (!filaFinal) {
+        throw new Error(
+          `No se pudo leer la tarea con id ${taskId} recién cerrada dentro de la transacción`,
+        );
+      }
+
+      // A12: solo cuando este cierre de tramo efectivamente cambió
+      // estadoTarea (marcarComoHecha) y la tarea pertenece a un Hito.
+      if (dto.marcarComoHecha === true && filaFinal.idHito !== null) {
+        await this.syncHitoEstado(tx, filaFinal.idHito);
+      }
+
+      return filaFinal;
+    });
+
+    return mapTarea(row);
+  }
+
+  /**
+   * A12: sincroniza `Hito.estadoHito` con el progreso real derivado de sus
+   * tareas vigentes — misma fórmula única que `ProjectsService.calcularAvanceHitos`
+   * (vía `calcularProgresoHito`, src/common/hito-progreso.ts), nunca una
+   * segunda definición. Se llama SIEMPRE dentro de la misma transacción que
+   * acaba de escribir `estadoTarea`, así que la consulta ve el estado ya
+   * comprometido (no el anterior). Acotado por `idHito`: una sola consulta
+   * (`tarea.findMany` filtrado por ese Hito, `eliminadoEn: null`) y una sola
+   * escritura (`hito.update`) — nunca recorre otros Hitos ni otros
+   * proyectos. El caller es responsable de solo invocar esto cuando la
+   * tarea realmente tiene `idHito !== null`.
+   */
+  private async syncHitoEstado(tx: Prisma.TransactionClient, idHito: number): Promise<void> {
+    const tareasHito = await tx.tarea.findMany({
+      where: { idHito, eliminadoEn: null },
+      select: { estadoTarea: true },
+    });
+    const { estadoHito } = calcularProgresoHito(tareasHito);
+    await tx.hito.update({
+      where: { idHito },
+      data: { estadoHito },
+    });
+  }
+
+  private assertValidAssignmentClosureInput(dto: CloseAssignmentDto): void {
+    if (!Number.isFinite(dto.horasReales) || dto.horasReales < 0) {
+      throw new BadRequestException('horasReales debe ser un número válido mayor o igual a 0');
+    }
+
+    if (
+      typeof dto.contenidoAvance !== 'string' ||
+      dto.contenidoAvance.trim().length < MIN_PROGRESS_CONTENT_LENGTH
+    ) {
+      throw new BadRequestException(
+        `contenidoAvance debe tener al menos ${MIN_PROGRESS_CONTENT_LENGTH} caracteres significativos`,
       );
     }
   }

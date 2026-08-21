@@ -1,20 +1,41 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { TasksService } from '../src/tasks/tasks.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
 
 // Cobertura mínima de camino exitoso para esta tarea (Tarea 15): consulta
 // delegada, mapeo básico al contrato público y orden de negocio. La matriz
 // exhaustiva de autorización/aislamiento/soft delete queda para la Tarea 16.
 
 function makePrisma() {
-  return { tarea: { findMany: vi.fn(), findFirst: vi.fn() } } as any;
+  return { tarea: { findMany: vi.fn(), findFirst: vi.fn() } };
 }
 
 function makeAuthorization() {
   return {
     assertCanListProjectTasks: vi.fn().mockResolvedValue(undefined),
     assertCanReadTask: vi.fn().mockResolvedValue(undefined),
-  } as any;
+  };
+}
+
+// findAll/findOne (las únicas rutas cubiertas en este archivo) solo usan
+// prisma y tasksAuthorization; las otras tres dependencias del constructor
+// real no se invocan en esos caminos, así que basta con stubs vacíos.
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  auth: ReturnType<typeof makeAuthorization>,
+) {
+  return new TasksService(
+    prisma as unknown as PrismaService,
+    auth as unknown as TasksAuthorizationService,
+    {} as unknown as TasksRelationsService,
+    {} as unknown as NotificationsService,
+    {} as unknown as TasksContextService,
+  );
 }
 
 function baseRow(overrides: Record<string, unknown> = {}) {
@@ -47,7 +68,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow()]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await service.findAll(5, 9);
 
@@ -67,7 +88,7 @@ describe('TasksService', () => {
         baseRow({ idTarea: 4, prioridad: 'MEDIA', fechaLimite: null }),
         baseRow({ idTarea: 5, prioridad: 'ALTA', fechaLimite: null }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const result = await service.findAll(5, 9);
 
@@ -78,7 +99,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow()]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -104,7 +125,7 @@ describe('TasksService', () => {
           ],
         }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -127,7 +148,7 @@ describe('TasksService', () => {
           ],
         }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -143,7 +164,7 @@ describe('TasksService', () => {
       prisma.tarea.findMany.mockResolvedValue([
         baseRow({ fechaLimite: new Date('2026-12-25T00:00:00.000Z') }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -156,7 +177,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findFirst.mockResolvedValue(baseRow({ idTarea: 8 }));
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await service.findOne(5, 8, 9);
 
@@ -172,7 +193,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findFirst.mockResolvedValue(null);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await expect(service.findOne(5, 999, 9)).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -181,7 +202,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findFirst.mockResolvedValue(baseRow({ idTarea: 8 }));
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const tarea = await service.findOne(5, 8, 9);
 
@@ -217,7 +238,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       auth.assertCanListProjectTasks.mockRejectedValue(new Error('rechazado'));
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await expect(service.findAll(5, 9)).rejects.toThrow();
       expect(prisma.tarea.findMany).not.toHaveBeenCalled();
@@ -227,7 +248,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       auth.assertCanReadTask.mockRejectedValue(new Error('rechazado'));
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await expect(service.findOne(5, 8, 9)).rejects.toThrow();
       expect(prisma.tarea.findFirst).not.toHaveBeenCalled();
@@ -242,7 +263,7 @@ describe('TasksService', () => {
         baseRow({ idTarea: 1, idHito: null, hito: null }),
         baseRow({ idTarea: 2, idHito: 4, hito: { idHito: 4, tituloHito: 'MVP funcional' } }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const result = await service.findAll(5, 9);
 
@@ -265,7 +286,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow(overrides)]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -290,7 +311,7 @@ describe('TasksService', () => {
         baseRow({ idTarea: 11, prioridad: 'ALTA', fechaLimite: new Date('2026-01-01') }),
         baseRow({ idTarea: 21, prioridad: 'MEDIA', fechaLimite: null }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const result = await service.findAll(5, 9);
 
@@ -309,7 +330,7 @@ describe('TasksService', () => {
       prisma.tarea.findMany.mockResolvedValue([
         baseRow({ fechaLimite: new Date('2026-12-25T00:00:00.000Z') }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -321,7 +342,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow({ fechaLimite: null })]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -341,7 +362,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow({ asignaciones: [asignacionRow] })]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -356,7 +377,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow({ asignaciones: [asignacionRow] })]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -368,7 +389,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow({ asignaciones: [asignacionRow] })]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -383,7 +404,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow({ etiquetas: [] })]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -400,7 +421,7 @@ describe('TasksService', () => {
           ],
         }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -420,7 +441,7 @@ describe('TasksService', () => {
           ],
         }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -443,7 +464,7 @@ describe('TasksService', () => {
           ],
         }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -464,7 +485,7 @@ describe('TasksService', () => {
       // comentarios totales (3 activos + 2 eliminados), _count.comentarios
       // ya llega en 3, sin que el service haga ningún filtrado adicional.
       prisma.tarea.findMany.mockResolvedValue([baseRow({ _count: { comentarios: 3 } })]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -475,7 +496,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow({ _count: { comentarios: 3 } })]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -487,7 +508,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow()]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await service.findAll(5, 9);
 
@@ -529,7 +550,7 @@ describe('TasksService', () => {
         _count: { comentarios: 4 },
       });
       prisma.tarea.findMany.mockResolvedValue([filaCompleta]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       const [tarea] = await service.findAll(5, 9);
 
@@ -586,7 +607,7 @@ describe('TasksService', () => {
         comentario: { count: vi.fn() },
         hito: { findUnique: vi.fn() },
         rolProyecto: { findUnique: vi.fn() },
-      } as any;
+      };
     }
 
     it('findAll con varias tareas llama a tarea.findMany exactamente una vez y a ningún otro delegate', async () => {
@@ -597,7 +618,7 @@ describe('TasksService', () => {
         baseRow({ idTarea: 2 }),
         baseRow({ idTarea: 3 }),
       ]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await service.findAll(5, 9);
 
@@ -613,7 +634,7 @@ describe('TasksService', () => {
       const prisma = makeRichPrisma();
       const auth = makeAuthorization();
       prisma.tarea.findFirst.mockResolvedValue(baseRow({ idTarea: 8 }));
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await service.findOne(5, 8, 9);
 
@@ -634,7 +655,7 @@ describe('TasksService', () => {
       const prisma = makePrisma();
       const auth = makeAuthorization();
       prisma.tarea.findMany.mockResolvedValue([baseRow()]);
-      const service = new TasksService(prisma, auth);
+      const service = makeService(prisma, auth);
 
       await service.findAll(5, 9);
 
