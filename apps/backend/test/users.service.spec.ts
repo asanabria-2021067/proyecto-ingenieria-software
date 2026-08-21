@@ -1,9 +1,18 @@
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import type { PrismaService } from '../src/prisma/prisma.service';
 import { UsersService } from '../src/users/users.service';
 
 function prismaMock() {
-  return {
+  const defaultTx = {
+    usuario: { update: vi.fn() },
+    perfilEstudiante: { update: vi.fn() },
+    usuarioHabilidad: { deleteMany: vi.fn(), createMany: vi.fn() },
+    usuarioInteres: { deleteMany: vi.fn(), createMany: vi.fn() },
+    usuarioCualidad: { deleteMany: vi.fn(), createMany: vi.fn() },
+  };
+
+  const prisma = {
     usuario: { findUnique: vi.fn(), update: vi.fn() },
     perfilEstudiante: { update: vi.fn(), findUnique: vi.fn() },
     carrera: { findMany: vi.fn() },
@@ -17,14 +26,9 @@ function prismaMock() {
     horasParticipacion: { aggregate: vi.fn() },
     participacionProyecto: { count: vi.fn() },
     postulacion: { findMany: vi.fn() },
-    $transaction: vi.fn(async (cb: (tx: any) => unknown) => cb({
-      usuario: { update: vi.fn() },
-      perfilEstudiante: { update: vi.fn() },
-      usuarioHabilidad: { deleteMany: vi.fn(), createMany: vi.fn() },
-      usuarioInteres: { deleteMany: vi.fn(), createMany: vi.fn() },
-      usuarioCualidad: { deleteMany: vi.fn(), createMany: vi.fn() },
-    })),
-  } as any;
+    $transaction: vi.fn(async (cb: (tx: typeof defaultTx) => unknown) => cb(defaultTx)),
+  };
+  return prisma as typeof prisma & PrismaService;
 }
 
 describe('UsersService', () => {
@@ -71,10 +75,12 @@ describe('UsersService', () => {
       usuario: { update: vi.fn() },
       perfilEstudiante: { update: vi.fn() },
     };
-    prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
+    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as typeof prisma.$transaction;
     prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 1 });
     const service = new UsersService(prisma);
-    const getProfileSpy = vi.spyOn(service, 'getProfile').mockResolvedValue({ ok: true } as any);
+    const getProfileSpy = vi
+      .spyOn(service, 'getProfile')
+      .mockResolvedValue({ ok: true } as unknown as Awaited<ReturnType<typeof service.getProfile>>);
 
     const result = await service.updateProfile(1, { nombreCompleto: 'Ana Perez', biografia: 'x' });
 
@@ -87,7 +93,7 @@ describe('UsersService', () => {
   it('replaceIntereses reemplaza y retorna count', async () => {
     const prisma = prismaMock();
     const tx = { usuarioInteres: { deleteMany: vi.fn(), createMany: vi.fn() } };
-    prisma.$transaction = vi.fn(async (cb: (arg: any) => unknown) => cb(tx));
+    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as typeof prisma.$transaction;
     const service = new UsersService(prisma);
 
     const result = await service.replaceIntereses(1, [2, 3]);

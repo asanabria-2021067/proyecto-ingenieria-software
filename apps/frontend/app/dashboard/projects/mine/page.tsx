@@ -8,7 +8,7 @@ import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
 } from '@/components/projects/available-project-card';
-import { getMyProjects, deleteProject } from '@/lib/services/projects';
+import { getMyProjects, getContributorProjects, deleteProject } from '@/lib/services/projects';
 import { TIPO_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
@@ -65,6 +65,19 @@ export default function MyProjectsPage() {
     queryKey: ['mis-proyectos'],
     queryFn: () => getMyProjects(),
   });
+
+  // Proyectos donde participo con un rol pero no soy el líder (Sección 20):
+  // única forma de llegar al workspace `/dashboard/projects/[id]` para un
+  // miembro que no creó el proyecto. Se excluyen los que ya aparecen arriba
+  // (un líder que además se autoasignó un rol no debe verse duplicado).
+  const idsPropios = new Set(proyectos.map((p) => p.idProyecto));
+  const { data: proyectosParticipo = [], isLoading: isLoadingParticipo } = useQuery<
+    MiProyectoListItemDTO[]
+  >({
+    queryKey: ['proyectos-donde-participo'],
+    queryFn: () => getContributorProjects(),
+  });
+  const participoFiltrados = proyectosParticipo.filter((p) => !idsPropios.has(p.idProyecto));
 
   async function handleDelete(proyecto: MiProyectoListItemDTO) {
     const result = await uvgSwal.fire({
@@ -280,6 +293,19 @@ export default function MyProjectsPage() {
                 onDelete={() => handleDelete(proyecto)}
               />
             ))}
+          </div>
+        )}
+
+        {!isLoadingParticipo && participoFiltrados.length > 0 && (
+          <div className="mt-8">
+            <h2 className="mb-3 text-[19px] font-bold text-on-surface">
+              Proyectos donde participo
+            </h2>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+              {participoFiltrados.map((proyecto) => (
+                <AvailableProjectCard key={proyecto.idProyecto} context="mine" proyecto={proyecto} />
+              ))}
+            </div>
           </div>
         )}
       </div>

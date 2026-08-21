@@ -180,11 +180,34 @@ enum TipoNotificacion {
   ROL_ASIGNADO_LIDER
   ROL_ACTUALIZADO
   SOLICITUD_RECUPERACION_CONTRASENA
+  SOLICITUD_AMISTAD
+  AMISTAD_ACEPTADA
+  NUEVO_SEGUIDOR
+}
+
+enum EstadoAmistad {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
 }
 
 enum EstadoSolicitudRecuperacion {
   PENDIENTE
   ATENDIDA
+}
+
+enum EstadoSolicitudSalida {
+  PREPARACION
+  PENDIENTE_LIDER
+  APROBADA
+  RECHAZADA
+  CANCELADA
+}
+
+enum EstadoSprint {
+  ACTIVO
+  EN_FINALIZACION
+  CERRADO
 }
 
 model Usuario {
@@ -207,27 +230,63 @@ model Usuario {
   organizacionesCreadas            Organizacion[]
   membresiasOrganizacion           UsuarioOrganizacion[]
   proyectosCreados                 Proyecto[]
-  postulaciones                    Postulacion[]             @relation("Postulante")
-  postulacionesResueltas           Postulacion[]             @relation("PostulacionResolutor")
+  postulaciones                    Postulacion[]              @relation("Postulante")
+  postulacionesResueltas           Postulacion[]              @relation("PostulacionResolutor")
   participaciones                  ParticipacionProyecto[]
   tareasCreadas                    Tarea[]
-  tareasAsignadas                  AsignacionTarea[]         @relation("TareaAsignada")
-  tareasQueAsigno                  AsignacionTarea[]         @relation("TareaAsignador")
+  tareasAsignadas                  AsignacionTarea[]          @relation("TareaAsignada")
+  tareasQueAsigno                  AsignacionTarea[]          @relation("TareaAsignador")
   evidenciasCargadas               Evidencia[]
   revisionesRealizadas             RevisionEvidencia[]
   horasAprobadas                   HorasParticipacion[]
   certificadosEmitidos             Certificado[]
   notificaciones                   Notificacion[]
-  solicitudesRecuperacion          SolicitudRecuperacion[]   @relation("SolicitudRecuperacionUsuario")
-  solicitudesRecuperacionAtendidas SolicitudRecuperacion[]   @relation("SolicitudRecuperacionAdmin")
+  solicitudesRecuperacion          SolicitudRecuperacion[]    @relation("SolicitudRecuperacionUsuario")
+  solicitudesRecuperacionAtendidas SolicitudRecuperacion[]    @relation("SolicitudRecuperacionAdmin")
   rolesAcceso                      UsuarioRolAcceso[]
   auditorias                       BitacoraAuditoria[]
   configuracionesActualizadas      ConfiguracionSistema[]
-  revisionesProyectoRealizadas     RevisionProyecto[]        @relation("RevisionesProyectoRealizadas")
+  revisionesProyectoRealizadas     RevisionProyecto[]         @relation("RevisionesProyectoRealizadas")
   comentariosEscritos              Comentario[]
-  mensajesRevisionEnviados         MensajeRevisionProyecto[] @relation("MensajesEnviados")
+  mensajesRevisionEnviados         MensajeRevisionProyecto[]  @relation("MensajesEnviados")
+  solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[]  @relation("SolicitudSalidaSolicitante")
+  solicitudesSalidaResueltas       SolicitudSalidaProyecto[]  @relation("SolicitudSalidaResolutor")
+  sprintsCerrados                  Sprint[]
+  registrosAvanceEscritos          RegistroAvanceAsignacion[]
+  amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
+  amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
+  siguiendo                        Seguimiento[]              @relation("Siguiendo")
+  seguidores                       Seguimiento[]              @relation("Seguidores")
 
   @@map("usuario")
+}
+
+model Amistad {
+  idAmistad            Int           @id @default(autoincrement()) @map("id_amistad")
+  idUsuarioSolicitante Int           @map("id_usuario_solicitante")
+  idUsuarioReceptor    Int           @map("id_usuario_receptor")
+  estado               EstadoAmistad @default(PENDIENTE)
+  fechaSolicitud       DateTime      @default(now()) @map("fecha_solicitud")
+  fechaResolucion      DateTime?     @map("fecha_resolucion")
+
+  solicitante Usuario @relation("AmistadesSolicitadas", fields: [idUsuarioSolicitante], references: [idUsuario])
+  receptor    Usuario @relation("AmistadesRecibidas", fields: [idUsuarioReceptor], references: [idUsuario])
+
+  @@unique([idUsuarioSolicitante, idUsuarioReceptor])
+  @@map("amistad")
+}
+
+model Seguimiento {
+  idSeguimiento Int      @id @default(autoincrement()) @map("id_seguimiento")
+  idSeguidor    Int      @map("id_seguidor")
+  idSeguido     Int      @map("id_seguido")
+  fechaCreacion DateTime @default(now()) @map("fecha_creacion")
+
+  seguidor Usuario @relation("Siguiendo", fields: [idSeguidor], references: [idUsuario])
+  seguido  Usuario @relation("Seguidores", fields: [idSeguido], references: [idUsuario])
+
+  @@unique([idSeguidor, idSeguido])
+  @@map("seguimiento")
 }
 
 model UsuarioTelefono {
@@ -415,21 +474,24 @@ model Proyecto {
   fechaPublicacion    DateTime?         @map("fecha_publicacion") @db.Date
   fechaInicio         DateTime?         @map("fecha_inicio") @db.Date
   fechaFinEstimada    DateTime?         @map("fecha_fin_estimada") @db.Date
+  /// Fuente de verdad del líder del proyecto. No existe una `ParticipacionProyecto` equivalente para el líder: no asumirla ni inventarla.
   creadoPor           Int               @map("creado_por")
   fechaCreacion       DateTime          @default(now()) @map("fecha_creacion")
   fechaActualizacion  DateTime?         @map("fecha_actualizacion")
   eliminadoEn         DateTime?         @map("eliminado_en")
 
-  creador          Usuario                   @relation(fields: [creadoPor], references: [idUsuario])
-  organizaciones   ProyectoOrganizacion[]
-  intereses        ProyectoInteres[]
-  roles            RolProyecto[]
-  hitos            Hito[]
-  tareas           Tarea[]
-  revisiones       RevisionProyecto[]
-  comentarios      Comentario[]
-  mensajesRevision MensajeRevisionProyecto[]
-  etiquetas        Etiqueta[]
+  creador           Usuario                   @relation(fields: [creadoPor], references: [idUsuario])
+  organizaciones    ProyectoOrganizacion[]
+  intereses         ProyectoInteres[]
+  roles             RolProyecto[]
+  hitos             Hito[]
+  tareas            Tarea[]
+  revisiones        RevisionProyecto[]
+  comentarios       Comentario[]
+  mensajesRevision  MensajeRevisionProyecto[]
+  etiquetas         Etiqueta[]
+  solicitudesSalida SolicitudSalidaProyecto[]
+  sprints           Sprint[]
 
   @@map("proyecto")
 }
@@ -511,6 +573,7 @@ model RequisitoHabilidadRol {
   @@map("requisito_habilidad_rol")
 }
 
+/// Representa la solicitud/postulación para ocupar un rol del proyecto. Sprint 6 (T-117/T-118) debe reutilizar este concepto: no crear un `SolicitudRol` paralelo.
 model Postulacion {
   idPostulacion        Int               @id @default(autoincrement()) @map("id_postulacion")
   idUsuarioPostulante  Int               @map("id_usuario_postulante")
@@ -533,6 +596,8 @@ model Postulacion {
   @@map("postulacion")
 }
 
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una participación ACTIVO por (idUsuario, idRolProyecto), vía índice único parcial `participacion_proyecto_activa_unique` (migración `20260726000100_enforce_one_active_participation`).
+/// Representa la participación de un usuario en UN rol del proyecto; no representa por sí sola la identidad person-centric del integrante (un usuario puede tener varias filas, una por rol).
 model ParticipacionProyecto {
   idParticipacion     Int                 @id @default(autoincrement()) @map("id_participacion")
   idUsuario           Int                 @map("id_usuario")
@@ -542,15 +607,48 @@ model ParticipacionProyecto {
   fechaIngreso        DateTime            @default(now()) @map("fecha_ingreso") @db.Date
   fechaSalida         DateTime?           @map("fecha_salida") @db.Date
 
-  usuario        Usuario              @relation(fields: [idUsuario], references: [idUsuario])
-  rolProyecto    RolProyecto          @relation(fields: [idRolProyecto], references: [idRolProyecto])
-  postulacion    Postulacion?         @relation(fields: [idPostulacion], references: [idPostulacion])
-  registrosHoras HorasParticipacion[]
-  certificados   Certificado[]
+  usuario           Usuario              @relation(fields: [idUsuario], references: [idUsuario])
+  rolProyecto       RolProyecto          @relation(fields: [idRolProyecto], references: [idRolProyecto])
+  postulacion       Postulacion?         @relation(fields: [idPostulacion], references: [idPostulacion])
+  registrosHoras    HorasParticipacion[]
+  certificados      Certificado[]
+  asignacionesTarea AsignacionTarea[]
 
   @@index([idRolProyecto, estadoParticipacion])
   @@index([idUsuario, estadoParticipacion])
   @@map("participacion_proyecto")
+}
+
+/// Identidad de la solicitud = (idProyecto, idUsuario), no idParticipacion: un
+/// usuario puede tener varios roles/participaciones en el proyecto, pero la
+/// salida que solicita es de la persona respecto al proyecto como un todo, no
+/// de una participación individual. A lo sumo puede existir una solicitud
+/// abierta (PREPARACION o PENDIENTE_LIDER) simultánea por (idProyecto,
+/// idUsuario), enforced por PostgreSQL (no por Prisma) vía el índice único
+/// parcial `solicitud_salida_proyecto_pendiente_unique` (migración original
+/// `20260811035302_add_solicitud_salida_proyecto`, ampliada en FND-05 —
+/// migración `20260815160000_rename_exit_request_pending_and_extend_open_index`
+/// — para cubrir ambos estados abiertos tras añadir PREPARACION en FND-04);
+/// APROBADA/RECHAZADA/CANCELADA no están restringidas, así que el historial
+/// completo se conserva y una persona puede volver a solicitar salir tras
+/// resolverse la anterior. La aplicación deberá traducir una violación de esa
+/// constraint (P2002) a 409 Conflict — no implementado en esta tarea.
+model SolicitudSalidaProyecto {
+  idSolicitud     Int                   @id @default(autoincrement()) @map("id_solicitud")
+  idProyecto      Int                   @map("id_proyecto")
+  idUsuario       Int                   @map("id_usuario")
+  motivo          String                @db.Text
+  estadoSolicitud EstadoSolicitudSalida @default(PENDIENTE_LIDER) @map("estado_solicitud")
+  solicitadaEn    DateTime              @default(now()) @map("solicitada_en")
+  resueltaEn      DateTime?             @map("resuelta_en")
+  resueltaPor     Int?                  @map("resuelta_por")
+
+  proyecto  Proyecto @relation(fields: [idProyecto], references: [idProyecto])
+  usuario   Usuario  @relation("SolicitudSalidaSolicitante", fields: [idUsuario], references: [idUsuario])
+  resolutor Usuario? @relation("SolicitudSalidaResolutor", fields: [resueltaPor], references: [idUsuario])
+
+  @@index([idProyecto, idUsuario])
+  @@map("solicitud_salida_proyecto")
 }
 
 model Hito {
@@ -569,11 +667,32 @@ model Hito {
   @@map("hito")
 }
 
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo un Sprint operable (estado ACTIVO o EN_FINALIZACION) por idProyecto, vía índice único parcial `sprint_operable_unique` (migración `20260815000000_add_sprint`). CERRADO no está restringido, así que el historial de sprints se conserva íntegro.
+model Sprint {
+  idSprint                  Int          @id @default(autoincrement()) @map("id_sprint")
+  idProyecto                Int          @map("id_proyecto")
+  numero                    Int
+  estado                    EstadoSprint @default(ACTIVO)
+  fechaInicio               DateTime     @default(now()) @map("fecha_inicio")
+  fechaFinalizacionIniciada DateTime?    @map("fecha_finalizacion_iniciada")
+  fechaCierre               DateTime?    @map("fecha_cierre")
+  cerradoPor                Int?         @map("cerrado_por")
+
+  proyecto           Proyecto             @relation(fields: [idProyecto], references: [idProyecto])
+  cerrador           Usuario?             @relation(fields: [cerradoPor], references: [idUsuario])
+  tareas             Tarea[]
+  horasParticipacion HorasParticipacion[]
+
+  @@index([idProyecto, estado])
+  @@map("sprint")
+}
+
 model Tarea {
   idTarea             Int         @id @default(autoincrement()) @map("id_tarea")
   idProyecto          Int         @map("id_proyecto")
   idHito              Int?        @map("id_hito")
   idRolProyecto       Int?        @map("id_rol_proyecto")
+  idSprint            Int         @map("id_sprint")
   tituloTarea         String      @map("titulo_tarea") @db.VarChar(255)
   descripcionTarea    String?     @map("descripcion_tarea") @db.Text
   estadoTarea         EstadoTarea @default(POR_HACER) @map("estado_tarea")
@@ -589,6 +708,7 @@ model Tarea {
   proyecto     Proyecto          @relation(fields: [idProyecto], references: [idProyecto])
   hito         Hito?             @relation(fields: [idHito], references: [idHito])
   rolProyecto  RolProyecto?      @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
+  sprint       Sprint            @relation(fields: [idSprint], references: [idSprint])
   creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario])
   asignaciones AsignacionTarea[]
   evidencias   Evidencia[]
@@ -598,23 +718,59 @@ model Tarea {
   @@index([idProyecto, eliminadoEn, estadoTarea])
   @@index([idProyecto, idRolProyecto])
   @@index([idHito])
+  @@index([idSprint])
   @@map("tarea")
 }
 
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una asignación activa (desasignadaEn IS NULL) por idTarea, vía índice único parcial `asignacion_tarea_activa_unique` (migración `20260720190329_enforce_one_active_task_assignment`).
+/// Fuente de verdad de asignaciones de tareas: asignación vigente = `desasignadaEn == null`. El soft-delete de la tarea vive en `Tarea.eliminadoEn`, NO aquí.
+/// idParticipacion (FND-06) es opcional y de mejor esfuerzo: solo los tramos
+/// activos legacy fueron backfilleados (migración
+/// `20260815170100_add_participacion_context_to_asignacion_tarea`), y solo
+/// cuando existía una única ParticipacionProyecto ACTIVO inequívoca para el
+/// mismo (usuario, rol de la tarea). Los tramos cerrados nunca se tocaron.
+/// No usar como fuente de verdad histórica todavía: puede ser NULL incluso
+/// en tramos donde una participación compatible sí existe.
 model AsignacionTarea {
   idAsignacion    Int       @id @default(autoincrement()) @map("id_asignacion")
   idTarea         Int       @map("id_tarea")
   idUsuario       Int       @map("id_usuario")
+  idParticipacion Int?      @map("id_participacion")
   fechaAsignacion DateTime  @default(now()) @map("fecha_asignacion")
   desasignadaEn   DateTime? @map("desasignada_en")
   asignadoPor     Int       @map("asignado_por")
+  /// Horas realmente trabajadas por idUsuario durante ESTE tramo concreto de asignación (nunca el total de la tarea): una tarea reasignada tiene una fila de AsignacionTarea por tramo, y cada una lleva sus propias horas. Reportado manualmente por el líder al editar la tarea. Fuente granular que HU-126 (HorasParticipacion.horasCalculadas) consumirá después; no confundir con esa capa de agregación/aprobación, que este PR no implementa.
+  horasReales     Decimal?  @map("horas_reales") @db.Decimal(6, 2)
+  /// FND-09 (A5.1): marca el momento en que este tramo (horasReales) fue consumido por un proceso de reconocimiento de horas (Flow A: cálculo por Sprint / Flow B: reconocimiento anticipado por salida). NULL = todavía reconocible; NOT NULL = ya reconocido, no debe volver a sumarse. Sin default: todos los tramos existentes y los tramos nuevos nacen NULL — no hay trazabilidad histórica suficiente para inferir reconocimiento retroactivo, y ningún reconocimiento granular está implementado todavía (ver HorasParticipacion, que no referencia AsignacionTarea individuales).
+  reconocidoEn    DateTime? @map("reconocido_en")
 
-  tarea     Tarea   @relation(fields: [idTarea], references: [idTarea])
-  usuario   Usuario @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
-  asignador Usuario @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
+  tarea           Tarea                      @relation(fields: [idTarea], references: [idTarea])
+  usuario         Usuario                    @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
+  asignador       Usuario                    @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
+  participacion   ParticipacionProyecto?     @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: SetNull)
+  registrosAvance RegistroAvanceAsignacion[]
 
   @@index([idUsuario, desasignadaEn])
+  @@index([idParticipacion])
   @@map("asignacion_tarea")
+}
+
+/// Registro de avance de una AsignacionTarea (FND-06 — Foundation de datos
+/// exclusivamente). El contrato funcional futuro (B1: mínimo 200 caracteres,
+/// autorización de autor, edición, ausencia de delete vía service) NO está
+/// implementado aquí; esta tabla solo prepara la persistencia.
+model RegistroAvanceAsignacion {
+  idRegistroAvance Int       @id @default(autoincrement()) @map("id_registro_avance")
+  idAsignacion     Int       @map("id_asignacion")
+  idAutor          Int       @map("id_autor")
+  contenido        String    @db.Text
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  editadoEn        DateTime? @map("editado_en")
+
+  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion])
+  autor      Usuario         @relation(fields: [idAutor], references: [idUsuario])
+
+  @@map("registro_avance_asignacion")
 }
 
 model Etiqueta {
@@ -674,20 +830,33 @@ model RevisionEvidencia {
   @@map("revision_evidencia")
 }
 
+/// Fuente de verdad de horas de una participación. Para horas reconocidas/agregadas se usa `horasAprobadas` únicamente cuando `estadoHoras = APROBADA`, siguiendo el patrón ya usado por el resto del código.
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una fila por (idParticipacion, idSprint) cuando idSprint NO es NULL, vía índice único parcial `horas_participacion_sprint_unique` (migración `20260816010000_add_sprint_hours_participation_uniqueness`, A7.1). Los registros históricos con idSprint = NULL no están restringidos: una participación conserva múltiples filas periódicas no vinculadas a Sprint.
+/// horasCalculadas/idSprint (FND-07) son Foundation de datos exclusivamente:
+/// preparan la persistencia para el futuro reconocimiento de horas por
+/// Sprint (Flow A), pero no implementan todavía cálculo, reconocimiento,
+/// ni la regla de que horasAprobadas != horasCalculadas exige
+/// justificacionAjuste — esa validación es responsabilidad de la capa de
+/// servicio, no del schema.
 model HorasParticipacion {
-  idRegistroHoras Int         @id @default(autoincrement()) @map("id_registro_horas")
-  idParticipacion Int         @map("id_participacion")
-  periodoInicio   DateTime    @map("periodo_inicio") @db.Date
-  periodoFin      DateTime    @map("periodo_fin") @db.Date
-  horasReportadas Decimal     @map("horas_reportadas") @db.Decimal(6, 2)
-  horasAprobadas  Decimal?    @map("horas_aprobadas") @db.Decimal(6, 2)
-  estadoHoras     EstadoHoras @default(PENDIENTE) @map("estado_horas")
-  aprobadoPor     Int?        @map("aprobado_por")
-  fechaAprobacion DateTime?   @map("fecha_aprobacion")
+  idRegistroHoras     Int         @id @default(autoincrement()) @map("id_registro_horas")
+  idParticipacion     Int         @map("id_participacion")
+  periodoInicio       DateTime    @map("periodo_inicio") @db.Date
+  periodoFin          DateTime    @map("periodo_fin") @db.Date
+  horasReportadas     Decimal     @map("horas_reportadas") @db.Decimal(6, 2)
+  horasCalculadas     Decimal?    @map("horas_calculadas") @db.Decimal(6, 2)
+  horasAprobadas      Decimal?    @map("horas_aprobadas") @db.Decimal(6, 2)
+  justificacionAjuste String?     @map("justificacion_ajuste") @db.Text
+  estadoHoras         EstadoHoras @default(PENDIENTE) @map("estado_horas")
+  aprobadoPor         Int?        @map("aprobado_por")
+  fechaAprobacion     DateTime?   @map("fecha_aprobacion")
+  idSprint            Int?        @map("id_sprint")
 
   participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion])
   aprobador     Usuario?              @relation(fields: [aprobadoPor], references: [idUsuario])
+  sprint        Sprint?               @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
 
+  @@index([idSprint])
   @@map("horas_participacion")
 }
 
