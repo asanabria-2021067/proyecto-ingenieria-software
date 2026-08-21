@@ -181,7 +181,7 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         badgeAnimated: false,
         estadoLabel: 'Publicado',
         buttonLabel: 'Ver proyecto',
-        buttonHref: `/dashboard/projects/${idProyecto}`,
+        buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: 'bg-primary text-on-primary hover:bg-primary/90',
         buttonAnimated: false,
         showDelete: false,
@@ -195,7 +195,7 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         badgeAnimated: false,
         estadoLabel: 'En progreso',
         buttonLabel: 'Ver proyecto',
-        buttonHref: `/dashboard/projects/${idProyecto}`,
+        buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: 'bg-primary text-on-primary hover:bg-primary/90',
         buttonAnimated: false,
         showDelete: false,
@@ -209,7 +209,7 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         badgeAnimated: false,
         estadoLabel: 'Cerrado',
         buttonLabel: 'Ver proyecto',
-        buttonHref: `/dashboard/projects/${idProyecto}`,
+        buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: 'bg-[#F6E7B0] text-[#775700] hover:bg-[#F0DA95] dark:bg-[#453405] dark:text-[#ffd873] dark:hover:bg-[#5a4408]',
         buttonAnimated: false,
         showDelete: false,
@@ -222,7 +222,7 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         badgeAnimated: true,
         estadoLabel: 'En solicitud de cierre',
         buttonLabel: 'Ver proyecto',
-        buttonHref: `/dashboard/projects/${idProyecto}`,
+        buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: '',
         buttonAnimated: true,
         showDelete: false,
@@ -238,7 +238,7 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         badgeAnimated: false,
         estadoLabel: ESTADO_LABEL[estadoProyecto] ?? estadoProyecto,
         buttonLabel: 'Ver proyecto',
-        buttonHref: `/dashboard/projects/${idProyecto}`,
+        buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: 'bg-primary text-on-primary hover:bg-primary/90',
         buttonAnimated: false,
         showDelete: false,
@@ -391,7 +391,10 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
   }
 
   return (
-    <div className="@container flex flex-col bg-surface-container-lowest border border-[#D3DDD3] dark:border-outline-variant hover:border-[#A9BFAE] dark:hover:border-primary/50 rounded-[10px] p-4.5 min-h-47 shadow-[0_1px_3px_rgba(24,28,32,0.05)] hover:shadow-[0_2px_5px_rgba(24,28,32,0.08)] transition-[border-color,box-shadow] duration-180 ease-out">
+    <div
+      data-testid={`project-card-${idProyecto}`}
+      className="@container flex flex-col bg-surface-container-lowest border border-[#D3DDD3] dark:border-outline-variant hover:border-[#A9BFAE] dark:hover:border-primary/50 rounded-[10px] p-4.5 min-h-47 shadow-[0_1px_3px_rgba(24,28,32,0.05)] hover:shadow-[0_2px_5px_rgba(24,28,32,0.08)] transition-[border-color,box-shadow] duration-180 ease-out"
+    >
       {/* Encabezado: nombre + etiquetas */}
       <div className="flex items-start justify-between gap-2">
         <h3 className="min-w-0 flex-1 text-[17px] font-bold leading-5.5 text-on-surface line-clamp-2">

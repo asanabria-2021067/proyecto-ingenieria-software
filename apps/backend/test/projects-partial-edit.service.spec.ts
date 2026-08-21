@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
+import type { Cache } from 'cache-manager';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { UpdateProjectDto } from '../src/projects/dto/update-project.dto';
 import { ProjectsService } from '../src/projects/projects.service';
 
 const OWNER = 7;
@@ -13,11 +17,15 @@ function makePrisma() {
       update: vi.fn(),
     },
     $transaction: vi.fn(),
-  } as any;
+  };
 }
 
-function makeService(prisma: any) {
-  return new ProjectsService(prisma, {} as any, {} as any);
+function makeService(prisma: ReturnType<typeof makePrisma>) {
+  return new ProjectsService(
+    prisma as unknown as PrismaService,
+    {} as unknown as NotificationsService,
+    {} as unknown as Cache,
+  );
 }
 
 function proyecto(estado: string) {
@@ -41,7 +49,7 @@ describe('ProjectsService.update — edición parcial (PUBLICADO / EN_PROGRESO)'
         contextoAcademico: 'Curso X',
         urlRecursoExterno: 'https://x.com',
         fechaFinEstimada: '2026-12-01',
-      } as any,
+      },
       OWNER,
     );
 
@@ -65,7 +73,7 @@ describe('ProjectsService.update — edición parcial (PUBLICADO / EN_PROGRESO)'
     prisma.proyecto.findUnique.mockResolvedValue({ idProyecto: PID });
     const service = makeService(prisma);
 
-    await service.update(PID, { descripcionProyecto: 'otra' } as any, OWNER);
+    await service.update(PID, { descripcionProyecto: 'otra' }, OWNER);
     expect(prisma.proyecto.update).toHaveBeenCalledTimes(1);
   });
 
@@ -75,13 +83,13 @@ describe('ProjectsService.update — edición parcial (PUBLICADO / EN_PROGRESO)'
     ['fechaInicio', { fechaInicio: '2026-01-01' }],
     ['organizacionesIds', { organizacionesIds: [1] }],
     ['roles', { roles: [{ nombreRol: 'x', cupos: 1 }] }],
-  ])('rechaza (400) un campo bloqueado en edición parcial: %s', async (_label, extra) => {
+  ] as [string, Partial<UpdateProjectDto>][])('rechaza (400) un campo bloqueado en edición parcial: %s', async (_label, extra) => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto('PUBLICADO'));
     const service = makeService(prisma);
 
     await expect(
-      service.update(PID, { tituloProyecto: 'ok', ...extra } as any, OWNER),
+      service.update(PID, { tituloProyecto: 'ok', ...extra }, OWNER),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.proyecto.update).not.toHaveBeenCalled();
   });
@@ -91,7 +99,7 @@ describe('ProjectsService.update — edición parcial (PUBLICADO / EN_PROGRESO)'
     prisma.proyecto.findFirst.mockResolvedValue(proyecto('CERRADO'));
     const service = makeService(prisma);
 
-    await expect(service.update(PID, { tituloProyecto: 'x' } as any, OWNER)).rejects.toBeInstanceOf(
+    await expect(service.update(PID, { tituloProyecto: 'x' }, OWNER)).rejects.toBeInstanceOf(
       BadRequestException,
     );
     expect(prisma.proyecto.update).not.toHaveBeenCalled();

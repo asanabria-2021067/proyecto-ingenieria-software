@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 
 function makePrisma() {
@@ -12,7 +15,7 @@ function makePrisma() {
     asignacionTarea: { create: vi.fn() },
     tareaEtiqueta: { create: vi.fn() },
     $transaction: vi.fn(),
-  } as any;
+  };
 }
 
 function makeContext() {
@@ -20,7 +23,7 @@ function makeContext() {
     getMilestoneInProjectOrThrow: vi.fn(),
     getRoleInProjectOrThrow: vi.fn(),
     getLabelsInProjectOrThrow: vi.fn(),
-  } as any;
+  };
 }
 
 const HITO = { idHito: 4, idProyecto: 5, tituloHito: 'MVP funcional' };
@@ -35,7 +38,7 @@ describe('TasksRelationsService', () => {
     it('todos los campos omitidos: devuelve undefined en los tres y no consulta nada', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateRelatedResources(5, {});
 
@@ -48,7 +51,7 @@ describe('TasksRelationsService', () => {
     it('idHito: null devuelve hito: null sin consultar', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateRelatedResources(5, { idHito: null });
 
@@ -59,7 +62,7 @@ describe('TasksRelationsService', () => {
     it('idRolProyecto: null devuelve rolProyecto: null sin consultar', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateRelatedResources(5, { idRolProyecto: null });
 
@@ -71,7 +74,7 @@ describe('TasksRelationsService', () => {
       const prisma = makePrisma();
       const context = makeContext();
       context.getLabelsInProjectOrThrow.mockResolvedValue([]);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateRelatedResources(5, { idsEtiquetas: [] });
 
@@ -83,7 +86,7 @@ describe('TasksRelationsService', () => {
       const prisma = makePrisma();
       const context = makeContext();
       context.getMilestoneInProjectOrThrow.mockResolvedValue(HITO);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateRelatedResources(5, { idHito: 4 });
 
@@ -95,7 +98,7 @@ describe('TasksRelationsService', () => {
       const prisma = makePrisma();
       const context = makeContext();
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateRelatedResources(5, { idRolProyecto: 6 });
 
@@ -107,7 +110,7 @@ describe('TasksRelationsService', () => {
       const prisma = makePrisma();
       const context = makeContext();
       context.getLabelsInProjectOrThrow.mockResolvedValue(ETIQUETAS);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateRelatedResources(5, { idsEtiquetas: [1, 2] });
 
@@ -121,7 +124,7 @@ describe('TasksRelationsService', () => {
       context.getMilestoneInProjectOrThrow.mockRejectedValue(
         new NotFoundException('Hito con id 999 no encontrado'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.validateRelatedResources(5, { idHito: 999 })).rejects.toBeInstanceOf(
         NotFoundException,
@@ -134,7 +137,7 @@ describe('TasksRelationsService', () => {
       context.getMilestoneInProjectOrThrow.mockRejectedValue(
         new BadRequestException('El hito con id 4 pertenece a otro proyecto'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.validateRelatedResources(5, { idHito: 4 })).rejects.toBeInstanceOf(
         BadRequestException,
@@ -147,7 +150,7 @@ describe('TasksRelationsService', () => {
       context.getRoleInProjectOrThrow.mockRejectedValue(
         new NotFoundException('Rol de proyecto con id 999 no encontrado'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateRelatedResources(5, { idRolProyecto: 999 }),
@@ -160,7 +163,7 @@ describe('TasksRelationsService', () => {
       context.getRoleInProjectOrThrow.mockRejectedValue(
         new BadRequestException('El rol con id 6 pertenece a otro proyecto'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateRelatedResources(5, { idRolProyecto: 6 }),
@@ -173,7 +176,7 @@ describe('TasksRelationsService', () => {
       context.getLabelsInProjectOrThrow.mockRejectedValue(
         new NotFoundException('Etiqueta(s) con id 999 no encontrada(s)'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateRelatedResources(5, { idsEtiquetas: [999] }),
@@ -186,7 +189,7 @@ describe('TasksRelationsService', () => {
       context.getLabelsInProjectOrThrow.mockRejectedValue(
         new BadRequestException('Etiqueta(s) con id 2 pertenece(n) a otro proyecto'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateRelatedResources(5, { idsEtiquetas: [2] }),
@@ -199,7 +202,7 @@ describe('TasksRelationsService', () => {
       context.getLabelsInProjectOrThrow.mockRejectedValue(
         new BadRequestException('idsEtiquetas contiene valores duplicados'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateRelatedResources(5, { idsEtiquetas: [1, 1] }),
@@ -211,7 +214,7 @@ describe('TasksRelationsService', () => {
       const context = makeContext();
       const ordenadas = [ETIQUETAS[1], ETIQUETAS[0]];
       context.getLabelsInProjectOrThrow.mockResolvedValue(ordenadas);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateRelatedResources(5, { idsEtiquetas: [2, 1] });
 
@@ -224,8 +227,8 @@ describe('TasksRelationsService', () => {
       context.getMilestoneInProjectOrThrow.mockResolvedValue(HITO);
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       context.getLabelsInProjectOrThrow.mockResolvedValue(ETIQUETAS);
-      const tx = { marker: 'tx' } as any;
-      const service = new TasksRelationsService(prisma, context);
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await service.validateRelatedResources(
         5,
@@ -254,7 +257,7 @@ describe('TasksRelationsService', () => {
         orden.push('etiquetas');
         return ETIQUETAS;
       });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await service.validateRelatedResources(5, { idHito: 4, idRolProyecto: 6, idsEtiquetas: [1, 2] });
 
@@ -269,18 +272,19 @@ describe('TasksRelationsService', () => {
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
-      await expect(
-        service.assertUserAssignableToProject(5, 3, 6),
-      ).resolves.toBeUndefined();
+      // X1.1: retorna el idParticipacion exacto ya resuelto por la
+      // consulta, para que el caller (TasksService) pueda persistirlo en
+      // AsignacionTarea.idParticipacion sin una segunda consulta.
+      await expect(service.assertUserAssignableToProject(5, 3, 6)).resolves.toBe(1);
     });
 
     it('rechaza con NotFoundException si el usuario no existe, sin validar el rol', async () => {
       const prisma = makePrisma();
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 999, 6)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -295,7 +299,7 @@ describe('TasksRelationsService', () => {
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       // El filtro idRolProyecto: 6 no coincide con la participación real (rol 9).
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 3, 6)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -308,7 +312,7 @@ describe('TasksRelationsService', () => {
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 3, 6)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -321,7 +325,7 @@ describe('TasksRelationsService', () => {
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 3, 6)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -336,7 +340,7 @@ describe('TasksRelationsService', () => {
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 100 });
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 100, 6)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -350,7 +354,7 @@ describe('TasksRelationsService', () => {
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 777 });
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 777, 6)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -364,7 +368,7 @@ describe('TasksRelationsService', () => {
       context.getRoleInProjectOrThrow.mockRejectedValue(
         new NotFoundException('Rol de proyecto con id 999 no encontrado'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 3, 999)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -379,7 +383,7 @@ describe('TasksRelationsService', () => {
       context.getRoleInProjectOrThrow.mockRejectedValue(
         new BadRequestException('El rol con id 6 pertenece a otro proyecto'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 3, 6)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -393,7 +397,7 @@ describe('TasksRelationsService', () => {
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await service.assertUserAssignableToProject(5, 3, 6);
 
@@ -415,9 +419,9 @@ describe('TasksRelationsService', () => {
       tx.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       tx.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
-      await service.assertUserAssignableToProject(5, 3, 6, tx);
+      await service.assertUserAssignableToProject(5, 3, 6, tx as unknown as Prisma.TransactionClient);
 
       expect(tx.usuario.findUnique).toHaveBeenCalledTimes(1);
       expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
@@ -433,9 +437,9 @@ describe('TasksRelationsService', () => {
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
-      await expect(service.assertUserAssignableToProject(5, 3, null)).resolves.toBeUndefined();
+      await expect(service.assertUserAssignableToProject(5, 3, null)).resolves.toBe(1);
       expect(context.getRoleInProjectOrThrow).not.toHaveBeenCalled();
     });
 
@@ -443,7 +447,7 @@ describe('TasksRelationsService', () => {
       const prisma = makePrisma();
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 999, null)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -455,7 +459,7 @@ describe('TasksRelationsService', () => {
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 3, null)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -467,7 +471,7 @@ describe('TasksRelationsService', () => {
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 3, null)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -480,7 +484,7 @@ describe('TasksRelationsService', () => {
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       // El filtro rolProyecto.idProyecto: 5 excluye una participación real en el proyecto 9.
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 3, null)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -492,7 +496,7 @@ describe('TasksRelationsService', () => {
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 100 });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(service.assertUserAssignableToProject(5, 100, null)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -504,7 +508,7 @@ describe('TasksRelationsService', () => {
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await service.assertUserAssignableToProject(5, 3, null);
 
@@ -526,9 +530,9 @@ describe('TasksRelationsService', () => {
       const context = makeContext();
       tx.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       tx.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
-      await service.assertUserAssignableToProject(5, 3, null, tx);
+      await service.assertUserAssignableToProject(5, 3, null, tx as unknown as Prisma.TransactionClient);
 
       expect(tx.usuario.findUnique).toHaveBeenCalledTimes(1);
       expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
@@ -541,7 +545,7 @@ describe('TasksRelationsService', () => {
     it('tarea sin relaciones: no valida usuario y devuelve recursos undefined', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateCreateTaskRelations(5, {});
 
@@ -555,7 +559,7 @@ describe('TasksRelationsService', () => {
       context.getMilestoneInProjectOrThrow.mockResolvedValue(HITO);
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       context.getLabelsInProjectOrThrow.mockResolvedValue(ETIQUETAS);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateCreateTaskRelations(5, {
         idHito: 4,
@@ -573,7 +577,7 @@ describe('TasksRelationsService', () => {
       context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await service.validateCreateTaskRelations(5, { idRolProyecto: 6, idUsuarioAsignado: 3 });
 
@@ -583,12 +587,50 @@ describe('TasksRelationsService', () => {
       );
     });
 
+    /**
+     * X1.1: caso multirol obligatorio — un usuario con DOS
+     * ParticipacionProyecto ACTIVO en el mismo proyecto (rol A y rol B)
+     * asignado a una tarea del rol B debe resolver EXACTAMENTE la
+     * participación de rol B, nunca la de rol A. El mock de
+     * `participacionProyecto.findFirst` sólo puede devolver una fila
+     * (`findFirst`, no `findMany`), así que la identidad exacta se
+     * demuestra devolviendo la fila de rol B (idParticipacion: 202,
+     * deliberadamente distinta de la de rol A, 101, que NUNCA se consulta
+     * porque el `where` ya filtra por idRolProyecto: 6) y verificando que
+     * `idParticipacionAsignado` sea exactamente 202.
+     */
+    it('multirol: usuario con participación en ROL_A (101) y ROL_B (202), asignado por ROL_B, resuelve idParticipacionAsignado = 202 (nunca 101)', async () => {
+      const prisma = makePrisma();
+      const context = makeContext();
+      const ROL_B = { idRolProyecto: 7, idProyecto: 5, nombreRol: 'QA' };
+      context.getRoleInProjectOrThrow.mockResolvedValue(ROL_B);
+      prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
+      // El where real exige idRolProyecto: 7 (ROL_B) — el mock simula que
+      // PostgreSQL solo encuentra la fila de esa participación exacta,
+      // nunca la de ROL_A (101), aunque el mismo usuario la tenga.
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 202 });
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
+
+      const recursos = await service.validateCreateTaskRelations(5, {
+        idRolProyecto: 7,
+        idUsuarioAsignado: 3,
+      });
+
+      expect(prisma.participacionProyecto.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ idUsuario: 3, idRolProyecto: 7, estadoParticipacion: 'ACTIVO' }),
+        }),
+      );
+      expect(recursos.idParticipacionAsignado).toBe(202);
+      expect(recursos.idParticipacionAsignado).not.toBe(101);
+    });
+
     it('tarea con asignado sin rol: usa null como rol efectivo', async () => {
       const prisma = makePrisma();
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await service.validateCreateTaskRelations(5, { idUsuarioAsignado: 3 });
 
@@ -601,7 +643,7 @@ describe('TasksRelationsService', () => {
       const context = makeContext();
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateCreateTaskRelations(5, { idUsuarioAsignado: 3 }),
@@ -615,7 +657,7 @@ describe('TasksRelationsService', () => {
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       // El filtro idRolProyecto: 6 no coincide con la participación real (otro rol).
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateCreateTaskRelations(5, { idRolProyecto: 6, idUsuarioAsignado: 3 }),
@@ -628,7 +670,7 @@ describe('TasksRelationsService', () => {
       context.getRoleInProjectOrThrow.mockRejectedValue(
         new BadRequestException('El rol con id 6 pertenece a otro proyecto'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateCreateTaskRelations(5, { idRolProyecto: 6, idUsuarioAsignado: 3 }),
@@ -643,7 +685,7 @@ describe('TasksRelationsService', () => {
       context.getLabelsInProjectOrThrow.mockRejectedValue(
         new NotFoundException('Etiqueta(s) con id 999 no encontrada(s)'),
       );
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await expect(
         service.validateCreateTaskRelations(5, { idsEtiquetas: [999], idUsuarioAsignado: 3 }),
@@ -659,7 +701,7 @@ describe('TasksRelationsService', () => {
         context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
         prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
         prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-        const service = new TasksRelationsService(prisma, context);
+        const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
         await service.validateCreateTaskRelations(5, {
           idRolProyecto: 6,
@@ -676,7 +718,7 @@ describe('TasksRelationsService', () => {
         const context = makeContext();
         prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
         prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-        const service = new TasksRelationsService(prisma, context);
+        const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
         await service.validateCreateTaskRelations(5, { idUsuarioAsignado: 3 });
 
@@ -709,7 +751,7 @@ describe('TasksRelationsService', () => {
           orden.push('participacion');
           return { idParticipacion: 1 };
         });
-        const service = new TasksRelationsService(prisma, context);
+        const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
         await service.validateCreateTaskRelations(5, {
           idHito: 4,
@@ -729,12 +771,12 @@ describe('TasksRelationsService', () => {
         context.getRoleInProjectOrThrow.mockResolvedValue(ROL);
         tx.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
         tx.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-        const service = new TasksRelationsService(prisma, context);
+        const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
         await service.validateCreateTaskRelations(
           5,
           { idRolProyecto: 6, idUsuarioAsignado: 3 },
-          tx,
+          tx as unknown as Prisma.TransactionClient,
         );
 
         expect(context.getRoleInProjectOrThrow).toHaveBeenCalledWith(5, 6, tx);
@@ -749,7 +791,7 @@ describe('TasksRelationsService', () => {
       const prisma = makePrisma();
       const context = makeContext();
       context.getMilestoneInProjectOrThrow.mockResolvedValue(HITO);
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       const result = await service.validateCreateTaskRelations(5, { idHito: 4 });
 
@@ -766,7 +808,7 @@ describe('TasksRelationsService', () => {
       context.getLabelsInProjectOrThrow.mockResolvedValue(ETIQUETAS);
       prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 3 });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
-      const service = new TasksRelationsService(prisma, context);
+      const service = new TasksRelationsService(prisma as unknown as PrismaService, context as unknown as TasksContextService);
 
       await service.validateCreateTaskRelations(5, {
         idHito: 4,
