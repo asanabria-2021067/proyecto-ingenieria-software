@@ -1,6 +1,9 @@
 import { vi } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Prisma } from '@prisma/client';
+import type { Cache } from 'cache-manager';
+import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
 import { TasksService } from '../../src/tasks/tasks.service';
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.service';
@@ -84,6 +87,12 @@ export interface ParticipacionRow {
   estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
 }
 
+export interface SprintRow {
+  idSprint: number;
+  idProyecto: number;
+  estado: 'ACTIVO' | 'EN_FINALIZACION' | 'CERRADO';
+}
+
 export interface TareaRow {
   idTarea: number;
   idProyecto: number;
@@ -143,6 +152,7 @@ export interface FixtureState {
   hitos: HitoRow[];
   etiquetas: EtiquetaRow[];
   participaciones: ParticipacionRow[];
+  sprints: SprintRow[];
   tareas: TareaRow[];
   asignaciones: AsignacionRow[];
   tareaEtiquetas: TareaEtiquetaRow[];
@@ -169,6 +179,7 @@ export const FIXTURE_IDS = {
   proyectos: { A: 1, B: 2 },
   roles: { desarrolloA: 10, disenoA: 11, desarrolloB: 20 },
   hitos: { A: 100, B: 200 },
+  sprints: { A: 1000, B: 2000 },
   etiquetas: { aUrgente: 1000, aBackend: 1001, bOtra: 2000 },
 } as const;
 
@@ -182,7 +193,7 @@ function nextId(state: FixtureState, table: string): number {
 export const FECHA_FUTURA = '2027-06-15';
 
 export function createFixtureState(): FixtureState {
-  const { usuarios: U, proyectos: P, roles: R, hitos: H, etiquetas: E } = FIXTURE_IDS;
+  const { usuarios: U, proyectos: P, roles: R, hitos: H, etiquetas: E, sprints: S } = FIXTURE_IDS;
 
   return {
     usuarios: [
@@ -245,6 +256,14 @@ export function createFixtureState(): FixtureState {
       { idParticipacion: 3, idUsuario: U.a3Diseno, idRolProyecto: R.disenoA, estadoParticipacion: 'ACTIVO' },
       { idParticipacion: 4, idUsuario: U.inactivoA, idRolProyecto: R.desarrolloA, estadoParticipacion: 'RETIRADO' },
       { idParticipacion: 5, idUsuario: U.participanteB, idRolProyecto: R.desarrolloB, estadoParticipacion: 'ACTIVO' },
+    ],
+    // Sprint ACTIVO por proyecto (FND-03.B): ambos proyectos del fixture
+    // admiten creación de tareas por defecto. Los tests que necesitan
+    // ejercitar el rechazo por falta de Sprint activo mutan este array
+    // directamente (p.ej. cambiando el estado a CERRADO o vaciándolo).
+    sprints: [
+      { idSprint: S.A, idProyecto: P.A, estado: 'ACTIVO' },
+      { idSprint: S.B, idProyecto: P.B, estado: 'ACTIVO' },
     ],
     tareas: [],
     asignaciones: [],
@@ -419,6 +438,12 @@ interface TxStore {
   undoLog: Array<() => void>;
 }
 
+/** Forma laxa de los args que Prisma pasa a cada método del fake — cada mock lee solo las claves que necesita. */
+interface FindArgs {
+  where?: Record<string, unknown>;
+  select?: Record<string, unknown>;
+}
+
 /**
  * `tx` es siempre el mismo objeto que `prisma` en este fake (ver comentario
  * de cabecera): no hay un cliente transaccional distinto que permita
@@ -475,7 +500,7 @@ export function makeFakeDb(state: FixtureState) {
     },
 
     proyecto: {
-      findFirst: vi.fn(async (args: any) => {
+      findFirst: vi.fn(async (args: FindArgs) => {
         maybeFail('proyecto.findFirst');
         const where = args.where ?? {};
         const row = state.proyectos.find(
@@ -486,9 +511,9 @@ export function makeFakeDb(state: FixtureState) {
         if (!row) return null;
         return args.select ? buildProyectoSelectShape(row, state, args.select) : row;
       }),
-      findUnique: vi.fn(async (args: any) => {
+      findUnique: vi.fn(async (args: FindArgs) => {
         maybeFail('proyecto.findUnique');
-        const row = state.proyectos.find((p) => p.idProyecto === args.where.idProyecto);
+        const row = state.proyectos.find((p) => p.idProyecto === args.where?.idProyecto);
         if (!row) return null;
         if (!args.select) return row;
         const result: Record<string, unknown> = {};
@@ -497,7 +522,7 @@ export function makeFakeDb(state: FixtureState) {
         }
         return result;
       }),
-      findMany: vi.fn(async (args: any) => {
+      findMany: vi.fn(async (args: FindArgs) => {
         maybeFail('proyecto.findMany');
         const where = args.where ?? {};
         const rows = state.proyectos.filter(
@@ -509,8 +534,27 @@ export function makeFakeDb(state: FixtureState) {
       }),
     },
 
+    sprint: {
+      findFirst: vi.fn(async (args: FindArgs) => {
+        maybeFail('sprint.findFirst');
+        const where = args.where ?? {};
+        const row = state.sprints.find(
+          (s) =>
+            (where.idProyecto === undefined || s.idProyecto === where.idProyecto) &&
+            (where.estado === undefined || s.estado === where.estado),
+        );
+        if (!row) return null;
+        if (!args.select) return row;
+        const result: Record<string, unknown> = {};
+        for (const key of Object.keys(args.select)) {
+          result[key] = (row as unknown as Record<string, unknown>)[key];
+        }
+        return result;
+      }),
+    },
+
     tarea: {
-      findFirst: vi.fn(async (args: any) => {
+      findFirst: vi.fn(async (args: FindArgs) => {
         maybeFail('tarea.findFirst');
         const where = args.where ?? {};
         const row = state.tareas.find(
@@ -522,17 +566,20 @@ export function makeFakeDb(state: FixtureState) {
         if (!row) return null;
         return args.select ? buildTareaSelectShape(row, state) : row;
       }),
-      findMany: vi.fn(async (args: any) => {
+      findMany: vi.fn(async (args: FindArgs) => {
         maybeFail('tarea.findMany');
         const where = args.where ?? {};
         const rows = state.tareas.filter(
           (t) =>
             (where.idProyecto === undefined || t.idProyecto === where.idProyecto) &&
+            // A12.1: syncHitoEstado filtra por idHito — necesario para que
+            // esta fixture soporte esa consulta correctamente.
+            (where.idHito === undefined || t.idHito === where.idHito) &&
             (where.eliminadoEn === undefined || t.eliminadoEn === where.eliminadoEn),
         );
         return rows.map((row) => (args.select ? buildTareaSelectShape(row, state) : row));
       }),
-      create: vi.fn(async (args: any) => {
+      create: vi.fn(async (args: { data: Partial<TareaRow> }) => {
         maybeFail('tarea.create');
         const row: TareaRow = {
           idTarea: nextId(state, 'tarea'),
@@ -540,14 +587,14 @@ export function makeFakeDb(state: FixtureState) {
           eliminadoEn: null,
           fechaCreacion: new Date(),
           ...args.data,
-        };
+        } as TareaRow;
         state.tareas.push(row);
         recordUndo(() => {
           state.tareas = state.tareas.filter((t) => t !== row);
         });
         return row;
       }),
-      update: vi.fn(async (args: any) => {
+      update: vi.fn(async (args: { where: { idTarea: number }; data: Record<string, unknown> }) => {
         maybeFail('tarea.update');
         const row = state.tareas.find((t) => t.idTarea === args.where.idTarea);
         if (!row) throw new Error(`fixture: tarea ${args.where.idTarea} no encontrada`);
@@ -559,7 +606,7 @@ export function makeFakeDb(state: FixtureState) {
     },
 
     asignacionTarea: {
-      findFirst: vi.fn(async (args: any) => {
+      findFirst: vi.fn(async (args: FindArgs) => {
         maybeFail('asignacionTarea.findFirst');
         const where = args.where ?? {};
         return (
@@ -570,7 +617,7 @@ export function makeFakeDb(state: FixtureState) {
           ) ?? null
         );
       }),
-      create: vi.fn(async (args: any) => {
+      create: vi.fn(async (args: { data: Partial<AsignacionRow> }) => {
         maybeFail('asignacionTarea.create');
         // Simula el índice parcial asignacion_tarea_activa_unique (Tarea 9):
         // a lo sumo una fila activa por tarea. Misma forma de error real
@@ -594,14 +641,14 @@ export function makeFakeDb(state: FixtureState) {
           idAsignacion: nextId(state, 'asignacion'),
           fechaAsignacion: new Date(),
           ...args.data,
-        };
+        } as AsignacionRow;
         state.asignaciones.push(row);
         recordUndo(() => {
           state.asignaciones = state.asignaciones.filter((a) => a !== row);
         });
         return row;
       }),
-      updateMany: vi.fn(async (args: any) => {
+      updateMany: vi.fn(async (args: { where?: Record<string, unknown>; data: Record<string, unknown> }) => {
         maybeFail('asignacionTarea.updateMany');
         const where = args.where ?? {};
         const matches = state.asignaciones.filter(
@@ -621,7 +668,7 @@ export function makeFakeDb(state: FixtureState) {
     },
 
     tareaEtiqueta: {
-      createMany: vi.fn(async (args: any) => {
+      createMany: vi.fn(async (args: { data: TareaEtiquetaRow[] }) => {
         maybeFail('tareaEtiqueta.createMany');
         const nuevas: TareaEtiquetaRow[] = args.data;
         state.tareaEtiquetas = [...state.tareaEtiquetas, ...nuevas];
@@ -630,7 +677,7 @@ export function makeFakeDb(state: FixtureState) {
         });
         return { count: nuevas.length };
       }),
-      deleteMany: vi.fn(async (args: any) => {
+      deleteMany: vi.fn(async (args: { where: { idTarea: number } }) => {
         maybeFail('tareaEtiqueta.deleteMany');
         const eliminadas = state.tareaEtiquetas.filter((te) => te.idTarea === args.where.idTarea);
         state.tareaEtiquetas = state.tareaEtiquetas.filter((te) => te.idTarea !== args.where.idTarea);
@@ -642,21 +689,32 @@ export function makeFakeDb(state: FixtureState) {
     },
 
     hito: {
-      findUnique: vi.fn(async (args: any) => {
+      findUnique: vi.fn(async (args: { where: { idHito: number } }) => {
         maybeFail('hito.findUnique');
         return state.hitos.find((h) => h.idHito === args.where.idHito) ?? null;
+      }),
+      // A12.1: usado por syncHitoEstado para persistir el progreso
+      // recalculado tras crear/mutar/eliminar una tarea de un Hito.
+      update: vi.fn(async (args: { where: { idHito: number }; data: Record<string, unknown> }) => {
+        maybeFail('hito.update');
+        const hito = state.hitos.find((h) => h.idHito === args.where.idHito);
+        if (!hito) throw new Error(`fixture: hito ${args.where.idHito} no encontrado`);
+        const before = { ...hito };
+        recordUndo(() => Object.assign(hito, before));
+        Object.assign(hito, args.data);
+        return hito;
       }),
     },
 
     rolProyecto: {
-      findUnique: vi.fn(async (args: any) => {
+      findUnique: vi.fn(async (args: { where: { idRolProyecto: number } }) => {
         maybeFail('rolProyecto.findUnique');
         return state.roles.find((r) => r.idRolProyecto === args.where.idRolProyecto) ?? null;
       }),
     },
 
     etiqueta: {
-      findMany: vi.fn(async (args: any) => {
+      findMany: vi.fn(async (args: { where: { idEtiqueta: { in: number[] } } }) => {
         maybeFail('etiqueta.findMany');
         const ids: number[] = args.where.idEtiqueta.in;
         return state.etiquetas.filter((e) => ids.includes(e.idEtiqueta));
@@ -664,7 +722,7 @@ export function makeFakeDb(state: FixtureState) {
     },
 
     usuario: {
-      findUnique: vi.fn(async (args: any) => {
+      findUnique: vi.fn(async (args: { where: { idUsuario: number }; select?: Record<string, unknown> }) => {
         maybeFail('usuario.findUnique');
         const row = state.usuarios.find((u) => u.idUsuario === args.where.idUsuario);
         if (!row) return null;
@@ -678,15 +736,19 @@ export function makeFakeDb(state: FixtureState) {
     },
 
     participacionProyecto: {
-      findFirst: vi.fn(async (args: any) => {
-        maybeFail('participacionProyecto.findFirst');
-        const match = state.participaciones.find((p) => matchesParticipacionWhere(p, state, args.where));
-        return match ? { idParticipacion: match.idParticipacion } : null;
-      }),
+      findFirst: vi.fn(
+        async (args: {
+          where: { idUsuario: number; idRolProyecto?: number; estadoParticipacion?: string; rolProyecto?: { idProyecto: number } };
+        }) => {
+          maybeFail('participacionProyecto.findFirst');
+          const match = state.participaciones.find((p) => matchesParticipacionWhere(p, state, args.where));
+          return match ? { idParticipacion: match.idParticipacion } : null;
+        },
+      ),
     },
 
     comentario: {
-      create: vi.fn(async (args: any) => {
+      create: vi.fn(async (args: { data: Partial<ComentarioRow> }) => {
         maybeFail('comentario.create');
         const row: ComentarioRow = {
           idComentario: nextId(state, 'comentario'),
@@ -697,7 +759,7 @@ export function makeFakeDb(state: FixtureState) {
           idTarea: null,
           idHito: null,
           ...args.data,
-        };
+        } as ComentarioRow;
         state.comentarios.push(row);
         return row;
       }),
@@ -733,9 +795,9 @@ export function setupLifecycleEnv(): LifecycleEnv {
   const state = createFixtureState();
   const db = makeFakeDb(state);
 
-  const tasksContext = new TasksContextService(db as any);
+  const tasksContext = new TasksContextService(db as unknown as PrismaService);
   const tasksAuthorization = new TasksAuthorizationService(tasksContext);
-  const tasksRelations = new TasksRelationsService(db as any, tasksContext);
+  const tasksRelations = new TasksRelationsService(db as unknown as PrismaService, tasksContext);
   const notifications = {
     notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
     notifyProjectActiveParticipants: vi.fn().mockResolvedValue(undefined),
@@ -752,7 +814,7 @@ export function setupLifecycleEnv(): LifecycleEnv {
      * por su cuenta).
      */
     notifyRoleMembers: vi.fn(
-      async (projectId: number, roleId: number, actorUserId: number, input: any) => {
+      async (projectId: number, roleId: number, actorUserId: number, input: unknown) => {
         const activos = state.participaciones.filter((p) => {
           if (p.idRolProyecto !== roleId) return false;
           if (p.estadoParticipacion !== 'ACTIVO') return false;
@@ -768,10 +830,10 @@ export function setupLifecycleEnv(): LifecycleEnv {
     ),
   };
   const tasksService = new TasksService(
-    db as any,
+    db as unknown as PrismaService,
     tasksAuthorization,
     tasksRelations,
-    notifications as any,
+    notifications as unknown as NotificationsService,
     tasksContext,
   );
 
@@ -780,9 +842,16 @@ export function setupLifecycleEnv(): LifecycleEnv {
     notifyAdminsFromTemplate: vi.fn().mockResolvedValue(undefined),
     notifyFromTemplate: vi.fn().mockResolvedValue(undefined),
   };
-  const projectsService = new ProjectsService(db as any, projectsNotifications as any, {} as any);
+  const projectsService = new ProjectsService(
+    db as unknown as PrismaService,
+    projectsNotifications as unknown as NotificationsService,
+    {} as unknown as Cache,
+  );
 
-  const comentariosService = new ComentariosService(db as any, notifications as any);
+  const comentariosService = new ComentariosService(
+    db as unknown as PrismaService,
+    notifications as unknown as NotificationsService,
+  );
 
   return {
     state,

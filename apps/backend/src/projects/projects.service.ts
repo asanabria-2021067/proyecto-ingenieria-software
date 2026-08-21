@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Inject,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -16,8 +17,9 @@ import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoHito, EstadoProyecto, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
+import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { calcularProgresoHito } from '../common/hito-progreso';
 
 const FEATURED_CACHE_KEY = 'projects:featured';
 const FEATURED_CACHE_TTL = 300_000;
@@ -56,11 +58,42 @@ function calcularAvanceTareas(tareas: { estadoTarea: string }[]) {
   };
 }
 
-function calcularAvanceHitos(hitos: { estadoHito: string }[]) {
+/**
+ * El estado de un hito, históricamente, NUNCA se leía de `Hito.estadoHito`:
+ * esa columna se fijaba en PENDIENTE al crear el hito (createHito) y ningún
+ * flujo la volvía a escribir, así que quedaba congelada aunque se
+ * completaran todas sus tareas (bug de cálculo de la barra de progreso de
+ * hitos). A12 corrige la persistencia (ver `TasksService` — sincroniza
+ * `Hito.estadoHito` en los write-paths reales de `estadoTarea`), pero este
+ * agregado de PROYECTO sigue derivando en memoria a partir de las tareas
+ * (`tarea.idHito`), nunca de la columna persistida: es un GET puro, no debe
+ * depender de que la sincronización ya haya corrido. La fórmula por-Hito
+ * (% = hechas/total; COMPLETADO al 100% con al menos una tarea, EN_PROGRESO
+ * si %>0, PENDIENTE en otro caso, incluye hitos sin tareas) es la misma
+ * semántica canónica de `calcularProgresoHito` (src/common/hito-progreso.ts,
+ * A12) — única fuente de verdad, reutilizada aquí en vez de duplicada.
+ */
+function calcularAvanceHitos(
+  hitos: { idHito: number }[],
+  tareas: { idHito: number | null; estadoTarea: string }[],
+) {
   const total = hitos.length;
-  const completado = hitos.filter((h) => h.estadoHito === 'COMPLETADO').length;
-  const pendiente = hitos.filter((h) => h.estadoHito === 'PENDIENTE').length;
-  const enProgreso = total - completado - pendiente;
+  let completado = 0;
+  let pendiente = 0;
+  let enProgreso = 0;
+
+  for (const hito of hitos) {
+    const tareasHito = tareas.filter((t) => t.idHito === hito.idHito);
+    const { estadoHito } = calcularProgresoHito(tareasHito);
+
+    if (estadoHito === EstadoHito.COMPLETADO) {
+      completado += 1;
+    } else if (estadoHito === EstadoHito.EN_PROGRESO) {
+      enProgreso += 1;
+    } else {
+      pendiente += 1;
+    }
+  }
 
   return {
     porcentaje: total === 0 ? 0 : Math.round((completado / total) * 100),
@@ -83,12 +116,12 @@ function toDateOnly(value: Date | null): string | null {
 
 /** % de avance del proyecto, desglosado por hitos y por tareas. */
 function calcularAvanceProyecto(
-  tareas: { estadoTarea: string }[],
-  hitos: { estadoHito: string }[],
+  tareas: { estadoTarea: string; idHito: number | null }[],
+  hitos: { idHito: number }[],
 ) {
   return {
     tareas: calcularAvanceTareas(tareas),
-    hitos: calcularAvanceHitos(hitos),
+    hitos: calcularAvanceHitos(hitos, tareas),
   };
 }
 
@@ -376,8 +409,8 @@ export class ProjectsService {
         creadoPor: true,
         // eliminadoEn: null — las tareas con soft delete (Tarea 22) no deben
         // contarse ni en el numerador ni en el denominador del avance.
-        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
-        hitos: { select: { estadoHito: true } },
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true, idHito: true } },
+        hitos: { select: { idHito: true } },
       },
     });
     if (!proyecto) {
@@ -427,8 +460,8 @@ export class ProjectsService {
         },
         // eliminadoEn: null — misma exclusión que en getAvance: una tarea con
         // soft delete no debe contarse en avanceProyecto.
-        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } },
-        hitos: { select: { estadoHito: true } },
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true, idHito: true } },
+        hitos: { select: { idHito: true } },
         revisiones: {
           select: {
             idRevisionProyecto: true,
@@ -491,41 +524,8 @@ export class ProjectsService {
     });
   }
 
-  async findTeam(id: number) {
-    return this.prisma.participacionProyecto.findMany({
-      where: {
-        rolProyecto: { idProyecto: id },
-        estadoParticipacion: 'ACTIVO',
-      },
-      select: {
-        idParticipacion: true,
-        estadoParticipacion: true,
-        fechaIngreso: true,
-        usuario: {
-          select: {
-            idUsuario: true,
-            nombre: true,
-            apellido: true,
-            correo: true,
-            fotoUrl: true,
-          },
-        },
-        rolProyecto: {
-          select: {
-            idRolProyecto: true,
-            nombreRol: true,
-            descripcionRolProyecto: true,
-          },
-        },
-      },
-      orderBy: {
-        fechaIngreso: 'asc',
-      },
-    });
-  }
-
   async findFeatured() {
-    const cached = await this.cacheManager.get<any[]>(FEATURED_CACHE_KEY).catch(() => null);
+    const cached = await this.cacheManager.get<Record<string, unknown>[]>(FEATURED_CACHE_KEY).catch(() => null);
     if (cached) return cached;
 
     const proyectos = await this.prisma.proyecto.findMany({
@@ -546,7 +546,7 @@ export class ProjectsService {
       }))
       .sort((a, b) => b.totalPostulaciones - a.totalPostulaciones)
       .slice(0, 6)
-      .map(({ totalPostulaciones, ...p }) => p);
+      .map(({ totalPostulaciones: _totalPostulaciones, ...p }) => p);
 
     await this.cacheManager.set(FEATURED_CACHE_KEY, destacados, FEATURED_CACHE_TTL).catch(() => {});
     return destacados;
@@ -883,6 +883,7 @@ export class ProjectsService {
         'Solo se puede solicitar cierre para proyectos en estado EN_PROGRESO',
       );
     }
+    await this.assertNoOperableSprint(id);
     return this.prisma.$transaction(async (tx) => {
       const actualizado = await tx.proyecto.update({
         where: { idProyecto: id },
@@ -1005,6 +1006,14 @@ export class ProjectsService {
         `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
       );
     }
+    // A11 / Decisión Bloqueante #2: esta es la transición real que persiste
+    // EstadoProyecto.CERRADO (EN_PROGRESO -> CERRADO, vía
+    // TRANSICIONES_PERMITIDAS) — no `approveClosure`, que en el flujo
+    // administrativo actual persiste CANCELADO, no CERRADO. La invariante
+    // "Proyecto=CERRADO con Sprint operable" se protege aquí.
+    if (nuevoEstado === EstadoProyectoCreador.CERRADO) {
+      await this.assertNoOperableSprint(id);
+    }
     const estadoAnterior = proyecto.estadoProyecto;
 
     const actualizado = await this.prisma.proyecto.update({
@@ -1089,6 +1098,32 @@ export class ProjectsService {
       throw new ForbiddenException('No eres el líder de este proyecto');
     }
     return proyecto;
+  }
+
+  /**
+   * A11 — Decisión Bloqueante #2 (congelada): un Proyecto no puede avanzar
+   * hacia su cierre mientras exista un Sprint operable (ACTIVO o
+   * EN_FINALIZACION) en ese proyecto. CERRADO nunca bloquea — Foundation ya
+   * establece esa misma semántica de "operable" para el índice parcial
+   * `sprint_operable_unique` (sprints/sprints-context.service.ts,
+   * getCurrentSprint). Consulta mínima: solo existencia, acotada por
+   * idProyecto — no carga tareas, horas, participantes ni histórico. No
+   * cierra, finaliza ni crea ningún Sprint; únicamente rechaza la
+   * transición del Proyecto si corresponde.
+   */
+  private async assertNoOperableSprint(idProyecto: number): Promise<void> {
+    const sprintOperable = await this.prisma.sprint.findFirst({
+      where: {
+        idProyecto,
+        estado: { in: [EstadoSprint.ACTIVO, EstadoSprint.EN_FINALIZACION] },
+      },
+      select: { idSprint: true },
+    });
+    if (sprintOperable) {
+      throw new ConflictException(
+        'Debes cerrar el Sprint actual antes de solicitar el cierre del proyecto',
+      );
+    }
   }
 
   private async _requireAdmin(userId: number) {

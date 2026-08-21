@@ -22,6 +22,11 @@ import { MensajesRevisionModule } from './mensajes-revision/mensajes-revision.mo
 import { AdminModule } from './admin/admin.module';
 import { LabelsModule } from './labels/labels.module';
 import { RolesModule } from './roles/roles.module';
+import { ProgressRecordsModule } from './progress-records/progress-records.module';
+import { SprintsModule } from './sprints/sprints.module';
+import { ExitRequestsModule } from './exit-requests/exit-requests.module';
+import { TeamModule } from './team/team.module';
+import { SocialModule } from './social/social.module';
 
 @Module({
   imports: [
@@ -66,6 +71,11 @@ import { RolesModule } from './roles/roles.module';
     AdminModule,
     LabelsModule,
     RolesModule,
+    ProgressRecordsModule,
+    SprintsModule,
+    ExitRequestsModule,
+    TeamModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [

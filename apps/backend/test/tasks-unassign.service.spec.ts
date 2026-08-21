@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
+import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import type { TasksContextService } from '../src/tasks/tasks-context.service';
+import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
 import { NOTIFICATION_TEMPLATES } from '../src/notifications/templates/notification.templates';
 
@@ -10,36 +15,42 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
-  return {
+  const prisma = {
     tx,
-    $transaction: vi.fn(async (callback: any) => callback(tx)),
+    $transaction: vi.fn(),
     usuario: { findUnique: vi.fn().mockResolvedValue({ nombre: 'Carlos', apellido: 'Mendoza' }) },
     proyecto: { findUnique: vi.fn().mockResolvedValue({ tituloProyecto: 'Portal de Empleo UVG' }) },
-  } as any;
+  };
+  prisma.$transaction.mockImplementation(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx));
+  return prisma as typeof prisma & PrismaService;
 }
 
 function makeAuthorization(overrides: Record<string, unknown> = {}) {
-  return {
+  const authorization = {
     assertCanUnassignTask: vi
       .fn()
       .mockResolvedValue({ idTarea: 42, idProyecto: 5, tituloTarea: 'Tarea original' }),
     ...overrides,
-  } as any;
+  };
+  return authorization as typeof authorization & TasksAuthorizationService;
 }
 
 function makeContext(overrides: Record<string, unknown> = {}) {
-  return {
+  const context = {
     getActiveAssignment: vi.fn().mockResolvedValue(null),
     ...overrides,
-  } as any;
+  };
+  return context as typeof context & TasksContextService;
 }
 
 function makeRelations() {
-  return { assertUserAssignableToProject: vi.fn(), validateRelatedResources: vi.fn() } as any;
+  const relations = { assertUserAssignableToProject: vi.fn(), validateRelatedResources: vi.fn() };
+  return relations as typeof relations & TasksRelationsService;
 }
 
 function makeNotifications() {
-  return { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) } as any;
+  const notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
+  return notifications as typeof notifications & NotificationsService;
 }
 
 function asignacionActivaFixture(overrides: Record<string, unknown> = {}) {
@@ -55,10 +66,10 @@ function asignacionActivaFixture(overrides: Record<string, unknown> = {}) {
 }
 
 function makeService(opts: {
-  prisma?: any;
-  auth?: any;
-  notifications?: any;
-  context?: any;
+  prisma?: ReturnType<typeof makePrisma>;
+  auth?: ReturnType<typeof makeAuthorization>;
+  notifications?: ReturnType<typeof makeNotifications>;
+  context?: ReturnType<typeof makeContext>;
 } = {}) {
   const tx = makeTx();
   const prisma = opts.prisma ?? makePrisma(tx);
@@ -326,10 +337,10 @@ describe('TasksService.unassign', () => {
 
       await service.unassign(5, 42, 1);
 
-      expect((tx.asignacionTarea as any).create).toBeUndefined();
-      expect((tx.asignacionTarea as any).delete).toBeUndefined();
-      expect((tx.asignacionTarea as any).deleteMany).toBeUndefined();
-      expect((tx.asignacionTarea as any).update).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).create).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).delete).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).deleteMany).toBeUndefined();
+      expect((tx.asignacionTarea as unknown as Record<string, unknown>).update).toBeUndefined();
     });
 
     it('no se actualizan idUsuario, asignadoPor ni fechaAsignacion (data solo trae desasignadaEn)', async () => {
@@ -352,7 +363,7 @@ describe('TasksService.unassign', () => {
 
       await service.unassign(5, 42, 1);
 
-      expect((tx as any).tarea).toBeUndefined();
+      expect((tx as unknown as Record<string, unknown>).tarea).toBeUndefined();
     });
   });
 
@@ -361,32 +372,35 @@ describe('TasksService.unassign', () => {
       const orden: string[] = [];
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      prisma.$transaction = vi.fn(async (callback: any) => {
+      prisma.$transaction = vi.fn(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => {
         const result = await callback(tx);
         orden.push('fin_transaccion');
         return result;
-      });
-      const auth = {
+      }) as typeof prisma.$transaction;
+      const authLiteral = {
         assertCanUnassignTask: vi.fn(async () => {
           orden.push('autorizacion');
           return { idTarea: 42, idProyecto: 5, tituloTarea: 'Tarea original' };
         }),
-      } as any;
-      const context = {
+      };
+      const auth = authLiteral as typeof authLiteral & TasksAuthorizationService;
+      const contextLiteral = {
         getActiveAssignment: vi.fn(async () => {
           orden.push('asignacion_activa');
           return asignacionActivaFixture();
         }),
-      } as any;
+      };
+      const context = contextLiteral as typeof contextLiteral & TasksContextService;
       tx.asignacionTarea.updateMany.mockImplementation(async () => {
         orden.push('updateMany');
         return { count: 1 };
       });
-      const notifications = {
+      const notificationsLiteral = {
         notifyFromTemplate: vi.fn(async () => {
           orden.push('notificacion');
         }),
-      } as any;
+      };
+      const notifications = notificationsLiteral as typeof notificationsLiteral & NotificationsService;
       const relations = makeRelations();
       const service = new TasksService(prisma, auth, relations, notifications, context);
 
@@ -438,11 +452,14 @@ describe('TasksService.unassign', () => {
     });
 
     it('fallo de notificación: no rechaza, responde éxito, se registra con Logger, no se relanza', async () => {
+      const notificationsLiteral = { notifyFromTemplate: vi.fn().mockRejectedValue(new Error('gateway caído')) };
       const { service } = makeService({
         context: makeContext({ getActiveAssignment: vi.fn().mockResolvedValue(asignacionActivaFixture()) }),
-        notifications: { notifyFromTemplate: vi.fn().mockRejectedValue(new Error('gateway caído')) } as any,
+        notifications: notificationsLiteral as typeof notificationsLiteral & NotificationsService,
       });
-      const loggerSpy = vi.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+      const loggerSpy = vi
+        .spyOn((service as unknown as { logger: { error: (...args: unknown[]) => void } }).logger, 'error')
+        .mockImplementation(() => undefined);
 
       await expect(service.unassign(5, 42, 1)).resolves.toBeUndefined();
       expect(loggerSpy).toHaveBeenCalledTimes(1);

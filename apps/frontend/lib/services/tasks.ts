@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   AssignTaskInput,
+  CloseAssignmentInput,
   CreateTaskInput,
   TareaPublicaDTO,
   UpdateTaskInput,
@@ -65,4 +66,20 @@ export function deleteTask(idProyecto: number, idTarea: number): Promise<void> {
   return apiFetch<void>(`/proyectos/${idProyecto}/tareas/${idTarea}`, {
     method: 'DELETE',
   });
+}
+
+/** B2 — `POST /proyectos/:id/tareas/:taskId/asignaciones/:assignmentId/cerrar`. */
+export function closeAssignment(
+  idProyecto: number,
+  idTarea: number,
+  idAsignacion: number,
+  input: CloseAssignmentInput,
+): Promise<TareaPublicaDTO> {
+  return apiFetch<TareaPublicaDTO>(
+    `/proyectos/${idProyecto}/tareas/${idTarea}/asignaciones/${idAsignacion}/cerrar`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
 }

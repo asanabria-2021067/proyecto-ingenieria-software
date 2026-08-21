@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { TipoExperiencia } from '@prisma/client';
+import { Prisma, TipoExperiencia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   UpdateProfileDto,
@@ -206,7 +206,7 @@ export class UsersService {
     return this.prisma.$transaction(async (tx) => {
       // Actualizar tabla usuario (nombre, apellido, correo, foto)
       if (hasUsuarioFields) {
-        const updateUsuarioData: any = {};
+        const updateUsuarioData: Prisma.UsuarioUpdateInput = {};
 
         if (dto.nombreCompleto !== undefined) {
           const [nombre, ...resto] = dto.nombreCompleto.trim().split(' ');

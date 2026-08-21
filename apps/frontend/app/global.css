@@ -291,7 +291,7 @@ button:disabled {
   --admin-bg:           #054526;
   --admin-border:       rgba(255, 255, 255, 0.1);
   --admin-text:         #ffffff;
-  --admin-text-muted:   rgba(255, 255, 255, 0.55);
+  --admin-text-muted:   rgba(255, 255, 255, 0.65);
   --admin-text-dim:     rgba(255, 255, 255, 0.75);
   --admin-selector-bg:  #5AB33E;
   --admin-selector-fg:  #ffffff;
