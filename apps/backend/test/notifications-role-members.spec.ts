@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Prisma, TipoNotificacion } from '@prisma/client';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { NotificationsGateway } from '../src/notifications/notifications.gateway';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * Tarea 33: NotificationsService.notifyRoleMembers — destinatarios son
@@ -9,10 +12,11 @@ import { NotificationsService } from '../src/notifications/notifications.service
  * persistencia ni emisión por gateway).
  */
 function makePrisma() {
-  return {
+  const prisma = {
     notificacion: { createMany: vi.fn() },
     participacionProyecto: { findMany: vi.fn() },
-  } as any;
+  };
+  return prisma as typeof prisma & PrismaService;
 }
 
 const PROJECT_A = 1;
@@ -22,7 +26,10 @@ const ROLE_A2 = 20;
 const ROLE_B1 = 30;
 const ACTOR_ID = 99;
 
-const INPUT = { tipoNotificacion: 'PROYECTO_ACTUALIZADO' as any, tituloNotificacion: 'x' };
+const INPUT = {
+  tipoNotificacion: TipoNotificacion.PROYECTO_ACTUALIZADO,
+  tituloNotificacion: 'x',
+};
 
 describe('NotificationsService.notifyRoleMembers — consulta (Tarea 33)', () => {
   it('consulta exactamente estadoParticipacion: ACTIVO y rolProyecto: { idRolProyecto, idProyecto, proyecto: { eliminadoEn: null } }, con select mínimo', async () => {
@@ -81,7 +88,9 @@ describe('NotificationsService.notifyRoleMembers — destinatarios (Tarea 33)', 
 
     await service.notifyRoleMembers(PROJECT_A, ROLE_A1, ACTOR_ID, INPUT);
 
-    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map((d: any) => d.idUsuario);
+    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map(
+      (row: Prisma.NotificacionCreateManyInput) => row.idUsuario,
+    );
     expect(new Set(idsNotificados)).toEqual(new Set([1, 2, 3]));
   });
 
@@ -97,7 +106,9 @@ describe('NotificationsService.notifyRoleMembers — destinatarios (Tarea 33)', 
 
     await service.notifyRoleMembers(PROJECT_A, ROLE_A1, ACTOR_ID, INPUT);
 
-    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map((d: any) => d.idUsuario);
+    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map(
+      (row: Prisma.NotificacionCreateManyInput) => row.idUsuario,
+    );
     expect(idsNotificados).toEqual([1]);
   });
 
@@ -108,7 +119,9 @@ describe('NotificationsService.notifyRoleMembers — destinatarios (Tarea 33)', 
 
     await service.notifyRoleMembers(PROJECT_A, ROLE_A1, ACTOR_ID, INPUT);
 
-    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map((d: any) => d.idUsuario);
+    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map(
+      (row: Prisma.NotificacionCreateManyInput) => row.idUsuario,
+    );
     expect(idsNotificados).not.toContain(ACTOR_ID);
     expect(idsNotificados).toEqual([1]);
   });
@@ -145,7 +158,9 @@ describe('NotificationsService.notifyRoleMembers — deduplicación (Tarea 33)',
 
     await service.notifyRoleMembers(PROJECT_A, ROLE_A1, ACTOR_ID, INPUT);
 
-    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map((d: any) => d.idUsuario);
+    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map(
+      (row: Prisma.NotificacionCreateManyInput) => row.idUsuario,
+    );
     expect(idsNotificados.filter((id: number) => id === 1)).toHaveLength(1);
   });
 
@@ -160,7 +175,9 @@ describe('NotificationsService.notifyRoleMembers — deduplicación (Tarea 33)',
 
     await service.notifyRoleMembers(PROJECT_A, ROLE_A1, ACTOR_ID, INPUT);
 
-    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map((d: any) => d.idUsuario);
+    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map(
+      (row: Prisma.NotificacionCreateManyInput) => row.idUsuario,
+    );
     expect(idsNotificados).toEqual([1]);
   });
 });
@@ -181,7 +198,7 @@ describe('NotificationsService.notifyRoleMembers — delegación en notifyUsers 
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 1 }]);
     const service = new NotificationsService(prisma);
     const input = {
-      tipoNotificacion: 'PROYECTO_ACTUALIZADO' as any,
+      tipoNotificacion: TipoNotificacion.PROYECTO_ACTUALIZADO,
       tituloNotificacion: 'Título real',
       mensajeNotificacion: 'Mensaje real',
       datosJson: { projectId: PROJECT_A, roleId: ROLE_A1 },
@@ -210,8 +227,8 @@ describe('NotificationsService.notifyRoleMembers — delegación en notifyUsers 
 
     await service.notifyRoleMembers(PROJECT_A, ROLE_A1, ACTOR_ID, INPUT);
 
-    expect((prisma.notificacion as any).create).toBeUndefined();
-    expect((prisma.notificacion as any).update).toBeUndefined();
+    expect(Reflect.get(prisma.notificacion, 'create')).toBeUndefined();
+    expect(Reflect.get(prisma.notificacion, 'update')).toBeUndefined();
   });
 
   it('no llama directamente al gateway (sin gateway inyectado, notifyUsers no intenta emitir)', async () => {
@@ -230,8 +247,11 @@ describe('NotificationsService.notifyRoleMembers — delegación en notifyUsers 
   it('emite por el gateway correcto cuando hay un gateway con server activo (mismo mecanismo que notifyUsers)', async () => {
     const prisma = makePrisma();
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: 1 }, { idUsuario: 2 }]);
-    const gateway = { server: {}, notifyUsers: vi.fn().mockResolvedValue(undefined) } as any;
-    const service = new NotificationsService(prisma, gateway);
+    const gateway = { server: {}, notifyUsers: vi.fn().mockResolvedValue(undefined) };
+    const service = new NotificationsService(
+      prisma,
+      gateway as unknown as NotificationsGateway,
+    );
 
     await service.notifyRoleMembers(PROJECT_A, ROLE_A1, ACTOR_ID, INPUT);
 
@@ -292,7 +312,9 @@ describe('NotificationsService.notifyRoleMembers — dataset amplio y aislamient
 
     await service.notifyRoleMembers(PROJECT_A, ROLE_A1, ACTOR_ID, INPUT);
 
-    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map((d: any) => d.idUsuario);
+    const idsNotificados = prisma.notificacion.createMany.mock.calls[0][0].data.map(
+      (row: Prisma.NotificacionCreateManyInput) => row.idUsuario,
+    );
     expect(new Set(idsNotificados)).toEqual(new Set(miembrosActivosA1));
     expect(idsNotificados).toHaveLength(miembrosActivosA1.length);
     expect(idsNotificados).not.toContain(ACTOR_ID);

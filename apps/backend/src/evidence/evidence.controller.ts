@@ -6,7 +6,7 @@ export class EvidenceController {
   constructor(private evidenceService: EvidenceService) {}
 
   @Post()
-  create(@Body() data: any) {
+  create(@Body() data: unknown) {
     return this.evidenceService.create(data);
   }
 

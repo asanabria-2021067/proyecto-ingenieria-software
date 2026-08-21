@@ -7,11 +7,19 @@ import { TasksAuthorizationService } from './tasks-authorization.service';
 import { TasksRelationsService } from './tasks-relations.service';
 import { ComentariosModule } from '../comentarios/comentarios.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SprintsModule } from '../sprints/sprints.module';
+import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 
 @Module({
-  imports: [ComentariosModule, NotificationsModule],
+  imports: [ComentariosModule, NotificationsModule, SprintsModule],
   controllers: [TasksController, TareaComentariosController],
-  providers: [TasksService, TasksContextService, TasksAuthorizationService, TasksRelationsService],
+  providers: [
+    TasksService,
+    TasksContextService,
+    TasksAuthorizationService,
+    TasksRelationsService,
+    ProjectWriteGuard,
+  ],
   exports: [TasksService],
 })
 export class TasksModule {}

@@ -79,6 +79,7 @@ export type Postulacion = {
   fechaPostulacion: string;
   comentarioResolucion?: string;
   rolProyecto: {
+    idRolProyecto: number;
     nombreRol: string;
     proyecto: {
       idProyecto: number;

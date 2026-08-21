@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
   ValidationPipe,
+  type ArgumentMetadata,
 } from '@nestjs/common';
 import { CreateTaskDto } from '../src/tasks/dto/create-task.dto';
 import { UpdateTaskDto } from '../src/tasks/dto/update-task.dto';
@@ -39,16 +40,16 @@ const pipe = new ValidationPipe({
 });
 
 async function parseCreate(plain: unknown): Promise<CreateTaskDto> {
-  return pipe.transform(plain, { type: 'body', metatype: CreateTaskDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: CreateTaskDto } as ArgumentMetadata);
 }
 async function parseUpdate(plain: unknown): Promise<UpdateTaskDto> {
-  return pipe.transform(plain, { type: 'body', metatype: UpdateTaskDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: UpdateTaskDto } as ArgumentMetadata);
 }
 async function parseEstado(plain: unknown): Promise<UpdateTaskEstadoDto> {
-  return pipe.transform(plain, { type: 'body', metatype: UpdateTaskEstadoDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: UpdateTaskEstadoDto } as ArgumentMetadata);
 }
 async function parseAssign(plain: unknown): Promise<AssignTaskDto> {
-  return pipe.transform(plain, { type: 'body', metatype: AssignTaskDto } as any);
+  return pipe.transform(plain, { type: 'body', metatype: AssignTaskDto } as ArgumentMetadata);
 }
 
 const { usuarios: U, proyectos: P, roles: R, hitos: H, etiquetas: E } = FIXTURE_IDS;
@@ -57,14 +58,18 @@ function baseCreatePayload(overrides: Record<string, unknown> = {}) {
   return { tituloTarea: 'Tarea de prueba', fechaLimite: FECHA_FUTURA, prioridad: 'MEDIA', ...overrides };
 }
 
-async function expectStatus(promise: Promise<unknown>, ctor: new (...args: any[]) => any, status: number) {
+async function expectStatus<T extends { getStatus(): number }>(
+  promise: Promise<unknown>,
+  ctor: new (...args: never[]) => T,
+  status: number,
+): Promise<T> {
   try {
     await promise;
     throw new Error('no debía resolver');
-  } catch (e: any) {
+  } catch (e) {
     expect(e).toBeInstanceOf(ctor);
-    expect(e.getStatus()).toBe(status);
-    return e;
+    expect((e as T).getStatus()).toBe(status);
+    return e as T;
   }
 }
 
@@ -89,7 +94,8 @@ const PUBLIC_TAREA_KEYS = [
   'cantidadComentarios',
 ].sort();
 
-function expectPublicContract(tarea: any) {
+function expectPublicContract(tareaValue: object) {
+  const tarea = tareaValue as Record<string, unknown>;
   expect(Object.keys(tarea).sort()).toEqual(PUBLIC_TAREA_KEYS);
   expect(tarea).not.toHaveProperty('eliminadoEn');
   expect(tarea).not.toHaveProperty('_count');
@@ -97,7 +103,7 @@ function expectPublicContract(tarea: any) {
   expect(serialized).not.toMatch(/desasignadaEn/i);
   expect(serialized).not.toMatch(/contrasena|password|hash|token/i);
   if (tarea.asignacionActiva) {
-    expect(Object.keys(tarea.asignacionActiva).sort()).toEqual(
+    expect(Object.keys(tarea.asignacionActiva as Record<string, unknown>).sort()).toEqual(
       ['idAsignacion', 'idUsuario', 'fechaAsignacion', 'usuario'].sort(),
     );
   }
@@ -249,7 +255,7 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       );
       const orden: string[] = [];
       const transactionOriginal = env.db.$transaction.bind(env.db);
-      env.db.$transaction = (async (callback: any) => {
+      env.db.$transaction = (async (callback: Parameters<typeof env.db.$transaction>[0]) => {
         const result = await transactionOriginal(callback);
         orden.push('transaccion_resuelta');
         return result;
@@ -268,7 +274,7 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       expectPublicContract(creada);
       expect(creada.idHito).toBe(H.A);
       expect(creada.idRolProyecto).toBe(R.desarrolloA);
-      expect(creada.etiquetas.map((e: any) => e.idEtiqueta).sort()).toEqual([E.aUrgente, E.aBackend].sort());
+      expect(creada.etiquetas.map((e) => e.idEtiqueta).sort()).toEqual([E.aUrgente, E.aBackend].sort());
       expect(creada.asignacionActiva?.idUsuario).toBe(U.a1);
       expect(env.state.tareaEtiquetas.filter((te) => te.idTarea === creada.idTarea)).toHaveLength(2);
       // La notificación ocurre después de que $transaction se resuelve, nunca dentro ni antes.
@@ -323,7 +329,7 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       expect(editada.prioridad).toBe('ALTA');
       expect(editada.idHito).toBe(H.A);
       expect(editada.idRolProyecto).toBe(R.desarrolloA);
-      expect(editada.etiquetas.map((e: any) => e.idEtiqueta).sort()).toEqual([E.aUrgente, E.aBackend].sort());
+      expect(editada.etiquetas.map((e) => e.idEtiqueta).sort()).toEqual([E.aUrgente, E.aBackend].sort());
       expect(editada.asignacionActiva?.idUsuario).toBe(U.a1);
     });
 
@@ -333,7 +339,7 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
 
       const dtoSustituir = await parseUpdate({ idsEtiquetas: [E.aUrgente] });
       const sustituida = await env.tasksService.update(P.A, creada.idTarea, U.liderA, dtoSustituir);
-      expect(sustituida.etiquetas.map((e: any) => e.idEtiqueta)).toEqual([E.aUrgente]);
+      expect(sustituida.etiquetas.map((e) => e.idEtiqueta)).toEqual([E.aUrgente]);
 
       const dtoVaciar = await parseUpdate({ idsEtiquetas: [] });
       const vaciada = await env.tasksService.update(P.A, creada.idTarea, U.liderA, dtoVaciar);
@@ -619,7 +625,7 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
     it('payload de edición vacío → 400', async () => {
       const env = setupLifecycleEnv();
       const creada = await env.tasksService.create(P.A, U.liderA, await parseCreate(baseCreatePayload()));
-      await expectStatus(env.tasksService.update(P.A, creada.idTarea, U.liderA, {} as any), BadRequestException, 400);
+      await expectStatus(env.tasksService.update(P.A, creada.idTarea, U.liderA, {}), BadRequestException, 400);
     });
 
     it('estado inválido → 400 vía validación real del DTO (UpdateTaskEstadoDto)', async () => {
@@ -828,7 +834,7 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
 
       // findMine coincide con getAvance sobre el mismo dataset.
       const misProyectos = await env.projectsService.findMine(U.liderA);
-      const miProyectoA = misProyectos.find((p: any) => p.idProyecto === P.A);
+      const miProyectoA = misProyectos.find((p) => p.idProyecto === P.A);
       expect(miProyectoA.avanceProyecto.tareas).toEqual(avanceDespues.tareas);
 
       expect(activaNoCompletada.estadoTarea).toBe('POR_HACER'); // sanity: nunca se tocó
@@ -865,7 +871,7 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       // que produciría esa carrera, cerrando la fila por fuera del service.
       const activa = env.state.asignaciones.find((a) => a.idTarea === creada.idTarea && a.desasignadaEn === null)!;
       const updateManyOriginal = env.db.asignacionTarea.updateMany.getMockImplementation()!;
-      env.db.asignacionTarea.updateMany.mockImplementationOnce(async (args: any) => {
+      env.db.asignacionTarea.updateMany.mockImplementationOnce(async (args: Parameters<typeof updateManyOriginal>[0]) => {
         activa.desasignadaEn = new Date(); // otra "solicitud" gana la carrera
         return updateManyOriginal(args); // esta ahora no encuentra nada que cerrar → count 0
       });

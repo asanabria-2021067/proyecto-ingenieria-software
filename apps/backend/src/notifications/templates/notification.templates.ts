@@ -118,6 +118,42 @@ export interface NotificationTemplateData {
     carne: string;
     solicitudId: number;
   };
+
+  // T-113 (HU-125, salida completa del proyecto): notifica al solicitante la
+  // resolución de su SolicitudSalidaProyecto. Reutiliza
+  // TipoNotificacion.PARTICIPACION_ACTUALIZADA — existe en el schema desde la
+  // migración inicial y no tenía ninguna plantilla asociada. Se descartó
+  // ROL_ABANDONADO a propósito: esa semántica es abandonar UN rol, mientras
+  // que HU-125 es la salida completa del proyecto (todas las participaciones
+  // ACTIVO). `approved` distingue aprobación/rechazo dentro del mismo tipo,
+  // igual que POSTULACION_RESUELTA.accepted.
+  PARTICIPACION_ACTUALIZADA: {
+    projectTitle: string;
+    projectId: number;
+    approved: boolean;
+  };
+
+  // HORAS_VALIDADAS ya existía en el enum sin plantilla asociada.
+  HORAS_VALIDADAS: {
+    projectTitle: string;
+    projectId: number;
+    horasReconocidas: number;
+    fueAjustado: boolean;
+  };
+
+  SOLICITUD_AMISTAD: {
+    userName: string;
+    idAmistad: number;
+  };
+
+  AMISTAD_ACEPTADA: {
+    userName: string;
+    idAmistad: number;
+  };
+
+  NUEVO_SEGUIDOR: {
+    userName: string;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -230,6 +266,41 @@ export const NOTIFICATION_TEMPLATES = {
       data: NotificationTemplateData['SOLICITUD_RECUPERACION_CONTRASENA'],
     ) =>
       `${data.userName} (carné ${data.carne}) solicitó recuperar su contraseña.`,
+  },
+
+  PARTICIPACION_ACTUALIZADA: {
+    title: (data: NotificationTemplateData['PARTICIPACION_ACTUALIZADA']) =>
+      data.approved ? 'Tu salida del proyecto fue aprobada' : 'Tu solicitud de salida fue rechazada',
+    message: (data: NotificationTemplateData['PARTICIPACION_ACTUALIZADA']) =>
+      data.approved
+        ? `Tu solicitud de salida de "${data.projectTitle}" fue aprobada. Tu participación en el proyecto quedó en estado RETIRADO.`
+        : `Tu solicitud de salida de "${data.projectTitle}" fue rechazada. Continúas activo en el proyecto.`,
+  },
+
+  HORAS_VALIDADAS: {
+    title: 'Se validaron tus horas',
+    message: (data: NotificationTemplateData['HORAS_VALIDADAS']) =>
+      data.fueAjustado
+        ? `Se cerró tu participación en "${data.projectTitle}" con ${data.horasReconocidas} horas reconocidas (con ajuste justificado).`
+        : `Se cerró tu participación en "${data.projectTitle}" con ${data.horasReconocidas} horas reconocidas.`,
+  },
+
+  SOLICITUD_AMISTAD: {
+    title: 'Nueva solicitud de amistad',
+    message: (data: NotificationTemplateData['SOLICITUD_AMISTAD']) =>
+      `${data.userName} te envió una solicitud de amistad.`,
+  },
+
+  AMISTAD_ACEPTADA: {
+    title: 'Solicitud de amistad aceptada',
+    message: (data: NotificationTemplateData['AMISTAD_ACEPTADA']) =>
+      `${data.userName} aceptó tu solicitud de amistad.`,
+  },
+
+  NUEVO_SEGUIDOR: {
+    title: 'Nuevo seguidor',
+    message: (data: NotificationTemplateData['NUEVO_SEGUIDOR']) =>
+      `${data.userName} comenzó a seguirte.`,
   },
 } as const;
 
