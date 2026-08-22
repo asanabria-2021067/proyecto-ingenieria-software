@@ -95,7 +95,6 @@ export function TaskCard({
         setNodeRef(el);
         onRegistrarCardRef?.(tarea.idTarea, el);
       }}
-      {...(puedeArrastrar ? listeners : undefined)}
       style={dragStyle}
       aria-busy={estadoPending}
       aria-describedby={resaltada ? `tarea-resaltada-${tarea.idTarea}` : undefined}
@@ -103,7 +102,7 @@ export function TaskCard({
         resaltada
           ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
           : 'border-outline-variant/30'
-      } ${isDragging ? 'opacity-40' : ''} ${puedeArrastrar ? 'touch-none cursor-grab active:cursor-grabbing' : ''}`}
+      } ${isDragging ? 'opacity-40' : ''}`}
     >
       {resaltada && (
         <p id={`tarea-resaltada-${tarea.idTarea}`} className="sr-only">

@@ -22,6 +22,7 @@ function makePrisma(tx = makeTx()) {
   return {
     tx,
     proyecto: { findFirst: vi.fn() },
+    participacionProyecto: { findFirst: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn(async (callback: (transaction: typeof tx) => unknown) => callback(tx)),
   };
 }
@@ -65,15 +66,30 @@ describe('ProjectsService.createHito', () => {
     expect(result.idHito).toBe(10);
   });
 
-  it('un no-líder recibe ForbiddenException y no se crea el hito', async () => {
+  it('un usuario sin participación activa recibe ForbiddenException y no se crea el hito', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 99 });
+    prisma.participacionProyecto.findFirst.mockResolvedValue(null);
     const service = makeService(prisma);
 
     await expect(service.createHito(5, 1, BASE_DTO)).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(tx.hito.create).not.toHaveBeenCalled();
+  });
+
+  it('un participante activo (no líder) también puede crear un hito', async () => {
+    const tx = makeTx();
+    const prisma = makePrisma(tx);
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 99 });
+    prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    tx.hito.create.mockResolvedValue(hitoRow());
+    const service = makeService(prisma);
+
+    const result = await service.createHito(5, 1, BASE_DTO);
+
+    expect(tx.hito.create).toHaveBeenCalledTimes(1);
+    expect(result.idHito).toBe(10);
   });
 
   it('un proyecto inexistente lanza NotFoundException', async () => {
