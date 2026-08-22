@@ -189,7 +189,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
       handleOpenChange(false);
       onCreated(conversacion.idConversacion);
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError));
+      setError(getApiErrorMessage(submitError, 'chat'));
     }
   };
 
