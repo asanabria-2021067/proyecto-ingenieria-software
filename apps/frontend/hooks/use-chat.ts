@@ -92,7 +92,7 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
     const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = apiUrl.replace(/^https?/, wsScheme);
     const socket = io(`${wsUrl}/chat`, {
-      auth: { token },
+      auth: (cb) => cb({ token: getAccessToken() }),
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
