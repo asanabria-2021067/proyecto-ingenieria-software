@@ -16,6 +16,16 @@ function getApiUrl(): string {
     if (isLocalApiHost && !isLocalPageHost) {
       return '';
     }
+
+    // Mixed content: la página se sirve por https pero NEXT_PUBLIC_API_URL
+    // quedó horneado en build time como http (típico si un proxy externo
+    // añadió TLS después). El navegador bloquea ese fetch directo; en vez de
+    // depender de rehornear el build, se usa el proxy same-origin de Next
+    // (app/api/[...path]/route.ts), que reenvía la petición server-side sin
+    // pasar por el navegador.
+    if (window.location.protocol === 'https:' && configuredUrl.protocol === 'http:') {
+      return '';
+    }
   } catch {
     return API_URL;
   }
