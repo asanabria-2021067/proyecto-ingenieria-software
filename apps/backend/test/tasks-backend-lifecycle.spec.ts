@@ -434,11 +434,11 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
   // Matriz de permisos 403
   // -------------------------------------------------------------------
   describe('Matriz de permisos 403', () => {
-    it('crear tarea: participante no líder → 403', async () => {
+    it('crear tarea: cualquier participante activo puede crear (no exclusivo del líder)', async () => {
       const env = setupLifecycleEnv();
       const dto = await parseCreate(baseCreatePayload());
-      const e = await expectStatus(env.tasksService.create(P.A, U.a1, dto), ForbiddenException, 403);
-      expect(e.getStatus()).toBe(403);
+      const creada = await env.tasksService.create(P.A, U.a1, dto);
+      expectPublicContract(creada);
     });
 
     it('editar tarea: asignado no líder → 403', async () => {

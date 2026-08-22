@@ -250,6 +250,9 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     deleteLabel,
   } = useProjectLabels(idProyecto);
   const { members } = useProjectMembers(idProyecto);
+  const esParticipante =
+    !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
+  const puedeCrear = isLeader || esParticipante;
   const { crearHito } = useProjectMilestones(idProyecto);
   const opcionesRol = useMemo(() => derivarOpcionesRol(tasks), [tasks]);
   const opcionesHito = useMemo(() => derivarOpcionesHito(tasks), [tasks]);
@@ -444,7 +447,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               )}
 
-              {isLeader && activeTab === 'hitos' && (
+              {puedeCrear && activeTab === 'hitos' && (
                 <Button
                   type="button"
                   size="sm"
@@ -472,7 +475,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   bloqueada: este botón es la única entrada que abre
                   TaskFormDialog en modo creación (`setCrearAbierto`), así
                   que ocultarlo cierra por completo esa vía. */}
-              {isLeader && haySprintDeTrabajo && (
+              {puedeCrear && haySprintDeTrabajo && (
                 <Button
                   type="button"
                   size="sm"
@@ -603,7 +606,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           onOpenChange={setCrearAbierto}
           onManageLabels={isLeader ? () => setEtiquetasAbierto(true) : undefined}
         />
-        {isLeader && (
+        {puedeCrear && (
           <CreateMilestoneDialog
             open={crearHitoAbierto}
             onOpenChange={setCrearHitoAbierto}

@@ -1086,6 +1086,22 @@ export class ProjectsService {
     return actualizado;
   }
 
+  /** Líder o participante con participación ACTIVO en algún rol del proyecto. */
+  private async _requireActiveMember(idProyecto: number, userId: number) {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: { idProyecto, eliminadoEn: null },
+      select: { idProyecto: true, creadoPor: true },
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
+    }
+    const esLider = proyecto.creadoPor === userId;
+    if (!esLider && !(await this.esParticipanteActivo(idProyecto, userId))) {
+      throw new ForbiddenException('No tienes una participación activa en este proyecto');
+    }
+    return proyecto;
+  }
+
   private async _requireOwner(idProyecto: number, userId: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
@@ -1169,7 +1185,7 @@ export class ProjectsService {
    * valor enviado por el cliente que podría colisionar con hitos existentes.
    */
   async createHito(idProyecto: number, userId: number, dto: CreateHitoDto) {
-    await this._requireOwner(idProyecto, userId);
+    await this._requireActiveMember(idProyecto, userId);
 
     const hito = await this.prisma.$transaction(async (tx) => {
       const ultimo = await tx.hito.findFirst({

@@ -33,15 +33,23 @@ describe('TasksAuthorizationService', () => {
   describe('assertCanCreateTask', () => {
     it('permite al líder', async () => {
       const ctx = makeContext();
-      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
       const service = new TasksAuthorizationService(ctx);
 
       await expect(service.assertCanCreateTask(1, LIDER_ID)).resolves.toBeUndefined();
     });
 
-    it('rechaza a un usuario que no es líder', async () => {
+    it('permite a un participante activo (no exclusivo del líder)', async () => {
       const ctx = makeContext();
-      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service.assertCanCreateTask(1, PARTICIPANTE_ID)).resolves.toBeUndefined();
+    });
+
+    it('rechaza a un usuario sin participación activa', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockRejectedValue(FORBIDDEN_PARTICIPANT());
       const service = new TasksAuthorizationService(ctx);
 
       await expect(service.assertCanCreateTask(1, EXTERNO_ID)).rejects.toBeInstanceOf(
@@ -51,7 +59,9 @@ describe('TasksAuthorizationService', () => {
 
     it('propaga NotFoundException si el proyecto no existe', async () => {
       const ctx = makeContext();
-      ctx.assertProjectLeader.mockRejectedValue(new NotFoundException('Proyecto con id 1 no encontrado'));
+      ctx.assertActiveProjectParticipant.mockRejectedValue(
+        new NotFoundException('Proyecto con id 1 no encontrado'),
+      );
       const service = new TasksAuthorizationService(ctx);
 
       await expect(service.assertCanCreateTask(1, LIDER_ID)).rejects.toBeInstanceOf(
@@ -61,13 +71,13 @@ describe('TasksAuthorizationService', () => {
 
     it('traslada el cliente transaccional recibido', async () => {
       const ctx = makeContext();
-      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
       const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
       const service = new TasksAuthorizationService(ctx);
 
       await service.assertCanCreateTask(1, LIDER_ID, tx);
 
-      expect(ctx.assertProjectLeader).toHaveBeenCalledWith(1, LIDER_ID, tx);
+      expect(ctx.assertActiveProjectParticipant).toHaveBeenCalledWith(1, LIDER_ID, tx);
     });
   });
 
