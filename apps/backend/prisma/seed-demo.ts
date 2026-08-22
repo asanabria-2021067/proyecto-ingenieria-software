@@ -277,6 +277,10 @@ async function seedSprint6Demo() {
   });
 
   // Participaciones
+  // Líder también necesita participación ACTIVO para poder autoasignarse
+  // tareas (requerido por k6/scenarios/kanban-operations.js — el líder crea,
+  // asigna y cierra su propio tramo con la misma identidad).
+  await ensureParticipacionS6(lider.idUsuario, rCoord.idRolProyecto, 'ACTIVO', dateOnly(-70), null);
   const partBeatriz = await ensureParticipacionS6(u.beatriz.idUsuario, rCoord.idRolProyecto, 'ACTIVO', dateOnly(-75), null, postBeatriz.idPostulacion);
   const partCarlosCoord = await ensureParticipacionS6(u.carlos.idUsuario, rCoord.idRolProyecto, 'ACTIVO', dateOnly(-70), null);
   const partCarlosPlat = await ensureParticipacionS6(u.carlos.idUsuario, rPlat.idRolProyecto, 'ACTIVO', dateOnly(-15), null);
