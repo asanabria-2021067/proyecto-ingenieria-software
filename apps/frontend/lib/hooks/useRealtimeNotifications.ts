@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { projectSprintsQueryKey } from '@/lib/query-keys/sprints';
+import { getAccessToken } from '@/lib/utils/token';
 
 export interface Notification {
   tipoNotificacion: string;
@@ -33,8 +34,12 @@ export function useRealtimeNotifications(token: string | null) {
     const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = apiUrl.replace(/^https?/, wsScheme);
 
+    // auth como callback (no objeto fijo): TokenRefreshManager rota el
+    // access token en localStorage sin re-renderizar este hook, así que un
+    // objeto capturado en el cierre quedaría con el token del montaje inicial
+    // para siempre — cualquier reconexión tras rotar el token fallaría.
     const newSocket = io(`${wsUrl}/notifications`, {
-      auth: { token },
+      auth: (cb) => cb({ token: getAccessToken() }),
       transports: ['websocket', 'polling'],
     });
 
