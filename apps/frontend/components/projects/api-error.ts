@@ -4,7 +4,7 @@
  * diferenciado para el usuario, sin destruir ni mutar el objeto original.
  */
 
-export type ApiErrorScope = 'task' | 'label' | 'assignment' | 'role';
+export type ApiErrorScope = 'task' | 'label' | 'assignment' | 'role' | 'chat';
 
 interface EnrichedError {
   statusCode?: number;
@@ -19,8 +19,9 @@ export function getApiErrorMessage(error: unknown, scope: ApiErrorScope = 'task'
   switch (statusCode) {
     case 400:
       // Las reglas de negocio de roles (cupo lleno, último rol, rol utilizado…)
+      // y de chat (participante sin participación activa, conteo inválido…)
       // devuelven un mensaje funcional específico que conviene mostrar tal cual.
-      if (scope === 'role') {
+      if (scope === 'role' || scope === 'chat') {
         return backendMessage || 'Revisa los datos ingresados y las relaciones seleccionadas.';
       }
       return 'Revisa los datos ingresados y las relaciones seleccionadas.';
