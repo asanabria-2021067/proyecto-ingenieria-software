@@ -95,4 +95,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`user:${idUsuario}`).emit('conversationUpdated', { idConversacion });
     }
   }
+
+  /**
+   * Llamado por ChatService tras crear una conversación nueva: sin esto, el
+   * resto de participantes no se enteran de que existe hasta recargar la
+   * página (su lista de conversaciones ya se cargó antes de que se creara).
+   * Reutiliza el mismo evento `conversationUpdated` que ya escucha el
+   * cliente para refrescar la lista — no hace falta un evento nuevo.
+   */
+  notifyConversationCreated(idConversacion: number, destinatarios: number[]) {
+    for (const idUsuario of destinatarios) {
+      this.server.to(`user:${idUsuario}`).emit('conversationUpdated', { idConversacion });
+    }
+  }
 }
