@@ -27,6 +27,7 @@ import { SprintsModule } from './sprints/sprints.module';
 import { ExitRequestsModule } from './exit-requests/exit-requests.module';
 import { TeamModule } from './team/team.module';
 import { SocialModule } from './social/social.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { SocialModule } from './social/social.module';
     ExitRequestsModule,
     TeamModule,
     SocialModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [
