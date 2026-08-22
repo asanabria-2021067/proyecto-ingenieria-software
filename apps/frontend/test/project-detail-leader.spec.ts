@@ -25,9 +25,11 @@ vi.mock('../lib/services/catalogs', () => ({
   getCarreras: vi.fn().mockResolvedValue([{ idCarrera: 3, nombreCarrera: 'Sistemas' }]),
   getHabilidades: vi.fn().mockResolvedValue([{ idHabilidad: 7, nombreHabilidad: 'React', categoriaHabilidad: null }]),
 }));
+const replaceMock = vi.fn();
+const searchParamsMock = vi.fn(() => new URLSearchParams());
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => searchParamsMock(),
+  useRouter: () => ({ replace: replaceMock, push: vi.fn() }),
 }));
 
 import ProjectDetailClient from '../app/dashboard/projects/[id]/project-detail-client';
@@ -113,6 +115,7 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } }); // = creador ⇒ líder
     (useProjectMembers as any).mockReturnValue({ members: [] });
     mockRoles([rol()]);
+    searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
   afterEach(() => {
@@ -120,27 +123,20 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
     vi.clearAllMocks();
   });
 
-  it('no contiene Kanban, pestañas ni progreso; muestra las acciones del líder sin "Gestionar roles"', () => {
+  it('no contiene Kanban, pestañas ni progreso; la navegación del proyecto vive en la sidebar', () => {
     renderPage();
     expect(screen.queryByRole('tab', { name: 'Tablero' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Por hacer' })).not.toBeInTheDocument();
 
-    expect(screen.getByRole('link', { name: /revisiones pasadas/i })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/mine/42?returnTo=/dashboard/projects/42',
-    );
-    expect(screen.getByRole('link', { name: /editar información/i })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/mine/form?id=42',
-    );
-    expect(screen.getByRole('button', { name: /editar roles/i })).toBeInTheDocument();
+    // Editar Información/Revisiones Pasadas/Editar Roles/Tablero ya no se
+    // renderizan dentro de esta página: son NavItems de ProjectSidebar.
+    expect(screen.queryByRole('link', { name: /revisiones pasadas/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /editar información/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /editar roles/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /tablero/i })).not.toBeInTheDocument();
     // La opción de editar fecha final ya no vive aquí (irá dentro del formulario
     // de editar información).
     expect(screen.queryByRole('button', { name: /editar fecha final/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /tablero/i })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/42/kanban',
-    );
     // Nunca el diálogo descartado.
     expect(screen.queryByText(/necesitas un rol para continuar/i)).not.toBeInTheDocument();
   });
@@ -193,15 +189,15 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
     expect(filaValor('Cupos totales')).toBe('5');
   });
 
-  it('"Editar roles" abre el Sheet en modo listado con los roles reales', () => {
+  it('?openRoles=1 (enlace "Editar Roles" de la sidebar) abre el Sheet en modo listado con los roles reales', () => {
     mockRoles([rol({ idRolProyecto: 1, nombreRol: 'Frontend' })]);
+    searchParamsMock.mockReturnValue(new URLSearchParams('openRoles=1'));
     renderPage();
-
-    fireEvent.click(screen.getByRole('button', { name: /editar roles/i }));
 
     expect(screen.getByRole('heading', { name: 'Gestionar roles' })).toBeInTheDocument();
     expect(screen.getByText('Roles existentes')).toBeInTheDocument();
     expect(screen.getAllByTestId('role-list-card')).toHaveLength(1);
+    expect(replaceMock).toHaveBeenCalledWith('/dashboard/projects/42');
   });
 
   it('"Agregar rol" abre el Sheet en modo creación', () => {
