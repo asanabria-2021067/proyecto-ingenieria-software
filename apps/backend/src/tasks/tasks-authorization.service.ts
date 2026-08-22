@@ -9,11 +9,12 @@ export class TasksAuthorizationService {
   constructor(private readonly tasksContext: TasksContextService) {}
 
   /**
-   * Crear tarea: exclusivo del líder del proyecto. No hay tarea todavía que
-   * devolver ni participación/asignación que comprobar.
+   * Crear tarea: cualquier miembro con participación activa en el proyecto
+   * (el líder siempre cuenta como tal). No hay tarea todavía que devolver ni
+   * asignación que comprobar.
    */
   async assertCanCreateTask(projectId: number, userId: number, tx?: TxClient): Promise<void> {
-    await this.tasksContext.assertProjectLeader(projectId, userId, tx);
+    await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
   }
 
   /** Editar tarea: exclusivo del líder. */
