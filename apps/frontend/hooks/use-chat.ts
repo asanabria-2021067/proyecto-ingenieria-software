@@ -79,6 +79,8 @@ export function useMarkConversationRead(idProyecto: number) {
 export function useChatSocket(idProyecto: number, activeConversationId: number | null) {
   const queryClient = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
+  const activeConversationIdRef = useRef<number | null>(activeConversationId);
+  activeConversationIdRef.current = activeConversationId;
 
   useEffect(() => {
     const token = getAccessToken();
@@ -117,12 +119,25 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
       queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
     };
 
+    // Las rooms de socket.io viven en la conexión, no en la cuenta: cada
+    // reconexión (red inestable, proxy con idle timeout, etc.) empieza sin
+    // ninguna room unida. Sin este re-join, un solo hiccup de red mata los
+    // mensajes en vivo para el resto de la sesión aunque el socket siga
+    // "conectado" a simple vista.
+    const handleConnect = () => {
+      if (activeConversationIdRef.current != null) {
+        socket.emit('joinConversation', { idConversacion: activeConversationIdRef.current });
+      }
+    };
+
     socket.on('newMessage', handleNewMessage);
     socket.on('conversationUpdated', handleConversationUpdated);
+    socket.on('connect', handleConnect);
 
     return () => {
       socket.off('newMessage', handleNewMessage);
       socket.off('conversationUpdated', handleConversationUpdated);
+      socket.off('connect', handleConnect);
       socket.close();
       socketRef.current = null;
     };
