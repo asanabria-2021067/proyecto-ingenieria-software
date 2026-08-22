@@ -177,11 +177,12 @@ export default function (data) {
   if (!assignParseable || !assignedTask) return;
 
   // El contrato HTTP público no expone un "assignmentId" plano: se deriva de
-  // `asignaciones` (activas, desasignadaEn: null — TASK_SELECT en
-  // tasks.service.ts) buscando la fila del usuario recién asignado, nunca
-  // una propiedad inventada.
-  const asignaciones = Array.isArray(assignedTask.asignaciones) ? assignedTask.asignaciones : [];
-  const activeAssignment = asignaciones.find((a) => a.idUsuario === userId);
+  // `asignacionActiva` (objeto único, TareaResponseDto — tasks.service.ts:145),
+  // nunca una propiedad inventada.
+  const activeAssignment =
+    assignedTask.asignacionActiva && assignedTask.asignacionActiva.idUsuario === userId
+      ? assignedTask.asignacionActiva
+      : null;
 
   const assignmentFound = check(activeAssignment, {
     'kanban: asignación activa presente en la respuesta': (a) => !!a && !!a.idAsignacion,
