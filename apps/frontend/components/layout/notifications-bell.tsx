@@ -102,7 +102,12 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
         align="end"
         sideOffset={8}
         aria-label="Panel de notificaciones"
-        className="w-80 p-0 rounded-xl shadow-xl border border-outline-variant bg-surface-container-lowest opacity-100! z-50 flex flex-col overflow-hidden max-h-[min(28rem,var(--radix-popover-content-available-height,28rem))]"
+        // z-[60]: Sheet/Dialog usan z-50 para su overlay de fondo
+        // (bg-black/50 fixed inset-0); si un Sheet queda montado a la vez
+        // que este popover, ese overlay puede pintarse encima con el mismo
+        // z-index y dejarlo atenuado e inclickeable ("Ver todas" no
+        // respondía). Por encima de esa capa para no competir con ella.
+        className="w-80 p-0 rounded-xl shadow-xl border border-outline-variant bg-surface-container-lowest opacity-100! z-[60] flex flex-col overflow-hidden max-h-[min(28rem,var(--radix-popover-content-available-height,28rem))]"
       >
         {/* Header */}
         <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-outline-variant">
