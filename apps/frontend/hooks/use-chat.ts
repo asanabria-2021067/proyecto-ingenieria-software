@@ -85,7 +85,10 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
     if (!token) return;
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    const wsUrl = apiUrl.replace(/^http/, 'ws');
+    // Mismo criterio que useRealtimeNotifications: el esquema ws/wss sigue
+    // el protocolo real de la página, no el prefijo de NEXT_PUBLIC_API_URL.
+    const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = apiUrl.replace(/^https?/, wsScheme);
     const socket = io(`${wsUrl}/chat`, {
       auth: { token },
       transports: ['websocket', 'polling'],
