@@ -125,7 +125,7 @@ export class ChatService {
       if (existente) return existente;
     }
 
-    return this.prisma.conversacion.create({
+    const conversacion = await this.prisma.conversacion.create({
       data: {
         idProyecto,
         tipo: dto.tipo,
@@ -135,6 +135,11 @@ export class ChatService {
       },
       include: { participantes: { select: { idUsuario: true, usuario: USUARIO_SELECT } } },
     });
+
+    const destinatarios = idsUnicos.filter((id) => id !== userId);
+    this.gateway.notifyConversationCreated(conversacion.idConversacion, destinatarios);
+
+    return conversacion;
   }
 
   /** Historial paginado: 30 mensajes más recientes, o los 30 anteriores a `cursorId`. */
