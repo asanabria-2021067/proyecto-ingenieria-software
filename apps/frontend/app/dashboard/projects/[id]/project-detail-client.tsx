@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, History, Pencil, Settings2 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -52,11 +51,6 @@ function ProjectDetailSkeleton() {
 }
 
 // ─── Vista principal ──────────────────────────────────────────────────────────
-const TAB_BASE =
-  'relative flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-1 text-[13px] font-bold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
-const TAB_ACTIVE = `${TAB_BASE} border-primary text-on-surface`;
-const TAB_INACTIVE = `${TAB_BASE} border-transparent text-tertiary hover:border-outline-variant hover:text-on-surface`;
-
 function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const idProyecto = proyecto.idProyecto;
   const { members } = useProjectMembers(idProyecto);
@@ -207,6 +201,17 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     setRolesSheetAbierto(true);
   };
 
+  // La sidebar del proyecto es la única navegación hacia esta página; "Editar
+  // Roles" no tiene ruta propia (abre este mismo sheet), así que enlaza aquí
+  // con ?openRoles=1 y este efecto lo traduce a abrir el sheet.
+  const openRolesParam = searchParams.get('openRoles');
+  useEffect(() => {
+    if (openRolesParam !== '1' || !isLeader) return;
+    abrirGestionRoles();
+    router.replace(`/dashboard/projects/${idProyecto}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRolesParam, isLeader, idProyecto]);
+
   // Resumen del equipo (Sección 24), todo derivado de datos reales.
   const participantesConfirmados = new Set(members.map((m) => m.idUsuario)).size;
   const cuposTotales = rolesAdmin.reduce((sum, r) => sum + r.cupos, 0);
@@ -249,53 +254,9 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
         )}
       </ProjectSummarySection>
 
-      {/* Barra de navegación estilo Jira: "Resumen" es la página actual (siempre
-          activa). Sprints/Miembros navegan a F3/F12 (rutas reales bajo
-          /dashboard/proyectos/[id], namespace distinto al de esta página mas
-          mismo idProyecto) y se muestran solo al líder porque esos endpoints
-          son exclusivos del líder en backend. */}
-      {(isLeader || puedeVerKanban) && (
-        <div className="my-5 flex items-center gap-5 overflow-x-auto border-b border-outline-variant/50">
-          <span className={TAB_ACTIVE} aria-current="page">
-            Resumen
-          </span>
-          {isLeader && (
-            <Link href={`/dashboard/projects/mine/form?id=${idProyecto}`} className={TAB_INACTIVE}>
-              <Pencil className="size-3.5" aria-hidden="true" />
-              Editar Información
-            </Link>
-          )}
-          {isLeader && (
-            <Link
-              href={`/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`}
-              className={TAB_INACTIVE}
-            >
-              <History className="size-3.5" aria-hidden="true" />
-              Revisiones Pasadas
-            </Link>
-          )}
-          {isLeader && (
-            <button type="button" onClick={abrirGestionRoles} className={TAB_INACTIVE}>
-              <Settings2 className="size-3.5" aria-hidden="true" />
-              Editar Roles
-            </button>
-          )}
-          {isLeader && (
-            <Link href={`/dashboard/proyectos/${idProyecto}/miembros`} className={TAB_INACTIVE}>
-              Miembros
-            </Link>
-          )}
-          {isLeader && (
-            <Link href={`/dashboard/proyectos/${idProyecto}/sprints`} className={TAB_INACTIVE}>
-              Sprints
-            </Link>
-          )}
-          <Link href={kanbanBase} className={TAB_INACTIVE}>
-            Tablero
-            <ArrowRight className="size-3.5" aria-hidden="true" />
-          </Link>
-        </div>
-      )}
+      {/* La navegación entre secciones del proyecto (Editar Información,
+          Revisiones Pasadas, Editar Roles, Miembros, Sprints, Tablero) vive
+          ahora únicamente en la sidebar del workspace (ProjectSidebar). */}
 
       {/* Fila 2: objetivos/roles · detalles/resumen sticky. */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">

@@ -127,25 +127,20 @@ describe('ProjectDetailClient — vista administrativa (Sección 19/21)', () => 
     expect(screen.queryByRole('heading', { name: 'Por hacer' })).not.toBeInTheDocument();
   });
 
-  it('el líder ve "Tablero" que enlaza directamente al workspace (sin selector de rol)', () => {
+  it('el líder no ve controles de "necesitas un rol" (Tablero se navega desde la sidebar)', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
     renderPage();
 
-    const enlaces = screen.getAllByRole('link', { name: /tablero/i });
-    expect(enlaces.length).toBeGreaterThan(0);
-    expect(enlaces[0]).toHaveAttribute('href', '/dashboard/projects/42/kanban');
+    expect(screen.queryByRole('link', { name: /tablero/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/necesitas un rol/i)).not.toBeInTheDocument();
   });
 
-  it('un participante activo (no líder) también ve "Tablero", sin controles exclusivos de líder', () => {
+  it('un participante activo (no líder) no ve controles exclusivos de líder (Tablero se navega desde la sidebar)', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 7 } });
     mockMembers([{ idUsuario: 7, idRolProyecto: 3 }]);
     renderPage();
 
-    expect(screen.getAllByRole('link', { name: /tablero/i })[0]).toHaveAttribute(
-      'href',
-      '/dashboard/projects/42/kanban',
-    );
+    expect(screen.queryByRole('link', { name: /tablero/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /revisiones previas/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /editar información/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /editar roles/i })).not.toBeInTheDocument();
