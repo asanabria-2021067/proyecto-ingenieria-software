@@ -26,7 +26,12 @@ export function useRealtimeNotifications(token: string | null) {
     if (!token) return;
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    const wsUrl = apiUrl.replace(/^http/, 'ws');
+    // El esquema ws/wss se deriva de cómo se sirve la página (no del prefijo
+    // http/https de NEXT_PUBLIC_API_URL): si la página es https y el env var
+    // quedó en http (proxy externo con TLS añadido después del build), un
+    // ws:// literal sería mixed content y el navegador lo bloquearía.
+    const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = apiUrl.replace(/^https?/, wsScheme);
 
     const newSocket = io(`${wsUrl}/notifications`, {
       auth: { token },

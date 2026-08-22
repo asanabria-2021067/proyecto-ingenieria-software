@@ -375,11 +375,13 @@ export function TaskBoard({
 
   const estaBloqueadaPorMutation = (idTarea: number) =>
     cambiarEstadoTarea.isPending && cambiarEstadoTarea.variables?.taskId === idTarea;
-  const estaBloqueadaPorDrag = (idTarea: number) => activeDrag?.taskId === idTarea;
 
   function renderTaskCard(tarea: TareaPublicaDTO) {
     const puedeCambiarEstado = isLeader || esAsignadoActivo(tarea);
-    const bloqueada = estaBloqueadaPorMutation(tarea.idTarea) || estaBloqueadaPorDrag(tarea.idTarea);
+    // No se bloquea por `activeDrag`: hacerlo desmonta el handle de arrastre
+    // (puedeArrastrar en TaskCard) de la propia tarjeta que se está
+    // arrastrando a mitad de gesto, cancelando el drag apenas empieza.
+    const bloqueada = estaBloqueadaPorMutation(tarea.idTarea);
 
     return (
       <TaskCard
