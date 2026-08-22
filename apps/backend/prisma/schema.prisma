@@ -210,6 +210,11 @@ enum EstadoSprint {
   CERRADO
 }
 
+enum TipoConversacion {
+  GRUPAL
+  INDIVIDUAL
+}
+
 model Usuario {
   idUsuario         Int           @id @default(autoincrement()) @map("id_usuario")
   correo            String        @unique @db.VarChar(255)
@@ -257,6 +262,9 @@ model Usuario {
   amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
   siguiendo                        Seguimiento[]              @relation("Siguiendo")
   seguidores                       Seguimiento[]              @relation("Seguidores")
+  conversacionesCreadas            Conversacion[]              @relation("ConversacionesCreadas")
+  conversacionesParticipa          ConversacionParticipante[]
+  mensajesChatEnviados             MensajeChat[]               @relation("MensajesChatEnviados")
 
   @@map("usuario")
 }
@@ -492,6 +500,7 @@ model Proyecto {
   etiquetas         Etiqueta[]
   solicitudesSalida SolicitudSalidaProyecto[]
   sprints           Sprint[]
+  conversaciones    Conversacion[]
 
   @@map("proyecto")
 }
@@ -1018,4 +1027,55 @@ model MensajeRevisionProyecto {
   revision  RevisionProyecto? @relation(fields: [idRevision], references: [idRevisionProyecto])
 
   @@map("mensaje_revision_proyecto")
+}
+
+/// Chat interno del proyecto (líder + miembros con participación activa).
+/// GRUPAL: `nombre` identifica el grupo (ej. "General" o uno creado a mano).
+/// INDIVIDUAL: conversación 1:1 entre exactamente dos participantes;
+/// `nombre` queda null y la unicidad (a lo sumo una conversación INDIVIDUAL
+/// por par de usuarios dentro del proyecto) se garantiza en ChatService
+/// buscando antes de crear, no con una constraint de base de datos.
+model Conversacion {
+  idConversacion Int              @id @default(autoincrement()) @map("id_conversacion")
+  idProyecto     Int              @map("id_proyecto")
+  tipo           TipoConversacion
+  nombre         String?          @db.VarChar(255)
+  creadaPor      Int              @map("creada_por")
+  creadaEn       DateTime         @default(now()) @map("creada_en")
+
+  proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto])
+  creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
+  participantes ConversacionParticipante[]
+  mensajes      MensajeChat[]
+
+  @@index([idProyecto])
+  @@map("conversacion")
+}
+
+model ConversacionParticipante {
+  idConversacion  Int       @map("id_conversacion")
+  idUsuario       Int       @map("id_usuario")
+  agregadoEn      DateTime  @default(now()) @map("agregado_en")
+  ultimaLecturaEn DateTime? @map("ultima_lectura_en")
+
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+  usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@id([idConversacion, idUsuario])
+  @@index([idUsuario])
+  @@map("conversacion_participante")
+}
+
+model MensajeChat {
+  idMensaje      Int      @id @default(autoincrement()) @map("id_mensaje")
+  idConversacion Int      @map("id_conversacion")
+  idRemitente    Int      @map("id_remitente")
+  contenido      String   @db.Text
+  enviadoEn      DateTime @default(now()) @map("enviado_en")
+
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+  remitente    Usuario      @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+
+  @@index([idConversacion, enviadoEn])
+  @@map("mensaje_chat")
 }

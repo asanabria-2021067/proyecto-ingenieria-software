@@ -70,6 +70,7 @@ function UsuarioCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
         ) : (
           <Button
             size="sm"
+            className="text-white hover:text-white"
             onClick={() => crearSolicitud.mutate(usuario.idUsuario)}
             disabled={crearSolicitud.isPending}
           >
