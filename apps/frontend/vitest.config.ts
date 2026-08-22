@@ -35,6 +35,7 @@ export default defineConfig({
         '**/*.spec.tsx',
         '**/*.config.ts',
         'app/**/layout.tsx',
+        '.next/**',
       ],
       thresholds: {
         lines: 30,
