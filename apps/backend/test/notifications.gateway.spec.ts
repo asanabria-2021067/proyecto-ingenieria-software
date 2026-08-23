@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GATEWAY_OPTIONS } from '@nestjs/websockets/constants';
 import { JwtService } from '@nestjs/jwt';
 import { NotificationsGateway } from '../src/notifications/notifications.gateway';
+import { getFrontendUrl } from '../src/common/utils/cookie';
 
 function makeGateway() {
   const gateway = new NotificationsGateway(new JwtService());
@@ -134,7 +135,10 @@ describe('NotificationsGateway', () => {
       const options = Reflect.getMetadata(GATEWAY_OPTIONS, NotificationsGateway);
       expect(options).toMatchObject({
         namespace: '/notifications',
-        cors: { origin: '*', credentials: true },
+        // `origin: '*'` + `credentials: true` es una combinación inválida
+        // para el navegador (nunca funcionó con cookies) — el gateway usa
+        // el mismo FRONTEND_URL que el CORS REST, no un origen fijo.
+        cors: { origin: getFrontendUrl(), credentials: true },
       });
     });
 
