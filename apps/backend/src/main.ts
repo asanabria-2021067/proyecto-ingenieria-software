@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
+import { getFrontendUrl } from './common/utils/cookie';
 const cookieParser = require('cookie-parser');
 
 async function bootstrap() {
@@ -28,7 +29,7 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: getFrontendUrl(),
     credentials: true,
   });
 

@@ -10,7 +10,7 @@ import { getConteoNoLeidas, getNotificaciones, marcarTodasLeidas } from '../lib/
 describe('simulación de procesos de usuario', () => {
   it('flujo líder: login -> crear borrador -> enviar revisión -> cierre', async () => {
     (apiFetch as any)
-      .mockResolvedValueOnce({ accessToken: 'jwt-1' })
+      .mockResolvedValueOnce({ mensaje: 'Sesión iniciada' })
       .mockResolvedValueOnce({ idProyecto: 10, estadoProyecto: 'BORRADOR', tituloProyecto: 'X' })
       .mockResolvedValueOnce({ idProyecto: 10, estadoProyecto: 'EN_REVISION' })
       .mockResolvedValueOnce({ idProyecto: 10, estadoProyecto: 'EN_SOLICITUD_CIERRE' });
@@ -20,7 +20,7 @@ describe('simulación de procesos de usuario', () => {
     const submitted = await submitProjectForReview(created.idProyecto);
     const closeReq = await requestProjectClosure(submitted.idProyecto);
 
-    expect(auth.accessToken).toBe('jwt-1');
+    expect(auth.mensaje).toBe('Sesión iniciada');
     expect(closeReq.estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
   });
 

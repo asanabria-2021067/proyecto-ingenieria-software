@@ -15,7 +15,6 @@ import {
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
 import type { ChatMensaje, CreateConversationPayload } from '@/lib/types/chat';
-import { getAccessToken } from '@/lib/utils/token';
 
 export function useConversations(idProyecto: number) {
   const query = useQuery({
@@ -83,16 +82,14 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
   activeConversationIdRef.current = activeConversationId;
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) return;
-
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     // Mismo criterio que useRealtimeNotifications: el esquema ws/wss sigue
     // el protocolo real de la página, no el prefijo de NEXT_PUBLIC_API_URL.
     const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = apiUrl.replace(/^https?/, wsScheme);
+    // Sesión vía cookie httpOnly access_token (ver useRealtimeNotifications).
     const socket = io(`${wsUrl}/chat`, {
-      auth: { token },
+      withCredentials: true,
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;

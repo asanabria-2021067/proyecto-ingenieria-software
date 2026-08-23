@@ -16,14 +16,14 @@ interface SprintRealtimePayload {
   sprintId: number;
 }
 
-export function useRealtimeNotifications(token: string | null) {
+export function useRealtimeNotifications(enabled: boolean) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [latestNotification, setLatestNotification] = useState<Notification | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!token) return;
+    if (!enabled) return;
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     // El esquema ws/wss se deriva de cómo se sirve la página (no del prefijo
@@ -33,8 +33,11 @@ export function useRealtimeNotifications(token: string | null) {
     const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = apiUrl.replace(/^https?/, wsScheme);
 
+    // La sesión vive en la cookie httpOnly access_token; `withCredentials`
+    // hace que el handshake (polling + upgrade) la adjunte, sin que el JS
+    // del navegador necesite leerla ni pasarla en `auth.token`.
     const newSocket = io(`${wsUrl}/notifications`, {
-      auth: { token },
+      withCredentials: true,
       transports: ['websocket', 'polling'],
     });
 
@@ -89,7 +92,7 @@ export function useRealtimeNotifications(token: string | null) {
       newSocket.off('SPRINT_CLOSED', handleSprintClosed);
       newSocket.close();
     };
-  }, [token, queryClient]);
+  }, [enabled, queryClient]);
 
   return { socket, latestNotification, isConnected };
 }
