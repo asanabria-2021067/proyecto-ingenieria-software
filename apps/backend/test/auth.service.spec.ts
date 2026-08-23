@@ -15,6 +15,7 @@ describe('AuthService', () => {
   it('login retorna token cuando credenciales son validas', async () => {
     const prisma = {
       usuario: { findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', contrasena: 'hash' }) },
+      tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     };
     const jwtService = { sign: vi.fn().mockReturnValue('jwt-token') };
     (bcrypt.compare as Mock).mockResolvedValue(true);
@@ -50,6 +51,7 @@ describe('AuthService', () => {
     const prisma = {
       usuario: { findUnique: vi.fn().mockResolvedValue(null) },
       $transaction: vi.fn(async (cb: (client: unknown) => unknown) => cb(tx)),
+      tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     };
     const jwtService = { sign: vi.fn().mockReturnValue('token-register') };
     (bcrypt.hash as Mock).mockResolvedValue('hashed');
