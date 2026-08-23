@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { clearTokens } from '@/lib/utils/token';
+import { logout } from '@/lib/services/auth';
 import uvgSwal from '@/lib/swal';
 
 /** Confirmación + limpieza de sesión compartida entre DashboardLayout y AdminLayout. */
@@ -22,7 +22,7 @@ export function useLogout() {
 
     if (!result.isConfirmed) return;
 
-    clearTokens();
+    await logout().catch(() => null);
     queryClient.clear();
     router.replace('/login');
   };

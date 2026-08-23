@@ -22,13 +22,16 @@ describe('Controllers and basic services', () => {
   });
 
   it('controllers delegan a sus servicios', async () => {
+    const tokens = { accessToken: 'a.t', refreshToken: 'r.t' };
     const auth = new AuthController(
-      { login: vi.fn(), register: vi.fn() } as unknown as ConstructorParameters<
-        typeof AuthController
-      >[0],
+      {
+        login: vi.fn().mockResolvedValue(tokens),
+        register: vi.fn().mockResolvedValue(tokens),
+      } as unknown as ConstructorParameters<typeof AuthController>[0],
     );
-    auth.login({ correo: 'a', contrasena: 'b' });
-    auth.register({} as Parameters<AuthController['register']>[0]);
+    const res = { cookie: vi.fn() } as unknown as Parameters<AuthController['login']>[1];
+    await auth.login({ correo: 'a', contrasena: 'b' }, res);
+    await auth.register({} as Parameters<AuthController['register']>[0], res);
 
     const usersSvc = {
       getMe: vi.fn(),

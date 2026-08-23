@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
@@ -15,7 +16,6 @@ import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { SidebarNav, flattenNavEntries, type NavEntry } from '@/components/dashboard/SidebarNav';
-import { TokenRefreshManager } from '@/components/TokenRefreshManager';
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
 
@@ -37,10 +37,17 @@ const adminNavItemsMobile = flattenNavEntries(adminNavEntries);
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { data: user, isLoading } = useCurrentUser();
+  const router = useRouter();
+  const { data: user, isLoading, isError } = useCurrentUser();
   const handleLogout = useLogout();
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isLoading && isError) {
+      router.replace('/login');
+    }
+  }, [isLoading, isError, router]);
+
+  if (isLoading || isError) {
     return (
       <div className="h-screen bg-surface flex items-center justify-center">
         <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -68,8 +75,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
-      <TokenRefreshManager />
-
       {/* Sidebar - Desktop Only */}
       <aside
         className="hidden md:flex w-64 h-screen flex-col shrink-0 overflow-y-auto"

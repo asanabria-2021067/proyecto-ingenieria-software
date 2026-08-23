@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useLogin } from '@/hooks/use-login';
+import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { z } from 'zod';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -23,10 +25,20 @@ const loginSchema = z.object({
 });
 
 export default function LoginPage() {
+  const router = useRouter();
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [errores, setErrores] = useState<{ correo?: string; contrasena?: string }>({});
   const { mutate, isPending } = useLogin();
+  // Sesión ya válida (cookie refresh_token de hasta 30 días todavía viva):
+  // no tiene sentido pedir credenciales de nuevo, se manda directo al panel.
+  const { data: user, isSuccess } = useCurrentUser();
+
+  useEffect(() => {
+    if (isSuccess) {
+      router.replace(isAdminUser(user) ? '/dashboard/admin' : '/dashboard');
+    }
+  }, [isSuccess, user, router]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
