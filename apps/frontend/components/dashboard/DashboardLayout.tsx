@@ -18,8 +18,6 @@ import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { SidebarNav, flattenNavEntries, type NavEntry } from '@/components/dashboard/SidebarNav';
-import { TokenRefreshManager } from '@/components/TokenRefreshManager';
-import { getAccessToken } from '@/lib/utils/token';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
@@ -64,8 +62,8 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useCurrentUser();
-  const { latestNotification } = useRealtimeNotifications(getAccessToken());
+  const { data: user, isLoading, isError } = useCurrentUser();
+  const { latestNotification } = useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
 
   useEffect(() => {
@@ -73,6 +71,15 @@ export default function DashboardLayout({
       router.replace('/dashboard/admin');
     }
   }, [user, isLoading, router, allowAdmin]);
+
+  // Sin sesión válida (cookie ausente o refresh_token ya expirado/revocado
+  // tras el reintento silencioso en apiFetch): de vuelta al login en vez de
+  // quedarse atascado en el spinner de isLoading.
+  useEffect(() => {
+    if (!isLoading && isError) {
+      router.replace('/login');
+    }
+  }, [isLoading, isError, router]);
 
   useEffect(() => {
     if (!latestNotification) return;
@@ -101,7 +108,7 @@ export default function DashboardLayout({
     });
   }, [latestNotification, queryClient, router]);
 
-  if (isLoading || (!allowAdmin && isAdminUser(user))) {
+  if (isLoading || isError || (!allowAdmin && isAdminUser(user))) {
     return (
       <div className="h-screen bg-surface flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -114,8 +121,7 @@ export default function DashboardLayout({
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
       </a>
-      <TokenRefreshManager />
-      
+
       {/* Sidebar - Desktop Only */}
       <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-surface-container-low md:flex">
         <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">

@@ -11,10 +11,11 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { extractCookie, getFrontendUrl } from '../common/utils/cookie';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: getFrontendUrl(),
     credentials: true,
   },
   namespace: '/chat',
@@ -32,7 +33,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.replace('Bearer ', '');
+      const token =
+        client.handshake.auth.token ||
+        client.handshake.headers.authorization?.replace('Bearer ', '') ||
+        extractCookie(client.handshake.headers.cookie, 'access_token');
 
       if (!token) {
         this.logger.warn(`Client ${client.id} rejected: no token`);
