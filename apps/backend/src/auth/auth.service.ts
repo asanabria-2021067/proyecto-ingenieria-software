@@ -7,10 +7,12 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
+import { createHash } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, REFRESH_TOKEN_MAX_AGE_MS } from "./cookie.util";
 
 interface ResetTokenPayload {
   tipo: string;
@@ -26,6 +28,27 @@ export class AuthService {
     private jwtService: JwtService,
     private notificationsService: NotificationsService,
   ) {}
+
+  private hashToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  /** Firma el par de tokens y persiste el hash del refresh token para poder revocarlo (logout, rotación). */
+  private async issueTokens(usuario: { idUsuario: number; correo: string }) {
+    const payload = { sub: usuario.idUsuario, correo: usuario.correo };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: ACCESS_TOKEN_TTL });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: REFRESH_TOKEN_TTL });
+
+    await this.prisma.tokenRefresco.create({
+      data: {
+        idUsuario: usuario.idUsuario,
+        tokenHash: this.hashToken(refreshToken),
+        expiraEn: new Date(Date.now() + REFRESH_TOKEN_MAX_AGE_MS),
+      },
+    });
+
+    return { accessToken, refreshToken };
+  }
 
   async login(loginDto: LoginDto) {
     const usuario = await this.prisma.usuario.findUnique({
@@ -45,14 +68,7 @@ export class AuthService {
       throw new UnauthorizedException("Credenciales invalidas");
     }
 
-    const payload = { sub: usuario.idUsuario, correo: usuario.correo };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: "45m" });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: "7d" });
-
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return this.issueTokens(usuario);
   }
 
   async register(registerDto: RegisterDto) {
@@ -88,14 +104,7 @@ export class AuthService {
       return user;
     });
 
-    const payload = { sub: usuario.idUsuario, correo: usuario.correo };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: "45m" });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: "7d" });
-
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return this.issueTokens(usuario);
   }
 
   async forgotPassword(carne: string, correo: string) {
@@ -179,22 +188,35 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
+    let payload: { sub: number; correo: string };
     try {
-      const payload = this.jwtService.verify(refreshToken);
-      const newPayload = { sub: payload.sub, correo: payload.correo };
-      const accessToken = this.jwtService.sign(newPayload, {
-        expiresIn: "45m",
-      });
-      const newRefreshToken = this.jwtService.sign(newPayload, {
-        expiresIn: "7d",
-      });
-
-      return {
-        accessToken,
-        refreshToken: newRefreshToken,
-      };
+      payload = this.jwtService.verify(refreshToken);
     } catch {
       throw new UnauthorizedException("Token de refresco inválido o expirado");
     }
+
+    const tokenHash = this.hashToken(refreshToken);
+    const registro = await this.prisma.tokenRefresco.findUnique({ where: { tokenHash } });
+
+    if (!registro || registro.revocadoEn || registro.expiraEn < new Date()) {
+      throw new UnauthorizedException("Token de refresco inválido o expirado");
+    }
+
+    // Rotación: el token usado queda inválido, uno reintentando reutilizarlo
+    // (robado o duplicado) se topa con `revocadoEn` ya seteado en el siguiente refresh.
+    await this.prisma.tokenRefresco.update({
+      where: { idTokenRefresco: registro.idTokenRefresco },
+      data: { revocadoEn: new Date() },
+    });
+
+    return this.issueTokens({ idUsuario: payload.sub, correo: payload.correo });
+  }
+
+  async logout(refreshToken?: string) {
+    if (!refreshToken) return;
+    await this.prisma.tokenRefresco.updateMany({
+      where: { tokenHash: this.hashToken(refreshToken), revocadoEn: null },
+      data: { revocadoEn: new Date() },
+    });
   }
 }
