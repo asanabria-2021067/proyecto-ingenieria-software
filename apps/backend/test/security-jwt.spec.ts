@@ -169,6 +169,7 @@ describe('AuthService — contenido del payload emitido', () => {
           .fn()
           .mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu.gt', contrasena: 'hash-secreto' }),
       },
+      tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     };
     const sign = vi.fn().mockReturnValue('token');
     const jwtService = { sign } as unknown as JwtServiceType;
@@ -198,6 +199,7 @@ describe('AuthService — contenido del payload emitido', () => {
     const prisma = {
       usuario: { findUnique: vi.fn().mockResolvedValue(null) },
       $transaction: vi.fn(async (cb: (client: unknown) => unknown) => cb(tx)),
+      tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     };
     const sign = vi.fn().mockReturnValue('token');
     const jwtService = { sign } as unknown as JwtServiceType;
