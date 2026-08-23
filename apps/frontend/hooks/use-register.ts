@@ -10,8 +10,7 @@ export function useRegister() {
 
   return useMutation({
     mutationFn: (data: RegisterPayload) => register(data),
-    onSuccess: (res) => {
-      localStorage.setItem('token', res.accessToken);
+    onSuccess: () => {
       uvgSwal.fire({
         icon: 'success',
         title: 'Registro exitoso',

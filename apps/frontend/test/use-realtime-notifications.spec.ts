@@ -44,10 +44,10 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('useRealtimeNotifications — sin token', () => {
-  it('sin token, no crea ningún socket', () => {
+describe('useRealtimeNotifications — deshabilitado', () => {
+  it('con enabled=false, no crea ningún socket', () => {
     const { wrapper } = createWrapper();
-    renderHook(() => useRealtimeNotifications(null), { wrapper });
+    renderHook(() => useRealtimeNotifications(false), { wrapper });
 
     expect(mockIo).not.toHaveBeenCalled();
   });
@@ -58,7 +58,7 @@ describe('useRealtimeNotifications — evento "notification" existente (regresi�
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    const { result } = renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     act(() => {
       socket.__emit('notification', { tipoNotificacion: 'X', tituloNotificacion: 'Hola' });
@@ -76,7 +76,7 @@ describe('useRealtimeNotifications — evento "notification" existente (regresi�
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    const { result } = renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     act(() => {
       socket.__emit('connect');
@@ -96,7 +96,7 @@ describe('useRealtimeNotifications — SPRINT_FINALIZATION_STARTED (F6 START)', 
     mockIo.mockReturnValue(socket);
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     socket.__emit('SPRINT_FINALIZATION_STARTED', { projectId: 42, sprintId: 1 });
 
@@ -110,7 +110,7 @@ describe('useRealtimeNotifications — SPRINT_FINALIZATION_STARTED (F6 START)', 
     mockIo.mockReturnValue(socket);
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     socket.__emit('SPRINT_FINALIZATION_STARTED', { projectId: 17, sprintId: 9 });
 
@@ -127,7 +127,7 @@ describe('useRealtimeNotifications — SPRINT_CLOSED (F6 CLOSE, A9.1)', () => {
     mockIo.mockReturnValue(socket);
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     socket.__emit('SPRINT_CLOSED', { projectId: 42, sprintId: 1 });
 
@@ -141,7 +141,7 @@ describe('useRealtimeNotifications — SPRINT_CLOSED (F6 CLOSE, A9.1)', () => {
     mockIo.mockReturnValue(socket);
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     socket.__emit('SPRINT_CLOSED', { projectId: 17, sprintId: 9 });
 
@@ -156,7 +156,7 @@ describe('useRealtimeNotifications — SPRINT_CLOSED (F6 CLOSE, A9.1)', () => {
     mockIo.mockReturnValue(socket);
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     socket.__emit('SPRINT_CLOSED', { projectId: 42, sprintId: 1 });
 
@@ -171,7 +171,7 @@ describe('useRealtimeNotifications — cleanup', () => {
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper } = createWrapper();
-    const { unmount } = renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    const { unmount } = renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     const onCalls = socket.on.mock.calls as [string, (...a: unknown[]) => void][];
     expect(onCalls.length).toBeGreaterThan(0);
@@ -192,7 +192,7 @@ describe('useRealtimeNotifications — cleanup', () => {
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper } = createWrapper();
-    const { unmount } = renderHook(() => useRealtimeNotifications('token-123'), { wrapper });
+    const { unmount } = renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     expect(socket.__handlerCount('SPRINT_FINALIZATION_STARTED')).toBeGreaterThan(0);
     unmount();
@@ -203,37 +203,39 @@ describe('useRealtimeNotifications — cleanup', () => {
 });
 
 describe('useRealtimeNotifications — sin listeners duplicados', () => {
-  it('un re-render con el mismo token no vuelve a conectar ni a registrar handlers otra vez', () => {
+  it('un re-render con el mismo enabled no vuelve a conectar ni a registrar handlers otra vez', () => {
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper } = createWrapper();
-    const { rerender } = renderHook(({ token }) => useRealtimeNotifications(token), {
+    const { rerender } = renderHook(({ enabled }) => useRealtimeNotifications(enabled), {
       wrapper,
-      initialProps: { token: 'token-123' },
+      initialProps: { enabled: true },
     });
 
     const registrosIniciales = socket.on.mock.calls.length;
     expect(mockIo).toHaveBeenCalledTimes(1);
 
-    rerender({ token: 'token-123' });
+    rerender({ enabled: true });
 
     expect(mockIo).toHaveBeenCalledTimes(1);
     expect(socket.on.mock.calls.length).toBe(registrosIniciales);
   });
 
-  it('un cambio real de token sí desconecta el socket anterior y conecta uno nuevo (remount legítimo, no leak)', () => {
+  it('un cambio real de enabled sí desconecta el socket anterior y conecta uno nuevo (remount legítimo, no leak)', () => {
     const socketA = createMockSocket();
-    const socketB = createMockSocket();
-    mockIo.mockReturnValueOnce(socketA).mockReturnValueOnce(socketB);
+    mockIo.mockReturnValueOnce(socketA);
     const { wrapper } = createWrapper();
-    const { rerender } = renderHook(({ token }) => useRealtimeNotifications(token), {
+    const { rerender } = renderHook(({ enabled }) => useRealtimeNotifications(enabled), {
       wrapper,
-      initialProps: { token: 'token-A' },
+      initialProps: { enabled: false },
     });
 
-    rerender({ token: 'token-B' });
+    rerender({ enabled: true });
+
+    expect(mockIo).toHaveBeenCalledTimes(1);
+
+    rerender({ enabled: false });
 
     expect(socketA.close).toHaveBeenCalledTimes(1);
-    expect(mockIo).toHaveBeenCalledTimes(2);
   });
 });

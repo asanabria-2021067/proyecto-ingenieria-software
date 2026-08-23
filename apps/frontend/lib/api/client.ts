@@ -40,20 +40,52 @@ function joinUrl(base: string, prefix: string, path: string): string {
   return `${normalizedBase}${normalizedPrefix}${normalizedPath}`;
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+// La sesión vive en cookies httpOnly (el JS del navegador no puede leer ni
+// adjuntar el token) — `credentials: 'include'` es lo único necesario para
+// que viajen en cada request, mismo origen o no (requiere CORS credentials
+// true en el backend, ya configurado).
+let refreshPromise: Promise<boolean> | null = null;
+
+function refreshSession(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = fetch(joinUrl(getApiUrl(), API_PREFIX, '/auth/refresh'), {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then((res) => res.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
 }
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+  _retriedAfterRefresh = false,
+): Promise<T> {
   const res = await fetch(joinUrl(getApiUrl(), API_PREFIX, path), {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
       ...(options.headers as Record<string, string>),
     },
   });
+
+  // Access token (1h) expirado a mitad de sesión: un refresh silencioso vía
+  // la cookie refresh_token (30d) evita mandar al usuario de vuelta al login
+  // solo porque dejó la pestaña abierta un rato. Nunca para las propias
+  // rutas /auth/* (evita el loop obvio de reintentar un refresh fallido).
+  if (res.status === 401 && !_retriedAfterRefresh && !path.startsWith('/auth/')) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      return apiFetch<T>(path, options, true);
+    }
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const error = new Error(
@@ -67,16 +99,4 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     return undefined as T;
   }
   return res.json();
-}
-
-export function getUserIdFromToken(): number | null {
-  if (typeof window === 'undefined') return null;
-  const token = localStorage.getItem('token');
-  if (!token) return null;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.sub ?? null;
-  } catch {
-    return null;
-  }
 }
