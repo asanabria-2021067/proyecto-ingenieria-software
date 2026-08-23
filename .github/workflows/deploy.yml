@@ -55,7 +55,7 @@ jobs:
             ${{ steps.vars.outputs.frontend_image }}:${{ github.sha }}
             ${{ steps.vars.outputs.frontend_image }}:latest
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118' }}
+            NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
             RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
             MAIL_FROM=${{ secrets.MAIL_FROM }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
@@ -147,7 +147,7 @@ jobs:
             DB_NAME=uvg_collab
             DB_PORT=5432
             JWT_SECRET=${{ secrets.JWT_SECRET }}
-            NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118' }}
+            NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
             NEXT_PUBLIC_API_PREFIX=/api
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
