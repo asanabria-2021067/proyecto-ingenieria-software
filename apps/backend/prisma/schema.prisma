@@ -265,8 +265,23 @@ model Usuario {
   conversacionesCreadas            Conversacion[]              @relation("ConversacionesCreadas")
   conversacionesParticipa          ConversacionParticipante[]
   mensajesChatEnviados             MensajeChat[]               @relation("MensajesChatEnviados")
+  tokensRefresco                   TokenRefresco[]
 
   @@map("usuario")
+}
+
+model TokenRefresco {
+  idTokenRefresco String    @id @default(uuid()) @map("id_token_refresco")
+  idUsuario       Int       @map("id_usuario")
+  tokenHash       String    @unique @map("token_hash") @db.VarChar(64)
+  expiraEn        DateTime  @map("expira_en")
+  revocadoEn      DateTime? @map("revocado_en")
+  fechaCreacion   DateTime  @default(now()) @map("fecha_creacion")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@index([idUsuario])
+  @@map("token_refresco")
 }
 
 model Amistad {
