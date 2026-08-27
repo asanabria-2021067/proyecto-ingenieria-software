@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Kanban, Users, Rocket, Pencil, History, Settings2 } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, Rocket, Pencil, History, Settings2, ScrollText } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
@@ -53,6 +53,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
     navItems.push(
       { href: `/dashboard/proyectos/${idProyecto}/miembros`, label: 'Miembros', icon: Users },
       { href: `/dashboard/proyectos/${idProyecto}/sprints`, label: 'Sprints', icon: Rocket },
+      { href: `/dashboard/proyectos/${idProyecto}/bitacora`, label: 'Bitácora', icon: ScrollText },
     );
   }
 
