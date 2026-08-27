@@ -5,9 +5,10 @@ import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { SprintsService } from './sprints.service';
 import { HoursRecognitionService } from './hours-recognition.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { BitacoraModule } from '../bitacora/bitacora.module';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, BitacoraModule],
   controllers: [SprintsController],
   providers: [
     SprintsContextService,
