@@ -12,6 +12,8 @@ import {
   SprintDetailHitoDto,
   SprintListItemDto,
 } from './dto/sprint-history.dto';
+import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 
 @Injectable()
 export class SprintsService {
@@ -20,6 +22,10 @@ export class SprintsService {
     private readonly sprintsContext: SprintsContextService,
     private readonly sprintsAuthorization: SprintsAuthorizationService,
     private readonly notificationsService: NotificationsService,
+    // T-164: opcional por el mismo motivo que TasksService.bitacoraEventos —
+    // las suites existentes construyen SprintsService directamente con 4
+    // argumentos posicionales; en producción SprintsModule siempre lo provee.
+    private readonly bitacoraEventos?: BitacoraEventosService,
   ) {}
 
   /**
@@ -63,8 +69,9 @@ export class SprintsService {
       });
       const siguienteNumero = (ultimoSprint?.numero ?? 0) + 1;
 
+      let sprintCreado;
       try {
-        return await tx.sprint.create({
+        sprintCreado = await tx.sprint.create({
           data: {
             idProyecto: projectId,
             numero: siguienteNumero,
@@ -79,6 +86,21 @@ export class SprintsService {
         }
         throw error;
       }
+
+      // T-164: mismo tx que la creación del Sprint — un fallo posterior en
+      // esta transacción revierte también el evento (sin eventos huérfanos).
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.SPRINT_STARTED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintCreado.idSprint,
+        tipoEntidad: 'SPRINT',
+        idEntidad: sprintCreado.idSprint,
+        valorNuevo: { numero: sprintCreado.numero },
+      });
+
+      return sprintCreado;
     });
   }
 
