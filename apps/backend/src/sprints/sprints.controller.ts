@@ -112,4 +112,15 @@ export class SprintsController {
   ) {
     return this.sprintsService.getSprintDetail(projectId, sprintId, user.userId);
   }
+
+  /** T-172: `:sprintId/analytics` nunca colisiona con `:sprintId` (arriba) — distinto número de segmentos, el orden entre ambas es irrelevante. */
+  @Get(':sprintId/analytics')
+  @HttpCode(HttpStatus.OK)
+  getAnalytics(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.getSprintAnalytics(projectId, sprintId, user.userId);
+  }
 }
