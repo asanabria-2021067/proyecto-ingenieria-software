@@ -1,7 +1,9 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   AdjustSprintHoursInput,
+  SprintAnalyticsDto,
   SprintClosingSummaryDto,
+  SprintComparativeAnalyticsDto,
   SprintDetailDto,
   SprintDto,
 } from '@/lib/types/sprints';
@@ -55,4 +57,14 @@ export function adjustSprintHours(
     method: 'PATCH',
     body: JSON.stringify(input),
   });
+}
+
+/** Analítica individual de un Sprint (T-172) — `GET /proyectos/:id/sprints/:sprintId/analytics`. */
+export function getSprintAnalytics(idProyecto: number, idSprint: number): Promise<SprintAnalyticsDto> {
+  return apiFetch<SprintAnalyticsDto>(`/proyectos/${idProyecto}/sprints/${idSprint}/analytics`);
+}
+
+/** Analítica comparativa entre Sprints del proyecto (T-173) — `GET /proyectos/:id/sprints/analytics`. */
+export function getSprintsAnalytics(idProyecto: number): Promise<SprintComparativeAnalyticsDto> {
+  return apiFetch<SprintComparativeAnalyticsDto>(`/proyectos/${idProyecto}/sprints/analytics`);
 }
