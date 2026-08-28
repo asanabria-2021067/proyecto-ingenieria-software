@@ -77,6 +77,23 @@ export class SprintsController {
     return this.sprintsService.getSprintClosingSummary(projectId, sprintId, user.userId);
   }
 
+  /**
+   * T-173: registrada ANTES de `detail(':sprintId')` a propósito — Nest/Express
+   * matchea rutas en orden de registro, y `analytics` (segmento literal)
+   * colisionaría con `:sprintId` (segmento parámetro) si `detail` fuera
+   * primero: una request a `GET .../sprints/analytics` caería en `detail`
+   * con `sprintId='analytics'`, que `ParseIntPipe` rechazaría con 400 en vez
+   * de resolver la analítica comparativa.
+   */
+  @Get('analytics')
+  @HttpCode(HttpStatus.OK)
+  getComparativeAnalytics(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.getSprintsAnalytics(projectId, user.userId);
+  }
+
   @Get()
   @HttpCode(HttpStatus.OK)
   list(
