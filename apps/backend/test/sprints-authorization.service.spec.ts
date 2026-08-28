@@ -121,6 +121,137 @@ describe('SprintsAuthorizationService', () => {
     });
   });
 
+  describe('assertCanViewSprintAnalytics (T-172, HU-143)', () => {
+    it('permite al líder y devuelve el Sprint validado', async () => {
+      const ctx = makeContext();
+      ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      const result = await service.assertCanViewSprintAnalytics(1, 10, LIDER_ID);
+
+      expect(result).toBe(SPRINT);
+    });
+
+    it('permite a un participante con rol activo — HU-143 pide explícitamente "líder o integrante", a diferencia de assertCanViewSprintHistory (F4, exclusivo del líder)', async () => {
+      const ctx = makeContext();
+      ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await expect(
+        service.assertCanViewSprintAnalytics(1, 10, PARTICIPANTE_ID),
+      ).resolves.toBe(SPRINT);
+    });
+
+    it('rechaza a un usuario sin participación activa ni liderazgo', async () => {
+      const ctx = makeContext();
+      ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
+      ctx.assertActiveProjectParticipant.mockRejectedValue(
+        new ForbiddenException('No tienes una participación activa en este proyecto'),
+      );
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await expect(service.assertCanViewSprintAnalytics(1, 10, EXTERNO_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('propaga NotFoundException si el Sprint no existe en el proyecto, sin evaluar participación (aislamiento cross-project)', async () => {
+      const ctx = makeContext();
+      ctx.getSprintInProjectOrThrow.mockRejectedValue(NOT_FOUND_SPRINT());
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await expect(service.assertCanViewSprintAnalytics(1, 999, LIDER_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(ctx.assertActiveProjectParticipant).not.toHaveBeenCalled();
+    });
+
+    it('valida el Sprint dentro del proyecto antes de comprobar participación activa', async () => {
+      const ctx = makeContext();
+      const orden: string[] = [];
+      ctx.getSprintInProjectOrThrow.mockImplementation(async () => {
+        orden.push('sprint');
+        return SPRINT;
+      });
+      ctx.assertActiveProjectParticipant.mockImplementation(async () => {
+        orden.push('participacion');
+      });
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await service.assertCanViewSprintAnalytics(1, 10, LIDER_ID);
+
+      expect(orden).toEqual(['sprint', 'participacion']);
+    });
+
+    it('traslada el cliente transaccional recibido a ambas llamadas de contexto', async () => {
+      const ctx = makeContext();
+      ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await service.assertCanViewSprintAnalytics(1, 10, LIDER_ID, tx);
+
+      expect(ctx.getSprintInProjectOrThrow).toHaveBeenCalledWith(1, 10, tx);
+      expect(ctx.assertActiveProjectParticipant).toHaveBeenCalledWith(1, LIDER_ID, tx);
+    });
+  });
+
+  describe('assertCanListSprintAnalytics (T-173, HU-143)', () => {
+    it('permite al líder del proyecto', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await expect(service.assertCanListSprintAnalytics(1, LIDER_ID)).resolves.toBeUndefined();
+    });
+
+    it('permite a un participante con rol activo', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await expect(
+        service.assertCanListSprintAnalytics(1, PARTICIPANTE_ID),
+      ).resolves.toBeUndefined();
+    });
+
+    it('rechaza a un usuario sin participación activa ni liderazgo', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockRejectedValue(
+        new ForbiddenException('No tienes una participación activa en este proyecto'),
+      );
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await expect(service.assertCanListSprintAnalytics(1, EXTERNO_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('propaga NotFoundException si el proyecto no existe', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockRejectedValue(NOT_FOUND_PROYECTO());
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await expect(service.assertCanListSprintAnalytics(99, LIDER_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('traslada el cliente transaccional recibido', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockResolvedValue(undefined);
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await service.assertCanListSprintAnalytics(1, LIDER_ID, tx);
+
+      expect(ctx.assertActiveProjectParticipant).toHaveBeenCalledWith(1, LIDER_ID, tx);
+    });
+  });
+
   describe.each([
     ['assertCanFinalizeSprint' as const, 'finalizar'],
     ['assertCanCloseSprint' as const, 'cerrar'],
