@@ -30,6 +30,7 @@ vi.mock('socket.io-client', () => ({
 
 import { useRealtimeNotifications } from '../lib/hooks/useRealtimeNotifications';
 import { projectSprintsQueryKey } from '../lib/query-keys/sprints';
+import { projectTasksQueryKey, taskHoursQueryKey } from '../lib/query-keys/tasks';
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -166,6 +167,39 @@ describe('useRealtimeNotifications — SPRINT_CLOSED (F6 CLOSE, A9.1)', () => {
   });
 });
 
+describe('useRealtimeNotifications — TASK_HOURS_LOGGED (HU-142/T-171)', () => {
+  it('invalida project-tasks y task-hours del proyecto/tarea reales del payload', async () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
+
+    socket.__emit('TASK_HOURS_LOGGED', { projectId: 42, taskId: 7, idAsignacion: 99 });
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectTasksQueryKey(42) }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskHoursQueryKey(42, 7) });
+  });
+
+  it('un evento de otra tarea/proyecto invalida solo esas keys, nunca una key hardcodeada de otro id', async () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
+
+    socket.__emit('TASK_HOURS_LOGGED', { projectId: 17, taskId: 3, idAsignacion: 5 });
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskHoursQueryKey(17, 3) }),
+    );
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: taskHoursQueryKey(42, 7) });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: projectSprintsQueryKey(17) });
+  });
+});
+
 describe('useRealtimeNotifications — cleanup', () => {
   it('al desmontar, desregistra cada handler (mismo objeto función registrado en .on) y cierra el socket', () => {
     const socket = createMockSocket();
@@ -198,6 +232,7 @@ describe('useRealtimeNotifications — cleanup', () => {
     unmount();
     expect(socket.__handlerCount('SPRINT_FINALIZATION_STARTED')).toBe(0);
     expect(socket.__handlerCount('SPRINT_CLOSED')).toBe(0);
+    expect(socket.__handlerCount('TASK_HOURS_LOGGED')).toBe(0);
     expect(socket.__handlerCount('notification')).toBe(0);
   });
 });

@@ -17,3 +17,7 @@ export const projectAvanceQueryKey = (idProyecto: number) => ['project-avance', 
 
 export const taskCommentsQueryKey = (idProyecto: number, idTarea: number) =>
   ['task-comments', idProyecto, idTarea] as const;
+
+/** HU-142 (T-171) — mismo criterio de forma que taskCommentsQueryKey. */
+export const taskHoursQueryKey = (idProyecto: number, idTarea: number) =>
+  ['task-hours', idProyecto, idTarea] as const;
