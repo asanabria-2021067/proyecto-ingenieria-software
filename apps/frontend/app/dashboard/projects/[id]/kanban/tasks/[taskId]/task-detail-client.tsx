@@ -183,15 +183,19 @@ function TaskDetailView({
   // HU-141: gestión colaborativa por rol — un participante activo en el
   // MISMO rol que la tarea puede editarla/asignarla/desasignarla sin ser
   // líder. `members` (useProjectMembers) ya trae solo participaciones
-  // ACTIVO (Sección/comentario del hook), así que basta con encontrar la
-  // fila del usuario actual y comparar su idRolProyecto contra el de la
-  // tarea. Una tarea sin rol (tarea.rolProyecto: null) nunca habilita esta
-  // vía — sigue siendo exclusiva del líder, igual que en el backend.
-  const miParticipacionActiva = currentUser
-    ? members.find((m) => m.idUsuario === currentUser.idUsuario)
-    : undefined;
+  // ACTIVO (Sección/comentario del hook). Un usuario puede tener varias
+  // filas ACTIVO en el mismo proyecto (una por rol) — por eso se usa
+  // `.some(...)` sobre TODAS sus participaciones en vez de `.find(...)`
+  // (que solo devolvería la primera y podría negar acceso legítimo a un
+  // usuario multi-rol cuyo rol coincidente no sea el primero). Una tarea
+  // sin rol (tarea.rolProyecto: null) nunca habilita esta vía — sigue
+  // siendo exclusiva del líder, igual que en el backend.
   const mismoRolActivo =
-    tarea.rolProyecto != null && miParticipacionActiva?.idRolProyecto === tarea.rolProyecto.idRolProyecto;
+    currentUser != null &&
+    tarea.rolProyecto != null &&
+    members.some(
+      (m) => m.idUsuario === currentUser.idUsuario && m.idRolProyecto === tarea.rolProyecto!.idRolProyecto,
+    );
   const puedeGestionarTarea = isLeader || mismoRolActivo;
 
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
