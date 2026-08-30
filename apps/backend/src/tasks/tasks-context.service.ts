@@ -95,6 +95,33 @@ export class TasksContextService {
   }
 
   /**
+   * Participación ACTIVO de userId en roleId dentro de projectId — usada por
+   * TasksAuthorizationService (HU-141) para la vía "mismo rol activo" de
+   * assertCanEditTask/assertCanAssignTask/assertCanUnassignTask. Mismo
+   * criterio de filtrado que assertActiveProjectParticipant: nunca compara
+   * por nombreRol, solo por idRolProyecto, y siempre acotado a este proyecto
+   * vía rolProyecto.idProyecto (un idRolProyecto de otro proyecto no puede
+   * colar aquí aunque coincidiera el número).
+   */
+  async getActiveParticipationInRole(
+    projectId: number,
+    userId: number,
+    roleId: number,
+    tx?: TxClient,
+  ) {
+    const db = tx ?? this.prisma;
+    return db.participacionProyecto.findFirst({
+      where: {
+        idUsuario: userId,
+        idRolProyecto: roleId,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto: projectId },
+      },
+      select: { idParticipacion: true },
+    });
+  }
+
+  /**
    * Hito no tiene soft delete en el schema actual (sin columna eliminadoEn),
    * por lo que no se aplica ningún filtro de eliminación: solo existencia y
    * pertenencia al proyecto.
