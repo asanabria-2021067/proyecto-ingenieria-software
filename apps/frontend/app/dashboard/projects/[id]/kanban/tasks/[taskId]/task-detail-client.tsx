@@ -190,12 +190,11 @@ function TaskDetailView({
   // usuario multi-rol cuyo rol coincidente no sea el primero). Una tarea
   // sin rol (tarea.rolProyecto: null) nunca habilita esta vía — sigue
   // siendo exclusiva del líder, igual que en el backend.
+  const idRolTarea = tarea.rolProyecto?.idRolProyecto ?? null;
   const mismoRolActivo =
     currentUser != null &&
-    tarea.rolProyecto != null &&
-    members.some(
-      (m) => m.idUsuario === currentUser.idUsuario && m.idRolProyecto === tarea.rolProyecto!.idRolProyecto,
-    );
+    idRolTarea != null &&
+    members.some((m) => m.idUsuario === currentUser.idUsuario && m.idRolProyecto === idRolTarea);
   const puedeGestionarTarea = isLeader || mismoRolActivo;
 
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
@@ -604,7 +603,7 @@ function TaskDetailView({
           desasignarTarea={desasignarTarea}
           onOpenChange={(open) => setEditarAbierto(open)}
           onRequestDelete={() => setBorrarAbierto(true)}
-          onManageLabels={() => setEtiquetasAbierto(true)}
+          onManageLabels={isLeader ? () => setEtiquetasAbierto(true) : undefined}
         />
       )}
 

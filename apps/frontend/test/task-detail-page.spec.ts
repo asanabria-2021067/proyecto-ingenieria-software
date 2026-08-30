@@ -349,6 +349,25 @@ describe('TaskDetailPage — HU-141 gestión colaborativa por rol', () => {
     expect(screen.queryByRole('menuitem', { name: /Eliminar tarea/ })).not.toBeInTheDocument();
   });
 
+  // Regresión (final-review Issue #1): el diálogo de edición ahora se abre
+  // para `puedeGestionarTarea` (líder o mismo-rol), pero el drawer
+  // <ProjectLabelsDrawer> que "Gestionar etiquetas" debería abrir sigue
+  // gateado solo a `isLeader`. Si `onManageLabels` se pasara sin condicionar,
+  // un colaborador de mismo rol vería el botón sin que hiciera nada al
+  // hacer clic (no drawer). Se verifica que el botón ni siquiera se renderiza.
+  it('un colaborador activo en el MISMO rol NO ve "Gestionar etiquetas" al abrir el formulario de edición', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
+    (useProjectMembers as any).mockReturnValue({
+      members: [{ idUsuario: 2, nombre: 'Beto', apellido: 'Ruiz', correo: 'beto@uvg.edu.gt', fotoUrl: null, idRolProyecto: 3 }],
+    });
+    mockTasks({ tasks: [tarea({ rolProyecto: { idRolProyecto: 3, nombreRol: 'Backend' } })] });
+    renderDetail();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Implementar login' }));
+    expect(screen.getByText('Actualiza la información de la tarea. Los cambios se reflejarán en el tablero.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Gestionar etiquetas del proyecto' })).not.toBeInTheDocument();
+  });
+
   it('un colaborador con un rol DIFERENTE al de la tarea no ve Editar ni Más', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
     (useProjectMembers as any).mockReturnValue({
