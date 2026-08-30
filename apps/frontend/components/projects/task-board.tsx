@@ -805,6 +805,7 @@ export function TaskBoard({
           members={members}
           labels={labels}
           isLeader={isLeader}
+          puedeGestionarTarea={isLeader}
           crearTarea={crearTarea}
           editarTarea={editarTarea}
           asignarTarea={asignarTarea}
