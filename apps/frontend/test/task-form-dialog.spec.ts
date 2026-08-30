@@ -99,6 +99,7 @@ function renderDialog(overrides: Record<string, unknown> = {}) {
     members: [miembro({ idUsuario: 5, idRolProyecto: 1 }), miembro({ idUsuario: 9, idRolProyecto: 2, nombre: 'Beto', apellido: 'Ruiz' })],
     labels: [etiqueta()],
     isLeader: true,
+    puedeGestionarTarea: true,
     crearTarea: mutationStub(),
     editarTarea: mutationStub(),
     asignarTarea: mutationStub(),
@@ -605,5 +606,15 @@ describe('TaskFormDialog — desasignar desde el pie', () => {
     await waitFor(() =>
       expect(desasignarTarea.mutateAsync).toHaveBeenCalledWith({ taskId: 1 }),
     );
+  });
+
+  it('aparece para un colaborador del mismo rol sin ser líder (puedeGestionarTarea sin isLeader)', () => {
+    renderDialog({ mode: 'edit', task: asignada(), isLeader: false, puedeGestionarTarea: true });
+    expect(screen.getByRole('button', { name: 'Desasignar tarea' })).toBeInTheDocument();
+  });
+
+  it('no aparece cuando ni es líder ni comparte el rol de la tarea (puedeGestionarTarea: false)', () => {
+    renderDialog({ mode: 'edit', task: asignada(), isLeader: false, puedeGestionarTarea: false });
+    expect(screen.queryByRole('button', { name: 'Desasignar tarea' })).not.toBeInTheDocument();
   });
 });
