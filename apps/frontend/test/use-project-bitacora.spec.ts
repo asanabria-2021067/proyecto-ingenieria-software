@@ -74,6 +74,26 @@ describe('useProjectBitacora', () => {
     expect(getProjectBitacora).not.toHaveBeenCalled();
   });
 
+  it('no dispara la query cuando habilitado=false, aunque idProyecto sea válido', () => {
+    (getProjectBitacora as any).mockResolvedValue(paginado());
+    const { wrapper } = createWrapper();
+
+    renderHook(() => useProjectBitacora(7, { page: 1, limit: 20 }, false), { wrapper });
+
+    expect(getProjectBitacora).not.toHaveBeenCalled();
+  });
+
+  it('habilitado=true (default) dispara la query normalmente', async () => {
+    (getProjectBitacora as any).mockResolvedValue(paginado());
+    const { wrapper } = createWrapper();
+
+    renderHook(() => useProjectBitacora(7, { page: 1, limit: 20 }, true), { wrapper });
+
+    await waitFor(() => {
+      expect(getProjectBitacora).toHaveBeenCalled();
+    });
+  });
+
   it('refleja los datos resueltos (eventos, total, totalPages) una vez cargados', async () => {
     const respuesta = paginado({
       data: [{ idAuditoria: 1, tipoEvento: 'TASK_CREATED' }],
