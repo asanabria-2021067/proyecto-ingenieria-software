@@ -24,7 +24,18 @@ export class BitacoraContextService {
     return proyecto;
   }
 
-  /** T-164: la bitácora es exclusiva del líder — a diferencia de tareas/tasks (líder o participante activo). */
+  /**
+   * T-164: la bitácora es exclusiva del líder — a diferencia de tareas/tasks
+   * (líder o participante activo).
+   *
+   * Se mantiene esta validación en el backend a propósito: es la única
+   * capa que no se puede saltar (un cliente podría llamar al endpoint
+   * directamente sin pasar por el frontend). El frontend ya evita disparar
+   * la petición cuando el usuario identificado vía la cookie JWT no es
+   * líder (ver `useIsProjectLeader` + `useProjectBitacora`), lo que resuelve
+   * la carga innecesaria al backend sin depender únicamente del cliente
+   * para autorizar.
+   */
   async assertProjectLeader(projectId: number, userId: number): Promise<void> {
     const proyecto = await this.getProjectOrThrow(projectId);
     if (proyecto.creadoPor !== userId) {
