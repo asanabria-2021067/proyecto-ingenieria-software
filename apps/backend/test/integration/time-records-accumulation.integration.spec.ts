@@ -74,6 +74,12 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const assignmentIds = scope.assignmentIds ?? [];
     if (assignmentIds.length > 0) {
       await prisma.registroTiempoTarea.deleteMany({ where: { idAsignacion: { in: assignmentIds } } });
+      // closeAssignment (usado en los tests de inmutabilidad e historial de
+      // tramos) crea también un RegistroAvanceAsignacion por cada cierre —
+      // mismo FK RESTRICT que bloquea el deleteMany de asignacionTarea en
+      // cleanupIntegrationFixtures si no se limpia antes (ver
+      // assignment-hours-immutability.integration.spec.ts, mismo patrón).
+      await prisma.registroAvanceAsignacion.deleteMany({ where: { idAsignacion: { in: assignmentIds } } });
     }
     await cleanupIntegrationFixtures(prisma, scope);
   });
