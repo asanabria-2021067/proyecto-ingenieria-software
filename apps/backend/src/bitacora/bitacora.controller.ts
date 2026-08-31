@@ -2,9 +2,9 @@ import { BadRequestException, Controller, Get, Param, ParseIntPipe, Query, UseGu
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BitacoraConsultaService } from './bitacora-consulta.service';
-import { TipoEventoBitacora } from './tipos-evento-bitacora';
+import { TipoEventoBitacora, TipoEventoBitacoraValor } from './tipos-evento-bitacora';
 
-const TIPOS_EVENTO_VALIDOS = Object.values(TipoEventoBitacora);
+const TIPOS_EVENTO_VALIDOS = TipoEventoBitacora.VALORES;
 
 /** Mismo criterio de límite que ProjectsController.findAll (tope 50, default 20). */
 function parsePaginationParam(value: string | undefined, fallback: number, max: number): number {
@@ -26,14 +26,14 @@ function parsePositiveIntParam(value: string | undefined, fieldName: string): nu
   return parsed;
 }
 
-function parseTipoEventoParam(value: string | undefined): TipoEventoBitacora | undefined {
+function parseTipoEventoParam(value: string | undefined): TipoEventoBitacoraValor | undefined {
   if (value === undefined) {
     return undefined;
   }
-  if (!TIPOS_EVENTO_VALIDOS.includes(value as TipoEventoBitacora)) {
+  if (!TIPOS_EVENTO_VALIDOS.includes(value as TipoEventoBitacoraValor)) {
     throw new BadRequestException(`tipoEvento debe ser uno de: ${TIPOS_EVENTO_VALIDOS.join(', ')}`);
   }
-  return value as TipoEventoBitacora;
+  return value as TipoEventoBitacoraValor;
 }
 
 /** T-164: bitácora semántica de Sprint (HU-140) — exclusiva del líder del proyecto. */
