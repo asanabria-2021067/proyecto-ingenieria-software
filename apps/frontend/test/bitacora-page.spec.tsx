@@ -124,6 +124,30 @@ describe('BitacoraPage — autorización (exclusiva del líder)', () => {
     expect(screen.queryByText('¡No eres líder!')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Bitácora' })).toBeInTheDocument();
   });
+
+  it('un no-líder NUNCA dispara la petición al backend (useProjectBitacora recibe habilitado=false)', () => {
+    mockLeader(false);
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[2]).toBe(false);
+  });
+
+  it('el líder SÍ dispara la petición (useProjectBitacora recibe habilitado=true)', () => {
+    mockLeader(true);
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[2]).toBe(true);
+  });
 });
 
 describe('BitacoraPage — loading', () => {
