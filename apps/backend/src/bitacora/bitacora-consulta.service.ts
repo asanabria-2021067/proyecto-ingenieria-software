@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BitacoraContextService } from './bitacora-context.service';
-import { TipoEntidadBitacora, TipoEventoBitacora } from './tipos-evento-bitacora';
+import { TipoEntidadBitacora, TipoEventoBitacora, TipoEventoBitacoraValor } from './tipos-evento-bitacora';
 import { BitacoraPaginadaDto, EventoBitacoraDto, FiltrosBitacoraInput } from './dto/bitacora-evento.dto';
 
 /** Mismo subconjunto público de Usuario que HISTORY_USUARIO_SELECT (sprints.service.ts) — nunca el objeto completo. */
@@ -50,7 +50,7 @@ export class BitacoraConsultaService {
     const { idSprint, idActor, tipoEvento, page, limit } = filtros;
 
     const andConditions: Prisma.BitacoraAuditoriaWhereInput[] = [
-      { accion: tipoEvento ? tipoEvento : { in: Object.values(TipoEventoBitacora) } },
+      { accion: tipoEvento ? tipoEvento : { in: [...TipoEventoBitacora.VALORES] } },
       { detalleJson: { path: ['idProyecto'], equals: projectId } },
     ];
     if (idSprint !== undefined) {
@@ -89,7 +89,7 @@ export class BitacoraConsultaService {
 
     return {
       idAuditoria: row.idAuditoria,
-      tipoEvento: row.accion as TipoEventoBitacora,
+      tipoEvento: row.accion as TipoEventoBitacoraValor,
       tipoEntidad: row.tipoObjeto as TipoEntidadBitacora,
       idEntidad: Number(row.idObjeto),
       idProyecto: detalle.idProyecto as number,
