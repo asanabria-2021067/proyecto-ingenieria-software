@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { TipoEntidadBitacora, TipoEventoBitacora } from './tipos-evento-bitacora';
+import { TipoEntidadBitacora, TipoEventoBitacoraValor } from './tipos-evento-bitacora';
 
 export interface RegistrarEventoBitacoraInput {
   /**
@@ -12,7 +12,7 @@ export interface RegistrarEventoBitacoraInput {
    * best-effort como NotificationsService).
    */
   tx: Prisma.TransactionClient;
-  tipoEvento: TipoEventoBitacora;
+  tipoEvento: TipoEventoBitacoraValor;
   idActor: number;
   idProyecto: number;
   idSprint?: number | null;
