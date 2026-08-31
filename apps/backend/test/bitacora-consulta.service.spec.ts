@@ -59,7 +59,7 @@ describe('BitacoraConsultaService.listEventos', () => {
     await service.listEventos(5, 9, { page: 1, limit: 20 });
 
     const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
-    expect(llamada.where.AND).toContainEqual({ accion: { in: Object.values(TipoEventoBitacora) } });
+    expect(llamada.where.AND).toContainEqual({ accion: { in: [...TipoEventoBitacora.VALORES] } });
     expect(llamada.where.AND).toContainEqual({ detalleJson: { path: ['idProyecto'], equals: 5 } });
   });
 
@@ -134,9 +134,11 @@ describe('BitacoraConsultaService.listEventos', () => {
 
   it('nunca expone filas de AuditInterceptor: el filtro accion IN excluye "METHOD /url" técnico', async () => {
     // AuditInterceptor escribe accion = `${method} ${url}` (p. ej. "POST
-    // /api/proyectos/5/tareas"), un valor que nunca pertenece al enum
-    // TipoEventoBitacora — este test documenta esa garantía de aislamiento
-    // técnico/funcional a nivel de contrato del filtro, no de datos reales.
-    expect(Object.values(TipoEventoBitacora)).not.toContain('POST /api/proyectos/5/tareas');
+    // /api/proyectos/5/tareas"), un valor que nunca pertenece al catálogo
+    // TipoEventoBitacora.VALORES — este test documenta esa garantía de
+    // aislamiento técnico/funcional a nivel de contrato del filtro, no de
+    // datos reales. Se usa VALORES explícito (no Object.values(clase), que
+    // también expondría el propio arreglo VALORES como "valor").
+    expect(TipoEventoBitacora.VALORES).not.toContain('POST /api/proyectos/5/tareas');
   });
 });
