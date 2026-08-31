@@ -7,14 +7,34 @@
  * de `Date` — mismo criterio que `SprintDto`/`TareaPublicaDTO`.
  */
 
-export type TipoEventoBitacora =
-  | 'TASK_CREATED'
-  | 'TASK_UPDATED'
-  | 'TASK_STATUS_CHANGED'
-  | 'TASK_ASSIGNED'
-  | 'TASK_REASSIGNED'
-  | 'TASK_HOURS_LOGGED'
-  | 'SPRINT_STARTED';
+/**
+ * Clase con constantes `static readonly` (no un `type` de union de
+ * strings), reflejando la misma decisión tomada en el backend — agregar un
+ * evento nuevo (p. ej. los de cambio de atributos de tarea de HU-141) es
+ * agregar una línea aquí y en `VALORES`.
+ */
+export class TipoEventoBitacora {
+  static readonly TASK_CREATED = 'TASK_CREATED' as const;
+  static readonly TASK_UPDATED = 'TASK_UPDATED' as const;
+  static readonly TASK_STATUS_CHANGED = 'TASK_STATUS_CHANGED' as const;
+  static readonly TASK_ASSIGNED = 'TASK_ASSIGNED' as const;
+  static readonly TASK_REASSIGNED = 'TASK_REASSIGNED' as const;
+  static readonly TASK_HOURS_LOGGED = 'TASK_HOURS_LOGGED' as const;
+  static readonly SPRINT_STARTED = 'SPRINT_STARTED' as const;
+
+  static readonly VALORES = [
+    'TASK_CREATED',
+    'TASK_UPDATED',
+    'TASK_STATUS_CHANGED',
+    'TASK_ASSIGNED',
+    'TASK_REASSIGNED',
+    'TASK_HOURS_LOGGED',
+    'SPRINT_STARTED',
+  ] as const;
+}
+
+/** Tipo derivado del catálogo — usar este nombre (no `TipoEventoBitacora`) en anotaciones de tipo. */
+export type TipoEventoBitacoraValor = (typeof TipoEventoBitacora.VALORES)[number];
 
 export type TipoEntidadBitacora = 'TAREA' | 'SPRINT';
 
@@ -28,7 +48,7 @@ export interface BitacoraActorDto {
 
 export interface EventoBitacoraDto {
   idAuditoria: number;
-  tipoEvento: TipoEventoBitacora;
+  tipoEvento: TipoEventoBitacoraValor;
   tipoEntidad: TipoEntidadBitacora;
   idEntidad: number;
   idProyecto: number;
@@ -51,7 +71,7 @@ export interface BitacoraPaginadaDto {
 export interface FiltrosBitacora {
   idSprint?: number;
   idActor?: number;
-  tipoEvento?: TipoEventoBitacora;
+  tipoEvento?: TipoEventoBitacoraValor;
   page?: number;
   limit?: number;
 }
