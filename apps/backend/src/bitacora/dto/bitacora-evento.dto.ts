@@ -1,4 +1,4 @@
-import { TipoEntidadBitacora, TipoEventoBitacora } from '../tipos-evento-bitacora';
+import { TipoEntidadBitacora, TipoEventoBitacoraValor } from '../tipos-evento-bitacora';
 
 /** Mismo subconjunto público de Usuario que HISTORY_USUARIO_SELECT (sprints.service.ts) — nunca el objeto completo. */
 export interface BitacoraActorDto {
@@ -16,7 +16,7 @@ export interface BitacoraActorDto {
  */
 export interface EventoBitacoraDto {
   idAuditoria: number;
-  tipoEvento: TipoEventoBitacora;
+  tipoEvento: TipoEventoBitacoraValor;
   tipoEntidad: TipoEntidadBitacora;
   idEntidad: number;
   idProyecto: number;
@@ -38,7 +38,7 @@ export interface BitacoraPaginadaDto {
 export interface FiltrosBitacoraInput {
   idSprint?: number;
   idActor?: number;
-  tipoEvento?: TipoEventoBitacora;
+  tipoEvento?: TipoEventoBitacoraValor;
   page: number;
   limit: number;
 }
