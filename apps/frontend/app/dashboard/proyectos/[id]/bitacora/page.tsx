@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectBitacora } from '@/hooks/use-project-bitacora';
@@ -30,12 +31,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import type { EventoBitacoraDto, TipoEventoBitacora } from '@/lib/types/bitacora';
+import type { EventoBitacoraDto, TipoEventoBitacoraValor } from '@/lib/types/bitacora';
 
 const LIMITE_POR_PAGINA = 20;
 
-/** Exhaustivo por diseño: un TipoEventoBitacora nuevo en el backend rompe la compilación en vez de mostrarse en blanco. */
-const EVENTO_STYLE: Record<TipoEventoBitacora, { label: string; icon: typeof ClipboardList }> = {
+/** Exhaustivo por diseño: un TipoEventoBitacoraValor nuevo en el backend rompe la compilación en vez de mostrarse en blanco. */
+const EVENTO_STYLE: Record<TipoEventoBitacoraValor, { label: string; icon: typeof ClipboardList }> = {
   TASK_CREATED: { label: 'Tarea creada', icon: ListPlus },
   TASK_UPDATED: { label: 'Tarea actualizada', icon: Pencil },
   TASK_STATUS_CHANGED: { label: 'Cambio de estado', icon: ArrowRightLeft },
@@ -140,8 +141,11 @@ export default function BitacoraPage() {
   const [tipoEventoFiltro, setTipoEventoFiltro] = useState<string>('');
 
   const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
-  const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
-  const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
+  const { isLoading: cargandoUsuario } = useCurrentUser();
+  // Validación de rol vía el usuario identificado por la cookie JWT httpOnly
+  // (ver hooks/use-is-project-leader.ts) — misma fuente de verdad que usa
+  // ProjectSidebar para decidir si mostrar el enlace "Bitácora".
+  const isLeader = useIsProjectLeader(idProyecto);
 
   const { sprints } = useProjectSprints(idProyecto);
   const { members } = useProjectMembers(idProyecto);
@@ -149,11 +153,18 @@ export default function BitacoraPage() {
   const filtros = {
     idSprint: idSprintFiltro ? Number(idSprintFiltro) : undefined,
     idActor: idActorFiltro ? Number(idActorFiltro) : undefined,
-    tipoEvento: tipoEventoFiltro ? (tipoEventoFiltro as TipoEventoBitacora) : undefined,
+    tipoEvento: tipoEventoFiltro ? (tipoEventoFiltro as TipoEventoBitacoraValor) : undefined,
     page,
     limit: LIMITE_POR_PAGINA,
   };
-  const { eventos, totalPages, isLoading, isError, error, refetch } = useProjectBitacora(idProyecto, filtros);
+  // `habilitado: isLeader` evita disparar la petición mientras no se sabe
+  // que el usuario (identificado vía la cookie JWT) es líder — el backend
+  // respondería 403 igual, pero no hace falta pedirlo.
+  const { eventos, totalPages, isLoading, isError, error, refetch } = useProjectBitacora(
+    idProyecto,
+    filtros,
+    isLeader,
+  );
 
   const cargando = isLoading || cargandoProyecto || cargandoUsuario;
 
@@ -220,7 +231,7 @@ export default function BitacoraPage() {
               className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface"
             >
               <option value="">Todos los tipos</option>
-              {(Object.keys(EVENTO_STYLE) as TipoEventoBitacora[]).map((tipo) => (
+              {(Object.keys(EVENTO_STYLE) as TipoEventoBitacoraValor[]).map((tipo) => (
                 <option key={tipo} value={tipo}>
                   {EVENTO_STYLE[tipo].label}
                 </option>
