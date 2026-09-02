@@ -95,3 +95,23 @@ export function filterTasksBySprint<T extends TareaFiltrable>(
   if (sprintId === null) return lista.filter((tarea) => (tarea.idSprint ?? null) === null);
   return lista.filter((tarea) => tarea.idSprint === sprintId);
 }
+
+/**
+ * Búsqueda por texto libre sobre `tituloTarea` y `descripcionTarea`.
+ * Insensible a mayúsculas/minúsculas y por coincidencia parcial (substring).
+ * Una consulta vacía o solo espacios devuelve una copia superficial sin
+ * filtrar. Preserva el orden de entrada.
+ */
+export function searchTasks<T extends TareaFiltrable>(
+  tasks: ListaTareas<T>,
+  query: string | null | undefined,
+): T[] {
+  const lista = tasks ?? [];
+  const termino = (query ?? '').trim().toLowerCase();
+  if (termino === '') return [...lista];
+  return lista.filter((tarea) => {
+    const titulo = tarea.tituloTarea.toLowerCase();
+    const descripcion = (tarea.descripcionTarea ?? '').toLowerCase();
+    return titulo.includes(termino) || descripcion.includes(termino);
+  });
+}
