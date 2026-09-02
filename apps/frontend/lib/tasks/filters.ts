@@ -47,6 +47,21 @@ export const FILTRO_TODOS = 'todos';
 export type FiltroEstado = EstadoTarea | typeof FILTRO_TODOS;
 export type FiltroPrioridad = Prioridad | typeof FILTRO_TODOS;
 
+/**
+ * Orden canónico de prioridad usado en todo el repo
+ * (misma tabla que `components/projects/task-board.utils.ts` y que
+ * `compareTareas` del backend): ALTA antes que MEDIA antes que BAJA.
+ */
+const PRIORIDAD_ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
+
+/** Orden de estado según las columnas fijas del tablero. */
+const ESTADO_ORDEN: Record<EstadoTarea, number> = {
+  POR_HACER: 0,
+  EN_PROGRESO: 1,
+  EN_REVISION: 2,
+  HECHO: 3,
+};
+
 // --- Filtros ---------------------------------------------------------------
 
 /**
@@ -113,5 +128,79 @@ export function searchTasks<T extends TareaFiltrable>(
     const titulo = tarea.tituloTarea.toLowerCase();
     const descripcion = (tarea.descripcionTarea ?? '').toLowerCase();
     return titulo.includes(termino) || descripcion.includes(termino);
+  });
+}
+
+// --- Ordenamiento --------------------------------------------------------
+
+export type CriterioOrdenTarea =
+  | 'fechaLimite'
+  | 'fechaCreacion'
+  | 'prioridad'
+  | 'estado'
+  | 'titulo';
+
+export type DireccionOrden = 'asc' | 'desc';
+
+function compararCampoNoNulo<T extends TareaFiltrable>(
+  a: T,
+  b: T,
+  criterio: 'prioridad' | 'estado' | 'titulo',
+): number {
+  switch (criterio) {
+    case 'prioridad':
+      return PRIORIDAD_ORDEN[a.prioridad] - PRIORIDAD_ORDEN[b.prioridad];
+    case 'estado':
+      return ESTADO_ORDEN[a.estadoTarea] - ESTADO_ORDEN[b.estadoTarea];
+    case 'titulo':
+      return a.tituloTarea.localeCompare(b.tituloTarea, 'es', { sensitivity: 'base' });
+  }
+}
+
+/**
+ * Ordena por un único criterio. No muta la entrada.
+ *
+ * - `prioridad`: ALTA → MEDIA → BAJA en `asc`.
+ * - `estado`: POR_HACER → EN_PROGRESO → EN_REVISION → HECHO en `asc`.
+ * - `titulo`: alfabético español, sin distinguir mayúsculas ni acentos.
+ * - `fechaLimite` / `fechaCreacion`: comparación directa de string ISO
+ *   (YYYY-MM-DD…). Las tareas sin fecha (`null`/`undefined`/`''`) quedan
+ *   SIEMPRE al final, tanto en `asc` como en `desc`.
+ *
+ * `direction` invierte el criterio principal, nunca el desempate: ante
+ * valores repetidos el orden final es estable y determinista por `idTarea`
+ * ascendente.
+ */
+export function sortTasks<T extends TareaFiltrable>(
+  tasks: ListaTareas<T>,
+  criteria: CriterioOrdenTarea,
+  direction: DireccionOrden = 'asc',
+): T[] {
+  const lista = tasks ?? [];
+  const factor = direction === 'desc' ? -1 : 1;
+
+  if (criteria === 'fechaLimite' || criteria === 'fechaCreacion') {
+    const valor = (tarea: T): string | null => {
+      const bruto = criteria === 'fechaLimite' ? tarea.fechaLimite : tarea.fechaCreacion;
+      return bruto == null || bruto === '' ? null : bruto;
+    };
+    const conFecha: T[] = [];
+    const sinFecha: T[] = [];
+    for (const tarea of lista) {
+      (valor(tarea) === null ? sinFecha : conFecha).push(tarea);
+    }
+    conFecha.sort((a, b) => {
+      const va = valor(a) as string;
+      const vb = valor(b) as string;
+      const dif = va < vb ? -1 : va > vb ? 1 : 0;
+      return dif !== 0 ? dif * factor : a.idTarea - b.idTarea;
+    });
+    sinFecha.sort((a, b) => a.idTarea - b.idTarea);
+    return [...conFecha, ...sinFecha];
+  }
+
+  return [...lista].sort((a, b) => {
+    const dif = compararCampoNoNulo(a, b, criteria);
+    return dif !== 0 ? dif * factor : a.idTarea - b.idTarea;
   });
 }
