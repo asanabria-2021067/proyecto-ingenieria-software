@@ -204,3 +204,58 @@ export function sortTasks<T extends TareaFiltrable>(
     return dif !== 0 ? dif * factor : a.idTarea - b.idTarea;
   });
 }
+
+// --- Paginación --------------------------------------------------------
+
+export interface ResultadoPaginado<T> {
+  /** Tareas de la página pedida; `[]` si la página está fuera de rango. */
+  items: T[];
+  /** Página solicitada, tal cual se recibió (no se normaliza). */
+  pagina: number;
+  /** Tamaño de página efectivo (mínimo 1). */
+  tamanioPagina: number;
+  /** Total de tareas de entrada. */
+  totalItems: number;
+  /** Nº de páginas completas/parciales; `0` si no hay tareas. */
+  totalPaginas: number;
+  /** `true` si `pagina` es un entero dentro de `[1, totalPaginas]`. */
+  paginaEnRango: boolean;
+  hayAnterior: boolean;
+  haySiguiente: boolean;
+}
+
+/**
+ * Pagina el arreglo con páginas indexadas desde 1. No muta la entrada.
+ *
+ * - `pageSize` se normaliza a un entero ≥ 1.
+ * - Página fuera de rango (`< 1`, `> totalPaginas`, o no entera) ⇒
+ *   `items: []` y `paginaEnRango: false`; NO se recorta a la última página,
+ *   para poder distinguir "última página" de "fuera de rango".
+ * - `pageSize` mayor que el total ⇒ la primera página trae todas las tareas.
+ * - Entrada vacía/`undefined` ⇒ `items: []`, `totalPaginas: 0`.
+ */
+export function paginateTasks<T>(
+  tasks: ListaTareas<T>,
+  page: number,
+  pageSize: number,
+): ResultadoPaginado<T> {
+  const lista = tasks ?? [];
+  const totalItems = lista.length;
+  const tamanioPagina = Math.max(1, Math.floor(pageSize) || 1);
+  const totalPaginas = Math.ceil(totalItems / tamanioPagina);
+  const paginaEnRango = Number.isInteger(page) && page >= 1 && page <= totalPaginas;
+
+  const inicio = paginaEnRango ? (page - 1) * tamanioPagina : 0;
+  const items = paginaEnRango ? lista.slice(inicio, inicio + tamanioPagina) : [];
+
+  return {
+    items,
+    pagina: page,
+    tamanioPagina,
+    totalItems,
+    totalPaginas,
+    paginaEnRango,
+    hayAnterior: paginaEnRango && page > 1,
+    haySiguiente: paginaEnRango && page < totalPaginas,
+  };
+}
