@@ -259,3 +259,53 @@ export function paginateTasks<T>(
     haySiguiente: paginaEnRango && page < totalPaginas,
   };
 }
+
+// --- Agrupación --------------------------------------------------------
+
+export interface GrupoTareas<T> {
+  /** Clave del grupo; `null` reúne las tareas sin proyecto/sprint. */
+  clave: number | null;
+  tareas: T[];
+}
+
+function agrupar<T>(
+  tasks: ListaTareas<T>,
+  clavear: (tarea: T) => number | null,
+): GrupoTareas<T>[] {
+  const grupos = new Map<number | null, T[]>();
+  for (const tarea of tasks ?? []) {
+    const clave = clavear(tarea);
+    const grupo = grupos.get(clave);
+    if (grupo) grupo.push(tarea);
+    else grupos.set(clave, [tarea]);
+  }
+  return [...grupos.entries()]
+    .sort(([a], [b]) => {
+      if (a === b) return 0;
+      if (a === null) return 1; // "sin proyecto/sprint" siempre al final
+      if (b === null) return -1;
+      return a - b;
+    })
+    .map(([clave, tareas]) => ({ clave, tareas }));
+}
+
+/**
+ * Agrupa por `idProyecto`, ordenando los grupos por id ascendente y dejando
+ * el grupo "sin proyecto" (`clave: null`) al final. Dentro de cada grupo se
+ * preserva el orden de entrada. No muta la entrada.
+ */
+export function groupTasksByProject<T extends TareaFiltrable>(
+  tasks: ListaTareas<T>,
+): GrupoTareas<T>[] {
+  return agrupar(tasks, (tarea) => tarea.idProyecto ?? null);
+}
+
+/**
+ * Igual que `groupTasksByProject` pero por `idSprint`. Las tareas sin sprint
+ * (campo ausente o `null`) caen en el grupo `clave: null`, al final.
+ */
+export function groupTasksBySprint<T extends TareaFiltrable>(
+  tasks: ListaTareas<T>,
+): GrupoTareas<T>[] {
+  return agrupar(tasks, (tarea) => tarea.idSprint ?? null);
+}
