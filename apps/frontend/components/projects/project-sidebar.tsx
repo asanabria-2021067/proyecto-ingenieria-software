@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Kanban, Users, Rocket, Pencil, History, Settings2, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Kanban, ListChecks, Users, Rocket, Pencil, History, Settings2, ScrollText } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
@@ -52,7 +52,10 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
     );
   }
   if (puedeChatear) {
-    navItems.push({ href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Tablero', icon: Kanban });
+    navItems.push(
+      { href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Tablero', icon: Kanban },
+      { href: `/dashboard/projects/${idProyecto}/tareas`, label: 'Lista de tareas', icon: ListChecks },
+    );
   }
   if (isLeader) {
     navItems.push(

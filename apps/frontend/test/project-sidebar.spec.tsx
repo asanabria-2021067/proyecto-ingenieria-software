@@ -35,6 +35,14 @@ function mockLeader() {
   (useProjectMembers as any).mockReturnValue({ members: [] });
 }
 
+function mockParticipante() {
+  (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
+  (useProjectDetail as any).mockReturnValue({
+    data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', creador: { idUsuario: 1 } },
+  });
+  (useProjectMembers as any).mockReturnValue({ members: [{ idUsuario: 2 }] });
+}
+
 function renderSidebar() {
   return render(createElement(ProjectSidebar, { idProyecto: 42 }));
 }
@@ -81,6 +89,10 @@ describe('ProjectSidebar', () => {
       'href',
       '/dashboard/projects/42/kanban',
     );
+    expect(screen.getByRole('link', { name: /lista de tareas/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/42/tareas',
+    );
   });
 
   it('al entrar al Tablero (ruta anidada bajo Resumen) solo un NavItem queda activo', () => {
@@ -101,5 +113,17 @@ describe('ProjectSidebar', () => {
     const activos = screen.getAllByRole('link').filter((link) => link.className.includes('text-primary'));
     expect(activos).toHaveLength(1);
     expect(activos[0]).toHaveAccessibleName(/tablero/i);
+  });
+
+  it('un integrante (no líder) también ve "Lista de tareas", igual que "Tablero"', () => {
+    mockParticipante();
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /tablero/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /lista de tareas/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/42/tareas',
+    );
+    expect(screen.queryByRole('link', { name: /editar información/i })).not.toBeInTheDocument();
   });
 });
