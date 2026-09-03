@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Kanban, Users, Rocket, Pencil, History, Settings2, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, Rocket, Pencil, History, Settings2, ScrollText, BarChart3 } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
@@ -60,6 +60,16 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
       { href: `/dashboard/proyectos/${idProyecto}/sprints`, label: 'Sprints', icon: Rocket },
       { href: `/dashboard/proyectos/${idProyecto}/bitacora`, label: 'Bitácora', icon: ScrollText },
     );
+  }
+  // HU-143: a diferencia de Sprints/Bitácora (arriba, exclusivos del líder),
+  // la analítica es explícitamente "líder o integrante" — mismo criterio de
+  // acceso que ya usa el backend (assertCanListSprintAnalytics).
+  if (isLeader || esParticipante) {
+    navItems.push({
+      href: `/dashboard/proyectos/${idProyecto}/sprints/analytics`,
+      label: 'Analítica',
+      icon: BarChart3,
+    });
   }
 
   // Varios NavItem pueden anidar la misma ruta (p. ej. Resumen en
