@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Kanban, Users, Rocket, Pencil, History, Settings2 } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, Rocket, Pencil, History, Settings2, ScrollText } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
+import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { ProjectChatPanel } from '@/components/projects/project-chat-panel';
 
 interface ProjectSidebarProps {
@@ -24,7 +25,11 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
   const { data: proyecto } = useProjectDetail(idProyecto);
   const { members } = useProjectMembers(idProyecto);
 
-  const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
+  // Validación de rol vía el usuario identificado por la cookie JWT httpOnly
+  // (useCurrentUser), comparado contra Proyecto.creadoPor — ver
+  // hooks/use-is-project-leader.ts. Única fuente de verdad de "isLeader" en
+  // el frontend; el enlace "Bitácora" (más abajo) depende de este valor.
+  const isLeader = useIsProjectLeader(idProyecto);
   const esParticipante = !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeChatear = isLeader || esParticipante;
 
@@ -53,6 +58,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
     navItems.push(
       { href: `/dashboard/proyectos/${idProyecto}/miembros`, label: 'Miembros', icon: Users },
       { href: `/dashboard/proyectos/${idProyecto}/sprints`, label: 'Sprints', icon: Rocket },
+      { href: `/dashboard/proyectos/${idProyecto}/bitacora`, label: 'Bitácora', icon: ScrollText },
     );
   }
 
