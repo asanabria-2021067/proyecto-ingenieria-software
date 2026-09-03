@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   AlertCircle,
   ArrowLeft,
+  BarChart3,
   Calendar,
   Clock,
   Flag,
@@ -120,7 +121,17 @@ function SprintCard({
           </span>
         </div>
 
-        <div className="flex shrink-0 items-center">
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            asChild
+            variant="outline"
+            className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
+          >
+            <Link href={`/dashboard/proyectos/${idProyecto}/sprints/${sprint.idSprint}/analytics`}>
+              <BarChart3 className="size-3.5" aria-hidden="true" />
+              Analítica
+            </Link>
+          </Button>
           {sprint.estado === 'ACTIVO' && isLeader && (
             <Button
               type="button"
@@ -207,9 +218,21 @@ export default function SprintListPage() {
         <LeaderOnlyNotice description="No puedes acceder a los Sprints de este proyecto." />
       ) : (
         <>
-      <div className="mb-8 flex items-center gap-2">
-        <History className="h-6 w-6 text-primary" aria-hidden="true" />
-        <h1 className="font-headline text-3xl font-extrabold text-on-surface">Sprints</h1>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <History className="h-6 w-6 text-primary" aria-hidden="true" />
+          <h1 className="font-headline text-3xl font-extrabold text-on-surface">Sprints</h1>
+        </div>
+        <Button
+          asChild
+          variant="outline"
+          className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
+        >
+          <Link href={`/dashboard/proyectos/${idProyecto}/sprints/analytics`}>
+            <BarChart3 className="size-3.5" aria-hidden="true" />
+            Analítica comparativa
+          </Link>
+        </Button>
       </div>
       <p className="-mt-6 mb-8 text-sm text-tertiary">Resumen de los sprints del proyecto y su progreso.</p>
 

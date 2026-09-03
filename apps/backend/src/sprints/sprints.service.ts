@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoSprint, EstadoTarea, Prisma, TipoNotificacion } from '@prisma/client';
+import { EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
@@ -12,6 +12,11 @@ import {
   SprintDetailHitoDto,
   SprintListItemDto,
 } from './dto/sprint-history.dto';
+import {
+  SprintAnalyticsDto,
+  SprintComparativeAnalyticsDto,
+  SprintComparativeAnalyticsItemDto,
+} from './dto/sprint-analytics.dto';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 
@@ -742,6 +747,224 @@ export class SprintsService {
       })),
       hitos: [...hitosPorId.values()],
     };
+  }
+
+  /** T-172: base vacía exhaustiva de `distribucionPorEstado` — evita que un `Record` parcial deje un `EstadoTarea` sin inicializar en 0. */
+  private static readonly DISTRIBUCION_ESTADO_VACIA: Record<EstadoTarea, number> = {
+    [EstadoTarea.POR_HACER]: 0,
+    [EstadoTarea.EN_PROGRESO]: 0,
+    [EstadoTarea.EN_REVISION]: 0,
+    [EstadoTarea.HECHO]: 0,
+  };
+
+  /** T-172: base vacía exhaustiva de `distribucionPorPrioridad`, mismo criterio que `DISTRIBUCION_ESTADO_VACIA`. */
+  private static readonly DISTRIBUCION_PRIORIDAD_VACIA: Record<Prioridad, number> = {
+    [Prioridad.BAJA]: 0,
+    [Prioridad.MEDIA]: 0,
+    [Prioridad.ALTA]: 0,
+  };
+
+  /**
+   * T-172 (HU-143): analítica de solo lectura de UN Sprint — tareas totales,
+   * distribución por estado/prioridad, hitos, planificado frente a
+   * completado. Restricción vigente: nunca "velocity" — solo cuenta tareas
+   * ("tareas completadas por sprint").
+   *
+   * Autorización: líder O integrante activo (`assertCanViewSprintAnalytics`,
+   * distinto del criterio exclusivo-líder de `getSprintDetail`/F4) — HU-143
+   * lo pide explícitamente ("Como líder o integrante del proyecto").
+   *
+   * Presupuesto fijo de 3 queries (independiente del número de tareas/hitos
+   * del Sprint), mismo patrón exacto que `getSprintDetail`:
+   *   1) Sprint + sus tareas (`idProyecto` + `eliminadoEn: null`, mismo
+   *      criterio de soft-delete que el resto del dominio) vía `include`.
+   *   2) y 3) Hitos referenciados por esas tareas + TODAS las tareas
+   *      vigentes de esos Hitos en el proyecto (mismo scope que
+   *      `getSprintDetail`/`ProjectsService.calcularAvanceHitos`), en
+   *      paralelo vía `Promise.all`.
+   *
+   * `hitos` reutiliza `calcularProgresoHito` — la MISMA fórmula canónica que
+   * `getSprintDetail`, nunca una segunda definición de progreso de Hito.
+   * `planificadoVsCompletado.tareasPlanificadas` = total de tareas del
+   * Sprint (mismo universo que `tareasTotales`); `horasEstimadas` =
+   * SUM(tiempoEstimadoHoras), nunca horas reales/reconocidas (A5/A7, un
+   * dominio distinto que esta analítica no toca).
+   */
+  async getSprintAnalytics(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+  ): Promise<SprintAnalyticsDto> {
+    await this.sprintsAuthorization.assertCanViewSprintAnalytics(projectId, sprintId, userId);
+
+    const sprint = await this.prisma.sprint.findFirst({
+      where: { idSprint: sprintId, idProyecto: projectId },
+      include: {
+        tareas: {
+          where: { idProyecto: projectId, eliminadoEn: null },
+          select: {
+            estadoTarea: true,
+            prioridad: true,
+            idHito: true,
+            tiempoEstimadoHoras: true,
+          },
+        },
+      },
+    });
+
+    if (!sprint) {
+      throw new NotFoundException(
+        `Sprint con id ${sprintId} no encontrado en el proyecto ${projectId}`,
+      );
+    }
+
+    const distribucionPorEstado = { ...SprintsService.DISTRIBUCION_ESTADO_VACIA };
+    const distribucionPorPrioridad = { ...SprintsService.DISTRIBUCION_PRIORIDAD_VACIA };
+    let horasEstimadas = 0;
+    let tareasCompletadas = 0;
+
+    for (const tarea of sprint.tareas) {
+      distribucionPorEstado[tarea.estadoTarea]++;
+      distribucionPorPrioridad[tarea.prioridad]++;
+      horasEstimadas += tarea.tiempoEstimadoHoras ?? 0;
+      if (tarea.estadoTarea === EstadoTarea.HECHO) {
+        tareasCompletadas++;
+      }
+    }
+
+    const idsHito = [
+      ...new Set(
+        sprint.tareas
+          .map((tarea) => tarea.idHito)
+          .filter((idHito): idHito is number => idHito !== null),
+      ),
+    ];
+
+    const hitos: SprintDetailHitoDto[] = [];
+    if (idsHito.length > 0) {
+      const [hitosRows, tareasDeHitos] = await Promise.all([
+        this.prisma.hito.findMany({
+          where: { idHito: { in: idsHito }, idProyecto: projectId },
+          select: { idHito: true, tituloHito: true, estadoHito: true },
+        }),
+        this.prisma.tarea.findMany({
+          where: { idHito: { in: idsHito }, idProyecto: projectId, eliminadoEn: null },
+          select: { idHito: true, estadoTarea: true },
+        }),
+      ]);
+      for (const hito of hitosRows) {
+        const tareasDelHito = tareasDeHitos.filter((tarea) => tarea.idHito === hito.idHito);
+        const { porcentaje } = calcularProgresoHito(tareasDelHito);
+        hitos.push({
+          idHito: hito.idHito,
+          tituloHito: hito.tituloHito,
+          estadoHito: hito.estadoHito,
+          porcentaje,
+        });
+      }
+    }
+
+    return {
+      idSprint: sprint.idSprint,
+      idProyecto: sprint.idProyecto,
+      numero: sprint.numero,
+      estado: sprint.estado,
+      tareasTotales: sprint.tareas.length,
+      distribucionPorEstado,
+      distribucionPorPrioridad,
+      hitos,
+      planificadoVsCompletado: {
+        tareasPlanificadas: sprint.tareas.length,
+        tareasCompletadas,
+        horasEstimadas,
+      },
+    };
+  }
+
+  /**
+   * T-173 (HU-143): analítica comparativa entre TODOS los Sprints del
+   * proyecto — cumplimiento por Sprint, planificado frente a completado,
+   * evolución de hitos y tareas completadas por Sprint. Restricción
+   * vigente: el campo se llama literalmente `tareasCompletadas`, nunca
+   * "velocity".
+   *
+   * Autorización: mismo criterio que `getSprintAnalytics`
+   * (`assertCanListSprintAnalytics` — líder o integrante activo).
+   *
+   * Una única consulta SQL agregada (`$queryRaw` con CTEs, mismo estilo que
+   * `getSprintClosingSummary`) resuelve tareas+hitos de TODOS los Sprints
+   * del proyecto de una vez — presupuesto de 1 query, independiente de
+   * cuántos Sprints o tareas tenga el proyecto (nunca una consulta por
+   * Sprint). Ordenado por `numero ASC` para reflejar la evolución en el
+   * tiempo (a diferencia de `listSprints`/F3, que ordena `numero DESC` para
+   * mostrar el más reciente primero).
+   *
+   * `tareas_agregadas`: total y completadas (`estado_tarea = 'HECHO'`) por
+   * Sprint, mismo universo (`idProyecto` + `eliminadoEn IS NULL`) que
+   * `getSprintAggregatesByProject`/`getSprintAnalytics`.
+   * `sprint_hitos`: Hitos DISTINTOS referenciados por tareas de cada
+   * Sprint. `hitos_agregados`: de esos Hitos distintos, cuántos están
+   * `estado_hito = 'COMPLETADO'` (estado global y ya persistido del Hito,
+   * A12 — esta consulta nunca lo recalcula). Un Sprint sin tareas/hitos
+   * nunca desaparece del resultado (`LEFT JOIN` + `COALESCE(..., 0)`), igual
+   * que `getSprintAggregatesByProject`.
+   */
+  async getSprintsAnalytics(
+    projectId: number,
+    userId: number,
+  ): Promise<SprintComparativeAnalyticsDto> {
+    await this.sprintsAuthorization.assertCanListSprintAnalytics(projectId, userId);
+
+    const filas = await this.prisma.$queryRaw<
+      Omit<SprintComparativeAnalyticsItemDto, 'porcentajeCumplimiento'>[]
+    >(Prisma.sql`
+      WITH tareas_agregadas AS (
+        SELECT
+          id_sprint AS "idSprint",
+          COUNT(*)::int AS "tareasPlanificadas",
+          COUNT(*) FILTER (WHERE estado_tarea = 'HECHO')::int AS "tareasCompletadas"
+        FROM tarea
+        WHERE id_proyecto = ${projectId} AND eliminado_en IS NULL
+        GROUP BY id_sprint
+      ),
+      sprint_hitos AS (
+        SELECT DISTINCT id_sprint, id_hito
+        FROM tarea
+        WHERE id_proyecto = ${projectId} AND eliminado_en IS NULL AND id_hito IS NOT NULL
+      ),
+      hitos_agregados AS (
+        SELECT
+          sh.id_sprint AS "idSprint",
+          COUNT(*)::int AS "hitosTotales",
+          COUNT(*) FILTER (WHERE h.estado_hito = 'COMPLETADO')::int AS "hitosCompletados"
+        FROM sprint_hitos sh
+        JOIN hito h ON h.id_hito = sh.id_hito
+        GROUP BY sh.id_sprint
+      )
+      SELECT
+        s.id_sprint AS "idSprint",
+        s.numero AS "numero",
+        s.estado AS "estado",
+        COALESCE(ta."tareasPlanificadas", 0) AS "tareasPlanificadas",
+        COALESCE(ta."tareasCompletadas", 0) AS "tareasCompletadas",
+        COALESCE(ha."hitosTotales", 0) AS "hitosTotales",
+        COALESCE(ha."hitosCompletados", 0) AS "hitosCompletados"
+      FROM sprint s
+      LEFT JOIN tareas_agregadas ta ON ta."idSprint" = s.id_sprint
+      LEFT JOIN hitos_agregados ha ON ha."idSprint" = s.id_sprint
+      WHERE s.id_proyecto = ${projectId}
+      ORDER BY s.numero ASC
+    `);
+
+    const sprints: SprintComparativeAnalyticsItemDto[] = filas.map((fila) => ({
+      ...fila,
+      porcentajeCumplimiento:
+        fila.tareasPlanificadas === 0
+          ? 0
+          : Math.round((fila.tareasCompletadas / fila.tareasPlanificadas) * 100),
+    }));
+
+    return { idProyecto: projectId, sprints };
   }
 
   /**
