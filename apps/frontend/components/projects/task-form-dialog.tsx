@@ -70,6 +70,7 @@ export interface TaskFormDialogProps {
   members: MiembroProyecto[];
   labels: LabelDTO[];
   isLeader: boolean;
+  puedeGestionarTarea: boolean;
   crearTarea: ProjectTasksHook['crearTarea'];
   editarTarea: ProjectTasksHook['editarTarea'];
   asignarTarea: ProjectTasksHook['asignarTarea'];
@@ -124,6 +125,7 @@ function TaskFormDialogContent({
   members,
   labels,
   isLeader,
+  puedeGestionarTarea,
   crearTarea,
   editarTarea,
   asignarTarea,
@@ -154,7 +156,7 @@ function TaskFormDialogContent({
   // de mutación paralela.
   const puedeDesasignar =
     mode === 'edit' &&
-    isLeader &&
+    puedeGestionarTarea &&
     task?.asignacionActiva != null &&
     asignadoActual !== SIN_ASIGNAR;
 
