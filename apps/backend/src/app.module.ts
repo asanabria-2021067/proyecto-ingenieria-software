@@ -28,6 +28,7 @@ import { ExitRequestsModule } from './exit-requests/exit-requests.module';
 import { TeamModule } from './team/team.module';
 import { SocialModule } from './social/social.module';
 import { ChatModule } from './chat/chat.module';
+import { BitacoraModule } from './bitacora/bitacora.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { ChatModule } from './chat/chat.module';
     TeamModule,
     SocialModule,
     ChatModule,
+    BitacoraModule,
   ],
   controllers: [AppController],
   providers: [
