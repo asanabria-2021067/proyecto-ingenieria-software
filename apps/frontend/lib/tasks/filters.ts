@@ -112,6 +112,21 @@ export function filterTasksBySprint<T extends TareaFiltrable>(
 }
 
 /**
+ * Devuelve las tareas de un hito dado. `hitoId === null` selecciona las
+ * tareas sin hito (`idHito` ausente o `null`). `undefined` ⇒ copia
+ * superficial sin filtrar. Mismo contrato que `filterTasksBySprint`.
+ */
+export function filterTasksByHito<T extends TareaFiltrable>(
+  tasks: ListaTareas<T>,
+  hitoId: number | null | undefined,
+): T[] {
+  const lista = tasks ?? [];
+  if (hitoId === undefined) return [...lista];
+  if (hitoId === null) return lista.filter((tarea) => (tarea.idHito ?? null) === null);
+  return lista.filter((tarea) => tarea.idHito === hitoId);
+}
+
+/**
  * Búsqueda por texto libre sobre `tituloTarea` y `descripcionTarea`.
  * Insensible a mayúsculas/minúsculas y por coincidencia parcial (substring).
  * Una consulta vacía o solo espacios devuelve una copia superficial sin
