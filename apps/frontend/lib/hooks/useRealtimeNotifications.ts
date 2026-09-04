@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { projectSprintsQueryKey } from '@/lib/query-keys/sprints';
-import { projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
 
 export interface Notification {
   tipoNotificacion: string;
@@ -15,13 +14,6 @@ export interface Notification {
 interface SprintRealtimePayload {
   projectId: number;
   sprintId: number;
-}
-
-/** Payload real de HU-142/T-171 — ver notifications.gateway.ts (backend): `{ projectId, taskId, idAsignacion }`. */
-interface TaskHoursLoggedPayload {
-  projectId: number;
-  taskId: number;
-  idAsignacion: number;
 }
 
 export function useRealtimeNotifications(enabled: boolean) {
@@ -81,23 +73,12 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(payload.projectId) });
     };
 
-    // HU-142 (T-171): mismo criterio que los handlers de Sprint — invalida
-    // las queries reales (`project-tasks` y `task-hours`) en vez de guardar
-    // un estado aparte, para que el total de horas registradas se mantenga
-    // correcto en cualquier pestaña abierta cuando otra persona registra
-    // horas sobre la misma tarea.
-    const handleTaskHoursLogged = (payload: TaskHoursLoggedPayload) => {
-      queryClient.invalidateQueries({ queryKey: projectTasksQueryKey(payload.projectId) });
-      queryClient.invalidateQueries({ queryKey: taskHoursQueryKey(payload.projectId, payload.taskId) });
-    };
-
     newSocket.on('connect', handleConnect);
     newSocket.on('disconnect', handleDisconnect);
     newSocket.on('connected', handleConnected);
     newSocket.on('notification', handleNotification);
     newSocket.on('SPRINT_FINALIZATION_STARTED', handleSprintFinalizationStarted);
     newSocket.on('SPRINT_CLOSED', handleSprintClosed);
-    newSocket.on('TASK_HOURS_LOGGED', handleTaskHoursLogged);
 
     const timeoutId = window.setTimeout(() => setSocket(newSocket), 0);
 
@@ -109,7 +90,6 @@ export function useRealtimeNotifications(enabled: boolean) {
       newSocket.off('notification', handleNotification);
       newSocket.off('SPRINT_FINALIZATION_STARTED', handleSprintFinalizationStarted);
       newSocket.off('SPRINT_CLOSED', handleSprintClosed);
-      newSocket.off('TASK_HOURS_LOGGED', handleTaskHoursLogged);
       newSocket.close();
     };
   }, [enabled, queryClient]);
