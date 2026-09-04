@@ -93,6 +93,8 @@ function makeSprintsAuthorization() {
     assertCanViewClosingSummary: vi.fn().mockResolvedValue(undefined),
     assertCanListSprintHistory: vi.fn().mockResolvedValue(undefined),
     assertCanViewSprintHistory: vi.fn().mockResolvedValue(undefined),
+    assertCanViewSprintAnalytics: vi.fn().mockResolvedValue(undefined),
+    assertCanListSprintAnalytics: vi.fn().mockResolvedValue(undefined),
   };
   return authorization as typeof authorization & SprintsAuthorizationService;
 }
@@ -2007,6 +2009,261 @@ describe('SprintsService', () => {
       expect(callArgs.where).toEqual({ idSprint: SPRINT_ID, idProyecto: PROJECT_ID });
       expect(callArgs.include.tareas.where).toEqual({ idProyecto: PROJECT_ID, eliminadoEn: null });
       expect(callArgs.include.tareas.include.comentarios.where).toEqual({ eliminadoEn: null });
+    });
+  });
+
+  describe('getSprintAnalytics (T-172, HU-143)', () => {
+    function sprintConTareas(tareas: unknown[], overrides: Record<string, unknown> = {}) {
+      return {
+        idSprint: SPRINT_ID,
+        idProyecto: PROJECT_ID,
+        numero: 3,
+        estado: 'ACTIVO',
+        tareas,
+        ...overrides,
+      };
+    }
+
+    it('caso 1: distribuye por estado/prioridad de forma exhaustiva (estados sin tareas quedan en 0, no ausentes)', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(
+        sprintConTareas([
+          { estadoTarea: 'HECHO', prioridad: 'ALTA', idHito: null, tiempoEstimadoHoras: 5 },
+          { estadoTarea: 'HECHO', prioridad: 'MEDIA', idHito: null, tiempoEstimadoHoras: 3 },
+          { estadoTarea: 'POR_HACER', prioridad: 'ALTA', idHito: null, tiempoEstimadoHoras: null },
+        ]),
+      );
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.tareasTotales).toBe(3);
+      expect(result.distribucionPorEstado).toEqual({
+        POR_HACER: 1,
+        EN_PROGRESO: 0,
+        EN_REVISION: 0,
+        HECHO: 2,
+      });
+      expect(result.distribucionPorPrioridad).toEqual({ BAJA: 0, MEDIA: 1, ALTA: 2 });
+      expect(result.planificadoVsCompletado).toEqual({
+        tareasPlanificadas: 3,
+        tareasCompletadas: 2,
+        horasEstimadas: 8,
+      });
+    });
+
+    it('caso 2: sin tareas — todas las distribuciones en 0, sin NaN ni división por cero', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([]));
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.tareasTotales).toBe(0);
+      expect(result.distribucionPorEstado).toEqual({ POR_HACER: 0, EN_PROGRESO: 0, EN_REVISION: 0, HECHO: 0 });
+      expect(result.planificadoVsCompletado).toEqual({
+        tareasPlanificadas: 0,
+        tareasCompletadas: 0,
+        horasEstimadas: 0,
+      });
+      expect(result.hitos).toEqual([]);
+    });
+
+    it('caso 3: reutiliza calcularProgresoHito — mismo Hito referenciado por varias tareas no se duplica, sin N+1', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(
+        sprintConTareas([
+          { estadoTarea: 'HECHO', prioridad: 'MEDIA', idHito: 200, tiempoEstimadoHoras: null },
+          { estadoTarea: 'POR_HACER', prioridad: 'MEDIA', idHito: 200, tiempoEstimadoHoras: null },
+        ]),
+      );
+      prisma.hito.findMany.mockResolvedValue([{ idHito: 200, tituloHito: 'MILESTONE', estadoHito: 'EN_PROGRESO' }]);
+      prisma.tarea.findMany.mockResolvedValue([
+        { idHito: 200, estadoTarea: 'HECHO' },
+        { idHito: 200, estadoTarea: 'POR_HACER' },
+      ]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.hitos).toEqual([
+        { idHito: 200, tituloHito: 'MILESTONE', estadoHito: 'EN_PROGRESO', porcentaje: 50 },
+      ]);
+      expect(prisma.hito.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.tarea.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('caso 4: exige autorización con projectId, sprintId y userId antes de leer el Sprint', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([]));
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(authorization.assertCanViewSprintAnalytics).toHaveBeenCalledTimes(1);
+      expect(authorization.assertCanViewSprintAnalytics).toHaveBeenCalledWith(PROJECT_ID, SPRINT_ID, LIDER_ID);
+    });
+
+    it('caso 5: aislamiento cross-project — propaga el error de autorización sin leer el Sprint', async () => {
+      const prisma = makePrisma();
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanViewSprintAnalytics.mockRejectedValue(
+        new NotFoundException(`Sprint con id ${SPRINT_ID} no encontrado en el proyecto ${PROJECT_ID}`),
+      );
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.sprint.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('caso 6: autorización pasó pero la relectura no encuentra fila — NotFoundException', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(null);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(
+        service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('caso 7: la consulta de tareas está acotada por idProyecto + eliminadoEn:null (evidencia contra contaminación cross-project)', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([]));
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      const callArgs = prisma.sprint.findFirst.mock.calls[0][0];
+      expect(callArgs.where).toEqual({ idSprint: SPRINT_ID, idProyecto: PROJECT_ID });
+      expect(callArgs.include.tareas.where).toEqual({ idProyecto: PROJECT_ID, eliminadoEn: null });
+    });
+  });
+
+  describe('getSprintsAnalytics (T-173, HU-143)', () => {
+    it('caso 1: mapea cada fila de la agregación, calcula porcentajeCumplimiento y expone "tareasCompletadas" (nunca velocity)', async () => {
+      const prisma = makePrisma();
+      prisma.$queryRaw.mockResolvedValue([
+        {
+          idSprint: 20,
+          numero: 1,
+          estado: 'CERRADO',
+          tareasPlanificadas: 4,
+          tareasCompletadas: 3,
+          hitosTotales: 2,
+          hitosCompletados: 1,
+        },
+        {
+          idSprint: 21,
+          numero: 2,
+          estado: 'ACTIVO',
+          tareasPlanificadas: 0,
+          tareasCompletadas: 0,
+          hitosTotales: 0,
+          hitosCompletados: 0,
+        },
+      ]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      const result = await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
+
+      expect(result.idProyecto).toBe(PROJECT_ID);
+      expect(result.sprints).toEqual([
+        {
+          idSprint: 20,
+          numero: 1,
+          estado: 'CERRADO',
+          tareasPlanificadas: 4,
+          tareasCompletadas: 3,
+          porcentajeCumplimiento: 75,
+          hitosTotales: 2,
+          hitosCompletados: 1,
+        },
+        {
+          idSprint: 21,
+          numero: 2,
+          estado: 'ACTIVO',
+          tareasPlanificadas: 0,
+          tareasCompletadas: 0,
+          // Sin división por cero: un Sprint sin tareas planificadas nunca produce NaN/Infinity.
+          porcentajeCumplimiento: 0,
+          hitosTotales: 0,
+          hitosCompletados: 0,
+        },
+      ]);
+      expect(Object.keys(result.sprints[0])).toContain('tareasCompletadas');
+      expect(Object.keys(result.sprints[0])).not.toContain('velocity');
+    });
+
+    it('caso 2: una única consulta agregada por invocación, independiente de cuántos Sprints tenga el proyecto', async () => {
+      const prisma = makePrisma();
+      prisma.$queryRaw.mockResolvedValue([]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.sprint.findMany).not.toHaveBeenCalled();
+      expect(prisma.tarea.findMany).not.toHaveBeenCalled();
+      expect(prisma.hito.findMany).not.toHaveBeenCalled();
+    });
+
+    it('caso 3: exige autorización (líder o integrante activo) con projectId y userId antes de consultar', async () => {
+      const prisma = makePrisma();
+      prisma.$queryRaw.mockResolvedValue([]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
+
+      expect(authorization.assertCanListSprintAnalytics).toHaveBeenCalledTimes(1);
+      expect(authorization.assertCanListSprintAnalytics).toHaveBeenCalledWith(PROJECT_ID, LIDER_ID);
+    });
+
+    it('caso 4: propaga el error de autorización sin ejecutar la consulta agregada', async () => {
+      const prisma = makePrisma();
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanListSprintAnalytics.mockRejectedValue(new ForbiddenException('no autorizado'));
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await expect(service.getSprintsAnalytics(PROJECT_ID, NO_LIDER_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('caso 5: la consulta agregada está acotada por idProyecto (evidencia contra contaminación cross-project)', async () => {
+      const prisma = makePrisma();
+      prisma.$queryRaw.mockResolvedValue([]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+
+      await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
+
+      const sqlEjecutado = prisma.$queryRaw.mock.calls[0][0] as { sql: string; values: unknown[] };
+      expect(sqlEjecutado.sql).toContain('id_proyecto = ?');
+      expect(sqlEjecutado.values).toContain(PROJECT_ID);
     });
   });
 });
