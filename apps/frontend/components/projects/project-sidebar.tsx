@@ -2,7 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Kanban, Users, Rocket, Pencil, History, Settings2, ScrollText, BarChart3 } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Kanban,
+  ListChecks,
+  Users,
+  Rocket,
+  Pencil,
+  History,
+  Settings2,
+  ScrollText,
+  BarChart3,
+} from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
@@ -30,37 +41,76 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
   // hooks/use-is-project-leader.ts. Única fuente de verdad de "isLeader" en
   // el frontend; el enlace "Bitácora" (más abajo) depende de este valor.
   const isLeader = useIsProjectLeader(idProyecto);
-  const esParticipante = !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
+  const esParticipante =
+    !!currentUser &&
+    members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeChatear = isLeader || esParticipante;
 
   const navItems: NavItem[] = [
     {
-      href: isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`,
+      href: isLeader
+        ? `/dashboard/projects/${idProyecto}`
+        : `/dashboard/proyectos/${idProyecto}`,
       label: 'Resumen',
       icon: LayoutDashboard,
     },
   ];
+
   if (isLeader) {
     navItems.push(
-      { href: `/dashboard/projects/mine/form?id=${idProyecto}`, label: 'Editar Información', icon: Pencil },
+      {
+        href: `/dashboard/projects/mine/form?id=${idProyecto}`,
+        label: 'Editar Información',
+        icon: Pencil,
+      },
       {
         href: `/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`,
         label: 'Revisiones Pasadas',
         icon: History,
       },
-      { href: `/dashboard/projects/${idProyecto}?openRoles=1`, label: 'Editar Roles', icon: Settings2 },
+      {
+        href: `/dashboard/projects/${idProyecto}?openRoles=1`,
+        label: 'Editar Roles',
+        icon: Settings2,
+      },
     );
   }
+
   if (puedeChatear) {
-    navItems.push({ href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Tablero', icon: Kanban });
+    navItems.push(
+      {
+        href: `/dashboard/projects/${idProyecto}/kanban`,
+        label: 'Tablero',
+        icon: Kanban,
+      },
+      {
+        href: `/dashboard/projects/${idProyecto}/tareas`,
+        label: 'Lista de tareas',
+        icon: ListChecks,
+      },
+    );
   }
+
   if (isLeader) {
     navItems.push(
-      { href: `/dashboard/proyectos/${idProyecto}/miembros`, label: 'Miembros', icon: Users },
-      { href: `/dashboard/proyectos/${idProyecto}/sprints`, label: 'Sprints', icon: Rocket },
-      { href: `/dashboard/proyectos/${idProyecto}/bitacora`, label: 'Bitácora', icon: ScrollText },
+      {
+        href: `/dashboard/proyectos/${idProyecto}/miembros`,
+        label: 'Miembros',
+        icon: Users,
+      },
+      {
+        href: `/dashboard/proyectos/${idProyecto}/sprints`,
+        label: 'Sprints',
+        icon: Rocket,
+      },
+      {
+        href: `/dashboard/proyectos/${idProyecto}/bitacora`,
+        label: 'Bitácora',
+        icon: ScrollText,
+      },
     );
   }
+
   // HU-143: a diferencia de Sprints/Bitácora (arriba, exclusivos del líder),
   // la analítica es explícitamente "líder o integrante" — mismo criterio de
   // acceso que ya usa el backend (assertCanListSprintAnalytics).
@@ -77,8 +127,17 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
   // prefijo ingenuo marcaría ambos como activos a la vez. Nos quedamos solo
   // con el href más específico (el más largo) que calce con la ruta actual.
   const activeHref = navItems
-    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
-    .reduce<string | null>((mejor, item) => (mejor === null || item.href.length > mejor.length ? item.href : mejor), null);
+    .filter(
+      (item) =>
+        pathname === item.href || pathname.startsWith(`${item.href}/`),
+    )
+    .reduce<string | null>(
+      (mejor, item) =>
+        mejor === null || item.href.length > mejor.length
+          ? item.href
+          : mejor,
+      null,
+    );
 
   return (
     <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-outline-variant bg-surface-container-low md:flex">
@@ -86,6 +145,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         <p className="truncate text-sm font-bold text-on-surface">
           {proyecto?.tituloProyecto ?? 'Proyecto'}
         </p>
+
         {isLeader && (
           <span className="mt-0.5 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
             Líder
@@ -97,6 +157,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         {navItems.map((item) => {
           const active = item.href === activeHref;
           const Icon = item.icon;
+
           return (
             <Link
               key={item.href}
