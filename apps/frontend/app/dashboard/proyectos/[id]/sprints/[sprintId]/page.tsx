@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   AlertCircle,
   ArrowLeft,
+  BarChart3,
   Calendar,
   CheckCircle2,
   Clock,
@@ -19,6 +20,7 @@ import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -349,14 +351,26 @@ function SprintDetailContent({
     <div className="space-y-6">
       {/* ENCABEZADO */}
       <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <History className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h1 className="font-headline text-3xl font-extrabold text-on-surface">Sprint {detail.numero}</h1>
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <History className="h-6 w-6 text-primary" aria-hidden="true" />
+            <h1 className="font-headline text-3xl font-extrabold text-on-surface">Sprint {detail.numero}</h1>
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
+            >
+              {estiloEstado.label}
+            </span>
+          </div>
+          <Button
+            asChild
+            variant="outline"
+            className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
           >
-            {estiloEstado.label}
-          </span>
+            <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/analytics`}>
+              <BarChart3 className="size-3.5" aria-hidden="true" />
+              Ver analítica
+            </Link>
+          </Button>
         </div>
         <p className="mt-2 text-sm text-tertiary">
           Resumen histórico del trabajo, las contribuciones y los hitos de este Sprint.

@@ -172,3 +172,48 @@ export interface AdjustSprintHoursInput {
   horasAprobadas: number;
   justificacionAjuste?: string;
 }
+
+/**
+ * Contrato de `GET /proyectos/:projectId/sprints/:sprintId/analytics`
+ * (T-172, HU-143). Refleja exactamente `SprintAnalyticsDto`
+ * (apps/backend/src/sprints/dto/sprint-analytics.dto.ts). Restricción
+ * vigente: nunca "velocity" — `planificadoVsCompletado` cuenta tareas
+ * ("tareas completadas por sprint"). `hitos` reutiliza el mismo shape que
+ * `SprintDetailHitoDto` (F4).
+ */
+export interface SprintAnalyticsDto {
+  idSprint: number;
+  idProyecto: number;
+  numero: number;
+  estado: EstadoSprint;
+  tareasTotales: number;
+  distribucionPorEstado: Record<EstadoTarea, number>;
+  distribucionPorPrioridad: Record<Prioridad, number>;
+  hitos: SprintDetailHitoDto[];
+  planificadoVsCompletado: {
+    tareasPlanificadas: number;
+    tareasCompletadas: number;
+    horasEstimadas: number;
+  };
+}
+
+/**
+ * Un elemento de `GET /proyectos/:projectId/sprints/analytics` (T-173,
+ * HU-143) — refleja `SprintComparativeAnalyticsItemDto`. El campo se llama
+ * literalmente `tareasCompletadas`, nunca "velocity".
+ */
+export interface SprintComparativeAnalyticsItemDto {
+  idSprint: number;
+  numero: number;
+  estado: EstadoSprint;
+  tareasPlanificadas: number;
+  tareasCompletadas: number;
+  porcentajeCumplimiento: number;
+  hitosTotales: number;
+  hitosCompletados: number;
+}
+
+export interface SprintComparativeAnalyticsDto {
+  idProyecto: number;
+  sprints: SprintComparativeAnalyticsItemDto[];
+}
