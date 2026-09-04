@@ -26,3 +26,20 @@ export const sprintDetailQueryKey = (idProyecto: number, idSprint: number) =>
  */
 export const sprintClosingSummaryQueryKey = (idProyecto: number, idSprint: number) =>
   ['sprint-closing-summary', idProyecto, idSprint] as const;
+
+/**
+ * Analítica individual de un Sprint (T-172) — read-model distinto de
+ * `sprint-detail` (`GET .../analytics`, no `GET .../sprints/:sprintId`),
+ * mismo criterio de namespace propio + ambos ids que
+ * `sprintClosingSummaryQueryKey`.
+ */
+export const sprintAnalyticsQueryKey = (idProyecto: number, idSprint: number) =>
+  ['sprint-analytics', idProyecto, idSprint] as const;
+
+/**
+ * Analítica comparativa entre Sprints del proyecto (T-173) — `GET
+ * .../sprints/analytics`, sin `idSprint` porque cubre TODOS los Sprints del
+ * proyecto a la vez.
+ */
+export const sprintsAnalyticsQueryKey = (idProyecto: number) =>
+  ['sprints-analytics', idProyecto] as const;

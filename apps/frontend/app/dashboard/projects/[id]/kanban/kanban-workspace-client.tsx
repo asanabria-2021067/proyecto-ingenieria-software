@@ -599,6 +599,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           members={members}
           labels={labels}
           isLeader={isLeader}
+          puedeGestionarTarea={isLeader}
           crearTarea={crearTarea}
           editarTarea={editarTarea}
           asignarTarea={asignarTarea}
