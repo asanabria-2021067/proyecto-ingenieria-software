@@ -23,6 +23,7 @@ import { AdminModule } from './admin/admin.module';
 import { LabelsModule } from './labels/labels.module';
 import { RolesModule } from './roles/roles.module';
 import { ProgressRecordsModule } from './progress-records/progress-records.module';
+import { TimeRecordsModule } from './time-records/time-records.module';
 import { SprintsModule } from './sprints/sprints.module';
 import { ExitRequestsModule } from './exit-requests/exit-requests.module';
 import { TeamModule } from './team/team.module';
@@ -74,6 +75,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
     LabelsModule,
     RolesModule,
     ProgressRecordsModule,
+    TimeRecordsModule,
     SprintsModule,
     ExitRequestsModule,
     TeamModule,
