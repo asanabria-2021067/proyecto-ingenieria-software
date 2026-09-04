@@ -34,6 +34,7 @@ export interface TareaFiltrable {
   fechaCreacion?: string | null;
   idProyecto?: number | null;
   idHito?: number | null;
+
   /** Aún no expuesto por el backend; ausente/`null` ⇒ "sin sprint". */
   idSprint?: number | null;
 }
@@ -52,7 +53,11 @@ export type FiltroPrioridad = Prioridad | typeof FILTRO_TODOS;
  * (misma tabla que `components/projects/task-board.utils.ts` y que
  * `compareTareas` del backend): ALTA antes que MEDIA antes que BAJA.
  */
-const PRIORIDAD_ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
+const PRIORIDAD_ORDEN: Record<Prioridad, number> = {
+  ALTA: 0,
+  MEDIA: 1,
+  BAJA: 2,
+};
 
 /** Orden de estado según las columnas fijas del tablero. */
 const ESTADO_ORDEN: Record<EstadoTarea, number> = {
@@ -75,7 +80,11 @@ export function filterTasksByStatus<T extends TareaFiltrable>(
   status: FiltroEstado | undefined,
 ): T[] {
   const lista = tasks ?? [];
-  if (!status || status === FILTRO_TODOS) return [...lista];
+
+  if (!status || status === FILTRO_TODOS) {
+    return [...lista];
+  }
+
   return lista.filter((tarea) => tarea.estadoTarea === status);
 }
 
@@ -88,7 +97,11 @@ export function filterTasksByPriority<T extends TareaFiltrable>(
   priority: FiltroPrioridad | undefined,
 ): T[] {
   const lista = tasks ?? [];
-  if (!priority || priority === FILTRO_TODOS) return [...lista];
+
+  if (!priority || priority === FILTRO_TODOS) {
+    return [...lista];
+  }
+
   return lista.filter((tarea) => tarea.prioridad === priority);
 }
 
@@ -106,8 +119,17 @@ export function filterTasksBySprint<T extends TareaFiltrable>(
   sprintId: number | null | undefined,
 ): T[] {
   const lista = tasks ?? [];
-  if (sprintId === undefined) return [...lista];
-  if (sprintId === null) return lista.filter((tarea) => (tarea.idSprint ?? null) === null);
+
+  if (sprintId === undefined) {
+    return [...lista];
+  }
+
+  if (sprintId === null) {
+    return lista.filter(
+      (tarea) => (tarea.idSprint ?? null) === null,
+    );
+  }
+
   return lista.filter((tarea) => tarea.idSprint === sprintId);
 }
 
@@ -121,8 +143,17 @@ export function filterTasksByHito<T extends TareaFiltrable>(
   hitoId: number | null | undefined,
 ): T[] {
   const lista = tasks ?? [];
-  if (hitoId === undefined) return [...lista];
-  if (hitoId === null) return lista.filter((tarea) => (tarea.idHito ?? null) === null);
+
+  if (hitoId === undefined) {
+    return [...lista];
+  }
+
+  if (hitoId === null) {
+    return lista.filter(
+      (tarea) => (tarea.idHito ?? null) === null,
+    );
+  }
+
   return lista.filter((tarea) => tarea.idHito === hitoId);
 }
 
@@ -138,15 +169,20 @@ export function searchTasks<T extends TareaFiltrable>(
 ): T[] {
   const lista = tasks ?? [];
   const termino = (query ?? '').trim().toLowerCase();
-  if (termino === '') return [...lista];
+
+  if (termino === '') {
+    return [...lista];
+  }
+
   return lista.filter((tarea) => {
     const titulo = tarea.tituloTarea.toLowerCase();
     const descripcion = (tarea.descripcionTarea ?? '').toLowerCase();
+
     return titulo.includes(termino) || descripcion.includes(termino);
   });
 }
 
-// --- Ordenamiento --------------------------------------------------------
+// --- Ordenamiento ----------------------------------------------------------
 
 export type CriterioOrdenTarea =
   | 'fechaLimite'
@@ -165,10 +201,14 @@ function compararCampoNoNulo<T extends TareaFiltrable>(
   switch (criterio) {
     case 'prioridad':
       return PRIORIDAD_ORDEN[a.prioridad] - PRIORIDAD_ORDEN[b.prioridad];
+
     case 'estado':
       return ESTADO_ORDEN[a.estadoTarea] - ESTADO_ORDEN[b.estadoTarea];
+
     case 'titulo':
-      return a.tituloTarea.localeCompare(b.tituloTarea, 'es', { sensitivity: 'base' });
+      return a.tituloTarea.localeCompare(b.tituloTarea, 'es', {
+        sensitivity: 'base',
+      });
   }
 }
 
@@ -196,45 +236,71 @@ export function sortTasks<T extends TareaFiltrable>(
 
   if (criteria === 'fechaLimite' || criteria === 'fechaCreacion') {
     const valor = (tarea: T): string | null => {
-      const bruto = criteria === 'fechaLimite' ? tarea.fechaLimite : tarea.fechaCreacion;
+      const bruto =
+        criteria === 'fechaLimite'
+          ? tarea.fechaLimite
+          : tarea.fechaCreacion;
+
       return bruto == null || bruto === '' ? null : bruto;
     };
+
     const conFecha: T[] = [];
     const sinFecha: T[] = [];
+
     for (const tarea of lista) {
-      (valor(tarea) === null ? sinFecha : conFecha).push(tarea);
+      if (valor(tarea) === null) {
+        sinFecha.push(tarea);
+      } else {
+        conFecha.push(tarea);
+      }
     }
+
     conFecha.sort((a, b) => {
-      const va = valor(a) as string;
-      const vb = valor(b) as string;
-      const dif = va < vb ? -1 : va > vb ? 1 : 0;
-      return dif !== 0 ? dif * factor : a.idTarea - b.idTarea;
+      const valorA = valor(a) as string;
+      const valorB = valor(b) as string;
+      const diferencia =
+        valorA < valorB ? -1 : valorA > valorB ? 1 : 0;
+
+      return diferencia !== 0
+        ? diferencia * factor
+        : a.idTarea - b.idTarea;
     });
+
     sinFecha.sort((a, b) => a.idTarea - b.idTarea);
+
     return [...conFecha, ...sinFecha];
   }
 
   return [...lista].sort((a, b) => {
-    const dif = compararCampoNoNulo(a, b, criteria);
-    return dif !== 0 ? dif * factor : a.idTarea - b.idTarea;
+    const diferencia = compararCampoNoNulo(a, b, criteria);
+
+    return diferencia !== 0
+      ? diferencia * factor
+      : a.idTarea - b.idTarea;
   });
 }
 
-// --- Paginación --------------------------------------------------------
+// --- Paginación ------------------------------------------------------------
 
 export interface ResultadoPaginado<T> {
   /** Tareas de la página pedida; `[]` si la página está fuera de rango. */
   items: T[];
+
   /** Página solicitada, tal cual se recibió (no se normaliza). */
   pagina: number;
+
   /** Tamaño de página efectivo (mínimo 1). */
   tamanioPagina: number;
+
   /** Total de tareas de entrada. */
   totalItems: number;
+
   /** Nº de páginas completas/parciales; `0` si no hay tareas. */
   totalPaginas: number;
+
   /** `true` si `pagina` es un entero dentro de `[1, totalPaginas]`. */
   paginaEnRango: boolean;
+
   hayAnterior: boolean;
   haySiguiente: boolean;
 }
@@ -258,10 +324,19 @@ export function paginateTasks<T>(
   const totalItems = lista.length;
   const tamanioPagina = Math.max(1, Math.floor(pageSize) || 1);
   const totalPaginas = Math.ceil(totalItems / tamanioPagina);
-  const paginaEnRango = Number.isInteger(page) && page >= 1 && page <= totalPaginas;
 
-  const inicio = paginaEnRango ? (page - 1) * tamanioPagina : 0;
-  const items = paginaEnRango ? lista.slice(inicio, inicio + tamanioPagina) : [];
+  const paginaEnRango =
+    Number.isInteger(page) &&
+    page >= 1 &&
+    page <= totalPaginas;
+
+  const inicio = paginaEnRango
+    ? (page - 1) * tamanioPagina
+    : 0;
+
+  const items = paginaEnRango
+    ? lista.slice(inicio, inicio + tamanioPagina)
+    : [];
 
   return {
     items,
@@ -275,7 +350,7 @@ export function paginateTasks<T>(
   };
 }
 
-// --- Agrupación --------------------------------------------------------
+// --- Agrupación ------------------------------------------------------------
 
 export interface GrupoTareas<T> {
   /** Clave del grupo; `null` reúne las tareas sin proyecto/sprint. */
@@ -288,20 +363,38 @@ function agrupar<T>(
   clavear: (tarea: T) => number | null,
 ): GrupoTareas<T>[] {
   const grupos = new Map<number | null, T[]>();
+
   for (const tarea of tasks ?? []) {
     const clave = clavear(tarea);
     const grupo = grupos.get(clave);
-    if (grupo) grupo.push(tarea);
-    else grupos.set(clave, [tarea]);
+
+    if (grupo) {
+      grupo.push(tarea);
+    } else {
+      grupos.set(clave, [tarea]);
+    }
   }
+
   return [...grupos.entries()]
     .sort(([a], [b]) => {
-      if (a === b) return 0;
-      if (a === null) return 1; // "sin proyecto/sprint" siempre al final
-      if (b === null) return -1;
+      if (a === b) {
+        return 0;
+      }
+
+      if (a === null) {
+        return 1;
+      }
+
+      if (b === null) {
+        return -1;
+      }
+
       return a - b;
     })
-    .map(([clave, tareas]) => ({ clave, tareas }));
+    .map(([clave, tareas]) => ({
+      clave,
+      tareas,
+    }));
 }
 
 /**
@@ -312,7 +405,10 @@ function agrupar<T>(
 export function groupTasksByProject<T extends TareaFiltrable>(
   tasks: ListaTareas<T>,
 ): GrupoTareas<T>[] {
-  return agrupar(tasks, (tarea) => tarea.idProyecto ?? null);
+  return agrupar(
+    tasks,
+    (tarea) => tarea.idProyecto ?? null,
+  );
 }
 
 /**
@@ -322,5 +418,8 @@ export function groupTasksByProject<T extends TareaFiltrable>(
 export function groupTasksBySprint<T extends TareaFiltrable>(
   tasks: ListaTareas<T>,
 ): GrupoTareas<T>[] {
-  return agrupar(tasks, (tarea) => tarea.idSprint ?? null);
+  return agrupar(
+    tasks,
+    (tarea) => tarea.idSprint ?? null,
+  );
 }

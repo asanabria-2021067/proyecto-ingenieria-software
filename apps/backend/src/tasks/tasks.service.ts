@@ -25,6 +25,8 @@ import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
 import { CloseAssignmentDto } from './dto/close-assignment.dto';
 import { calcularProgresoHito } from '../common/hito-progreso';
+import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -253,6 +255,11 @@ export class TasksService {
     private tasksRelations: TasksRelationsService,
     private notifications: NotificationsService,
     private tasksContext: TasksContextService,
+    // T-164: opcional únicamente porque las suites de test existentes
+    // construyen TasksService directamente (sin contenedor de Nest) con 5
+    // argumentos posicionales — en producción, TasksModule siempre lo provee
+    // vía BitacoraModule. Cada llamada usa `?.` por el mismo motivo.
+    private bitacoraEventos?: BitacoraEventosService,
   ) {}
 
   async findAll(projectId: number, userId: number): Promise<TareaPublica[]> {
@@ -395,6 +402,25 @@ export class TasksService {
         await this.syncHitoEstado(tx, filaFinal.idHito);
       }
 
+      // T-164: registrado con el MISMO tx que la creación — si cualquier
+      // paso posterior de esta transacción falla, el evento revierte junto
+      // con la tarea (sin eventos huérfanos).
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_CREATED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintActivo.idSprint,
+        tipoEntidad: 'TAREA',
+        idEntidad: filaFinal.idTarea,
+        valorNuevo: {
+          tituloTarea: filaFinal.tituloTarea,
+          estadoTarea: filaFinal.estadoTarea,
+          prioridad: filaFinal.prioridad,
+          idUsuarioAsignado: dto.idUsuarioAsignado ?? null,
+        },
+      });
+
       return filaFinal;
     });
 
@@ -450,7 +476,7 @@ export class TasksService {
     }
 
     const row = await this.prisma.$transaction(async (tx) => {
-      await this.tasksAuthorization.assertCanEditTask(projectId, taskId, userId, tx);
+      const tareaAntes = await this.tasksAuthorization.assertCanEditTask(projectId, taskId, userId, tx);
 
       const relacionesInput: RelatedResourcesInput = {};
       if (Object.prototype.hasOwnProperty.call(dto, 'idHito')) {
@@ -534,6 +560,35 @@ export class TasksService {
         );
       }
 
+      // T-164: diff limitado a las claves realmente enviadas en `data` (no
+      // toda la fila) — mismo criterio hasOwnProperty que el resto del
+      // método para distinguir "omitido" de "enviado explícitamente". Todo
+      // el bloque queda protegido por este `if` (en vez de encadenar `?.`)
+      // para no depender de que `tareaAntes` tenga cada campo cuando no hay
+      // bitácora conectada (mismo criterio que create/updateEstado/assign,
+      // donde el corto-circuito de `?.` ya evita tocar sus variables).
+      if (this.bitacoraEventos) {
+        const camposModificados = Object.keys(data) as (keyof typeof data)[];
+        const valorAnterior: Record<string, Prisma.InputJsonValue | null> = {};
+        const valorNuevo: Record<string, Prisma.InputJsonValue | null> = {};
+        for (const campo of camposModificados) {
+          valorAnterior[campo] = this.serializarValorBitacora((tareaAntes as Record<string, unknown>)[campo]);
+          valorNuevo[campo] = this.serializarValorBitacora(data[campo]);
+        }
+
+        await this.bitacoraEventos.registrarEvento({
+          tx,
+          tipoEvento: TipoEventoBitacora.TASK_UPDATED,
+          idActor: userId,
+          idProyecto: projectId,
+          idSprint: tareaAntes.idSprint,
+          tipoEntidad: 'TAREA',
+          idEntidad: taskId,
+          valorAnterior,
+          valorNuevo,
+        });
+      }
+
       return filaFinal;
     });
 
@@ -582,7 +637,12 @@ export class TasksService {
     dto: UpdateTaskEstadoDto,
   ): Promise<TareaPublica> {
     const row = await this.prisma.$transaction(async (tx) => {
-      await this.tasksAuthorization.assertCanChangeTaskState(projectId, taskId, userId, tx);
+      const tareaAntes = await this.tasksAuthorization.assertCanChangeTaskState(
+        projectId,
+        taskId,
+        userId,
+        tx,
+      );
 
       await tx.tarea.update({
         where: { idTarea: taskId },
@@ -607,6 +667,18 @@ export class TasksService {
       if (filaFinal.idHito !== null) {
         await this.syncHitoEstado(tx, filaFinal.idHito);
       }
+
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_STATUS_CHANGED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: tareaAntes.idSprint,
+        tipoEntidad: 'TAREA',
+        idEntidad: taskId,
+        valorAnterior: { estadoTarea: tareaAntes.estadoTarea },
+        valorNuevo: { estadoTarea: filaFinal.estadoTarea },
+      });
 
       return filaFinal;
     });
@@ -760,6 +832,7 @@ export class TasksService {
 
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
       let escribio = false;
+      let esReasignacion = false;
 
       if (!asignacionActiva) {
         await this.createActiveAssignment(tx, {
@@ -790,6 +863,7 @@ export class TasksService {
           desasignadaEn: null,
         });
         escribio = true;
+        esReasignacion = true;
       }
       // Si asignacionActiva.idUsuario === dto.idUsuario: idempotente, sin escrituras.
 
@@ -802,6 +876,26 @@ export class TasksService {
         throw new Error(
           `No se pudo leer la tarea con id ${taskId} recién asignada dentro de la transacción`,
         );
+      }
+
+      // T-164: solo cuando esta llamada realmente escribió (idempotente no
+      // genera evento, mismo criterio que la notificación de assign()).
+      // TASK_REASSIGNED cuando había un asignado activo distinto,
+      // TASK_ASSIGNED cuando la tarea no tenía ninguno.
+      if (escribio) {
+        await this.bitacoraEventos?.registrarEvento({
+          tx,
+          tipoEvento: esReasignacion
+            ? TipoEventoBitacora.TASK_REASSIGNED
+            : TipoEventoBitacora.TASK_ASSIGNED,
+          idActor: actorUserId,
+          idProyecto: projectId,
+          idSprint: tarea.idSprint,
+          tipoEntidad: 'TAREA',
+          idEntidad: taskId,
+          valorAnterior: { idUsuario: asignacionActiva?.idUsuario ?? null },
+          valorNuevo: { idUsuario: dto.idUsuario },
+        });
       }
 
       return { fila: filaFinal, escribio };
@@ -971,7 +1065,7 @@ export class TasksService {
     this.assertValidAssignmentClosureInput(dto);
 
     const row = await this.prisma.$transaction(async (tx) => {
-      await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
+      const tareaBase = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
 
       const asignacion = await tx.asignacionTarea.findFirst({
         where: { idAsignacion: assignmentId, idTarea: taskId },
@@ -1044,6 +1138,18 @@ export class TasksService {
         await this.syncHitoEstado(tx, filaFinal.idHito);
       }
 
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_HOURS_LOGGED,
+        idActor: actorUserId,
+        idProyecto: projectId,
+        idSprint: tareaBase.idSprint,
+        tipoEntidad: 'TAREA',
+        idEntidad: taskId,
+        valorAnterior: { horasReales: null },
+        valorNuevo: { idAsignacion: assignmentId, horasReales: dto.horasReales },
+      });
+
       return filaFinal;
     });
 
@@ -1087,6 +1193,24 @@ export class TasksService {
         `contenidoAvance debe tener al menos ${MIN_PROGRESS_CONTENT_LENGTH} caracteres significativos`,
       );
     }
+  }
+
+  /**
+   * T-164: normaliza un valor de campo de Tarea para `detalleJson` (columna
+   * Json de bitacora_auditoria) — Date no es serializable tal cual por
+   * Prisma.InputJsonValue, así que se convierte a fecha-calendario
+   * (YYYY-MM-DD), mismo formato que toDateOnly ya usa para exponer
+   * fechaLimite al resto de la API. `undefined` se normaliza a `null`
+   * (nunca se omite la clave del diff).
+   */
+  private serializarValorBitacora(value: unknown): Prisma.InputJsonValue | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return toDateOnly(value);
+    }
+    return value as Prisma.InputJsonValue;
   }
 
   /**

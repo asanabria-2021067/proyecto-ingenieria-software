@@ -17,26 +17,30 @@ export class TasksAuthorizationService {
     await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
   }
 
-  /** Editar tarea: exclusivo del líder. */
+  /**
+   * Editar tarea (HU-141): líder del proyecto, o participante con
+   * participación activa en el MISMO rol que la tarea.
+   */
   async assertCanEditTask(projectId: number, taskId: number, userId: number, tx?: TxClient) {
-    return this._requireTaskAndLeadership(projectId, taskId, userId, tx);
+    return this._requireTaskAndRoleAuthority(projectId, taskId, userId, tx);
   }
 
   /**
-   * Asignar tarea: exclusivo del líder. Solo autoriza al actor que solicita
-   * la operación; el usuario que será asignado se valida en otra capa.
+   * Asignar tarea (HU-141): mismas reglas que editar. Solo autoriza al actor
+   * que solicita la operación; el usuario que será asignado se valida en
+   * otra capa (TasksRelationsService.assertUserAssignableToProject).
    */
   async assertCanAssignTask(projectId: number, taskId: number, userId: number, tx?: TxClient) {
-    return this._requireTaskAndLeadership(projectId, taskId, userId, tx);
+    return this._requireTaskAndRoleAuthority(projectId, taskId, userId, tx);
   }
 
   /**
-   * Desasignar tarea: mismas reglas de liderazgo que asignar. El usuario
-   * actualmente asignado no puede desasignarse a sí mismo mediante esta
-   * regla (no hay ninguna excepción para el asignado activo aquí).
+   * Desasignar tarea (HU-141): mismas reglas que asignar/editar. El usuario
+   * actualmente asignado no queda exento por esa sola razón — solo el líder
+   * o un participante activo del mismo rol de la tarea puede desasignar.
    */
   async assertCanUnassignTask(projectId: number, taskId: number, userId: number, tx?: TxClient) {
-    return this._requireTaskAndLeadership(projectId, taskId, userId, tx);
+    return this._requireTaskAndRoleAuthority(projectId, taskId, userId, tx);
   }
 
   /** Eliminar tarea: exclusivo del líder. */
@@ -112,5 +116,44 @@ export class TasksAuthorizationService {
     const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
     await this.tasksContext.assertProjectLeader(projectId, userId, tx);
     return tarea;
+  }
+
+  /**
+   * Secuencia compartida por editar/asignar/desasignar (HU-141): validar la
+   * tarea, luego autorizar si el actor es el líder del proyecto O tiene una
+   * participación activa en el MISMO rol que la tarea (tarea.idRolProyecto),
+   * en ese orden — mismo patrón ya usado por assertCanChangeTaskState
+   * (líder primero, sin consultar participación si ya es líder). Una tarea
+   * sin rol (idRolProyecto: null) nunca admite la segunda vía — ninguna
+   * participación tiene idRolProyecto: null — así que sigue siendo exclusiva
+   * del líder en ese caso. No crea un modelo de roles nuevo: reutiliza
+   * ParticipacionProyecto tal como ya hace assertActiveProjectParticipant.
+   */
+  private async _requireTaskAndRoleAuthority(
+    projectId: number,
+    taskId: number,
+    userId: number,
+    tx?: TxClient,
+  ) {
+    const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
+    const proyecto = await this.tasksContext.getProjectOrThrow(projectId, tx);
+
+    if (proyecto.creadoPor === userId) {
+      return tarea;
+    }
+
+    if (tarea.idRolProyecto !== null) {
+      const participacionActiva = await this.tasksContext.getActiveParticipationInRole(
+        projectId,
+        userId,
+        tarea.idRolProyecto,
+        tx,
+      );
+      if (participacionActiva) {
+        return tarea;
+      }
+    }
+
+    throw new ForbiddenException('No tienes permiso para realizar esta acción sobre la tarea');
   }
 }
