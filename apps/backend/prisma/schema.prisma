@@ -258,7 +258,6 @@ model Usuario {
   solicitudesSalidaResueltas       SolicitudSalidaProyecto[]  @relation("SolicitudSalidaResolutor")
   sprintsCerrados                  Sprint[]
   registrosAvanceEscritos          RegistroAvanceAsignacion[]
-  registrosTiempoRegistrados       RegistroTiempoTarea[]
   amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
   amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
   siguiendo                        Seguimiento[]              @relation("Siguiendo")
@@ -774,7 +773,6 @@ model AsignacionTarea {
   asignador       Usuario                    @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
   participacion   ParticipacionProyecto?     @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: SetNull)
   registrosAvance RegistroAvanceAsignacion[]
-  registrosTiempo RegistroTiempoTarea[]
 
   @@index([idUsuario, desasignadaEn])
   @@index([idParticipacion])
@@ -797,32 +795,6 @@ model RegistroAvanceAsignacion {
   autor      Usuario         @relation(fields: [idAutor], references: [idUsuario])
 
   @@map("registro_avance_asignacion")
-}
-
-/// Registro aditivo de tiempo trabajado (HU-142): cada fila es un evento de
-/// horas registradas por idUsuario sobre un tramo concreto de AsignacionTarea
-/// (nunca sobre la tarea en general). Distinto de RegistroAvanceAsignacion
-/// (bitácora de texto sin horas) y de HorasParticipacion (agregación/aprobación
-/// de horas por período o Sprint): esta tabla es la fuente granular de eventos
-/// individuales cuya suma (agrupada por idAsignacion) recalcula
-/// AsignacionTarea.horasReales del tramo activo. Solo se puede escribir
-/// mientras el tramo sigue activo (desasignadaEn IS NULL) — regla de la capa
-/// de servicio (TimeRecordsService), no constraint de schema.
-model RegistroTiempoTarea {
-  idRegistroTiempo Int      @id @default(autoincrement()) @map("id_registro_tiempo")
-  idAsignacion     Int      @map("id_asignacion")
-  idUsuario        Int      @map("id_usuario")
-  horas            Decimal  @db.Decimal(6, 2)
-  fecha            DateTime @db.Date
-  nota             String?  @db.Text
-  creadoEn         DateTime @default(now()) @map("creado_en")
-
-  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion])
-  usuario    Usuario         @relation(fields: [idUsuario], references: [idUsuario])
-
-  @@index([idAsignacion])
-  @@index([idUsuario])
-  @@map("registro_tiempo_tarea")
 }
 
 model Etiqueta {

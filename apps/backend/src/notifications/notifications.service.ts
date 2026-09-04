@@ -295,38 +295,6 @@ export class NotificationsService {
   }
 
   /**
-   * HU-142 (T-171): mismo criterio de audiencia y mecanismo exacto que
-   * notifySprintClosed (participantes ACTIVO del proyecto, excluyendo al
-   * actor, deduplicados por idUsuario, señal realtime pura sin persistir
-   * Notificacion) — reutiliza el helper ya introducido por A4/A9.1 para
-   * eventos de Sprint, aplicado ahora a horas registradas por tarea.
-   */
-  async notifyTaskHoursLogged(
-    idProyecto: number,
-    autorId: number,
-    payload: { projectId: number; taskId: number; idAsignacion: number },
-    tx?: TxClient,
-  ): Promise<void> {
-    const db = tx ?? this.prisma;
-    const participaciones = await db.participacionProyecto.findMany({
-      where: {
-        estadoParticipacion: 'ACTIVO',
-        idUsuario: { not: autorId },
-        rolProyecto: { idProyecto },
-      },
-      distinct: ['idUsuario'],
-      select: { idUsuario: true },
-    });
-
-    if (this.gateway?.server) {
-      await this.gateway.notifyTaskHoursLogged(
-        participaciones.map((p) => p.idUsuario),
-        payload,
-      );
-    }
-  }
-
-  /**
    * Tarea 33: destinatarios = miembros con participación ACTIVA en un rol
    * concreto de un proyecto concreto (nunca miembros de otro rol o de otro
    * proyecto), excluyendo al actor y deduplicados por `idUsuario`. A

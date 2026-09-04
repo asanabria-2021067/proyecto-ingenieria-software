@@ -97,20 +97,4 @@ export class NotificationsGateway
       this.server.to(`user:${userId}`).emit('SPRINT_CLOSED', payload);
     }
   }
-
-  /**
-   * HU-142 (T-171): mismo mecanismo de rooms (`user:{idUsuario}`) y mismo
-   * patrón de nombre de evento propio que notifySprintFinalizationStarted/
-   * notifySprintClosed — señal realtime para que la UI de tarea/equipo
-   * invalide sus queries cuando alguien registra horas, sin namespace ni
-   * WebSocketServer nuevos.
-   */
-  async notifyTaskHoursLogged(
-    userIds: number[],
-    payload: { projectId: number; taskId: number; idAsignacion: number },
-  ) {
-    for (const userId of userIds) {
-      this.server.to(`user:${userId}`).emit('TASK_HOURS_LOGGED', payload);
-    }
-  }
 }
