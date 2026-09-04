@@ -114,29 +114,3 @@ export interface CloseAssignmentInput {
   contenidoAvance: string;
   marcarComoHecha: boolean;
 }
-
-/**
- * Forma real de cada elemento de `GET /proyectos/:projectId/tareas/:taskId/horas`
- * (HU-142/T-170) — un evento individual de tiempo trabajado, distinto de
- * `AsignacionTarea.horasReales` (el total ya acumulado del tramo) y de las
- * horas aprobadas por Sprint (`HorasParticipacion.horasAprobadas`, ver
- * `@/lib/dto/member-detail.dto`): "horas registradas" aquí es autorreportado
- * por quien trabajó la tarea y todavía no implica aprobación.
- */
-export interface RegistroTiempoTareaDTO {
-  idRegistroTiempo: number;
-  idAsignacion: number;
-  idUsuario: number;
-  horas: number;
-  fecha: string;
-  nota: string | null;
-  creadoEn: string;
-  usuario: UsuarioAsignadoResumen;
-}
-
-/** Body de `POST /proyectos/:projectId/tareas/:taskId/horas` — equivalente a `CreateTimeRecordDto`. */
-export interface CreateTimeRecordInput {
-  horas: number;
-  fecha: string;
-  nota?: string;
-}

@@ -56,7 +56,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { TaskCommentsPanel } from '@/components/projects/task-comments-panel';
-import { TaskHoursPanel } from '@/components/projects/task-hours-panel';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
 import { CloseAssignmentForm } from '@/components/projects/close-assignment-form';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
@@ -520,17 +519,6 @@ function TaskDetailView({
                 )}
               </DatoOrganizacion>
             </div>
-          </section>
-
-          {/* Horas trabajadas (HU-142) */}
-          <section className={CARD}>
-            <SeccionTitulo icon={Clock}>Horas trabajadas</SeccionTitulo>
-            <TaskHoursPanel
-              idProyecto={idProyecto}
-              idTarea={tarea.idTarea}
-              puedeRegistrar={esAsignadoActivo}
-              enabled
-            />
           </section>
 
           {/* Etiquetas (Sección 40) */}

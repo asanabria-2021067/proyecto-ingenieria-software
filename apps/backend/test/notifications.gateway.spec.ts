@@ -116,55 +116,6 @@ describe('NotificationsGateway', () => {
     });
   });
 
-  describe('notifyTaskHoursLogged (HU-142 / T-171)', () => {
-    it('emite literalmente el evento TASK_HOURS_LOGGED', async () => {
-      const { gateway, emit } = makeGateway();
-
-      await gateway.notifyTaskHoursLogged([5], { projectId: 10, taskId: 20, idAsignacion: 30 });
-
-      expect(emit).toHaveBeenCalledWith('TASK_HOURS_LOGGED', { projectId: 10, taskId: 20, idAsignacion: 30 });
-    });
-
-    it('el payload incluye projectId, taskId e idAsignacion', async () => {
-      const { gateway, emit } = makeGateway();
-
-      await gateway.notifyTaskHoursLogged([5], { projectId: 42, taskId: 99, idAsignacion: 7 });
-
-      const [, payload] = emit.mock.calls[0];
-      expect(payload).toEqual({ projectId: 42, taskId: 99, idAsignacion: 7 });
-    });
-
-    it('usa el mismo mecanismo de rooms user:{idUsuario} que los demás eventos de Sprint, uno por destinatario', async () => {
-      const { gateway, to, emit } = makeGateway();
-
-      await gateway.notifyTaskHoursLogged([7, 8, 9], { projectId: 1, taskId: 2, idAsignacion: 3 });
-
-      expect(to).toHaveBeenCalledWith('user:7');
-      expect(to).toHaveBeenCalledWith('user:8');
-      expect(to).toHaveBeenCalledWith('user:9');
-      expect(emit).toHaveBeenCalledTimes(3);
-    });
-
-    it('con lista vacía de destinatarios no emite nada', async () => {
-      const { gateway, emit } = makeGateway();
-
-      await gateway.notifyTaskHoursLogged([], { projectId: 1, taskId: 2, idAsignacion: 3 });
-
-      expect(emit).not.toHaveBeenCalled();
-    });
-
-    it('TASK_HOURS_LOGGED coexiste con SPRINT_CLOSED y "notification" — ninguno reemplaza a otro', async () => {
-      const { gateway, emit } = makeGateway();
-
-      await gateway.notifyUsers([1], { tituloNotificacion: 'x' });
-      await gateway.notifySprintClosed([1], { projectId: 10, sprintId: 20 });
-      await gateway.notifyTaskHoursLogged([1], { projectId: 10, taskId: 20, idAsignacion: 30 });
-
-      const eventosEmitidos = emit.mock.calls.map(([evento]) => evento);
-      expect(eventosEmitidos).toEqual(['notification', 'SPRINT_CLOSED', 'TASK_HOURS_LOGGED']);
-    });
-  });
-
   /**
    * X4 (Parte C): regresión de que incorporar SPRINT_FINALIZATION_STARTED
    * (A4) no alteró la configuración observable del gateway ni reemplazó el

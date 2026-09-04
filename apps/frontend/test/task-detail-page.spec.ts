@@ -29,13 +29,6 @@ vi.mock('../components/projects/task-comments-panel', () => ({
   TaskCommentsPanel: () => createElement('div', { 'data-testid': 'panel-comentarios' }, 'Comentarios'),
 }));
 
-// HU-142: mismo criterio que TaskCommentsPanel — su consulta/mutación ya
-// tienen cobertura dedicada en task-hours-panel.spec.ts, así que aquí se
-// stubea para verificar únicamente que se monta junto al resto del detalle.
-vi.mock('../components/projects/task-hours-panel', () => ({
-  TaskHoursPanel: () => createElement('div', { 'data-testid': 'panel-horas' }, 'Horas'),
-}));
-
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
 const searchParamsState = vi.hoisted(() => ({ current: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
