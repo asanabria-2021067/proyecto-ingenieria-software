@@ -29,11 +29,14 @@ import {
 } from '@/components/ui/empty';
 import { getMisTareas, type MiTareaDTO } from '@/lib/services/users';
 import {
+  filterTasksByHito,
   filterTasksByPriority,
   filterTasksByStatus,
   paginateTasks,
   searchTasks,
   sortTasks,
+  type CriterioOrdenTarea,
+  type DireccionOrden,
 } from '@/lib/tasks/filters';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 
@@ -118,7 +121,9 @@ export default function MisTareasPage() {
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('TODOS');
   const [prioridadFiltro, setPrioridadFiltro] = useState('TODAS');
-  const [orden, setOrden] = useState<'asc' | 'desc'>('asc');
+  const [hitoFiltro, setHitoFiltro] = useState('TODOS');
+  // valor combinado "criterio:direccion" (p. ej. "prioridad:desc")
+  const [orden, setOrden] = useState('fechaLimite:asc');
   const [pagina, setPagina] = useState(1);
 
   // Se piden todas las tareas asignadas una sola vez al mismo endpoint
@@ -131,6 +136,18 @@ export default function MisTareasPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Opciones de hito derivadas de las tareas ya cargadas. MiTareaDTO solo
+  // trae `idHito` (sin título), así que las opciones se etiquetan por id.
+  const opcionesHito = useMemo(() => {
+    const idsHito = new Set<number>();
+    let haySinHito = false;
+    for (const tarea of tareas) {
+      if (tarea.idHito == null) haySinHito = true;
+      else idsHito.add(tarea.idHito);
+    }
+    return { ids: [...idsHito].sort((a, b) => a - b), haySinHito };
+  }, [tareas]);
+
   const tareasFiltradas = useMemo(() => {
     const buscadas = searchTasks(tareas, busqueda);
     const porEstado = filterTasksByStatus(
@@ -141,8 +158,17 @@ export default function MisTareasPage() {
       porEstado,
       prioridadFiltro === 'TODAS' ? undefined : (prioridadFiltro as Prioridad),
     );
-    return sortTasks(porPrioridad, 'fechaLimite', orden);
-  }, [tareas, busqueda, estadoFiltro, prioridadFiltro, orden]);
+    const porHito = filterTasksByHito(
+      porPrioridad,
+      hitoFiltro === 'TODOS'
+        ? undefined
+        : hitoFiltro === 'SIN_HITO'
+          ? null
+          : Number(hitoFiltro),
+    );
+    const [criterio, direccion] = orden.split(':') as [CriterioOrdenTarea, DireccionOrden];
+    return sortTasks(porHito, criterio, direccion);
+  }, [tareas, busqueda, estadoFiltro, prioridadFiltro, hitoFiltro, orden]);
 
   const totalPaginas = Math.max(1, Math.ceil(tareasFiltradas.length / TAMANIO_PAGINA));
   const paginaActual = Math.min(Math.max(1, pagina), totalPaginas);
@@ -164,7 +190,11 @@ export default function MisTareasPage() {
     setPrioridadFiltro(valor);
     setPagina(1);
   };
-  const cambiarOrden = (valor: 'asc' | 'desc') => {
+  const cambiarHito = (valor: string) => {
+    setHitoFiltro(valor);
+    setPagina(1);
+  };
+  const cambiarOrden = (valor: string) => {
     setOrden(valor);
     setPagina(1);
   };
@@ -184,12 +214,16 @@ export default function MisTareasPage() {
   }, [paginacion.items]);
 
   const hayFiltrosActivos =
-    busqueda.trim() !== '' || estadoFiltro !== 'TODOS' || prioridadFiltro !== 'TODAS';
+    busqueda.trim() !== '' ||
+    estadoFiltro !== 'TODOS' ||
+    prioridadFiltro !== 'TODAS' ||
+    hitoFiltro !== 'TODOS';
 
   const limpiarFiltros = () => {
     setBusqueda('');
     setEstadoFiltro('TODOS');
     setPrioridadFiltro('TODAS');
+    setHitoFiltro('TODOS');
     setPagina(1);
   };
 
@@ -245,13 +279,32 @@ export default function MisTareasPage() {
               </SelectContent>
             </Select>
 
-            <Select value={orden} onValueChange={(v) => cambiarOrden(v as 'asc' | 'desc')}>
-              <SelectTrigger className="w-56 h-auto py-2 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm">
+            <Select value={hitoFiltro} onValueChange={cambiarHito}>
+              <SelectTrigger className="w-40 h-auto py-2 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm">
+                <SelectValue placeholder="Hito" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODOS">Todos los hitos</SelectItem>
+                {opcionesHito.haySinHito && <SelectItem value="SIN_HITO">Sin hito</SelectItem>}
+                {opcionesHito.ids.map((id) => (
+                  <SelectItem key={id} value={String(id)}>
+                    Hito #{id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={orden} onValueChange={cambiarOrden}>
+              <SelectTrigger className="w-60 h-auto py-2 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm">
                 <SelectValue placeholder="Ordenar" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="asc">Fecha límite: más próxima primero</SelectItem>
-                <SelectItem value="desc">Fecha límite: más lejana primero</SelectItem>
+                <SelectItem value="fechaLimite:asc">Fecha límite: más próxima primero</SelectItem>
+                <SelectItem value="fechaLimite:desc">Fecha límite: más lejana primero</SelectItem>
+                <SelectItem value="prioridad:asc">Prioridad: más alta primero</SelectItem>
+                <SelectItem value="prioridad:desc">Prioridad: más baja primero</SelectItem>
+                <SelectItem value="estado:asc">Estado: por hacer primero</SelectItem>
+                <SelectItem value="estado:desc">Estado: completadas primero</SelectItem>
               </SelectContent>
             </Select>
           </div>

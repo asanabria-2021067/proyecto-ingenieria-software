@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   FILTRO_TODOS,
+  filterTasksByHito,
   filterTasksByPriority,
   filterTasksBySprint,
   filterTasksByStatus,
@@ -118,7 +119,40 @@ describe('filterTasksBySprint', () => {
   });
 });
 
-describe('filtros combinados (estado + prioridad + sprint)', () => {
+describe('filterTasksByHito', () => {
+  const conHito = [
+    tarea({ idTarea: 1, idHito: 10 }),
+    tarea({ idTarea: 2, idHito: 20 }),
+    tarea({ idTarea: 3, idHito: 10 }),
+    tarea({ idTarea: 4, idHito: null }),
+    { ...tarea({ idTarea: 5 }), idHito: undefined } as unknown as TareaTest,
+  ];
+
+  it('entrada vacía: [] y undefined devuelven []', () => {
+    expect(filterTasksByHito([], 10)).toEqual([]);
+    expect(filterTasksByHito(undefined, 10)).toEqual([]);
+  });
+
+  it('filtra por un hito concreto', () => {
+    expect(ids(filterTasksByHito(conHito, 10))).toEqual([1, 3]);
+  });
+
+  it('hitoId null selecciona las tareas sin hito (null o ausente)', () => {
+    expect(ids(filterTasksByHito(conHito, null))).toEqual([4, 5]);
+  });
+
+  it('hitoId undefined devuelve una copia sin filtrar', () => {
+    expect(filterTasksByHito(conHito, undefined)).toHaveLength(5);
+  });
+
+  it('no muta el arreglo original', () => {
+    const copiaIds = ids(conHito);
+    filterTasksByHito(conHito, 10);
+    expect(ids(conHito)).toEqual(copiaIds);
+  });
+});
+
+describe('filtros combinados (estado + prioridad + sprint + hito)', () => {
   it('encadena los tres filtros con lógica AND', () => {
     const resultado = filterTasksBySprint(
       filterTasksByPriority(
@@ -150,6 +184,23 @@ describe('filtros combinados (estado + prioridad + sprint)', () => {
       1,
     );
     expect(resultado).toEqual([]);
+  });
+
+  it('encadena estado + prioridad + sprint + hito con lógica AND', () => {
+    const entrada = [
+      tarea({ idTarea: 1, estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', idSprint: 1, idHito: 10 }),
+      tarea({ idTarea: 2, estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', idSprint: 1, idHito: 20 }),
+      tarea({ idTarea: 3, estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', idSprint: 2, idHito: 10 }),
+      tarea({ idTarea: 4, estadoTarea: 'POR_HACER', prioridad: 'ALTA', idSprint: 1, idHito: 10 }),
+    ];
+    const resultado = filterTasksByHito(
+      filterTasksBySprint(
+        filterTasksByPriority(filterTasksByStatus(entrada, 'EN_PROGRESO'), 'ALTA'),
+        1,
+      ),
+      10,
+    );
+    expect(ids(resultado)).toEqual([1]);
   });
 });
 
