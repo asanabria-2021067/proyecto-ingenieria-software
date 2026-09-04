@@ -91,6 +91,36 @@ export class SprintsAuthorizationService {
   }
 
   /**
+   * Ver analítica de un Sprint (T-172, HU-143): "líder o integrante del
+   * proyecto" — a diferencia de `assertCanViewSprintHistory` (F4, exclusivo
+   * del líder), HU-143 pide explícitamente que cualquier integrante activo
+   * también pueda ver la analítica. Mismo criterio de acceso que
+   * `assertCanListSprintHistory` (F3, la lista de Sprints con sus
+   * agregados), aplicado aquí a un Sprint concreto: primero se resuelve el
+   * Sprint dentro del proyecto (404 si no existe o es de otro proyecto),
+   * luego se exige participación activa.
+   */
+  async assertCanViewSprintAnalytics(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+    tx?: TxClient,
+  ) {
+    const sprint = await this.sprintsContext.getSprintInProjectOrThrow(projectId, sprintId, tx);
+    await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
+    return sprint;
+  }
+
+  /**
+   * Ver analítica comparativa entre Sprints del proyecto (T-173, HU-143):
+   * mismo criterio que `assertCanListSprintHistory`/`assertCanViewSprintAnalytics`
+   * — líder o integrante con participación activa.
+   */
+  async assertCanListSprintAnalytics(projectId: number, userId: number, tx?: TxClient): Promise<void> {
+    await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
+  }
+
+  /**
    * Secuencia compartida por finalizar/cerrar: validar el Sprint dentro del
    * proyecto y luego exigir liderazgo, en ese orden (mismo patrón que
    * TasksAuthorizationService._requireTaskAndLeadership).

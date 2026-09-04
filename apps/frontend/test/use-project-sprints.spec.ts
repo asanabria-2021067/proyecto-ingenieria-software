@@ -11,6 +11,8 @@ vi.mock('../lib/services/sprints', () => ({
   getSprintDetail: vi.fn(),
   getSprintClosingSummary: vi.fn(),
   adjustSprintHours: vi.fn(),
+  getSprintAnalytics: vi.fn(),
+  getSprintsAnalytics: vi.fn(),
 }));
 
 import {
@@ -18,22 +20,28 @@ import {
   useCloseSprint,
   useFinalizeSprint,
   useProjectSprints,
+  useSprintAnalytics,
   useSprintClosingSummary,
   useSprintDetail,
+  useSprintsAnalytics,
   useStartSprint,
 } from '../hooks/use-project-sprints';
 import {
   projectSprintsQueryKey,
+  sprintAnalyticsQueryKey,
   sprintClosingSummaryQueryKey,
   sprintDetailQueryKey,
+  sprintsAnalyticsQueryKey,
 } from '../lib/query-keys/sprints';
 import {
   adjustSprintHours,
   closeSprint,
   finalizeSprint,
   getProjectSprints,
+  getSprintAnalytics,
   getSprintClosingSummary,
   getSprintDetail,
+  getSprintsAnalytics,
   startSprint,
 } from '../lib/services/sprints';
 
@@ -499,5 +507,158 @@ describe('useAdjustSprintHours (F5)', () => {
       result.current.mutateAsync({ idParticipacion: 51, horasAprobadas: 12 }),
     ).rejects.toThrow('400');
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+});
+
+function sprintAnalytics(overrides: Partial<any> = {}) {
+  return {
+    idSprint: 1,
+    idProyecto: 7,
+    numero: 1,
+    estado: 'ACTIVO',
+    tareasTotales: 4,
+    distribucionPorEstado: { POR_HACER: 1, EN_PROGRESO: 1, EN_REVISION: 0, HECHO: 2 },
+    distribucionPorPrioridad: { BAJA: 1, MEDIA: 2, ALTA: 1 },
+    hitos: [],
+    planificadoVsCompletado: { tareasPlanificadas: 4, tareasCompletadas: 2, horasEstimadas: 20 },
+    ...overrides,
+  };
+}
+
+describe('useSprintAnalytics (T-172)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa la query key canónica exacta, distinta por proyecto y por Sprint', () => {
+    expect(sprintAnalyticsQueryKey(7, 1)).toEqual(['sprint-analytics', 7, 1]);
+    expect(sprintAnalyticsQueryKey(7, 1)).not.toEqual(sprintAnalyticsQueryKey(8, 1));
+    expect(sprintAnalyticsQueryKey(7, 1)).not.toEqual(sprintAnalyticsQueryKey(7, 2));
+    expect(sprintAnalyticsQueryKey(7, 1)).not.toEqual(sprintDetailQueryKey(7, 1));
+  });
+
+  it('consulta una sola vez con projectId y sprintId correctos', async () => {
+    (getSprintAnalytics as any).mockResolvedValue(sprintAnalytics());
+    const { wrapper } = createWrapper();
+    renderHook(() => useSprintAnalytics(7, 1), { wrapper });
+
+    await waitFor(() => expect(getSprintAnalytics).toHaveBeenCalledTimes(1));
+    expect(getSprintAnalytics).toHaveBeenCalledWith(7, 1);
+  });
+
+  it.each([
+    [0, 1],
+    [7, 0],
+    [-1, 1],
+    [7, NaN],
+  ])('con projectId=%s / sprintId=%s inválidos no consulta', async (idProyecto, idSprint) => {
+    (getSprintAnalytics as any).mockResolvedValue(sprintAnalytics());
+    const { wrapper } = createWrapper();
+    renderHook(() => useSprintAnalytics(idProyecto, idSprint), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getSprintAnalytics).not.toHaveBeenCalled();
+  });
+
+  it('expone la analítica resuelta por el service', async () => {
+    (getSprintAnalytics as any).mockResolvedValue(sprintAnalytics({ tareasTotales: 9 }));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintAnalytics(7, 1), { wrapper });
+
+    await waitFor(() => expect(result.current.analytics?.tareasTotales).toBe(9));
+  });
+
+  it('analytics es undefined antes de resolver, con isLoading true', () => {
+    (getSprintAnalytics as any).mockReturnValue(new Promise(() => {}));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintAnalytics(7, 1), { wrapper });
+
+    expect(result.current.analytics).toBeUndefined();
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it('expone isError y error cuando la query falla', async () => {
+    const boom = new Error('403');
+    (getSprintAnalytics as any).mockRejectedValue(boom);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintAnalytics(7, 1), { wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(boom);
+  });
+});
+
+function comparativeAnalyticsItem(overrides: Partial<any> = {}) {
+  return {
+    idSprint: 1,
+    numero: 1,
+    estado: 'CERRADO',
+    tareasPlanificadas: 4,
+    tareasCompletadas: 3,
+    porcentajeCumplimiento: 75,
+    hitosTotales: 1,
+    hitosCompletados: 1,
+    ...overrides,
+  };
+}
+
+describe('useSprintsAnalytics (T-173)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa la query key canónica exacta', () => {
+    expect(sprintsAnalyticsQueryKey(7)).toEqual(['sprints-analytics', 7]);
+    expect(sprintsAnalyticsQueryKey(7)).not.toEqual(sprintsAnalyticsQueryKey(8));
+    expect(sprintsAnalyticsQueryKey(7)).not.toEqual(projectSprintsQueryKey(7));
+  });
+
+  it('consulta una sola vez con el projectId correcto', async () => {
+    (getSprintsAnalytics as any).mockResolvedValue({ idProyecto: 7, sprints: [] });
+    const { wrapper } = createWrapper();
+    renderHook(() => useSprintsAnalytics(7), { wrapper });
+
+    await waitFor(() => expect(getSprintsAnalytics).toHaveBeenCalledTimes(1));
+    expect(getSprintsAnalytics).toHaveBeenCalledWith(7);
+  });
+
+  it.each([0, -1, NaN])('un projectId inválido (%s) no consulta', async (idInvalido) => {
+    (getSprintsAnalytics as any).mockResolvedValue({ idProyecto: 7, sprints: [] });
+    const { wrapper } = createWrapper();
+    renderHook(() => useSprintsAnalytics(idInvalido), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getSprintsAnalytics).not.toHaveBeenCalled();
+  });
+
+  it('sprints por defecto es [] antes de que resuelva la query', () => {
+    (getSprintsAnalytics as any).mockReturnValue(new Promise(() => {}));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintsAnalytics(7), { wrapper });
+
+    expect(result.current.sprints).toEqual([]);
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it('expone la lista de sprints resuelta por el service (data.sprints, no la envoltura completa)', async () => {
+    (getSprintsAnalytics as any).mockResolvedValue({
+      idProyecto: 7,
+      sprints: [comparativeAnalyticsItem()],
+    });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintsAnalytics(7), { wrapper });
+
+    await waitFor(() => expect(result.current.sprints).toHaveLength(1));
+    expect(result.current.sprints[0]).toEqual(comparativeAnalyticsItem());
+  });
+
+  it('expone isError y error cuando la query falla', async () => {
+    const boom = new Error('fallo de red');
+    (getSprintsAnalytics as any).mockRejectedValue(boom);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSprintsAnalytics(7), { wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(boom);
   });
 });
