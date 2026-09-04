@@ -56,6 +56,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { TaskCommentsPanel } from '@/components/projects/task-comments-panel';
+import { TaskHoursPanel } from '@/components/projects/task-hours-panel';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
 import { CloseAssignmentForm } from '@/components/projects/close-assignment-form';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
@@ -180,6 +181,23 @@ function TaskDetailView({
     currentUser != null && tarea.asignacionActiva?.idUsuario === currentUser.idUsuario;
   const puedeCambiarEstado = isLeader || esAsignadoActivo;
 
+  // HU-141: gestión colaborativa por rol — un participante activo en el
+  // MISMO rol que la tarea puede editarla/asignarla/desasignarla sin ser
+  // líder. `members` (useProjectMembers) ya trae solo participaciones
+  // ACTIVO (Sección/comentario del hook). Un usuario puede tener varias
+  // filas ACTIVO en el mismo proyecto (una por rol) — por eso se usa
+  // `.some(...)` sobre TODAS sus participaciones en vez de `.find(...)`
+  // (que solo devolvería la primera y podría negar acceso legítimo a un
+  // usuario multi-rol cuyo rol coincidente no sea el primero). Una tarea
+  // sin rol (tarea.rolProyecto: null) nunca habilita esta vía — sigue
+  // siendo exclusiva del líder, igual que en el backend.
+  const idRolTarea = tarea.rolProyecto?.idRolProyecto ?? null;
+  const mismoRolActivo =
+    currentUser != null &&
+    idRolTarea != null &&
+    members.some((m) => m.idUsuario === currentUser.idUsuario && m.idRolProyecto === idRolTarea);
+  const puedeGestionarTarea = isLeader || mismoRolActivo;
+
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
   const vencida = estaVencida(tarea);
   const estiloEstado = ESTADO_COLUMNA_STYLE[tarea.estadoTarea];
@@ -289,7 +307,7 @@ function TaskDetailView({
             Volver al tablero
           </Button>
 
-          {(esAsignadoActivo || isLeader) && (
+          {(esAsignadoActivo || puedeGestionarTarea) && (
             <div className="flex flex-wrap items-center gap-2">
               {/* F10 — solo quien tiene la asignación activa puede cerrar su
                   propio tramo (mismo criterio que el backend:
@@ -308,7 +326,7 @@ function TaskDetailView({
                   Cerrar tramo
                 </Button>
               )}
-              {isLeader && (
+              {puedeGestionarTarea && (
               <Button
                 type="button"
                 size="sm"
@@ -320,7 +338,7 @@ function TaskDetailView({
                 Editar tarea
               </Button>
               )}
-              {isLeader && (
+              {puedeGestionarTarea && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -362,15 +380,19 @@ function TaskDetailView({
                       Desasignar
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    aria-label={`Eliminar tarea ${tarea.tituloTarea}`}
-                    onSelect={() => setBorrarAbierto(true)}
-                  >
-                    <Trash2 className="size-4" aria-hidden="true" />
-                    Eliminar tarea
-                  </DropdownMenuItem>
+                  {isLeader && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        aria-label={`Eliminar tarea ${tarea.tituloTarea}`}
+                        onSelect={() => setBorrarAbierto(true)}
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                        Eliminar tarea
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
               )}
@@ -521,6 +543,17 @@ function TaskDetailView({
             </div>
           </section>
 
+          {/* Horas trabajadas (HU-142) */}
+          <section className={CARD}>
+            <SeccionTitulo icon={Clock}>Horas trabajadas</SeccionTitulo>
+            <TaskHoursPanel
+              idProyecto={idProyecto}
+              idTarea={tarea.idTarea}
+              puedeRegistrar={esAsignadoActivo}
+              enabled
+            />
+          </section>
+
           {/* Etiquetas (Sección 40) */}
           <section className={CARD}>
             <SeccionTitulo icon={Tag}>Etiquetas</SeccionTitulo>
@@ -565,7 +598,7 @@ function TaskDetailView({
       </div>
 
       {/* EDITAR (reutiliza el formulario compartido — Sección 24/67) */}
-      {isLeader && (
+      {puedeGestionarTarea && (
         <TaskFormDialog
           open={editarAbierto}
           mode="edit"
@@ -575,13 +608,14 @@ function TaskDetailView({
           members={members}
           labels={labels}
           isLeader={isLeader}
+          puedeGestionarTarea={puedeGestionarTarea}
           crearTarea={crearTarea}
           editarTarea={editarTarea}
           asignarTarea={asignarTarea}
           desasignarTarea={desasignarTarea}
           onOpenChange={(open) => setEditarAbierto(open)}
           onRequestDelete={() => setBorrarAbierto(true)}
-          onManageLabels={() => setEtiquetasAbierto(true)}
+          onManageLabels={isLeader ? () => setEtiquetasAbierto(true) : undefined}
         />
       )}
 

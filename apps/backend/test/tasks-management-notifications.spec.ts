@@ -229,7 +229,11 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
   function makeUpdateSetup(rowOverrides: Record<string, unknown> = {}) {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanEditTask: vi.fn().mockResolvedValue(undefined) };
+    // T-164: assertCanEditTask ahora también sirve como "tareaAntes" para el
+    // diff de la bitácora (idSprint incluido, ausente de TASK_SELECT) —
+    // antes su resuelto se descartaba, así que este mock puede devolver
+    // cualquier fila con los campos que update() vaya a leer.
+    const auth = { assertCanEditTask: vi.fn().mockResolvedValue({ idSprint: 1, ...tareaRow(rowOverrides) }) };
     const relations = {
       validateRelatedResources: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     };
@@ -284,7 +288,7 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
   it('error de update: ninguna notificación', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanEditTask: vi.fn().mockResolvedValue(undefined) };
+    const auth = { assertCanEditTask: vi.fn().mockResolvedValue({ idSprint: 1, ...tareaRow() }) };
     const relations = {
       validateRelatedResources: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     };

@@ -13,6 +13,8 @@ function makeService() {
     closeSprint: vi.fn(),
     listSprints: vi.fn(),
     getSprintDetail: vi.fn(),
+    getSprintAnalytics: vi.fn(),
+    getSprintsAnalytics: vi.fn(),
   };
 }
 
@@ -328,5 +330,103 @@ describe('SprintsController.detail (GET /proyectos/:projectId/sprints/:sprintId)
     const controller = makeController(service);
 
     await expect(controller.detail(5, 12, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.getAnalytics (GET /proyectos/:projectId/sprints/:sprintId/analytics) — T-172', () => {
+  it('está registrado como GET en :sprintId/analytics', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.getAnalytics)).toBe(
+      ':sprintId/analytics',
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.getAnalytics)).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.getAnalytics)).toBe(200);
+  });
+
+  it('delega en SprintsService.getSprintAnalytics con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.getAnalytics(5, 12, { userId: 9 });
+
+    expect(service.getSprintAnalytics).toHaveBeenCalledTimes(1);
+    expect(service.getSprintAnalytics).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.getSprintAnalytics, sin transformarlo', async () => {
+    const service = makeService();
+    const analytics = { idSprint: 12, idProyecto: 5, tareasTotales: 3 };
+    service.getSprintAnalytics.mockResolvedValue(analytics);
+    const controller = makeController(service);
+
+    const result = await controller.getAnalytics(5, 12, { userId: 9 });
+
+    expect(result).toBe(analytics);
+  });
+
+  it('propaga los errores de autorización/negocio (p. ej. aislamiento cross-project) que lance SprintsService.getSprintAnalytics', async () => {
+    const service = makeService();
+    const error = new Error('no encontrado');
+    service.getSprintAnalytics.mockRejectedValue(error);
+    const controller = makeController(service);
+
+    await expect(controller.getAnalytics(5, 12, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.getComparativeAnalytics (GET /proyectos/:projectId/sprints/analytics) — T-173', () => {
+  it('está registrado como GET en analytics (segmento literal, no confundible con :sprintId)', () => {
+    expect(
+      Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.getComparativeAnalytics),
+    ).toBe('analytics');
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.getComparativeAnalytics),
+    ).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.getComparativeAnalytics),
+    ).toBe(200);
+  });
+
+  it('delega en SprintsService.getSprintsAnalytics con projectId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.getComparativeAnalytics(5, { userId: 9 });
+
+    expect(service.getSprintsAnalytics).toHaveBeenCalledTimes(1);
+    expect(service.getSprintsAnalytics).toHaveBeenCalledWith(5, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.getSprintsAnalytics, sin transformarlo', async () => {
+    const service = makeService();
+    const comparativa = { idProyecto: 5, sprints: [] };
+    service.getSprintsAnalytics.mockResolvedValue(comparativa);
+    const controller = makeController(service);
+
+    const result = await controller.getComparativeAnalytics(5, { userId: 9 });
+
+    expect(result).toBe(comparativa);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.getSprintsAnalytics', async () => {
+    const service = makeService();
+    const error = new Error('no autorizado');
+    service.getSprintsAnalytics.mockRejectedValue(error);
+    const controller = makeController(service);
+
+    await expect(controller.getComparativeAnalytics(5, { userId: 9 })).rejects.toBe(error);
+  });
+
+  it('está registrada en el controller ANTES que detail(:sprintId) — evita que Express matchee "analytics" como sprintId', () => {
+    const prototype = SprintsController.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
+    const rutasGet = Object.getOwnPropertyNames(prototype).filter(
+      (nombreMetodo) => Reflect.getMetadata(METHOD_METADATA, prototype[nombreMetodo]) === 0,
+    );
+    expect(rutasGet.indexOf('getComparativeAnalytics')).toBeLessThan(rutasGet.indexOf('detail'));
   });
 });
