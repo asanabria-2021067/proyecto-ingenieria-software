@@ -161,7 +161,7 @@ describeIntegration(
       exitController = new ExitRequestsController(exitService);
 
       const sprintsAuthorization = new SprintsAuthorizationService(sprintsContext);
-      sprintsService = new SprintsService(prismaService, sprintsContext, sprintsAuthorization, notifications);
+      sprintsService = new SprintsService(prismaService, sprintsContext, sprintsAuthorization, notifications, new ProjectTransactionService(prismaService), new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
     });
 
     afterAll(async () => {

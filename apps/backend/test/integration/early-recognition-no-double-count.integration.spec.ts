@@ -82,7 +82,14 @@ function makeSprintsService(prisma: PrismaClient): SprintsService {
     notifySprintFinalizationStarted: async () => undefined,
     notifySprintClosed: async () => undefined,
   } as unknown as NotificationsService;
-  return new SprintsService(prismaService, context, authorization, notifications);
+  return new SprintsService(
+    prismaService,
+    context,
+    authorization,
+    notifications,
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+  );
 }
 
 function longProgressContent(label: string): string {

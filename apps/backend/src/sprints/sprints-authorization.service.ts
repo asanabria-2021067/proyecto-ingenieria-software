@@ -4,6 +4,12 @@ import { SprintsContextService } from './sprints-context.service';
 
 type TxClient = Prisma.TransactionClient;
 
+/**
+ * C045 (06 v2 §32/§40): las reglas de autoridad del Sprint no cambian; en las
+ * tres operaciones del ciclo de vida se evalúan con el `tx` del runner por
+ * proyecto, ya con el lock adquirido, junto a la policy de la familia
+ * correspondiente. Este servicio nunca abre una transacción propia.
+ */
 @Injectable()
 export class SprintsAuthorizationService {
   constructor(private readonly sprintsContext: SprintsContextService) {}

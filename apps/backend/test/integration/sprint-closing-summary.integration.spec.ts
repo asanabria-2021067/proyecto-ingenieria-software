@@ -17,6 +17,9 @@ import type { NotificationsService } from '../../src/notifications/notifications
 import { SprintsService } from '../../src/sprints/sprints.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 
 /**
  * Integración real A8: SprintsService.getSprintClosingSummary
@@ -70,7 +73,7 @@ describeIntegration(
       const context = new SprintsContextService(prisma as unknown as PrismaService);
       const authorization = new SprintsAuthorizationService(context);
       const notifications = {} as unknown as NotificationsService;
-      service = new SprintsService(prisma as unknown as PrismaService, context, authorization, notifications);
+      service = new SprintsService(prisma as unknown as PrismaService, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)));
       await prisma.$connect();
     });
 
