@@ -1,15 +1,24 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
+import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
+import { BitacoraModule } from '../bitacora/bitacora.module';
+import { StorageModule } from '../storage/storage.module';
+import { ClosureDocumentsController } from './closure-documents.controller';
+import { ProjectClosureDocumentsService } from './project-closure-documents.service';
 import { ProjectClosureReportService } from './project-closure-report.service';
 
 /**
- * C111 (06 v2 §38/§39): contenedor del cierre de proyecto.
+ * C111/C113 (06 v2 §38/§39): módulo de cierre de proyecto.
  *
- * Nace aquí únicamente para alojar el render y NO se registra en `AppModule`:
- * mientras no exista ruta alguna, ningún documento puede generarse ni subirse.
- * Sus dependencias de dominio se incorporan en los commits que las contratan.
+ * Importa Storage para hablar con el proveedor a través del puerto, nunca con
+ * su SDK directamente, y Policy para autorizar bajo el lock. Todavía no se
+ * registra en `AppModule`: la superficie de cierre se abre con el commit que
+ * la contrata.
  */
 @Module({
-  providers: [ProjectClosureReportService],
-  exports: [ProjectClosureReportService],
+  imports: [PrismaModule, ProjectPolicyModule, BitacoraModule, StorageModule],
+  controllers: [ClosureDocumentsController],
+  providers: [ProjectClosureReportService, ProjectClosureDocumentsService],
+  exports: [ProjectClosureReportService, ProjectClosureDocumentsService],
 })
 export class ProjectClosureModule {}
