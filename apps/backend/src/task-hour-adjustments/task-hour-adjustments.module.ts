@@ -7,9 +7,9 @@ import { TaskHourAdjustmentsController } from './task-hour-adjustments.controlle
 import { TaskHourAdjustmentsService } from './task-hour-adjustments.service';
 
 /**
- * C070 (06 v2 §39): módulo de ajustes de horas por tramo. Importa Policy,
- * Bitacora y Notifications. NO se registra en AppModule en este commit: sin
- * ese registro ninguna ruta responde y la superficie sigue siendo cero.
+ * C070/C071 (06 v2 §39): módulo de ajustes de horas por tramo. Importa
+ * Policy, Bitacora y Notifications, y desde C071 queda registrado en
+ * AppModule, que es cuando sus rutas empiezan a responder.
  */
 @Module({
   imports: [PrismaModule, ProjectPolicyModule, BitacoraModule, NotificationsModule],
