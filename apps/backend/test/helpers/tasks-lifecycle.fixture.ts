@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './time-records.fixture';
 import { vi } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Prisma } from '@prisma/client';
@@ -867,7 +868,7 @@ export function setupLifecycleEnv(): LifecycleEnv {
     tasksContext,
     new ProjectTransactionService(db as unknown as PrismaService),
     makeProjectPolicyDouble(),
-    makeProjectReadPolicyDouble(),
+    makeProjectReadPolicyDouble(), makeTimeRecordsDouble(),
   );
 
   const projectsNotifications = {

@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { TasksService } from '../src/tasks/tasks.service';
@@ -41,7 +42,7 @@ function makeService(
     new TasksContextService(prisma as unknown as PrismaService),
     new ProjectTransactionService(prisma as unknown as PrismaService),
     makeProjectPolicyDouble(),
-    makeProjectReadPolicyDouble());
+    makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 }
 
 function baseRow(overrides: Record<string, unknown> = {}) {

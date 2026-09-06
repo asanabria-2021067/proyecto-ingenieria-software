@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { ConflictException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
@@ -33,7 +34,7 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     new TasksContextService(prismaService),
     new ProjectTransactionService(prismaService),
     new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-    new ProjectReadPolicyService(prismaService));
+    new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
 }
 
 function longContent(label: string): string {
@@ -106,8 +107,11 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
     scope.assignmentIds = [assignment.idAsignacion];
 
     const service = makeTasksService(prisma);
+    await prisma.registroTiempoTarea.create({
+      data: { idAsignacion: assignment.idAsignacion, idUsuario: assignee.idUsuario, horas: '3.00', fecha: new Date('2026-09-06') },
+    });
     await service.closeAssignment(project.idProyecto, task.idTarea, assignment.idAsignacion, assignee.idUsuario, {
-      horasReales: 3,
+      horasReales: 8,
       contenidoAvance: longContent('primer cierre horas 3'),
       marcarComoHecha: false,
     });
@@ -166,6 +170,9 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
       userA.idUsuario,
       leader.idUsuario,
     );
+    await prisma.registroTiempoTarea.create({
+      data: { idAsignacion: tramoA1.idAsignacion, idUsuario: userA.idUsuario, horas: '3.00', fecha: new Date('2026-09-06') },
+    });
     await service.closeAssignment(project.idProyecto, task.idTarea, tramoA1.idAsignacion, userA.idUsuario, {
       horasReales: 3,
       contenidoAvance: longContent('tramo A1 horas 3'),
@@ -178,6 +185,9 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
       userB.idUsuario,
       leader.idUsuario,
     );
+    await prisma.registroTiempoTarea.create({
+      data: { idAsignacion: tramoB.idAsignacion, idUsuario: userB.idUsuario, horas: '8.00', fecha: new Date('2026-09-06') },
+    });
     await service.closeAssignment(project.idProyecto, task.idTarea, tramoB.idAsignacion, userB.idUsuario, {
       horasReales: 8,
       contenidoAvance: longContent('tramo B horas 8'),
@@ -190,6 +200,9 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
       userA.idUsuario,
       leader.idUsuario,
     );
+    await prisma.registroTiempoTarea.create({
+      data: { idAsignacion: tramoA2.idAsignacion, idUsuario: userA.idUsuario, horas: '2.00', fecha: new Date('2026-09-06') },
+    });
     await service.closeAssignment(project.idProyecto, task.idTarea, tramoA2.idAsignacion, userA.idUsuario, {
       horasReales: 2,
       contenidoAvance: longContent('tramo A2 horas 2'),

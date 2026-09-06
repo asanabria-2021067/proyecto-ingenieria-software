@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BadRequestException,
@@ -95,7 +96,7 @@ function makeService(
   notifications: ReturnType<typeof makeNotifications> = makeNotifications(),
   projectTx = makeProjectTransactionDouble({ tx: prisma }),
 ) {
-  return new RolesService(prisma, notifications, projectTx, makeProjectPolicyDouble());
+  return new RolesService(prisma, notifications, projectTx, makeProjectPolicyDouble(), makeTimeRecordsDouble());
 }
 
 function knownError(code: string) {

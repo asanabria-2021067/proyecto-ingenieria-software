@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Prioridad } from '@prisma/client';
@@ -78,7 +79,7 @@ function makeService(
   relations: TasksRelationsService,
   notifications: NotificationsService,
 ) {
-  return new TasksService(prisma, auth, relations, notifications, makeContext(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+  return new TasksService(prisma, auth, relations, notifications, makeContext(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 }
 
 const BASE_DTO = {
