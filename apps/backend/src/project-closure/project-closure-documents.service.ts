@@ -6,7 +6,6 @@ import {
   Injectable,
   NotFoundException,
   PayloadTooLargeException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import { EstadoDocumentoCierre, Prisma, TipoDocumentoCierre } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,6 +23,7 @@ import {
   type ClosureCryptoMetadata,
 } from '../storage/closure-crypto.service';
 import { ClosureTicketService } from '../storage/closure-ticket.service';
+import { ClosurePdfValidationService } from '../storage/closure-pdf-validation.service';
 import {
   ASSET_NO_COINCIDE,
   CLOSURE_REMOTE_TIMEOUT_MS,
@@ -122,6 +122,7 @@ export class ProjectClosureDocumentsService {
     private readonly tickets: ClosureTicketService,
     private readonly crypto: ClosureCryptoService,
     private readonly adapter: CloudinaryClosureStorageAdapter,
+    private readonly pdfValidation: ClosurePdfValidationService,
     @Inject(CLOUDINARY_CLOSURE_PORT) private readonly storage: ClosureStoragePort,
     private readonly bitacoraEventos: BitacoraEventosService,
   ) {}
@@ -253,12 +254,9 @@ export class ProjectClosureDocumentsService {
         message: 'El documento supera el tamaño máximo permitido',
       });
     }
-    // Un nombre o un Content-Type no prueban que esto sea un PDF; la firma sí
-    // es una condición necesaria. La validación estructural completa vive en
-    // su propio contrato.
-    if (file.subarray(0, 5).toString('latin1') !== '%PDF-') {
-      throw new UnprocessableEntityException('El documento no es un PDF válido');
-    }
+    // Un nombre o un Content-Type no prueban que esto sea un PDF: se parsea
+    // el documento completo en un worker acotado, sin reescribir el original.
+    await this.pdfValidation.assertValidPdf(file);
 
     const documentoPrevio = await this.prisma.documentoCierre.findFirst({
       where: { idDocumentoCierre: payload.documentId, idProyecto: projectId },
