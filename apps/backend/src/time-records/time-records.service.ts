@@ -20,6 +20,7 @@ import { ProjectReadPolicyService } from '../common/project-policy/project-read-
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { CreateTimeRecordDto } from './dto/create-time-record.dto';
+import { UPDATE_TIME_RECORD_FIELDS, UpdateTimeRecordDto } from './dto/update-time-record.dto';
 
 const TIME_RECORD_SELECT = {
   idRegistroTiempo: true,
@@ -83,6 +84,28 @@ function mapRegistroTiempo(row: TimeRecordRow): RegistroTiempoTareaPublico {
     nota: row.nota,
     creadoEn: row.creadoEn,
     usuario: row.usuario,
+  };
+}
+
+/**
+ * C061 (06 v2 §9 UPDATE): la bitácora de una edición debe mostrar el antes y
+ * el después completos del registro, no solo los campos enviados. Decimal se
+ * serializa con toFixed(2) para que el detalle JSON conserve la escala
+ * contractual en vez de depender de la representación de Decimal.js.
+ */
+function snapshotRegistro(row: {
+  horas: Prisma.Decimal;
+  fecha: Date;
+  nota: string | null;
+  justificacionExceso: string | null;
+  editadoEn: Date | null;
+}) {
+  return {
+    horas: row.horas.toFixed(2),
+    fecha: toDateOnly(row.fecha),
+    nota: row.nota,
+    justificacionExceso: row.justificacionExceso,
+    editadoEn: row.editadoEn?.toISOString() ?? null,
   };
 }
 
@@ -238,6 +261,115 @@ export class TimeRecordsService {
       });
 
       return mapRegistroTiempo(nuevoRegistro);
+    });
+
+    await this.notifyHoursLogged(projectId, taskId, userId, registro);
+
+    return registro;
+  }
+
+  /**
+   * C061 (06 v2 §9 UPDATE / §41 E057): el registro se resuelve por su propia
+   * cadena registro→asignación→tarea→proyecto y NUNCA por
+   * `getActiveAssignment`. Ese es el punto del contrato: el autor corrige un
+   * registro de un tramo ya cerrado aunque la tarea esté hoy asignada a otra
+   * persona. El tramo no se reabre, `desasignadaEn` no se toca y solo se
+   * recalcula la caché de ese tramo.
+   */
+  async update(
+    projectId: number,
+    taskId: number,
+    recordId: number,
+    userId: number,
+    dto: UpdateTimeRecordDto,
+  ): Promise<RegistroTiempoTareaPublico> {
+    const huboCampoEnviado = UPDATE_TIME_RECORD_FIELDS.some((campo) =>
+      Object.prototype.hasOwnProperty.call(dto, campo),
+    );
+    if (!huboCampoEnviado) {
+      throw new BadRequestException('Debe enviar al menos un campo para actualizar el registro');
+    }
+
+    const registro = await this.projectTx.run(projectId, userId, 'time-records.update', async (ctx) => {
+      const { tx } = ctx;
+      const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
+
+      const actual = await tx.registroTiempoTarea.findFirst({
+        where: { idRegistroTiempo: recordId, asignacion: { idTarea: taskId } },
+        select: {
+          idRegistroTiempo: true,
+          idAsignacion: true,
+          idUsuario: true,
+          horas: true,
+          fecha: true,
+          nota: true,
+          justificacionExceso: true,
+          editadoEn: true,
+          revocadoEn: true,
+        },
+      });
+      if (!actual) {
+        throw new NotFoundException(
+          `Registro de tiempo con id ${recordId} no encontrado en la tarea ${taskId}`,
+        );
+      }
+      if (actual.idUsuario !== userId) {
+        throw new ForbiddenException('Solo el autor puede editar su propio registro de horas');
+      }
+      if (actual.revocadoEn !== null) {
+        throw new ConflictException('El registro está revocado y ya no admite ediciones');
+      }
+
+      await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'REGISTRO_TIEMPO', userId, {
+        sprintId: tarea.idSprint,
+      });
+
+      const assignment = await tx.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: actual.idAsignacion },
+        select: { origenReporte: true, reconocidoEn: true },
+      });
+      if (assignment.origenReporte !== 'GRANULAR' || assignment.reconocidoEn !== null) {
+        throw new ConflictException('El tramo no admite correcciones de sus registros');
+      }
+
+      const actualizado = await tx.registroTiempoTarea.update({
+        where: { idRegistroTiempo: actual.idRegistroTiempo },
+        data: {
+          ...(dto.horas !== undefined ? { horas: dto.horas } : {}),
+          ...(dto.fecha !== undefined ? { fecha: new Date(`${dto.fecha}T00:00:00.000Z`) } : {}),
+          ...(dto.nota !== undefined ? { nota: dto.nota } : {}),
+          ...(dto.justificacionExceso !== undefined
+            ? { justificacionExceso: dto.justificacionExceso }
+            : {}),
+          editadoEn: new Date(),
+        },
+        select: { ...TIME_RECORD_SELECT, justificacionExceso: true, editadoEn: true },
+      });
+
+      await this.recalculateAssignment(tx, actual.idAsignacion);
+
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TIME_RECORD_EDITED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: tarea.idSprint,
+        tipoEntidad: 'TAREA',
+        idEntidad: taskId,
+        valorAnterior: {
+          idAsignacion: actual.idAsignacion,
+          idRegistroTiempo: actual.idRegistroTiempo,
+          ...snapshotRegistro(actual),
+        },
+        valorNuevo: {
+          idAsignacion: actualizado.idAsignacion,
+          idRegistroTiempo: actualizado.idRegistroTiempo,
+          ...snapshotRegistro(actualizado),
+        },
+      });
+
+      return mapRegistroTiempo(actualizado);
     });
 
     await this.notifyHoursLogged(projectId, taskId, userId, registro);

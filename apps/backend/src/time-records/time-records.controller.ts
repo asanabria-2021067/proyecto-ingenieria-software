@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -26,6 +27,7 @@ const TIME_WRITE: ProjectWriteMetadata = {
   family: 'REGISTRO_TIEMPO',
 };
 import { CreateTimeRecordDto } from './dto/create-time-record.dto';
+import { UpdateTimeRecordDto } from './dto/update-time-record.dto';
 import { TimeRecordsService } from './time-records.service';
 
 @Controller('proyectos/:projectId/tareas/:taskId/horas')
@@ -55,5 +57,25 @@ export class TimeRecordsController {
     @Body() dto: CreateTimeRecordDto,
   ) {
     return this.timeRecordsService.create(projectId, taskId, user.userId, dto);
+  }
+
+  /**
+   * E057: corregir un registro propio. Misma familia y misma metadata que el
+   * alta — el proyecto en P/E y el Sprint ambiente ACTIVO — porque el tramo
+   * puede estar cerrado sin que eso convierta la corrección en una escritura
+   * histórica: el servicio resuelve el registro por su propia cadena y exige
+   * autoría, tramo no consumido y Sprint de la tarea ACTIVO dentro del lock.
+   */
+  @Patch(':recordId')
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(TIME_WRITE)
+  update(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('recordId', ParseIntPipe) recordId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: UpdateTimeRecordDto,
+  ) {
+    return this.timeRecordsService.update(projectId, taskId, recordId, user.userId, dto);
   }
 }
