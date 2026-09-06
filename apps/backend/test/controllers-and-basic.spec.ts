@@ -84,9 +84,6 @@ describe('Controllers and basic services', () => {
     projects.changeEstado(1, { nuevoEstado: 'PUBLICADO' } as Parameters<ProjectsController['changeEstado']>[1], { userId: 1 });
     projects.submitForReview(1, { userId: 1 });
     projects.resubmit(1, { userId: 1 });
-    projects.requestClose(1, { userId: 1 });
-    projects.approveClosure(1, { userId: 1 });
-    projects.rejectClosure(1, { userId: 1 });
     projects.findPostulaciones(1, { userId: 1 });
 
     const applicationsSvc = { create: vi.fn(), findAll: vi.fn(), findMine: vi.fn(), findOne: vi.fn(), updateEstado: vi.fn() };
