@@ -13,6 +13,7 @@ import { pdfFixture, type ClosureCleanupScope } from './setup/closure-storage';
 import { GenerateReportDto } from '../../src/project-closure/dto/closure.dto';
 import { createIntegrationAdmin } from './setup/leadership';
 import { flowAStack } from './setup/flow-a';
+import { createIntegrationProject } from './setup/fixtures';
 
 const pipe = new ValidationPipe({
   whitelist: true,
@@ -171,6 +172,73 @@ describeIntegration('S7 frescura del informe de cierre', () => {
     const notice = await db.notificacion.findFirstOrThrow({ where: { idUsuario: admin.idUsuario, tipoNotificacion: 'SOLICITUD_CIERRE_PROYECTO' }, orderBy: { idNotificacion: 'desc' } });
     expect(notice.mensajeNotificacion).toContain('revisión 2');
     expect(gateway.emitToUsers.mock.calls.map((call) => call[0])).toEqual(['CLOSURE_REVIEW_UPDATED']);
+  });
+
+  it('T26-C: la devolución a ejecución vuelve a EN_PROGRESO sin tocar horas ni Sprints, y el modo legacy solo aplica sin revisiones', async () => {
+    const f = await closureReadyFixture(db, scope);
+    const { closure, review, report, gateway } = f.stack;
+    const admin = await createIntegrationAdmin(db, scope);
+    await closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto);
+    const hoursBefore = JSON.stringify(await db.horasParticipacion.findMany({
+      where: { participacion: { rolProyecto: { idProyecto: f.project.idProyecto } } }, orderBy: { idRegistroHoras: 'asc' },
+    }));
+    const sprintsBefore = JSON.stringify(await db.sprint.findMany({ where: { idProyecto: f.project.idProyecto }, orderBy: { idSprint: 'asc' } }));
+    const oldAutomatic = await db.documentoCierre.findFirstOrThrow({
+      where: { idProyecto: f.project.idProyecto, tipoDocumento: 'INFORME_AUTOMATICO' },
+    });
+    await expectStatus(400, () => review.returnToExecution(f.project.idProyecto, admin.idUsuario, {
+      revisionId: f.dto.revisionId, comentario: '  ',
+    }));
+    await expectStatus(409, () => review.returnToExecution(f.project.idProyecto, admin.idUsuario, {
+      revisionId: null, legacy: true, comentario: 'No debe aplicar',
+    }));
+    gateway.emitToUsers.mockClear();
+    const returned = await review.returnToExecution(f.project.idProyecto, admin.idUsuario, {
+      revisionId: f.dto.revisionId, comentario: '  Retomar ejecución  ',
+    });
+    expect(returned).toMatchObject({ estadoProyecto: 'EN_PROGRESO', revisionId: f.dto.revisionId, numeroRevision: 1 });
+    expect(await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: f.dto.revisionId } })).toMatchObject({
+      estadoRevision: 'DEVUELTA_A_EJECUCION', idRevisor: admin.idUsuario, comentarioRevisor: 'Retomar ejecución', resueltaEn: expect.any(Date),
+    });
+    expect(JSON.stringify(await db.horasParticipacion.findMany({
+      where: { participacion: { rolProyecto: { idProyecto: f.project.idProyecto } } }, orderBy: { idRegistroHoras: 'asc' },
+    }))).toBe(hoursBefore);
+    expect(JSON.stringify(await db.sprint.findMany({ where: { idProyecto: f.project.idProyecto }, orderBy: { idSprint: 'asc' } }))).toBe(sprintsBefore);
+    expect(gateway.emitToUsers.mock.calls.map((call) => call[0])).toEqual(['PROJECT_STATE_CHANGED', 'CLOSURE_REVIEW_UPDATED']);
+
+    await db.usuario.update({ where: { idUsuario: f.leader.idUsuario }, data: { nombre: 'Perfil del ciclo nuevo' } });
+    const next = await closure.prepare(f.project.idProyecto, f.leader.idUsuario);
+    expect(next.numeroRevision).toBe(2);
+    expect(await db.documentoRevisionCierre.count({ where: { idRevisionCierre: next.idRevisionCierre } })).toBe(0);
+    const regenerated = await report.generateAutoReport(f.project.idProyecto, f.leader.idUsuario, next.idRevisionCierre);
+    const regeneratedDocument = await db.documentoCierre.findUniqueOrThrow({ where: { idDocumentoCierre: regenerated.documentId } });
+    expect(regeneratedDocument.contextoReporte).toMatchObject({ presentacion: { usuarios: expect.arrayContaining([
+      expect.objectContaining({ id: f.leader.idUsuario, nombre: expect.stringContaining('Perfil del ciclo nuevo') }),
+    ]) } });
+    expect(await db.documentoCierre.findUniqueOrThrow({ where: { idDocumentoCierre: oldAutomatic.idDocumentoCierre } })).toEqual(oldAutomatic);
+
+    const legacyProject = await createIntegrationProject(db, f.leader.idUsuario, { estadoProyecto: 'EN_SOLICITUD_CIERRE' });
+    const reviewedProject = await createIntegrationProject(db, f.leader.idUsuario, { estadoProyecto: 'EN_SOLICITUD_CIERRE' });
+    scope.projectIds = [...(scope.projectIds ?? []), legacyProject.idProyecto, reviewedProject.idProyecto];
+    const foreignReview = await db.revisionCierreProyecto.create({ data: { idProyecto: reviewedProject.idProyecto, numeroRevision: 1 } });
+    scope.revisionIds = [...(scope.revisionIds ?? []), foreignReview.idRevisionCierre];
+    await expectStatus(409, () => review.returnToExecution(reviewedProject.idProyecto, admin.idUsuario, {
+      revisionId: null, legacy: true, comentario: 'Tiene revisión',
+    }));
+    gateway.emitToUsers.mockClear();
+    const legacy = await review.returnToExecution(legacyProject.idProyecto, admin.idUsuario, {
+      revisionId: null, legacy: true, comentario: 'Proyecto heredado sin revisión',
+    });
+    expect(legacy).toMatchObject({ estadoProyecto: 'EN_PROGRESO', revisionId: null, numeroRevision: 0 });
+    expect(await db.revisionCierreProyecto.count({ where: { idProyecto: legacyProject.idProyecto } })).toBe(0);
+    expect(await db.documentoCierre.count({ where: { idProyecto: legacyProject.idProyecto } })).toBe(0);
+    const legacyAudit = await db.bitacoraAuditoria.findFirstOrThrow({ where: { idUsuario: admin.idUsuario,
+      accion: 'PROJECT_CLOSE_RETURNED_TO_EXECUTION', detalleJson: { path: ['idProyecto'], equals: legacyProject.idProyecto } } });
+    expect(legacyAudit.detalleJson).toMatchObject({ valorNuevo: { legacy: true } });
+    expect(gateway.emitToUsers.mock.calls.map((call) => call[0])).toEqual(['PROJECT_STATE_CHANGED']);
+    await expectStatus(409, () => review.approveClosure(legacyProject.idProyecto, admin.idUsuario, {
+      revisionId: 1, expectedFingerprint: 'a'.repeat(64),
+    }));
   });
 
   it('T25-A: la generación automática captura bajo lock, renderiza fuera y vincula el slot 0 tras comparar la huella', async () => {
