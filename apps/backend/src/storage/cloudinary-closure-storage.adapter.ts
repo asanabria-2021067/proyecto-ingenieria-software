@@ -1,8 +1,13 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { ClosureAvailability } from '../config/environment.validation';
+import { randomUUID } from 'node:crypto';
+import {
+  CLOSURE_DEFAULT_PREFIX,
+  type ClosureAvailability,
+} from '../config/environment.validation';
 import {
   CLOSURE_RESOURCE_TYPE,
+  CLOSURE_STORAGE_EXTENSION,
   CLOSURE_STORAGE_PROVIDER,
   type ClosureAssetDescriptor,
   type ClosureDestroyOutcome,
@@ -12,7 +17,7 @@ import {
 } from './closure-storage.port';
 
 /**
- * C103 (06 v2 §26/§39): adaptador Cloudinary del puerto de cierre.
+ * C103/C106 (06 v2 §26/§27/§39): adaptador Cloudinary del puerto de cierre.
  *
  * Resuelve credenciales y modalidad desde la configuración YA VALIDADA
  * (`closure` de `validateEnvironment`), nunca leyendo `process.env` por su
@@ -64,6 +69,47 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
       deliveryType: this.availability().deliveryMode,
     };
   }
+
+  /**
+   * Prefijo del namespace de cierre. Ausente usa el default CONGELADO;
+   * presente debe coincidir exactamente con él. Aceptar otro namespace
+   * permitiría que un despliegue mal configurado escribiera documentos de
+   * cierre sobre los assets del resto del producto.
+   */
+  protected prefix(): string {
+    const configurado = this.config.get<string>('CLOSURE_CLOUDINARY_PREFIX');
+    if (configurado === undefined || configurado.trim().length === 0) {
+      return CLOSURE_DEFAULT_PREFIX;
+    }
+    if (configurado.trim() !== CLOSURE_DEFAULT_PREFIX) {
+      throw new ServiceUnavailableException(
+        'CLOSURE_CLOUDINARY_PREFIX está fuera del namespace de cierre permitido',
+      );
+    }
+    return CLOSURE_DEFAULT_PREFIX;
+  }
+
+  /**
+   * Construye la identidad remota de un documento NUEVO.
+   *
+   * El identificador se compone del prefijo congelado, el proyecto y un UUID
+   * v4 recién generado con el sufijo cifrado. Nada de lo que envía el usuario
+   * entra aquí: ni el nombre del archivo ni una ruta, de modo que no existe
+   * forma de apuntar a un objeto ajeno ni de escapar del namespace.
+   *
+   * Cada llamada produce un identificador DISTINTO. Tras un error de carga o
+   * una purga se pide uno nuevo y jamás se reutiliza el anterior: reutilizarlo
+   * llevaría un reintento sobre un objeto que otro intento ya tocó.
+   */
+  buildIdentity(projectId: number): ClosureRemoteIdentity {
+    if (!Number.isSafeInteger(projectId) || projectId < 1) {
+      throw new ServiceUnavailableException('El proyecto del documento de cierre no es válido');
+    }
+    return {
+      ...this.baseIdentity(`${this.prefix()}/${projectId}/${randomUUID()}${CLOSURE_STORAGE_EXTENSION}`),
+    };
+  }
+
 
   uploadImmutable(
     _identity: ClosureRemoteIdentity,
