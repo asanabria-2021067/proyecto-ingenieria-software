@@ -4,10 +4,12 @@ import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import {
   cleanupLeadershipFixture,
+  collectInto,
   leadershipFixture,
   leadershipStack,
   type LeadershipCleanupScope,
 } from './setup/leadership';
+import { createIntegrationProject } from './setup/fixtures';
 import {
   ADVERTENCIA_ADMIN_SIN_PARTICIPACION,
   ADVERTENCIA_APELACION_SIN_PARTICIPACION,
@@ -266,6 +268,102 @@ describeIntegration('S7 liderazgo y Q1', () => {
       where: { idProyecto: f.project.idProyecto },
     });
     expect(proyecto.creadoPor).toBe(lider);
+    expect(await db.historialLiderazgo.count()).toBe(0);
+  });
+
+  it('T20-B: cancelar una apelación exige ser el autor que aún lidera y que siga pendiente', async () => {
+    const f = await leadershipFixture(db, scope);
+    const { service } = leadershipStack(db);
+    const lider = f.leaderSinParticipacion.idUsuario;
+
+    const propia = await service.createAppeal(f.project.idProyecto, lider, {
+      asunto: 'Transferencia solicitada',
+      mensaje: 'Solicito que se designe un nuevo líder para el proyecto.',
+      idCandidatoPropuesto: f.elegible.idUsuario,
+    });
+
+    // Segundo proyecto: A apeló y el liderazgo ya cambió de manos.
+    const entregado = await createIntegrationProject(db, lider, { estadoProyecto: 'EN_PROGRESO' });
+    collectInto(scope, 'projectIds', [entregado.idProyecto]);
+    const huerfana = await db.apelacionLiderazgo.create({
+      data: {
+        idProyecto: entregado.idProyecto,
+        idLiderSolicitante: lider,
+        asunto: 'Apelación de un liderazgo ya entregado',
+        mensaje: 'Se mantuvo pendiente después de que el liderazgo cambiara.',
+        idCandidatoPropuesto: f.elegible.idUsuario,
+      },
+    });
+    await db.proyecto.update({
+      where: { idProyecto: entregado.idProyecto },
+      data: { creadoPor: f.leaderConParticipacion.idUsuario },
+    });
+
+    // Una apelación ya resuelta que nadie debe poder tocar.
+    const denegada = await db.apelacionLiderazgo.create({
+      data: {
+        idProyecto: f.project.idProyecto,
+        idLiderSolicitante: f.elegible.idUsuario,
+        asunto: 'Apelación resuelta',
+        mensaje: 'Fue denegada antes de esta prueba.',
+        idCandidatoPropuesto: lider,
+        estadoApelacion: 'DENEGADA',
+        resueltaEn: new Date('2026-09-02T12:00:00.000Z'),
+        idAdminResolutor: f.admin.idUsuario,
+        mensajeResolucion: 'No procede en este ciclo.',
+      },
+    });
+
+    // El nuevo líder no cancela la apelación del anterior: no es su autor.
+    await expectStatus(403, () =>
+      service.cancelAppeal(
+        entregado.idProyecto,
+        huerfana.idApelacion,
+        f.leaderConParticipacion.idUsuario,
+      ),
+    );
+    // El administrador tampoco cancela por esta ruta.
+    await expectStatus(403, () =>
+      service.cancelAppeal(f.project.idProyecto, propia.idApelacion, f.admin.idUsuario),
+    );
+    // El autor que ya no lidera tampoco: la autoridad que apeló ya no es suya.
+    await expectStatus(403, () =>
+      service.cancelAppeal(entregado.idProyecto, huerfana.idApelacion, lider),
+    );
+
+    const cancelada = await service.cancelAppeal(f.project.idProyecto, propia.idApelacion, lider);
+    expect(cancelada.estadoApelacion).toBe('CANCELADA');
+    expect(cancelada.resueltaEn).not.toBeNull();
+    expect(cancelada.idAdminResolutor).toBeNull();
+    expect(cancelada.mensajeResolucion).toBeNull();
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_APPEAL_CANCELLED', idObjeto: String(propia.idApelacion) },
+      }),
+    ).toBe(1);
+
+    // Repetir es un conflicto, no un segundo efecto.
+    await expectStatus(409, () =>
+      service.cancelAppeal(f.project.idProyecto, propia.idApelacion, lider),
+    );
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_APPEAL_CANCELLED', idObjeto: String(propia.idApelacion) },
+      }),
+    ).toBe(1);
+
+    // Las resueltas se conservan intactas y el liderazgo no se movió.
+    const resuelta = await db.apelacionLiderazgo.findUniqueOrThrow({
+      where: { idApelacion: denegada.idApelacion },
+    });
+    expect(resuelta.estadoApelacion).toBe('DENEGADA');
+    expect(resuelta.mensajeResolucion).toBe('No procede en este ciclo.');
+    expect(
+      (await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } })).creadoPor,
+    ).toBe(lider);
+    expect(
+      (await db.proyecto.findUniqueOrThrow({ where: { idProyecto: entregado.idProyecto } })).creadoPor,
+    ).toBe(f.leaderConParticipacion.idUsuario);
     expect(await db.historialLiderazgo.count()).toBe(0);
   });
 });
