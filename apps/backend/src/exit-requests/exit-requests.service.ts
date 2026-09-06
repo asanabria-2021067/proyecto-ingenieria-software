@@ -50,6 +50,27 @@ export class ExitRequestsService {
     return ctx.project;
   }
 
+  /**
+   * C085 (06 v2 §13/§32): mientras un Sprint está EN_FINALIZACION el proyecto
+   * está consolidando, y ninguna de las cinco rutas de salida puede tocarlo:
+   * crear, continuar, cancelar, aprobar y rechazar devuelven 409 sin escribir.
+   *
+   * La metadata de ruta ya declara `NOT_FINALIZING`, pero el service repite el
+   * rechazo por su cuenta: el guard protege la ruta HTTP, no al servicio, y
+   * cualquier caller interno debe encontrarse con la misma pared.
+   */
+  private async assertSprintNotFinalizingTx(tx: Prisma.TransactionClient, idProyecto: number): Promise<void> {
+    const operable = await this.sprintsContext?.getCurrentSprint(idProyecto, tx);
+    if (operable?.estado === EstadoSprint.EN_FINALIZACION) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_EN_FINALIZACION',
+        message: 'El Sprint actual está en finalización y el proyecto está temporalmente bloqueado',
+        idSprint: operable.idSprint,
+      });
+    }
+  }
+
   async createSolicitudSalida(idProyecto: number, idUsuario: number, motivo: string) {
     const motivoLimpio = motivo.trim();
     if (motivoLimpio.length === 0) {
@@ -60,6 +81,7 @@ export class ExitRequestsService {
       const { tx } = ctx;
       await this.authorization.assertCanCreateSolicitudSalida(idProyecto, idUsuario, tx);
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', idUsuario);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
 
       const solicitudAbierta = await tx.solicitudSalidaProyecto.findFirst({
         where: {
@@ -246,6 +268,7 @@ export class ExitRequestsService {
       async (ctx) => {
       const { tx } = ctx;
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', actorUserId);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
       const solicitud = await tx.solicitudSalidaProyecto.findFirst({
         where: {
           idProyecto,
@@ -317,6 +340,7 @@ export class ExitRequestsService {
       async (ctx) => {
       const { tx } = ctx;
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', actorUserId);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
       const solicitud = await tx.solicitudSalidaProyecto.findFirst({
         where: {
           idProyecto,
@@ -381,6 +405,7 @@ export class ExitRequestsService {
       const { tx } = ctx;
       const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId, tx);
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', liderId);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
       const solicitud = await tx.solicitudSalidaProyecto.findFirst({
         where: { idSolicitud, idProyecto },
       });
@@ -520,6 +545,7 @@ export class ExitRequestsService {
       const { tx } = ctx;
       const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId, tx);
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', liderId);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
       const solicitud = await tx.solicitudSalidaProyecto.findFirst({
         where: { idSolicitud, idProyecto },
       });
@@ -544,6 +570,27 @@ export class ExitRequestsService {
       if (resolved.count !== 1) {
         throw new ConflictException('La solicitud ya no está en estado PENDIENTE_LIDER');
       }
+
+      // Rechazar CONSERVA las participaciones y no toca horas: ni resta, ni
+      // duplica, ni reconoce. Tampoco recrea las asignaciones que el saliente
+      // hubiera entregado durante la preparación — eso sería inventar trabajo.
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.EXIT_REQUEST_REJECTED,
+        idActor: liderId,
+        idProyecto,
+        idSprint: null,
+        tipoEntidad: 'PROYECTO',
+        idEntidad: idProyecto,
+        valorAnterior: { estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER },
+        valorNuevo: {
+          idSolicitud: solicitud.idSolicitud,
+          idUsuario: solicitud.idUsuario,
+          estadoSolicitud: EstadoSolicitudSalida.RECHAZADA,
+          resueltaEn: ahora.toISOString(),
+        },
+      });
+
       await this.notifications.notifyFromTemplate(
         [solicitud.idUsuario],
         'PARTICIPACION_ACTUALIZADA',
