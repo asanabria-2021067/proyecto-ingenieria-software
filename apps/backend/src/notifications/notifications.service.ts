@@ -156,6 +156,26 @@ export class NotificationsService {
     }
   }
 
+  async deferClosureEventsTx(
+    tx: TxClient, effects: PostCommitEffectSink, projectId: number, leaderId: number,
+    revisionId: number, estadoProyecto?: string,
+  ): Promise<void> {
+    const members = await tx.participacionProyecto.findMany({
+      where: { rolProyecto: { idProyecto: projectId } }, select: { idUsuario: true }, distinct: ['idUsuario'],
+    });
+    const admins = await tx.usuarioRolAcceso.findMany({
+      where: { rolAcceso: { nombrePerfil: 'administrador' } }, select: { idUsuario: true }, distinct: ['idUsuario'],
+    });
+    const defer = (event: string, users: number[], payload: object) => effects.add({
+      key: `${event}:${projectId}:${revisionId}`,
+      publish: async () => {
+        if (this.gateway?.server) await this.gateway.emitToUsers(event, [...new Set(users)], payload);
+      },
+    });
+    if (estadoProyecto) defer('PROJECT_STATE_CHANGED', [leaderId, ...members.map((row) => row.idUsuario)], { projectId, estadoProyecto });
+    defer('CLOSURE_REVIEW_UPDATED', [leaderId, ...admins.map((row) => row.idUsuario)], { projectId, revisionId });
+  }
+
   private payloadFromTemplate<K extends NotificationTemplateKey>(
     templateKey: K,
     data: NotificationTemplateData[K],

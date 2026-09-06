@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
 import { BitacoraModule } from '../bitacora/bitacora.module';
@@ -26,7 +27,7 @@ import { ProjectClosureReportService } from './project-closure-report.service';
  * la contrata.
  */
 @Module({
-  imports: [PrismaModule, ProjectPolicyModule, BitacoraModule, StorageModule, SprintsModule],
+  imports: [PrismaModule, ProjectPolicyModule, BitacoraModule, StorageModule, SprintsModule, NotificationsModule],
   controllers: [
     ClosureDocumentsController,
     HistoricalProjectController,
