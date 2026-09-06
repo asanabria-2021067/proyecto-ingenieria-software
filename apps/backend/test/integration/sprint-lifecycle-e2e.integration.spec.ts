@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
 import { Prioridad, type PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import {
@@ -12,6 +13,8 @@ import {
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { FINALIZING_SPRINT_MESSAGE, ProjectWriteGuard } from '../../src/common/guards/project-write.guard';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
@@ -65,9 +68,15 @@ function makeFakeNotifications(): NotificationsService {
   } as unknown as NotificationsService;
 }
 
-function fakeExecutionContext(params: Record<string, unknown>): ExecutionContext {
+function fakeExecutionContext(
+  params: Record<string, unknown>,
+  handler: object,
+  controllerClass: object,
+): ExecutionContext {
   return {
-    switchToHttp: () => ({ getRequest: () => ({ params }) }),
+    switchToHttp: () => ({ getRequest: () => ({ params, body: {} }) }),
+    getHandler: () => handler,
+    getClass: () => controllerClass,
   } as unknown as ExecutionContext;
 }
 
@@ -111,7 +120,8 @@ describeIntegration(
       const notifications = makeFakeNotifications();
 
       const sprintsContext = new SprintsContextService(prismaService);
-      guard = new ProjectWriteGuard(sprintsContext);
+      const resolver = new ProjectIdResolverService(prismaService);
+      guard = new ProjectWriteGuard(new Reflector(), resolver, new ProjectPolicyService(resolver), prismaService);
 
       const tasksContext = new TasksContextService(prismaService);
       const tasksAuthorization = new TasksAuthorizationService(tasksContext);
@@ -191,7 +201,10 @@ describeIntegration(
       action: () => Promise<T>,
     ): Promise<T> {
       expect(guardsOf(controller, handlerName)).toContain(ProjectWriteGuard);
-      await guard.canActivate(fakeExecutionContext({ projectId: String(projectId) }));
+      const prototype = Object.getPrototypeOf(controller) as Record<string, object>;
+      await guard.canActivate(
+        fakeExecutionContext({ projectId: String(projectId) }, prototype[handlerName], prototype.constructor),
+      );
       return action();
     }
 
@@ -203,7 +216,7 @@ describeIntegration(
       const collaborator = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, collaborator.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const role = await createIntegrationProjectRole(prisma, project.idProyecto, { nombreRol: 'X3 Rol' });
