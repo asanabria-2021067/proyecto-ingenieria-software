@@ -4,7 +4,6 @@ import { ApplicationsController } from '../src/applications/applications.control
 import { AuthController } from '../src/auth/auth.controller';
 import { CatalogsController } from '../src/catalogs/catalogs.controller';
 import { ComentariosController } from '../src/comentarios/comentarios.controller';
-import { EvidenceController } from '../src/evidence/evidence.controller';
 import { MensajesRevisionController } from '../src/mensajes-revision/mensajes-revision.controller';
 import { NotificationsController } from '../src/notifications/notifications.controller';
 import { ProjectsController } from '../src/projects/projects.controller';
@@ -12,7 +11,6 @@ import { RevisionesController } from '../src/revisiones/revisiones.controller';
 import { UsersController } from '../src/users/users.controller';
 import { ValidationController } from '../src/validation/validation.controller';
 import { CatalogsService } from '../src/catalogs/catalogs.service';
-import { EvidenceService } from '../src/evidence/evidence.service';
 import { ValidationService } from '../src/validation/validation.service';
 import { TasksController } from '../src/tasks/tasks.controller';
 
@@ -168,7 +166,7 @@ describe('Controllers and basic services', () => {
     mensajes.markAsRead(1, { userId: 1 });
   });
 
-  it('catalogs/tasks/validation/evidence servicios básicos', async () => {
+  it('catalogs/tasks/validation servicios básicos', async () => {
     const prisma = {
       carrera: { findMany: vi.fn().mockResolvedValue([{ idCarrera: 1, nombreCarrera: 'Ing' }]) },
       habilidad: { findMany: vi.fn().mockResolvedValue([{ idHabilidad: 1, nombreHabilidad: 'TS' }]) },
@@ -204,11 +202,5 @@ describe('Controllers and basic services', () => {
     expect(validation.findAll()).toEqual({ message: 'Not implemented yet' });
     expect(validation.create({})).toEqual({ message: 'Not implemented yet' });
 
-    const evidenceService = new EvidenceService(
-      {} as ConstructorParameters<typeof EvidenceService>[0],
-    );
-    const evidence = new EvidenceController(evidenceService);
-    expect(evidence.findAll()).toEqual({ message: 'Not implemented yet' });
-    expect(evidence.create({})).toEqual({ message: 'Not implemented yet' });
   });
 });
