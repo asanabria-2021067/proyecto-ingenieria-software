@@ -44,7 +44,14 @@ function makeTasksService(prisma: PrismaClient): TasksService {
 function makeTimeRecordsService(prisma: PrismaClient): TimeRecordsService {
   const prismaService = prisma as unknown as PrismaService;
   const notifications = { notifyTaskHoursLogged: async () => undefined } as unknown as NotificationsService;
-  return new TimeRecordsService(prismaService, new TasksContextService(prismaService), notifications);
+  return new TimeRecordsService(
+    prismaService,
+    new TasksContextService(prismaService),
+    notifications,
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService),
+  );
 }
 
 function longContent(label: string): string {
