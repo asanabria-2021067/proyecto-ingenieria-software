@@ -993,18 +993,46 @@ export async function applyManifest(
         origenReporte: tramo.origenReporte,
       };
 
-      // 3. Idempotencia: si el efecto ya está exactamente aplicado, no-op.
+      // 3. Idempotencia (06 v2 §14): si el efecto ya está EXACTAMENTE aplicado,
+      //    no-op. «Exactamente» incluye el agregado resultante: un estado a
+      //    medias no se da por bueno, se trata como divergencia.
       const yaConsumido = tramo.reconocidoEn !== null;
-      if (
-        (entry.accion === 'CONSUMIR_NUEVO' || entry.accion === 'MARCAR_YA_INCLUIDO') &&
-        yaConsumido &&
-        tramo.idParticipacion === entry.idParticipacion
-      ) {
-        noop += 1;
-        detalle.push({ idAsignacion: entry.idAsignacion, accion: entry.accion, efecto: 'NO_OP' });
-        continue;
+      const mismaParticipacion = tramo.idParticipacion === entry.idParticipacion;
+      let yaAplicado = false;
+
+      if (entry.accion === 'ENLAZAR') {
+        yaAplicado = mismaParticipacion;
+      } else if (entry.accion === 'MARCAR_YA_INCLUIDO') {
+        yaAplicado = yaConsumido && mismaParticipacion;
+      } else if (entry.accion === 'CLASIFICAR_REPORTE') {
+        yaAplicado = tramo.origenReporte === 'LEGACY';
+      } else if (entry.accion === 'CONSUMIR_NUEVO' && yaConsumido && mismaParticipacion) {
+        const existente = await tx.horasParticipacion.findFirst({
+          where: {
+            idParticipacion: entry.idParticipacion,
+            idSprint: manifest.sprintId,
+            estadoHoras: 'PENDIENTE',
+          },
+          select: { idRegistroHoras: true, horasReportadas: true },
+        });
+        if (
+          existente &&
+          existente.horasReportadas.toFixed(2) === Number(entry.importeEsperado).toFixed(2)
+        ) {
+          yaAplicado = true;
+        } else {
+          throw new LegacyDivergenceError(
+            'El tramo ya está consumido pero su agregado no corresponde al manifiesto.',
+            [`tramo ${entry.idAsignacion}`],
+          );
+        }
+      } else if (entry.accion === 'CONSUMIR_INCREMENTO' && yaConsumido && mismaParticipacion) {
+        // Un incremento ya aplicado se reconoce por el marcador del tramo: es
+        // lo único que impide sumarlo dos veces. Repetirlo NO vuelve a sumar.
+        yaAplicado = true;
       }
-      if (entry.accion === 'ENLAZAR' && tramo.idParticipacion === entry.idParticipacion) {
+
+      if (yaAplicado) {
         noop += 1;
         detalle.push({ idAsignacion: entry.idAsignacion, accion: entry.accion, efecto: 'NO_OP' });
         continue;
@@ -1143,6 +1171,162 @@ export async function applyManifest(
   });
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Modo verify (06 v2 §14). SOLO LECTURA: informa, nunca corrige.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export interface LegacyDivergence {
+  idAsignacion: number;
+  idRegistroHoras: number | null;
+  motivo: string;
+  esperado: string;
+  actual: string;
+}
+
+export interface LegacyVerification {
+  ok: boolean;
+  comprobadas: number;
+  divergencias: LegacyDivergence[];
+}
+
+/**
+ * Comprueba que los tramos marcados, el agregado resultante y el manifiesto
+ * siguen correspondiéndose.
+ *
+ * No existe compensación aritmética automática: si algo divergió, `verify` lo
+ * señala con sus identificadores y ahí termina su trabajo. Corregir un drift
+ * exige un manifiesto nuevo revisado por una persona.
+ */
+export async function verifyManifest(
+  prisma: PrismaClient,
+  manifest: LegacyManifest,
+): Promise<LegacyVerification> {
+  const divergencias: LegacyDivergence[] = [];
+  const anotar = (
+    idAsignacion: number,
+    idRegistroHoras: number | null,
+    motivo: string,
+    esperado: string,
+    actual: string,
+  ): void => {
+    divergencias.push({ idAsignacion, idRegistroHoras, motivo, esperado, actual });
+  };
+
+  for (const entry of manifest.entradas) {
+    const tramo = await prisma.asignacionTarea.findFirst({
+      where: { idAsignacion: entry.idAsignacion, tarea: { idProyecto: manifest.projectId } },
+      select: {
+        idParticipacion: true,
+        horasReales: true,
+        reconocidoEn: true,
+        origenReporte: true,
+        tarea: { select: { idSprint: true } },
+      },
+    });
+    if (!tramo || tramo.tarea.idSprint !== manifest.sprintId) {
+      anotar(entry.idAsignacion, null, 'TRAMO_AUSENTE', 'presente en el Sprint', 'ausente');
+      continue;
+    }
+
+    if (tramo.idParticipacion !== entry.idParticipacion) {
+      anotar(
+        entry.idAsignacion,
+        null,
+        'PARTICIPACION_DIVERGENTE',
+        String(entry.idParticipacion),
+        String(tramo.idParticipacion),
+      );
+    }
+
+    const exigeConsumo =
+      entry.accion === 'CONSUMIR_NUEVO' ||
+      entry.accion === 'CONSUMIR_INCREMENTO' ||
+      entry.accion === 'MARCAR_YA_INCLUIDO';
+    if (exigeConsumo && tramo.reconocidoEn === null) {
+      anotar(entry.idAsignacion, null, 'TRAMO_NO_MARCADO', 'consumido', 'sin marcar');
+    }
+
+    if (entry.accion === 'CLASIFICAR_REPORTE' && tramo.origenReporte !== 'LEGACY') {
+      anotar(
+        entry.idAsignacion,
+        null,
+        'PROCEDENCIA_DIVERGENTE',
+        'LEGACY',
+        tramo.origenReporte,
+      );
+    }
+
+    // El importe del tramo no debe haberse movido después de conciliar.
+    const stored = tramo.horasReales === null ? null : tramo.horasReales.toFixed(2);
+    const esperadoTramo =
+      entry.importeAnterior === null ? null : Number(entry.importeAnterior).toFixed(2);
+    if (stored !== esperadoTramo) {
+      anotar(
+        entry.idAsignacion,
+        null,
+        'IMPORTE_TRAMO_DIVERGENTE',
+        esperadoTramo ?? 'null',
+        stored ?? 'null',
+      );
+    }
+
+    if (entry.accion === 'CONSUMIR_NUEVO') {
+      const agregado = await prisma.horasParticipacion.findFirst({
+        where: { idParticipacion: entry.idParticipacion, idSprint: manifest.sprintId },
+        select: { idRegistroHoras: true, horasReportadas: true, estadoHoras: true },
+      });
+      if (!agregado) {
+        anotar(entry.idAsignacion, null, 'AGREGADO_AUSENTE', entry.importeEsperado, 'ninguno');
+      } else {
+        const actual = agregado.horasReportadas.toFixed(2);
+        const esperado = Number(entry.importeEsperado).toFixed(2);
+        if (actual !== esperado) {
+          anotar(
+            entry.idAsignacion,
+            agregado.idRegistroHoras,
+            'IMPORTE_AGREGADO_DIVERGENTE',
+            esperado,
+            actual,
+          );
+        }
+        if (agregado.estadoHoras !== 'PENDIENTE') {
+          anotar(
+            entry.idAsignacion,
+            agregado.idRegistroHoras,
+            'AGREGADO_YA_RESUELTO',
+            'PENDIENTE',
+            agregado.estadoHoras,
+          );
+        }
+      }
+    }
+  }
+
+  return {
+    ok: divergencias.length === 0,
+    comprobadas: manifest.entradas.length,
+    divergencias,
+  };
+}
+
+export function formatVerification(result: LegacyVerification): string {
+  if (result.ok) {
+    return `verify: ${result.comprobadas} entrada(s) siguen correspondiéndose con el manifiesto.`;
+  }
+  const lines = [
+    `verify: ${result.divergencias.length} divergencia(s) sobre ${result.comprobadas} entrada(s).`,
+  ];
+  for (const divergence of result.divergencias) {
+    lines.push(
+      `  tramo ${divergence.idAsignacion}` +
+        (divergence.idRegistroHoras === null ? '' : ` agregado ${divergence.idRegistroHoras}`) +
+        ` [${divergence.motivo}] esperado ${divergence.esperado}, actual ${divergence.actual}`,
+    );
+  }
+  lines.push('No se corrigió nada: un drift exige un manifiesto nuevo revisado.');
+  return lines.join('\n');
+}
+
 export function formatRefusals(refusals: readonly LegacyRefusal[]): string {
   const lines = [`apply rechazado: ${refusals.length} entrada(s) no demostrables.`];
   for (const refusal of refusals) {
@@ -1205,9 +1389,16 @@ export async function runCli(argv: readonly string[]): Promise<number> {
         );
         return 0;
       }
-      case 'verify':
-        process.stderr.write('El modo verify todavía no está implementado.\n');
-        return 4;
+      case 'verify': {
+        const manifest = loadManifest(options.manifestPath as string);
+        const result = await verifyManifest(prisma, manifest);
+        process.stdout.write(
+          options.json
+            ? `${JSON.stringify(result, null, 2)}\n`
+            : `${formatVerification(result)}\n`,
+        );
+        return result.ok ? 0 : 9;
+      }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
