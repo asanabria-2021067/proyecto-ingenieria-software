@@ -5,7 +5,12 @@ import * as path from 'node:path';
 import { Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BACKEND_ENV_PATH, buildEnvOptions, resolveBackendEnvPath } from '../src/config/env.options';
-import { validateEnvironment } from '../src/config/environment.validation';
+import { ServiceUnavailableException } from '@nestjs/common';
+import {
+  assertSweeperAdmin,
+  validateEnvironment,
+  type SweeperAdminReader,
+} from '../src/config/environment.validation';
 
 /**
  * TC03 — foundation única de environment (06 v2 §51.1 y §47). Cada caso usa
@@ -233,6 +238,85 @@ describe('S7 environment foundation (TC03)', () => {
       expect(() =>
         validateEnvironment({ ...completeClosureEnvironment(), FRONTEND_URL: 'ftp://example.com' }),
       ).toThrow('FRONTEND_URL must use http or https');
+    } finally {
+      logger.restore();
+    }
+  });
+  it('TC03-C: CLOSURE_SWEEPER_ADMIN_ID solo acepta un entero positivo y su verificación de administrador ocurre contra la base, no contra el entorno', async () => {
+    const logger = captureLogger();
+    try {
+      const uuid = '8f3c1b2e-4a5d-4c6f-9e7a-1b2c3d4e5f60';
+
+      // Formatos rechazados: cleanup no disponible, documentos intactos, sin lanzar en arranque.
+      for (const invalid of [uuid, '0', '-3', '12.5']) {
+        const result = validateEnvironment({
+          ...completeClosureEnvironment(),
+          CLOSURE_SWEEPER_ADMIN_ID: invalid,
+        });
+        expect(result.closure.disponible).toBe(true);
+        expect(result.closure.cleanupDisponible).toBe(false);
+        expect(result.closure.sweeperAdminId).toBeNull();
+        expect(result.closure.motivosCleanup).toEqual(['SWEEPER_ADMIN_ID_INVALIDO']);
+        expect(result.closure.motivos).toEqual([]);
+      }
+
+      // Ausente: cleanup no disponible sin afectar la disponibilidad de documentos.
+      const absent = validateEnvironment(completeClosureEnvironment());
+      expect(absent.closure.disponible).toBe(true);
+      expect(absent.closure.cleanupDisponible).toBe(false);
+      expect(absent.closure.sweeperAdminId).toBeNull();
+      expect(absent.closure.motivosCleanup).toEqual(['SWEEPER_ADMIN_ID_AUSENTE']);
+
+      // "7": el formato valida; la verificación de administrador es responsabilidad de la base.
+      const configured = validateEnvironment({
+        ...completeClosureEnvironment(),
+        CLOSURE_SWEEPER_ADMIN_ID: '7',
+      });
+      expect(configured.closure.sweeperAdminId).toBe(7);
+      expect(configured.closure.cleanupDisponible).toBe(true);
+      expect(configured.closure.motivosCleanup).toEqual([]);
+
+      const readerWith = (record: { idUsuario: number } | null) =>
+        ({
+          usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue(record) },
+        }) as unknown as SweeperAdminReader;
+
+      const enabledAdmin = readerWith({ idUsuario: 7 });
+      await expect(assertSweeperAdmin(enabledAdmin, 7)).resolves.toEqual({ idUsuario: 7 });
+      const query = (enabledAdmin.usuarioRolAcceso.findFirst as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as { where: Record<string, unknown> };
+      expect(query.where).toEqual({
+        idUsuario: 7,
+        rolAcceso: { nombrePerfil: 'administrador' },
+        usuario: { estado: 'ACTIVO' },
+      });
+
+      // Usuario sin perfil de administrador (o deshabilitado) e inexistente: 503 sin exponer el valor.
+      const notAdmin = readerWith(null);
+      const missing = readerWith(null);
+      for (const reader of [notAdmin, missing]) {
+        const failure = await assertSweeperAdmin(reader, 7).then(
+          () => null,
+          (error: unknown) => error,
+        );
+        expect(failure).toBeInstanceOf(ServiceUnavailableException);
+        expect((failure as ServiceUnavailableException).getStatus()).toBe(503);
+        const message = (failure as ServiceUnavailableException).message;
+        expect(message).toContain('CLOSURE_SWEEPER_ADMIN_ID');
+        expect(message).not.toContain('7');
+      }
+
+      // Con tx, la consulta usa la transacción del caller y no abre otra.
+      const txReader = readerWith({ idUsuario: 7 });
+      const untouched = readerWith(null);
+      await expect(assertSweeperAdmin(untouched, 7, txReader)).resolves.toEqual({ idUsuario: 7 });
+      expect(untouched.usuarioRolAcceso.findFirst).not.toHaveBeenCalled();
+      expect(txReader.usuarioRolAcceso.findFirst).toHaveBeenCalledTimes(1);
+
+      // Ningún mensaje ni log contiene valores de entorno distintos del nombre de la variable.
+      const loggedText = collectStrings(logger.calls);
+      expect(loggedText.some((text) => text.includes(uuid))).toBe(false);
+      expect(leakedSecrets(loggedText)).toEqual([]);
     } finally {
       logger.restore();
     }

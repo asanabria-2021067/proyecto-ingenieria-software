@@ -1,4 +1,5 @@
-import { Logger } from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
+import { EstadoUsuario, type Prisma } from '@prisma/client';
 
 /**
  * Validador único y puro de environment (06 v2 §51.1 y §51.2). Conserva las
@@ -33,6 +34,9 @@ export const CLOSURE_REQUIRED_VARIABLES = [
 ] as const;
 export type ClosureRequiredVariable = (typeof CLOSURE_REQUIRED_VARIABLES)[number];
 
+export const CLOSURE_SWEEPER_ADMIN_ID_VARIABLE = 'CLOSURE_SWEEPER_ADMIN_ID';
+export type ClosureCleanupReason = 'SWEEPER_ADMIN_ID_AUSENTE' | 'SWEEPER_ADMIN_ID_INVALIDO';
+
 export type ClosureUnavailabilityReason =
   | 'CLOUDINARY_CLOUD_NAME_INVALIDO'
   | 'CLOUDINARY_API_KEY_INVALIDO'
@@ -56,6 +60,15 @@ export interface ClosureAvailability {
   activeKeyId: string | null;
   /** Identificadores de KEK, nunca su material. */
   keyIds: string[];
+  /**
+   * El barrido de purga puede ejecutarse: storage disponible y sweeper con
+   * formato válido. Independiente de la disponibilidad de documentos: un
+   * sweeper ausente o inválido nunca deshabilita cargas ni lecturas.
+   */
+  cleanupDisponible: boolean;
+  /** Entero positivo declarado en CLOSURE_SWEEPER_ADMIN_ID; la verificación de administrador ocurre contra la base. */
+  sweeperAdminId: number | null;
+  motivosCleanup: ClosureCleanupReason[];
 }
 
 export interface RedisEnvironment {
@@ -174,6 +187,29 @@ function parseKeks(value: string): Map<string, Buffer> | null {
   return keys;
 }
 
+interface SweeperAdminIdParse {
+  id: number | null;
+  motivos: ClosureCleanupReason[];
+}
+
+/**
+ * CLOSURE_SWEEPER_ADMIN_ID es la clave primaria entera de Usuario: solo se
+ * acepta un entero positivo en base 10 (nunca un UUID, cero, negativo o
+ * decimal). El formato se valida aquí; la existencia y el perfil de
+ * administrador habilitado se verifican contra la base con
+ * `assertSweeperAdmin` antes de cada barrido.
+ */
+function parseSweeperAdminId(raw: RawEnvironment): SweeperAdminIdParse {
+  const value = readString(raw, CLOSURE_SWEEPER_ADMIN_ID_VARIABLE);
+  if (value === undefined) {
+    return { id: null, motivos: ['SWEEPER_ADMIN_ID_AUSENTE'] };
+  }
+  if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    return { id: null, motivos: ['SWEEPER_ADMIN_ID_INVALIDO'] };
+  }
+  return { id: Number(value), motivos: [] };
+}
+
 function isDeliveryMode(value: string): value is ClosureDeliveryMode {
   return (CLOSURE_DELIVERY_MODES as readonly string[]).includes(value);
 }
@@ -228,8 +264,11 @@ function deriveClosureAvailability(raw: RawEnvironment): ClosureAvailability {
     }
   }
 
+  const sweeper = parseSweeperAdminId(raw);
+  const disponible = faltantes.length === 0 && motivos.length === 0;
+
   return {
-    disponible: faltantes.length === 0 && motivos.length === 0,
+    disponible,
     faltantes,
     motivos,
     cloudName,
@@ -237,6 +276,9 @@ function deriveClosureAvailability(raw: RawEnvironment): ClosureAvailability {
     deliveryMode,
     activeKeyId,
     keyIds: keks === null ? [] : [...keks.keys()],
+    cleanupDisponible: disponible && sweeper.id !== null,
+    sweeperAdminId: sweeper.id,
+    motivosCleanup: sweeper.motivos,
   };
 }
 
@@ -251,5 +293,48 @@ export function validateEnvironment(raw: RawEnvironment): ValidatedEnvironment {
     );
   }
 
+  if (!closure.cleanupDisponible) {
+    logger.warn(`Closure cleanup no disponible: motivosCleanup=[${closure.motivosCleanup.join(', ')}]`);
+  }
+
   return { ...raw, app, closure };
+}
+
+export type SweeperAdminReader = Pick<Prisma.TransactionClient, 'usuarioRolAcceso'>;
+
+/**
+ * Precondición de cada barrido: el sweeper configurado debe existir en la base
+ * como usuario ACTIVO con el perfil de acceso 'administrador'. Consulta la
+ * base en cada invocación (sin caché), usa `tx` cuando el caller ya opera en
+ * una transacción y nunca abre una propia. Falla con 503 sin revelar el valor
+ * configurado: el mensaje solo nombra la variable.
+ */
+export async function assertSweeperAdmin(
+  prisma: SweeperAdminReader,
+  sweeperAdminId: number,
+  tx?: SweeperAdminReader,
+): Promise<{ idUsuario: number }> {
+  if (!Number.isSafeInteger(sweeperAdminId) || sweeperAdminId < 1) {
+    throw new ServiceUnavailableException(
+      `${CLOSURE_SWEEPER_ADMIN_ID_VARIABLE} debe ser un entero positivo de un usuario existente`,
+    );
+  }
+
+  const reader = tx ?? prisma;
+  const record = await reader.usuarioRolAcceso.findFirst({
+    where: {
+      idUsuario: sweeperAdminId,
+      rolAcceso: { nombrePerfil: 'administrador' },
+      usuario: { estado: EstadoUsuario.ACTIVO },
+    },
+    select: { idUsuario: true },
+  });
+
+  if (!record) {
+    throw new ServiceUnavailableException(
+      `${CLOSURE_SWEEPER_ADMIN_ID_VARIABLE} no corresponde a un administrador habilitado`,
+    );
+  }
+
+  return { idUsuario: record.idUsuario };
 }
