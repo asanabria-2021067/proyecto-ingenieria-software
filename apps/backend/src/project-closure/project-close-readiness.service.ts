@@ -4,8 +4,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { captureClosureExecution } from './closure-execution-capture';
 import { matchesStoredExecutionFingerprint, type ClosureReportContext } from './closure-report-model';
 
-/** Versión del generador; entra en la huella de ejecución. */
-export const CLOSURE_GENERATOR_VERSION = 'closure-report/1.0.0';
+/**
+ * Versión del generador; entra en la huella de ejecución y queda estampada en
+ * cada documento producido (06 v2 §28).
+ *
+ * C159: se fija a las versiones REALES del renderer según `package-lock.json`
+ * —`jspdf` y `jspdf-autotable`, las dos únicas librerías que
+ * `ProjectClosureReportService` usa para producir el PDF— y no a un número
+ * inventado. Así, un informe generado con otra versión del renderer no puede
+ * confundirse con uno producido por esta: cambiar cualquiera de las dos
+ * dependencias obliga a actualizar esta constante, y la huella lo delata.
+ */
+export const CLOSURE_GENERATOR_VERSION = 'closure-report/1.0.0+jspdf3.0.3+jspdf-autotable5.0.2';
 
 type Db = Prisma.TransactionClient | PrismaService;
 

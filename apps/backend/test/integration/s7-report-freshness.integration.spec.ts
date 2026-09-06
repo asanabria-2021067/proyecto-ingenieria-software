@@ -14,6 +14,7 @@ import { GenerateReportDto } from '../../src/project-closure/dto/closure.dto';
 import { createIntegrationAdmin } from './setup/leadership';
 import { flowAStack } from './setup/flow-a';
 import { createIntegrationProject } from './setup/fixtures';
+import { CLOSURE_GENERATOR_VERSION } from '../../src/project-closure/project-close-readiness.service';
 
 const pipe = new ValidationPipe({
   whitelist: true,
@@ -283,7 +284,7 @@ describeIntegration('S7 frescura del informe de cierre', () => {
     });
     expect(documento.tipoDocumento).toBe('INFORME_AUTOMATICO');
     expect(documento.estadoDocumento).toBe('DISPONIBLE');
-    expect(documento.generatorVersion).toBe('closure-report/1.0.0');
+    expect(documento.generatorVersion).toBe(CLOSURE_GENERATOR_VERSION);
     expect(documento.fingerprintEjecucion).toBe(primero.fingerprintEjecucion);
     expect(documento.fingerprintModelo).toBe(primero.fingerprintModelo);
     expect(documento.contextoReporte).toMatchObject({ schemaVersion: 1, variante: 'AUTOMATICO' });
