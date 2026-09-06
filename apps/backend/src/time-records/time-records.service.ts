@@ -22,6 +22,14 @@ import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { CreateTimeRecordDto } from './dto/create-time-record.dto';
 import { UPDATE_TIME_RECORD_FIELDS, UpdateTimeRecordDto } from './dto/update-time-record.dto';
 
+/**
+ * C062 (06 v2 §9 REVOKE): una segunda revocación no es un error del cliente
+ * ni una operación idempotente silenciosa — es un conflicto explícito con
+ * código estable, para que quien lo reciba distinga «ya estaba revocado» de
+ * cualquier otro 409 del tramo.
+ */
+export const REGISTRO_YA_REVOCADO_CODE = 'REGISTRO_YA_REVOCADO';
+
 const TIME_RECORD_SELECT = {
   idRegistroTiempo: true,
   idAsignacion: true,
@@ -269,6 +277,67 @@ export class TimeRecordsService {
   }
 
   /**
+   * C062 (06 v2 §9): precondiciones comunes de UPDATE y REVOKE, resueltas
+   * SIEMPRE dentro del lock y SIEMPRE por la cadena del propio registro.
+   * El orden importa: primero existencia, después autoría (403 al ajeno antes
+   * de revelar el estado del tramo), después participación y política, y solo
+   * al final el estado del tramo. El registro puede pertenecer a un tramo ya
+   * cerrado; lo que lo bloquea es estar consumido, no estar cerrado.
+   */
+  private async assertRecordOwnerTx(
+    tx: Prisma.TransactionClient,
+    project: ProjectLockRow,
+    tarea: { idTarea: number; idSprint: number },
+    recordId: number,
+    userId: number,
+  ) {
+    const actual = await tx.registroTiempoTarea.findFirst({
+      where: { idRegistroTiempo: recordId, asignacion: { idTarea: tarea.idTarea } },
+      select: {
+        idRegistroTiempo: true,
+        idAsignacion: true,
+        idUsuario: true,
+        horas: true,
+        fecha: true,
+        nota: true,
+        justificacionExceso: true,
+        editadoEn: true,
+        revocadoEn: true,
+      },
+    });
+    if (!actual) {
+      throw new NotFoundException(
+        `Registro de tiempo con id ${recordId} no encontrado en la tarea ${tarea.idTarea}`,
+      );
+    }
+    if (actual.idUsuario !== userId) {
+      throw new ForbiddenException('Solo el autor puede operar sobre su propio registro de horas');
+    }
+    if (actual.revocadoEn !== null) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: REGISTRO_YA_REVOCADO_CODE,
+        message: 'El registro de tiempo ya estaba revocado',
+      });
+    }
+
+    await this.tasksContext.assertActiveProjectParticipant(project.idProyecto, userId, tx);
+    await this.policy.assertWriteTx(tx, project, 'REGISTRO_TIEMPO', userId, {
+      sprintId: tarea.idSprint,
+    });
+
+    const assignment = await tx.asignacionTarea.findUniqueOrThrow({
+      where: { idAsignacion: actual.idAsignacion },
+      select: { origenReporte: true, reconocidoEn: true },
+    });
+    if (assignment.origenReporte !== 'GRANULAR' || assignment.reconocidoEn !== null) {
+      throw new ConflictException('El tramo no admite cambios sobre sus registros');
+    }
+
+    return actual;
+  }
+
+  /**
    * C061 (06 v2 §9 UPDATE / §41 E057): el registro se resuelve por su propia
    * cadena registro→asignación→tarea→proyecto y NUNCA por
    * `getActiveAssignment`. Ese es el punto del contrato: el autor corrige un
@@ -294,44 +363,7 @@ export class TimeRecordsService {
       const { tx } = ctx;
       const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
 
-      const actual = await tx.registroTiempoTarea.findFirst({
-        where: { idRegistroTiempo: recordId, asignacion: { idTarea: taskId } },
-        select: {
-          idRegistroTiempo: true,
-          idAsignacion: true,
-          idUsuario: true,
-          horas: true,
-          fecha: true,
-          nota: true,
-          justificacionExceso: true,
-          editadoEn: true,
-          revocadoEn: true,
-        },
-      });
-      if (!actual) {
-        throw new NotFoundException(
-          `Registro de tiempo con id ${recordId} no encontrado en la tarea ${taskId}`,
-        );
-      }
-      if (actual.idUsuario !== userId) {
-        throw new ForbiddenException('Solo el autor puede editar su propio registro de horas');
-      }
-      if (actual.revocadoEn !== null) {
-        throw new ConflictException('El registro está revocado y ya no admite ediciones');
-      }
-
-      await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'REGISTRO_TIEMPO', userId, {
-        sprintId: tarea.idSprint,
-      });
-
-      const assignment = await tx.asignacionTarea.findUniqueOrThrow({
-        where: { idAsignacion: actual.idAsignacion },
-        select: { origenReporte: true, reconocidoEn: true },
-      });
-      if (assignment.origenReporte !== 'GRANULAR' || assignment.reconocidoEn !== null) {
-        throw new ConflictException('El tramo no admite correcciones de sus registros');
-      }
+      const actual = await this.assertRecordOwnerTx(tx, this.lockedProject(ctx), tarea, recordId, userId);
 
       const actualizado = await tx.registroTiempoTarea.update({
         where: { idRegistroTiempo: actual.idRegistroTiempo },
@@ -370,6 +402,75 @@ export class TimeRecordsService {
       });
 
       return mapRegistroTiempo(actualizado);
+    });
+
+    await this.notifyHoursLogged(projectId, taskId, userId, registro);
+
+    return registro;
+  }
+
+  /**
+   * C062 (06 v2 §9 REVOKE / §41 E058): revocación LÓGICA. Nunca hay DELETE
+   * físico: el importe, la fecha, la nota y la justificación se conservan
+   * como evidencia y lo único que cambia es que la fila deja de contar en el
+   * SUM efectivo. El `updateMany` con `revocadoEn: null` es el compare-and-set
+   * que hace que dos revocaciones simultáneas produzcan un solo evento.
+   */
+  async revoke(
+    projectId: number,
+    taskId: number,
+    recordId: number,
+    userId: number,
+  ): Promise<RegistroTiempoTareaPublico> {
+    const registro = await this.projectTx.run(projectId, userId, 'time-records.revoke', async (ctx) => {
+      const { tx } = ctx;
+      const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
+      const actual = await this.assertRecordOwnerTx(tx, this.lockedProject(ctx), tarea, recordId, userId);
+
+      const revocadoEn = new Date();
+      const cas = await tx.registroTiempoTarea.updateMany({
+        where: { idRegistroTiempo: actual.idRegistroTiempo, revocadoEn: null },
+        // CK03: el revocador es siempre el autor, nunca un tercero.
+        data: { revocadoEn, revocadoPor: userId },
+      });
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: REGISTRO_YA_REVOCADO_CODE,
+          message: 'El registro de tiempo ya estaba revocado',
+        });
+      }
+
+      const revocado = await tx.registroTiempoTarea.findUniqueOrThrow({
+        where: { idRegistroTiempo: actual.idRegistroTiempo },
+        select: { ...TIME_RECORD_SELECT, justificacionExceso: true, editadoEn: true },
+      });
+
+      await this.recalculateAssignment(tx, actual.idAsignacion);
+
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TIME_RECORD_REVOKED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: tarea.idSprint,
+        tipoEntidad: 'TAREA',
+        idEntidad: taskId,
+        valorAnterior: {
+          idAsignacion: actual.idAsignacion,
+          idRegistroTiempo: actual.idRegistroTiempo,
+          ...snapshotRegistro(actual),
+        },
+        valorNuevo: {
+          idAsignacion: revocado.idAsignacion,
+          idRegistroTiempo: revocado.idRegistroTiempo,
+          ...snapshotRegistro(revocado),
+          revocadoEn: revocadoEn.toISOString(),
+          revocadoPor: userId,
+        },
+      });
+
+      return mapRegistroTiempo(revocado);
     });
 
     await this.notifyHoursLogged(projectId, taskId, userId, registro);

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -77,5 +78,23 @@ export class TimeRecordsController {
     @Body() dto: UpdateTimeRecordDto,
   ) {
     return this.timeRecordsService.update(projectId, taskId, recordId, user.userId, dto);
+  }
+
+  /**
+   * E058: revocar un registro propio. Es una revocación lógica y por eso
+   * responde con el registro conservado, no con 204: el importe, la fecha, la
+   * nota y la justificación siguen existiendo como evidencia.
+   */
+  @Delete(':recordId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(TIME_WRITE)
+  revoke(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('recordId', ParseIntPipe) recordId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.timeRecordsService.revoke(projectId, taskId, recordId, user.userId);
   }
 }
