@@ -270,6 +270,8 @@ model Usuario {
   registrosAvanceEscritos          RegistroAvanceAsignacion[]
   registrosTiempoRegistrados       RegistroTiempoTarea[]
   registrosTiempoRevocados         RegistroTiempoTarea[]      @relation("RegistroTiempoRevocador")
+  ajustesAutor                     AjusteHoraTarea[]          @relation("AjusteHoraAutor")
+  ajustesAnulados                  AjusteHoraTarea[]          @relation("AjusteHoraAnulador")
   amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
   amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
   siguiendo                        Seguimiento[]              @relation("Siguiendo")
@@ -788,6 +790,7 @@ model AsignacionTarea {
   participacion   ParticipacionProyecto?     @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: Restrict, onUpdate: Cascade)
   registrosAvance RegistroAvanceAsignacion[]
   registrosTiempo RegistroTiempoTarea[]
+  ajustes         AjusteHoraTarea[]
 
   @@index([idUsuario, desasignadaEn])
   @@index([idParticipacion])
@@ -846,6 +849,35 @@ model RegistroTiempoTarea {
   @@index([idUsuario])
   @@index([idAsignacion, revocadoEn])
   @@map("registro_tiempo_tarea")
+}
+
+/// S7 M3 (06 v2 §11/§35): ajuste del líder sobre un tramo cerrado, append-only
+/// respecto de importe/base/justificación/autor. Para corregir se anula el
+/// vigente y se crea un sucesor enlazado por idAjusteAnterior; el anterior
+/// nunca se borra. horasBase es la evidencia del reporte visto al ajustar,
+/// no la fuente del reporte. A lo sumo un ajuste vigente por tramo
+/// (índice parcial s7_ajuste_vigente, SQL manual).
+model AjusteHoraTarea {
+  idAjusteHora     Int       @id @default(autoincrement()) @map("id_ajuste_hora")
+  idAsignacion     Int       @map("id_asignacion")
+  deltaHoras       Decimal   @map("delta_horas") @db.Decimal(12, 2)
+  horasBase        Decimal   @map("horas_base") @db.Decimal(12, 2)
+  justificacion    String?   @db.Text
+  idAutor          Int       @map("id_autor")
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  anuladoEn        DateTime? @map("anulado_en")
+  anuladoPor       Int?      @map("anulado_por")
+  idAjusteAnterior Int?      @unique @map("id_ajuste_anterior")
+
+  asignacion      AsignacionTarea  @relation(fields: [idAsignacion], references: [idAsignacion], onDelete: Restrict, onUpdate: Cascade)
+  autor           Usuario          @relation("AjusteHoraAutor", fields: [idAutor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  anulador        Usuario?         @relation("AjusteHoraAnulador", fields: [anuladoPor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  ajusteAnterior  AjusteHoraTarea? @relation("CadenaAjusteHora", fields: [idAjusteAnterior], references: [idAjusteHora], onDelete: Restrict, onUpdate: Cascade)
+  ajusteSiguiente AjusteHoraTarea? @relation("CadenaAjusteHora")
+
+  @@index([idAsignacion, anuladoEn])
+  @@index([idAutor])
+  @@map("ajuste_hora_tarea")
 }
 
 model Etiqueta {
