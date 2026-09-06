@@ -48,6 +48,9 @@ export async function timeFixture(db: PrismaClient, scope: IntegrationCleanupSco
 export async function cleanupTimeFixture(db: PrismaClient, scope: IntegrationCleanupScope) {
   await db.bitacoraAuditoria.deleteMany({ where: { idUsuario: { in: scope.userIds ?? [] } } });
   await db.registroAvanceAsignacion.deleteMany({ where: { idAsignacion: { in: scope.assignmentIds ?? [] } } });
+  // HorasParticipacion → ParticipacionProyecto: el agregado debe irse antes
+  // que la participación que lo ancla, o el cleanup genérico choca con la FK.
+  await db.horasParticipacion.deleteMany({ where: { idParticipacion: { in: scope.participationIds ?? [] } } });
   await cleanupIntegrationFixtures(db, scope);
 }
 
