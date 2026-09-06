@@ -94,9 +94,10 @@ describe('Controllers and basic services', () => {
       applicationsSvc as unknown as ConstructorParameters<typeof ApplicationsController>[0],
     );
     applications.create({} as Parameters<ApplicationsController['create']>[0], { userId: 1 });
-    applications.findAll();
+    // C043: los lectores reciben el actor (nunca un listado global).
+    applications.findAll({ userId: 1 });
     applications.findMine({ userId: 1 });
-    applications.findOne(1);
+    applications.findOne(1, { userId: 1 });
     applications.updateEstado(
       1,
       {} as Parameters<ApplicationsController['updateEstado']>[1],
