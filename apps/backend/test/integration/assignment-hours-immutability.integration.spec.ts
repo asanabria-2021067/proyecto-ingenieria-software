@@ -111,7 +111,6 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
       data: { idAsignacion: assignment.idAsignacion, idUsuario: assignee.idUsuario, horas: '3.00', fecha: new Date('2026-09-06') },
     });
     await service.closeAssignment(project.idProyecto, task.idTarea, assignment.idAsignacion, assignee.idUsuario, {
-      horasReales: 8,
       contenidoAvance: longContent('primer cierre horas 3'),
       marcarComoHecha: false,
     });
@@ -125,7 +124,6 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
 
     await expect(
       service.closeAssignment(project.idProyecto, task.idTarea, assignment.idAsignacion, assignee.idUsuario, {
-        horasReales: 99,
         contenidoAvance: longContent('segundo intento horas 99'),
         marcarComoHecha: false,
       }),
@@ -174,7 +172,6 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
       data: { idAsignacion: tramoA1.idAsignacion, idUsuario: userA.idUsuario, horas: '3.00', fecha: new Date('2026-09-06') },
     });
     await service.closeAssignment(project.idProyecto, task.idTarea, tramoA1.idAsignacion, userA.idUsuario, {
-      horasReales: 3,
       contenidoAvance: longContent('tramo A1 horas 3'),
       marcarComoHecha: false,
     });
@@ -189,7 +186,6 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
       data: { idAsignacion: tramoB.idAsignacion, idUsuario: userB.idUsuario, horas: '8.00', fecha: new Date('2026-09-06') },
     });
     await service.closeAssignment(project.idProyecto, task.idTarea, tramoB.idAsignacion, userB.idUsuario, {
-      horasReales: 8,
       contenidoAvance: longContent('tramo B horas 8'),
       marcarComoHecha: false,
     });
@@ -204,7 +200,6 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
       data: { idAsignacion: tramoA2.idAsignacion, idUsuario: userA.idUsuario, horas: '2.00', fecha: new Date('2026-09-06') },
     });
     await service.closeAssignment(project.idProyecto, task.idTarea, tramoA2.idAsignacion, userA.idUsuario, {
-      horasReales: 2,
       contenidoAvance: longContent('tramo A2 horas 2'),
       marcarComoHecha: false,
     });
