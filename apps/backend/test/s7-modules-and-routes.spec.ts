@@ -157,6 +157,82 @@ function listTypeScriptFiles(directory: string): string[] {
   return found;
 }
 
+/** Una operación HTTP registrada: método + ruta completa. */
+interface RouteEntry {
+  method: string;
+  path: string;
+  /** Ruta con cada `:segmento` sustituido por `:p`. */
+  normalized: string;
+  controller: string;
+  handler: string;
+  /** Posición dentro de su controller: Nest registra en orden de declaración. */
+  order: number;
+}
+
+const METHOD_NAMES = [
+  'GET',
+  'POST',
+  'PUT',
+  'DELETE',
+  'PATCH',
+  'ALL',
+  'OPTIONS',
+  'HEAD',
+  'SEARCH',
+];
+
+function joinPath(prefix: string, suffix: string): string {
+  const clean = (value: string): string => value.replace(/^\/+|\/+$/g, '');
+  const parts = [clean(prefix), clean(suffix)].filter((part) => part.length > 0);
+  return `/${parts.join('/')}`;
+}
+
+/** Sustituye todo segmento `:algo` por `:p`: Express no distingue el nombre. */
+function normalizePath(routePath: string): string {
+  return routePath
+    .split('/')
+    .map((segment) => (segment.startsWith(':') ? ':p' : segment))
+    .join('/');
+}
+
+function collectRoutes(modules: Map<string, Type<unknown>>): RouteEntry[] {
+  const routes: RouteEntry[] = [];
+  for (const moduleClass of modules.values()) {
+    const controllers = metadataOf(moduleClass, MODULE_METADATA.CONTROLLERS) as Type<unknown>[];
+    for (const controller of controllers) {
+      const prefixMeta = Reflect.getMetadata('path', controller);
+      const prefixes = Array.isArray(prefixMeta) ? prefixMeta : [prefixMeta ?? ''];
+      const prototype = controller.prototype as Record<string, unknown>;
+      const handlers = Object.getOwnPropertyNames(prototype).filter(
+        (name) => name !== 'constructor' && typeof prototype[name] === 'function',
+      );
+      let order = 0;
+      for (const handler of handlers) {
+        const fn = prototype[handler] as (...args: unknown[]) => unknown;
+        const methodIndex = Reflect.getMetadata('method', fn);
+        if (methodIndex === undefined) continue;
+        const pathMeta = Reflect.getMetadata('path', fn);
+        const suffixes = Array.isArray(pathMeta) ? pathMeta : [pathMeta ?? '/'];
+        for (const prefix of prefixes) {
+          for (const suffix of suffixes) {
+            const full = joinPath(String(prefix), String(suffix));
+            routes.push({
+              method: METHOD_NAMES[methodIndex as number] ?? String(methodIndex),
+              path: full,
+              normalized: normalizePath(full),
+              controller: controller.name,
+              handler,
+              order,
+            });
+          }
+        }
+        order += 1;
+      }
+    }
+  }
+  return routes;
+}
+
 /**
  * Entorno sintético mínimo para importar el grafo. Nunca lee el `.env` real ni
  * expone ningún secreto: son valores inventados para este proceso.
@@ -169,6 +245,131 @@ function applySyntheticEnvironment(): void {
   process.env.REDIS_PORT = '6380';
   process.env.DATABASE_URL = 'postgresql://synthetic:synthetic@127.0.0.1:1/synthetic';
 }
+
+/**
+ * Inventario canónico de operaciones ACTIVAS de 06 v2 §41 (E001–E121 sin las
+ * tres retiradas), con los nombres de parámetro ya normalizados a `:p`.
+ */
+const CANONICAL_OPERATIONS: Array<[string, string]> = [
+    ['GET', '/proyectos/:p/admin'], // E001
+    ['GET', '/proyectos/:p/owner'], // E002
+    ['GET', '/proyectos/:p/avance'], // E003
+    ['GET', '/proyectos/:p/postulaciones'], // E004
+    ['POST', '/proyectos'], // E005
+    ['PUT', '/proyectos/:p'], // E006
+    ['PATCH', '/proyectos/:p'], // E007
+    ['PATCH', '/proyectos/:p/estado'], // E008
+    ['POST', '/proyectos/:p/enviar-revision'], // E009
+    ['POST', '/proyectos/:p/reenviar'], // E010
+    ['POST', '/proyectos/:p/hitos'], // E011
+    ['DELETE', '/proyectos/:p'], // E012
+    ['POST', '/proyectos/:p/solicitar-cierre'], // E013
+    ['POST', '/proyectos/:p/aprobar-cierre'], // E014
+    ['POST', '/proyectos/:p/rechazar-cierre'], // E015
+    ['GET', '/proyectos/:p/roles'], // E016
+    ['POST', '/proyectos/:p/roles'], // E017
+    ['PATCH', '/proyectos/:p/roles/:p'], // E018
+    ['DELETE', '/proyectos/:p/roles/:p'], // E019
+    ['POST', '/proyectos/:p/roles/:p/participacion'], // E020
+    ['DELETE', '/proyectos/:p/roles/:p/participacion'], // E021
+    ['GET', '/proyectos/:p/etiquetas'], // E022
+    ['POST', '/proyectos/:p/etiquetas'], // E023
+    ['PATCH', '/proyectos/:p/etiquetas/:p'], // E024
+    ['DELETE', '/proyectos/:p/etiquetas/:p'], // E025
+    ['PUT', '/proyectos/:p/tareas/:p/etiquetas/:p'], // E026
+    ['DELETE', '/proyectos/:p/tareas/:p/etiquetas/:p'], // E027
+    ['POST', '/comentarios'], // E028
+    ['GET', '/comentarios/proyecto/:p'], // E029
+    ['GET', '/comentarios/hito/:p'], // E030
+    ['PATCH', '/comentarios/:p'], // E031
+    ['DELETE', '/comentarios/:p'], // E032
+    ['GET', '/proyectos/:p/tareas/:p/comentarios'], // E033
+    ['POST', '/proyectos/:p/tareas/:p/comentarios'], // E034
+    ['PATCH', '/proyectos/:p/tareas/:p/comentarios/:p'], // E035
+    ['DELETE', '/proyectos/:p/tareas/:p/comentarios/:p'], // E036
+    ['GET', '/mensajes-revision/proyectos/:p'], // E037
+    ['POST', '/mensajes-revision/proyectos/:p'], // E038
+    ['PATCH', '/mensajes-revision/proyectos/:p/marcar-leidos'], // E039
+    ['GET', '/revisiones/admin/bandeja'], // E040
+    ['GET', '/revisiones/proyectos/:p'], // E041
+    ['POST', '/revisiones/proyectos/:p/reclamar'], // E042
+    ['POST', '/revisiones/proyectos/:p/resolver'], // E043
+    ['GET', '/proyectos/:p/tareas'], // E044
+    ['GET', '/proyectos/:p/tareas/:p'], // E045
+    ['POST', '/proyectos/:p/tareas'], // E046
+    ['PATCH', '/proyectos/:p/tareas/:p'], // E047
+    ['PATCH', '/proyectos/:p/tareas/:p/estado'], // E048
+    ['DELETE', '/proyectos/:p/tareas/:p'], // E049
+    ['POST', '/proyectos/:p/tareas/:p/asignar'], // E050
+    ['DELETE', '/proyectos/:p/tareas/:p/asignar'], // E051
+    ['POST', '/proyectos/:p/tareas/:p/asignaciones/:p/cerrar'], // E052
+    ['POST', '/proyectos/:p/tareas/:p/asignaciones/:p/avance'], // E053
+    ['PATCH', '/proyectos/:p/tareas/:p/asignaciones/:p/avance/:p'], // E054
+    ['GET', '/proyectos/:p/tareas/:p/horas'], // E055
+    ['POST', '/proyectos/:p/tareas/:p/horas'], // E056
+    ['PATCH', '/proyectos/:p/tareas/:p/horas/:p'], // E057
+    ['DELETE', '/proyectos/:p/tareas/:p/horas/:p'], // E058
+    ['GET', '/proyectos/:p/tareas/:p/horas/resumen'], // E059
+    ['POST', '/proyectos/:p/sprints'], // E060
+    ['POST', '/proyectos/:p/sprints/:p/finalizar'], // E061
+    ['POST', '/proyectos/:p/sprints/:p/cerrar'], // E062
+    ['GET', '/proyectos/:p/sprints/:p/resumen-cierre'], // E064
+    ['GET', '/proyectos/:p/sprints/analytics'], // E065
+    ['GET', '/proyectos/:p/sprints'], // E066
+    ['GET', '/proyectos/:p/sprints/:p'], // E067
+    ['GET', '/proyectos/:p/sprints/:p/analytics'], // E068
+    ['GET', '/proyectos/:p/sprints/:p/resumen-cierre/miembros/:p'], // E069
+    ['POST', '/proyectos/:p/sprints/:p/asignaciones/:p/ajuste-horas'], // E070
+    ['DELETE', '/proyectos/:p/sprints/:p/asignaciones/:p/ajuste-horas'], // E071
+    ['GET', '/proyectos/:p/sprints/:p/asignaciones/:p/ajuste-horas'], // E072
+    ['POST', '/proyectos/:p/solicitudes-salida'], // E073
+    ['POST', '/proyectos/:p/solicitudes-salida/:p/aprobar'], // E074
+    ['POST', '/proyectos/:p/solicitudes-salida/:p/rechazar'], // E075
+    ['GET', '/proyectos/:p/salida/estado'], // E076
+    ['GET', '/proyectos/:p/salida/preparacion'], // E077
+    ['POST', '/proyectos/:p/salida/preparacion/continuar'], // E078
+    ['POST', '/proyectos/:p/salida/preparacion/cancelar'], // E079
+    ['GET', '/proyectos/:p/miembros/postulaciones-pendientes'], // E080
+    ['GET', '/proyectos/:p/equipo'], // E081
+    ['GET', '/proyectos/:p/equipo/:p'], // E082
+    ['GET', '/proyectos/:p/miembros/resumen'], // E083
+    ['GET', '/proyectos/:p/miembros/solicitudes-salida-pendientes'], // E084
+    ['POST', '/postulaciones'], // E085
+    ['GET', '/postulaciones'], // E086
+    ['GET', '/postulaciones/mis-postulaciones'], // E087
+    ['GET', '/postulaciones/:p'], // E088
+    ['PATCH', '/postulaciones/:p/estado'], // E089
+    ['DELETE', '/postulaciones/:p'], // E090
+    ['GET', '/proyectos/:p/bitacora'], // E091
+    ['GET', '/usuarios/me/dashboard'], // E092
+    ['GET', '/proyectos/:p/liderazgo/contexto'], // E093
+    ['GET', '/proyectos/:p/liderazgo/candidatos'], // E094
+    ['GET', '/proyectos/:p/liderazgo/historial'], // E095
+    ['GET', '/proyectos/:p/liderazgo/apelaciones'], // E096
+    ['POST', '/proyectos/:p/liderazgo/apelaciones'], // E097
+    ['POST', '/proyectos/:p/liderazgo/apelaciones/:p/cancelar'], // E098
+    ['GET', '/admin/liderazgo/apelaciones'], // E099
+    ['POST', '/admin/proyectos/:p/liderazgo/apelaciones/:p/aceptar'], // E100
+    ['POST', '/admin/proyectos/:p/liderazgo/apelaciones/:p/denegar'], // E101
+    ['POST', '/admin/proyectos/:p/liderazgo/cambiar'], // E102
+    ['GET', '/proyectos/:p/cierre/readiness'], // E103
+    ['POST', '/proyectos/:p/cierre/preparacion'], // E104
+    ['POST', '/proyectos/:p/cierre/informe-automatico'], // E105
+    ['POST', '/proyectos/:p/cierre/documentos/firma'], // E106
+    ['POST', '/proyectos/:p/cierre/documentos'], // E107
+    ['DELETE', '/proyectos/:p/cierre/documentos/:p'], // E108
+    ['GET', '/proyectos/:p/cierre/documentos/:p/url'], // E109
+    ['GET', '/proyectos/:p/cierre/documentos/:p/contenido'], // E110
+    ['GET', '/proyectos/:p/cierre/revisiones'], // E111
+    ['GET', '/proyectos/:p/cierre/revisiones/:p'], // E112
+    ['POST', '/proyectos/:p/cierre/reenviar'], // E113
+    ['POST', '/proyectos/:p/cierre/correccion-documental'], // E114
+    ['POST', '/admin/storage/cierre/barrido'], // E115
+    ['GET', '/admin/proyectos'], // E116
+    ['GET', '/admin/proyectos/:p'], // E117
+    ['GET', '/proyectos/:p/historico'], // E118
+    ['GET', '/proyectos/:p/sprints/:p/contribuciones-eliminadas'], // E119
+];
 
 describe('S7 grafo de módulos y rutas (T36)', () => {
   const snapshot = { ...process.env };
@@ -335,5 +536,92 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
         `${nuevo} registrado dinámicamente`,
       ).toBe(0);
     }
+  }, 30_000);
+  it('T36-B: el registro de rutas no tiene duplicados tras normalizar parámetros y las tres rutas retiradas responden 404', async () => {
+    const { AppModule } = await import('../src/app.module');
+    const graph = await collectModuleGraph(AppModule as Type<unknown>);
+    const routes = collectRoutes(graph.modules);
+
+    // ── Ningún par método + ruta NORMALIZADA aparece dos veces. Normalizar es
+    //    lo que hace útil la comprobación: para Express `:id` y `:projectId`
+    //    son el mismo segmento, así que dos handlers que solo difieran en el
+    //    nombre del parámetro colisionan en tiempo de ejecución.
+    const byNormalized = new Map<string, RouteEntry[]>();
+    for (const route of routes) {
+      const key = `${route.method} ${route.normalized}`;
+      byNormalized.set(key, [...(byNormalized.get(key) ?? []), route]);
+    }
+    const duplicados = [...byNormalized.entries()]
+      .filter(([, entries]) => entries.length > 1)
+      .map(([key, entries]) => `${key} → ${entries.map((e) => `${e.controller}.${e.handler}`).join(', ')}`);
+    expect(duplicados).toEqual([]);
+
+    // ── Los tres handlers trasladados existen UNA sola vez y viven en el
+    //    controller de cierre, conservando método y URL (§39 estrategia A).
+    for (const ruta of ['solicitar-cierre', 'aprobar-cierre', 'rechazar-cierre']) {
+      const encontrados = routes.filter(
+        (route) => route.method === 'POST' && route.path.endsWith(`/${ruta}`),
+      );
+      expect(encontrados, `POST …/${ruta}`).toHaveLength(1);
+      expect(encontrados[0].controller).toBe('ProjectClosureController');
+    }
+
+    // ── Las rutas literales se registran ANTES del parámetro que podría
+    //    capturarlas: si `:sprintId` llegara primero, `analytics` nunca se
+    //    alcanzaría.
+    const literales = ['analytics', 'resumen', 'contexto', 'mis-postulaciones', 'bandeja', 'me'];
+    for (const literal of literales) {
+      const conLiteral = routes.filter((route) => route.path.split('/').includes(literal));
+      for (const literalRoute of conLiteral) {
+        const segmentos = literalRoute.path.split('/');
+        const indice = segmentos.indexOf(literal);
+        // Una ruta del MISMO controller y método cuya forma normalizada es
+        // idéntica salvo que en esa posición lleva un parámetro.
+        const capturadoras = routes.filter((candidate) => {
+          if (candidate.controller !== literalRoute.controller) return false;
+          if (candidate.method !== literalRoute.method) return false;
+          const otros = candidate.path.split('/');
+          if (otros.length !== segmentos.length) return false;
+          if (!otros[indice]?.startsWith(':')) return false;
+          return otros.every(
+            (segmento, posicion) => posicion === indice || segmento === segmentos[posicion],
+          );
+        });
+        for (const capturadora of capturadoras) {
+          expect(
+            literalRoute.order,
+            `${literalRoute.method} ${literalRoute.path} debe registrarse antes de ${capturadora.path}`,
+          ).toBeLessThan(capturadora.order);
+        }
+      }
+    }
+
+    // ── Las tres rutas retiradas NO están registradas: un método+ruta ausente
+    //    del router es exactamente lo que produce el 404 (E063, E120, E121).
+    const retiradas = [
+      { method: 'PATCH', normalized: '/proyectos/:p/sprints/:p/horas/:p' },
+      { method: 'POST', normalized: '/evidencias' },
+      { method: 'GET', normalized: '/evidencias' },
+    ];
+    for (const retirada of retiradas) {
+      const viva = routes.find(
+        (route) => route.method === retirada.method && route.normalized === retirada.normalized,
+      );
+      expect(viva, `${retirada.method} ${retirada.normalized} sigue registrada`).toBeUndefined();
+    }
+    // Y ningún controller conserva el prefijo de evidencias.
+    expect(routes.filter((route) => route.path.startsWith('/evidencias'))).toEqual([]);
+
+    // ── El inventario canónico de §41 está COMPLETO. Sus 118 operaciones
+    //    activas (121 filas E001–E121 menos E063, E120 y E121) deben estar
+    //    registradas. El catálogo describe el alcance de Sprint 7, no la
+    //    aplicación entera: auth, chat, social, catálogos y notificaciones no
+    //    figuran en él, así que se comprueba INCLUSIÓN, no igualdad de conteo.
+    const registradas = new Set(routes.map((route) => `${route.method} ${route.normalized}`));
+    const ausentes = CANONICAL_OPERATIONS.filter(
+      ([method, normalized]) => !registradas.has(`${method} ${normalized}`),
+    ).map(([method, normalized]) => `${method} ${normalized}`);
+    expect(ausentes).toEqual([]);
+    expect(CANONICAL_OPERATIONS).toHaveLength(118);
   }, 30_000);
 });
