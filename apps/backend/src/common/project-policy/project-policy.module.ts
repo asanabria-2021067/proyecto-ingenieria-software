@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProjectIdResolverService } from './project-id-resolver.service';
+import { ProjectPolicyService } from './project-policy.service';
 import { ProjectTransactionService } from './project-transaction.service';
 
 /**
@@ -12,7 +13,7 @@ import { ProjectTransactionService } from './project-transaction.service';
  */
 @Module({
   imports: [PrismaModule],
-  providers: [ProjectIdResolverService, ProjectTransactionService],
-  exports: [ProjectIdResolverService, ProjectTransactionService],
+  providers: [ProjectIdResolverService, ProjectTransactionService, ProjectPolicyService],
+  exports: [ProjectIdResolverService, ProjectTransactionService, ProjectPolicyService],
 })
 export class ProjectPolicyModule {}
