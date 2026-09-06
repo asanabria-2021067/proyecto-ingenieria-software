@@ -9,7 +9,12 @@ import {
   leadershipStack,
   type LeadershipCleanupScope,
 } from './setup/leadership';
-import { createIntegrationProject } from './setup/fixtures';
+import {
+  createIntegrationParticipation,
+  createIntegrationProject,
+  createIntegrationProjectRole,
+  createIntegrationUser,
+} from './setup/fixtures';
 import {
   ADVERTENCIA_ADMIN_SIN_PARTICIPACION,
   ADVERTENCIA_APELACION_SIN_PARTICIPACION,
@@ -449,5 +454,196 @@ describeIntegration('S7 liderazgo y Q1', () => {
         where: { idUsuario: lider, tipoNotificacion: 'APELACION_LIDERAZGO_RESUELTA' },
       }),
     ).toBe(1);
+  });
+
+  it('T18-B: el exlíder sin participación lee solo su historial y sus apelaciones, y la bandeja administrativa lista las pendientes', async () => {
+    const f = await leadershipFixture(db, scope);
+    const { read } = leadershipStack(db);
+    const a = f.leaderSinParticipacion.idUsuario;
+    const b = f.elegible.idUsuario;
+
+    const c = await createIntegrationUser(db);
+    collectInto(scope, 'userIds', [c.idUsuario]);
+    const participacionC = await createIntegrationParticipation(db, c.idUsuario, f.role.idRolProyecto, {
+      estadoParticipacion: 'ACTIVO',
+    });
+    collectInto(scope, 'participationIds', [participacionC.idParticipacion]);
+
+    // A apeló, la apelación se aceptó y el liderazgo pasó a B; después un
+    // cambio administrativo directo lo llevó de B a C.
+    const apelacionDeA = await db.apelacionLiderazgo.create({
+      data: {
+        idProyecto: f.project.idProyecto,
+        idLiderSolicitante: a,
+        asunto: 'Apelación de A',
+        mensaje: 'Solicito la transferencia del liderazgo.',
+        idCandidatoPropuesto: b,
+        estadoApelacion: 'ACEPTADA',
+        creadaEn: new Date('2026-09-02T10:00:00.000Z'),
+        resueltaEn: new Date('2026-09-03T10:00:00.000Z'),
+        idAdminResolutor: f.admin.idUsuario,
+      },
+    });
+    const porApelacion = await db.historialLiderazgo.create({
+      data: {
+        idProyecto: f.project.idProyecto,
+        idLiderAnterior: a,
+        idLiderNuevo: b,
+        idAdminResponsable: f.admin.idUsuario,
+        motivo: 'Se acepta la apelación del líder saliente.',
+        origen: 'SOLICITUD_LIDER',
+        idApelacion: apelacionDeA.idApelacion,
+        registradoEn: new Date('2026-09-03T10:00:00.000Z'),
+      },
+    });
+    const directo = await db.historialLiderazgo.create({
+      data: {
+        idProyecto: f.project.idProyecto,
+        idLiderAnterior: b,
+        idLiderNuevo: c.idUsuario,
+        idAdminResponsable: f.admin.idUsuario,
+        motivo: 'Cambio administrativo por inactividad sostenida.',
+        origen: 'CAMBIO_ADMINISTRATIVO',
+        registradoEn: new Date('2026-09-04T10:00:00.000Z'),
+      },
+    });
+    const apelacionDeB = await db.apelacionLiderazgo.create({
+      data: {
+        idProyecto: f.project.idProyecto,
+        idLiderSolicitante: b,
+        asunto: 'Apelación de B',
+        mensaje: 'Sigue pendiente de resolución.',
+        idCandidatoPropuesto: c.idUsuario,
+        creadaEn: new Date('2026-09-05T10:00:00.000Z'),
+      },
+    });
+    await db.proyecto.update({
+      where: { idProyecto: f.project.idProyecto },
+      data: { creadoPor: c.idUsuario },
+    });
+
+    // Admin y líder actual ven la historia completa.
+    for (const lector of [f.admin.idUsuario, c.idUsuario]) {
+      const historial = await read.history(undefined, {
+        projectId: f.project.idProyecto,
+        actorId: lector,
+      });
+      expect(historial.total).toBe(2);
+      expect(historial.page).toBe(1);
+      expect(historial.limit).toBe(20);
+      // Orden: lo más reciente primero.
+      expect(historial.items.map((fila) => fila.idHistorialLiderazgo)).toEqual([
+        directo.idHistorialLiderazgo,
+        porApelacion.idHistorialLiderazgo,
+      ]);
+      // El candidato sugerido viaja por la FK de la apelación.
+      const aceptada = historial.items[1];
+      expect(aceptada.origen).toBe('SOLICITUD_LIDER');
+      expect(aceptada.idApelacion).toBe(apelacionDeA.idApelacion);
+      expect(aceptada.candidatoSugerido?.idUsuario).toBe(b);
+      // El cambio directo no tuvo candidato sugerido y no se le inventa uno.
+      expect(historial.items[0].origen).toBe('CAMBIO_ADMINISTRATIVO');
+      expect(historial.items[0].idApelacion).toBeNull();
+      expect(historial.items[0].candidatoSugerido).toBeNull();
+    }
+
+    // `HistorialLiderazgo` no duplica el candidato: no existe tal columna.
+    const filaCruda = await db.historialLiderazgo.findUniqueOrThrow({
+      where: { idHistorialLiderazgo: porApelacion.idHistorialLiderazgo },
+    });
+    expect(Object.keys(filaCruda)).not.toContain('idCandidatoPropuesto');
+
+    // A ya no participa ni lidera: solo sus propios hechos.
+    const historialDeA = await read.history(undefined, {
+      projectId: f.project.idProyecto,
+      actorId: a,
+    });
+    expect(historialDeA.total).toBe(1);
+    expect(historialDeA.items[0].idHistorialLiderazgo).toBe(porApelacion.idHistorialLiderazgo);
+
+    const apelacionesDeA = await read.appeals(undefined, {
+      projectId: f.project.idProyecto,
+      actorId: a,
+    });
+    expect(apelacionesDeA.total).toBe(1);
+    expect(apelacionesDeA.items[0].idApelacion).toBe(apelacionDeA.idApelacion);
+    expect(apelacionesDeA.items[0].liderSolicitante.idUsuario).toBe(a);
+
+    // El resto del proyecto no se le abre por haber liderado.
+    await expectStatus(403, () =>
+      read.context(undefined, { projectId: f.project.idProyecto, actorId: a }),
+    );
+
+    // El líder actual ve las dos apelaciones del proyecto.
+    const apelacionesLider = await read.appeals(undefined, {
+      projectId: f.project.idProyecto,
+      actorId: c.idUsuario,
+    });
+    expect(apelacionesLider.total).toBe(2);
+    expect(apelacionesLider.items.map((fila) => fila.idApelacion)).toEqual([
+      apelacionDeB.idApelacion,
+      apelacionDeA.idApelacion,
+    ]);
+
+    // Un participante ordinario de un proyecto vivo no lee el liderazgo.
+    await expectStatus(403, () =>
+      read.history(undefined, { projectId: f.project.idProyecto, actorId: f.conSalidaAbierta.idUsuario }),
+    );
+
+    // Bandeja administrativa: pagina, filtra y no amplía la audiencia.
+    const bandeja = await read.adminInbox(undefined, { actorId: f.admin.idUsuario });
+    expect(bandeja.items.length).toBeGreaterThanOrEqual(2);
+    const claves = bandeja.items.map((fila) => [fila.creadaEn.getTime(), fila.idApelacion]);
+    expect(claves).toEqual(
+      [...claves].sort((x, y) => (y[0] === x[0] ? y[1] - x[1] : y[0] - x[0])),
+    );
+    const pendientes = await read.adminInbox(undefined, {
+      actorId: f.admin.idUsuario,
+      query: { estado: 'PENDIENTE' },
+    });
+    expect(pendientes.items.every((fila) => fila.estadoApelacion === 'PENDIENTE')).toBe(true);
+    expect(pendientes.items.map((fila) => fila.idApelacion)).toContain(apelacionDeB.idApelacion);
+    const primeraPagina = await read.adminInbox(undefined, {
+      actorId: f.admin.idUsuario,
+      query: { page: 1, limit: 1 },
+    });
+    expect(primeraPagina.items).toHaveLength(1);
+    expect(primeraPagina.limit).toBe(1);
+    // El filtro no convierte a nadie en administrador.
+    await expectStatus(403, () =>
+      read.adminInbox(undefined, { actorId: a, query: { estado: 'PENDIENTE' } }),
+    );
+    await expectStatus(403, () => read.adminInbox(undefined, { actorId: c.idUsuario }));
+
+    // Un participante AUTORIZADO por la policy sí lee la historia completa:
+    // en un proyecto cerrado el histórico le corresponde.
+    const cerrado = await createIntegrationProject(db, f.admin.idUsuario, {
+      estadoProyecto: 'CERRADO',
+    });
+    collectInto(scope, 'projectIds', [cerrado.idProyecto]);
+    const rolCerrado = await createIntegrationProjectRole(db, cerrado.idProyecto, { cupos: 2 });
+    collectInto(scope, 'roleIds', [rolCerrado.idRolProyecto]);
+    const participacionCerrado = await createIntegrationParticipation(
+      db,
+      f.retirado.idUsuario,
+      rolCerrado.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    collectInto(scope, 'participationIds', [participacionCerrado.idParticipacion]);
+    await db.historialLiderazgo.create({
+      data: {
+        idProyecto: cerrado.idProyecto,
+        idLiderAnterior: a,
+        idLiderNuevo: f.admin.idUsuario,
+        idAdminResponsable: f.admin.idUsuario,
+        motivo: 'Cambio registrado antes del cierre.',
+        origen: 'CAMBIO_ADMINISTRATIVO',
+      },
+    });
+    const historialCerrado = await read.history(undefined, {
+      projectId: cerrado.idProyecto,
+      actorId: f.retirado.idUsuario,
+    });
+    expect(historialCerrado.total).toBe(1);
   });
 });

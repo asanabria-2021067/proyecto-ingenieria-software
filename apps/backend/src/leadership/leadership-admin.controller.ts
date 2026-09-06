@@ -1,17 +1,20 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
+import { ApelacionPageQueryDto } from './dto/appeal-page.query';
 import { DenyAppealDto } from './dto/deny-appeal.dto';
 import { LeadershipReadService } from './leadership-read.service';
 import { LeadershipService } from './leadership.service';
@@ -39,6 +42,12 @@ export class LeadershipAdminController {
     private readonly leadershipRead: LeadershipReadService,
     private readonly leadership: LeadershipService,
   ) {}
+
+  /** E099: bandeja global de apelaciones; el filtro acota, no amplía. */
+  @Get('liderazgo/apelaciones')
+  inbox(@CurrentUser() user: { userId: number }, @Query() query: ApelacionPageQueryDto) {
+    return this.leadershipRead.adminInbox(undefined, { actorId: user.userId, query });
+  }
 
   /** E101: denegar la apelación con un motivo, sin tocar el liderazgo. */
   @Post('proyectos/:projectId/liderazgo/apelaciones/:appealId/denegar')

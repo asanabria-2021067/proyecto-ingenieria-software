@@ -14,11 +14,8 @@ export const APPEAL_PAGE_DEFAULT_PAGE = 1;
 export const APPEAL_PAGE_DEFAULT_LIMIT = 20;
 export const APPEAL_PAGE_MAX_LIMIT = 50;
 
-export class ApelacionPageQueryDto {
-  @IsOptional()
-  @IsEnum(EstadoApelacionLiderazgo)
-  estado?: EstadoApelacionLiderazgo;
-
+/** Paginación sin filtro: el historial no tiene estados que acotar. */
+export class LeadershipPageQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -33,6 +30,12 @@ export class ApelacionPageQueryDto {
   limit?: number;
 }
 
+export class ApelacionPageQueryDto extends LeadershipPageQueryDto {
+  @IsOptional()
+  @IsEnum(EstadoApelacionLiderazgo)
+  estado?: EstadoApelacionLiderazgo;
+}
+
 /** Paginación común de §46: `{items,total,page,limit}` en toda lista nueva. */
 export interface PaginaLiderazgo<T> {
   items: T[];
@@ -42,7 +45,7 @@ export interface PaginaLiderazgo<T> {
 }
 
 /** Normaliza la página pedida a los valores por defecto congelados. */
-export function resolveAppealPage(query: ApelacionPageQueryDto | undefined): {
+export function resolveAppealPage(query: LeadershipPageQueryDto | undefined): {
   page: number;
   limit: number;
   skip: number;
