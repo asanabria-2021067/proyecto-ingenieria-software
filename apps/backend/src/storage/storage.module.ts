@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CloudinaryClosureStorageAdapter } from './cloudinary-closure-storage.adapter';
+import { ClosureCryptoService } from './closure-crypto.service';
 import { CLOUDINARY_CLOSURE_PORT } from './closure-storage.port';
 
 /**
@@ -16,8 +17,9 @@ import { CLOUDINARY_CLOSURE_PORT } from './closure-storage.port';
 @Module({
   providers: [
     CloudinaryClosureStorageAdapter,
+    ClosureCryptoService,
     { provide: CLOUDINARY_CLOSURE_PORT, useExisting: CloudinaryClosureStorageAdapter },
   ],
-  exports: [CLOUDINARY_CLOSURE_PORT, CloudinaryClosureStorageAdapter],
+  exports: [CLOUDINARY_CLOSURE_PORT, CloudinaryClosureStorageAdapter, ClosureCryptoService],
 })
 export class StorageModule {}
