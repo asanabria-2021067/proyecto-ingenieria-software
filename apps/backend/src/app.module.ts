@@ -30,6 +30,7 @@ import { TimeRecordsModule } from './time-records/time-records.module';
 import { SprintsModule } from './sprints/sprints.module';
 import { TaskHourAdjustmentsModule } from './task-hour-adjustments/task-hour-adjustments.module';
 import { StorageModule } from './storage/storage.module';
+import { ProjectClosureModule } from './project-closure/project-closure.module';
 import { LeadershipModule } from './leadership/leadership.module';
 import { ExitRequestsModule } from './exit-requests/exit-requests.module';
 import { TeamModule } from './team/team.module';
@@ -90,6 +91,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
     SprintsModule,
     TaskHourAdjustmentsModule,
     StorageModule,
+    ProjectClosureModule,
     LeadershipModule,
     ExitRequestsModule,
     TeamModule,

@@ -3,6 +3,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
 import { BitacoraModule } from '../bitacora/bitacora.module';
 import { StorageModule } from '../storage/storage.module';
+import { SprintsModule } from '../sprints/sprints.module';
 import { AdminProjectsController } from './admin-projects.controller';
 import { ClosureDocumentsController } from './closure-documents.controller';
 import { HistoricalProjectController } from './historical-project.controller';
@@ -19,7 +20,7 @@ import { ProjectClosureReportService } from './project-closure-report.service';
  * la contrata.
  */
 @Module({
-  imports: [PrismaModule, ProjectPolicyModule, BitacoraModule, StorageModule],
+  imports: [PrismaModule, ProjectPolicyModule, BitacoraModule, StorageModule, SprintsModule],
   controllers: [ClosureDocumentsController, HistoricalProjectController, AdminProjectsController],
   providers: [
     ProjectClosureReportService,
