@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { Prisma, type PrismaClient } from '@prisma/client';
+import { HttpException } from '@nestjs/common';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import { createBarrier, useSecondClient, withDeadline } from './setup/concurrency';
 import { cleanupTimeFixture, timeFixture, timeStack } from './setup/time-records';
@@ -161,6 +162,39 @@ describeIntegration('S7 time concurrency', () => {
     expect(agregados[0].estadoHoras).toBe('PENDIENTE');
 
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.autor.idUsuario, accion: 'TIME_RECORD_EDITED' } })).toBe(1);
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'EXIT_REQUEST_APPROVED' } })).toBe(1);
+  });
+
+  /** Un rechazo por carrera es SIEMPRE un 409 limpio, nunca un error opaco. */
+  function esConflicto(resultado: { ok: boolean; error?: unknown }): boolean {
+    return !resultado.ok && resultado.error instanceof HttpException && resultado.error.getStatus() === 409;
+  }
+
+  it('T02-B: la edición que llega después del reconocimiento se rechaza con 409 y el agregado no cambia', async () => {
+    const f = await raceFixture(db, scope, ['4.00']);
+    solicitudIds = [f.solicitud.idSolicitud];
+
+    const { resultadoPrimera, resultadoSegunda } = await correrCarrera(f, 'consumo', (stack) =>
+      stack.service.update(f.project.idProyecto, f.task.idTarea, f.registros[0].idRegistroTiempo, f.autor.idUsuario, { horas: 6 }),
+    );
+    // El consumo gana; la edición posterior encuentra el tramo ya consumido.
+    expect(resultadoPrimera.ok).toBe(true);
+    expect(esConflicto(resultadoSegunda)).toBe(true);
+
+    const registro = await db.registroTiempoTarea.findUniqueOrThrow({ where: { idRegistroTiempo: f.registros[0].idRegistroTiempo } });
+    expect(registro.horas.toFixed(2)).toBe('4.00');
+    expect(registro.editadoEn).toBeNull();
+    const tramo = await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: f.assignment.idAsignacion } });
+    expect(tramo.horasReales?.toFixed(2)).toBe('4.00');
+    expect(tramo.reconocidoEn).not.toBeNull();
+
+    const agregados = await db.horasParticipacion.findMany({ where: { idParticipacion: f.participacion.idParticipacion } });
+    expect(agregados).toHaveLength(1);
+    // El agregado conserva el importe original: el intento rechazado no lo recalcula.
+    expect(agregados[0].horasReportadas.toFixed(2)).toBe('4.00');
+    expect(agregados[0].horasCalculadas?.toFixed(2)).toBe('4.00');
+
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.autor.idUsuario, accion: 'TIME_RECORD_EDITED' } })).toBe(0);
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'EXIT_REQUEST_APPROVED' } })).toBe(1);
   });
 });
