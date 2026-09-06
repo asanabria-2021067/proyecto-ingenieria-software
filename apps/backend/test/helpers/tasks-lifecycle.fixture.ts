@@ -9,6 +9,11 @@ import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { ProjectsService } from '../../src/projects/projects.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './project-policy.double';
 import { ComentariosService } from '../../src/comentarios/comentarios.service';
 
 /**
@@ -846,6 +851,9 @@ export function setupLifecycleEnv(): LifecycleEnv {
     db as unknown as PrismaService,
     projectsNotifications as unknown as NotificationsService,
     {} as unknown as Cache,
+    makeProjectTransactionDouble({ tx: db }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 
   const comentariosService = new ComentariosService(

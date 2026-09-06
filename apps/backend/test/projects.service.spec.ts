@@ -6,7 +6,11 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { EstadoProyectoCreador } from '../src/projects/dto/update-estado-proyecto.dto';
 import { ProjectsService } from '../src/projects/projects.service';
-import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 function makePrisma() {
   const defaultTx = {
@@ -71,6 +75,7 @@ function makeService(
     {} as unknown as Cache,
     makeProjectTransactionDouble({ tx: prisma }),
     makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 }
 

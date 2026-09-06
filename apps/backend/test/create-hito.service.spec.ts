@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ProjectsService } from '../src/projects/projects.service';
 import { CreateHitoDto } from '../src/projects/dto/create-hito.dto';
-import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 type HitoTxOverrides = Partial<{
   findFirst: ReturnType<typeof vi.fn>;
@@ -37,6 +41,7 @@ function makeService(prisma: ReturnType<typeof makePrisma>) {
     {} as ConstructorParameters<typeof ProjectsService>[2],
     makeProjectTransactionDouble({ tx }),
     makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 }
 

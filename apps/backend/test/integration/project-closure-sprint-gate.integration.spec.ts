@@ -15,6 +15,7 @@ import { NotificationsService } from '../../src/notifications/notifications.serv
 import { ProjectsService } from '../../src/projects/projects.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
@@ -82,6 +83,7 @@ describeIntegration(
         makeFakeCacheManager(),
         new ProjectTransactionService(prismaService),
         new ProjectPolicyService(resolver),
+        new ProjectReadPolicyService(prismaService),
       );
 
       const sprintsContext = new SprintsContextService(prismaService);
