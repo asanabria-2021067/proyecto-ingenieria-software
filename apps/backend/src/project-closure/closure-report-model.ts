@@ -485,14 +485,21 @@ export function matchesStoredExecutionFingerprint(
   context: ClosureExecutionContext,
   expectedFingerprint: string,
 ): boolean {
+  return executionMatchingStoredFingerprint(context, expectedFingerprint) !== null;
+}
+
+export function executionMatchingStoredFingerprint(
+  context: ClosureExecutionContext,
+  expectedFingerprint: string,
+): ClosureExecutionInput | null {
   if (computeExecutionFingerprint(context) === expectedFingerprint) {
-    return true;
+    return context.datosEjecucion;
   }
   const historicalLabel = context.presentacion.usuarios.find(
     (user) => user.id === context.datosEjecucion.lider.idUsuario,
   )?.nombre;
   if (!historicalLabel) {
-    return false;
+    return null;
   }
   for (let index = 1; index < historicalLabel.length - 1; index += 1) {
     if (historicalLabel[index] !== ' ') {
@@ -508,10 +515,10 @@ export function matchesStoredExecutionFingerprint(
       lider: { ...context.datosEjecucion.lider, nombre, apellido },
     };
     if (computeExecutionFingerprint({ ...context, datosEjecucion }) === expectedFingerprint) {
-      return true;
+      return datosEjecucion;
     }
   }
-  return false;
+  return null;
 }
 
 export function buildExecutionEnvelope(context: ClosureExecutionContext): Record<string, unknown> {

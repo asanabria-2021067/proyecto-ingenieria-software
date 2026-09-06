@@ -31,7 +31,6 @@ export function closureLifecycleStack(db: PrismaClient) {
   const gateway = { server: {}, notifyUsers: vi.fn(), emitToUsers: vi.fn() };
   const notifications = new NotificationsService(prisma, gateway as unknown as NotificationsGateway);
   const closure = new ProjectClosureService(prisma, runner, policy, readiness, audit, notifications, new ProjectReadPolicyService(prisma));
-  const review = new ProjectClosureReviewService(prisma, runner, policy, readiness, audit, notifications);
   // El almacenamiento va mockeado: lo que se prueba es el protocolo de
   // captura, render y vínculo, no la capacidad del proveedor.
   const documentos = closureDocumentsStack(db, closureConfig());
@@ -43,6 +42,7 @@ export function closureLifecycleStack(db: PrismaClient) {
     documentos.service,
     audit,
   );
+  const review = new ProjectClosureReviewService(prisma, runner, policy, readiness, audit, notifications, report, documentos.service);
   return { closure, review, readiness, runner, policy, audit, report, documentos, notifications, gateway };
 }
 

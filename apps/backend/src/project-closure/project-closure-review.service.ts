@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -6,6 +7,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectCloseReadinessService } from './project-close-readiness.service';
+import { CLOSURE_GENERATOR_VERSION } from './project-close-readiness.service';
+import { ProjectClosureReportService } from './project-closure-report.service';
+import { ProjectClosureDocumentsService } from './project-closure-documents.service';
 import type {
   ApproveClosureDto,
   ClosureResult,
@@ -32,6 +36,8 @@ export class ProjectClosureReviewService {
     protected readonly readiness: ProjectCloseReadinessService,
     protected readonly audit: BitacoraEventosService,
     protected readonly notifications: NotificationsService,
+    protected readonly report: ProjectClosureReportService,
+    protected readonly documents: ProjectClosureDocumentsService,
   ) {}
 
   /** E114: corrección documental; el proyecto sigue en solicitud de cierre. */
@@ -132,11 +138,51 @@ export class ProjectClosureReviewService {
   }
 
   /** E112: aprobación; cierra, acredita y completa en una sola transacción. */
-  async approveClosure(projectId: number, actorId: number, _dto: ApproveClosureDto): Promise<ClosureResult> {
-    return this.projectTx.run(projectId, actorId, 'closure.approve.preflight', async ({ tx, project }) => {
+  async approveClosure(projectId: number, actorId: number, dto: ApproveClosureDto): Promise<ClosureResult> {
+    const fechaAprobacion = new Date();
+    const phaseOne = await this.projectTx.run(projectId, actorId, 'closure.approve.capture', async ({ tx, project }) => {
       if (!project) throw new NotFoundException('Proyecto no encontrado');
       await this.policy.assertWriteTx(tx, project, 'CIERRE_VEREDICTO', actorId);
-      throw new ConflictException('La aprobación exige una revisión enviada por el flujo ordinario');
+      const revision = await tx.revisionCierreProyecto.findFirst({
+        where: { idRevisionCierre: dto.revisionId, idProyecto: projectId },
+        select: { idRevisionCierre: true, estadoRevision: true, fingerprintEntrega: true, numeroRevision: true },
+      });
+      if (!revision) throw new NotFoundException('Revisión de cierre no encontrada');
+      if (revision.estadoRevision !== 'ENVIADA') throw new ConflictException('La revisión no está enviada');
+      if (revision.fingerprintEntrega !== dto.expectedFingerprint) throw new ConflictException('La entrega cambió');
+      await this.readiness.assertReady(tx, projectId, { phase: 'APPROVE', revisionId: dto.revisionId });
+      const capture = await this.report.buildOfficialModelTx(tx, {
+        projectId, revisionId: dto.revisionId, adminId: actorId, fechaAprobacion,
+      });
+      const document = await this.documents.reserveGeneratedTx(tx, {
+        projectId,
+        revisionId: dto.revisionId,
+        tipoDocumento: 'INFORME_OFICIAL_FINAL',
+        nombreArchivo: `informe-oficial-${projectId}-${dto.revisionId}.pdf`,
+        actorId,
+        generatorVersion: CLOSURE_GENERATOR_VERSION,
+        fingerprintEjecucion: capture.fingerprintEjecucion,
+        fingerprintModelo: capture.fingerprintModelo,
+        contextoReporte: capture.contexto as unknown as Prisma.InputJsonValue,
+      });
+      return { capture, documentId: document.idDocumentoCierre, deliveryFingerprint: revision.fingerprintEntrega,
+        numeroRevision: revision.numeroRevision };
     });
+    const rendered = this.report.renderOfficial(phaseOne.capture);
+    const uploaded = await this.documents.uploadGenerated(phaseOne.documentId, projectId, rendered.pdf);
+    await this.projectTx.run(projectId, actorId, 'closure.approve.record-upload', async ({ tx }) => {
+      const recorded = await tx.documentoCierre.updateMany({
+        where: { idDocumentoCierre: phaseOne.documentId, idProyecto: projectId, idRevisionOrigen: dto.revisionId,
+          tipoDocumento: 'INFORME_OFICIAL_FINAL', estadoDocumento: 'RESERVADO',
+          fingerprintEjecucion: phaseOne.capture.fingerprintEjecucion, fingerprintModelo: phaseOne.capture.fingerprintModelo },
+        data: { estadoDocumento: 'EN_CARGA', cargaIniciadaEn: new Date(), cargaLimiteEn: new Date(Date.now() + 7_200_000),
+          assetId: uploaded.identidad.assetId ?? null, versionRemota: uploaded.identidad.version ?? null,
+          tamanoBytes: BigInt(uploaded.tamanoBytes), tamanoCifradoBytes: BigInt(uploaded.tamanoCifradoBytes),
+          checksumSha256: uploaded.checksumSha256, checksumCifradoSha256: uploaded.checksumCifradoSha256,
+          cryptoMetadata: uploaded.metadata as unknown as Prisma.InputJsonValue },
+      });
+      if (recorded.count !== 1) throw new ConflictException('La reserva oficial cambió');
+    });
+    throw new ConflictException('La fase final de aprobación todavía no está habilitada');
   }
 }

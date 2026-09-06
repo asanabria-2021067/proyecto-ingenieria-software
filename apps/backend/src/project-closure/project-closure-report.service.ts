@@ -13,7 +13,9 @@ import {
   buildReportContext,
   computeExecutionFingerprint,
   computeModelFingerprint,
+  executionMatchingStoredFingerprint,
   projectClosureModel,
+  type ClosureOfficialContext,
   type ClosureReportContext,
   type ClosureReportModelV1,
 } from './closure-report-model';
@@ -113,6 +115,14 @@ export interface GeneratedReport {
   documentoSustituido: number | null;
 }
 
+export interface OfficialReportCapture {
+  modelo: ClosureReportModelV1;
+  contexto: ClosureReportContext;
+  oficial: ClosureOfficialContext;
+  fingerprintEjecucion: string;
+  fingerprintModelo: string;
+}
+
 @Injectable()
 export class ProjectClosureReportService {
   private fuenteBase64: string | null = null;
@@ -184,7 +194,11 @@ export class ProjectClosureReportService {
    * escribe en los metadatos: usar `now()` haría que dos renders del mismo
    * modelo difirieran por el momento en que se ejecutaron.
    */
-  render(modelo: ClosureReportModelV1, contexto: ClosureReportContext): ClosureRenderResult {
+  render(
+    modelo: ClosureReportModelV1,
+    contexto: ClosureReportContext,
+    oficial?: ClosureOfficialContext,
+  ): ClosureRenderResult {
     const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
     doc.addFileToVFS(FONT_FILE, this.fontBase64());
     doc.addFont(FONT_FILE, CLOSURE_REPORT_FONT, 'normal');
@@ -205,12 +219,23 @@ export class ProjectClosureReportService {
     escribir(`Horas reportadas: ${totales.horasReportadas}`, 40, 94, 11);
     escribir(`Horas propuestas: ${totales.horasPropuestas}`, 40, 110, 11);
     escribir(`Variante: ${contexto.variante}`, 40, 126, 11);
+    let tableStartY = 146;
+    if (oficial) {
+      escribir(`Administrador: ${oficial.adminId}`, 40, 142, 11);
+      escribir(`Fecha de aprobación: ${new Date(oficial.fechaAprobacion as string | Date).toISOString()}`, 40, 158, 11);
+      escribir(`Revisión: ${oficial.revisionId}`, 40, 174, 11);
+      escribir('Estado final: CERRADO', 40, 190, 11);
+      for (const [index, row] of oficial.horasFinales.entries()) {
+        escribir(`Participación ${row.idParticipacion}: ${new Prisma.Decimal(row.horas as string).toFixed(2)} horas`, 40, 206 + index * 14, 9);
+      }
+      tableStartY = 226 + oficial.horasFinales.length * 14;
+    }
 
     const filas = this.filasDeContribucion(modelo);
     const encabezadoPorPagina: string[][] = [];
 
     autoTable(doc, {
-      startY: 146,
+      startY: tableStartY,
       head: [[...CONTRIBUCION_HEADER]],
       body: filas.map((fila) => [
         fila.tarea,
@@ -256,6 +281,74 @@ export class ProjectClosureReportService {
         fechaGeneracion: contexto.fechaGeneracion,
         textosRenderizados,
       },
+    };
+  }
+
+  renderOfficial(capture: OfficialReportCapture): ClosureRenderResult {
+    const rendered = this.render(capture.modelo, capture.contexto, capture.oficial);
+    this.assertRenderedSize(rendered.pdf);
+    return rendered;
+  }
+
+  async buildOfficialModelTx(
+    tx: Prisma.TransactionClient,
+    input: { projectId: number; revisionId: number; adminId: number; fechaAprobacion: Date },
+  ): Promise<OfficialReportCapture> {
+    const links = await tx.documentoRevisionCierre.findMany({
+      where: { idRevisionCierre: input.revisionId }, orderBy: [{ orden: 'asc' }, { idDocumentoCierre: 'asc' }],
+      include: { documento: true },
+    });
+    const automatic = links.find((link) => link.orden === 0)?.documento;
+    const storedContext = automatic?.contextoReporte as unknown as ClosureReportContext | null;
+    if (!automatic?.fingerprintEjecucion || storedContext?.schemaVersion !== 1) {
+      throw new ConflictException('El informe automático no tiene contexto verificable');
+    }
+    const captured = await captureClosureExecution(tx, input.projectId);
+    const execution = executionMatchingStoredFingerprint({
+      generatorVersion: CLOSURE_GENERATOR_VERSION,
+      projectId: input.projectId,
+      cicloRevisionOrigenId: storedContext.cicloRevisionOrigenId,
+      datosEjecucion: captured.ejecucion,
+      presentacion: storedContext.presentacion,
+    }, automatic.fingerprintEjecucion);
+    if (!execution) {
+      throw new ConflictException({ statusCode: 409, code: 'INFORME_DESACTUALIZADO', message: 'El informe automático dejó de representar la ejecución' });
+    }
+    const aggregates = await tx.horasParticipacion.findMany({
+      where: { participacion: { rolProyecto: { idProyecto: input.projectId } } },
+      orderBy: [{ idParticipacion: 'asc' }, { idRegistroHoras: 'asc' }],
+      select: { idParticipacion: true, horasCalculadas: true },
+    });
+    const totals = new Map<number, Prisma.Decimal>();
+    for (const row of aggregates) {
+      if (row.horasCalculadas === null) throw new ConflictException('Todas las horas deben estar calculadas');
+      totals.set(row.idParticipacion, (totals.get(row.idParticipacion) ?? new Prisma.Decimal(0)).plus(row.horasCalculadas));
+    }
+    const oficial: ClosureOfficialContext = {
+      revisionId: input.revisionId,
+      adminId: input.adminId,
+      fechaAprobacion: input.fechaAprobacion,
+      horasFinales: [...totals.entries()].map(([idParticipacion, horas]) => ({ idParticipacion, horas: horas.toFixed(2) })),
+      manifiestoEntrega: links.map((link) => ({
+        documentId: link.idDocumentoCierre, orden: link.orden, checksumSha256: link.documento.checksumSha256!,
+      })),
+    };
+    const modelo = projectClosureModel(execution);
+    const fingerprintModelo = computeModelFingerprint({
+      modelo, fingerprintEjecucion: automatic.fingerprintEjecucion, variante: 'OFICIAL', oficial,
+    });
+    return {
+      modelo,
+      contexto: buildReportContext({
+        cicloRevisionOrigenId: storedContext.cicloRevisionOrigenId,
+        presentacion: storedContext.presentacion,
+        variante: 'OFICIAL',
+        fechaGeneracion: input.fechaAprobacion,
+        aprobacion: { adminId: input.adminId, fechaAprobacion: input.fechaAprobacion, revisionId: input.revisionId },
+      }),
+      oficial,
+      fingerprintEjecucion: automatic.fingerprintEjecucion,
+      fingerprintModelo,
     };
   }
 
