@@ -18,6 +18,7 @@ import {
   computeBaseline,
   diagnose,
   manifestHash,
+  verifyManifest,
   manifestEntriesHash,
   resolveAdmin,
   validateManifest,
@@ -932,5 +933,105 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
     expect(nuevo.reconocido).toBe(true);
     expect(nuevo.manifestHash).toBe(manifestHash(build()));
     expect(detalle.idProyecto).toBe(unequivocal.projectId);
+  });
+  it('T22-B: repetir apply con el mismo manifiesto no incrementa nada y verify confirma el estado', async () => {
+    // El manifiesto es el MISMO de T22-A; su baseline se recalcula sobre el
+    // estado ya conciliado, porque un manifiesto se aplica sobre lo que describe.
+    const baseline = await computeBaseline(prisma, unequivocal.projectId, unequivocal.sprintId);
+    const entradas: LegacyManifestEntry[] = [
+      {
+        accion: 'CONSUMIR_NUEVO',
+        idAsignacion: unequivocal.assignmentId,
+        idParticipacion: unequivocal.participationId,
+        idRegistroHoras: null,
+        importeAnterior: '8.00',
+        importeEsperado: '8.00',
+      },
+    ];
+    const manifest: LegacyManifest = {
+      version: LEGACY_MANIFEST_VERSION,
+      baseline,
+      adminId,
+      projectId: unequivocal.projectId,
+      sprintId: unequivocal.sprintId,
+      evidencia: 'acta-de-revision-T22A',
+      entradas,
+      sha256: manifestEntriesHash(entradas),
+    };
+
+    const agregadoAntes = await prisma.horasParticipacion.findFirstOrThrow({
+      where: { idParticipacion: unequivocal.participationId },
+    });
+    const tramoAntes = await prisma.asignacionTarea.findUniqueOrThrow({
+      where: { idAsignacion: unequivocal.assignmentId },
+    });
+    const eventosAntes = await prisma.bitacoraAuditoria.count({
+      where: { accion: 'LEGACY_HOURS_RECONCILED', idObjeto: String(unequivocal.assignmentId) },
+    });
+    expect(eventosAntes).toBe(1);
+
+    // ── Segundo apply del MISMO manifiesto: no-op.
+    const repeated = await applyManifest(prisma, manifest, adminId);
+    expect(repeated.applied).toBe(0);
+    expect(repeated.noop).toBe(1);
+
+    // El agregado conserva su importe exacto: no se sumó dos veces.
+    const agregadoDespues = await prisma.horasParticipacion.findFirstOrThrow({
+      where: { idParticipacion: unequivocal.participationId },
+    });
+    expect(agregadoDespues.horasReportadas.toFixed(2)).toBe(
+      agregadoAntes.horasReportadas.toFixed(2),
+    );
+    expect(agregadoDespues.horasCalculadas?.toFixed(2)).toBe(
+      agregadoAntes.horasCalculadas?.toFixed(2),
+    );
+    expect(agregadoDespues.estadoHoras).toBe('PENDIENTE');
+
+    // El marcador conserva su fecha original: no se reescribe sin motivo.
+    const tramoDespues = await prisma.asignacionTarea.findUniqueOrThrow({
+      where: { idAsignacion: unequivocal.assignmentId },
+    });
+    expect(tramoDespues.reconocidoEn?.toISOString()).toBe(tramoAntes.reconocidoEn?.toISOString());
+
+    // Y NO se emitió un segundo evento de conciliación.
+    const eventosDespues = await prisma.bitacoraAuditoria.count({
+      where: { accion: 'LEGACY_HOURS_RECONCILED', idObjeto: String(unequivocal.assignmentId) },
+    });
+    expect(eventosDespues).toBe(1);
+
+    // ── verify confirma la correspondencia.
+    const verified = await verifyManifest(prisma, manifest);
+    expect(verified.ok).toBe(true);
+    expect(verified.comprobadas).toBe(1);
+    expect(verified.divergencias).toEqual([]);
+
+    // ── Un cambio externo del importe hace fallar a verify.
+    await prisma.horasParticipacion.update({
+      where: { idRegistroHoras: agregadoDespues.idRegistroHoras },
+      data: { horasReportadas: '99.00' },
+    });
+
+    const drifted = await verifyManifest(prisma, manifest);
+    expect(drifted.ok).toBe(false);
+    const divergencia = drifted.divergencias.find(
+      (row) => row.motivo === 'IMPORTE_AGREGADO_DIVERGENTE',
+    );
+    expect(divergencia).toBeDefined();
+    expect(divergencia?.idAsignacion).toBe(unequivocal.assignmentId);
+    expect(divergencia?.idRegistroHoras).toBe(agregadoDespues.idRegistroHoras);
+    expect(divergencia?.esperado).toBe('8.00');
+    expect(divergencia?.actual).toBe('99.00');
+
+    // ── verify NO corrigió nada: el drift sigue exactamente donde estaba.
+    const trasVerify = await prisma.horasParticipacion.findUniqueOrThrow({
+      where: { idRegistroHoras: agregadoDespues.idRegistroHoras },
+    });
+    expect(trasVerify.horasReportadas.toFixed(2)).toBe('99.00');
+
+    // Se restaura para no contaminar el resto de la suite.
+    await prisma.horasParticipacion.update({
+      where: { idRegistroHoras: agregadoDespues.idRegistroHoras },
+      data: { horasReportadas: agregadoAntes.horasReportadas },
+    });
   });
 });
