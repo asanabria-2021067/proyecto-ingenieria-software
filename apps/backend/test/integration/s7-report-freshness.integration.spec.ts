@@ -129,6 +129,50 @@ describeIntegration('S7 frescura del informe de cierre', () => {
     expect(gateway.emitToUsers.mock.calls.map((call) => call[0])).toEqual(['CLOSURE_REVIEW_UPDATED']);
   });
 
+  it('T26-B: el reenvío conserva el informe heredado y no produce stale al cambiar un nombre de perfil externo', async () => {
+    const f = await closureReadyFixture(db, scope);
+    const { closure, review, documentos, report, gateway } = f.stack;
+    const admin = await createIntegrationAdmin(db, scope);
+    await closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto);
+    const corrected = await review.requestDocumentaryCorrection(f.project.idProyecto, admin.idUsuario, {
+      revisionId: f.dto.revisionId, comentario: 'Sustituya las evidencias',
+    });
+    const inherited = await db.documentoRevisionCierre.findMany({
+      where: { idRevisionCierre: corrected.revisionId }, orderBy: { orden: 'asc' }, include: { documento: true },
+    });
+    const automatic = inherited[0].documento;
+    for (const link of inherited.slice(1)) {
+      await documentos.service.detach(f.project.idProyecto, f.leader.idUsuario, corrected.revisionId, link.idDocumentoCierre);
+    }
+    await db.usuario.update({ where: { idUsuario: f.leader.idUsuario }, data: { nombre: 'Nombre externo actualizado' } });
+    const dto = { revisionId: corrected.revisionId, confirmado: true, expectedFingerprint: f.generated.fingerprintEjecucion };
+    const missingEvidence = await expectStatus(409, () => closure.resubmit(f.project.idProyecto, f.leader.idUsuario, dto));
+    expect(missingEvidence).toMatchObject({ blockers: expect.arrayContaining([expect.objectContaining({ code: 'EVIDENCIAS_INVALIDAS' })]) });
+    expect(JSON.stringify(missingEvidence)).not.toContain('INFORME_DESACTUALIZADO');
+    const grant = await documentos.service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+      revisionId: corrected.revisionId, nombreArchivo: 'evidencia-corregida.pdf',
+    });
+    await documentos.service.uploadAndAttach(f.project.idProyecto, f.leader.idUsuario, grant.ticket, await pdfFixture());
+    await expectStatus(409, () => report.generateAutoReport(f.project.idProyecto, f.leader.idUsuario, corrected.revisionId));
+    gateway.emitToUsers.mockClear();
+    const result = await closure.resubmit(f.project.idProyecto, f.leader.idUsuario, dto);
+    expect(result).toMatchObject({ estadoProyecto: 'EN_SOLICITUD_CIERRE', revisionId: corrected.revisionId,
+      numeroRevision: 2, fingerprintEntrega: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    expect(result.fingerprintEntrega).not.toBe((await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: f.dto.revisionId } })).fingerprintEntrega);
+    expect(await db.documentoCierre.findUniqueOrThrow({ where: { idDocumentoCierre: automatic.idDocumentoCierre } })).toEqual(automatic);
+    expect(await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: corrected.revisionId } })).toMatchObject({
+      estadoRevision: 'ENVIADA', fingerprintEntrega: result.fingerprintEntrega, idSolicitante: f.leader.idUsuario, enviadaEn: expect.any(Date),
+    });
+    expect((await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } })).estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
+    const audit = await db.bitacoraAuditoria.findFirstOrThrow({ where: { idUsuario: f.leader.idUsuario, accion: 'PROJECT_CLOSE_DOCUMENTS_SUBMITTED' } });
+    const detail = audit.detalleJson as { valorNuevo: Record<string, unknown> };
+    expect(detail.valorNuevo).toMatchObject({ fingerprintEntrega: result.fingerprintEntrega,
+      documentos: expect.arrayContaining([expect.objectContaining({ id: automatic.idDocumentoCierre, orden: 0 })]) });
+    const notice = await db.notificacion.findFirstOrThrow({ where: { idUsuario: admin.idUsuario, tipoNotificacion: 'SOLICITUD_CIERRE_PROYECTO' }, orderBy: { idNotificacion: 'desc' } });
+    expect(notice.mensajeNotificacion).toContain('revisión 2');
+    expect(gateway.emitToUsers.mock.calls.map((call) => call[0])).toEqual(['CLOSURE_REVIEW_UPDATED']);
+  });
+
   it('T25-A: la generación automática captura bajo lock, renderiza fuera y vincula el slot 0 tras comparar la huella', async () => {
     const f = await proyectoListoParaGenerar(db, scope);
     const { report, documentos } = closureLifecycleStack(db);
