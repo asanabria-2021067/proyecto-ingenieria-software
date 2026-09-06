@@ -269,6 +269,7 @@ model Usuario {
   sprintsCerrados                  Sprint[]
   registrosAvanceEscritos          RegistroAvanceAsignacion[]
   registrosTiempoRegistrados       RegistroTiempoTarea[]
+  registrosTiempoRevocados         RegistroTiempoTarea[]      @relation("RegistroTiempoRevocador")
   amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
   amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
   siguiendo                        Seguimiento[]              @relation("Siguiendo")
@@ -822,19 +823,28 @@ model RegistroAvanceAsignacion {
 /// mientras el tramo sigue activo (desasignadaEn IS NULL) — regla de la capa
 /// de servicio (TimeRecordsService), no constraint de schema.
 model RegistroTiempoTarea {
-  idRegistroTiempo Int      @id @default(autoincrement()) @map("id_registro_tiempo")
-  idAsignacion     Int      @map("id_asignacion")
-  idUsuario        Int      @map("id_usuario")
-  horas            Decimal  @db.Decimal(6, 2)
-  fecha            DateTime @db.Date
-  nota             String?  @db.Text
-  creadoEn         DateTime @default(now()) @map("creado_en")
+  idRegistroTiempo    Int       @id @default(autoincrement()) @map("id_registro_tiempo")
+  idAsignacion        Int       @map("id_asignacion")
+  idUsuario           Int       @map("id_usuario")
+  horas               Decimal   @db.Decimal(6, 2)
+  fecha               DateTime  @db.Date
+  nota                String?   @db.Text
+  creadoEn            DateTime  @default(now()) @map("creado_en")
+  /// S7 M2 (06 v2 §9/§10): justificación exigida solo al registro que cruza la estimación de la tarea; se conserva aunque deje de ser necesaria.
+  justificacionExceso String?   @map("justificacion_exceso") @db.Text
+  /// S7 M2: última edición del autor sobre un registro todavía no consumido.
+  editadoEn           DateTime? @map("editado_en")
+  /// S7 M2: revocación lógica (nunca DELETE físico): el importe deja de contar en el SUM efectivo pero se conserva como evidencia junto con fecha, nota y justificación.
+  revocadoEn          DateTime? @map("revocado_en")
+  revocadoPor         Int?      @map("revocado_por")
 
-  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion])
-  usuario    Usuario         @relation(fields: [idUsuario], references: [idUsuario])
+  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion], onDelete: Restrict, onUpdate: Cascade)
+  usuario    Usuario         @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  revocador  Usuario?        @relation("RegistroTiempoRevocador", fields: [revocadoPor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([idAsignacion])
   @@index([idUsuario])
+  @@index([idAsignacion, revocadoEn])
   @@map("registro_tiempo_tarea")
 }
 
