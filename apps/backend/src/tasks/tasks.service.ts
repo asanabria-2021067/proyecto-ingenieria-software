@@ -383,7 +383,13 @@ export class TasksService {
       // crear no tiene una entidad previa que exigir.
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId);
 
-      const recursos = await this.tasksRelations.validateCreateTaskRelations(projectId, dto, tx);
+      // C086: la asignación inicial al crear una tarea pasa por la misma
+      // decisión de elegibilidad que una asignación posterior.
+      const recursos = await this.tasksRelations.validateCreateTaskRelations(
+        projectId,
+        { ...dto, actorId: userId },
+        tx,
+      );
 
       const tarea = await tx.tarea.create({
         data: {
@@ -940,6 +946,7 @@ export class TasksService {
         dto.idUsuario,
         rolEfectivo,
         tx,
+        { nuevaAsignacion: true, actorId: actorUserId },
       );
 
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
