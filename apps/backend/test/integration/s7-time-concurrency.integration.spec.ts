@@ -229,4 +229,36 @@ describeIntegration('S7 time concurrency', () => {
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.autor.idUsuario, accion: 'TIME_RECORD_REVOKED' } })).toBe(1);
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'EXIT_REQUEST_APPROVED' } })).toBe(1);
   });
+
+  it('T03-B: la revocación posterior al reconocimiento se rechaza con 409 y no altera el agregado', async () => {
+    const f = await raceFixture(db, scope, ['4.00', '2.00']);
+    solicitudIds = [f.solicitud.idSolicitud];
+    const revocable = f.registros[1];
+
+    const { resultadoPrimera, resultadoSegunda } = await correrCarrera(f, 'consumo', (stack) =>
+      stack.service.revoke(f.project.idProyecto, f.task.idTarea, revocable.idRegistroTiempo, f.autor.idUsuario),
+    );
+    // El consumo gana con los dos registros vigentes; la revocación llega tarde.
+    expect(resultadoPrimera.ok).toBe(true);
+    expect(esConflicto(resultadoSegunda)).toBe(true);
+
+    const registro = await db.registroTiempoTarea.findUniqueOrThrow({ where: { idRegistroTiempo: revocable.idRegistroTiempo } });
+    expect(registro.revocadoEn).toBeNull();
+    expect(registro.revocadoPor).toBeNull();
+    expect(registro.horas.toFixed(2)).toBe('2.00');
+
+    const tramo = await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: f.assignment.idAsignacion } });
+    expect(tramo.horasReales?.toFixed(2)).toBe('6.00');
+    expect(tramo.reconocidoEn).not.toBeNull();
+
+    const agregados = await db.horasParticipacion.findMany({ where: { idParticipacion: f.participacion.idParticipacion } });
+    expect(agregados).toHaveLength(1);
+    // Consolidado exactamente lo que había: ni una hora perdida ni duplicada.
+    expect(agregados[0].horasReportadas.toFixed(2)).toBe('6.00');
+    expect(agregados[0].horasCalculadas?.toFixed(2)).toBe('6.00');
+    expect(agregados[0].horasAprobadas).toBeNull();
+
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.autor.idUsuario, accion: 'TIME_RECORD_REVOKED' } })).toBe(0);
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'EXIT_REQUEST_APPROVED' } })).toBe(1);
+  });
 });
