@@ -10,12 +10,14 @@ import { canonicalDigest } from '../../src/project-closure/closure-report-model'
 import { createIntegrationUser } from './setup/fixtures';
 import { createIntegrationAdmin } from './setup/leadership';
 import { createBarrier, useSecondClient, withDeadline } from './setup/concurrency';
+import { flowAStack } from './setup/flow-a';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import {
   cleanupClosureLifecycle,
   closureLifecycleStack,
   proyectoConIncumplimientos,
   proyectoListoParaGenerar,
+  closureReadyFixture,
 } from './setup/closure-lifecycle';
 import { pdfFixture, type ClosureCleanupScope } from './setup/closure-storage';
 
@@ -58,6 +60,50 @@ describeIntegration('S7 carreras y preparación del cierre', () => {
   });
   afterAll(async () => {
     await db.$disconnect();
+  });
+
+  it('T12: requestClose frente a startSprint termina con cierre y arranque rechazado, o con arranque previo y cierre rechazado', async () => {
+    for (const closureFirst of [true, false]) {
+      const f = await closureReadyFixture(db, scope);
+      const sprintStack = flowAStack(second());
+      const pending = await db.postulacion.create({ data: { idRolProyecto: f.role.idRolProyecto,
+        idUsuarioPostulante: f.leader.idUsuario, justificacion: 'Pendiente ante carrera' } });
+      const entered = createBarrier(1);
+      const contender = createBarrier(1);
+      if (closureFirst) {
+        const evaluate = f.stack.readiness.assertReady.bind(f.stack.readiness);
+        vi.spyOn(f.stack.readiness, 'assertReady').mockImplementationOnce(async (...args) => {
+          const result = await evaluate(...args);
+          await entered.arrive(); await contender.wait(); return result;
+        });
+        const run = sprintStack.runner.run.bind(sprintStack.runner);
+        vi.spyOn(sprintStack.runner, 'run').mockImplementationOnce(async (...args) => {
+          await contender.arrive(); return run(...args);
+        });
+        const request = f.stack.closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto);
+        await withDeadline(entered.wait(), 5000);
+        await withDeadline(Promise.all([request, expectStatus(409, () => sprintStack.service.startSprint(f.project.idProyecto, f.leader.idUsuario))]), 10000);
+        expect(await db.sprint.count({ where: { idProyecto: f.project.idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } } })).toBe(0);
+      } else {
+        const record = sprintStack.audit.registrarEvento.bind(sprintStack.audit);
+        vi.spyOn(sprintStack.audit, 'registrarEvento').mockImplementationOnce(async (...args) => {
+          await record(...args); await entered.arrive(); await contender.wait();
+        });
+        const run = f.stack.runner.run.bind(f.stack.runner);
+        vi.spyOn(f.stack.runner, 'run').mockImplementationOnce(async (...args) => {
+          await contender.arrive(); return run(...args);
+        });
+        const start = sprintStack.service.startSprint(f.project.idProyecto, f.leader.idUsuario);
+        await withDeadline(entered.wait(), 5000);
+        const [sprint, error] = await withDeadline(Promise.all([start, expectStatus(409, () => f.stack.closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto))]), 10000);
+        scope.sprintIds = [...scope.sprintIds!, sprint.idSprint];
+        expect(error).toMatchObject({ blockers: expect.arrayContaining([expect.objectContaining({ code: 'SPRINTS_NO_CERRADOS' })]) });
+        expect(await db.postulacion.findUniqueOrThrow({ where: { idPostulacion: pending.idPostulacion } })).toEqual(pending);
+        expect(await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: f.dto.revisionId } })).toMatchObject({ estadoRevision: 'BORRADOR', fingerprintEntrega: null, enviadaEn: null });
+      }
+      expect((await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } })).estadoProyecto).toBe(closureFirst ? 'EN_SOLICITUD_CIERRE' : 'EN_PROGRESO');
+      vi.restoreAllMocks();
+    }
   });
 
   it('T14: solicitar el cierre rechaza todas las postulaciones pendientes con conteo exacto y no deja ninguna superviviente', async () => {
