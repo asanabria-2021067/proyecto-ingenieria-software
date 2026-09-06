@@ -16,7 +16,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import type { ClosurePhase } from './project-close-readiness.service';
-import { GenerateReportDto, RequestCloseDto } from './dto/closure.dto';
+import { CorrectionDto, GenerateReportDto, RequestCloseDto } from './dto/closure.dto';
 import { ProjectClosureReportService } from './project-closure-report.service';
 import { ProjectClosureService } from './project-closure.service';
 import { ProjectCloseReadinessService } from './project-close-readiness.service';
@@ -49,6 +49,25 @@ export class ProjectClosureController {
   ) {}
 
   /** E103: crea el borrador de cierre o devuelve el existente. */
+  @Post('cierre/correccion-documental')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_VEREDICTO' })
+  correction(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: CorrectionDto) {
+    return this.review.requestDocumentaryCorrection(projectId, user.userId, dto);
+  }
+
+  @Get('cierre/revisiones')
+  listRevisions(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number },
+    @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.closure.listRevisions(projectId, user.userId, page === undefined ? 1 : Number(page), limit === undefined ? 20 : Number(limit));
+  }
+
+  @Get('cierre/revisiones/:numero')
+  getRevision(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Param('numero', ParseIntPipe) numero: number) {
+    return this.closure.getRevision(projectId, user.userId, numero);
+  }
+
   @Post('cierre/preparacion')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ProjectWriteGuard)

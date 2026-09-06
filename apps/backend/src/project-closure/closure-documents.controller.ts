@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  HttpCode,
   Get,
   Header,
   Param,
@@ -42,6 +44,19 @@ const CLOSURE_EVIDENCE_WRITE: ProjectWriteMetadata = {
 @UseGuards(JwtAuthGuard)
 export class ClosureDocumentsController {
   constructor(private readonly documents: ProjectClosureDocumentsService) {}
+
+  @Delete(':documentId')
+  @HttpCode(204)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(CLOSURE_EVIDENCE_WRITE)
+  detach(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('documentId', ParseIntPipe) documentId: number,
+    @Query('revisionId', ParseIntPipe) revisionId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.documents.detach(projectId, user.userId, revisionId, documentId);
+  }
 
   /** E106: reserva y permiso de carga; el cliente no recibe firma del proveedor. */
   @Post('firma')

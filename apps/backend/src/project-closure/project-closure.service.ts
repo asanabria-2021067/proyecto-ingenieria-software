@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service';
 import { canonicalDigest } from './closure-report-model';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
@@ -37,6 +38,7 @@ export class ProjectClosureService {
     protected readonly readinessService: ProjectCloseReadinessService,
     protected readonly bitacoraEventos: BitacoraEventosService,
     protected readonly notifications: NotificationsService,
+    protected readonly readPolicy: ProjectReadPolicyService,
   ) {}
 
   /**
@@ -112,6 +114,34 @@ export class ProjectClosureService {
   }
 
   /** E105: solicita el cierre y sella la entrega. */
+  async listRevisions(projectId: number, actorId: number, page = 1, limit = 20, numeroRevision?: number) {
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new BadRequestException('Paginación inválida');
+    }
+    const decision = await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'documentos' });
+    const rows = await this.prisma.revisionCierreProyecto.findMany({
+      where: { idProyecto: projectId, numeroRevision }, orderBy: { numeroRevision: 'desc' }, skip: (page - 1) * limit, take: limit,
+      include: { documentos: { orderBy: { orden: 'asc' }, include: { documento: { select: {
+        idDocumentoCierre: true, tipoDocumento: true, nombreArchivo: true, tamanoBytes: true, checksumSha256: true,
+      } } } }, informeOficial: { select: { idDocumentoCierre: true, tipoDocumento: true, nombreArchivo: true, tamanoBytes: true, checksumSha256: true } } },
+    });
+    return { page, limit, total: await this.prisma.revisionCierreProyecto.count({ where: { idProyecto: projectId } }),
+      items: rows.map(({ documentos, informeOficial, ...row }) => ({ ...row,
+        documentosEnviados: documentos.map(({ orden, documento }) => ({ ...documento, orden, tamanoBytes: documento.tamanoBytes === null ? null : Number(documento.tamanoBytes) })),
+        informeOficial: informeOficial ? { ...informeOficial, tamanoBytes: Number(informeOficial.tamanoBytes) } : null,
+        puedeEditar: decision.profile === 'LIDER' && row.estadoRevision === 'BORRADOR' && ['EN_PROGRESO', 'EN_SOLICITUD_CIERRE'].includes(decision.project.estadoProyecto),
+        puedeEnviar: decision.profile === 'LIDER' && row.estadoRevision === 'BORRADOR' && ['EN_PROGRESO', 'EN_SOLICITUD_CIERRE'].includes(decision.project.estadoProyecto),
+        puedeResolver: decision.isAdmin && row.estadoRevision === 'ENVIADA' && decision.project.estadoProyecto === 'EN_SOLICITUD_CIERRE',
+      })) };
+  }
+
+  async getRevision(projectId: number, actorId: number, numero: number) {
+    if (!Number.isInteger(numero) || numero < 1) throw new BadRequestException('Número de revisión inválido');
+    const target = (await this.listRevisions(projectId, actorId, 1, 1, numero)).items[0];
+    if (!target) throw new NotFoundException('Revisión no encontrada');
+    return target;
+  }
+
   requestClose(
     projectId: number,
     actorId: number,
