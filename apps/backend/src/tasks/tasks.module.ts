@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EligibilityModule } from '../eligibility/eligibility.module';
 import { TimeRecordsModule } from '../time-records/time-records.module';
 import { TasksController } from './tasks.controller';
 import { TareaComentariosController } from './tarea-comentarios.controller';
@@ -13,7 +14,7 @@ import { ProjectPolicyModule } from '../common/project-policy/project-policy.mod
 import { BitacoraModule } from '../bitacora/bitacora.module';
 
 @Module({
-  imports: [ProjectPolicyModule, ComentariosModule, NotificationsModule, SprintsModule, BitacoraModule, TimeRecordsModule],
+  imports: [ProjectPolicyModule, ComentariosModule, NotificationsModule, SprintsModule, BitacoraModule, TimeRecordsModule, EligibilityModule],
   controllers: [TasksController, TareaComentariosController],
   providers: [
     TasksService,
