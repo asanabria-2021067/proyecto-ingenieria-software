@@ -859,6 +859,9 @@ export function setupLifecycleEnv(): LifecycleEnv {
   const comentariosService = new ComentariosService(
     db as unknown as PrismaService,
     notifications as unknown as NotificationsService,
+    makeProjectTransactionDouble({ tx: db }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 
   return {
