@@ -3,6 +3,12 @@ import { HttpException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import { cleanupTimeFixture, timeLifecycleFixture, timeStack } from './setup/time-records';
+import {
+  createIntegrationParticipation,
+  createIntegrationProjectRole,
+  createIntegrationTaskAssignment,
+  createIntegrationUser,
+} from './setup/fixtures';
 import type { IntegrationCleanupScope } from './setup/cleanup';
 
 /**
@@ -284,5 +290,119 @@ describeIntegration('S7 time lifecycle', () => {
     }
 
     expect(realtime).not.toHaveBeenCalled();
+  });
+
+  it('T06-C: el resumen de horas recalcula indicadores tras cambiar la estimación, conserva justificaciones y expone revocados según autorización', async () => {
+    const f = await timeLifecycleFixture(db, scope);
+    await db.tarea.update({ where: { idTarea: f.task.idTarea }, data: { tiempoEstimadoHoras: 10 } });
+    // Tramo de A: 8 efectivas con la justificación del registro que cruzó.
+    await db.registroTiempoTarea.update({
+      where: { idRegistroTiempo: f.ownerRecord.idRegistroTiempo },
+      data: { horas: '8.00' },
+    });
+    await db.asignacionTarea.update({ where: { idAsignacion: f.closed.idAsignacion }, data: { horasReales: '8.00' } });
+    // Un registro revocado de A: es evidencia visible para su autor y para el
+    // líder, y no cuenta en ningún total.
+    const revocado = await db.registroTiempoTarea.create({
+      data: {
+        idAsignacion: f.closed.idAsignacion,
+        idUsuario: f.owner.idUsuario,
+        horas: '3.00',
+        fecha: new Date('2026-08-29T00:00:00.000Z'),
+        nota: 'nota privada de A',
+        revocadoEn: new Date('2026-08-30T09:00:00.000Z'),
+        revocadoPor: f.owner.idUsuario,
+      },
+    });
+    // Tramo LEGACY de un tercer usuario: importe histórico SIN registros.
+    const historico = await createIntegrationUser(db);
+    scope.userIds = [...(scope.userIds ?? []), historico.idUsuario];
+    const rolHistorico = await createIntegrationProjectRole(db, f.project.idProyecto, { cupos: 2 });
+    scope.roleIds = [...(scope.roleIds ?? []), rolHistorico.idRolProyecto];
+    const participacionHistorica = await createIntegrationParticipation(db, historico.idUsuario, rolHistorico.idRolProyecto, { estadoParticipacion: 'RETIRADO' });
+    scope.participationIds = [...(scope.participationIds ?? []), participacionHistorica.idParticipacion];
+    const tramoLegacy = await createIntegrationTaskAssignment(db, f.task.idTarea, historico.idUsuario, f.leader.idUsuario, {
+      idParticipacion: participacionHistorica.idParticipacion,
+      desasignadaEn: new Date('2026-08-20T00:00:00.000Z'),
+      horasReales: '6.00',
+      origenReporte: 'LEGACY',
+    });
+    scope.assignmentIds = [...(scope.assignmentIds ?? []), tramoLegacy.idAsignacion];
+    const externo = await createIntegrationUser(db);
+    scope.userIds = [...(scope.userIds ?? []), externo.idUsuario];
+
+    const { service } = timeStack(db);
+
+    const conEstimacion10 = await service.getTaskHoursSummary(f.project.idProyecto, f.task.idTarea, f.owner.idUsuario);
+    expect(conEstimacion10.estimacion).toBe(10);
+    expect(conEstimacion10.horasReportadasTarea).toBe('12.00');
+    expect(conEstimacion10.horasLegacyNoGranulares).toBe('6.00');
+    expect(conEstimacion10.restantes).toBe('0.00');
+    expect(conEstimacion10.sobreEstimacion).toBe('2.00');
+
+    /**
+     * La estimación se eleva sobre la fila de la tarea: lo que el contrato
+     * exige demostrar es que el resumen la relee y recalcula, no la ruta que
+     * la cambia — que es la de HU-D4 y ya tiene su propia cobertura.
+     */
+    await db.tarea.update({ where: { idTarea: f.task.idTarea }, data: { tiempoEstimadoHoras: 20 } });
+
+    const comoAutor = await service.getTaskHoursSummary(f.project.idProyecto, f.task.idTarea, f.owner.idUsuario);
+    expect(comoAutor.estimacion).toBe(20);
+    // Indicadores recalculados; ninguna obligación retroactiva se inventa.
+    expect(comoAutor.horasReportadasTarea).toBe('12.00');
+    expect(comoAutor.restantes).toBe('8.00');
+    expect(comoAutor.sobreEstimacion).toBe('0.00');
+    // El legacy sigue separado y nunca se suma al reporte granular.
+    expect(comoAutor.horasLegacyNoGranulares).toBe('6.00');
+    // La justificación histórica sigue almacenada intacta.
+    expect(
+      (await db.registroTiempoTarea.findUniqueOrThrow({ where: { idRegistroTiempo: f.ownerRecord.idRegistroTiempo } })).justificacionExceso,
+    ).toBe('justificación histórica del cruce');
+
+    const tramoA = comoAutor.tramos.find((t) => t.idAsignacion === f.closed.idAsignacion)!;
+    expect(tramoA.reportadas).toBe('8.00');
+    expect(tramoA.abierto).toBe(false);
+    expect(tramoA.origen).toBe('GRANULAR');
+    expect(tramoA.justificaciones).toEqual(['justificación histórica del cruce']);
+    const tramoLegacyProyectado = comoAutor.tramos.find((t) => t.idAsignacion === tramoLegacy.idAsignacion)!;
+    // Un importe legacy no se hace pasar por SUM de registros granulares.
+    expect(tramoLegacyProyectado.reportadas).toBe('0.00');
+    expect(tramoLegacyProyectado.origen).toBe('LEGACY');
+    expect(tramoLegacyProyectado.propuestas).toBe('6.00');
+    expect(tramoLegacyProyectado.ajuste).toBeNull();
+    // A no tiene tramo abierto pero sí registros propios mutables.
+    expect(comoAutor.puedeCrear).toBe(false);
+    expect(comoAutor.puedeEditar).toBe(true);
+    expect(comoAutor.puedeRevocar).toBe(true);
+
+    const comoSucesor = await service.getTaskHoursSummary(f.project.idProyecto, f.task.idTarea, f.successor.idUsuario);
+    // B no ve las justificaciones privadas de A, pero sí los totales.
+    expect(comoSucesor.tramos.find((t) => t.idAsignacion === f.closed.idAsignacion)!.justificaciones).toEqual([]);
+    expect(comoSucesor.horasReportadasTarea).toBe('12.00');
+    expect(comoSucesor.puedeCrear).toBe(true);
+
+    const comoLider = await service.getTaskHoursSummary(f.project.idProyecto, f.task.idTarea, f.leader.idUsuario);
+    expect(comoLider.tramos.find((t) => t.idAsignacion === f.closed.idAsignacion)!.justificaciones).toEqual([
+      'justificación histórica del cruce',
+    ]);
+    // El líder no reporta horas propias en esta tarea.
+    expect(comoLider.puedeCrear).toBe(false);
+    expect(comoLider.puedeEditar).toBe(false);
+
+    // Visibilidad de la lista: el autor ve sus propios revocados, el líder ve
+    // todos, B solo los suyos y el externo no ve nada.
+    const listaAutor = await service.findAllForTask(f.project.idProyecto, f.task.idTarea, f.owner.idUsuario);
+    expect(listaAutor.map((r) => r.idRegistroTiempo).sort()).toEqual(
+      [f.ownerRecord.idRegistroTiempo, revocado.idRegistroTiempo].sort(),
+    );
+    const listaSucesor = await service.findAllForTask(f.project.idProyecto, f.task.idTarea, f.successor.idUsuario);
+    expect(listaSucesor.map((r) => r.idRegistroTiempo)).toEqual([f.successorRecord.idRegistroTiempo]);
+    const listaLider = await service.findAllForTask(f.project.idProyecto, f.task.idTarea, f.leader.idUsuario);
+    expect(listaLider).toHaveLength(3);
+    expect(listaLider.some((r) => r.idRegistroTiempo === revocado.idRegistroTiempo)).toBe(true);
+
+    await expectStatus(403, () => service.findAllForTask(f.project.idProyecto, f.task.idTarea, externo.idUsuario));
+    await expectStatus(403, () => service.getTaskHoursSummary(f.project.idProyecto, f.task.idTarea, externo.idUsuario));
   });
 });

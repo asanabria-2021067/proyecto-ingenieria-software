@@ -46,6 +46,20 @@ export class TimeRecordsController {
     return this.timeRecordsService.findAllForTask(projectId, taskId, user.userId);
   }
 
+  /**
+   * E059: resumen de horas de la tarea. Lectura pura y autorizada por §34: no
+   * lleva ProjectWriteGuard porque no escribe, y la proyección que devuelve
+   * depende del perfil del lector.
+   */
+  @Get('resumen')
+  getSummary(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.timeRecordsService.getTaskHoursSummary(projectId, taskId, user.userId);
+  }
+
   /** E056: registrar horas sobre el tramo propio. */
   @Post()
   @HttpCode(HttpStatus.CREATED)
