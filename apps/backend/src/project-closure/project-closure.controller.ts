@@ -16,7 +16,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import type { ClosurePhase } from './project-close-readiness.service';
-import { CorrectionDto, GenerateReportDto, RequestCloseDto } from './dto/closure.dto';
+import { CorrectionDto, GenerateReportDto, RequestCloseDto, ResubmitClosureDto } from './dto/closure.dto';
 import { ProjectClosureReportService } from './project-closure-report.service';
 import { ProjectClosureService } from './project-closure.service';
 import { ProjectCloseReadinessService } from './project-close-readiness.service';
@@ -47,6 +47,14 @@ export class ProjectClosureController {
     protected readonly review: ProjectClosureReviewService,
     protected readonly report: ProjectClosureReportService,
   ) {}
+
+  @Post('cierre/reenviar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_ENVIO' })
+  resubmit(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: ResubmitClosureDto) {
+    return this.closure.resubmit(projectId, user.userId, dto);
+  }
 
   /** E103: crea el borrador de cierre o devuelve el existente. */
   @Post('cierre/correccion-documental')
