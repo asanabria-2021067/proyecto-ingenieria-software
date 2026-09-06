@@ -406,7 +406,7 @@ export class RolesService {
         where: { idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
       });
       if (activos >= rol.cupos) {
-        throw new BadRequestException('El rol ya alcanzó su límite de cupos activos');
+        throw new ConflictException('El rol ya alcanzó su límite de cupos activos');
       }
 
       let participacion: { idParticipacion: number };
