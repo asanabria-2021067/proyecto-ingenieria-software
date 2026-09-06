@@ -28,6 +28,10 @@ import { ProgressRecordsController } from '../../src/progress-records/progress-r
 import { ProgressRecordsService } from '../../src/progress-records/progress-records.service';
 import { TimeRecordsController } from '../../src/time-records/time-records.controller';
 import { TimeRecordsService } from '../../src/time-records/time-records.service';
+import { TaskLabelsController } from '../../src/labels/task-labels.controller';
+import { LabelsService } from '../../src/labels/labels.service';
+import { TareaComentariosController } from '../../src/tasks/tarea-comentarios.controller';
+import { ComentariosService } from '../../src/comentarios/comentarios.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
 
@@ -69,6 +73,8 @@ describeIntegration('T34 — política de escritura por entidad contra PostgreSQ
   let tasksController: TasksController;
   let progressController: ProgressRecordsController;
   let timeRecordsController: TimeRecordsController;
+  let taskLabelsController: TaskLabelsController;
+  let tareaComentariosController: TareaComentariosController;
   let guard: ProjectWriteGuard;
   let scope: IntegrationCleanupScope;
 
@@ -102,6 +108,18 @@ describeIntegration('T34 — política de escritura por entidad contra PostgreSQ
       new TimeRecordsService(
         prismaService,
         tasksContext,
+        makeFakeNotifications(),
+        projectTx,
+        policy,
+        readPolicy,
+      ),
+    );
+    taskLabelsController = new TaskLabelsController(
+      new LabelsService(prismaService, projectTx, policy),
+    );
+    tareaComentariosController = new TareaComentariosController(
+      new ComentariosService(
+        prismaService,
         makeFakeNotifications(),
         projectTx,
         policy,
@@ -513,5 +531,254 @@ describeIntegration('T34 — política de escritura por entidad contra PostgreSQ
       historicoAntes.tarea,
     );
     expect(Prioridad.MEDIA).toBeDefined();
+  });
+
+  it('T34-B: etiquetas y comentarios de una tarea del Sprint cerrado se rechazan con 409 mientras el Sprint N+1 está activo', async () => {
+    const env = await montarEscenario();
+    const projectId = env.project.idProyecto;
+
+    const etiqueta = await prisma.etiqueta.create({
+      data: {
+        idProyecto: projectId,
+        nombreEtiqueta: 'Histórica',
+        nombreNormalizado: 'histórica',
+        color: '#10B981',
+      },
+    });
+    await prisma.tareaEtiqueta.create({
+      data: { idTarea: env.tareaHistorica.idTarea, idEtiqueta: etiqueta.idEtiqueta },
+    });
+    const comentarioHistorico = await prisma.comentario.create({
+      data: {
+        idAutor: env.miembro.idUsuario,
+        idTarea: env.tareaHistorica.idTarea,
+        contenido: 'Comentario del Sprint ya cerrado',
+      },
+    });
+
+    const vinculosAntes = await prisma.tareaEtiqueta.findMany({
+      where: { idTarea: env.tareaHistorica.idTarea },
+      orderBy: { idEtiqueta: 'asc' },
+    });
+    const comentarioAntes = await prisma.comentario.findUnique({
+      where: { idComentario: comentarioHistorico.idComentario },
+    });
+    const comentariosAntes = await prisma.comentario.count({
+      where: { idTarea: env.tareaHistorica.idTarea },
+    });
+
+    const rechazos = [
+      await esperarRechazo(() =>
+        runThroughRealGuard(
+          TaskLabelsController,
+          TaskLabelsController.prototype.attach,
+          projectId,
+          () =>
+            taskLabelsController.attach(projectId, env.tareaHistorica.idTarea, etiqueta.idEtiqueta, {
+              userId: env.leader.idUsuario,
+            }),
+          {
+            params: {
+              taskId: String(env.tareaHistorica.idTarea),
+              labelId: String(etiqueta.idEtiqueta),
+            },
+          },
+        ),
+      ),
+      await esperarRechazo(() =>
+        runThroughRealGuard(
+          TaskLabelsController,
+          TaskLabelsController.prototype.detach,
+          projectId,
+          () =>
+            taskLabelsController.detach(projectId, env.tareaHistorica.idTarea, etiqueta.idEtiqueta, {
+              userId: env.leader.idUsuario,
+            }),
+          {
+            params: {
+              taskId: String(env.tareaHistorica.idTarea),
+              labelId: String(etiqueta.idEtiqueta),
+            },
+          },
+        ),
+      ),
+      await esperarRechazo(() =>
+        runThroughRealGuard(
+          TareaComentariosController,
+          TareaComentariosController.prototype.createComentario,
+          projectId,
+          () =>
+            tareaComentariosController.createComentario(
+              projectId,
+              env.tareaHistorica.idTarea,
+              { userId: env.miembro.idUsuario },
+              { contenido: 'Anotación tardía' },
+            ),
+          { params: { taskId: String(env.tareaHistorica.idTarea) } },
+        ),
+      ),
+      await esperarRechazo(() =>
+        runThroughRealGuard(
+          TareaComentariosController,
+          TareaComentariosController.prototype.updateComentario,
+          projectId,
+          () =>
+            tareaComentariosController.updateComentario(
+              projectId,
+              env.tareaHistorica.idTarea,
+              comentarioHistorico.idComentario,
+              { userId: env.miembro.idUsuario },
+              { contenido: 'Reescritura del comentario histórico' },
+            ),
+          {
+            params: {
+              taskId: String(env.tareaHistorica.idTarea),
+              commentId: String(comentarioHistorico.idComentario),
+            },
+          },
+        ),
+      ),
+      await esperarRechazo(() =>
+        runThroughRealGuard(
+          TareaComentariosController,
+          TareaComentariosController.prototype.removeComentario,
+          projectId,
+          () =>
+            tareaComentariosController.removeComentario(
+              projectId,
+              env.tareaHistorica.idTarea,
+              comentarioHistorico.idComentario,
+              { userId: env.miembro.idUsuario },
+            ),
+          {
+            params: {
+              taskId: String(env.tareaHistorica.idTarea),
+              commentId: String(comentarioHistorico.idComentario),
+            },
+          },
+        ),
+      ),
+    ];
+
+    for (const rechazo of rechazos) {
+      expect(rechazo).toBeInstanceOf(ConflictException);
+    }
+
+    // El vínculo y el comentario históricos permanecen idénticos.
+    expect(
+      await prisma.tareaEtiqueta.findMany({
+        where: { idTarea: env.tareaHistorica.idTarea },
+        orderBy: { idEtiqueta: 'asc' },
+      }),
+    ).toEqual(vinculosAntes);
+    expect(
+      await prisma.comentario.findUnique({ where: { idComentario: comentarioHistorico.idComentario } }),
+    ).toEqual(comentarioAntes);
+    expect(
+      await prisma.comentario.count({ where: { idTarea: env.tareaHistorica.idTarea } }),
+    ).toBe(comentariosAntes);
+
+    // --- Las mismas operaciones sobre la tarea del Sprint activo funcionan ---
+    await runThroughRealGuard(
+      TaskLabelsController,
+      TaskLabelsController.prototype.attach,
+      projectId,
+      () =>
+        taskLabelsController.attach(projectId, env.tareaVigente.idTarea, etiqueta.idEtiqueta, {
+          userId: env.leader.idUsuario,
+        }),
+      {
+        params: {
+          taskId: String(env.tareaVigente.idTarea),
+          labelId: String(etiqueta.idEtiqueta),
+        },
+      },
+    );
+    expect(
+      await prisma.tareaEtiqueta.count({
+        where: { idTarea: env.tareaVigente.idTarea, idEtiqueta: etiqueta.idEtiqueta },
+      }),
+    ).toBe(1);
+
+    const comentarioVigente = await runThroughRealGuard(
+      TareaComentariosController,
+      TareaComentariosController.prototype.createComentario,
+      projectId,
+      () =>
+        tareaComentariosController.createComentario(
+          projectId,
+          env.tareaVigente.idTarea,
+          { userId: env.miembro.idUsuario },
+          { contenido: 'Anotación del Sprint activo' },
+        ),
+      { params: { taskId: String(env.tareaVigente.idTarea) } },
+    );
+    expect(comentarioVigente.idComentario).toBeTypeOf('number');
+
+    await runThroughRealGuard(
+      TareaComentariosController,
+      TareaComentariosController.prototype.updateComentario,
+      projectId,
+      () =>
+        tareaComentariosController.updateComentario(
+          projectId,
+          env.tareaVigente.idTarea,
+          comentarioVigente.idComentario,
+          { userId: env.miembro.idUsuario },
+          { contenido: 'Anotación del Sprint activo (editada)' },
+        ),
+      {
+        params: {
+          taskId: String(env.tareaVigente.idTarea),
+          commentId: String(comentarioVigente.idComentario),
+        },
+      },
+    );
+
+    await runThroughRealGuard(
+      TareaComentariosController,
+      TareaComentariosController.prototype.removeComentario,
+      projectId,
+      () =>
+        tareaComentariosController.removeComentario(
+          projectId,
+          env.tareaVigente.idTarea,
+          comentarioVigente.idComentario,
+          { userId: env.miembro.idUsuario },
+        ),
+      {
+        params: {
+          taskId: String(env.tareaVigente.idTarea),
+          commentId: String(comentarioVigente.idComentario),
+        },
+      },
+    );
+
+    await runThroughRealGuard(
+      TaskLabelsController,
+      TaskLabelsController.prototype.detach,
+      projectId,
+      () =>
+        taskLabelsController.detach(projectId, env.tareaVigente.idTarea, etiqueta.idEtiqueta, {
+          userId: env.leader.idUsuario,
+        }),
+      {
+        params: {
+          taskId: String(env.tareaVigente.idTarea),
+          labelId: String(etiqueta.idEtiqueta),
+        },
+      },
+    );
+    expect(
+      await prisma.tareaEtiqueta.count({ where: { idTarea: env.tareaVigente.idTarea } }),
+    ).toBe(0);
+
+    // La historia cerrada sigue exactamente igual tras todo el recorrido.
+    expect(
+      await prisma.tareaEtiqueta.findMany({
+        where: { idTarea: env.tareaHistorica.idTarea },
+        orderBy: { idEtiqueta: 'asc' },
+      }),
+    ).toEqual(vinculosAntes);
   });
 });
