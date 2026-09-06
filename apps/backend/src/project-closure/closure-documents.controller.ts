@@ -16,14 +16,10 @@ import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { CLOSURE_TICKET_MAX_BYTES } from '../storage/closure-ticket.service';
 import { ReserveDocumentDto } from './dto/reserve-document.dto';
-import {
-  MAX_DOCUMENT_SIZE,
-  MULTIPART_OVERHEAD_BYTES,
-  ProjectClosureDocumentsService,
-} from './project-closure-documents.service';
+import { MAX_DOCUMENT_SIZE, ProjectClosureDocumentsService } from './project-closure-documents.service';
 
 /**
- * C113 (06 v2 §41 E106–E107): reserva y carga de documentos de cierre.
+ * C113/C116 (06 v2 §25/§26/§41 E106–E107): reserva y carga de documentos de cierre.
  *
  * El multipart trae exactamente DOS partes: el ticket de aplicación y el
  * archivo. Los límites se declaran aquí para que un exceso se rechace en el
@@ -61,14 +57,17 @@ export class ClosureDocumentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
+        // Exactamente dos partes: el ticket y el archivo.
         files: 1,
         fields: 1,
-        fieldSize: CLOSURE_TICKET_MAX_BYTES,
-        fileSize: MAX_DOCUMENT_SIZE,
-        // Margen de framing sobre el límite del archivo, no sobre el archivo.
         parts: 2,
+        fieldNameSize: 64,
+        fieldSize: CLOSURE_TICKET_MAX_BYTES,
+        // El límite del ARCHIVO es el del contrato, sin descuentos. El margen
+        // de framing (MULTIPART_OVERHEAD_BYTES) es holgura del request
+        // completo y nunca se resta de este número.
+        fileSize: MAX_DOCUMENT_SIZE,
         headerPairs: 32,
-        fieldNameSize: MULTIPART_OVERHEAD_BYTES,
       },
     }),
   )
@@ -76,11 +75,13 @@ export class ClosureDocumentsController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
     @Body('ticket') ticket: string,
-    @UploadedFile() file?: { buffer: Buffer; size: number },
+    @UploadedFile() file?: { buffer: Buffer; size?: number },
   ) {
     if (!file) {
       throw new BadRequestException('No se recibió el archivo del documento');
     }
+    // Se pasan los BYTES REALES recibidos: `size` y `Content-Length` los
+    // declara el cliente y no deciden el límite.
     return this.documents.uploadAndAttach(projectId, user.userId, ticket, file.buffer);
   }
 }
