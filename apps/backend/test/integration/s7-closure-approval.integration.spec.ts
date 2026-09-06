@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { HttpException, ValidationPipe } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
+import { PDFDocument } from 'pdf-lib';
 import { ApproveClosureDto } from '../../src/project-closure/dto/closure.dto';
 import type { OfficialReportCapture } from '../../src/project-closure/project-closure-report.service';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
@@ -248,5 +249,75 @@ describeIntegration('S7 aprobación del cierre', () => {
       participacion: { rolProyecto: { idProyecto: unreconciled.project.idProyecto } }, estadoHoras: 'APROBADA',
     } })).toBe(0);
     expect((await db.proyecto.findUniqueOrThrow({ where: { idProyecto: unreconciled.project.idProyecto } })).estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
+  });
+
+  it('T27-D: el informe oficial reproduce exactamente los importes acreditados, el estado CERRADO, el admin y la fecha de aprobación', async () => {
+    for (const delayUpload of [false, true]) {
+      const f = await readyForApproval(db, scope);
+      let renderedTexts: string[] = [];
+      const originalRender = f.stack.report.renderOfficial.bind(f.stack.report);
+      vi.spyOn(f.stack.report, 'renderOfficial').mockImplementation((capture) => {
+        const rendered = originalRender(capture);
+        renderedTexts = rendered.resumen.textosRenderizados;
+        return rendered;
+      });
+      if (delayUpload) {
+        const originalUpload = f.stack.documentos.service.uploadGenerated.bind(f.stack.documentos.service);
+        vi.spyOn(f.stack.documentos.service, 'uploadGenerated').mockImplementation(async (...args) => {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          return originalUpload(...args);
+        });
+      }
+
+      const result = await f.stack.review.approveClosure(f.project.idProyecto, f.admin.idUsuario, f.approveDto);
+      const project = await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } });
+      const revision = await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: f.dto.revisionId } });
+      const official = await db.documentoCierre.findUniqueOrThrow({ where: { idDocumentoCierre: result.informeOficialId! } });
+      const automatic = await db.documentoCierre.findFirstOrThrow({ where: {
+        idProyecto: f.project.idProyecto, tipoDocumento: 'INFORME_AUTOMATICO',
+        revisiones: { some: { idRevisionCierre: f.dto.revisionId, orden: 0 } },
+      } });
+      const hours = await db.horasParticipacion.findMany({
+        where: { participacion: { rolProyecto: { idProyecto: f.project.idProyecto } } },
+        orderBy: { idParticipacion: 'asc' },
+      });
+      const context = official.contextoReporte as { aprobacion: {
+        adminId: number; revisionId: number; fechaAprobacion: string;
+      }; fechaGeneracion: string };
+      const approvalDate = revision.resueltaEn!.toISOString();
+
+      expect(project.estadoProyecto).toBe('CERRADO');
+      expect(context).toMatchObject({ aprobacion: {
+        adminId: f.admin.idUsuario, revisionId: revision.idRevisionCierre, fechaAprobacion: approvalDate,
+      }, fechaGeneracion: approvalDate });
+      expect(official.disponibleEn?.toISOString()).toBe(approvalDate);
+      expect(official.fingerprintModelo).not.toBe(automatic.fingerprintModelo);
+      expect(official.fingerprintModelo).toMatch(/^[a-f0-9]{64}$/);
+      expect(automatic.fingerprintModelo).toMatch(/^[a-f0-9]{64}$/);
+      expect(renderedTexts).toEqual(expect.arrayContaining([
+        `Administrador: ${f.admin.idUsuario}`,
+        `Fecha de aprobación: ${approvalDate}`,
+        `Revisión: ${revision.idRevisionCierre}`,
+        'Estado final: CERRADO',
+        ...hours.map((row) => `Participación ${row.idParticipacion}: ${row.horasAprobadas!.toFixed(2)} horas`),
+      ]));
+      for (const row of hours) {
+        expect(row).toMatchObject({ estadoHoras: 'APROBADA', aprobadoPor: f.admin.idUsuario, fechaAprobacion: revision.resueltaEn });
+      }
+
+      const grant = await f.stack.documentos.service.getReadUrl(
+        f.project.idProyecto, official.idDocumentoCierre, f.admin.idUsuario,
+      );
+      const ticket = new URL(grant.url, 'http://localhost').searchParams.get('ticket')!;
+      const content = await f.stack.documentos.service.readContent(
+        f.project.idProyecto, official.idDocumentoCierre, f.admin.idUsuario, ticket,
+      );
+      const parsed = await PDFDocument.load(content.bytes);
+      expect(parsed.getPageCount()).toBeGreaterThan(0);
+      expect(parsed.getCreationDate()?.toISOString()).toBe(
+        new Date(Math.floor(revision.resueltaEn!.getTime() / 1000) * 1000).toISOString(),
+      );
+      expect(content.nombreArchivo).toBe(`informe-oficial-${f.project.idProyecto}-${revision.idRevisionCierre}.pdf`);
+    }
   });
 });
