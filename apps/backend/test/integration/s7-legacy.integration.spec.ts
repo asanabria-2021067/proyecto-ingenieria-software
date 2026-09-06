@@ -10,8 +10,19 @@ import {
   createIntegrationUser,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures } from './setup/cleanup';
+import { closureLifecycleStack } from './setup/closure-lifecycle';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
-import { diagnose, resolveAdmin, LegacyCliError } from '../../scripts/sprint7-legacy';
+import {
+  assessManifest,
+  diagnose,
+  manifestEntriesHash,
+  resolveAdmin,
+  validateManifest,
+  LegacyCliError,
+  LEGACY_MANIFEST_VERSION,
+  type LegacyManifest,
+  type LegacyManifestEntry,
+} from '../../scripts/sprint7-legacy';
 
 /**
  * T23-A (06 v2 §14): el modo `diagnose` de la CLI de conciliación legacy
@@ -45,6 +56,23 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
 
   let adminId = 0;
   let outsiderId = 0;
+  let healthyProjectId = 0;
+  let mainProjectId = 0;
+
+  // Casos de T23-B: atribuciones que NO pueden demostrarse.
+  const ambiguous = {
+    projectId: 0,
+    sprintId: 0,
+    multiHistoryAssignment: 0,
+    firstParticipation: 0,
+    secondParticipation: 0,
+    reactivatedAssignment: 0,
+    reactivatedParticipation: 0,
+    approvedAggregateAssignment: 0,
+    approvedAggregateParticipation: 0,
+    approvedAggregate: 0,
+    porConciliarAssignment: 0,
+  };
   let rolAccesoId: number | null = null;
   let usuarioRolAccesoId: number | null = null;
 
@@ -129,6 +157,7 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
     const project = await createIntegrationProject(prisma, adminId, {
       estadoProyecto: 'EN_PROGRESO',
     });
+    mainProjectId = project.idProyecto;
     scope.projectIds.push(project.idProyecto);
     const role = await createIntegrationProjectRole(prisma, project.idProyecto);
     scope.roleIds.push(role.idRolProyecto);
@@ -332,6 +361,166 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
     });
     planted.p07Project = awaiting.idProyecto;
     scope.projectIds.push(awaiting.idProyecto);
+
+    // ────────────────────────────────────────────────────────────────────────
+    // T23-B: proyecto con tres atribuciones NO demostrables.
+    // ────────────────────────────────────────────────────────────────────────
+    const ambiguousProject = await createIntegrationProject(prisma, adminId, {
+      estadoProyecto: 'EN_PROGRESO',
+    });
+    ambiguous.projectId = ambiguousProject.idProyecto;
+    scope.projectIds.push(ambiguousProject.idProyecto);
+    const ambiguousSprint = await createIntegrationSprint(prisma, ambiguousProject.idProyecto, {
+      numero: 1,
+      estado: 'CERRADO',
+    });
+    ambiguous.sprintId = ambiguousSprint.idSprint;
+    scope.sprintIds.push(ambiguousSprint.idSprint);
+
+    // Caso 1 — dos historias de participación con ROLES DISTINTOS.
+    const roleA = await createIntegrationProjectRole(prisma, ambiguousProject.idProyecto, {
+      nombreRol: 'Rol historico A',
+    });
+    const roleB = await createIntegrationProjectRole(prisma, ambiguousProject.idProyecto, {
+      nombreRol: 'Rol historico B',
+    });
+    scope.roleIds.push(roleA.idRolProyecto, roleB.idRolProyecto);
+    const historyA = await createIntegrationParticipation(prisma, worker.idUsuario, roleA.idRolProyecto, {
+      estadoParticipacion: 'RETIRADO',
+    });
+    // La segunda historia está ACTIVA hoy: es precisamente la que un
+    // desempate ingenuo elegiría, y la que la CLI NO debe elegir.
+    const historyB = await createIntegrationParticipation(prisma, worker.idUsuario, roleB.idRolProyecto, {
+      estadoParticipacion: 'ACTIVO',
+    });
+    scope.participationIds.push(historyA.idParticipacion, historyB.idParticipacion);
+    ambiguous.firstParticipation = historyA.idParticipacion;
+    ambiguous.secondParticipation = historyB.idParticipacion;
+
+    const multiTask = await createIntegrationTask(
+      prisma,
+      ambiguousProject.idProyecto,
+      adminId,
+      ambiguousSprint.idSprint,
+    );
+    scope.taskIds.push(multiTask.idTarea);
+    const multiAssignment = await createIntegrationTaskAssignment(
+      prisma,
+      multiTask.idTarea,
+      worker.idUsuario,
+      adminId,
+      { horasReales: '3.00', desasignadaEn: new Date(), origenReporte: 'POR_CONCILIAR' },
+    );
+    scope.assignmentIds.push(multiAssignment.idAsignacion);
+    ambiguous.multiHistoryAssignment = multiAssignment.idAsignacion;
+    // Este mismo tramo es el que deja el proyecto en LEGACY_SIN_CONCILIAR.
+    ambiguous.porConciliarAssignment = multiAssignment.idAsignacion;
+
+    // Caso 2 — participación reactivada: fechaIngreso posterior al tramo.
+    const reactivatedUser = await createIntegrationUser(prisma);
+    scope.userIds.push(reactivatedUser.idUsuario);
+    const roleC = await createIntegrationProjectRole(prisma, ambiguousProject.idProyecto, {
+      nombreRol: 'Rol reactivado',
+    });
+    scope.roleIds.push(roleC.idRolProyecto);
+    const reactivated = await createIntegrationParticipation(
+      prisma,
+      reactivatedUser.idUsuario,
+      roleC.idRolProyecto,
+    );
+    scope.participationIds.push(reactivated.idParticipacion);
+    ambiguous.reactivatedParticipation = reactivated.idParticipacion;
+
+    const reactivatedTask = await createIntegrationTask(
+      prisma,
+      ambiguousProject.idProyecto,
+      adminId,
+      ambiguousSprint.idSprint,
+    );
+    scope.taskIds.push(reactivatedTask.idTarea);
+    const reactivatedAssignment = await createIntegrationTaskAssignment(
+      prisma,
+      reactivatedTask.idTarea,
+      reactivatedUser.idUsuario,
+      adminId,
+      { horasReales: '2.00', desasignadaEn: new Date(), origenReporte: 'LEGACY' },
+    );
+    scope.assignmentIds.push(reactivatedAssignment.idAsignacion);
+    ambiguous.reactivatedAssignment = reactivatedAssignment.idAsignacion;
+    // El tramo es anterior; la reactivación reescribió la fecha de ingreso.
+    await prisma.asignacionTarea.update({
+      where: { idAsignacion: reactivatedAssignment.idAsignacion },
+      data: { fechaAsignacion: new Date('2026-01-10T00:00:00.000Z') },
+    });
+    await prisma.participacionProyecto.update({
+      where: { idParticipacion: reactivated.idParticipacion },
+      data: { fechaIngreso: new Date('2026-05-01T00:00:00.000Z') },
+    });
+
+    // Caso 3 — agregado ya APROBADA sobre una participación inequívoca.
+    const approvedUser = await createIntegrationUser(prisma);
+    scope.userIds.push(approvedUser.idUsuario);
+    const roleD = await createIntegrationProjectRole(prisma, ambiguousProject.idProyecto, {
+      nombreRol: 'Rol con agregado aprobado',
+    });
+    scope.roleIds.push(roleD.idRolProyecto);
+    const approvedParticipation = await createIntegrationParticipation(
+      prisma,
+      approvedUser.idUsuario,
+      roleD.idRolProyecto,
+    );
+    scope.participationIds.push(approvedParticipation.idParticipacion);
+    ambiguous.approvedAggregateParticipation = approvedParticipation.idParticipacion;
+
+    const approvedTask = await createIntegrationTask(
+      prisma,
+      ambiguousProject.idProyecto,
+      adminId,
+      ambiguousSprint.idSprint,
+    );
+    scope.taskIds.push(approvedTask.idTarea);
+    const approvedAssignment = await createIntegrationTaskAssignment(
+      prisma,
+      approvedTask.idTarea,
+      approvedUser.idUsuario,
+      adminId,
+      {
+        idParticipacion: approvedParticipation.idParticipacion,
+        horasReales: '1.00',
+        desasignadaEn: new Date(),
+        origenReporte: 'LEGACY',
+      },
+    );
+    scope.assignmentIds.push(approvedAssignment.idAsignacion);
+    ambiguous.approvedAggregateAssignment = approvedAssignment.idAsignacion;
+
+    const approvedAggregate = await prisma.horasParticipacion.create({
+      data: {
+        idParticipacion: approvedParticipation.idParticipacion,
+        periodoInicio: new Date('2026-01-01'),
+        periodoFin: new Date('2026-01-31'),
+        horasReportadas: '1.00',
+        horasCalculadas: '1.00',
+        horasAprobadas: '1.00',
+        estadoHoras: 'APROBADA',
+        aprobadoPor: adminId,
+        fechaAprobacion: new Date('2026-02-01T00:00:00.000Z'),
+        idSprint: ambiguousSprint.idSprint,
+      },
+    });
+    ambiguous.approvedAggregate = approvedAggregate.idRegistroHoras;
+
+    // ── Proyecto SANO de control: nada que conciliar.
+    const controlProject = await createIntegrationProject(prisma, adminId, {
+      estadoProyecto: 'EN_PROGRESO',
+    });
+    healthyProjectId = controlProject.idProyecto;
+    scope.projectIds.push(controlProject.idProyecto);
+    const healthySprint = await createIntegrationSprint(prisma, controlProject.idProyecto, {
+      numero: 1,
+      estado: 'CERRADO',
+    });
+    scope.sprintIds.push(healthySprint.idSprint);
   });
 
   afterAll(async () => {
@@ -455,5 +644,117 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
     // ── La bitácora no participa en ninguna decisión de importes: el
     //    diagnóstico no la consulta y su huella permanece intacta.
     expect(after).toContain('bitacora_auditoria=');
+  });
+  it('T23-B: apply rechaza los casos ambiguos, no elige la participación activa actual y bloquea solo el proyecto afectado', async () => {
+    const before = await fingerprintTables();
+
+    const entradas: LegacyManifestEntry[] = [
+      // Caso 1: el usuario tuvo DOS historias de participación con roles
+      // distintos. El manifiesto propone una; la CLI no puede demostrarla.
+      {
+        accion: 'ENLAZAR',
+        idAsignacion: ambiguous.multiHistoryAssignment,
+        idParticipacion: ambiguous.firstParticipation,
+        idRegistroHoras: null,
+        importeAnterior: '3.00',
+        importeEsperado: '3.00',
+      },
+      // Caso 2: la participación fue reactivada y su fechaIngreso reescrita, de
+      // modo que es posterior al propio tramo.
+      {
+        accion: 'ENLAZAR',
+        idAsignacion: ambiguous.reactivatedAssignment,
+        idParticipacion: ambiguous.reactivatedParticipation,
+        idRegistroHoras: null,
+        importeAnterior: '2.00',
+        importeEsperado: '2.00',
+      },
+      // Caso 3: el agregado citado ya está APROBADA.
+      {
+        accion: 'CONSUMIR_INCREMENTO',
+        idAsignacion: ambiguous.approvedAggregateAssignment,
+        idParticipacion: ambiguous.approvedAggregateParticipation,
+        idRegistroHoras: ambiguous.approvedAggregate,
+        importeAnterior: '1.00',
+        importeEsperado: '1.00',
+      },
+    ];
+    const manifest: LegacyManifest = {
+      version: LEGACY_MANIFEST_VERSION,
+      baseline: 'diagnose-t23b',
+      adminId,
+      projectId: ambiguous.projectId,
+      sprintId: ambiguous.sprintId,
+      evidencia: 'acta-de-revision-T23B',
+      entradas,
+      sha256: manifestEntriesHash(entradas),
+    };
+
+    const refusals = await assessManifest(prisma, manifest);
+
+    // ── Los tres casos se rechazan, cada uno con su motivo y sus IDs.
+    expect(refusals).toHaveLength(3);
+    const byAssignment = new Map(refusals.map((row) => [row.idAsignacion, row]));
+
+    const multi = byAssignment.get(ambiguous.multiHistoryAssignment);
+    expect(multi?.motivo).toBe('PARTICIPACION_AMBIGUA');
+    // El diagnóstico cita AMBAS historias: no elige ninguna.
+    expect(multi?.ids).toEqual(
+      expect.arrayContaining([ambiguous.firstParticipation, ambiguous.secondParticipation]),
+    );
+
+    const reactivated = byAssignment.get(ambiguous.reactivatedAssignment);
+    expect(reactivated?.motivo).toBe('FECHA_INGRESO_REESCRITA');
+    expect(reactivated?.ids).toEqual([ambiguous.reactivatedParticipation]);
+
+    const approved = byAssignment.get(ambiguous.approvedAggregateAssignment);
+    expect(approved?.motivo).toBe('AGREGADO_NO_PENDIENTE');
+    expect(approved?.ids).toEqual([ambiguous.approvedAggregate]);
+
+    // ── Evaluar el manifiesto no escribió absolutamente nada.
+    expect(await fingerprintTables()).toBe(before);
+
+    // ── El agregado APROBADA conserva su estado y su importe.
+    const untouched = await prisma.horasParticipacion.findUniqueOrThrow({
+      where: { idRegistroHoras: ambiguous.approvedAggregate },
+    });
+    expect(untouched.estadoHoras).toBe('APROBADA');
+    expect(untouched.horasAprobadas?.toFixed(2)).toBe('1.00');
+
+    // ── El proyecto afectado queda bloqueado por LEGACY_SIN_CONCILIAR.
+    const { readiness } = closureLifecycleStack(prisma);
+    const afectado = await readiness.evaluate(undefined, ambiguous.projectId, { phase: 'REQUEST' });
+    expect(afectado.canSubmit).toBe(false);
+    const codigos = afectado.blockers.map((blocker) => blocker.code);
+    expect(codigos).toContain('LEGACY_SIN_CONCILIAR');
+    const conciliacion = afectado.blockers.find(
+      (blocker) => blocker.code === 'LEGACY_SIN_CONCILIAR',
+    );
+    expect(conciliacion?.ids).toEqual(
+      expect.arrayContaining([ambiguous.porConciliarAssignment]),
+    );
+
+    // ── La otra mitad de §22: un agregado PENDIENTE sin Sprint tampoco deja
+    //    cerrar, y se cita por su identificador.
+    const conAgregadoSinSprint = await readiness.evaluate(undefined, mainProjectId, {
+      phase: 'REQUEST',
+    });
+    const agregadoBlocker = conAgregadoSinSprint.blockers.find(
+      (blocker) => blocker.code === 'LEGACY_SIN_CONCILIAR',
+    );
+    expect(agregadoBlocker?.ids).toEqual(expect.arrayContaining([planted.p06Aggregate]));
+
+    // ── El bloqueo está ACOTADO: el proyecto sano no lo sufre.
+    const sano = await readiness.evaluate(undefined, healthyProjectId, { phase: 'REQUEST' });
+    expect(sano.blockers.map((blocker) => blocker.code)).not.toContain('LEGACY_SIN_CONCILIAR');
+
+    // ── Un manifiesto cuyo SHA-256 no corresponde al conjunto se rechaza
+    //    antes de mirar la base: la firma no es decorativa.
+    expect(() => validateManifest({ ...manifest, sha256: 'f'.repeat(64) })).toThrow(
+      LegacyCliError,
+    );
+
+    // ── Y sigue sin haberse tocado ninguna fila.
+    expect(await fingerprintTables()).toBe(before);
   });
 });
