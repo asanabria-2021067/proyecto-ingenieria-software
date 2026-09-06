@@ -5,11 +5,11 @@ import { PDFDocument } from 'pdf-lib';
 import { ApproveClosureDto } from '../../src/project-closure/dto/closure.dto';
 import type { OfficialReportCapture } from '../../src/project-closure/project-closure-report.service';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
-import { cleanupClosureLifecycle, closureReadyFixture } from './setup/closure-lifecycle';
+import { cleanupClosureLifecycle, closureLifecycleStack, closureReadyFixture } from './setup/closure-lifecycle';
 import { pdfFixture, type ClosureCleanupScope } from './setup/closure-storage';
 import { createIntegrationAdmin } from './setup/leadership';
 import { createIntegrationParticipation, createIntegrationProject, createIntegrationProjectRole, createIntegrationSprint, createIntegrationUser } from './setup/fixtures';
-import { useSecondClient } from './setup/concurrency';
+import { useSecondClient, withDeadline } from './setup/concurrency';
 
 const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
 
@@ -377,6 +377,81 @@ describeIntegration('S7 aprobación del cierre', () => {
     expect(completed.estadoProyecto).toBe('CERRADO');
     expect(await db.documentoCierre.count({ where: {
       idProyecto: retry.project.idProyecto, tipoDocumento: 'INFORME_OFICIAL_FINAL', estadoDocumento: 'DISPONIBLE',
+    } })).toBe(1);
+  });
+
+  it('T28-B: si otro administrador resuelve durante el upload, la segunda fase devuelve 409 y deja el oficial sin referencia', async () => {
+    const corrected = await readyForApproval(db, scope);
+    const correctionAdmin = await createIntegrationAdmin(second(), scope);
+    const correctionStack = closureLifecycleStack(second());
+    const originalUpload = corrected.stack.documentos.storage.uploadImmutable.getMockImplementation()!;
+    let signalUpload: () => void = () => undefined;
+    let releaseUpload: () => void = () => undefined;
+    const uploadReached = new Promise<void>((resolve) => { signalUpload = resolve; });
+    const uploadReleased = new Promise<void>((resolve) => { releaseUpload = resolve; });
+    corrected.stack.documentos.storage.uploadImmutable.mockImplementation(async (...args) => {
+      signalUpload();
+      await uploadReleased;
+      return originalUpload(...args);
+    });
+
+    const heldApproval = corrected.stack.review.approveClosure(
+      corrected.project.idProyecto, corrected.admin.idUsuario, corrected.approveDto,
+    );
+    await withDeadline(uploadReached, 8_000, 'fase uno de la aprobación retenida');
+    const correction = await correctionStack.review.requestDocumentaryCorrection(
+      corrected.project.idProyecto, correctionAdmin.idUsuario,
+      { revisionId: corrected.dto.revisionId, comentario: 'Corregir antes de aprobar' },
+    );
+    releaseUpload();
+    await expectStatus(409, () => heldApproval);
+    expect(correction.estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
+    expect(await db.revisionCierreProyecto.findUniqueOrThrow({
+      where: { idRevisionCierre: corrected.dto.revisionId },
+    })).toMatchObject({ estadoRevision: 'CORRECCION_DOCUMENTAL', idDocumentoOficial: null });
+    const correctionOrphan = await db.documentoCierre.findFirstOrThrow({ where: {
+      idProyecto: corrected.project.idProyecto, idRevisionOrigen: corrected.dto.revisionId,
+      tipoDocumento: 'INFORME_OFICIAL_FINAL',
+    } });
+    expect(correctionOrphan).toMatchObject({ estadoDocumento: 'EN_CARGA' });
+    expect(await db.revisionCierreProyecto.count({ where: { idDocumentoOficial: correctionOrphan.idDocumentoCierre } })).toBe(0);
+    expect(await db.horasParticipacion.count({ where: {
+      participacion: { rolProyecto: { idProyecto: corrected.project.idProyecto } }, estadoHoras: 'APROBADA',
+    } })).toBe(0);
+
+    const competing = await readyForApproval(db, scope);
+    const secondAdmin = await createIntegrationAdmin(second(), scope);
+    const secondStack = closureLifecycleStack(second());
+    const firstUpload = competing.stack.documentos.storage.uploadImmutable.getMockImplementation()!;
+    let signalFirst: () => void = () => undefined;
+    let releaseFirst: () => void = () => undefined;
+    const firstReached = new Promise<void>((resolve) => { signalFirst = resolve; });
+    const firstReleased = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    competing.stack.documentos.storage.uploadImmutable.mockImplementation(async (...args) => {
+      signalFirst();
+      await firstReleased;
+      return firstUpload(...args);
+    });
+    const firstApproval = competing.stack.review.approveClosure(
+      competing.project.idProyecto, competing.admin.idUsuario, competing.approveDto,
+    );
+    await withDeadline(firstReached, 8_000, 'upload de la aprobación ganadora');
+    await expectStatus(409, () => secondStack.review.approveClosure(
+      competing.project.idProyecto, secondAdmin.idUsuario, competing.approveDto,
+    ));
+    releaseFirst();
+    const winner = await firstApproval;
+    expect(winner.estadoProyecto).toBe('CERRADO');
+    const referenced = await db.revisionCierreProyecto.findUniqueOrThrow({
+      where: { idRevisionCierre: competing.dto.revisionId },
+    });
+    expect(referenced).toMatchObject({ estadoRevision: 'APROBADA', idRevisor: competing.admin.idUsuario,
+      idDocumentoOficial: winner.informeOficialId });
+    expect(await db.documentoCierre.count({ where: {
+      idProyecto: competing.project.idProyecto, tipoDocumento: 'INFORME_OFICIAL_FINAL',
+    } })).toBe(1);
+    expect(await db.bitacoraAuditoria.count({ where: {
+      idUsuario: competing.admin.idUsuario, accion: 'PROJECT_CLOSE_REVIEW_APPROVED',
     } })).toBe(1);
   });
 });
