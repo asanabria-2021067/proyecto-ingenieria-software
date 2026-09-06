@@ -16,6 +16,13 @@ export const CLOSURE_STORAGE_PROVIDER = 'cloudinary' as const;
 export const CLOSURE_RESOURCE_TYPE = 'raw' as const;
 
 /**
+ * Sufijo congelado del objeto remoto. Nombra lo que realmente hay allí:
+ * ciphertext. El proveedor acepta este sufijo y lo que se guarda nunca es un
+ * PDF legible.
+ */
+export const CLOSURE_STORAGE_EXTENSION = '.enc' as const;
+
+/**
  * Modalidad de entrega del asset. `authenticated` es la primaria verificada;
  * `private` es el primer fallback y `upload` el segundo, admisible ÚNICAMENTE
  * para ciphertext AES-256-GCM (§26): en ningún modo se sube texto claro.
