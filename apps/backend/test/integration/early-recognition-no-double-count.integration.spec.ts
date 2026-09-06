@@ -89,7 +89,7 @@ function makeSprintsService(prisma: PrismaClient): SprintsService {
     notifications,
     new ProjectTransactionService(prismaService),
     new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-  );
+    new ProjectReadPolicyService(prismaService));
 }
 
 function longProgressContent(label: string): string {
