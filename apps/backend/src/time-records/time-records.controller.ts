@@ -12,6 +12,15 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
+import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
+
+/** C028: registro de horas en P/E con Sprint ambiente ACTIVO (06 v2 §32). */
+const TIME_WRITE: ProjectWriteMetadata = {
+  source: { kind: 'param', name: 'projectId' },
+  states: ['P', 'E'],
+  sprint: 'ACTIVO',
+  family: 'REGISTRO_TIEMPO',
+};
 import { CreateTimeRecordDto } from './dto/create-time-record.dto';
 import { TimeRecordsService } from './time-records.service';
 
@@ -32,6 +41,7 @@ export class TimeRecordsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(TIME_WRITE)
   create(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,

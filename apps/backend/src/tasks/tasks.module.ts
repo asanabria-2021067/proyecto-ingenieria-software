@@ -8,18 +8,17 @@ import { TasksRelationsService } from './tasks-relations.service';
 import { ComentariosModule } from '../comentarios/comentarios.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SprintsModule } from '../sprints/sprints.module';
-import { ProjectWriteGuard } from '../common/guards/project-write.guard';
+import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
 import { BitacoraModule } from '../bitacora/bitacora.module';
 
 @Module({
-  imports: [ComentariosModule, NotificationsModule, SprintsModule, BitacoraModule],
+  imports: [ProjectPolicyModule, ComentariosModule, NotificationsModule, SprintsModule, BitacoraModule],
   controllers: [TasksController, TareaComentariosController],
   providers: [
     TasksService,
     TasksContextService,
     TasksAuthorizationService,
     TasksRelationsService,
-    ProjectWriteGuard,
   ],
   exports: [TasksService],
 })
