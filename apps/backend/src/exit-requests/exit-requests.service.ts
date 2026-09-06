@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoSolicitudSalida, Prisma } from '@prisma/client';
+import { EstadoSolicitudSalida, EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { HoursRecognitionService } from '../sprints/hours-recognition.service';
@@ -449,26 +449,28 @@ export class ExitRequestsService {
        *                      un Sprint ni una fila con idSprint NULL; lo que
        *                      quede pendiente pertenece a la conciliación §14.
        */
-      if (!sprint) {
-        throw new ConflictException('No hay un Sprint activo en este proyecto');
-      }
       const reconocidas: Array<{ idParticipacion: number; horasReportadas: string; horasPropuestas: string }> = [];
-      const consolidadoEn = new Date();
-      for (const participacion of participacionesActivas) {
-        const resultado = await this.hoursRecognition.recognizeParticipationHours(tx, {
-          projectId: idProyecto,
-          sprintId: sprint!.idSprint,
-          participationId: participacion.idParticipacion,
-          reconocidoEn: consolidadoEn,
-        });
-        if (resultado.horasParticipacion !== null) {
-          reconocidas.push({
-            idParticipacion: participacion.idParticipacion,
-            horasReportadas: resultado.horasReportadas.toFixed(2),
-            horasPropuestas: resultado.horasPropuestas.toFixed(2),
+      if (sprint?.estado === EstadoSprint.ACTIVO) {
+        const consolidadoEn = new Date();
+        for (const participacion of participacionesActivas) {
+          const resultado = await this.hoursRecognition.recognizeParticipationHours(tx, {
+            projectId: idProyecto,
+            sprintId: sprint.idSprint,
+            participationId: participacion.idParticipacion,
+            reconocidoEn: consolidadoEn,
           });
+          if (resultado.horasParticipacion !== null) {
+            reconocidas.push({
+              idParticipacion: participacion.idParticipacion,
+              horasReportadas: resultado.horasReportadas.toFixed(2),
+              horasPropuestas: resultado.horasPropuestas.toFixed(2),
+            });
+          }
         }
       }
+      // Sin Sprint operable NO se reconoce nada: no se fabrica un Sprint, no
+      // se crea una fila con idSprint NULL y lo que quede pendiente queda para
+      // la conciliación de §14. Salir entre Sprints no inventa historia.
 
       await tx.participacionProyecto.updateMany({
         where: {
