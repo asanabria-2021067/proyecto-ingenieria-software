@@ -23,4 +23,20 @@ export class HistoricalProjectController {
   ) {
     return this.historical.historicalProject(projectId, user.userId);
   }
+
+  /**
+   * E119 (§15): contribuciones de tareas eliminadas de un Sprint.
+   *
+   * Es una lectura HISTÓRICA: devuelve el trabajo que existió, marcado como
+   * tal, y no reabre nada. El tablero operativo sigue filtrando las tareas
+   * eliminadas exactamente como antes.
+   */
+  @Get('sprints/:sprintId/contribuciones-eliminadas')
+  deletedContributions(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.historical.deletedContributions(projectId, user.userId, sprintId);
+  }
 }
