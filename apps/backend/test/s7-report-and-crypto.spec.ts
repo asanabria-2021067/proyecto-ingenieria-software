@@ -678,4 +678,78 @@ describe('S7 informe canónico y criptografía de cierre', () => {
       '2026-09-06T12:00:00.000Z',
     );
   });
+
+  it('TC04: un PDF de 10485760 bytes produce un ciphertext de 10485760 bytes y la autenticidad se verifica antes de emitir', () => {
+    const service = cryptoService({ k1: fixtureKek(1) }, 'k1');
+    const LIMITE = 10485760;
+    // Un documento del tamaño EXACTO del techo del contrato.
+    const documento = Buffer.alloc(LIMITE, 0x20);
+    documento.write('%PDF-1.7\n', 0, 'latin1');
+    documento.write('\n%%EOF\n', LIMITE - 7, 'latin1');
+    expect(documento).toHaveLength(10485760);
+
+    const sellado = service.seal(documento, contextoBase);
+
+    // Longitud IDÉNTICA: el IV y el tag viven en la metadata, no delante del
+    // objeto, así que el límite no necesita ningún margen criptográfico.
+    expect(sellado.ciphertext).toHaveLength(LIMITE);
+    expect(sellado.tamanoCifradoBytes).toBe(LIMITE);
+    expect(sellado.tamanoBytes).toBe(LIMITE);
+    expect(sellado.tamanoCifradoBytes).toBe(sellado.tamanoBytes);
+    // CK29 aceptaría la fila: 1…10485760 y cifrado igual al claro.
+    expect(sellado.tamanoBytes).toBeGreaterThanOrEqual(1);
+    expect(sellado.tamanoBytes).toBeLessThanOrEqual(10485760);
+
+    // IV y tag están FUERA del objeto remoto, con sus longitudes exactas.
+    const iv = Buffer.from(sellado.metadata.iv, 'base64');
+    const tag = Buffer.from(sellado.metadata.tag, 'base64');
+    expect(iv).toHaveLength(12);
+    expect(tag).toHaveLength(16);
+    expect(sellado.ciphertext.subarray(0, 12).equals(iv)).toBe(false);
+    expect(sellado.ciphertext.subarray(0, 16).equals(tag)).toBe(false);
+    expect(sellado.ciphertext.subarray(-16).equals(tag)).toBe(false);
+    expect(sellado.ciphertext.includes(tag)).toBe(false);
+
+    // Lectura correcta: verifica autenticidad y huella ANTES de emitir.
+    const abierto = service.open(sellado.ciphertext, sellado.metadata, contextoBase, {
+      checksumSha256: sellado.checksumSha256,
+      tamanoBytes: sellado.tamanoBytes,
+    });
+    expect(abierto.equals(documento)).toBe(true);
+    expect(sha256Hex(abierto)).toBe(sellado.checksumSha256);
+
+    // Con el tag alterado no se emite un solo byte.
+    const tagAlterado = Buffer.from(tag);
+    tagAlterado[0] ^= 0xff;
+    let emitido: Buffer | undefined;
+    try {
+      emitido = service.open(
+        sellado.ciphertext,
+        { ...sellado.metadata, tag: tagAlterado.toString('base64') },
+        contextoBase,
+      );
+    } catch {
+      emitido = undefined;
+    }
+    expect(emitido).toBeUndefined();
+
+    // Y con el tag válido pero una huella esperada distinta tampoco: la
+    // comprobación de SHA-256 precede a la entrega.
+    let conHuellaAjena: Buffer | undefined;
+    try {
+      conHuellaAjena = service.open(sellado.ciphertext, sellado.metadata, contextoBase, {
+        checksumSha256: 'f'.repeat(64),
+        tamanoBytes: sellado.tamanoBytes,
+      });
+    } catch {
+      conHuellaAjena = undefined;
+    }
+    expect(conHuellaAjena).toBeUndefined();
+
+    // Ninguna cabecera ni metadata reduce el techo efectivo: lo que se sube
+    // mide exactamente lo que midió el documento del usuario.
+    const pesoDeLaMetadata = Buffer.byteLength(JSON.stringify(sellado.metadata), 'utf8');
+    expect(pesoDeLaMetadata).toBeGreaterThan(0);
+    expect(sellado.ciphertext.length + 0).toBe(LIMITE);
+  });
 });
