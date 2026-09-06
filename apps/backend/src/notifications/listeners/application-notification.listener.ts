@@ -4,6 +4,16 @@ import { ApplicationCreatedEvent } from '../events/application-created.event';
 import { NotificationsService } from '../notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
+/**
+ * C030 (06 v2 §23): la notificación NUEVA_POSTULACION se persiste dentro de
+ * la transacción que crea la postulación (ApplicationsService.create), con
+ * el líder y los datos capturados allí, y su socket se publica después del
+ * commit. Este listener ya NO emite una segunda notificación para ese
+ * productor: hacerlo duplicaba la fila y podía sobrevivir a un rollback del
+ * dominio o seleccionar un líder posterior. Se conserva registrado (el
+ * evento `application.created` sigue emitiéndose para cualquier otro
+ * consumidor) sin ninguna otra responsabilidad.
+ */
 @Injectable()
 export class ApplicationNotificationListener {
   constructor(
@@ -12,42 +22,9 @@ export class ApplicationNotificationListener {
   ) {}
 
   @OnEvent('application.created')
-  async handleApplicationCreated(event: ApplicationCreatedEvent) {
-    const [application, project] = await Promise.all([
-      this.prisma.postulacion.findUnique({
-        where: { idPostulacion: event.applicationId },
-        include: {
-          postulante: {
-            select: { nombre: true, apellido: true },
-          },
-          rolProyecto: {
-            select: { nombreRol: true },
-          },
-        },
-      }),
-      this.prisma.proyecto.findUnique({
-        where: { idProyecto: event.projectId },
-        select: { tituloProyecto: true, creadoPor: true },
-      }),
-    ]);
-
-    if (!application || !project) return;
-
-    // El líder puede ser el propio postulante (ej. se postula a su propio proyecto);
-    // en ese caso no se genera notificación.
-    if (project.creadoPor === application.idUsuarioPostulante) return;
-
-    await this.notificationsService.notifyFromTemplate(
-      [project.creadoPor],
-      'NUEVA_POSTULACION',
-      {
-        userName: `${application.postulante.nombre} ${application.postulante.apellido}`,
-        roleName: application.rolProyecto.nombreRol,
-        projectTitle: project.tituloProyecto,
-        projectId: event.projectId,
-        applicationId: event.applicationId,
-        roleId: event.roleId,
-      },
-    );
+  async handleApplicationCreated(_event: ApplicationCreatedEvent): Promise<void> {
+    // Sin efecto: la notificación ya fue persistida en la transacción de creación.
+    void this.notificationsService;
+    void this.prisma;
   }
 }
