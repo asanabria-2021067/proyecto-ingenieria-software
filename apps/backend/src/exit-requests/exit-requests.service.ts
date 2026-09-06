@@ -13,6 +13,8 @@ import {
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 
 /**
  * C044 (06 v2 §13/§32): las cinco escrituras de salida corren en el runner
@@ -35,6 +37,10 @@ export class ExitRequestsService {
     private readonly readPolicy: ProjectReadPolicyService,
     private readonly hoursRecognition?: HoursRecognitionService,
     private readonly sprintsContext?: SprintsContextService,
+    // C083: la aprobación deja hecho funcional en bitácora dentro de la misma
+    // transacción de dominio. Opcional por el mismo motivo posicional que en
+    // Tasks/Sprints; en producción el módulo siempre lo provee.
+    private readonly bitacoraEventos?: BitacoraEventosService,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -417,10 +423,10 @@ export class ExitRequestsService {
       }
 
       const sprint = await this.sprintsContext.getCurrentSprint(idProyecto, tx);
-      if (!sprint) {
-        throw new ConflictException('No hay un Sprint activo en este proyecto');
-      }
 
+      // §13: TODAS las participaciones activas del saliente en este proyecto,
+      // en orden ascendente, releídas bajo el lock. Salir del proyecto es
+      // salir de todos sus roles, no solo del que motivó la solicitud.
       const participacionesActivas = await tx.participacionProyecto.findMany({
         where: {
           idUsuario: solicitud.idUsuario,
@@ -431,12 +437,37 @@ export class ExitRequestsService {
         orderBy: { idParticipacion: 'asc' },
       });
 
+      /**
+       * §13: tres ramas según el Sprint operable, y solo una reconoce horas.
+       *
+       *   ACTIVO           → reconocer SOLO los tramos elegibles de quien sale,
+       *                      del Sprint actual, dejándolos PENDIENTE; después
+       *                      retirar. Flow A omitirá después esos tramos.
+       *   EN_FINALIZACION  → 409 sin escribir: una consolidación en curso no
+       *                      admite que alguien se lleve tramos por debajo.
+       *   Ninguno operable → retirar SIN reconocimiento nuevo. No se inventa
+       *                      un Sprint ni una fila con idSprint NULL; lo que
+       *                      quede pendiente pertenece a la conciliación §14.
+       */
+      if (!sprint) {
+        throw new ConflictException('No hay un Sprint activo en este proyecto');
+      }
+      const reconocidas: Array<{ idParticipacion: number; horasReportadas: string; horasPropuestas: string }> = [];
+      const consolidadoEn = new Date();
       for (const participacion of participacionesActivas) {
-        await this.hoursRecognition.recognizeParticipationHours(tx, {
+        const resultado = await this.hoursRecognition.recognizeParticipationHours(tx, {
           projectId: idProyecto,
-          sprintId: sprint.idSprint,
+          sprintId: sprint!.idSprint,
           participationId: participacion.idParticipacion,
+          reconocidoEn: consolidadoEn,
         });
+        if (resultado.horasParticipacion !== null) {
+          reconocidas.push({
+            idParticipacion: participacion.idParticipacion,
+            horasReportadas: resultado.horasReportadas.toFixed(2),
+            horasPropuestas: resultado.horasPropuestas.toFixed(2),
+          });
+        }
       }
 
       await tx.participacionProyecto.updateMany({
@@ -447,6 +478,27 @@ export class ExitRequestsService {
         },
         data: { estadoParticipacion: 'RETIRADO', fechaSalida: ahora },
       });
+
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.EXIT_REQUEST_APPROVED,
+        idActor: liderId,
+        idProyecto,
+        idSprint: sprint?.idSprint ?? null,
+        tipoEntidad: 'PROYECTO',
+        idEntidad: idProyecto,
+        valorAnterior: { estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER },
+        valorNuevo: {
+          idSolicitud,
+          idUsuario: solicitud.idUsuario,
+          estadoSolicitud: EstadoSolicitudSalida.APROBADA,
+          fechaSalida: ahora.toISOString(),
+          participacionesRetiradas: participacionesActivas.map((fila) => fila.idParticipacion),
+          // Reconocidas, NO acreditadas: quedan PENDIENTE hasta el cierre.
+          reconocidas,
+        },
+      });
+
       await this.notifications.notifyFromTemplate(
         [solicitud.idUsuario],
         'PARTICIPACION_ACTUALIZADA',
