@@ -453,6 +453,20 @@ export class TimeRecordsService {
 
       const actual = await this.assertRecordOwnerTx(tx, this.lockedProject(ctx), tarea, recordId, userId);
 
+      // §10 tabla UPDATE: «antes» es el total efectivo actual, que YA incluye
+      // el importe vigente de este registro; «después» lo sustituye por el
+      // nuevo. Así, bajar un importe nunca puede cruzar el umbral y por tanto
+      // nunca exige una justificación nueva. La justificación vigente cuenta
+      // como texto válido cuando el DTO no envía una: §9 la conserva.
+      const antes = await this.sumTaskEffectiveTx(tx, taskId);
+      const nuevasHoras = dto.horas !== undefined ? new Prisma.Decimal(dto.horas) : actual.horas;
+      this.assertExcessJustification(
+        antes,
+        antes.minus(actual.horas).plus(nuevasHoras),
+        tarea.tiempoEstimadoHoras ?? null,
+        dto.justificacionExceso ?? actual.justificacionExceso,
+      );
+
       const actualizado = await tx.registroTiempoTarea.update({
         where: { idRegistroTiempo: actual.idRegistroTiempo },
         data: {
@@ -514,6 +528,18 @@ export class TimeRecordsService {
       const { tx } = ctx;
       const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
       const actual = await this.assertRecordOwnerTx(tx, this.lockedProject(ctx), tarea, recordId, userId);
+
+      // §10 tabla REVOKE: «después» = «antes» − el importe revocado. Una
+      // revocación solo puede bajar el total, así que el predicado de cruce
+      // jamás se cumple; se evalúa igual para que la regla viva en un solo
+      // sitio y no por omisión.
+      const antes = await this.sumTaskEffectiveTx(tx, taskId);
+      this.assertExcessJustification(
+        antes,
+        antes.minus(actual.horas),
+        tarea.tiempoEstimadoHoras ?? null,
+        actual.justificacionExceso,
+      );
 
       const revocadoEn = new Date();
       const cas = await tx.registroTiempoTarea.updateMany({
