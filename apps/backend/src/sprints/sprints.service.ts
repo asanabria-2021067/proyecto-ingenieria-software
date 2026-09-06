@@ -19,7 +19,20 @@ import {
 } from './dto/sprint-analytics.dto';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 
+/**
+ * C045 (06 v2 §32/§41 E060–E062): iniciar, finalizar y cerrar un Sprint
+ * corren en el runner por proyecto. La policy restringe el inicio a un
+ * proyecto P/E sin Sprint operable, y finalizar/cerrar al Sprint exacto en
+ * `ACTIVO`/`EN_FINALIZACION`; el cuerpo de consolidación de `closeSprint` se
+ * conserva tal cual hasta su propio commit.
+ */
 @Injectable()
 export class SprintsService {
   constructor(
@@ -27,11 +40,20 @@ export class SprintsService {
     private readonly sprintsContext: SprintsContextService,
     private readonly sprintsAuthorization: SprintsAuthorizationService,
     private readonly notificationsService: NotificationsService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
     // T-164: opcional por el mismo motivo que TasksService.bitacoraEventos —
     // las suites existentes construyen SprintsService directamente con 4
     // argumentos posicionales; en producción SprintsModule siempre lo provee.
     private readonly bitacoraEventos?: BitacoraEventosService,
   ) {}
+
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
 
   /**
    * Inicia el Sprint manualmente: exclusivo del líder (contrato A1), y solo
@@ -57,8 +79,12 @@ export class SprintsService {
    * persistida.
    */
   async startSprint(projectId: number, userId: number) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.projectTx.run(projectId, userId, 'sprints.startSprint', async (ctx) => {
+      const { tx } = ctx;
       await this.sprintsAuthorization.assertCanStartSprint(projectId, userId, tx);
+      // C045: además del liderazgo, el proyecto debe estar en P/E y no tener
+      // ningún Sprint operable; iniciar en B/R/O/C deja de aceptarse.
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SPRINT_START', userId);
 
       const sprintOperable = await this.sprintsContext.getCurrentSprint(projectId, tx);
       if (sprintOperable) {
@@ -138,13 +164,21 @@ export class SprintsService {
    * duplicada).
    */
   async finalizeSprint(projectId: number, sprintId: number, userId: number) {
-    const sprintFinalizado = await this.prisma.$transaction(async (tx) => {
+    const sprintFinalizado = await this.projectTx.run(
+      projectId,
+      userId,
+      'sprints.finalizeSprint',
+      async (ctx) => {
+      const { tx } = ctx;
       const sprint = await this.sprintsAuthorization.assertCanFinalizeSprint(
         projectId,
         sprintId,
         userId,
         tx,
       );
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SPRINT_FINALIZE', userId, {
+        sprintId,
+      });
 
       if (sprint.estado !== EstadoSprint.ACTIVO) {
         throw new ConflictException('El Sprint ya no está en estado ACTIVO');
@@ -196,7 +230,8 @@ export class SprintsService {
       }
 
       return filaFinal;
-    });
+      },
+    );
 
     await this.notificationsService.notifyProjectActiveParticipants(projectId, userId, {
       tipoNotificacion: TipoNotificacion.CAMBIO_ESTADO_PROYECTO,
@@ -473,13 +508,21 @@ export class SprintsService {
    * bloqueo, no un mensaje de bandeja.
    */
   async closeSprint(projectId: number, sprintId: number, userId: number) {
-    const sprintCerrado = await this.prisma.$transaction(async (tx) => {
+    const sprintCerrado = await this.projectTx.run(
+      projectId,
+      userId,
+      'sprints.closeSprint',
+      async (ctx) => {
+      const { tx } = ctx;
       const sprint = await this.sprintsAuthorization.assertCanCloseSprint(
         projectId,
         sprintId,
         userId,
         tx,
       );
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SPRINT_CLOSE', userId, {
+        sprintId,
+      });
 
       if (sprint.estado !== EstadoSprint.EN_FINALIZACION) {
         throw new ConflictException('El Sprint no está en estado EN_FINALIZACION');
@@ -512,7 +555,8 @@ export class SprintsService {
       }
 
       return filaFinal;
-    });
+      },
+    );
 
     await this.notificationsService.notifySprintClosed(projectId, userId, {
       projectId,

@@ -77,9 +77,9 @@ describe('SprintsController.finalize (POST /proyectos/:projectId/sprints/:sprint
     );
   });
 
-  it('NO tiene ProjectWriteGuard aplicado (A4 gestiona su propia seguridad de estado en la transacción)', () => {
+  it('declara ProjectWriteGuard (C045: §41 E061 exige JWT+PWG con ambiente ACTIVO)', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, SprintsController.prototype.finalize) ?? [];
-    expect(guards).not.toContain(ProjectWriteGuard);
+    expect(guards).toContain(ProjectWriteGuard);
   });
 
   it('delega en SprintsService.finalizeSprint con projectId, sprintId y userId (CurrentUser)', () => {
