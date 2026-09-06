@@ -18,6 +18,7 @@ import type { NotificationsService } from '../../src/notifications/notifications
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real A9: SprintsService.closeSprint (EN_FINALIZACION ->
@@ -99,7 +100,8 @@ describeIntegration(
         authorization,
         makeNotificationsSpy() as unknown as NotificationsService,
         new ProjectTransactionService(prismaParaTransaccion as unknown as PrismaService),
-        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)));
+        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
+        new ProjectReadPolicyService(prisma as unknown as PrismaService));
     }
 
     beforeAll(async () => {
@@ -279,7 +281,8 @@ describeIntegration(
         authorization,
         notifications as unknown as NotificationsService,
         new ProjectTransactionService(prisma as unknown as PrismaService),
-        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)));
+        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
+        new ProjectReadPolicyService(prisma as unknown as PrismaService));
 
       await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
 
@@ -317,7 +320,8 @@ describeIntegration(
         authorization,
         notifications as unknown as NotificationsService,
         new ProjectTransactionService(rollbackPrisma),
-        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)));
+        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
+        new ProjectReadPolicyService(prisma as unknown as PrismaService));
 
       await expect(
         service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario),

@@ -101,6 +101,7 @@ export class SprintsController {
     );
   }
 
+  /** E066: resumen de cierre (líder actual mientras el Sprint no esté cerrado). */
   @Get(':sprintId/resumen-cierre')
   @HttpCode(HttpStatus.OK)
   getClosingSummary(
@@ -119,6 +120,7 @@ export class SprintsController {
    * con `sprintId='analytics'`, que `ParseIntPipe` rechazaría con 400 en vez
    * de resolver la analítica comparativa.
    */
+  /** E068: analítica comparativa; el ámbito por actor se aplica en la consulta. */
   @Get('analytics')
   @HttpCode(HttpStatus.OK)
   getComparativeAnalytics(
@@ -128,6 +130,7 @@ export class SprintsController {
     return this.sprintsService.getSprintsAnalytics(projectId, user.userId);
   }
 
+  /** E064: lista de Sprints con el alcance por actor (§34). */
   @Get()
   @HttpCode(HttpStatus.OK)
   list(
@@ -137,6 +140,7 @@ export class SprintsController {
     return this.sprintsService.listSprints(projectId, user.userId);
   }
 
+  /** E065: detalle de un Sprint; ACTIVO/EN_FINALIZACION solo para el líder. */
   @Get(':sprintId')
   @HttpCode(HttpStatus.OK)
   detail(
@@ -148,6 +152,7 @@ export class SprintsController {
   }
 
   /** T-172: `:sprintId/analytics` nunca colisiona con `:sprintId` (arriba) — distinto número de segmentos, el orden entre ambas es irrelevante. */
+  /** E067: analítica de un Sprint con el mismo alcance por actor. */
   @Get(':sprintId/analytics')
   @HttpCode(HttpStatus.OK)
   getAnalytics(
