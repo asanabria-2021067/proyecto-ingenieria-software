@@ -474,6 +474,46 @@ export function computeExecutionFingerprint(context: ClosureExecutionContext): s
   return canonicalDigest(buildExecutionEnvelope(context));
 }
 
+/**
+ * Revalida una huella existente con la presentación estrecha que quedó
+ * guardada en el documento. El contexto histórico conserva el nombre
+ * completo, mientras que el modelo legado del líder lo representó como dos
+ * campos; se prueban sus divisiones posibles y solo se acepta una que
+ * reproduzca exactamente la huella persistida.
+ */
+export function matchesStoredExecutionFingerprint(
+  context: ClosureExecutionContext,
+  expectedFingerprint: string,
+): boolean {
+  if (computeExecutionFingerprint(context) === expectedFingerprint) {
+    return true;
+  }
+  const historicalLabel = context.presentacion.usuarios.find(
+    (user) => user.id === context.datosEjecucion.lider.idUsuario,
+  )?.nombre;
+  if (!historicalLabel) {
+    return false;
+  }
+  for (let index = 1; index < historicalLabel.length - 1; index += 1) {
+    if (historicalLabel[index] !== ' ') {
+      continue;
+    }
+    const nombre = historicalLabel.slice(0, index);
+    const apellido = historicalLabel.slice(index + 1);
+    if (!nombre || !apellido) {
+      continue;
+    }
+    const datosEjecucion: ClosureExecutionInput = {
+      ...context.datosEjecucion,
+      lider: { ...context.datosEjecucion.lider, nombre, apellido },
+    };
+    if (computeExecutionFingerprint({ ...context, datosEjecucion }) === expectedFingerprint) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function buildExecutionEnvelope(context: ClosureExecutionContext): Record<string, unknown> {
   // `ambiente` se recibe y NO se usa: la exclusión es el contrato.
   return {
