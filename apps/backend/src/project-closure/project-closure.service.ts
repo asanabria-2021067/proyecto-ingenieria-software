@@ -120,10 +120,12 @@ export class ProjectClosureService {
     if (dto.confirmado !== true) throw new BadRequestException('Debe confirmar la solicitud');
     return this.projectTx.run(projectId, actorId, 'closure.requestClose', async ({ tx, project, effects }) => {
       if (!project) throw new NotFoundException('Proyecto no encontrado');
-      await this.policy.assertWriteTx(tx, project, 'CIERRE_ENVIO', actorId);
+      this.policy.assertProjectState(project, ['E']);
+      await this.policy.assertActorTx(tx, project, 'LIDER', actorId);
       const ready = await this.readinessService.assertReady(tx, projectId, {
         phase: 'REQUEST', revisionId: dto.revisionId, expectedFingerprint: dto.expectedFingerprint,
       });
+      await this.policy.assertWriteTx(tx, project, 'CIERRE_ENVIO', actorId);
       const revision = await tx.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: dto.revisionId } });
       const links = await tx.documentoRevisionCierre.findMany({
         where: { idRevisionCierre: dto.revisionId }, orderBy: [{ orden: 'asc' }, { idDocumentoCierre: 'asc' }],
