@@ -12,5 +12,6 @@ import { TasksContextService } from '../tasks/tasks-context.service';
   imports: [ProjectPolicyModule, BitacoraModule, NotificationsModule],
   controllers: [TimeRecordsController],
   providers: [TimeRecordsService, TasksContextService],
+  exports: [TimeRecordsService],
 })
 export class TimeRecordsModule {}

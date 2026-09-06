@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
@@ -55,7 +56,7 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     tasksContext,
     new ProjectTransactionService(prismaService),
     new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-    new ProjectReadPolicyService(prismaService));
+    new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
 }
 
 function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
@@ -204,6 +205,9 @@ describeIntegration(
       // Fase C — durante PREPARACION, el colaborador cierra su único tramo
       // (B2/B1) con horas inequívocas y marca la tarea como HECHO, para que
       // el Sprint pueda finalizar más adelante sin más blockers.
+      await prisma.registroTiempoTarea.create({
+        data: { idAsignacion: assignment.idAsignacion, idUsuario: member.idUsuario, horas: HORAS_REALES, fecha: new Date('2026-09-06') },
+      });
       await tasksService.closeAssignment(project.idProyecto, task.idTarea, assignment.idAsignacion, member.idUsuario, {
         horasReales: HORAS_REALES,
         contenidoAvance: longProgressContent('X1 cierre de tramo en PREPARACION'),

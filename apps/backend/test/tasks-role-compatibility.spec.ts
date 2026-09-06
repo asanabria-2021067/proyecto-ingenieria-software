@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, HttpException, NotFoundException } from '@nestjs/common';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -253,7 +254,7 @@ function makeService(state: Fixture) {
   const tasksAuthorization = new TasksAuthorizationService(tasksContext);
   const tasksRelations = new TasksRelationsService(db as unknown as PrismaService, tasksContext);
   const notifications = {} as unknown as NotificationsService;
-  const service = new TasksService(db as unknown as PrismaService, tasksAuthorization, tasksRelations, notifications, tasksContext, new ProjectTransactionService(db as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+  const service = new TasksService(db as unknown as PrismaService, tasksAuthorization, tasksRelations, notifications, tasksContext, new ProjectTransactionService(db as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return { db, service };
 }
 

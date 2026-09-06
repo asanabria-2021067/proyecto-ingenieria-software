@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
 import { Prioridad, type PrismaClient } from '@prisma/client';
@@ -103,7 +104,7 @@ describeIntegration('T34 — política de escritura por entidad contra PostgreSQ
         tasksContext,
         projectTx,
         policy,
-        readPolicy,
+        readPolicy, makeTimeRecordsService(prismaService),
       ),
     );
     progressController = new ProgressRecordsController(
@@ -123,7 +124,7 @@ describeIntegration('T34 — política de escritura por entidad contra PostgreSQ
     taskLabelsController = new TaskLabelsController(labelsService);
     labelsController = new LabelsController(labelsService);
     rolesController = new RolesController(
-      new RolesService(prismaService, makeFakeNotifications(), projectTx, policy),
+      new RolesService(prismaService, makeFakeNotifications(), projectTx, policy, makeTimeRecordsService(prismaService)),
     );
     tareaComentariosController = new TareaComentariosController(
       new ComentariosService(

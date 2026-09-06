@@ -91,14 +91,9 @@ function mapRegistroTiempo(row: TimeRecordRow): RegistroTiempoTareaPublico {
  * exclusivamente sobre el tramo ACTIVO de la tarea (AsignacionTarea con
  * desasignadaEn: null) y por el propio usuario asignado — nunca el líder ni
  * un tercero, y nunca sobre un tramo ya cerrado (misma inmutabilidad que
- * closeAssignment). Tras cada creación se recalcula
- * AsignacionTarea.horasReales de ese tramo como SUM(RegistroTiempoTarea.horas)
- * dentro de la misma transacción, protegido con `updateMany` +
- * `desasignadaEn: null` (mismo patrón optimista que
- * TasksService.closeAssignment/unassign): si el tramo se cerró entre la
- * lectura y la escritura, la transacción completa se revierte con
- * ConflictException en vez de dejar un registro huérfano o pisar
- * horasReales de un tramo ya inmutable.
+ * closeAssignment). El lock del proyecto serializa altas y cierres.
+ * recalculateAssignment materializa la suma efectiva en la transacción
+ * del caller, sin reabrir tramos ni sobrescribir reportes históricos.
  */
 @Injectable()
 export class TimeRecordsService {
@@ -122,6 +117,38 @@ export class TimeRecordsService {
       throw new NotFoundException('Proyecto no encontrado');
     }
     return ctx.project;
+  }
+
+  async recalculateAssignment(tx: Prisma.TransactionClient, idAsignacion: number): Promise<Prisma.Decimal> {
+    const assignment = await tx.asignacionTarea.findUniqueOrThrow({
+      where: { idAsignacion },
+      select: { origenReporte: true, horasReales: true, reconocidoEn: true },
+    });
+    if (assignment.origenReporte === 'POR_CONCILIAR' || assignment.reconocidoEn !== null) {
+      throw new ConflictException('El tramo requiere conciliación o ya fue consumido');
+    }
+    if (assignment.origenReporte === 'LEGACY') {
+      if (assignment.horasReales === null) {
+        throw new ConflictException('El tramo legacy carece de importe histórico');
+      }
+      return assignment.horasReales;
+    }
+    const sum = await tx.registroTiempoTarea.aggregate({
+      where: { idAsignacion, revocadoEn: null },
+      _sum: { horas: true },
+    });
+    const hours = new Prisma.Decimal(sum._sum.horas ?? 0);
+    if (hours.isNegative() || hours.gt('9999999999.99')) {
+      throw new BadRequestException('El total de horas excede el dominio del agregado');
+    }
+    const updated = await tx.asignacionTarea.updateMany({
+      where: { idAsignacion, origenReporte: 'GRANULAR', reconocidoEn: null },
+      data: { horasReales: hours },
+    });
+    if (updated.count !== 1) {
+      throw new ConflictException('El tramo cambió durante el recálculo');
+    }
+    return hours;
   }
 
   async create(
@@ -152,6 +179,14 @@ export class TimeRecordsService {
         sprintId: tarea?.idSprint ?? null,
       });
 
+      const assignment = await tx.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: asignacionActiva.idAsignacion },
+        select: { origenReporte: true, reconocidoEn: true, desasignadaEn: true },
+      });
+      if (assignment.origenReporte !== 'GRANULAR' || assignment.reconocidoEn !== null || assignment.desasignadaEn !== null) {
+        throw new ConflictException('El tramo no admite nuevos registros granulares');
+      }
+
       const nuevoRegistro = await tx.registroTiempoTarea.create({
         data: {
           idAsignacion: asignacionActiva.idAsignacion,
@@ -163,21 +198,7 @@ export class TimeRecordsService {
         select: TIME_RECORD_SELECT,
       });
 
-      const suma = await tx.registroTiempoTarea.aggregate({
-        where: { idAsignacion: asignacionActiva.idAsignacion },
-        _sum: { horas: true },
-      });
-
-      const actualizado = await tx.asignacionTarea.updateMany({
-        where: { idAsignacion: asignacionActiva.idAsignacion, desasignadaEn: null },
-        data: { horasReales: suma._sum.horas ?? 0 },
-      });
-
-      if (actualizado.count !== 1) {
-        throw new ConflictException(
-          'El tramo ya fue cerrado; no se pueden registrar más horas sobre él',
-        );
-      }
+      await this.recalculateAssignment(tx, asignacionActiva.idAsignacion);
 
       // C049: el evento se persiste en la MISMA transacción que el registro;
       // si algo posterior falla, no queda un evento huérfano.

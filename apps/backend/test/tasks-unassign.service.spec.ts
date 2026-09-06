@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -82,7 +83,7 @@ function makeService(opts: {
   const relations = makeRelations();
   const notifications = opts.notifications ?? makeNotifications();
   const context = opts.context ?? makeContext();
-  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -407,7 +408,7 @@ describe('TasksService.unassign', () => {
       };
       const notifications = notificationsLiteral as typeof notificationsLiteral & NotificationsService;
       const relations = makeRelations();
-      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 
       await service.unassign(5, 42, 1);
 

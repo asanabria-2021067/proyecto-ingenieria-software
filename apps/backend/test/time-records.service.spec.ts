@@ -44,6 +44,11 @@ function makeTx(overrides: Record<string, unknown> = {}) {
 
 function setup(txOverrides: Record<string, unknown> = {}) {
   const tx = makeTx(txOverrides);
+  Object.assign(tx.asignacionTarea, {
+    findUniqueOrThrow: vi.fn().mockResolvedValue({
+      origenReporte: 'GRANULAR', horasReales: null, reconocidoEn: null, desasignadaEn: null,
+    }),
+  });
   const prisma = {
     $transaction: vi.fn((callback: (tx: unknown) => unknown) => callback(tx)),
     registroTiempoTarea: {
@@ -139,11 +144,11 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
       await service.create(PROJECT_ID, TASK_ID, ASSIGNEE_ID, { horas: 1, fecha: '2026-08-20' });
 
       expect(tx.registroTiempoTarea.aggregate).toHaveBeenCalledWith({
-        where: { idAsignacion: ASSIGNMENT_ID },
+        where: { idAsignacion: ASSIGNMENT_ID, revocadoEn: null },
         _sum: { horas: true },
       });
       const llamada = tx.asignacionTarea.updateMany.mock.calls[0][0];
-      expect(llamada.where).toEqual({ idAsignacion: ASSIGNMENT_ID, desasignadaEn: null });
+      expect(llamada.where).toEqual({ idAsignacion: ASSIGNMENT_ID, origenReporte: 'GRANULAR', reconocidoEn: null });
       expect(Number(llamada.data.horasReales)).toBe(6);
     });
 

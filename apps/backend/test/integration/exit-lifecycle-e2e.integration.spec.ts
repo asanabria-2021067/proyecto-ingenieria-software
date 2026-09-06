@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
@@ -56,7 +57,7 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     tasksContext,
     new ProjectTransactionService(prismaService),
     new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-    new ProjectReadPolicyService(prismaService));
+    new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
 }
 
 function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
@@ -249,6 +250,9 @@ describeIntegration(
       // F. B2: cierre real del tramo, con horas y evidencia de avance
       // válidas (nunca desasignadaEn escrito a mano vía Prisma).
       // ---------------------------------------------------------------
+      await prisma.registroTiempoTarea.create({
+        data: { idAsignacion: assignment.idAsignacion, idUsuario: collaborator.idUsuario, horas: HORAS_REALES, fecha: new Date('2026-09-06') },
+      });
       await tasksService.closeAssignment(
         projectA.idProyecto,
         taskA.idTarea,
