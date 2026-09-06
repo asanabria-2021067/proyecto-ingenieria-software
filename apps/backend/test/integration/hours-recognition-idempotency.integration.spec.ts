@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
+import { Prisma } from '@prisma/client';
 import { describeIntegration } from './setup/database';
 import {
   createIntegrationUser,
@@ -369,6 +370,9 @@ describeIntegration(
 
       expect(segundo).toEqual({
         horasReconocidas: 0,
+        // C077: reporte y propuesta viajan separados también en el no-op.
+        horasReportadas: new Prisma.Decimal(0),
+        horasPropuestas: new Prisma.Decimal(0),
         idsAsignacionesReconocidas: [],
         horasParticipacion: null,
       });
