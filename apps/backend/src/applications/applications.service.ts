@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService, type PostCommitEffect } from '../notifications/notifications.service';
 import { ApplicationCreatedEvent } from '../notifications/events/application-created.event';
 import { EstadoProyecto, Prisma, TipoNotificacion } from '@prisma/client';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
@@ -82,26 +82,54 @@ export class ApplicationsService {
       );
     }
 
-    const postulacion = await this.prisma.postulacion.create({
-      data: {
-        idUsuarioPostulante: postulanteId,
-        idRolProyecto: dto.idRolProyecto,
-        justificacion: dto.justificacion,
-      },
-      include: {
-        rolProyecto: {
-          include: { proyecto: true },
+    // C030 (06 v2 §23): la notificación al líder se persiste en la MISMA
+    // transacción que crea la postulación, capturando aquí el líder y los
+    // datos; el socket se publica solo después del commit. El listener
+    // `application.created` ya no emite una segunda notificación.
+    const effects: PostCommitEffect[] = [];
+    const postulacion = await this.prisma.$transaction(async (tx) => {
+      const creada = await tx.postulacion.create({
+        data: {
+          idUsuarioPostulante: postulanteId,
+          idRolProyecto: dto.idRolProyecto,
+          justificacion: dto.justificacion,
         },
-        postulante: {
-          select: {
-            nombre: true,
-            apellido: true,
+        include: {
+          rolProyecto: {
+            include: { proyecto: true },
+          },
+          postulante: {
+            select: {
+              nombre: true,
+              apellido: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Emit event (event-driven)
+      // El líder puede ser el propio postulante; en ese caso no se notifica.
+      if (rol.proyecto.creadoPor !== postulanteId) {
+        await this.notificationsService.persistTemplateTx(
+          tx,
+          [rol.proyecto.creadoPor],
+          'NUEVA_POSTULACION',
+          {
+            userName: `${creada.postulante.nombre} ${creada.postulante.apellido}`,
+            roleName: creada.rolProyecto.nombreRol,
+            projectTitle: rol.proyecto.tituloProyecto,
+            projectId: rol.proyecto.idProyecto,
+            applicationId: creada.idPostulacion,
+            roleId: dto.idRolProyecto,
+          },
+          { add: (effect) => effects.push(effect) },
+        );
+      }
+
+      return creada;
+    });
+    await this.notificationsService.publishEffects(effects);
+
+    // Emit event (event-driven): se conserva para cualquier otro listener.
     this.eventEmitter.emit(
       'application.created',
       new ApplicationCreatedEvent(
