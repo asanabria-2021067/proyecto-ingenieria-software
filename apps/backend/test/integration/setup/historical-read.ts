@@ -2,7 +2,11 @@ import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ProjectReadPolicyService } from '../../../src/common/project-policy/project-read-policy.service';
 import { ProjectHoursSummaryService } from '../../../src/sprints/project-hours-summary.service';
+import { ProjectPolicyService } from '../../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../../src/common/project-policy/project-id-resolver.service';
 import { HistoricalProjectReadService } from '../../../src/project-closure/historical-project-read.service';
+import { BitacoraConsultaService } from '../../../src/bitacora/bitacora-consulta.service';
+import { BitacoraContextService } from '../../../src/bitacora/bitacora-context.service';
 import * as fixtures from './fixtures';
 import { cleanupIntegrationFixtures } from './cleanup';
 import type { ClosureCleanupScope } from './closure-storage';
@@ -19,8 +23,14 @@ export function historicalStack(db: PrismaClient) {
     prisma,
     readPolicy,
     new ProjectHoursSummaryService(prisma),
+    new ProjectPolicyService(new ProjectIdResolverService(prisma)),
   );
-  return { service, readPolicy };
+  const bitacora = new BitacoraConsultaService(
+    prisma,
+    new BitacoraContextService(prisma),
+    readPolicy,
+  );
+  return { service, readPolicy, bitacora };
 }
 
 /**
