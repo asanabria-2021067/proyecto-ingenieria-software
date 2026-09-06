@@ -207,4 +207,82 @@ describeIntegration('S7 time lifecycle', () => {
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.owner.idUsuario } })).toBe(0);
     expect(realtime).not.toHaveBeenCalled();
   });
+
+  it('T05-C: Sprint en finalización o cerrado y proyecto en cierre o cerrado rechazan editar y revocar', async () => {
+    const { service, realtime } = timeStack(db);
+
+    /**
+     * Cada escenario es un proyecto propio: el estado terminal de uno no debe
+     * poder explicar el rechazo de otro. `origen` fija de qué assert viene el
+     * rechazo, que es justamente lo que distingue el Sprint cerrado con un
+     * Sprint posterior activo (ambiente OK, entidad NO) del resto.
+     */
+    const escenarios: Array<{ nombre: string; origen: string; preparar: () => Promise<Awaited<ReturnType<typeof timeLifecycleFixture>>> }> = [
+      {
+        nombre: 'Sprint EN_FINALIZACION',
+        origen: 'El Sprint actual está en finalización y el proyecto está temporalmente bloqueado',
+        preparar: async () => {
+          const f = await timeLifecycleFixture(db, scope);
+          await db.sprint.update({ where: { idSprint: f.sprint.idSprint }, data: { estado: 'EN_FINALIZACION' } });
+          return f;
+        },
+      },
+      {
+        nombre: 'Sprint CERRADO con Sprint siguiente ACTIVO',
+        origen: 'El Sprint de la entidad afectada no admite esta operación',
+        preparar: async () => {
+          const f = await timeLifecycleFixture(db, scope);
+          await db.sprint.update({ where: { idSprint: f.sprint.idSprint }, data: { estado: 'CERRADO' } });
+          const siguiente = await db.sprint.create({
+            data: { idProyecto: f.project.idProyecto, numero: 2, estado: 'ACTIVO' },
+          });
+          scope.sprintIds = [...(scope.sprintIds ?? []), siguiente.idSprint];
+          return f;
+        },
+      },
+      {
+        nombre: 'proyecto EN_SOLICITUD_CIERRE',
+        origen: 'El estado actual del proyecto no permite esta operación',
+        preparar: async () => {
+          const f = await timeLifecycleFixture(db, scope);
+          await db.proyecto.update({ where: { idProyecto: f.project.idProyecto }, data: { estadoProyecto: 'EN_SOLICITUD_CIERRE' } });
+          return f;
+        },
+      },
+      {
+        nombre: 'proyecto CERRADO',
+        origen: 'El estado actual del proyecto no permite esta operación',
+        preparar: async () => {
+          const f = await timeLifecycleFixture(db, scope);
+          await db.proyecto.update({ where: { idProyecto: f.project.idProyecto }, data: { estadoProyecto: 'CERRADO' } });
+          return f;
+        },
+      },
+    ];
+
+    for (const escenario of escenarios) {
+      const f = await escenario.preparar();
+      const antes = await db.registroTiempoTarea.findUniqueOrThrow({
+        where: { idRegistroTiempo: f.ownerRecord.idRegistroTiempo },
+      });
+      const tramoAntes = await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: f.closed.idAsignacion } });
+
+      const edicion = await expectStatus(409, () =>
+        service.update(f.project.idProyecto, f.task.idTarea, antes.idRegistroTiempo, f.owner.idUsuario, { horas: 7 }),
+      );
+      const revocacion = await expectStatus(409, () =>
+        service.revoke(f.project.idProyecto, f.task.idTarea, antes.idRegistroTiempo, f.owner.idUsuario),
+      );
+      for (const cuerpo of [edicion, revocacion]) {
+        const mensaje = typeof cuerpo === 'string' ? cuerpo : (cuerpo as { message?: string }).message;
+        expect(mensaje, `origen del rechazo en «${escenario.nombre}»`).toBe(escenario.origen);
+      }
+
+      expect(await db.registroTiempoTarea.findUniqueOrThrow({ where: { idRegistroTiempo: antes.idRegistroTiempo } })).toEqual(antes);
+      expect(await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: f.closed.idAsignacion } })).toEqual(tramoAntes);
+      expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.owner.idUsuario } })).toBe(0);
+    }
+
+    expect(realtime).not.toHaveBeenCalled();
+  });
 });
