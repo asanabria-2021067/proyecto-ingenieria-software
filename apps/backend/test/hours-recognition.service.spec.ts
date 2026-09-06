@@ -383,28 +383,29 @@ describe('HoursRecognitionService', () => {
       expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
     });
 
-    it('caso 6: colisión P2002 al crear (otra tx ganó la carrera de creación) — reintenta como increment sobre la fila ganadora', async () => {
+    /**
+     * C078 (§12/§16): el catch de P2002 fue RETIRADO. Bajo el lock del
+     * proyecto no hay carrera normal de primera creación, y consultar dentro
+     * de una transacción PostgreSQL ya abortada solo produce un error opaco.
+     * Un P2002 inesperado ahora revierte todo, que es lo correcto.
+     */
+    it('caso 6: un P2002 inesperado al crear propaga y aborta la transacción, sin consultar dentro de ella', async () => {
       const { prisma } = makeRootPrismaSpy();
       const tx = makeTx();
       tx.asignacionTarea.findMany.mockResolvedValue([tramo(9, 6)]);
       tx.asignacionTarea.updateMany.mockResolvedValue({ count: 1 });
       tx.horasParticipacion.findFirst.mockResolvedValue(null);
-      tx.horasParticipacion.create.mockRejectedValue(makeHorasParticipacionCollisionError());
-      const filaGanadora = { idRegistroHoras: 777, horasCalculadas: new Prisma.Decimal(2) };
-      tx.horasParticipacion.findFirstOrThrow.mockResolvedValue(filaGanadora);
-      tx.horasParticipacion.update.mockResolvedValue({ ...filaGanadora, horasCalculadas: new Prisma.Decimal(8) });
+      const colision = makeHorasParticipacionCollisionError();
+      tx.horasParticipacion.create.mockRejectedValue(colision);
       const service = new HoursRecognitionService(prisma);
 
-      const resultado = await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
+      await expect(
+        service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT),
+      ).rejects.toBe(colision);
 
-      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
-        where: { idRegistroHoras: 777 },
-        data: {
-          horasReportadas: { increment: expect.any(Prisma.Decimal) },
-          horasCalculadas: { increment: expect.any(Prisma.Decimal) },
-        },
-      });
-      expect(resultado.horasParticipacion).toEqual({ ...filaGanadora, horasCalculadas: new Prisma.Decimal(8) });
+      // Ninguna consulta posterior dentro de la tx ya fallida.
+      expect(tx.horasParticipacion.findFirstOrThrow).not.toHaveBeenCalled();
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
     });
 
     it('caso 7: transaction client supplied — todas las operaciones usan tx, ninguna usa this.prisma raíz', async () => {

@@ -312,35 +312,26 @@ export class HoursRecognitionService {
         },
       });
     } else {
-      try {
-        horasParticipacion = await tx.horasParticipacion.create({
-          data: {
-            idParticipacion: participationId,
-            // Nunca una fila con idSprint NULL (§8).
-            idSprint: sprintId,
-            periodoInicio: hoy,
-            periodoFin: hoy,
-            horasReportadas,
-            horasCalculadas: horasPropuestas,
-            // horasAprobadas/fechaAprobacion/aprobadoPor NO se tocan:
-            // reconocer no es acreditar. Solo approveClosure acredita (§31).
-          },
-        });
-      } catch (error) {
-        if (!this.isHorasParticipacionSprintCollision(error)) {
-          throw error;
-        }
-        const ganadora = await tx.horasParticipacion.findFirstOrThrow({
-          where: { idParticipacion: participationId, idSprint: sprintId },
-        });
-        horasParticipacion = await tx.horasParticipacion.update({
-          where: { idRegistroHoras: ganadora.idRegistroHoras },
-          data: {
-            horasReportadas: { increment: horasReportadas },
-            horasCalculadas: { increment: horasPropuestas },
-          },
-        });
-      }
+      // C078 (§12/§16): bajo el lock del proyecto no existe carrera normal de
+      // primera creación, así que un P2002 aquí es inesperado y debe abortar
+      // TODA la transacción. No se captura: PostgreSQL ya marcó la tx como
+      // fallida, y cualquier consulta posterior dentro de ella solo produce un
+      // error opaco de «transacción abortada» que oculta la causa real. El
+      // índice único parcial sigue protegiendo la cardinalidad; la
+      // idempotencia la da el CAS de `reconocidoEn`, no este catch.
+      horasParticipacion = await tx.horasParticipacion.create({
+        data: {
+          idParticipacion: participationId,
+          // Nunca una fila con idSprint NULL (§8).
+          idSprint: sprintId,
+          periodoInicio: hoy,
+          periodoFin: hoy,
+          horasReportadas,
+          horasCalculadas: horasPropuestas,
+          // horasAprobadas/fechaAprobacion/aprobadoPor NO se tocan:
+          // reconocer no es acreditar. Solo approveClosure acredita (§31).
+        },
+      });
     }
 
     return {
@@ -350,33 +341,5 @@ export class HoursRecognitionService {
       idsAsignacionesReconocidas: idsAsignaciones,
       horasParticipacion,
     };
-  }
-
-  /**
-   * Reconoce específicamente la violación del índice único parcial
-   * `horas_participacion_sprint_unique` (idParticipacion, idSprint) — mismo
-   * criterio estrecho que `SprintsService.isOperableSprintCollision`: no
-   * basta `code === 'P2002'`, se exige además modelo HorasParticipacion y
-   * ambas columnas del target. Cualquier otro P2002 (u otro código) se
-   * relanza sin cambios.
-   */
-  private isHorasParticipacionSprintCollision(error: unknown): boolean {
-    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
-      return false;
-    }
-    if (error.code !== 'P2002') {
-      return false;
-    }
-
-    const modelName = error.meta?.modelName;
-    const target = error.meta?.target;
-
-    return (
-      modelName === 'HorasParticipacion' &&
-      Array.isArray(target) &&
-      target.length === 2 &&
-      target.includes('id_participacion') &&
-      target.includes('id_sprint')
-    );
   }
 }
