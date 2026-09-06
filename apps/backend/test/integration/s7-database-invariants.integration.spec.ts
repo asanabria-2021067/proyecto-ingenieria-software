@@ -746,4 +746,100 @@ describeIntegration('S7 database invariants (T38)', () => {
     expect(secondAutomaticId).toBeGreaterThan(0);
     expect(await prisma.documentoCierre.count({ where: { idRevisionOrigen: draftId } })).toBe(6);
   });
+  it('T38-G: DocumentoRevisionCierre limita el orden a 0..10 y prohíbe duplicar documento u orden dentro de la revisión', async () => {
+    const leader = await createIntegrationUser(prisma);
+    scope.userIds = [leader.idUsuario];
+    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    scope.projectIds = [project.idProyecto];
+    const P = project.idProyecto;
+    const L = leader.idUsuario;
+
+    // Revisión ENVIADA (origen de los documentos) y el nuevo BORRADOR de una corrección documental.
+    const submittedRows = await prisma.$queryRaw<Array<{ id_revision_cierre: number }>>`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega) VALUES (${P}, 1, 'ENVIADA', ${L}, NOW(), ${HEX64}) RETURNING id_revision_cierre`;
+    const submittedId = submittedRows[0].id_revision_cierre;
+    revisionIds.push(submittedId);
+    const draftRows = await prisma.$queryRaw<Array<{ id_revision_cierre: number }>>`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision) VALUES (${P}, 2) RETURNING id_revision_cierre`;
+    const draftId = draftRows[0].id_revision_cierre;
+    revisionIds.push(draftId);
+
+    // Doce documentos DISPONIBLE insertados directamente (el primero es el informe automático).
+    const docIds: number[] = [];
+    for (let index = 0; index < 12; index += 1) {
+      const isReport = index === 0;
+      const rows = await prisma.$queryRawUnsafe<Array<{ id_documento_cierre: number }>>(
+        documentInsertSql(
+          {
+            id_proyecto: P,
+            id_revision_origen: submittedId,
+            tipo_documento: isReport ? 'INFORME_AUTOMATICO' : 'EVIDENCIA_LIDER',
+            external_id: `uvgenius/cierre/${P}/t38g-${index}.enc`,
+            delivery_type: 'authenticated',
+            nombre_archivo: `documento-${index}.pdf`,
+            id_autor: L,
+            reserva_expira_en: NOW_PLUS_HOUR,
+            estado_documento: 'DISPONIBLE',
+            tamano_bytes: 1024,
+            tamano_cifrado_bytes: 1024,
+            checksum_sha256: HEX64,
+            checksum_cifrado_sha256: HEX64,
+            crypto_metadata: JSONB('{"format":"aes-256-gcm-v1"}'),
+            carga_iniciada_en: NOW,
+            carga_limite_en: NOW_PLUS_HOUR,
+            asset_id: `asset-t38g-${index}`,
+            version_remota: '1',
+            disponible_en: NOW,
+            ...(isReport
+              ? {
+                  generator_version: 'closure-report-v1',
+                  fingerprint_ejecucion: HEX64,
+                  fingerprint_modelo: HEX64,
+                  contexto_reporte: JSONB('{"schemaVersion":1}'),
+                }
+              : {}),
+          },
+          true,
+        ),
+      );
+      docIds.push(rows[0].id_documento_cierre);
+      documentIds.push(rows[0].id_documento_cierre);
+    }
+
+    // Vínculo válido: el automático en el orden 0.
+    await prisma.$executeRaw`INSERT INTO documento_revision_cierre (id_revision_cierre, id_documento_cierre, orden) VALUES (${submittedId}, ${docIds[0]}, 0)`;
+
+    // CK30: fuera de 0..10.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_30',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO documento_revision_cierre (id_revision_cierre, id_documento_cierre, orden) VALUES (${submittedId}, ${docIds[1]}, -1)`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_30',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO documento_revision_cierre (id_revision_cierre, id_documento_cierre, orden) VALUES (${submittedId}, ${docIds[11]}, 11)`,
+    );
+
+    // Mismo documento dos veces en la misma revisión; dos documentos en el mismo orden.
+    await expectUniqueViolation(
+      prisma,
+      'documento_revision_cierre_id_revision_cierre_id_documento_c_key',
+      `INSERT INTO documento_revision_cierre (id_revision_cierre, id_documento_cierre, orden) VALUES (${submittedId}, ${docIds[0]}, 5)`,
+    );
+    await prisma.$executeRaw`INSERT INTO documento_revision_cierre (id_revision_cierre, id_documento_cierre, orden) VALUES (${submittedId}, ${docIds[2]}, 3)`;
+    await expectUniqueViolation(
+      prisma,
+      'documento_revision_cierre_id_revision_cierre_orden_key',
+      `INSERT INTO documento_revision_cierre (id_revision_cierre, id_documento_cierre, orden) VALUES (${submittedId}, ${docIds[3]}, 3)`,
+    );
+
+    // El mismo documento en OTRA revisión (herencia por corrección documental) y el orden máximo 10 se aceptan.
+    await prisma.$executeRaw`INSERT INTO documento_revision_cierre (id_revision_cierre, id_documento_cierre, orden) VALUES (${draftId}, ${docIds[0]}, 0)`;
+    await prisma.$executeRaw`INSERT INTO documento_revision_cierre (id_revision_cierre, id_documento_cierre, orden) VALUES (${submittedId}, ${docIds[10]}, 10)`;
+
+    expect(await prisma.documentoRevisionCierre.count({ where: { idDocumentoCierre: docIds[0] } })).toBe(2);
+    expect(await prisma.documentoRevisionCierre.count({ where: { idRevisionCierre: submittedId } })).toBe(3);
+    expect(await prisma.documentoRevisionCierre.count({ where: { idRevisionCierre: draftId } })).toBe(1);
+  });
 });
