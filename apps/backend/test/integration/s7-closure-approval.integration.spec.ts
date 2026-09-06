@@ -108,7 +108,7 @@ describeIntegration('S7 aprobación del cierre', () => {
       });
       throw new Error('fallo controlado después de fase uno');
     });
-    await expect(review.approveClosure(f.project.idProyecto, admin.idUsuario, dto)).rejects.toThrow('fallo controlado después de fase uno');
+    await expectStatus(503, () => review.approveClosure(f.project.idProyecto, admin.idUsuario, dto));
     expect(capture).toBeDefined();
     expect(capture!.oficial).toMatchObject({ revisionId: f.dto.revisionId, adminId: admin.idUsuario,
       fechaAprobacion: expect.any(Date), manifiestoEntrega: expect.arrayContaining([
@@ -319,5 +319,64 @@ describeIntegration('S7 aprobación del cierre', () => {
       );
       expect(content.nombreArchivo).toBe(`informe-oficial-${f.project.idProyecto}-${revision.idRevisionCierre}.pdf`);
     }
+  });
+
+  it('T28-A: un fallo de render o de storage deja el proyecto en S, sin acreditación y con la reserva huérfana', async () => {
+    const cases = [
+      { status: 503, fail: (f: Awaited<ReturnType<typeof readyForApproval>>) =>
+        vi.spyOn(f.stack.report, 'renderOfficial').mockImplementation(() => { throw new Error('render caído'); }) },
+      { status: 503, fail: (f: Awaited<ReturnType<typeof readyForApproval>>) =>
+        f.stack.documentos.storage.uploadImmutable.mockRejectedValueOnce(new Error('upload caído')) },
+      { status: 503, fail: (f: Awaited<ReturnType<typeof readyForApproval>>) =>
+        f.stack.documentos.storage.verifyAsset.mockRejectedValueOnce(new Error('verificación caída')) },
+      { status: 409, fail: (f: Awaited<ReturnType<typeof readyForApproval>>) =>
+        f.stack.documentos.storage.readCiphertext.mockResolvedValueOnce(Buffer.alloc(64, 0x7f)) },
+    ];
+
+    let retryFixture: Awaited<ReturnType<typeof readyForApproval>> | undefined;
+    for (const failure of cases) {
+      const f = await readyForApproval(db, scope);
+      failure.fail(f);
+      await expectStatus(failure.status, () => f.stack.review.approveClosure(
+        f.project.idProyecto, f.admin.idUsuario, f.approveDto,
+      ));
+      const project = await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } });
+      const revision = await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: f.dto.revisionId } });
+      const orphan = await db.documentoCierre.findFirstOrThrow({ where: {
+        idProyecto: f.project.idProyecto, idRevisionOrigen: f.dto.revisionId, tipoDocumento: 'INFORME_OFICIAL_FINAL',
+      } });
+      expect(project.estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
+      expect(revision).toMatchObject({ estadoRevision: 'ENVIADA', idDocumentoOficial: null });
+      expect(orphan.estadoDocumento).toBe('RESERVADO');
+      expect(await db.horasParticipacion.count({ where: {
+        participacion: { rolProyecto: { idProyecto: f.project.idProyecto } }, estadoHoras: 'APROBADA',
+      } })).toBe(0);
+      expect(await db.horasParticipacion.count({ where: {
+        participacion: { rolProyecto: { idProyecto: f.project.idProyecto } }, horasAprobadas: { not: null },
+      } })).toBe(0);
+      expect(await db.bitacoraAuditoria.count({ where: {
+        idUsuario: f.admin.idUsuario, accion: { in: ['PROJECT_CLOSE_REVIEW_APPROVED', 'PROJECT_HOURS_CREDITED'] },
+      } })).toBe(0);
+      expect(await db.notificacion.count({ where: {
+        idUsuario: { in: [f.leader.idUsuario, f.miembro.idUsuario, f.retiredUser.idUsuario] },
+        tipoNotificacion: { in: ['CIERRE_APROBADO', 'HORAS_ACREDITADAS'] },
+      } })).toBe(0);
+      retryFixture = f;
+      vi.restoreAllMocks();
+    }
+
+    const retry = retryFixture!;
+    await db.documentoCierre.updateMany({
+      where: { idProyecto: retry.project.idProyecto, idRevisionOrigen: retry.dto.revisionId,
+        tipoDocumento: 'INFORME_OFICIAL_FINAL', estadoDocumento: 'RESERVADO' },
+      data: { estadoDocumento: 'PURGA_PENDIENTE', purgaSolicitadaEn: new Date() },
+    });
+    const completed = await retry.stack.review.approveClosure(
+      retry.project.idProyecto, retry.admin.idUsuario, retry.approveDto,
+    );
+    expect(completed.estadoProyecto).toBe('CERRADO');
+    expect(await db.documentoCierre.count({ where: {
+      idProyecto: retry.project.idProyecto, tipoDocumento: 'INFORME_OFICIAL_FINAL', estadoDocumento: 'DISPONIBLE',
+    } })).toBe(1);
   });
 });
