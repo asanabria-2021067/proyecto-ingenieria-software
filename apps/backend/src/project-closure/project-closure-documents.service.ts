@@ -6,10 +6,12 @@ import {
   Injectable,
   NotFoundException,
   PayloadTooLargeException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { EstadoDocumentoCierre, Prisma, TipoDocumentoCierre } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import {
   ProjectTransactionService,
   type ProjectLockRow,
@@ -35,10 +37,10 @@ import {
   type ClosureStoragePort,
 } from '../storage/closure-storage.port';
 import { ReserveDocumentDto } from './dto/reserve-document.dto';
-import type { UploadGrant } from './dto/upload-grant.dto';
+import type { ReadGrant, UploadGrant } from './dto/upload-grant.dto';
 
 /**
- * C113/C114 (06 v2 §25/§26/§27): carga mediada de documentos de cierre.
+ * C113/C114/C117 (06 v2 §25/§26/§27): carga mediada de documentos de cierre.
  *
  * La secuencia es deliberada: una transacción BREVE reserva, el trabajo caro
  * —hash, cifrado y transferencia— ocurre FUERA de cualquier lock, y una
@@ -91,6 +93,9 @@ const DOCUMENTO_SELECT = {
   resourceType: true,
   proveedor: true,
   reservaExpiraEn: true,
+  cryptoMetadata: true,
+  tamanoCifradoBytes: true,
+  checksumCifradoSha256: true,
 } satisfies Prisma.DocumentoCierreSelect;
 
 type DocumentoRow = Prisma.DocumentoCierreGetPayload<{ select: typeof DOCUMENTO_SELECT }>;
@@ -119,6 +124,7 @@ export class ProjectClosureDocumentsService {
     private readonly prisma: PrismaService,
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
     private readonly tickets: ClosureTicketService,
     private readonly crypto: ClosureCryptoService,
     private readonly adapter: CloudinaryClosureStorageAdapter,
@@ -467,6 +473,97 @@ export class ProjectClosureDocumentsService {
     }
     // `etag` nunca se interpreta como el SHA-256 del PDF ni se persiste: su
     // única función es cruzar las dos respuestas del proveedor.
+  }
+
+  /**
+   * E109 (§26): permiso de lectura. Devuelve una URL DEL BACKEND y un ticket
+   * de cinco minutos atado al usuario, al documento y a su checksum.
+   *
+   * Nunca se entrega una URL del proveedor: el PDF en claro solo existe
+   * dentro del backend autorizado, y una URL remota —firmada o no— sacaría el
+   * control de acceso de nuestras manos.
+   */
+  async getReadUrl(projectId: number, documentId: number, actorId: number): Promise<ReadGrant> {
+    this.tickets.assertAvailable();
+    await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'documentos' });
+    const documento = await this.loadAvailable(projectId, documentId);
+    const { ticket, expiraEn } = this.tickets.sign({
+      purpose: 'read',
+      documentId,
+      projectId,
+      revisionId: documento.idRevisionOrigen,
+      actorId,
+      checksum: documento.checksumSha256 ?? '',
+    });
+    return {
+      documentId,
+      url: `/proyectos/${projectId}/cierre/documentos/${documentId}/contenido?ticket=${encodeURIComponent(ticket)}`,
+      expiraEn,
+    };
+  }
+
+  /**
+   * E110 (§26): bytes del documento, descifrados y verificados.
+   *
+   * Exige las TRES cosas a la vez: la sesión autenticada del mismo usuario,
+   * un ticket vigente para ese documento y los permisos ACTUALES sobre el
+   * proyecto. El ticket solo no autoriza: si los permisos cambiaron desde que
+   * se emitió, la lectura se niega.
+   */
+  async readContent(
+    projectId: number,
+    documentId: number,
+    actorId: number,
+    ticket: string,
+  ): Promise<{ bytes: Buffer; nombreArchivo: string }> {
+    this.tickets.assertAvailable();
+    const payload = this.tickets.verify(ticket, { purpose: 'read', projectId, documentId });
+    if (payload.actorId !== actorId) {
+      throw new UnauthorizedException('El ticket no corresponde a la sesión autenticada');
+    }
+    // Permisos ACTUALES, no los que existían al emitir el ticket.
+    await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'documentos' });
+
+    const documento = await this.loadAvailable(projectId, documentId);
+    const identidad: ClosureRemoteIdentity = {
+      proveedor: 'cloudinary',
+      cloudName: this.adapter.cloudNameForIdentity(),
+      publicId: documento.externalId,
+      resourceType: 'raw',
+      deliveryType: documento.deliveryType as ClosureRemoteIdentity['deliveryType'],
+    };
+    const ciphertext = await this.storage.readCiphertext(identidad, CLOSURE_REMOTE_TIMEOUT_MS);
+    // Autenticar y verificar ANTES de emitir un solo byte.
+    const bytes = this.crypto.open(
+      ciphertext,
+      this.cryptoMetadataOf(documento),
+      {
+        projectId,
+        documentId,
+        publicId: documento.externalId,
+        tipoDocumento: documento.tipoDocumento,
+      },
+      {
+        checksumSha256: documento.checksumSha256 ?? '',
+        tamanoBytes: Number(documento.tamanoBytes ?? 0),
+      },
+    );
+    return { bytes, nombreArchivo: documento.nombreArchivo };
+  }
+
+  /** Solo un documento DISPONIBLE se lee; una reserva o una purga no. */
+  private async loadAvailable(projectId: number, documentId: number): Promise<DocumentoRow> {
+    const documento = await this.prisma.documentoCierre.findFirst({
+      where: { idDocumentoCierre: documentId, idProyecto: projectId },
+      select: DOCUMENTO_SELECT,
+    });
+    if (!documento) {
+      throw new NotFoundException(`Documento de cierre ${documentId} no encontrado`);
+    }
+    if (documento.estadoDocumento !== EstadoDocumentoCierre.DISPONIBLE) {
+      throw new ConflictException('El documento no está disponible para lectura');
+    }
+    return documento;
   }
 
   /** Metadata pública del documento; nunca metadata criptográfica. */
