@@ -2,6 +2,15 @@ import { Body, Controller, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Pos
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
+import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
+
+/** C028: avances en P/E con Sprint ambiente ACTIVO (06 v2 §32). */
+const PROGRESS_WRITE: ProjectWriteMetadata = {
+  source: { kind: 'param', name: 'projectId' },
+  states: ['P', 'E'],
+  sprint: 'ACTIVO',
+  family: 'AVANCE',
+};
 import { CreateProgressRecordDto } from './dto/create-progress-record.dto';
 import { UpdateProgressRecordDto } from './dto/update-progress-record.dto';
 import { ProgressRecordsService } from './progress-records.service';
@@ -14,6 +23,7 @@ export class ProgressRecordsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(PROGRESS_WRITE)
   create(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -26,6 +36,7 @@ export class ProgressRecordsController {
 
   @Patch(':progressRecordId')
   @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(PROGRESS_WRITE)
   update(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
