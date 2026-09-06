@@ -13,12 +13,16 @@ import { cleanupIntegrationFixtures } from './setup/cleanup';
 import { closureLifecycleStack } from './setup/closure-lifecycle';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import {
+  applyManifest,
   assessManifest,
+  computeBaseline,
   diagnose,
+  manifestHash,
   manifestEntriesHash,
   resolveAdmin,
   validateManifest,
   LegacyCliError,
+  LegacyDivergenceError,
   LEGACY_MANIFEST_VERSION,
   type LegacyManifest,
   type LegacyManifestEntry,
@@ -58,6 +62,16 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
   let outsiderId = 0;
   let healthyProjectId = 0;
   let mainProjectId = 0;
+
+  // T22-A: caso inequívoco — FK ausente pero demostrable, no consumido y sin
+  // agregado previo (fila 2 de la tabla de 06 v2 §14).
+  const unequivocal = {
+    projectId: 0,
+    sprintId: 0,
+    taskId: 0,
+    assignmentId: 0,
+    participationId: 0,
+  };
 
   // Casos de T23-B: atribuciones que NO pueden demostrarse.
   const ambiguous = {
@@ -510,6 +524,68 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
     });
     ambiguous.approvedAggregate = approvedAggregate.idRegistroHoras;
 
+    // ────────────────────────────────────────────────────────────────────────
+    // T22-A: proyecto con un único caso inequívoco.
+    // ────────────────────────────────────────────────────────────────────────
+    const unequivocalUser = await createIntegrationUser(prisma);
+    scope.userIds.push(unequivocalUser.idUsuario);
+    const unequivocalProject = await createIntegrationProject(prisma, adminId, {
+      estadoProyecto: 'EN_PROGRESO',
+    });
+    unequivocal.projectId = unequivocalProject.idProyecto;
+    scope.projectIds.push(unequivocalProject.idProyecto);
+    const unequivocalRole = await createIntegrationProjectRole(
+      prisma,
+      unequivocalProject.idProyecto,
+    );
+    scope.roleIds.push(unequivocalRole.idRolProyecto);
+    // UNA sola historia de participación: nada que desempatar.
+    const unequivocalParticipation = await createIntegrationParticipation(
+      prisma,
+      unequivocalUser.idUsuario,
+      unequivocalRole.idRolProyecto,
+    );
+    scope.participationIds.push(unequivocalParticipation.idParticipacion);
+    unequivocal.participationId = unequivocalParticipation.idParticipacion;
+    await prisma.participacionProyecto.update({
+      where: { idParticipacion: unequivocalParticipation.idParticipacion },
+      data: { fechaIngreso: new Date('2026-01-01T00:00:00.000Z') },
+    });
+
+    const unequivocalSprint = await createIntegrationSprint(prisma, unequivocalProject.idProyecto, {
+      numero: 1,
+      estado: 'CERRADO',
+    });
+    unequivocal.sprintId = unequivocalSprint.idSprint;
+    scope.sprintIds.push(unequivocalSprint.idSprint);
+    const unequivocalTask = await createIntegrationTask(
+      prisma,
+      unequivocalProject.idProyecto,
+      adminId,
+      unequivocalSprint.idSprint,
+      { estadoTarea: 'HECHO' },
+    );
+    unequivocal.taskId = unequivocalTask.idTarea;
+    scope.taskIds.push(unequivocalTask.idTarea);
+    const unequivocalAssignment = await createIntegrationTaskAssignment(
+      prisma,
+      unequivocalTask.idTarea,
+      unequivocalUser.idUsuario,
+      adminId,
+      {
+        // Sin participación: es justo lo que el manifiesto debe completar.
+        horasReales: '8.00',
+        desasignadaEn: new Date('2026-03-15T00:00:00.000Z'),
+        origenReporte: 'LEGACY',
+      },
+    );
+    unequivocal.assignmentId = unequivocalAssignment.idAsignacion;
+    scope.assignmentIds.push(unequivocalAssignment.idAsignacion);
+    await prisma.asignacionTarea.update({
+      where: { idAsignacion: unequivocalAssignment.idAsignacion },
+      data: { fechaAsignacion: new Date('2026-02-01T00:00:00.000Z') },
+    });
+
     // ── Proyecto SANO de control: nada que conciliar.
     const controlProject = await createIntegrationProject(prisma, adminId, {
       estadoProyecto: 'EN_PROGRESO',
@@ -756,5 +832,105 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
 
     // ── Y sigue sin haberse tocado ninguna fila.
     expect(await fingerprintTables()).toBe(before);
+  });
+  it('T22-A: un caso P-05 inequívoco se aplica bajo manifiesto dejando PENDIENTE y una entrada de bitácora auditable', async () => {
+    const baseline = await computeBaseline(prisma, unequivocal.projectId, unequivocal.sprintId);
+    const build = (
+      overrides: Partial<LegacyManifest> = {},
+      entryOverrides: Partial<LegacyManifestEntry> = {},
+    ): LegacyManifest => {
+      const entradas: LegacyManifestEntry[] = [
+        {
+          accion: 'CONSUMIR_NUEVO',
+          idAsignacion: unequivocal.assignmentId,
+          idParticipacion: unequivocal.participationId,
+          idRegistroHoras: null,
+          importeAnterior: '8.00',
+          importeEsperado: '8.00',
+          ...entryOverrides,
+        },
+      ];
+      return {
+        version: LEGACY_MANIFEST_VERSION,
+        baseline,
+        adminId,
+        projectId: unequivocal.projectId,
+        sprintId: unequivocal.sprintId,
+        evidencia: 'acta-de-revision-T22A',
+        entradas,
+        sha256: manifestEntriesHash(entradas),
+        ...overrides,
+      };
+    };
+
+    const before = await fingerprintTables();
+
+    // ── Variante 1: SHA-256 del conjunto incorrecto. Ni siquiera se carga.
+    expect(() => validateManifest({ ...build(), sha256: '0'.repeat(64) })).toThrow(LegacyCliError);
+
+    // ── Variante 2: importe esperado distinto del almacenado.
+    const wrongAmount = build({}, { importeAnterior: '99.00' });
+    await expect(
+      applyManifest(prisma, wrongAmount, adminId),
+    ).rejects.toBeInstanceOf(LegacyDivergenceError);
+
+    // ── Variante 3: baseline de otra ejecución.
+    const staleBaseline = build({ baseline: 'baseline-de-otra-ejecucion' });
+    await expect(
+      applyManifest(prisma, staleBaseline, adminId),
+    ).rejects.toBeInstanceOf(LegacyDivergenceError);
+
+    // ── Las tres variantes hicieron rollback completo: cero cambios.
+    expect(await fingerprintTables()).toBe(before);
+
+    // ── El manifiesto correcto sí se aplica.
+    const result = await applyManifest(prisma, build(), adminId);
+    expect(result.applied).toBe(1);
+    expect(result.noop).toBe(0);
+
+    const tramo = await prisma.asignacionTarea.findUniqueOrThrow({
+      where: { idAsignacion: unequivocal.assignmentId },
+    });
+    // FK completada y tramo marcado como consumido, con su importe intacto.
+    expect(tramo.idParticipacion).toBe(unequivocal.participationId);
+    expect(tramo.reconocidoEn).not.toBeNull();
+    expect(tramo.horasReales?.toFixed(2)).toBe('8.00');
+
+    // ── El agregado nace PENDIENTE. NUNCA APROBADA.
+    const agregados = await prisma.horasParticipacion.findMany({
+      where: { idParticipacion: unequivocal.participationId },
+    });
+    expect(agregados).toHaveLength(1);
+    expect(agregados[0].estadoHoras).toBe('PENDIENTE');
+    expect(agregados[0].idSprint).toBe(unequivocal.sprintId);
+    expect(agregados[0].horasReportadas.toFixed(2)).toBe('8.00');
+    expect(agregados[0].horasCalculadas?.toFixed(2)).toBe('8.00');
+    expect(agregados[0].horasAprobadas).toBeNull();
+    expect(agregados[0].aprobadoPor).toBeNull();
+
+    // ── El Sprint no se reabrió y la tarea cerrada no se tocó.
+    const sprint = await prisma.sprint.findUniqueOrThrow({
+      where: { idSprint: unequivocal.sprintId },
+    });
+    expect(sprint.estado).toBe('CERRADO');
+    const tarea = await prisma.tarea.findUniqueOrThrow({
+      where: { idTarea: unequivocal.taskId },
+    });
+    expect(tarea.estadoTarea).toBe('HECHO');
+
+    // ── Bitácora: un evento con antes, después y el hash del manifiesto.
+    const eventos = await prisma.bitacoraAuditoria.findMany({
+      where: { accion: 'LEGACY_HOURS_RECONCILED', idObjeto: String(unequivocal.assignmentId) },
+    });
+    expect(eventos).toHaveLength(1);
+    const detalle = eventos[0].detalleJson as Record<string, unknown>;
+    const nuevo = detalle.valorNuevo as Record<string, unknown>;
+    const anterior = detalle.valorAnterior as Record<string, unknown>;
+    expect(anterior.idParticipacion).toBeNull();
+    expect(anterior.reconocido).toBe(false);
+    expect(nuevo.idParticipacion).toBe(unequivocal.participationId);
+    expect(nuevo.reconocido).toBe(true);
+    expect(nuevo.manifestHash).toBe(manifestHash(build()));
+    expect(detalle.idProyecto).toBe(unequivocal.projectId);
   });
 });
