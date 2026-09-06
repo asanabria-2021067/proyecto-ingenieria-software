@@ -62,6 +62,8 @@ async function expectUniqueViolation(prisma: PrismaClient, indexName: string, sq
   expect(String((outcome as Error).message)).toContain(`unique constraint "${indexName}"`);
 }
 
+const HEX64 = '0123456789abcdef'.repeat(4);
+
 describeIntegration('S7 database invariants (T38)', () => {
   let prisma: PrismaClient;
   let scope: IntegrationCleanupScope;
@@ -70,6 +72,8 @@ describeIntegration('S7 database invariants (T38)', () => {
   let adjustmentIds: number[];
   let appealIds: number[];
   let historyIds: number[];
+  let revisionIds: number[];
+  let documentIds: number[];
 
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
@@ -87,9 +91,20 @@ describeIntegration('S7 database invariants (T38)', () => {
     adjustmentIds = [];
     appealIds = [];
     historyIds = [];
+    revisionIds = [];
+    documentIds = [];
   });
 
   afterEach(async () => {
+    if (revisionIds.length > 0 || documentIds.length > 0) {
+      // Orden FK-safe: revisiones que referencian un oficial → puente → documentos → revisiones de origen.
+      await prisma.revisionCierreProyecto.deleteMany({
+        where: { idRevisionCierre: { in: revisionIds }, idDocumentoOficial: { not: null } },
+      });
+      await prisma.documentoRevisionCierre.deleteMany({ where: { idDocumentoCierre: { in: documentIds } } });
+      await prisma.documentoCierre.deleteMany({ where: { idDocumentoCierre: { in: documentIds } } });
+      await prisma.revisionCierreProyecto.deleteMany({ where: { idRevisionCierre: { in: revisionIds } } });
+    }
     if (historyIds.length > 0) {
       await prisma.historialLiderazgo.deleteMany({ where: { idHistorialLiderazgo: { in: historyIds } } });
     }
@@ -481,5 +496,126 @@ describeIntegration('S7 database invariants (T38)', () => {
     });
     expect(accepted.estadoApelacion).toBe('ACEPTADA');
     expect(accepted.historial?.idHistorialLiderazgo).toBe(linkedHistoryId);
+  });
+  it('T38-E: los estados de RevisionCierreProyecto, su numeración y su documento oficial rechazan combinaciones imposibles', async () => {
+    const leader = await createIntegrationUser(prisma);
+    const admin = await createIntegrationUser(prisma);
+    scope.userIds = [leader.idUsuario, admin.idUsuario];
+    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const otherProject = await createIntegrationProject(prisma, leader.idUsuario);
+    scope.projectIds = [project.idProyecto, otherProject.idProyecto];
+    const P = project.idProyecto;
+    const P2 = otherProject.idProyecto;
+    const L = leader.idUsuario;
+    const ADMIN = admin.idUsuario;
+
+    const insertRevision = async (sql: TemplateStringsArray, ...values: unknown[]): Promise<number> => {
+      const rows = await prisma.$queryRaw<Array<{ id_revision_cierre: number }>>(sql, ...values);
+      revisionIds.push(rows[0].id_revision_cierre);
+      return rows[0].id_revision_cierre;
+    };
+
+    // Revisión BORRADOR válida y, sobre ella, un informe oficial DISPONIBLE insertado directamente.
+    const draftId = await insertRevision`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision) VALUES (${P}, 1) RETURNING id_revision_cierre`;
+    const officialRows = await prisma.$queryRaw<Array<{ id_documento_cierre: number }>>`INSERT INTO documento_cierre (id_proyecto, id_revision_origen, tipo_documento, external_id, delivery_type, asset_id, version_remota, nombre_archivo, tamano_bytes, tamano_cifrado_bytes, checksum_sha256, checksum_cifrado_sha256, crypto_metadata, generator_version, fingerprint_ejecucion, fingerprint_modelo, contexto_reporte, id_autor, estado_documento, reserva_expira_en, carga_iniciada_en, carga_limite_en, disponible_en) VALUES (${P}, ${draftId}, 'INFORME_OFICIAL_FINAL', ${`uvgenius/cierre/${P}/oficial-t38e.enc`}, 'authenticated', 'asset-oficial', '1', 'informe-oficial.pdf', 1024, 1024, ${HEX64}, ${HEX64}, '{"format":"aes-256-gcm-v1"}'::jsonb, 'closure-report-v1', ${HEX64}, ${HEX64}, '{"schemaVersion":1}'::jsonb, ${ADMIN}, 'DISPONIBLE', NOW() + INTERVAL '1 hour', NOW(), NOW() + INTERVAL '1 hour', NOW()) RETURNING id_documento_cierre`;
+    const officialId = officialRows[0].id_documento_cierre;
+    documentIds.push(officialId);
+
+    // CK17: numeración positiva.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_17',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision) VALUES (${P2}, 0)`,
+    );
+    // CK18: BORRADOR con datos de entrega; ENVIADA incompleta o con revisor; hash mal formado.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_18',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, id_solicitante) VALUES (${P2}, 1, ${L})`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_18',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, fingerprint_entrega) VALUES (${P2}, 1, ${HEX64})`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_18',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, fingerprint_entrega) VALUES (${P2}, 1, 'ENVIADA', ${L}, ${HEX64})`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_18',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega, id_revisor) VALUES (${P2}, 1, 'ENVIADA', ${L}, NOW(), ${HEX64}, ${ADMIN})`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_18',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega) VALUES (${P2}, 1, 'ENVIADA', ${L}, NOW(), ${HEX64.slice(0, 63)})`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_18',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega) VALUES (${P2}, 1, 'ENVIADA', ${L}, NOW(), ${HEX64.toUpperCase()})`,
+    );
+    // CK19: corrección documental sin comentario. CK20: APROBADA sin oficial; BORRADOR con oficial.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_19',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega, id_revisor, resuelta_en) VALUES (${P2}, 1, 'CORRECCION_DOCUMENTAL', ${L}, NOW(), ${HEX64}, ${ADMIN}, NOW())`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_20',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega, id_revisor, resuelta_en) VALUES (${P2}, 1, 'APROBADA', ${L}, NOW(), ${HEX64}, ${ADMIN}, NOW())`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_20',
+      (tx) => tx.$executeRaw`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, id_documento_oficial) VALUES (${P2}, 1, ${officialId})`,
+    );
+
+    // Índices parciales: segunda BORRADOR y segunda ENVIADA del mismo proyecto.
+    await expectUniqueViolation(
+      prisma,
+      's7_revision_borrador',
+      `INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision) VALUES (${P}, 2)`,
+    );
+    const submittedId = await insertRevision`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega) VALUES (${P}, 2, 'ENVIADA', ${L}, NOW(), ${HEX64}) RETURNING id_revision_cierre`;
+    expect(submittedId).toBeGreaterThan(0);
+    await expectUniqueViolation(
+      prisma,
+      's7_revision_enviada',
+      `INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega) VALUES (${P}, 3, 'ENVIADA', ${L}, NOW(), '${HEX64}')`,
+    );
+
+    // UNIQUE de numeración y de documento oficial.
+    await expectUniqueViolation(
+      prisma,
+      'revision_cierre_proyecto_id_proyecto_numero_revision_key',
+      `INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega, id_revisor, resuelta_en, comentario_revisor) VALUES (${P}, 1, 'DEVUELTA_A_EJECUCION', ${L}, NOW(), '${HEX64}', ${ADMIN}, NOW(), 'vuelve a ejecución')`,
+    );
+    const approvedId = await insertRevision`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega, id_revisor, resuelta_en, id_documento_oficial) VALUES (${P}, 4, 'APROBADA', ${L}, NOW(), ${HEX64}, ${ADMIN}, NOW(), ${officialId}) RETURNING id_revision_cierre`;
+    expect(approvedId).toBeGreaterThan(0);
+    await expectUniqueViolation(
+      prisma,
+      'revision_cierre_proyecto_id_documento_oficial_key',
+      `INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega, id_revisor, resuelta_en, id_documento_oficial) VALUES (${P}, 5, 'APROBADA', ${L}, NOW(), '${HEX64}', ${ADMIN}, NOW(), ${officialId})`,
+    );
+
+    // Casos legítimos: BORRADOR (P) y ENVIADA (P2) coexisten en proyectos distintos; devolución completa con comentario.
+    const otherSubmittedId = await insertRevision`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega) VALUES (${P2}, 1, 'ENVIADA', ${L}, NOW(), ${HEX64}) RETURNING id_revision_cierre`;
+    expect(otherSubmittedId).toBeGreaterThan(0);
+    const returnedId = await insertRevision`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision, estado_revision, id_solicitante, enviada_en, fingerprint_entrega, id_revisor, resuelta_en, comentario_revisor) VALUES (${P2}, 2, 'DEVUELTA_A_EJECUCION', ${L}, NOW(), ${HEX64}, ${ADMIN}, NOW(), 'Falta el Sprint final') RETURNING id_revision_cierre`;
+    expect(returnedId).toBeGreaterThan(0);
+
+    expect(await prisma.revisionCierreProyecto.count({ where: { idProyecto: P } })).toBe(3);
+    expect(await prisma.revisionCierreProyecto.count({ where: { idProyecto: P2 } })).toBe(2);
+    const approved = await prisma.revisionCierreProyecto.findUniqueOrThrow({
+      where: { idRevisionCierre: approvedId },
+      include: { informeOficial: true, documentos: true },
+    });
+    expect(approved.informeOficial?.idDocumentoCierre).toBe(officialId);
+    expect(approved.documentos).toHaveLength(0);
   });
 });
