@@ -36,6 +36,7 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
   let anaId: number;
   let betoId: number;
   let projectId: number;
+  let sprintId: number;
   let rolFrontId: number;
   let rolDocsId: number;
   const tareas: Record<string, number> = {};
@@ -87,6 +88,12 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
       },
     });
     projectId = proyecto.idProyecto;
+    // FND-03/FND-08: `Tarea.idSprint` es NOT NULL, así que toda tarea exige un
+    // Sprint del mismo proyecto. El fixture es anterior a esa restricción.
+    const sprint = await prisma.sprint.create({
+      data: { idProyecto: projectId, numero: 1, estado: 'ACTIVO' },
+    });
+    sprintId = sprint.idSprint;
 
     const rolFront = await prisma.rolProyecto.create({
       data: { idProyecto: projectId, nombreRol: 'Frontend', cupos: 3 },
@@ -116,6 +123,7 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
       const t = await prisma.tarea.create({
         data: {
           idProyecto: projectId,
+          idSprint: sprintId,
           idRolProyecto: idRol,
           tituloTarea: clave,
           estadoTarea: estado,
