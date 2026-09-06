@@ -77,6 +77,8 @@ export interface SprintClosingSummaryParticipantDto {
   horasCalculadas: number;
   horasAprobadas: number;
   participaciones: SprintClosingSummaryParticipationDto[];
+  /** C079 (§46): desglose por tramos y ajustes. Aditivo; nunca editable. */
+  totales?: SprintClosingMemberTotalsDto;
 }
 
 /**
@@ -86,5 +88,55 @@ export interface SprintClosingSummaryParticipantDto {
 export interface SprintClosingSummaryDto {
   idProyecto: number;
   idSprint: number;
+  /** C079 (§46): el estado del Sprint forma parte del resumen de cierre. */
+  estadoSprint?: string;
   participantes: SprintClosingSummaryParticipantDto[];
+  /** C079 (§22/§46): lo que impide consolidar, visible en vez de silencioso. */
+  blockers?: SprintClosingBlockerDto[];
+}
+
+/**
+ * C079 (06 v2 §46): desglose por TRAMO del resumen de cierre. Es aditivo: los
+ * campos anteriores de HU-D1 no cambian de significado ni de tipo.
+ *
+ * `reportadas` es el reporte del integrante y `propuestas` es reportadas más
+ * el ajuste vigente del líder. Se muestran uno al lado del otro justamente
+ * para que se vean como capas distintas: el resumen no ofrece ningún total
+ * editable, porque corregir es potestad del ajuste append-only, no de este
+ * read-model.
+ */
+export interface SprintClosingTramoDto {
+  idAsignacion: number;
+  idTarea: number;
+  tituloTarea: string;
+  tareaEliminada: boolean;
+  idParticipacion: number | null;
+  abierto: boolean;
+  origen: string;
+  reportadas: string;
+  ajuste: string | null;
+  justificacionAjuste: string | null;
+  propuestas: string;
+  reconocidoEn: Date | null;
+}
+
+/** C079 (§46): totales por integrante derivados de sus tramos, no editables. */
+export interface SprintClosingMemberTotalsDto {
+  tareasDistintas: number;
+  estimacionAsociada: number | null;
+  reportadas: string;
+  legacy: string;
+  exceso: string;
+  propuestas: string;
+  filasPendientes: number;
+  filasConsumidas: number;
+  tramos: SprintClosingTramoDto[];
+}
+
+/** C079 (§22/§46): impedimento visible del cierre, con sus identificadores. */
+export interface SprintClosingBlockerDto {
+  code: string;
+  message: string;
+  ids: number[];
+  cantidad: number;
 }
