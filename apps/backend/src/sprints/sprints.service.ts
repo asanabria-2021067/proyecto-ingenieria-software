@@ -25,6 +25,7 @@ import {
   type ProjectTransactionContext,
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): iniciar, finalizar y cerrar un Sprint
@@ -42,6 +43,8 @@ export class SprintsService {
     private readonly notificationsService: NotificationsService,
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
+    // C046 (06 v2 §34): alcance por actor de los lectores de Sprint.
+    private readonly readPolicy: ProjectReadPolicyService,
     // T-164: opcional por el mismo motivo que TasksService.bitacoraEventos —
     // las suites existentes construyen SprintsService directamente con 4
     // argumentos posicionales; en producción SprintsModule siempre lo provee.
@@ -363,6 +366,14 @@ export class SprintsService {
     sprintId: number,
     userId: number,
   ): Promise<SprintClosingSummaryDto> {
+    // C046 (§41 E066): resumen de cierre — solo el líder actual mientras el
+    // Sprint no esté cerrado.
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
     await this.sprintsAuthorization.assertCanViewClosingSummary(projectId, sprintId, userId);
 
     const participantes = await this.prisma.$queryRaw<SprintClosingSummaryParticipantDto[]>(Prisma.sql`
@@ -624,12 +635,23 @@ export class SprintsService {
     return new Map(filas.map((fila) => [fila.idSprint, fila]));
   }
 
+  /**
+   * C046 (§34/§41 E064): la autorización actual se conserva y se le añade el
+   * ámbito por actor; un administrador o un participante histórico solo ve
+   * los Sprints cerrados del proyecto vivo.
+   */
   async listSprints(projectId: number, userId: number): Promise<SprintListItemDto[]> {
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+    });
     await this.sprintsAuthorization.assertCanListSprintHistory(projectId, userId);
+    const alcance = this.sprintsContext.sprintScopeWhere(this.readPolicy.scopeForActor(decision));
 
     const [sprints, agregadosPorSprint] = await Promise.all([
       this.prisma.sprint.findMany({
-        where: { idProyecto: projectId },
+        where: { idProyecto: projectId, ...alcance },
         orderBy: { numero: 'desc' },
         select: {
           idSprint: true,
@@ -692,6 +714,15 @@ export class SprintsService {
    * `Hito.estadoHito`.
    */
   async getSprintDetail(projectId: number, sprintId: number, userId: number): Promise<SprintDetailDto> {
+    // C046 (§34/§41 E065): el detalle de un Sprint ACTIVO o EN_FINALIZACION
+    // solo es visible para el líder actual; el resto de perfiles queda
+    // limitado a los Sprints cerrados.
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
     await this.sprintsAuthorization.assertCanViewSprintHistory(projectId, sprintId, userId);
 
     const sprint = await this.prisma.sprint.findFirst({
@@ -839,6 +870,12 @@ export class SprintsService {
     sprintId: number,
     userId: number,
   ): Promise<SprintAnalyticsDto> {
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
     await this.sprintsAuthorization.assertCanViewSprintAnalytics(projectId, sprintId, userId);
 
     const sprint = await this.prisma.sprint.findFirst({
@@ -957,7 +994,20 @@ export class SprintsService {
     projectId: number,
     userId: number,
   ): Promise<SprintComparativeAnalyticsDto> {
+    // C046 (§41 E068): la comparativa también respeta el ámbito por actor.
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+    });
     await this.sprintsAuthorization.assertCanListSprintAnalytics(projectId, userId);
+    // La comparativa es SQL agregado: el ámbito se aplica como fragmento
+    // parametrizado, nunca interpolando estados en el texto de la consulta.
+    const estadosVisibles = decision.sprintEstados;
+    const filtroEstados =
+      estadosVisibles === null
+        ? Prisma.empty
+        : Prisma.sql` AND s.estado::text IN (${Prisma.join([...estadosVisibles])})`;
 
     const filas = await this.prisma.$queryRaw<
       Omit<SprintComparativeAnalyticsItemDto, 'porcentajeCumplimiento'>[]
@@ -996,7 +1046,7 @@ export class SprintsService {
       FROM sprint s
       LEFT JOIN tareas_agregadas ta ON ta."idSprint" = s.id_sprint
       LEFT JOIN hitos_agregados ha ON ha."idSprint" = s.id_sprint
-      WHERE s.id_proyecto = ${projectId}
+      WHERE s.id_proyecto = ${projectId}${filtroEstados}
       ORDER BY s.numero ASC
     `);
 
