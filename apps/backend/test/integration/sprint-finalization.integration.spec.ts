@@ -17,6 +17,7 @@ import type { NotificationsService } from '../../src/notifications/notifications
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real A4: SprintsService.finalizeSprint contra PostgreSQL real
@@ -52,7 +53,8 @@ describeIntegration(
           authorization,
           notifications as unknown as NotificationsService,
           new ProjectTransactionService(prisma as unknown as PrismaService),
-          new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService))),
+          new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
+          new ProjectReadPolicyService(prisma as unknown as PrismaService)),
         notifications,
       };
     }

@@ -12,6 +12,7 @@ import type { NotificationsService } from '../../src/notifications/notifications
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real A2: concurrencia de SprintsService.startSprint contra el
@@ -42,7 +43,7 @@ describeIntegration(
       // finalizeSprint (A4) lo hace — así que un doble vacío es suficiente
       // aquí; nunca se invoca en este archivo.
       const notifications = {} as unknown as NotificationsService;
-      service = new SprintsService(prisma as unknown as PrismaService, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)));
+      service = new SprintsService(prisma as unknown as PrismaService, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)), new ProjectReadPolicyService(prisma as unknown as PrismaService));
       await prisma.$connect();
     });
 
