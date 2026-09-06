@@ -255,7 +255,6 @@ describe('SprintsAuthorizationService', () => {
   describe.each([
     ['assertCanFinalizeSprint' as const, 'finalizar'],
     ['assertCanCloseSprint' as const, 'cerrar'],
-    ['assertCanAdjustRecognizedHours' as const, 'ajustar horas'],
     ['assertCanViewSprintHistory' as const, 'ver detalle histórico (A10)'],
   ])('%s (%s)', (method, _accion) => {
     it('permite al líder y devuelve el Sprint validado', async () => {
@@ -352,7 +351,7 @@ describe('SprintsAuthorizationService', () => {
       expect(result).toBe(SPRINT_CON_PROYECTO);
       expect(ctx.getSprintWithProjectOrThrow).toHaveBeenCalledTimes(1);
       // A diferencia de assertCanFinalizeSprint/assertCanCloseSprint/
-      // assertCanAdjustRecognizedHours, esta variante NUNCA llama a
+      // los asserts de gestión del Sprint, esta variante NUNCA llama a
       // assertProjectLeader por separado: el liderazgo ya viaja en la
       // misma fila (proyecto.creadoPor) resuelta por
       // getSprintWithProjectOrThrow — ese es el ahorro de query de A8.
