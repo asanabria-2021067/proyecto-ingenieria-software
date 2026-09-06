@@ -18,9 +18,10 @@ import { ProjectEligibilityService } from '../eligibility/project-eligibility.se
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { CreateLeadershipAppealDto } from './dto/create-leadership-appeal.dto';
+import { DenyAppealDto } from './dto/deny-appeal.dto';
 
 /**
- * C091/C093/C094 (06 v2 §18/§19): escrituras de liderazgo — ciclo de vida de la
+ * C091/C093/C094/C095 (06 v2 §18/§19): escrituras de liderazgo — ciclo de vida de la
  * apelación y el motor ÚNICO de cambio de líder.
  *
  * `Proyecto.creadoPor` es la única fuente de verdad sobre quién lidera: este
@@ -240,6 +241,72 @@ export class LeadershipService {
       });
 
       return cancelada;
+    });
+  }
+
+  /**
+   * E101 (§19): un administrador deniega la apelación.
+   *
+   * Denegar es terminal y NO transfiere nada: el proyecto sigue con el mismo
+   * líder y el equipo sigue igual. El motivo es obligatorio (CK12) y el autor
+   * recibe el aviso aunque ya no participe en el proyecto, porque la respuesta
+   * a su solicitud le pertenece a él, no a su membresía.
+   */
+  async denyAppeal(
+    projectId: number,
+    appealId: number,
+    actorId: number,
+    dto: DenyAppealDto,
+  ): Promise<ApelacionPublica> {
+    return this.projectTx.run(projectId, actorId, 'leadership.denyAppeal', async (ctx) => {
+      const { tx } = ctx;
+      const project = this.lockedProject(ctx);
+      await this.policy.assertWriteTx(tx, project, 'LIDERAZGO', actorId);
+      await this.policy.assertAdminTx(tx, actorId);
+
+      const apelacion = await this.loadAppealTx(tx, projectId, appealId);
+      const mensajeResolucion = dto.mensajeResolucion?.trim() ?? '';
+      if (mensajeResolucion.length === 0 || mensajeResolucion.length > 5000) {
+        throw new BadRequestException('mensajeResolucion debe tener entre 1 y 5000 caracteres');
+      }
+
+      const denegada = await this.resolveAppealTx(tx, {
+        appealId,
+        estado: EstadoApelacionLiderazgo.DENEGADA,
+        idAdminResolutor: actorId,
+        mensajeResolucion,
+      });
+
+      await this.bitacoraEventos.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.LEADERSHIP_APPEAL_DENIED,
+        idActor: actorId,
+        idProyecto: projectId,
+        tipoEntidad: 'APELACION_LIDERAZGO',
+        idEntidad: appealId,
+        valorAnterior: snapshotApelacion(apelacion),
+        valorNuevo: snapshotApelacion(denegada),
+      });
+
+      const proyecto = await tx.proyecto.findUniqueOrThrow({
+        where: { idProyecto: projectId },
+        select: { tituloProyecto: true },
+      });
+      await this.notifications.persistTemplateTx(
+        tx,
+        [apelacion.idLiderSolicitante],
+        'APELACION_LIDERAZGO_RESUELTA',
+        {
+          projectTitle: proyecto.tituloProyecto,
+          projectId,
+          appealId,
+          accepted: false,
+          mensajeResolucion,
+        },
+        ctx.effects,
+      );
+
+      return denegada;
     });
   }
 
