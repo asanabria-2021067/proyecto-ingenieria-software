@@ -131,4 +131,15 @@ export class NotificationsGateway
       this.server.to(`user:${userId}`).emit('TASK_HOURS_LOGGED', payload);
     }
   }
+
+  /**
+   * Sprint 7 (06 v2 §45): emisor genérico por nombre de evento catalogado,
+   * pensado para los efectos post-commit del runner de proyecto. Mismo
+   * mecanismo de rooms `user:{idUsuario}`; ningún emisor lo usa todavía.
+   */
+  async emitToUsers(event: string, userIds: number[], payload: unknown): Promise<void> {
+    for (const userId of userIds) {
+      this.server.to(`user:${userId}`).emit(event, payload);
+    }
+  }
 }
