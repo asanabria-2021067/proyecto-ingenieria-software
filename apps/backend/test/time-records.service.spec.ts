@@ -106,6 +106,9 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
             horas: VALID_DTO.horas,
             fecha: new Date('2026-08-20T00:00:00.000Z'),
             nota: VALID_DTO.nota,
+            // C065 (§10): el alta persiste siempre la justificación enviada
+            // (aquí ninguna); la exigencia de texto la decide el umbral.
+            justificacionExceso: null,
           },
         }),
       );
