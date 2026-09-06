@@ -48,8 +48,15 @@ async function expectCheckViolation(
  * diagnosticado por la propia base. `sql` solo contiene literales de fixture
  * (IDs enteros y textos constantes), nunca entrada externa.
  */
-async function expectUniqueViolation(prisma: PrismaClient, indexName: string, sql: string): Promise<void> {
-  const wrapped = `DO $s7$ DECLARE violated text; BEGIN ${sql}; EXCEPTION WHEN unique_violation THEN GET STACKED DIAGNOSTICS violated = CONSTRAINT_NAME; RAISE EXCEPTION 'unique constraint "%"', violated; END $s7$;`;
+type NamedViolation = 'unique_violation' | 'foreign_key_violation';
+
+async function violatedConstraintName(
+  prisma: PrismaClient,
+  kind: NamedViolation,
+  sql: string,
+): Promise<string | null> {
+  const label = kind === 'unique_violation' ? 'unique constraint' : 'foreign key constraint';
+  const wrapped = `DO $s7$ DECLARE violated text; BEGIN ${sql}; EXCEPTION WHEN ${kind} THEN GET STACKED DIAGNOSTICS violated = CONSTRAINT_NAME; RAISE EXCEPTION '${label} "%"', violated; END $s7$;`;
   const outcome = await prisma
     .$transaction(async (tx) => {
       await tx.$executeRawUnsafe(wrapped);
@@ -58,8 +65,31 @@ async function expectUniqueViolation(prisma: PrismaClient, indexName: string, sq
       () => null,
       (error: unknown) => error,
     );
-  expect(outcome, `se esperaba una violación de ${indexName}`).toBeInstanceOf(Error);
-  expect(String((outcome as Error).message)).toContain(`unique constraint "${indexName}"`);
+  if (outcome === null) {
+    return null;
+  }
+  const match = String((outcome as Error).message).match(new RegExp(`${label} "([^"]+)"`));
+  if (!match) {
+    throw outcome;
+  }
+  return match[1];
+}
+
+async function expectUniqueViolation(prisma: PrismaClient, indexName: string, sql: string): Promise<void> {
+  const violated = await violatedConstraintName(prisma, 'unique_violation', sql);
+  expect(violated, `se esperaba una violación de ${indexName}`).toBe(indexName);
+}
+
+/** El borrado debe fallar por RESTRICT; devuelve el nombre de la FK reportada por PostgreSQL. */
+async function expectForeignKeyViolation(
+  prisma: PrismaClient,
+  sql: string,
+  expectedConstraints: string[],
+): Promise<string> {
+  const violated = await violatedConstraintName(prisma, 'foreign_key_violation', sql);
+  expect(violated, `se esperaba una violación de FK ejecutando: ${sql}`).not.toBeNull();
+  expect(expectedConstraints, `FK inesperada ${violated}`).toContain(violated);
+  return violated as string;
 }
 
 const HEX64 = '0123456789abcdef'.repeat(4);
@@ -841,5 +871,192 @@ describeIntegration('S7 database invariants (T38)', () => {
     expect(await prisma.documentoRevisionCierre.count({ where: { idDocumentoCierre: docIds[0] } })).toBe(2);
     expect(await prisma.documentoRevisionCierre.count({ where: { idRevisionCierre: submittedId } })).toBe(3);
     expect(await prisma.documentoRevisionCierre.count({ where: { idRevisionCierre: draftId } })).toBe(1);
+  });
+  it('T38-H: las claves foráneas de Sprint 7 impiden borrar usuarios, proyectos, revisiones y asignaciones con historia', async () => {
+    // Proyecto completo con historia de Sprint 7 en todas las tablas nuevas.
+    const leader = await createIntegrationUser(prisma);
+    const candidate = await createIntegrationUser(prisma);
+    const admin = await createIntegrationUser(prisma);
+    scope.userIds = [leader.idUsuario, candidate.idUsuario, admin.idUsuario];
+    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    scope.projectIds = [project.idProyecto];
+    const role = await createIntegrationProjectRole(prisma, project.idProyecto);
+    scope.roleIds = [role.idRolProyecto];
+    const participation = await createIntegrationParticipation(prisma, leader.idUsuario, role.idRolProyecto);
+    scope.participationIds = [participation.idParticipacion];
+    const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: EstadoSprint.ACTIVO });
+    scope.sprintIds = [sprint.idSprint];
+    const task = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, {
+      idRolProyecto: role.idRolProyecto,
+    });
+    scope.taskIds = [task.idTarea];
+    const created = await createIntegrationTaskAssignment(prisma, task.idTarea, leader.idUsuario, leader.idUsuario);
+    scope.assignmentIds = [created.idAsignacion];
+    const assignment = await prisma.asignacionTarea.update({
+      where: { idAsignacion: created.idAsignacion },
+      data: { idParticipacion: participation.idParticipacion, horasReales: '3.00' },
+    });
+    const P = project.idProyecto;
+    const L = leader.idUsuario;
+    const C = candidate.idUsuario;
+    const ADMIN = admin.idUsuario;
+    const inOneHour = new Date(Date.now() + 60 * 60 * 1000);
+
+    const record = await prisma.registroTiempoTarea.create({
+      data: {
+        idAsignacion: assignment.idAsignacion,
+        idUsuario: L,
+        horas: '3.00',
+        fecha: new Date('2026-09-02T00:00:00.000Z'),
+        revocadoEn: new Date(),
+        revocadoPor: L,
+      },
+    });
+    recordIds.push(record.idRegistroTiempo);
+    const annulled = await prisma.ajusteHoraTarea.create({
+      data: { idAsignacion: assignment.idAsignacion, deltaHoras: '-1.00', horasBase: '3.00', justificacion: 'primer ajuste', idAutor: L, anuladoEn: new Date(), anuladoPor: L },
+    });
+    const successor = await prisma.ajusteHoraTarea.create({
+      data: { idAsignacion: assignment.idAsignacion, deltaHoras: '-0.50', horasBase: '3.00', justificacion: 'corrección', idAutor: L, idAjusteAnterior: annulled.idAjusteHora },
+    });
+    adjustmentIds.push(annulled.idAjusteHora, successor.idAjusteHora);
+    const appeal = await prisma.apelacionLiderazgo.create({
+      data: { idProyecto: P, idLiderSolicitante: L, asunto: 'Transferencia', mensaje: 'Solicito transferir el liderazgo.', idCandidatoPropuesto: C, estadoApelacion: 'ACEPTADA', resueltaEn: new Date(), idAdminResolutor: ADMIN },
+    });
+    appealIds.push(appeal.idApelacion);
+    const history = await prisma.historialLiderazgo.create({
+      data: { idProyecto: P, idLiderAnterior: L, idLiderNuevo: C, idAdminResponsable: ADMIN, motivo: 'Apelación aceptada', origen: 'SOLICITUD_LIDER', idApelacion: appeal.idApelacion },
+    });
+    historyIds.push(history.idHistorialLiderazgo);
+    const submitted = await prisma.revisionCierreProyecto.create({
+      data: { idProyecto: P, numeroRevision: 1, estadoRevision: 'ENVIADA', idSolicitante: L, enviadaEn: new Date(), fingerprintEntrega: HEX64 },
+    });
+    revisionIds.push(submitted.idRevisionCierre);
+    const availableDocument = (name: string, extra: Record<string, unknown>) => ({
+      idProyecto: P,
+      idRevisionOrigen: submitted.idRevisionCierre,
+      externalId: `uvgenius/cierre/${P}/${name}.enc`,
+      deliveryType: 'authenticated',
+      nombreArchivo: `${name}.pdf`,
+      tamanoBytes: 1024n,
+      tamanoCifradoBytes: 1024n,
+      checksumSha256: HEX64,
+      checksumCifradoSha256: HEX64,
+      cryptoMetadata: { format: 'aes-256-gcm-v1' },
+      estadoDocumento: 'DISPONIBLE' as const,
+      reservaExpiraEn: inOneHour,
+      cargaIniciadaEn: new Date(),
+      cargaLimiteEn: inOneHour,
+      assetId: `asset-${name}`,
+      versionRemota: '1',
+      disponibleEn: new Date(),
+      ...extra,
+    });
+    const evidence = await prisma.documentoCierre.create({
+      data: availableDocument('evidencia-t38h', { tipoDocumento: 'EVIDENCIA_LIDER', idAutor: L }),
+    });
+    const official = await prisma.documentoCierre.create({
+      data: availableDocument('oficial-t38h', {
+        tipoDocumento: 'INFORME_OFICIAL_FINAL',
+        idAutor: ADMIN,
+        generatorVersion: 'closure-report-v1',
+        fingerprintEjecucion: HEX64,
+        fingerprintModelo: HEX64,
+        contextoReporte: { schemaVersion: 1 },
+      }),
+    });
+    documentIds.push(evidence.idDocumentoCierre, official.idDocumentoCierre);
+    await prisma.documentoRevisionCierre.create({
+      data: { idRevisionCierre: submitted.idRevisionCierre, idDocumentoCierre: evidence.idDocumentoCierre, orden: 1 },
+    });
+    const approved = await prisma.revisionCierreProyecto.create({
+      data: { idProyecto: P, numeroRevision: 2, estadoRevision: 'APROBADA', idSolicitante: L, enviadaEn: new Date(), fingerprintEntrega: HEX64, idRevisor: ADMIN, resueltaEn: new Date(), idDocumentoOficial: official.idDocumentoCierre },
+    });
+    revisionIds.push(approved.idRevisionCierre);
+
+    // Ningún padre con historia de Sprint 7 puede borrarse: RESTRICT en todas las FK nuevas y adaptadas.
+    const userFks = [
+      'registro_tiempo_tarea_revocado_por_fkey',
+      'registro_tiempo_tarea_id_usuario_fkey',
+      'ajuste_hora_tarea_id_autor_fkey',
+      'ajuste_hora_tarea_anulado_por_fkey',
+      'apelacion_liderazgo_id_lider_solicitante_fkey',
+      'apelacion_liderazgo_id_candidato_propuesto_fkey',
+      'apelacion_liderazgo_id_admin_resolutor_fkey',
+      'historial_liderazgo_id_lider_anterior_fkey',
+      'historial_liderazgo_id_lider_nuevo_fkey',
+      'historial_liderazgo_id_admin_responsable_fkey',
+      'revision_cierre_proyecto_id_solicitante_fkey',
+      'revision_cierre_proyecto_id_revisor_fkey',
+      'documento_cierre_id_autor_fkey',
+      // FK preexistentes del fixture (proyecto, participación, tarea, asignación) también protegen al usuario.
+      'proyecto_creado_por_fkey',
+      'participacion_proyecto_id_usuario_fkey',
+      'tarea_creada_por_fkey',
+      'asignacion_tarea_id_usuario_fkey',
+      'asignacion_tarea_asignado_por_fkey',
+    ];
+    for (const userId of [L, C, ADMIN]) {
+      await expectForeignKeyViolation(prisma, `DELETE FROM usuario WHERE id_usuario = ${userId}`, userFks);
+    }
+    await expectForeignKeyViolation(prisma, `DELETE FROM proyecto WHERE id_proyecto = ${P}`, [
+      'apelacion_liderazgo_id_proyecto_fkey',
+      'historial_liderazgo_id_proyecto_fkey',
+      'revision_cierre_proyecto_id_proyecto_fkey',
+      'documento_cierre_id_proyecto_fkey',
+      'rol_proyecto_id_proyecto_fkey',
+      'sprint_id_proyecto_fkey',
+      'tarea_id_proyecto_fkey',
+    ]);
+    await expectForeignKeyViolation(
+      prisma,
+      `DELETE FROM revision_cierre_proyecto WHERE id_revision_cierre = ${submitted.idRevisionCierre}`,
+      ['documento_cierre_id_revision_origen_fkey', 'documento_revision_cierre_id_revision_cierre_fkey'],
+    );
+    await expectForeignKeyViolation(
+      prisma,
+      `DELETE FROM documento_cierre WHERE id_documento_cierre = ${evidence.idDocumentoCierre}`,
+      ['documento_revision_cierre_id_documento_cierre_fkey'],
+    );
+    await expectForeignKeyViolation(
+      prisma,
+      `DELETE FROM documento_cierre WHERE id_documento_cierre = ${official.idDocumentoCierre}`,
+      ['revision_cierre_proyecto_id_documento_oficial_fkey'],
+    );
+    await expectForeignKeyViolation(
+      prisma,
+      `DELETE FROM asignacion_tarea WHERE id_asignacion = ${assignment.idAsignacion}`,
+      ['registro_tiempo_tarea_id_asignacion_fkey', 'ajuste_hora_tarea_id_asignacion_fkey'],
+    );
+    await expectForeignKeyViolation(
+      prisma,
+      `DELETE FROM ajuste_hora_tarea WHERE id_ajuste_hora = ${annulled.idAjusteHora}`,
+      ['ajuste_hora_tarea_id_ajuste_anterior_fkey'],
+    );
+    await expectForeignKeyViolation(
+      prisma,
+      `DELETE FROM apelacion_liderazgo WHERE id_apelacion = ${appeal.idApelacion}`,
+      ['historial_liderazgo_id_apelacion_fkey'],
+    );
+    // La participación del tramo ya no degrada a SET NULL: RESTRICT.
+    await expectForeignKeyViolation(
+      prisma,
+      `DELETE FROM participacion_proyecto WHERE id_participacion = ${participation.idParticipacion}`,
+      ['asignacion_tarea_id_participacion_fkey'],
+    );
+    const stillLinked = await prisma.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: assignment.idAsignacion } });
+    expect(stillLinked.idParticipacion).toBe(participation.idParticipacion);
+    expect(await prisma.usuario.count({ where: { idUsuario: { in: [L, C, ADMIN] } } })).toBe(3);
+
+    // ON UPDATE CASCADE: cambiar la PK del candidato se propaga a todas las hijas sin huérfanos.
+    const relocatedId = C + 1_000_000;
+    await prisma.$executeRaw`UPDATE usuario SET id_usuario = ${relocatedId} WHERE id_usuario = ${C}`;
+    scope.userIds = [L, relocatedId, ADMIN];
+    const relocatedAppeal = await prisma.apelacionLiderazgo.findUniqueOrThrow({ where: { idApelacion: appeal.idApelacion } });
+    const relocatedHistory = await prisma.historialLiderazgo.findUniqueOrThrow({ where: { idHistorialLiderazgo: history.idHistorialLiderazgo } });
+    expect(relocatedAppeal.idCandidatoPropuesto).toBe(relocatedId);
+    expect(relocatedHistory.idLiderNuevo).toBe(relocatedId);
+    expect(await prisma.usuario.count({ where: { idUsuario: C } })).toBe(0);
+    expect(await prisma.apelacionLiderazgo.count({ where: { idCandidatoPropuesto: C } })).toBe(0);
   });
 });
