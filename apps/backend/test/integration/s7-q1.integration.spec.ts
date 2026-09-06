@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import { HttpException } from '@nestjs/common';
+import { HttpException, ValidationPipe } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import {
@@ -12,6 +12,22 @@ import {
   ADVERTENCIA_ADMIN_SIN_PARTICIPACION,
   ADVERTENCIA_APELACION_SIN_PARTICIPACION,
 } from '../../src/leadership/leadership-read.service';
+import { CreateLeadershipAppealDto } from '../../src/leadership/dto/create-leadership-appeal.dto';
+
+/** Misma configuración que apps/backend/src/main.ts: el 400 lo produce el pipe real. */
+const pipe = new ValidationPipe({
+  whitelist: true,
+  forbidNonWhitelisted: true,
+  transform: true,
+  transformOptions: { enableImplicitConversion: true },
+});
+
+function parseAppeal(plain: unknown): Promise<CreateLeadershipAppealDto> {
+  return pipe.transform(plain, {
+    type: 'body',
+    metatype: CreateLeadershipAppealDto,
+  }) as Promise<CreateLeadershipAppealDto>;
+}
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
   try {
@@ -169,5 +185,87 @@ describeIntegration('S7 liderazgo y Q1', () => {
 
     // Consultar no crea apelación, historial, rol ni participación.
     expect(await conteoPrevio()).toEqual(antes);
+  });
+
+  it('T20-A: crear una apelación exige líder actual, candidato elegible y una sola pendiente por proyecto y líder', async () => {
+    const f = await leadershipFixture(db, scope);
+    const { service } = leadershipStack(db);
+    const lider = f.leaderSinParticipacion.idUsuario;
+    const valido = {
+      asunto: 'Necesito dejar el liderazgo',
+      mensaje: 'Ya no puedo sostener la coordinación del proyecto durante este ciclo.',
+      idCandidatoPropuesto: f.elegible.idUsuario,
+    };
+
+    // El texto vacío y el mensaje desbordado los rechaza el pipe real: no
+    // llegan nunca al service ni a la constraint CK10.
+    await expectStatus(400, () => parseAppeal({ ...valido, asunto: '   ' }));
+    await expectStatus(400, () => parseAppeal({ ...valido, mensaje: 'x'.repeat(10001) }));
+
+    // Proponerse a sí mismo y proponer a quien tiene una salida abierta son
+    // decisiones de elegibilidad, no de formato: 409 con sus motivos.
+    const propio = await expectStatus(409, () =>
+      service.createAppeal(f.project.idProyecto, lider, { ...valido, idCandidatoPropuesto: lider }),
+    );
+    expect(propio).toMatchObject({ code: 'SUCESOR_INELEGIBLE' });
+    expect((propio as { motivos: string[] }).motivos).toContain('ES_EL_LIDER_ACTUAL');
+
+    const conSalida = await expectStatus(409, () =>
+      service.createAppeal(f.project.idProyecto, lider, {
+        ...valido,
+        idCandidatoPropuesto: f.conSalidaAbierta.idUsuario,
+      }),
+    );
+    expect((conSalida as { motivos: string[] }).motivos).toContain('SALIDA_EN_CURSO');
+
+    const creada = await service.createAppeal(f.project.idProyecto, lider, await parseAppeal(valido));
+    expect(creada.estadoApelacion).toBe('PENDIENTE');
+    expect(creada.idLiderSolicitante).toBe(lider);
+    expect(creada.idCandidatoPropuesto).toBe(f.elegible.idUsuario);
+    expect(creada.resueltaEn).toBeNull();
+    expect(creada.idAdminResolutor).toBeNull();
+    expect(creada.mensajeResolucion).toBeNull();
+
+    // Una pendiente por proyecto y líder: la repetición choca con el índice
+    // parcial y no deja una segunda fila.
+    await expectStatus(409, () =>
+      service.createAppeal(f.project.idProyecto, lider, {
+        ...valido,
+        asunto: 'Segundo intento',
+      }),
+    );
+    expect(
+      await db.apelacionLiderazgo.count({ where: { idProyecto: f.project.idProyecto } }),
+    ).toBe(1);
+
+    // Un participante ordinario no apela: apelar es del líder actual.
+    await expectStatus(403, () =>
+      service.createAppeal(f.project.idProyecto, f.elegible.idUsuario, {
+        ...valido,
+        idCandidatoPropuesto: lider,
+      }),
+    );
+
+    // Un proyecto en BORRADOR no tiene liderazgo que transferir todavía.
+    await expectStatus(409, () => service.createAppeal(f.draft.idProyecto, lider, valido));
+
+    // Los efectos viven en la misma transacción que la apelación.
+    const eventos = await db.bitacoraAuditoria.findMany({
+      where: { accion: 'LEADERSHIP_APPEAL_CREATED', idObjeto: String(creada.idApelacion) },
+    });
+    expect(eventos).toHaveLength(1);
+    expect(eventos[0].idUsuario).toBe(lider);
+
+    const avisos = await db.notificacion.findMany({
+      where: { idUsuario: f.admin.idUsuario, tipoNotificacion: 'APELACION_LIDERAZGO_RECIBIDA' },
+    });
+    expect(avisos).toHaveLength(1);
+
+    // Crear no mueve el liderazgo ni la membresía de nadie.
+    const proyecto = await db.proyecto.findUniqueOrThrow({
+      where: { idProyecto: f.project.idProyecto },
+    });
+    expect(proyecto.creadoPor).toBe(lider);
+    expect(await db.historialLiderazgo.count()).toBe(0);
   });
 });
