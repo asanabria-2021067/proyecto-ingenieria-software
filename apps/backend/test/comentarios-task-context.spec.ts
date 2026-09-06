@@ -81,7 +81,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
           eliminadoEn: null,
           proyecto: { eliminadoEn: null },
         },
-        select: { idTarea: true, idProyecto: true, creadaPor: true },
+        select: { idTarea: true, idProyecto: true, creadaPor: true, idSprint: true },
       });
     });
 

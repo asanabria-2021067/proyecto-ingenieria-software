@@ -385,7 +385,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
           eliminadoEn: null,
           proyecto: { eliminadoEn: null },
         },
-        select: { idTarea: true, idProyecto: true, creadaPor: true },
+        select: { idTarea: true, idProyecto: true, creadaPor: true, idSprint: true },
       });
     });
 
