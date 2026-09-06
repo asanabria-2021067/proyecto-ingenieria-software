@@ -1,50 +1,64 @@
+import { CanActivate, ExecutionContext, Injectable, NotFoundException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { PrismaService } from '../../prisma/prisma.service';
+import { ProjectIdResolverService } from '../project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../project-policy/project-policy.service';
 import {
-  BadRequestException,
-  CanActivate,
-  ConflictException,
-  ExecutionContext,
-  Injectable,
-} from '@nestjs/common';
-import { EstadoSprint } from '@prisma/client';
-import { SprintsContextService } from '../../sprints/sprints-context.service';
+  DEFAULT_PROJECT_WRITE_METADATA,
+  FINALIZING_SPRINT_MESSAGE,
+  NO_ACTIVE_SPRINT_MESSAGE,
+  PROJECT_WRITE_METADATA_KEY,
+  type ProjectWriteMetadata,
+} from './project-write.metadata';
 
-export const NO_ACTIVE_SPRINT_MESSAGE = 'No hay un Sprint activo en este proyecto';
-export const FINALIZING_SPRINT_MESSAGE =
-  'El Sprint actual está en finalización y el proyecto está temporalmente bloqueado';
+export { FINALIZING_SPRINT_MESSAGE, NO_ACTIVE_SPRINT_MESSAGE };
 
 /**
- * SYNC GATE 2 (Sprint 6): precondition gate reutilizable que bloquea
- * mutaciones de proyecto cuando no hay un Sprint ACTIVO. Reutiliza
- * exclusivamente el contrato ya publicado por A1
- * (SprintsContextService.getCurrentSprint), sin consultar Prisma
- * directamente ni duplicar la máquina de estados de Sprint: ese método solo
- * devuelve ACTIVO, EN_FINALIZACION o null (CERRADO nunca es operable, así
- * que un proyecto con únicamente Sprints CERRADO cae en null). No decide
- * identidad/permisos del usuario — eso sigue siendo responsabilidad de
- * JwtAuthGuard y de los *AuthorizationService existentes; este guard solo
- * representa disponibilidad de escritura del proyecto.
+ * Sprint 7 (06 v2 §32): guard de escritura guiado por metadata. Rechazo
+ * temprano de ruta: resuelve el proyecto por la fuente enumerada declarada
+ * en `@ProjectWrite`, comprueba el estado del proyecto admitido y la
+ * exigencia del Sprint ambiente, y lanza 400/403/404/409. Sin metadata
+ * aplica el default restrictivo (P/E + Sprint ambiente ACTIVO).
+ *
+ * El guard NO adquiere locks, NO sustituye al actor y NO decide identidad
+ * (eso sigue en JwtAuthGuard). La autorización mutable se repite después
+ * del lock en el service con ProjectPolicyService.assertWriteTx, incluido
+ * el Sprint de la entidad afectada, aunque este guard haya aprobado el
+ * ambiente. Conserva literalmente los mensajes NO_ACTIVE_SPRINT_MESSAGE y
+ * FINALIZING_SPRINT_MESSAGE para las rutas que hoy los devuelven.
  */
 @Injectable()
 export class ProjectWriteGuard implements CanActivate {
-  constructor(private readonly sprintsContext: SprintsContextService) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly resolver: ProjectIdResolverService,
+    private readonly policy: ProjectPolicyService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const metadata =
+      this.reflector.getAllAndOverride<ProjectWriteMetadata | undefined>(PROJECT_WRITE_METADATA_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) ?? DEFAULT_PROJECT_WRITE_METADATA;
+
     const request = context.switchToHttp().getRequest();
-    const rawProjectId = request.params?.projectId;
-    const projectId = Number(rawProjectId);
-    if (rawProjectId === undefined || !Number.isInteger(projectId)) {
-      throw new BadRequestException('projectId debe ser un número entero');
+    const resolved = await this.resolver.resolve(metadata.source, {
+      params: request?.params,
+      body: request?.body,
+    });
+
+    const project = await this.prisma.proyecto.findUnique({
+      where: { idProyecto: resolved.projectId },
+      select: { idProyecto: true, estadoProyecto: true, creadoPor: true, eliminadoEn: true },
+    });
+    if (!project || project.eliminadoEn !== null) {
+      throw new NotFoundException(`Proyecto con id ${resolved.projectId} no encontrado`);
     }
 
-    const sprintOperable = await this.sprintsContext.getCurrentSprint(projectId);
-
-    if (!sprintOperable) {
-      throw new ConflictException(NO_ACTIVE_SPRINT_MESSAGE);
-    }
-
-    if (sprintOperable.estado === EstadoSprint.EN_FINALIZACION) {
-      throw new ConflictException(FINALIZING_SPRINT_MESSAGE);
-    }
+    this.policy.assertProjectState(project, metadata.states);
+    await this.policy.assertEnvironmentTx(this.prisma, project.idProyecto, metadata.sprint);
 
     return true;
   }
