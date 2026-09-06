@@ -16,10 +16,14 @@ export class TeamController {
     return this.teamService.getPendingPostulations(id, user.userId);
   }
 
+  /** E081: integrantes del proyecto (incluye históricos anotados) según §34. */
   @Get(':id/equipo')
   @UseGuards(JwtAuthGuard)
-  findTeam(@Param('id', ParseIntPipe) id: number) {
-    return this.teamService.findTeam(id);
+  findTeam(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.teamService.findTeam(id, user.userId);
   }
 
   @Get(':id/equipo/:idUsuario')
