@@ -26,6 +26,9 @@ import { RolesController } from '../../src/roles/roles.controller';
 import { RolesService } from '../../src/roles/roles.service';
 import { LabelsController } from '../../src/labels/labels.controller';
 import { LabelsService } from '../../src/labels/labels.service';
+import { ProjectsController } from '../../src/projects/projects.controller';
+import { ProjectsService } from '../../src/projects/projects.service';
+import { calcularProgresoHito } from '../../src/common/hito-progreso';
 import { ComentariosController } from '../../src/comentarios/comentarios.controller';
 import { ComentariosService } from '../../src/comentarios/comentarios.service';
 import { TareaComentariosController } from '../../src/tasks/tarea-comentarios.controller';
@@ -75,6 +78,7 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
   let prisma: PrismaClient;
   let rolesController: RolesController;
   let labelsController: LabelsController;
+  let projectsController: ProjectsController;
   let comentariosController: ComentariosController;
   let tareaComentariosController: TareaComentariosController;
   let guard: ProjectWriteGuard;
@@ -95,6 +99,17 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
       new RolesService(prismaService, makeFakeNotifications(), projectTx, policy),
     );
     labelsController = new LabelsController(new LabelsService(prismaService, projectTx, policy));
+
+    projectsController = new ProjectsController(
+      new ProjectsService(
+        prismaService,
+        makeFakeNotifications(),
+        { get: async () => undefined, set: async () => undefined, del: async () => undefined } as never,
+        projectTx,
+        policy,
+        new ProjectReadPolicyService(prismaService),
+      ),
+    );
 
     const comentariosService = new ComentariosService(
       prismaService,
@@ -612,5 +627,188 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
     expect(tareasDespues).toBe(tareasAntes);
     const avancesDespues = await prisma.registroAvanceAsignacion.count();
     expect(avancesDespues).toBe(avancesAntes);
+  });
+
+  it('T33-C: el líder se incorpora a un rol con cupo y crea hitos en prepublicación conservando el actor real y las fórmulas', async () => {
+    const leader = await createIntegrationUser(prisma);
+    const participante = await createIntegrationUser(prisma);
+    const ocupante = await createIntegrationUser(prisma);
+    scope.userIds = [leader.idUsuario, participante.idUsuario, ocupante.idUsuario];
+
+    const project = await createIntegrationProject(prisma, leader.idUsuario, {
+      estadoProyecto: 'BORRADOR',
+    });
+    scope.projectIds = [project.idProyecto];
+    const projectId = project.idProyecto;
+
+    const rolConCupo = await createIntegrationProjectRole(prisma, projectId, { cupos: 1 });
+    const rolAgotado = await createIntegrationProjectRole(prisma, projectId, { cupos: 1 });
+    const rolDelParticipante = await createIntegrationProjectRole(prisma, projectId, { cupos: 1 });
+    scope.roleIds = [
+      rolConCupo.idRolProyecto,
+      rolAgotado.idRolProyecto,
+      rolDelParticipante.idRolProyecto,
+    ];
+
+    const participacionOcupante = await createIntegrationParticipation(
+      prisma,
+      ocupante.idUsuario,
+      rolAgotado.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    const participacionParticipante = await createIntegrationParticipation(
+      prisma,
+      participante.idUsuario,
+      rolDelParticipante.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    scope.participationIds = [
+      participacionOcupante.idParticipacion,
+      participacionParticipante.idParticipacion,
+    ];
+
+    // --- Incorporación normal del líder al rol con cupo ---
+    const incorporacion = await runThroughRealGuard(
+      RolesController,
+      RolesController.prototype.selfAssign,
+      projectId,
+      () =>
+        rolesController.selfAssign(projectId, rolConCupo.idRolProyecto, {
+          userId: leader.idUsuario,
+        }),
+      { params: { roleId: String(rolConCupo.idRolProyecto) } },
+    );
+    expect(incorporacion.estadoParticipacion).toBe('ACTIVO');
+    expect(incorporacion.yaParticipaba).toBe(false);
+    scope.participationIds.push(incorporacion.idParticipacion);
+
+    const participacionPersistida = await prisma.participacionProyecto.findUnique({
+      where: { idParticipacion: incorporacion.idParticipacion },
+      select: { idUsuario: true, idRolProyecto: true, estadoParticipacion: true },
+    });
+    expect(participacionPersistida).toEqual({
+      idUsuario: leader.idUsuario,
+      idRolProyecto: rolConCupo.idRolProyecto,
+      estadoParticipacion: 'ACTIVO',
+    });
+
+    // --- El rol sin cupo disponible rechaza la incorporación, sin escribir ---
+    const participacionesEnAgotado = await prisma.participacionProyecto.count({
+      where: { idRolProyecto: rolAgotado.idRolProyecto },
+    });
+    let rechazoCupo: unknown;
+    try {
+      await runThroughRealGuard(
+        RolesController,
+        RolesController.prototype.selfAssign,
+        projectId,
+        () =>
+          rolesController.selfAssign(projectId, rolAgotado.idRolProyecto, {
+            userId: leader.idUsuario,
+          }),
+        { params: { roleId: String(rolAgotado.idRolProyecto) } },
+      );
+    } catch (error) {
+      rechazoCupo = error;
+    }
+    // El rechazo vigente por cupo agotado es el 400 de RolesService; C052 no
+    // toca ese servicio (su alcance productivo es la metadata de las rutas),
+    // así que se fija el comportamiento real, no uno nuevo.
+    expect(rechazoCupo).toBeInstanceOf(BadRequestException);
+    expect(
+      await prisma.participacionProyecto.count({
+        where: { idRolProyecto: rolAgotado.idRolProyecto },
+      }),
+    ).toBe(participacionesEnAgotado);
+
+    // --- Hitos: los crea el líder y también un participante activo ---
+    const hitoDelLider = await runThroughRealGuard(
+      ProjectsController,
+      ProjectsController.prototype.createHito,
+      projectId,
+      () =>
+        projectsController.createHito(
+          projectId,
+          { tituloHito: 'Hito del líder' },
+          { userId: leader.idUsuario },
+        ),
+      { params: { id: String(projectId) } },
+    );
+    expect(hitoDelLider.idHito).toBeTypeOf('number');
+
+    const hitoDelParticipante = await runThroughRealGuard(
+      ProjectsController,
+      ProjectsController.prototype.createHito,
+      projectId,
+      () =>
+        projectsController.createHito(
+          projectId,
+          { tituloHito: 'Hito del participante' },
+          { userId: participante.idUsuario },
+        ),
+      { params: { id: String(projectId) } },
+    );
+    expect(hitoDelParticipante.idHito).toBeTypeOf('number');
+
+    // El actor real de cada operación se conserva: crear un hito no otorga
+    // liderazgo ni reescribe `creadoPor`.
+    const proyectoTrasHitos = await prisma.proyecto.findUnique({
+      where: { idProyecto: projectId },
+      select: { creadoPor: true },
+    });
+    expect(proyectoTrasHitos?.creadoPor).toBe(leader.idUsuario);
+    const participacionesDelParticipante = await prisma.participacionProyecto.findMany({
+      where: { idUsuario: participante.idUsuario, rolProyecto: { idProyecto: projectId } },
+      select: { idParticipacion: true, estadoParticipacion: true },
+    });
+    expect(participacionesDelParticipante).toEqual([
+      {
+        idParticipacion: participacionParticipante.idParticipacion,
+        estadoParticipacion: 'ACTIVO',
+      },
+    ]);
+
+    // --- El avance usa exactamente la fórmula canónica, sin cambios ---
+    const sprint = await createIntegrationSprint(prisma, projectId, { estado: 'ACTIVO' });
+    scope.sprintIds = [sprint.idSprint];
+    const tareaHecha = await createIntegrationTask(
+      prisma,
+      projectId,
+      leader.idUsuario,
+      sprint.idSprint,
+      { estadoTarea: 'HECHO' },
+    );
+    const tareaPendiente = await createIntegrationTask(
+      prisma,
+      projectId,
+      leader.idUsuario,
+      sprint.idSprint,
+    );
+    scope.taskIds = [tareaHecha.idTarea, tareaPendiente.idTarea];
+    await prisma.tarea.updateMany({
+      where: { idTarea: { in: [tareaHecha.idTarea, tareaPendiente.idTarea] } },
+      data: { idHito: hitoDelLider.idHito },
+    });
+
+    const avance = await projectsController.getAvance(projectId, { userId: leader.idUsuario });
+
+    // El agregado del proyecto se deriva exactamente de la fórmula canónica
+    // aplicada hito a hito: uno con 1 de 2 tareas HECHO (EN_PROGRESO) y otro
+    // sin tareas (PENDIENTE).
+    const progresoHitoDelLider = calcularProgresoHito([
+      { estadoTarea: 'HECHO' },
+      { estadoTarea: 'POR_HACER' },
+    ]);
+    const progresoHitoDelParticipante = calcularProgresoHito([]);
+    expect(progresoHitoDelLider.estadoHito).toBe('EN_PROGRESO');
+    expect(progresoHitoDelParticipante.estadoHito).toBe('PENDIENTE');
+    expect(avance.hitos).toEqual({
+      porcentaje: 0,
+      total: 2,
+      pendiente: 1,
+      enProgreso: 1,
+      completado: 0,
+    });
+    expect(avance.tareas.porcentaje).toBe(50);
   });
 });
