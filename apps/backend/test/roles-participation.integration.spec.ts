@@ -4,6 +4,9 @@ import { PrismaClient } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { RolesService } from '../src/roles/roles.service';
+import { ProjectIdResolverService } from '../src/common/project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../src/common/project-policy/project-policy.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
 
 /**
  * Pruebas de INTEGRACIÓN reales contra PostgreSQL (Secciones 2/3): validan el
@@ -39,7 +42,14 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
 
   beforeAll(async () => {
     prisma = new PrismaClient({ datasources: { db: { url: DB_URL } } });
-    service = new RolesService(prisma as unknown as PrismaService, fakeNotifications);
+    // C034: el servicio corre sobre el protocolo real (runner + policy).
+    const prismaService = prisma as unknown as PrismaService;
+    service = new RolesService(
+      prismaService,
+      fakeNotifications,
+      new ProjectTransactionService(prismaService),
+      new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    );
     await prisma.$connect();
   });
 
