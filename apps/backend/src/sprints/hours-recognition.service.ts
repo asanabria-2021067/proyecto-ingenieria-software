@@ -109,6 +109,44 @@ export class HoursRecognitionService {
   }
 
   /**
+   * C076 (06 v2 §12): las participaciones reconocibles se derivan de los
+   * TRAMOS, no de la lista de participantes ACTIVO. La diferencia no es
+   * cosmética: quien se retiró o completó su participación dejando trabajo sin
+   * consumir tiene derecho a que se le reconozca, y un miembro activo que no
+   * trabajó en este Sprint no debe generar ningún agregado.
+   *
+   * Se excluyen los tramos ya consumidos (`reconocidoEn` no nulo, típicamente
+   * por una salida anticipada de Flow B) y los de origen sin conciliar, cuya
+   * procedencia todavía no está determinada.
+   *
+   * El orden ascendente es deliberado: fija un orden de bloqueo determinista
+   * para el lote y hace la enumeración reproducible entre ejecuciones.
+   */
+  async listEligibleParticipationsTx(
+    tx: TxClient,
+    input: { projectId: number; sprintId: number },
+  ): Promise<number[]> {
+    const tramos = await tx.asignacionTarea.findMany({
+      where: {
+        idParticipacion: { not: null },
+        desasignadaEn: { not: null },
+        horasReales: { not: null },
+        reconocidoEn: null,
+        origenReporte: { not: 'POR_CONCILIAR' },
+        // Sin filtro de `eliminadoEn`: borrar la tarea no borra las horas ya
+        // trabajadas en ella.
+        tarea: { idProyecto: input.projectId, idSprint: input.sprintId },
+      },
+      distinct: ['idParticipacion'],
+      orderBy: { idParticipacion: 'asc' },
+      select: { idParticipacion: true },
+    });
+    return tramos
+      .map((tramo) => tramo.idParticipacion)
+      .filter((id): id is number => id !== null);
+  }
+
+  /**
    * SYNC GATE 1: operación productiva transaction-aware que B10 (Flow B)
    * puede invocar dentro de SU PROPIA transacción externa (resolución de
    * solicitud de salida), junto con el retiro de participaciones, sin abrir
