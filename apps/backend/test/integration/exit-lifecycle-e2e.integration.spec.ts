@@ -259,7 +259,6 @@ describeIntegration(
         assignment.idAsignacion,
         collaborator.idUsuario,
         {
-          horasReales: HORAS_REALES,
           contenidoAvance: longProgressContent('X2 cierre real de tramo antes de PENDIENTE_LIDER'),
           marcarComoHecha: false,
         },

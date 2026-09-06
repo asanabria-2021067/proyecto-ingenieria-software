@@ -209,7 +209,6 @@ describeIntegration(
         data: { idAsignacion: assignment.idAsignacion, idUsuario: member.idUsuario, horas: HORAS_REALES, fecha: new Date('2026-09-06') },
       });
       await tasksService.closeAssignment(project.idProyecto, task.idTarea, assignment.idAsignacion, member.idUsuario, {
-        horasReales: HORAS_REALES,
         contenidoAvance: longProgressContent('X1 cierre de tramo en PREPARACION'),
         marcarComoHecha: true,
       });
