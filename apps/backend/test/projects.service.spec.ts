@@ -381,55 +381,17 @@ describe('ProjectsService', () => {
       });
     });
 
-    describe('changeEstado -> CERRADO (transición real que persiste EstadoProyecto.CERRADO)', () => {
-      it('Sprint ACTIVO bloquea la transición a CERRADO, sin persistir el nuevo estado', async () => {
-        const prisma = makePrisma();
-        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
-        prisma.sprint.findFirst.mockResolvedValue({ idSprint: 99 });
-        const service = makeService(prisma);
+    // C032: las tres aserciones que congelaban `changeEstado -> CERRADO` se retiran
+    // (categoría C): el líder ya no tiene ruta directa a CERRADO.
+    it('changeEstado ya no admite CERRADO como destino del líder (EN_PROGRESO sin transiciones)', async () => {
+      const prisma = makePrisma();
+      prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
+      const service = makeService(prisma);
 
-        await expect(
-          service.changeEstado(1, 1, EstadoProyectoCreador.CERRADO),
-        ).rejects.toBeInstanceOf(ConflictException);
-        expect(prisma.proyecto.update).not.toHaveBeenCalled();
-      });
-
-      it('Sprint EN_FINALIZACION bloquea la transición a CERRADO, sin persistir el nuevo estado', async () => {
-        const prisma = makePrisma();
-        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
-        prisma.sprint.findFirst.mockResolvedValue({ idSprint: 99 });
-        const service = makeService(prisma);
-
-        await expect(
-          service.changeEstado(1, 1, EstadoProyectoCreador.CERRADO),
-        ).rejects.toBeInstanceOf(ConflictException);
-        expect(prisma.proyecto.update).not.toHaveBeenCalled();
-      });
-
-      it('sin Sprint operable, changeEstado(CERRADO) NO se bloquea por A11 (llega a intentar persistir)', async () => {
-        const prisma = makePrisma();
-        prisma.proyecto.findFirst.mockResolvedValue(proyectoEnProgreso());
-        prisma.sprint.findFirst.mockResolvedValue(null);
-        prisma.proyecto.update.mockResolvedValue({
-          idProyecto: 1,
-          estadoProyecto: EstadoProyecto.CERRADO,
-          tituloProyecto: 'P',
-        });
-        prisma.participacionProyecto.findMany.mockResolvedValue([]);
-        const notifications = makeNotifications();
-        const service = makeService(prisma, notifications);
-
-        const result = await service.changeEstado(1, 1, EstadoProyectoCreador.CERRADO);
-
-        expect(result.estadoProyecto).toBe(EstadoProyecto.CERRADO);
-        expect(notifications.persistTemplateTx).toHaveBeenCalledWith(
-          prisma,
-          [1],
-          'CAMBIO_ESTADO_PROYECTO',
-          expect.objectContaining({ newStatus: EstadoProyecto.CERRADO }),
-          expect.objectContaining({ add: expect.any(Function) }),
-        );
-      });
+      await expect(
+        service.changeEstado(1, 1, 'CERRADO' as unknown as EstadoProyectoCreador),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.proyecto.update).not.toHaveBeenCalled();
     });
   });
 
