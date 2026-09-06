@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { MensajesRevisionService } from '../src/mensajes-revision/mensajes-revision.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 function makePrisma() {
   const prisma = {
@@ -22,6 +27,9 @@ describe('MensajesRevisionService', () => {
     const service = new MensajesRevisionService(
       prisma,
       { isAdmin: vi.fn() } as unknown as NotificationsService,
+      makeProjectTransactionDouble({ tx: prisma }),
+      makeProjectPolicyDouble(),
+      makeProjectReadPolicyDouble(),
     );
     await expect(service.findByProyecto(1, 1)).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -37,6 +45,9 @@ describe('MensajesRevisionService', () => {
     const service = new MensajesRevisionService(
       prisma,
       { isAdmin: vi.fn().mockResolvedValue(true) } as unknown as NotificationsService,
+      makeProjectTransactionDouble({ tx: prisma }),
+      makeProjectPolicyDouble(),
+      makeProjectReadPolicyDouble(),
     );
     const result = await service.findByProyecto(1, 99);
     expect(result).toEqual([{ idMensaje: 1 }]);
@@ -57,6 +68,9 @@ describe('MensajesRevisionService', () => {
         isAdmin: vi.fn().mockResolvedValue(true),
         notifyUsers: vi.fn(),
       } as unknown as NotificationsService,
+      makeProjectTransactionDouble({ tx: prisma }),
+      makeProjectPolicyDouble(),
+      makeProjectReadPolicyDouble(),
     );
     await expect(
       service.create(1, 2, { contenido: 'hola', idRevision: 99 }),
@@ -77,6 +91,9 @@ describe('MensajesRevisionService', () => {
     const service = new MensajesRevisionService(
       prisma,
       notifications as unknown as NotificationsService,
+      makeProjectTransactionDouble({ tx: prisma }),
+      makeProjectPolicyDouble(),
+      makeProjectReadPolicyDouble(),
     );
 
     const result = await service.create(1, 2, { contenido: ' hola ' });
@@ -95,6 +112,9 @@ describe('MensajesRevisionService', () => {
     const service = new MensajesRevisionService(
       prisma,
       { isAdmin: vi.fn().mockResolvedValue(false) } as unknown as NotificationsService,
+      makeProjectTransactionDouble({ tx: prisma }),
+      makeProjectPolicyDouble(),
+      makeProjectReadPolicyDouble(),
     );
     await expect(service.markAsRead(1, 3)).rejects.toBeInstanceOf(ForbiddenException);
   });
