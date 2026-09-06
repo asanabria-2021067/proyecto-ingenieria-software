@@ -847,6 +847,302 @@ export async function assessManifest(
   return refusals;
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Modo apply (06 v2 §14). ESCRIBE, y por eso vuelve a demostrarlo todo.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Huella del estado relevante de un proyecto y Sprint. El manifiesto la fija
+ * como `baseline`; si la base se movió entre el diagnóstico y la aplicación, la
+ * huella deja de coincidir y `apply` se niega en vez de escribir sobre un
+ * estado que nadie revisó.
+ */
+export async function computeBaseline(
+  prisma: Pick<PrismaClient, '$queryRawUnsafe'>,
+  projectId: number,
+  sprintId: number,
+): Promise<string> {
+  const tramos = await prisma.$queryRawUnsafe<
+    Array<{
+      idAsignacion: number;
+      idParticipacion: number | null;
+      horasReales: string | null;
+      reconocido: boolean;
+      origenReporte: string;
+    }>
+  >(`
+    SELECT at.id_asignacion AS "idAsignacion", at.id_participacion AS "idParticipacion",
+           at.horas_reales::text AS "horasReales", at.reconocido_en IS NOT NULL AS "reconocido",
+           at.origen_reporte::text AS "origenReporte"
+    FROM asignacion_tarea at
+    JOIN tarea t ON t.id_tarea = at.id_tarea
+    WHERE t.id_proyecto = ${projectId} AND t.id_sprint = ${sprintId}
+    ORDER BY at.id_asignacion
+  `);
+  const agregados = await prisma.$queryRawUnsafe<
+    Array<{
+      idRegistroHoras: number;
+      idParticipacion: number;
+      idSprint: number | null;
+      estadoHoras: string;
+      horasReportadas: string;
+    }>
+  >(`
+    SELECT hp.id_registro_horas AS "idRegistroHoras", hp.id_participacion AS "idParticipacion",
+           hp.id_sprint AS "idSprint", hp.estado_horas::text AS "estadoHoras",
+           hp.horas_reportadas::text AS "horasReportadas"
+    FROM horas_participacion hp
+    JOIN participacion_proyecto pp ON pp.id_participacion = hp.id_participacion
+    JOIN rol_proyecto rp ON rp.id_rol_proyecto = pp.id_rol_proyecto
+    WHERE rp.id_proyecto = ${projectId} AND hp.id_sprint = ${sprintId}
+    ORDER BY hp.id_registro_horas
+  `);
+  return createHash('sha256')
+    .update(canonicalJson({ projectId, sprintId, tramos, agregados }), 'utf8')
+    .digest('hex');
+}
+
+export interface LegacyApplyResult {
+  applied: number;
+  noop: number;
+  detalle: Array<{ idAsignacion: number; accion: LegacyAction; efecto: 'APLICADO' | 'NO_OP' }>;
+}
+
+export class LegacyDivergenceError extends LegacyCliError {
+  constructor(
+    message: string,
+    readonly divergencias: string[],
+  ) {
+    super(message, 9);
+    this.name = 'LegacyDivergenceError';
+  }
+}
+
+/**
+ * Aplica un manifiesto ya demostrado. Todo ocurre dentro de UNA transacción por
+ * proyecto y Sprint, bajo el lock del proyecto, en orden ascendente de tramo.
+ *
+ * Ninguna acción crea un agregado `APROBADA`, reabre un Sprint ni corrige una
+ * tarea cerrada: acreditar es competencia del administrador en el cierre, no de
+ * una herramienta de datos.
+ */
+export async function applyManifest(
+  prisma: PrismaClient,
+  manifest: LegacyManifest,
+  adminId: number,
+): Promise<LegacyApplyResult> {
+  // Import diferido: mantiene el arranque de `--help` y `diagnose` libre de Nest.
+  const { ProjectTransactionService } = await import(
+    '../src/common/project-policy/project-transaction.service'
+  );
+  const { BitacoraEventosService } = await import('../src/bitacora/bitacora-eventos.service');
+  const { TipoEventoBitacora } = await import('../src/bitacora/tipos-evento-bitacora');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const runner = new ProjectTransactionService(prisma as any);
+  const audit = new BitacoraEventosService();
+  const hash = manifestHash(manifest);
+  const entries = [...manifest.entradas].sort((a, b) => a.idAsignacion - b.idAsignacion);
+
+  return runner.run(manifest.projectId, adminId, 'legacy.apply', async ({ tx }) => {
+    // 1. Releer todo y comparar la huella del estado revisado.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const actual = await computeBaseline(tx as any, manifest.projectId, manifest.sprintId);
+    if (actual !== manifest.baseline) {
+      throw new LegacyDivergenceError(
+        'El estado del proyecto cambió desde el diagnóstico que originó el manifiesto.',
+        [`baseline esperado ${manifest.baseline}, actual ${actual}`],
+      );
+    }
+
+    const detalle: LegacyApplyResult['detalle'] = [];
+    let applied = 0;
+    let noop = 0;
+
+    for (const entry of entries) {
+      const tramo = await tx.asignacionTarea.findFirst({
+        where: { idAsignacion: entry.idAsignacion, tarea: { idProyecto: manifest.projectId } },
+        select: {
+          idAsignacion: true,
+          idParticipacion: true,
+          horasReales: true,
+          reconocidoEn: true,
+          origenReporte: true,
+          tarea: { select: { idSprint: true } },
+        },
+      });
+      if (!tramo || tramo.tarea.idSprint !== manifest.sprintId) {
+        throw new LegacyDivergenceError('Un tramo del manifiesto ya no corresponde.', [
+          `tramo ${entry.idAsignacion}`,
+        ]);
+      }
+      // 2. El importe declarado debe seguir siendo el almacenado.
+      const stored = tramo.horasReales === null ? null : tramo.horasReales.toFixed(2);
+      const expectedPrevious =
+        entry.importeAnterior === null ? null : Number(entry.importeAnterior).toFixed(2);
+      if (stored !== expectedPrevious) {
+        throw new LegacyDivergenceError('El importe anterior del manifiesto ya no corresponde.', [
+          `tramo ${entry.idAsignacion}: almacenado ${stored ?? 'null'}, manifiesto ${expectedPrevious ?? 'null'}`,
+        ]);
+      }
+
+      const antes = {
+        idParticipacion: tramo.idParticipacion,
+        horasReales: stored,
+        reconocido: tramo.reconocidoEn !== null,
+        origenReporte: tramo.origenReporte,
+      };
+
+      // 3. Idempotencia: si el efecto ya está exactamente aplicado, no-op.
+      const yaConsumido = tramo.reconocidoEn !== null;
+      if (
+        (entry.accion === 'CONSUMIR_NUEVO' || entry.accion === 'MARCAR_YA_INCLUIDO') &&
+        yaConsumido &&
+        tramo.idParticipacion === entry.idParticipacion
+      ) {
+        noop += 1;
+        detalle.push({ idAsignacion: entry.idAsignacion, accion: entry.accion, efecto: 'NO_OP' });
+        continue;
+      }
+      if (entry.accion === 'ENLAZAR' && tramo.idParticipacion === entry.idParticipacion) {
+        noop += 1;
+        detalle.push({ idAsignacion: entry.idAsignacion, accion: entry.accion, efecto: 'NO_OP' });
+        continue;
+      }
+
+      // 4. Efecto, siempre con compare-and-set sobre el estado que se leyó.
+      let creado: number | null = null;
+      if (entry.accion === 'ENLAZAR' || entry.accion === 'CONSUMIR_NUEVO') {
+        if (tramo.idParticipacion === null) {
+          const linked = await tx.asignacionTarea.updateMany({
+            where: { idAsignacion: entry.idAsignacion, idParticipacion: null },
+            data: { idParticipacion: entry.idParticipacion },
+          });
+          if (linked.count !== 1) {
+            throw new LegacyDivergenceError('La participación del tramo cambió durante la aplicación.', [
+              `tramo ${entry.idAsignacion}`,
+            ]);
+          }
+        } else if (tramo.idParticipacion !== entry.idParticipacion) {
+          throw new LegacyDivergenceError('El tramo ya apunta a otra participación.', [
+            `tramo ${entry.idAsignacion}`,
+          ]);
+        }
+      }
+
+      if (entry.accion === 'CONSUMIR_NUEVO' || entry.accion === 'MARCAR_YA_INCLUIDO') {
+        const marked = await tx.asignacionTarea.updateMany({
+          where: { idAsignacion: entry.idAsignacion, reconocidoEn: null },
+          data: { reconocidoEn: new Date() },
+        });
+        if (marked.count !== 1) {
+          throw new LegacyDivergenceError('El tramo fue consumido por otra vía.', [
+            `tramo ${entry.idAsignacion}`,
+          ]);
+        }
+      }
+
+      if (entry.accion === 'CONSUMIR_NUEVO') {
+        // Agregado nuevo: SIEMPRE PENDIENTE. Acreditar es del administrador.
+        const sprint = await tx.sprint.findUniqueOrThrow({
+          where: { idSprint: manifest.sprintId },
+          select: { fechaInicio: true, fechaCierre: true },
+        });
+        const aggregate = await tx.horasParticipacion.create({
+          data: {
+            idParticipacion: entry.idParticipacion,
+            idSprint: manifest.sprintId,
+            // El período del agregado es el del propio Sprint: no se inventa
+            // una ventana temporal que nadie registró.
+            periodoInicio: sprint.fechaInicio,
+            periodoFin: sprint.fechaCierre ?? sprint.fechaInicio,
+            horasReportadas: entry.importeEsperado,
+            horasCalculadas: entry.importeEsperado,
+            estadoHoras: 'PENDIENTE',
+          },
+          select: { idRegistroHoras: true },
+        });
+        creado = aggregate.idRegistroHoras;
+      }
+
+      if (entry.accion === 'CONSUMIR_INCREMENTO') {
+        const incremented = await tx.horasParticipacion.updateMany({
+          where: {
+            idRegistroHoras: entry.idRegistroHoras as number,
+            estadoHoras: 'PENDIENTE',
+          },
+          data: {
+            horasReportadas: { increment: entry.importeEsperado },
+            horasCalculadas: { increment: entry.importeEsperado },
+          },
+        });
+        if (incremented.count !== 1) {
+          throw new LegacyDivergenceError('El agregado a incrementar cambió de estado.', [
+            `agregado ${entry.idRegistroHoras}`,
+          ]);
+        }
+        const marked = await tx.asignacionTarea.updateMany({
+          where: { idAsignacion: entry.idAsignacion, reconocidoEn: null },
+          data: { reconocidoEn: new Date() },
+        });
+        if (marked.count !== 1) {
+          throw new LegacyDivergenceError('El tramo fue consumido por otra vía.', [
+            `tramo ${entry.idAsignacion}`,
+          ]);
+        }
+      }
+
+      if (entry.accion === 'CLASIFICAR_REPORTE') {
+        const reclassified = await tx.asignacionTarea.updateMany({
+          where: { idAsignacion: entry.idAsignacion, origenReporte: tramo.origenReporte },
+          data: { origenReporte: 'LEGACY' },
+        });
+        if (reclassified.count !== 1) {
+          throw new LegacyDivergenceError('La procedencia del tramo cambió durante la aplicación.', [
+            `tramo ${entry.idAsignacion}`,
+          ]);
+        }
+      }
+
+      const despues = await tx.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: entry.idAsignacion },
+        select: {
+          idParticipacion: true,
+          horasReales: true,
+          reconocidoEn: true,
+          origenReporte: true,
+        },
+      });
+
+      // 5. Bitácora con antes, después y la huella del manifiesto.
+      await audit.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.LEGACY_HOURS_RECONCILED,
+        idActor: adminId,
+        idProyecto: manifest.projectId,
+        idSprint: manifest.sprintId,
+        tipoEntidad: 'ASIGNACION_TAREA',
+        idEntidad: entry.idAsignacion,
+        valorAnterior: antes,
+        valorNuevo: {
+          accion: entry.accion,
+          idParticipacion: despues.idParticipacion,
+          horasReales: despues.horasReales === null ? null : despues.horasReales.toFixed(2),
+          reconocido: despues.reconocidoEn !== null,
+          origenReporte: despues.origenReporte,
+          agregadoCreado: creado,
+          manifestHash: hash,
+        },
+      });
+
+      applied += 1;
+      detalle.push({ idAsignacion: entry.idAsignacion, accion: entry.accion, efecto: 'APLICADO' });
+    }
+
+    return { applied, noop, detalle };
+  });
+}
+
 export function formatRefusals(refusals: readonly LegacyRefusal[]): string {
   const lines = [`apply rechazado: ${refusals.length} entrada(s) no demostrables.`];
   for (const refusal of refusals) {
@@ -901,8 +1197,13 @@ export async function runCli(argv: readonly string[]): Promise<number> {
           process.stderr.write(`${formatRefusals(refusals)}\n`);
           return 9;
         }
-        process.stderr.write('La aplicación del manifiesto todavía no está implementada.\n');
-        return 4;
+        const result = await applyManifest(prisma, manifest, options.adminId);
+        process.stdout.write(
+          options.json
+            ? `${JSON.stringify(result, null, 2)}\n`
+            : `Aplicadas ${result.applied} entrada(s), ${result.noop} sin efecto.\n`,
+        );
+        return 0;
       }
       case 'verify':
         process.stderr.write('El modo verify todavía no está implementado.\n');
