@@ -10,6 +10,7 @@ import { BitacoraContextService } from '../../../src/bitacora/bitacora-context.s
 import * as fixtures from './fixtures';
 import { cleanupIntegrationFixtures } from './cleanup';
 import type { ClosureCleanupScope } from './closure-storage';
+import { CLOSURE_GENERATOR_VERSION } from '../../../src/project-closure/project-close-readiness.service';
 
 /**
  * C122+ (06 v2 §34/§46/§47 T35): pila real de lecturas históricas sobre
@@ -180,7 +181,7 @@ export async function closedProjectFixture(db: PrismaClient, scope: ClosureClean
         // evidencia exige que los cuatro sean nulos.
         ...(tipo === 'INFORME_OFICIAL_FINAL'
           ? {
-              generatorVersion: 'closure-report/1.0.0',
+              generatorVersion: CLOSURE_GENERATOR_VERSION,
               fingerprintEjecucion: 'd'.repeat(64),
               fingerprintModelo: 'e'.repeat(64),
               contextoReporte: { schemaVersion: 1, variante: 'OFICIAL' },
