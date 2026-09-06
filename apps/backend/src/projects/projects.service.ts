@@ -935,124 +935,6 @@ export class ProjectsService {
     });
   }
 
-  async requestClose(id: number, userId: number) {
-    const proyecto = await this._requireOwner(id, userId);
-    if (proyecto.estadoProyecto !== EstadoProyecto.EN_PROGRESO) {
-      throw new BadRequestException(
-        'Solo se puede solicitar cierre para proyectos en estado EN_PROGRESO',
-      );
-    }
-    await this.assertNoOperableSprint(id);
-    return this.prisma.$transaction(async (tx) => {
-      const actualizado = await tx.proyecto.update({
-        where: { idProyecto: id },
-        data: {
-          estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE,
-          fechaActualizacion: new Date(),
-        },
-        select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
-      });
-      await this.notifications.notifyAdminsFromTemplate(
-        'SOLICITUD_CIERRE_PROYECTO',
-        {
-          projectTitle: actualizado.tituloProyecto,
-          projectId: id,
-        },
-        tx,
-      );
-      return actualizado;
-    });
-  }
-
-  async approveClosure(id: number, adminId: number) {
-    await this._requireAdmin(adminId);
-    const proyecto = await this.prisma.proyecto.findUnique({
-      where: { idProyecto: id },
-      select: { idProyecto: true, tituloProyecto: true, estadoProyecto: true, creadoPor: true },
-    });
-    if (!proyecto) throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
-    if (proyecto.estadoProyecto !== EstadoProyecto.EN_SOLICITUD_CIERRE) {
-      throw new BadRequestException(
-        'Solo se puede aprobar cierre de proyectos en estado EN_SOLICITUD_CIERRE',
-      );
-    }
-    return this.prisma.$transaction(async (tx) => {
-      const ahora = new Date();
-      await tx.proyecto.update({
-        where: { idProyecto: id },
-        data: {
-          estadoProyecto: EstadoProyecto.CANCELADO,
-          eliminadoEn: ahora,
-          fechaActualizacion: ahora,
-        },
-      });
-      await tx.participacionProyecto.updateMany({
-        where: { estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: id } },
-        data: { estadoParticipacion: 'RETIRADO', fechaSalida: ahora },
-      });
-      await tx.postulacion.updateMany({
-        where: { estadoPostulacion: 'PENDIENTE', rolProyecto: { idProyecto: id } },
-        data: {
-          estadoPostulacion: 'RECHAZADA',
-          comentarioResolucion: 'Cierre administrativo del proyecto aprobado',
-          resueltaPor: adminId,
-          fechaResolucion: ahora,
-        },
-      });
-      const participantes = await tx.participacionProyecto.findMany({
-        where: { estadoParticipacion: 'RETIRADO', rolProyecto: { idProyecto: id } },
-        distinct: ['idUsuario'],
-        select: { idUsuario: true },
-      });
-      const destinatarios = Array.from(
-        new Set([proyecto.creadoPor, ...participantes.map((p) => p.idUsuario)]),
-      );
-      await this.notifications.notifyFromTemplate(
-        destinatarios,
-        'CIERRE_APROBADO',
-        {
-          projectTitle: proyecto.tituloProyecto,
-          projectId: id,
-        },
-        tx,
-      );
-      return { idProyecto: id, estadoProyecto: EstadoProyecto.CANCELADO };
-    });
-  }
-
-  async rejectClosure(id: number, adminId: number) {
-    await this._requireAdmin(adminId);
-    const proyecto = await this.prisma.proyecto.findUnique({
-      where: { idProyecto: id },
-      select: { idProyecto: true, tituloProyecto: true, estadoProyecto: true, creadoPor: true },
-    });
-    if (!proyecto) throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
-    if (proyecto.estadoProyecto !== EstadoProyecto.EN_SOLICITUD_CIERRE) {
-      throw new BadRequestException(
-        'Solo se puede rechazar cierre de proyectos en estado EN_SOLICITUD_CIERRE',
-      );
-    }
-    return this.prisma.$transaction(async (tx) => {
-      await tx.proyecto.update({
-        where: { idProyecto: id },
-        data: {
-          estadoProyecto: EstadoProyecto.EN_PROGRESO,
-          fechaActualizacion: new Date(),
-        },
-      });
-      await this.notifications.notifyFromTemplate(
-        [proyecto.creadoPor],
-        'CIERRE_RECHAZADO',
-        {
-          projectTitle: proyecto.tituloProyecto,
-          projectId: id,
-        },
-        tx,
-      );
-      return { idProyecto: id, estadoProyecto: EstadoProyecto.EN_PROGRESO };
-    });
-  }
-
   async changeEstado(
     id: number,
     userId: number,
@@ -1190,7 +1072,13 @@ export class ProjectsService {
    * cierra, finaliza ni crea ningún Sprint; únicamente rechaza la
    * transición del Proyecto si corresponde.
    */
-  private async assertNoOperableSprint(idProyecto: number, db: Db = this.prisma): Promise<void> {
+  /**
+   * Invariante A11: un proyecto con Sprint operable no puede iniciar su
+   * cierre. Sobrevive al retiro del cierre legacy porque describe el
+   * proyecto, no aquel endpoint; el evaluador de preparación la vuelve a
+   * comprobar por su cuenta cuando decide si se puede solicitar.
+   */
+  async assertNoOperableSprint(idProyecto: number, db: Db = this.prisma): Promise<void> {
     const sprintOperable = await db.sprint.findFirst({
       where: {
         idProyecto,
