@@ -6,6 +6,7 @@ import {
   CLOSURE_DEFAULT_PREFIX,
   type ClosureAvailability,
 } from '../config/environment.validation';
+import { assertClosureAvailable } from './closure-ticket.service';
 import {
   CLOSURE_DELIVERY_TYPES,
   CLOSURE_RESOURCE_TYPE,
@@ -49,11 +50,8 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
    * no está disponible después de arrancar.
    */
   protected availability(): ClosureAvailability {
-    const closure = this.config.get<ClosureAvailability>('closure');
-    if (!closure) {
-      throw new ServiceUnavailableException('La configuración de cierre no está disponible');
-    }
-    return closure;
+    // Gate único: sin configuración válida ninguna operación remota empieza.
+    return assertClosureAvailable(this.config.get<ClosureAvailability>('closure'));
   }
 
   /** Nombre de cuenta configurado; parte de toda identidad remota. */
@@ -231,21 +229,18 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
     }
   }
 
-  verifyAsset(_identity: ClosureRemoteIdentity): Promise<ClosureAssetDescriptor> {
-    return Promise.reject(
-      new ServiceUnavailableException('La verificación remota todavía no está habilitada'),
-    );
+  async verifyAsset(_identity: ClosureRemoteIdentity): Promise<ClosureAssetDescriptor> {
+    this.availability();
+    throw new ServiceUnavailableException('La verificación remota todavía no está habilitada');
   }
 
-  readCiphertext(_identity: ClosureRemoteIdentity, _timeoutMs: number): Promise<Buffer> {
-    return Promise.reject(
-      new ServiceUnavailableException('La lectura remota todavía no está habilitada'),
-    );
+  async readCiphertext(_identity: ClosureRemoteIdentity, _timeoutMs: number): Promise<Buffer> {
+    this.availability();
+    throw new ServiceUnavailableException('La lectura remota todavía no está habilitada');
   }
 
-  destroy(_identity: ClosureRemoteIdentity): Promise<ClosureDestroyOutcome> {
-    return Promise.reject(
-      new ServiceUnavailableException('La destrucción remota todavía no está habilitada'),
-    );
+  async destroy(_identity: ClosureRemoteIdentity): Promise<ClosureDestroyOutcome> {
+    this.availability();
+    throw new ServiceUnavailableException('La destrucción remota todavía no está habilitada');
   }
 }
