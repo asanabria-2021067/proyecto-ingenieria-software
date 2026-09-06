@@ -11,6 +11,7 @@ import {
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures } from './setup/cleanup';
 import { closureLifecycleStack } from './setup/closure-lifecycle';
+import { flowAStack } from './setup/flow-a';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import {
   applyManifest,
@@ -63,6 +64,18 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
   let outsiderId = 0;
   let healthyProjectId = 0;
   let mainProjectId = 0;
+
+  // T24-A: tramo con fuente mixta en disputa (caché manual 12.00 frente a
+  // registros que suman 7.00), clasificado POR_CONCILIAR.
+  const disputed = {
+    projectId: 0,
+    sprintId: 0,
+    taskId: 0,
+    assignmentId: 0,
+    participationId: 0,
+    leaderId: 0,
+    memberId: 0,
+  };
 
   // T22-A: caso inequívoco — FK ausente pero demostrable, no consumido y sin
   // agregado previo (fila 2 de la tabla de 06 v2 §14).
@@ -587,6 +600,77 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
       data: { fechaAsignacion: new Date('2026-02-01T00:00:00.000Z') },
     });
 
+    // ────────────────────────────────────────────────────────────────────────
+    // T24-A: fuente mixta que NO puede resolverse por suma ciega.
+    // ────────────────────────────────────────────────────────────────────────
+    const disputedLeader = await createIntegrationUser(prisma);
+    const disputedMember = await createIntegrationUser(prisma);
+    scope.userIds.push(disputedLeader.idUsuario, disputedMember.idUsuario);
+    disputed.leaderId = disputedLeader.idUsuario;
+    disputed.memberId = disputedMember.idUsuario;
+
+    const disputedProject = await createIntegrationProject(prisma, disputedLeader.idUsuario, {
+      estadoProyecto: 'EN_PROGRESO',
+    });
+    disputed.projectId = disputedProject.idProyecto;
+    scope.projectIds.push(disputedProject.idProyecto);
+    const disputedRole = await createIntegrationProjectRole(prisma, disputedProject.idProyecto, {
+      cupos: 3,
+    });
+    scope.roleIds.push(disputedRole.idRolProyecto);
+    const disputedParticipation = await createIntegrationParticipation(
+      prisma,
+      disputedMember.idUsuario,
+      disputedRole.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    scope.participationIds.push(disputedParticipation.idParticipacion);
+    disputed.participationId = disputedParticipation.idParticipacion;
+
+    const disputedSprint = await createIntegrationSprint(prisma, disputedProject.idProyecto, {
+      numero: 1,
+      estado: 'ACTIVO',
+    });
+    disputed.sprintId = disputedSprint.idSprint;
+    scope.sprintIds.push(disputedSprint.idSprint);
+    const disputedTask = await createIntegrationTask(
+      prisma,
+      disputedProject.idProyecto,
+      disputedLeader.idUsuario,
+      disputedSprint.idSprint,
+      { estadoTarea: 'HECHO' },
+    );
+    disputed.taskId = disputedTask.idTarea;
+    scope.taskIds.push(disputedTask.idTarea);
+    const disputedAssignment = await createIntegrationTaskAssignment(
+      prisma,
+      disputedTask.idTarea,
+      disputedMember.idUsuario,
+      disputedLeader.idUsuario,
+      {
+        idParticipacion: disputedParticipation.idParticipacion,
+        // Caché manual histórica que NO coincide con la suma de registros.
+        horasReales: '12.00',
+        origenReporte: 'POR_CONCILIAR',
+        // Cerrado: así el Sprint no se detiene antes por «asignaciones
+        // abiertas» y llega al predicado de procedencia, que es lo que
+        // este contrato demuestra.
+        desasignadaEn: new Date('2026-04-30T00:00:00.000Z'),
+      },
+    );
+    disputed.assignmentId = disputedAssignment.idAsignacion;
+    scope.assignmentIds.push(disputedAssignment.idAsignacion);
+    for (const horas of ['4.00', '3.00']) {
+      await prisma.registroTiempoTarea.create({
+        data: {
+          idAsignacion: disputedAssignment.idAsignacion,
+          idUsuario: disputedMember.idUsuario,
+          horas,
+          fecha: new Date('2026-04-10'),
+        },
+      });
+    }
+
     // ── Proyecto SANO de control: nada que conciliar.
     const controlProject = await createIntegrationProject(prisma, adminId, {
       estadoProyecto: 'EN_PROGRESO',
@@ -1033,5 +1117,82 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
       where: { idRegistroHoras: agregadoDespues.idRegistroHoras },
       data: { horasReportadas: agregadoAntes.horasReportadas },
     });
+  });
+  it('T24-A: un tramo POR_CONCILIAR bloquea consolidar y cerrar, y ningún recálculo destruye su importe', async () => {
+    const { service, timeRecords, runner } = flowAStack(prisma);
+    const cacheAntes = (
+      await prisma.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: disputed.assignmentId },
+      })
+    ).horasReales?.toFixed(2);
+    expect(cacheAntes).toBe('12.00');
+
+    const citaElTramo = (error: unknown): void => {
+      const response = (error as { getResponse?: () => unknown }).getResponse?.() as {
+        code?: string;
+        idsAsignacion?: number[];
+      };
+      expect(response.code).toBe('ORIGEN_SIN_CONCILIAR');
+      expect(response.idsAsignacion).toContain(disputed.assignmentId);
+    };
+
+    // ── 1. Finalizar el Sprint: 409 citando el tramo ofensivo.
+    await expect(
+      service.finalizeSprint(disputed.projectId, disputed.sprintId, disputed.leaderId),
+    ).rejects.toSatisfy((error: unknown) => {
+      citaElTramo(error);
+      return true;
+    });
+
+    // ── 2. Cerrar el Sprint: también se rechaza. No puede citar el mismo
+    //    código porque el Sprint sigue ACTIVO —finalizar acaba de ser
+    //    rechazado—, pero cerrar comparte el MISMO
+    //    `assertFinalizationPredicatesTx`, así que la procedencia en disputa
+    //    lo detendría igualmente si llegara a evaluarse.
+    await expect(
+      service.closeSprint(disputed.projectId, disputed.sprintId, disputed.leaderId),
+    ).rejects.toBeDefined();
+
+    // ── 3. Solicitar el cierre del proyecto: LEGACY_SIN_CONCILIAR.
+    const { readiness } = closureLifecycleStack(prisma);
+    const resumen = await readiness.evaluate(undefined, disputed.projectId, { phase: 'REQUEST' });
+    expect(resumen.canSubmit).toBe(false);
+    const blocker = resumen.blockers.find((row) => row.code === 'LEGACY_SIN_CONCILIAR');
+    expect(blocker?.ids).toContain(disputed.assignmentId);
+
+    // ── 4. Registrar horas nuevas en ese tramo: tampoco se permite.
+    await expect(
+      timeRecords.create(disputed.projectId, disputed.taskId, disputed.memberId, {
+        horas: 1,
+        fecha: '2026-04-11',
+      }),
+    ).rejects.toBeDefined();
+
+    // ── 5. Un recálculo NO destruye el importe en disputa.
+    await expect(
+      runner.run(disputed.projectId, disputed.leaderId, 'test.recalculate', ({ tx }) =>
+        timeRecords.recalculateAssignment(tx, disputed.assignmentId),
+      ),
+    ).rejects.toBeDefined();
+
+    // ── La caché sigue en 12.00 y NO fue sobrescrita con 7.00.
+    const cacheDespues = (
+      await prisma.asignacionTarea.findUniqueOrThrow({
+        where: { idAsignacion: disputed.assignmentId },
+      })
+    ).horasReales?.toFixed(2);
+    expect(cacheDespues).toBe('12.00');
+    expect(cacheDespues).not.toBe('7.00');
+
+    // ── El Sprint sigue ACTIVO: ninguna transición se coló.
+    const sprint = await prisma.sprint.findUniqueOrThrow({
+      where: { idSprint: disputed.sprintId },
+    });
+    expect(sprint.estado).toBe('ACTIVO');
+
+    // ── El resto del sistema sigue utilizable: el proyecto sano no se ve
+    //    afectado por la disputa de otro proyecto.
+    const sano = await readiness.evaluate(undefined, healthyProjectId, { phase: 'REQUEST' });
+    expect(sano.blockers.map((row) => row.code)).not.toContain('LEGACY_SIN_CONCILIAR');
   });
 });
