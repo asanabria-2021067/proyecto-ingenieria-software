@@ -22,6 +22,9 @@ import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.s
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 
 /**
  * X2 — regresión cross-flow: ciclo de vida completo de una salida de
@@ -50,7 +53,8 @@ function makeTasksService(prisma: PrismaClient): TasksService {
       notifyUsers: vi.fn(),
     } as unknown as NotificationsService,
     tasksContext,
-  );
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
 }
 
 function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
@@ -131,8 +135,8 @@ describeIntegration(
       const collaborator = await createIntegrationUser(prisma);
       scope.userIds = [leaderA.idUsuario, leaderB.idUsuario, collaborator.idUsuario];
 
-      const projectA = await createIntegrationProject(prisma, leaderA.idUsuario);
-      const projectB = await createIntegrationProject(prisma, leaderB.idUsuario);
+      const projectA = await createIntegrationProject(prisma, leaderA.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      const projectB = await createIntegrationProject(prisma, leaderB.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [projectA.idProyecto, projectB.idProyecto];
 
       const roleA1 = await createIntegrationProjectRole(prisma, projectA.idProyecto, {

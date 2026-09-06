@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { EstadoProyecto } from '@prisma/client';
 import type { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import type { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 import {
@@ -113,4 +114,28 @@ export function makeProjectReadPolicyDouble(): ProjectReadPolicyDouble {
     assertRead: vi.fn().mockResolvedValue({ profile: 'LIDER', sprintEstados: null, ownOnly: false, isAdmin: false }),
     scopeForActor: vi.fn().mockReturnValue({ sprintWhere: {}, ownOnly: false }),
   } as unknown as ProjectReadPolicyDouble;
+}
+
+/**
+ * C040: añade a un `tx` simulado las dos sentencias que
+ * `ProjectTransactionService.run` ejecuta antes del callback (`SET LOCAL
+ * lock_timeout` y el `UPDATE … RETURNING` del lock del proyecto), para poder
+ * usar el runner REAL sobre un `$transaction` mockeado y conservar intactas
+ * las aserciones existentes sobre `$transaction`.
+ */
+export function withProjectLock<T extends object>(
+  tx: T,
+  project: Partial<ProjectLockRow> = {},
+): T & { $executeRawUnsafe: ReturnType<typeof vi.fn>; $queryRaw: ReturnType<typeof vi.fn> } {
+  const row: ProjectLockRow = {
+    idProyecto: 0,
+    creadoPor: 0,
+    estadoProyecto: EstadoProyecto.EN_PROGRESO,
+    eliminadoEn: null,
+    ...project,
+  };
+  return Object.assign(tx, {
+    $executeRawUnsafe: vi.fn().mockResolvedValue(0),
+    $queryRaw: vi.fn().mockResolvedValue([row]),
+  });
 }

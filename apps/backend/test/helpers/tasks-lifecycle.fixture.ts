@@ -8,6 +8,7 @@ import { TasksService } from '../../src/tasks/tasks.service';
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectsService } from '../../src/projects/projects.service';
 import {
   makeProjectPolicyDouble,
@@ -504,6 +505,28 @@ export function makeFakeDb(state: FixtureState) {
       });
     },
 
+    /**
+     * C040: el runner real (`ProjectTransactionService`) ejecuta estas dos
+     * sentencias antes del callback. `$queryRaw` reproduce la forma del
+     * `UPDATE … RETURNING` del lock a partir del estado en memoria.
+     */
+    async $executeRawUnsafe(): Promise<number> {
+      return 0;
+    },
+    async $queryRaw(_strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> {
+      const idProyecto = values[0];
+      const row = state.proyectos.find((p) => p.idProyecto === idProyecto);
+      if (!row) return [];
+      return [
+        {
+          idProyecto: row.idProyecto,
+          creadoPor: row.creadoPor,
+          estadoProyecto: row.estadoProyecto,
+          eliminadoEn: row.eliminadoEn,
+        },
+      ];
+    },
+
     proyecto: {
       findFirst: vi.fn(async (args: FindArgs) => {
         maybeFail('proyecto.findFirst');
@@ -834,12 +857,16 @@ export function setupLifecycleEnv(): LifecycleEnv {
       },
     ),
   };
+  // C040: runner REAL sobre el `$transaction` del fake (conserva su rollback
+  // en memoria); la policy es un doble no-op.
   const tasksService = new TasksService(
     db as unknown as PrismaService,
     tasksAuthorization,
     tasksRelations,
     notifications as unknown as NotificationsService,
     tasksContext,
+    new ProjectTransactionService(db as unknown as PrismaService),
+    makeProjectPolicyDouble(),
   );
 
   const projectsNotifications = {

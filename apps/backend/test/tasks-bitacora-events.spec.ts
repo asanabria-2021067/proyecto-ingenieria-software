@@ -7,6 +7,8 @@ import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import type { BitacoraEventosService } from '../src/bitacora/bitacora-eventos.service';
 import { TasksService } from '../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * T-164: instrumentación de TasksService con BitacoraEventosService.
@@ -81,6 +83,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   const prisma = {
     tx,
     $transaction: vi.fn(async (cb: (t: ReturnType<typeof makeTx>) => unknown) => cb(tx)),
@@ -119,7 +124,7 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
     const relations = {
       validateCreateTaskRelations: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     } as unknown as TasksRelationsService;
-    const service = new TasksService(prisma, auth, relations, makeNotifications(), {} as TasksContextService, bitacora);
+    const service = new TasksService(prisma, auth, relations, makeNotifications(), {} as TasksContextService, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), bitacora);
 
     await service.create(PROJECT_ID, ACTOR_ID, {
       tituloTarea: 'Nueva tarea',
@@ -152,7 +157,7 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
       validateRelatedResources: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     } as unknown as TasksRelationsService;
     const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) } as unknown as TasksContextService;
-    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, bitacora);
+    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), bitacora);
 
     await service.update(PROJECT_ID, TASK_ID, ACTOR_ID, { tituloTarea: 'Nuevo título' });
 
@@ -179,7 +184,7 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
       validateRelatedResources: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     } as unknown as TasksRelationsService;
     const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) } as unknown as TasksContextService;
-    const service = new TasksService(prisma, auth, relations, makeNotifications(), context);
+    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
 
     await expect(service.update(PROJECT_ID, TASK_ID, ACTOR_ID, { tituloTarea: 'x' })).resolves.toBeDefined();
   });
@@ -192,7 +197,7 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
     const auth = {
       assertCanChangeTaskState: vi.fn().mockResolvedValue(tareaRaw({ estadoTarea: 'POR_HACER' })),
     } as unknown as TasksAuthorizationService;
-    const service = new TasksService(prisma, auth, {} as TasksRelationsService, makeNotifications(), {} as TasksContextService, bitacora);
+    const service = new TasksService(prisma, auth, {} as TasksRelationsService, makeNotifications(), {} as TasksContextService, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), bitacora);
 
     await service.updateEstado(PROJECT_ID, TASK_ID, ACTOR_ID, { estadoTarea: 'HECHO' as any });
 
@@ -218,7 +223,7 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
       assertUserAssignableToProject: vi.fn().mockResolvedValue(10),
     } as unknown as TasksRelationsService;
     const context = { getActiveAssignment: vi.fn().mockResolvedValue(null) } as unknown as TasksContextService;
-    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, bitacora);
+    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), bitacora);
 
     await service.assign(PROJECT_ID, TASK_ID, ACTOR_ID, { idUsuario: 7 });
 
@@ -246,7 +251,7 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
     const context = {
       getActiveAssignment: vi.fn().mockResolvedValue({ idAsignacion: 1, idUsuario: 3 }),
     } as unknown as TasksContextService;
-    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, bitacora);
+    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), bitacora);
 
     await service.assign(PROJECT_ID, TASK_ID, ACTOR_ID, { idUsuario: 7 });
 
@@ -273,7 +278,7 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
     const context = {
       getActiveAssignment: vi.fn().mockResolvedValue({ idAsignacion: 1, idUsuario: 7 }),
     } as unknown as TasksContextService;
-    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, bitacora);
+    const service = new TasksService(prisma, auth, relations, makeNotifications(), context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), bitacora);
 
     await service.assign(PROJECT_ID, TASK_ID, ACTOR_ID, { idUsuario: 7 });
 
@@ -302,8 +307,9 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
       {} as TasksRelationsService,
       makeNotifications(),
       context,
-      bitacora,
-    );
+      new ProjectTransactionService(prisma as unknown as PrismaService),
+      makeProjectPolicyDouble(),
+      bitacora);
 
     await service.closeAssignment(PROJECT_ID, TASK_ID, 1, ACTOR_ID, {
       horasReales: 4,

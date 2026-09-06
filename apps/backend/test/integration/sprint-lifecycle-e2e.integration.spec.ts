@@ -31,6 +31,7 @@ import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksController } from '../../src/tasks/tasks.controller';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 
 /**
  * X3 (Escenario A) — regresión cross-flow: ciclo de vida COMPLETO de un
@@ -132,7 +133,8 @@ describeIntegration(
         tasksRelations,
         notifications,
         tasksContext,
-      );
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
       tasksController = new TasksController(tasksService);
 
       const progressService = new ProgressRecordsService(prismaService, tasksContext);

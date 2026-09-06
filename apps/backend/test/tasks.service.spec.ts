@@ -6,6 +6,8 @@ import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization
 import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import type { TasksContextService } from '../src/tasks/tasks-context.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble } from './helpers/project-policy.double';
 
 // Cobertura mínima de camino exitoso para esta tarea (Tarea 15): consulta
 // delegada, mapeo básico al contrato público y orden de negocio. La matriz
@@ -35,7 +37,8 @@ function makeService(
     {} as unknown as TasksRelationsService,
     {} as unknown as NotificationsService,
     {} as unknown as TasksContextService,
-  );
+    new ProjectTransactionService(prisma as unknown as PrismaService),
+    makeProjectPolicyDouble());
 }
 
 function baseRow(overrides: Record<string, unknown> = {}) {

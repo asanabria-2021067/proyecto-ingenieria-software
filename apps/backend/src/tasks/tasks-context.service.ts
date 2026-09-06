@@ -4,6 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type TxClient = Prisma.TransactionClient;
 
+/**
+ * C040 (06 v2 §40): consultas de contexto compartidas. Cuando el llamador
+ * está dentro del runner por proyecto pasa su `tx`, y entonces cada lectura
+ * ocurre bajo el lock, en la misma vista que la escritura; sin `tx` (lecturas
+ * puras) usa el cliente base. Este servicio nunca abre una transacción.
+ */
 @Injectable()
 export class TasksContextService {
   constructor(private prisma: PrismaService) {}
