@@ -14,6 +14,11 @@ import {
   type ClosureCleanupScope,
 } from './setup/closure-storage';
 import { ClosurePdfValidationService } from '../../src/storage/closure-pdf-validation.service';
+import { createIntegrationAdmin, leadershipStack } from './setup/leadership';
+import {
+  createIntegrationParticipation,
+  createIntegrationProjectRole,
+} from './setup/fixtures';
 import { MAX_DOCUMENT_SIZE } from '../../src/project-closure/project-closure-documents.service';
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
@@ -620,5 +625,116 @@ describeIntegration('S7 seguridad del almacenamiento de cierre', () => {
     expect(Buffer.isBuffer(contenido.bytes)).toBe(true);
     expect(JSON.stringify(Object.keys(contenido))).not.toContain('url');
     expect(JSON.stringify(Object.keys(contenido))).not.toContain('location');
+  });
+
+  it('T29-B: un permiso retirado después de emitir el ticket impide la lectura aunque el ticket siga vigente', async () => {
+    const f = await closureDraftFixture(db, scope);
+    const { service, readPolicy } = closureDocumentsStack(db);
+    scope.documentIds = [];
+    const pdf = await pdfFixture();
+
+    // Sucesor elegible y administrador que ejecutará el cambio.
+    const rol = await createIntegrationProjectRole(db, f.project.idProyecto, { cupos: 3 });
+    scope.roleIds = [...(scope.roleIds ?? []), rol.idRolProyecto];
+    const participacion = await createIntegrationParticipation(db, f.otro.idUsuario, rol.idRolProyecto, {
+      estadoParticipacion: 'ACTIVO',
+    });
+    scope.participationIds = [...(scope.participationIds ?? []), participacion.idParticipacion];
+    const admin = await createIntegrationAdmin(db, scope);
+
+    const grant = await service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+      revisionId: f.revision.idRevisionCierre,
+      nombreArchivo: 'evidencia.pdf',
+    });
+    scope.documentIds.push(grant.documentId);
+    await service.uploadAndAttach(f.project.idProyecto, f.leader.idUsuario, grant.ticket, pdf);
+
+    // Ticket recién emitido, con vigencia de sobra.
+    const lectura = await service.getReadUrl(
+      f.project.idProyecto,
+      grant.documentId,
+      f.leader.idUsuario,
+    );
+    const ticketVigente = decodeURIComponent(lectura.url.split('ticket=')[1]);
+    expect(lectura.expiraEn.getTime() - Date.now()).toBeGreaterThan(200_000);
+    // Con el permiso todavía vigente, el ticket sirve.
+    expect(
+      (
+        await service.readContent(
+          f.project.idProyecto,
+          grant.documentId,
+          f.leader.idUsuario,
+          ticketVigente,
+        )
+      ).bytes.equals(pdf),
+    ).toBe(true);
+
+    // Se le retira el permiso por un flujo normal: deja de liderar y no tiene
+    // participación, así que pierde el acceso a los documentos del proyecto.
+    const liderazgo = leadershipStack(db);
+    await liderazgo.service.transfer(f.project.idProyecto, admin.idUsuario, {
+      idLiderNuevo: f.otro.idUsuario,
+      expectedLeaderId: f.leader.idUsuario,
+      motivo: 'Cambio administrativo durante la preparación del cierre.',
+    });
+
+    // El ticket sigue vigente y aun así no autoriza: los permisos se
+    // resuelven en CADA lectura.
+    expect(lectura.expiraEn.getTime()).toBeGreaterThan(Date.now());
+    await expectStatus(403, () =>
+      service.readContent(
+        f.project.idProyecto,
+        grant.documentId,
+        f.leader.idUsuario,
+        ticketVigente,
+      ),
+    );
+
+    // Un documento en PURGA_PENDIENTE no se sirve, ni siquiera al nuevo líder.
+    const suLectura = await service.getReadUrl(
+      f.project.idProyecto,
+      grant.documentId,
+      f.otro.idUsuario,
+    );
+    const suTicket = decodeURIComponent(suLectura.url.split('ticket=')[1]);
+    await db.documentoCierre.update({
+      where: { idDocumentoCierre: grant.documentId },
+      data: { estadoDocumento: 'PURGA_PENDIENTE', purgaSolicitadaEn: new Date() },
+    });
+    await expectStatus(409, () =>
+      service.readContent(f.project.idProyecto, grant.documentId, f.otro.idUsuario, suTicket),
+    );
+    await db.documentoCierre.update({
+      where: { idDocumentoCierre: grant.documentId },
+      data: { estadoDocumento: 'DISPONIBLE', purgaSolicitadaEn: null },
+    });
+
+    // Una reserva tampoco: solo DISPONIBLE se lee.
+    const reservado = await service.reserve(f.project.idProyecto, f.otro.idUsuario, {
+      revisionId: f.revision.idRevisionCierre,
+      nombreArchivo: 'reservado.pdf',
+    });
+    scope.documentIds.push(reservado.documentId);
+    await expectStatus(409, () =>
+      service.getReadUrl(f.project.idProyecto, reservado.documentId, f.otro.idUsuario),
+    );
+
+    // La lectura histórica que §34 sí conserva al exlíder sigue disponible en
+    // su propia superficie: sus hechos de liderazgo.
+    const decision = await readPolicy.assertRead(undefined, {
+      projectId: f.project.idProyecto,
+      actorId: f.leader.idUsuario,
+      scope: 'liderazgo',
+    });
+    expect(decision.profile).toBe('EXLIDER_SIN_PARTICIPACION');
+    expect(decision.ownOnly).toBe(true);
+    // Y no se le abre nada más.
+    await expectStatus(403, () =>
+      readPolicy.assertRead(undefined, {
+        projectId: f.project.idProyecto,
+        actorId: f.leader.idUsuario,
+        scope: 'documentos',
+      }),
+    );
   });
 });

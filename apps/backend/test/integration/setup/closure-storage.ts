@@ -141,6 +141,9 @@ export function closureDocumentsStack(
 export interface ClosureCleanupScope extends IntegrationCleanupScope {
   revisionIds?: number[];
   documentIds?: number[];
+  /** Reutilizados por el cleanup de liderazgo cuando la prueba transfiere. */
+  exitRequestIds?: number[];
+  accessRoleUserIds?: number[];
 }
 
 /** Proyecto EN_PROGRESO con su borrador de cierre y el líder autenticado. */
@@ -231,6 +234,12 @@ export async function cleanupClosureFixture(
   scope: ClosureCleanupScope,
 ): Promise<void> {
   await db.bitacoraAuditoria.deleteMany({ where: { idUsuario: { in: scope.userIds ?? [] } } });
+  await db.notificacion.deleteMany({ where: { idUsuario: { in: scope.userIds ?? [] } } });
+  await db.historialLiderazgo.deleteMany({ where: { idProyecto: { in: scope.projectIds ?? [] } } });
+  await db.apelacionLiderazgo.deleteMany({ where: { idProyecto: { in: scope.projectIds ?? [] } } });
+  await db.usuarioRolAcceso.deleteMany({
+    where: { idUsuario: { in: scope.accessRoleUserIds ?? [] } },
+  });
   await db.documentoRevisionCierre.deleteMany({
     where: { idRevisionCierre: { in: scope.revisionIds ?? [] } },
   });
