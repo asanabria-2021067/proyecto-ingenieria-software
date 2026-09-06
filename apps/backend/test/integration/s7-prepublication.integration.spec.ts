@@ -756,10 +756,8 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
     } catch (error) {
       rechazoCupo = error;
     }
-    // El rechazo vigente por cupo agotado es el 400 de RolesService; C052 no
-    // toca ese servicio (su alcance productivo es la metadata de las rutas),
-    // así que se fija el comportamiento real, no uno nuevo.
-    expect(rechazoCupo).toBeInstanceOf(BadRequestException);
+    expect(rechazoCupo).toBeInstanceOf(ConflictException);
+    expect((rechazoCupo as ConflictException).getStatus()).toBe(409);
     expect(
       await prisma.participacionProyecto.count({
         where: { idRolProyecto: rolAgotado.idRolProyecto },
