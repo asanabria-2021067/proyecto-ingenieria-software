@@ -15,6 +15,13 @@ import {
   createIntegrationUser,
 } from './setup/fixtures';
 import { ProjectsService } from '../../src/projects/projects.service';
+import { UsersService } from '../../src/users/users.service';
+import { ProjectHoursSummaryService } from '../../src/sprints/project-hours-summary.service';
+import {
+  createIntegrationSprint as crearSprint,
+  createIntegrationTask,
+  createIntegrationTaskAssignment,
+} from './setup/fixtures';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
@@ -408,5 +415,128 @@ describeIntegration('S7 lectura histórica de proyectos', () => {
     // Cero cambios: ninguna de las diez llegó a escribir.
     expect(await db.tarea.count()).toBe(tareasAntes);
     expect(await db.registroTiempoTarea.count()).toBe(registrosAntes);
+  });
+
+  it('T35-D: el dashboard suma horas registradas en proyectos abiertos incluyendo participaciones retiradas y acredita solo las aprobadas', async () => {
+    const prisma = db as unknown as PrismaService;
+    const users = new UsersService(prisma, new ProjectHoursSummaryService(prisma));
+
+    const estudiante = await createIntegrationUser(db);
+    const otroEstudiante = await createIntegrationUser(db);
+    const lider = await createIntegrationUser(db);
+    scope.userIds = [
+      ...(scope.userIds ?? []),
+      estudiante.idUsuario,
+      otroEstudiante.idUsuario,
+      lider.idUsuario,
+    ];
+
+    /** Crea un proyecto con una participación del estudiante y horas reportadas. */
+    const escenario = async (
+      estadoProyecto: 'EN_PROGRESO' | 'CERRADO',
+      estadoParticipacion: 'ACTIVO' | 'RETIRADO' | 'COMPLETADO',
+      horas: string,
+    ) => {
+      const proyecto = await createIntegrationProject(db, lider.idUsuario, { estadoProyecto });
+      scope.projectIds = [...(scope.projectIds ?? []), proyecto.idProyecto];
+      const rol = await createIntegrationProjectRole(db, proyecto.idProyecto, { cupos: 3 });
+      scope.roleIds = [...(scope.roleIds ?? []), rol.idRolProyecto];
+      const participacion = await createIntegrationParticipation(
+        db,
+        estudiante.idUsuario,
+        rol.idRolProyecto,
+        { estadoParticipacion },
+      );
+      scope.participationIds = [...(scope.participationIds ?? []), participacion.idParticipacion];
+      const sprint = await crearSprint(db, proyecto.idProyecto, {
+        estado: estadoProyecto === 'CERRADO' ? 'CERRADO' : 'ACTIVO',
+      });
+      scope.sprintIds = [...(scope.sprintIds ?? []), sprint.idSprint];
+      const tarea = await createIntegrationTask(
+        db,
+        proyecto.idProyecto,
+        lider.idUsuario,
+        sprint.idSprint,
+      );
+      scope.taskIds = [...(scope.taskIds ?? []), tarea.idTarea];
+      const asignacion = await createIntegrationTaskAssignment(
+        db,
+        tarea.idTarea,
+        estudiante.idUsuario,
+        lider.idUsuario,
+        { idParticipacion: participacion.idParticipacion, horasReales: horas },
+      );
+      scope.assignmentIds = [...(scope.assignmentIds ?? []), asignacion.idAsignacion];
+      await db.registroTiempoTarea.create({
+        data: {
+          idAsignacion: asignacion.idAsignacion,
+          idUsuario: estudiante.idUsuario,
+          horas,
+          fecha: new Date('2026-04-15'),
+        },
+      });
+      return { proyecto, participacion, sprint };
+    };
+
+    const activo = await escenario('EN_PROGRESO', 'ACTIVO', '4.00');
+    // Retirado de un proyecto TODAVÍA ABIERTO: sus horas siguen contando.
+    await escenario('EN_PROGRESO', 'RETIRADO', '2.50');
+    const cerrado = await escenario('CERRADO', 'COMPLETADO', '6.00');
+
+    // Un agregado APROBADA (acreditado) y otro PENDIENTE (solo propuesto).
+    await db.horasParticipacion.create({
+      data: {
+        idParticipacion: cerrado.participacion.idParticipacion,
+        periodoInicio: new Date('2026-03-01'),
+        periodoFin: new Date('2026-04-30'),
+        horasReportadas: '6.00',
+        horasCalculadas: '6.00',
+        horasAprobadas: '6.00',
+        estadoHoras: 'APROBADA',
+        aprobadoPor: lider.idUsuario,
+        fechaAprobacion: new Date('2026-05-03'),
+      },
+    });
+    await db.horasParticipacion.create({
+      data: {
+        idParticipacion: activo.participacion.idParticipacion,
+        periodoInicio: new Date('2026-04-01'),
+        periodoFin: new Date('2026-04-30'),
+        horasReportadas: '4.00',
+        horasCalculadas: '4.00',
+        estadoHoras: 'PENDIENTE',
+      },
+    });
+
+    const dashboard = await users.getDashboard(estudiante.idUsuario);
+
+    // 4.00 del activo + 2.50 del RETIRADO; las 6.00 del proyecto cerrado no
+    // son de un proyecto abierto.
+    expect(dashboard.horasRegistradasEnProyectosAbiertos).toBe('6.50');
+    // Solo el agregado APROBADA acredita; el PENDIENTE es una propuesta.
+    expect(dashboard.horasAcreditadas).toBe('6.00');
+    // Importes como strings decimales de dos posiciones.
+    expect(dashboard.horasRegistradasEnProyectosAbiertos).toMatch(/^\d+\.\d{2}$/);
+    expect(dashboard.horasAcreditadas).toMatch(/^\d+\.\d{2}$/);
+
+    // Los campos existentes del dashboard se conservan.
+    for (const campo of [
+      'horasBeca',
+      'horasBecaRequeridas',
+      'horasExtension',
+      'horasExtensionRequeridas',
+      'horasTotal',
+      'proyectosActivos',
+      'postulacionesRecientes',
+    ]) {
+      expect(Object.keys(dashboard), campo).toContain(campo);
+    }
+    expect(dashboard.proyectosActivos).toBe(1);
+
+    // Otro usuario solo ve lo suyo, y la ruta no exige proyecto alguno.
+    const ajeno = await users.getDashboard(otroEstudiante.idUsuario);
+    expect(ajeno.horasRegistradasEnProyectosAbiertos).toBe('0.00');
+    expect(ajeno.horasAcreditadas).toBe('0.00');
+    expect(ajeno.proyectosActivos).toBe(0);
   });
 });
