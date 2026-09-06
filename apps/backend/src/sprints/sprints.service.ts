@@ -159,15 +159,25 @@ export class SprintsService {
       where: { horasReales: { not: null }, tarea: { idProyecto: projectId, idSprint: sprintId } },
       select: { idAsignacion: true, idParticipacion: true, origenReporte: true },
     });
-    const malAtribuidas = conHoras.filter(
-      (fila) => fila.idParticipacion === null || fila.origenReporte === 'POR_CONCILIAR',
-    );
-    if (malAtribuidas.length > 0) {
+    // §22: los dos motivos de F3 son diagnósticos DISTINTOS y se informan por
+    // separado, siempre citando los tramos exactos: un impedimento que no dice
+    // cuál fila lo causa obliga al líder a adivinar dónde está el problema.
+    const sinParticipacion = conHoras.filter((fila) => fila.idParticipacion === null);
+    if (sinParticipacion.length > 0) {
       throw new ConflictException({
         statusCode: 409,
-        code: 'SPRINT_F3_ATRIBUCION_INCOMPLETA',
-        message: 'Hay tramos con horas sin participación resuelta u origen sin conciliar',
-        idsAsignacion: malAtribuidas.map((fila) => fila.idAsignacion),
+        code: 'TRAMOS_SIN_PARTICIPACION',
+        message: 'Hay tramos con horas sin participación resuelta',
+        idsAsignacion: sinParticipacion.map((fila) => fila.idAsignacion),
+      });
+    }
+    const sinConciliar = conHoras.filter((fila) => fila.origenReporte === 'POR_CONCILIAR');
+    if (sinConciliar.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'ORIGEN_SIN_CONCILIAR',
+        message: 'Hay tramos con horas cuyo origen todavía no está conciliado',
+        idsAsignacion: sinConciliar.map((fila) => fila.idAsignacion),
       });
     }
 

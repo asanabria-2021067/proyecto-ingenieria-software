@@ -814,14 +814,40 @@ export class TasksService {
 
       const eliminadoEn = new Date();
 
+      // C082 (§15): eliminar la tarea NO borra las horas trabajadas en ella.
+      // Se materializa la caché con el writer único ANTES de cerrar el tramo,
+      // de modo que el reporte quede fijado y siga entrando en la
+      // consolidación del Sprint. Nunca hay borrado físico del tramo.
+      let horasMaterializadas: string | null = null;
       if (asignacionActiva) {
-        await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion);
+        horasMaterializadas = (
+          await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion)
+        ).toFixed(2);
       }
 
       await tx.asignacionTarea.updateMany({
         where: { idTarea: taskId, desasignadaEn: null },
         data: { desasignadaEn: eliminadoEn },
       });
+
+      if (asignacionActiva) {
+        await this.bitacoraEventos?.registrarEvento({
+          tx,
+          tipoEvento: TipoEventoBitacora.ASSIGNMENT_CLOSED,
+          idActor: userId,
+          idProyecto: projectId,
+          idSprint: tarea.idSprint,
+          tipoEntidad: 'TAREA',
+          idEntidad: taskId,
+          valorAnterior: { desasignadaEn: null },
+          valorNuevo: {
+            idAsignacion: asignacionActiva.idAsignacion,
+            horasReales: horasMaterializadas,
+            desasignadaEn: eliminadoEn.toISOString(),
+            motivo: 'TAREA_ELIMINADA',
+          },
+        });
+      }
 
       await tx.tarea.update({
         where: { idTarea: taskId },
