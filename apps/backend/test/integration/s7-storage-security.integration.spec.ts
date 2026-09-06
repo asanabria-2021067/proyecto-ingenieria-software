@@ -8,12 +8,14 @@ import {
   closureConfig,
   closureDocumentsStack,
   closureDraftFixture,
+  disponibilidadFixture,
   pdfCifradoPorElUsuario,
   pdfFixture,
   pdfSinPaginas,
   type ClosureCleanupScope,
 } from './setup/closure-storage';
 import { ClosurePdfValidationService } from '../../src/storage/closure-pdf-validation.service';
+import { PDFDocument } from 'pdf-lib';
 import { createIntegrationAdmin, leadershipStack } from './setup/leadership';
 import {
   createIntegrationParticipation,
@@ -736,5 +738,100 @@ describeIntegration('S7 seguridad del almacenamiento de cierre', () => {
         scope: 'documentos',
       }),
     );
+  });
+
+  it('T29-C: en las tres modalidades el objeto remoto es ciphertext y no un PDF legible, y el endpoint de lectura es el mismo', async () => {
+    const f = await closureDraftFixture(db, scope);
+    scope.documentIds = [];
+    const pdf = await pdfFixture();
+    const nombreOriginal = 'memoria-de-cierre-2026.pdf';
+
+    const filasPorModalidad: Array<Record<string, unknown>> = [];
+
+    for (const modalidad of ['authenticated', 'private', 'upload'] as const) {
+      const stack = closureDocumentsStack(
+        db,
+        closureConfig({ closure: { ...disponibilidadFixture, deliveryMode: modalidad } }),
+      );
+      const grant = await stack.service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+        revisionId: f.revision.idRevisionCierre,
+        nombreArchivo: nombreOriginal,
+      });
+      scope.documentIds.push(grant.documentId);
+      const documento = await stack.service.uploadAndAttach(
+        f.project.idProyecto,
+        f.leader.idUsuario,
+        grant.ticket,
+        pdf,
+      );
+      expect(documento.deliveryType, modalidad).toBe(modalidad);
+
+      // Lo que quedó en el proveedor NO es un documento legible.
+      const almacenado = stack.storage.uploadImmutable.mock.calls.at(-1)![1] as Buffer;
+      expect(almacenado.subarray(0, 5).toString('latin1'), modalidad).not.toBe('%PDF-');
+      expect(almacenado.equals(pdf), modalidad).toBe(false);
+      await expect(PDFDocument.load(almacenado, { ignoreEncryption: false })).rejects.toThrow();
+      // Ni el nombre original viaja en los bytes remotos.
+      expect(almacenado.includes(Buffer.from(nombreOriginal, 'utf8')), modalidad).toBe(false);
+      expect(almacenado.includes(Buffer.from('memoria-de-cierre', 'latin1')), modalidad).toBe(false);
+
+      // Ninguna clave llega al proveedor: solo identidad, bytes y firma.
+      const opcionesDeCarga = JSON.stringify(stack.storage.uploadImmutable.mock.calls.at(-1)![2]);
+      expect(opcionesDeCarga, modalidad).not.toContain(Buffer.alloc(32, 3).toString('base64'));
+      expect(opcionesDeCarga, modalidad).not.toContain(Buffer.alloc(32, 7).toString('base64'));
+
+      // El MISMO endpoint de backend devuelve el PDF correcto en las tres.
+      const lectura = await stack.service.getReadUrl(
+        f.project.idProyecto,
+        grant.documentId,
+        f.leader.idUsuario,
+      );
+      expect(lectura.url, modalidad).toBe(
+        `/proyectos/${f.project.idProyecto}/cierre/documentos/${grant.documentId}/contenido?ticket=${encodeURIComponent(
+          decodeURIComponent(lectura.url.split('ticket=')[1]),
+        )}`,
+      );
+      const contenido = await stack.service.readContent(
+        f.project.idProyecto,
+        grant.documentId,
+        f.leader.idUsuario,
+        decodeURIComponent(lectura.url.split('ticket=')[1]),
+      );
+      expect(contenido.bytes.equals(pdf), modalidad).toBe(true);
+
+      const fila = await db.documentoCierre.findUniqueOrThrow({
+        where: { idDocumentoCierre: grant.documentId },
+      });
+      filasPorModalidad.push(fila as unknown as Record<string, unknown>);
+    }
+
+    // Mismo schema, mismo lifecycle, mismo resource_type: solo cambia la
+    // modalidad de entrega.
+    const [autenticada, privada, publica] = filasPorModalidad;
+    expect(Object.keys(privada).sort()).toEqual(Object.keys(autenticada).sort());
+    expect(Object.keys(publica).sort()).toEqual(Object.keys(autenticada).sort());
+    for (const fila of filasPorModalidad) {
+      expect(fila.resourceType).toBe('raw');
+      expect(fila.proveedor).toBe('cloudinary');
+      expect(fila.estadoDocumento).toBe('DISPONIBLE');
+      expect(fila.mimeType).toBe('application/pdf');
+      expect(String(fila.externalId).endsWith('.enc')).toBe(true);
+      // La metadata criptográfica es idéntica en forma y nunca lleva claves.
+      expect(Object.keys(fila.cryptoMetadata as Record<string, string>).sort()).toEqual(
+        ['format', 'iv', 'keyId', 'tag', 'wrapIv', 'wrapTag', 'wrappedDek'].sort(),
+      );
+      expect(JSON.stringify(fila.cryptoMetadata)).not.toContain(Buffer.alloc(32, 3).toString('base64'));
+    }
+    expect([autenticada.deliveryType, privada.deliveryType, publica.deliveryType]).toEqual([
+      'authenticated',
+      'private',
+      'upload',
+    ]);
+    // Los tres documentos comparten el mismo checksum de plaintext y difieren
+    // en su ciphertext: cada uno tiene su propia clave.
+    expect(privada.checksumSha256).toBe(autenticada.checksumSha256);
+    expect(publica.checksumSha256).toBe(autenticada.checksumSha256);
+    expect(privada.checksumCifradoSha256).not.toBe(autenticada.checksumCifradoSha256);
+    expect(publica.checksumCifradoSha256).not.toBe(autenticada.checksumCifradoSha256);
   });
 });
