@@ -101,7 +101,12 @@ export async function leadershipFixture(db: PrismaClient, scope: LeadershipClean
   const twin = await fixtures.createIntegrationProject(db, leaderConParticipacion.idUsuario, {
     estadoProyecto: 'EN_PROGRESO',
   });
-  collectInto(scope, 'projectIds', [project.idProyecto, twin.idProyecto]);
+  // Proyecto del mismo líder todavía en BORRADOR: la familia «Liderazgo»
+  // solo opera en P/E, y esta fila lo demuestra sin inventar un estado.
+  const draft = await fixtures.createIntegrationProject(db, leaderSinParticipacion.idUsuario, {
+    estadoProyecto: 'BORRADOR',
+  });
+  collectInto(scope, 'projectIds', [project.idProyecto, twin.idProyecto, draft.idProyecto]);
 
   const role = await fixtures.createIntegrationProjectRole(db, project.idProyecto, { cupos: 8 });
   collectInto(scope, 'roleIds', [role.idRolProyecto]);
@@ -184,6 +189,7 @@ export async function leadershipFixture(db: PrismaClient, scope: LeadershipClean
     deshabilitado,
     project,
     twin,
+    draft,
     role,
     twinRoleA,
     twinRoleB,
