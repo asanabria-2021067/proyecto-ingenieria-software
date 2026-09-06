@@ -1,8 +1,16 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { EstadoDocumentoCierre, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
+import { CloudinaryClosureStorageAdapter } from '../storage/cloudinary-closure-storage.adapter';
+import {
+  CLOUDINARY_CLOSURE_PORT,
+  type ClosureRemoteIdentity,
+  type ClosureStoragePort,
+} from '../storage/closure-storage.port';
 import type { SweepDto } from './dto/closure.dto';
 
 /**
@@ -20,6 +28,7 @@ export interface SweepReport {
   candidatos: number[];
   purgados: number[];
   fallidos: number[];
+  remotosSinFila: string[];
 }
 
 @Injectable()
@@ -28,6 +37,9 @@ export class ClosureCleanupService {
     protected readonly prisma: PrismaService,
     protected readonly projectTx: ProjectTransactionService,
     protected readonly policy: ProjectPolicyService,
+    protected readonly adapter: CloudinaryClosureStorageAdapter,
+    @Inject(CLOUDINARY_CLOSURE_PORT) protected readonly storage: ClosureStoragePort,
+    protected readonly audit: BitacoraEventosService,
   ) {}
 
   /** E120: informa qué se purgaría sin tocar nada. */
@@ -35,7 +47,13 @@ export class ClosureCleanupService {
     const limit = this.limitOf(dto);
     await this.policy.assertAdminTx(this.prisma as unknown as Prisma.TransactionClient, actorId);
     const candidatos = await this.findCandidates(new Date(), limit);
-    return { dryRun: true, candidatos: candidatos.map((row) => row.idDocumentoCierre), purgados: [], fallidos: [] };
+    const remote = await this.adapter.listClosurePublicIds();
+    const local = remote.length === 0 ? [] : await this.prisma.documentoCierre.findMany({
+      where: { externalId: { in: remote } }, select: { externalId: true },
+    });
+    const known = new Set(local.map((row) => row.externalId));
+    return { dryRun: true, candidatos: candidatos.map((row) => row.idDocumentoCierre), purgados: [], fallidos: [],
+      remotosSinFila: remote.filter((publicId) => !known.has(publicId)) };
   }
 
   /** E120: reserva la purga bajo lock, destruye fuera de tx y confirma después. */
@@ -50,7 +68,73 @@ export class ClosureCleanupService {
       const documentId = await this.reservePurge(candidate.idProyecto, candidate.idDocumentoCierre, actorId, now);
       if (documentId !== null) reserved.push(documentId);
     }
-    return { dryRun: false, candidatos: reserved, purgados: [], fallidos: [] };
+    const purgeable = await this.prisma.documentoCierre.findMany({
+      where: { estadoDocumento: { in: [EstadoDocumentoCierre.PURGA_PENDIENTE, EstadoDocumentoCierre.PURGADO] } },
+      orderBy: [{ idProyecto: 'asc' }, { idDocumentoCierre: 'asc' }],
+      take: limit,
+      select: { idDocumentoCierre: true, idProyecto: true, estadoDocumento: true, proveedor: true,
+        externalId: true, resourceType: true, deliveryType: true, assetId: true, versionRemota: true },
+    });
+    const purgados: number[] = [];
+    const fallidos: number[] = [];
+    for (const document of purgeable) {
+      const identity: ClosureRemoteIdentity = {
+        proveedor: 'cloudinary', cloudName: this.adapter.cloudNameForIdentity(), publicId: document.externalId,
+        resourceType: 'raw', deliveryType: document.deliveryType as ClosureRemoteIdentity['deliveryType'],
+        assetId: document.assetId, version: document.versionRemota,
+      };
+      try {
+        const outcome = await this.storage.destroy(identity);
+        if (document.estadoDocumento === EstadoDocumentoCierre.PURGA_PENDIENTE) {
+          const finalized = await this.finalizePurge(document.idProyecto, document.idDocumentoCierre, actorId, now, identity, outcome);
+          if (finalized) purgados.push(document.idDocumentoCierre);
+        } else {
+          purgados.push(document.idDocumentoCierre);
+        }
+      } catch {
+        fallidos.push(document.idDocumentoCierre);
+      }
+    }
+    return { dryRun: false, candidatos: reserved, purgados, fallidos, remotosSinFila: [] };
+  }
+
+  protected async finalizePurge(
+    projectId: number,
+    documentId: number,
+    actorId: number,
+    now: Date,
+    identity: ClosureRemoteIdentity,
+    outcome: 'deleted' | 'absent',
+  ): Promise<boolean> {
+    return this.projectTx.run(projectId, actorId, 'closure-cleanup.finalize', async ({ tx }) => {
+      await this.policy.assertAdminTx(tx, actorId);
+      await tx.$queryRaw(Prisma.sql`
+        SELECT id_documento_cierre FROM documento_cierre
+        WHERE id_documento_cierre = ${documentId} AND id_proyecto = ${projectId}
+        FOR UPDATE
+      `);
+      const document = await tx.documentoCierre.findFirst({
+        where: { idDocumentoCierre: documentId, idProyecto: projectId },
+        select: { estadoDocumento: true, purgaSolicitadaEn: true, _count: { select: { revisiones: true } },
+          oficialDe: { select: { idRevisionCierre: true } } },
+      });
+      if (!document || document.estadoDocumento !== EstadoDocumentoCierre.PURGA_PENDIENTE ||
+          document._count.revisiones !== 0 || document.oficialDe !== null) return false;
+      const changed = await tx.documentoCierre.updateMany({
+        where: { idDocumentoCierre: documentId, idProyecto: projectId,
+          estadoDocumento: EstadoDocumentoCierre.PURGA_PENDIENTE, purgaSolicitadaEn: document.purgaSolicitadaEn },
+        data: { estadoDocumento: EstadoDocumentoCierre.PURGADO, purgadoEn: now },
+      });
+      if (changed.count !== 1) return false;
+      await this.audit.registrarEvento({
+        tx, tipoEvento: TipoEventoBitacora.CLOSURE_STORAGE_SWEPT, idActor: actorId, idProyecto: projectId,
+        tipoEntidad: 'DOCUMENTO_CIERRE', idEntidad: documentId,
+        valorAnterior: { estadoDocumento: 'PURGA_PENDIENTE' },
+        valorNuevo: { estadoDocumento: 'PURGADO', proveedor: identity.proveedor, externalId: identity.publicId,
+          assetId: identity.assetId ?? null, version: identity.version ?? null, outcome },
+      });
+      return true;
+    });
   }
 
   protected async reservePurge(

@@ -302,8 +302,36 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
     });
   }
 
-  async destroy(_identity: ClosureRemoteIdentity): Promise<ClosureDestroyOutcome> {
+  async destroy(identity: ClosureRemoteIdentity): Promise<ClosureDestroyOutcome> {
     this.availability();
-    throw new ServiceUnavailableException('La destrucción remota todavía no está habilitada');
+    const result = await this.callProvider('purga', () => cloudinary.uploader.destroy(identity.publicId, {
+      resource_type: CLOSURE_RESOURCE_TYPE,
+      type: identity.deliveryType,
+      invalidate: true,
+    }));
+    if (result.result === 'ok') return 'deleted';
+    if (result.result === 'not found') return 'absent';
+    throw new ServiceUnavailableException('El proveedor no confirmó la purga del documento de cierre');
+  }
+
+  /** Inventario diagnóstico; el dominio solo reporta IDs sin fila y nunca los borra por prefijo. */
+  async listClosurePublicIds(): Promise<string[]> {
+    this.availability();
+    const publicIds = new Set<string>();
+    for (const type of CLOSURE_DELIVERY_TYPES) {
+      let nextCursor: string | undefined;
+      do {
+        const page = await this.callProvider('inventario', () => cloudinary.api.resources({
+          resource_type: CLOSURE_RESOURCE_TYPE,
+          type,
+          prefix: `${this.prefix()}/`,
+          max_results: 500,
+          ...(nextCursor ? { next_cursor: nextCursor } : {}),
+        }));
+        for (const resource of page.resources) publicIds.add(resource.public_id);
+        nextCursor = page.next_cursor;
+      } while (nextCursor);
+    }
+    return [...publicIds].sort();
   }
 }

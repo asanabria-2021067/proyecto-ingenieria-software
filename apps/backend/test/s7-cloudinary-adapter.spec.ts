@@ -13,6 +13,8 @@ import {
  */
 const uploadResultado = vi.fn();
 const firmar = vi.fn(() => 'firma-sintetica');
+const destroyResultado = vi.fn(() => ({ result: 'ok' }));
+const inventarioResultado = vi.fn(() => ({ resources: [] as Array<{ public_id: string }> }));
 /** `api.resource` refleja por defecto lo que el upload acaba de devolver. */
 const ultimaSubida: { opciones?: Record<string, unknown>; resultado?: Record<string, unknown> } = {};
 const recursoResultado = vi.fn((publicId: string) => ({
@@ -32,8 +34,10 @@ vi.mock('cloudinary', () => ({
     },
     api: {
       resource: (publicId: string) => Promise.resolve(recursoResultado(publicId)),
+      resources: (...args: unknown[]) => Promise.resolve(inventarioResultado(...(args as []))),
     },
     uploader: {
+      destroy: (...args: unknown[]) => Promise.resolve(destroyResultado(...(args as []))),
       upload_stream: (
         options: Record<string, unknown>,
         callback: (error: unknown, result: unknown) => void,
@@ -97,6 +101,8 @@ describe('S7 adaptador Cloudinary de cierre', () => {
     uploadResultado.mockReset();
     firmar.mockClear();
     recursoResultado.mockClear();
+    destroyResultado.mockClear();
+    inventarioResultado.mockClear();
     delete ultimaSubida.opciones;
     delete ultimaSubida.resultado;
   });
@@ -250,5 +256,29 @@ describe('S7 adaptador Cloudinary de cierre', () => {
         closure: { ...disponibilidadBase, deliveryMode: 'publico' as ClosureAvailability['deliveryMode'] },
       }).signUploadParams(identidad),
     ).toThrow();
+  });
+
+  it('confirma purga solo con ok o not found y limita el inventario al prefijo de cierre', async () => {
+    const subject = adapter();
+    const identity = subject.buildIdentity(41);
+    destroyResultado.mockReturnValueOnce({ result: 'ok' }).mockReturnValueOnce({ result: 'not found' });
+    expect(await subject.destroy(identity)).toBe('deleted');
+    expect(await subject.destroy(identity)).toBe('absent');
+    expect(destroyResultado).toHaveBeenCalledWith(identity.publicId, expect.objectContaining({
+      resource_type: 'raw', type: 'authenticated', invalidate: true,
+    }));
+
+    inventarioResultado.mockImplementation(({ type }: { type: string }) => ({
+      resources: [{ public_id: `uvgenius/cierre/41/${type}.enc` }],
+    }));
+    expect(await subject.listClosurePublicIds()).toEqual([
+      'uvgenius/cierre/41/authenticated.enc',
+      'uvgenius/cierre/41/private.enc',
+      'uvgenius/cierre/41/upload.enc',
+    ]);
+    expect(inventarioResultado).toHaveBeenCalledTimes(3);
+    for (const [options] of inventarioResultado.mock.calls) {
+      expect(options).toMatchObject({ resource_type: 'raw', prefix: 'uvgenius/cierre/', max_results: 500 });
+    }
   });
 });
