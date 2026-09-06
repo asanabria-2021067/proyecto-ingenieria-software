@@ -63,7 +63,10 @@ function makeTx() {
     // que el doble expone las consultas de tramos que esas revalidaciones
     // hacen. Por defecto todo vacío = los cuatro predicados se cumplen.
     asignacionTarea: { findMany: vi.fn().mockResolvedValue([]) },
-    horasParticipacion: { findFirst: vi.fn(), update: vi.fn() },
+    horasParticipacion: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
+    // C080: cerrar consolida y avisa; el título del proyecto solo se consulta
+    // cuando hay destinatarios.
+    proyecto: { findUniqueOrThrow: vi.fn().mockResolvedValue({ tituloProyecto: 'Proyecto' }) },
   };
 }
 
@@ -1224,7 +1227,7 @@ describe('SprintsService', () => {
       expect(tx.sprint.updateMany).not.toHaveBeenCalled();
     });
 
-    it('caso 7: preserva las horas de A7 — closeSprint nunca lee ni escribe HorasParticipacion/AsignacionTarea', async () => {
+    it('caso 7: consolidar nunca acredita — closeSprint jamás escribe las columnas de aprobación', async () => {
       const tx = makeTx();
       const sprint = sprintEnFinalizacion();
       const authorization = makeSprintsAuthorization();
@@ -1237,12 +1240,19 @@ describe('SprintsService', () => {
 
       await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
-      expect(tx.horasParticipacion.findFirst).not.toHaveBeenCalled();
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-      // C075: `asignacionTarea` ya existe en el doble porque finalizar la
-      // consulta para F2–F4. Lo que este caso fija es que CERRAR, en este
-      // punto del plan, todavía no la toca.
-      expect(tx.asignacionTarea.findMany).not.toHaveBeenCalled();
+      // C080: cerrar SÍ consolida — reconoce las participaciones elegibles
+      // antes de la transición. Lo que sigue siendo cierto, y es lo que este
+      // caso protege, es que NUNCA acredita: `horasAprobadas`,
+      // `fechaAprobacion` y `aprobadoPor` son exclusivas de approveClosure.
+      const escrituras = [
+        ...tx.horasParticipacion.update.mock.calls,
+        ...tx.horasParticipacion.create.mock.calls,
+      ];
+      for (const [argumento] of escrituras) {
+        expect(argumento.data).not.toHaveProperty('horasAprobadas');
+        expect(argumento.data).not.toHaveProperty('fechaAprobacion');
+        expect(argumento.data).not.toHaveProperty('aprobadoPor');
+      }
     });
 
     it('terminalidad: una segunda llamada a closeSprint sobre un Sprint ya CERRADO se rechaza (mismo caso 3, verificado explícitamente como "terminal")', async () => {

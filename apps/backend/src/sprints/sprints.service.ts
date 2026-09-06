@@ -33,6 +33,7 @@ import { ProjectPolicyService } from '../common/project-policy/project-policy.se
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { TimeRecordsService } from '../time-records/time-records.service';
 import { ProjectHoursSummaryService } from './project-hours-summary.service';
+import { HoursRecognitionService } from './hours-recognition.service';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): iniciar, finalizar y cerrar un Sprint
@@ -77,6 +78,10 @@ export class SprintsService {
     // C079 (§40): el detalle por integrante lo compone el proveedor de
     // agregación de horas; Sprints solo decide quién puede leerlo.
     private readonly projectHours?: ProjectHoursSummaryService,
+    // C080 (§12): el reconocimiento por participación vive en su propio
+    // servicio; `closeSprint` solo lo ORQUESTA y es el único que cambia el
+    // estado del Sprint.
+    private readonly recognition?: HoursRecognitionService,
   ) {}
 
   /**
@@ -787,6 +792,48 @@ export class SprintsService {
         throw new ConflictException('El Sprint no está en estado EN_FINALIZACION');
       }
 
+      // C080 (§12): CERRAR es CONSOLIDAR, no acreditar. Se reconocen TODAS las
+      // participaciones elegibles primero y solo después se hace la única
+      // transición de estado, de modo que ningún Sprint pueda quedar cerrado
+      // con horas a medio consolidar: o entra todo, o no entra nada.
+      await this.assertFinalizationPredicatesTx(tx, projectId, sprintId);
+
+      const participaciones =
+        (await this.recognition?.listEligibleParticipationsTx(tx, { projectId, sprintId })) ?? [];
+      // Un único instante para TODO el lote: la consolidación de un Sprint es
+      // un solo hecho, y verlo con marcas distintas por participación sugeriría
+      // que ocurrió a trozos.
+      const consolidadoEn = new Date();
+      const consolidadas: Array<{
+        idParticipacion: number;
+        idUsuario: number;
+        horasReportadas: string;
+        horasPropuestas: string;
+        idsAsignaciones: number[];
+      }> = [];
+      for (const idParticipacion of participaciones) {
+        const resultado = await this.recognition!.recognizeParticipationHours(tx, {
+          projectId,
+          sprintId,
+          participationId: idParticipacion,
+          reconocidoEn: consolidadoEn,
+        });
+        if (resultado.horasParticipacion === null) {
+          continue;
+        }
+        const duenio = await tx.participacionProyecto.findUniqueOrThrow({
+          where: { idParticipacion },
+          select: { idUsuario: true },
+        });
+        consolidadas.push({
+          idParticipacion,
+          idUsuario: duenio.idUsuario,
+          horasReportadas: resultado.horasReportadas.toFixed(2),
+          horasPropuestas: resultado.horasPropuestas.toFixed(2),
+          idsAsignaciones: resultado.idsAsignacionesReconocidas,
+        });
+      }
+
       const actualizado = await tx.sprint.updateMany({
         where: {
           idSprint: sprintId,
@@ -813,10 +860,64 @@ export class SprintsService {
         );
       }
 
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.SPRINT_HOURS_CONSOLIDATED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintId,
+        tipoEntidad: 'SPRINT',
+        idEntidad: sprintId,
+        valorNuevo: { consolidadas },
+      });
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.SPRINT_CLOSED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintId,
+        tipoEntidad: 'SPRINT',
+        idEntidad: sprintId,
+        valorAnterior: { estado: EstadoSprint.EN_FINALIZACION },
+        valorNuevo: {
+          estado: EstadoSprint.CERRADO,
+          fechaCierre: filaFinal.fechaCierre?.toISOString() ?? null,
+          cerradoPor: userId,
+        },
+      });
+
+      // §44: se avisa a TODO usuario con tramos consumidos, incluido aquel
+      // cuya propuesta final es 0.00 — saber que su Sprint se consolidó en
+      // cero también es información suya.
+      // Sin nadie a quien avisar, ni siquiera se consulta el título.
+      const proyecto = consolidadas.length > 0
+        ? await tx.proyecto.findUniqueOrThrow({
+            where: { idProyecto: projectId },
+            select: { tituloProyecto: true },
+          })
+        : null;
+      for (const fila of consolidadas) {
+        await this.notificationsService.persistTemplateTx(
+          tx,
+          [fila.idUsuario],
+          'HORAS_CONSOLIDADAS',
+          {
+            projectTitle: proyecto!.tituloProyecto,
+            projectId,
+            sprintId,
+            numeroSprint: filaFinal.numero,
+            horasReportadas: fila.horasReportadas,
+            horasPropuestas: fila.horasPropuestas,
+          },
+          ctx.effects,
+        );
+      }
+
       return filaFinal;
       },
     );
 
+    // Realtime SIEMPRE post-commit: nunca un socket dentro de la transacción.
     await this.notificationsService.notifySprintClosed(projectId, userId, {
       projectId,
       sprintId,

@@ -331,4 +331,96 @@ describeIntegration('S7 Flow A — consolidación de Sprint', () => {
     expect(agregado.horasCalculadas?.toFixed(2)).toBe('8.00');
     expect(agregado.horasAprobadas).toBeNull();
   });
+
+  it('T08-E: closeSprint consolida todas las participaciones y cierra el Sprint en una sola transacción atómica', async () => {
+    const f = await flowAFixture(db, scope, 'EN_FINALIZACION');
+    const { service, notifyClosed } = flowAStack(db);
+    const baseTask = { projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, leaderId: f.leader.idUsuario };
+
+    // Cuatro participaciones elegibles: activa, retirada, completada y una
+    // cuya propuesta final es exactamente 0.00.
+    const retirado = await createIntegrationUser(db);
+    const completado = await createIntegrationUser(db);
+    const enCero = await createIntegrationUser(db);
+    f.collect('userIds', [retirado.idUsuario, completado.idUsuario, enCero.idUsuario]);
+    const pRetirado = await createIntegrationParticipation(db, retirado.idUsuario, f.role.idRolProyecto, { estadoParticipacion: 'RETIRADO' });
+    const pCompletado = await createIntegrationParticipation(db, completado.idUsuario, f.role.idRolProyecto, { estadoParticipacion: 'COMPLETADO' });
+    const pCero = await createIntegrationParticipation(db, enCero.idUsuario, f.role.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+    f.collect('participationIds', [pRetirado.idParticipacion, pCompletado.idParticipacion, pCero.idParticipacion]);
+
+    const tA = await closedTask(db, scope, { ...baseTask, userId: f.memberA.idUsuario, participationId: f.participationA.idParticipacion, horasReales: '3.00' });
+    await backWithEntries(db, { assignmentId: tA.assignment.idAsignacion, userId: f.memberA.idUsuario, horas: '3.00' });
+    const tR = await closedTask(db, scope, { ...baseTask, userId: retirado.idUsuario, participationId: pRetirado.idParticipacion, horasReales: '2.00' });
+    await backWithEntries(db, { assignmentId: tR.assignment.idAsignacion, userId: retirado.idUsuario, horas: '2.00' });
+    const tC = await closedTask(db, scope, { ...baseTask, userId: completado.idUsuario, participationId: pCompletado.idParticipacion, horasReales: '1.00' });
+    await backWithEntries(db, { assignmentId: tC.assignment.idAsignacion, userId: completado.idUsuario, horas: '1.00' });
+    // Propuesta final 0.00: tramo cerrado sin registros.
+    const t0 = await closedTask(db, scope, { ...baseTask, userId: enCero.idUsuario, participationId: pCero.idParticipacion, horasReales: '0.00' });
+    // No elegible: ya consumido por una salida anticipada.
+    const tYaConsumido = await closedTask(db, scope, {
+      ...baseTask, userId: f.memberB.idUsuario, participationId: f.participationB.idParticipacion,
+      horasReales: '5.00', reconocidoEn: new Date('2026-09-01T08:00:00.000Z'),
+    });
+    await backWithEntries(db, { assignmentId: tYaConsumido.assignment.idAsignacion, userId: f.memberB.idUsuario, horas: '5.00' });
+
+    expect(await db.notificacion.count({ where: { idUsuario: { in: scope.userIds } } })).toBe(0);
+
+    const cerrado = await service.closeSprint(f.project.idProyecto, f.sprint.idSprint, f.leader.idUsuario);
+    expect(cerrado.estado).toBe('CERRADO');
+    expect(cerrado.fechaCierre).not.toBeNull();
+    expect(cerrado.cerradoPor).toBe(f.leader.idUsuario);
+
+    // Las cuatro participaciones elegibles tienen agregado PENDIENTE.
+    const agregados = await db.horasParticipacion.findMany({
+      where: { idSprint: f.sprint.idSprint },
+      orderBy: { idParticipacion: 'asc' },
+    });
+    expect(agregados).toHaveLength(4);
+    expect(agregados.every((fila) => fila.estadoHoras === 'PENDIENTE')).toBe(true);
+    // Ninguna acreditación: eso es exclusivo del cierre administrativo.
+    expect(agregados.every((fila) => fila.horasAprobadas === null)).toBe(true);
+    expect(agregados.every((fila) => fila.fechaAprobacion === null && fila.aprobadoPor === null)).toBe(true);
+    const porParticipacion = new Map(agregados.map((fila) => [fila.idParticipacion, fila]));
+    expect(porParticipacion.get(f.participationA.idParticipacion)!.horasCalculadas?.toFixed(2)).toBe('3.00');
+    expect(porParticipacion.get(pRetirado.idParticipacion)!.horasCalculadas?.toFixed(2)).toBe('2.00');
+    expect(porParticipacion.get(pCompletado.idParticipacion)!.horasCalculadas?.toFixed(2)).toBe('1.00');
+    expect(porParticipacion.get(pCero.idParticipacion)!.horasCalculadas?.toFixed(2)).toBe('0.00');
+    // El tramo ya consumido no generó un segundo agregado.
+    expect(porParticipacion.has(f.participationB.idParticipacion)).toBe(false);
+
+    // Todos los tramos elegibles quedan marcados con la MISMA fecha.
+    const marcados = await db.asignacionTarea.findMany({
+      where: { idAsignacion: { in: [tA, tR, tC, t0].map((t) => t.assignment.idAsignacion) } },
+    });
+    expect(marcados.every((fila) => fila.reconocidoEn !== null)).toBe(true);
+    expect(new Set(marcados.map((fila) => fila.reconocidoEn!.toISOString())).size).toBe(1);
+    // El tramo ya consumido conserva SU fecha original, no se re-marca.
+    expect((await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: tYaConsumido.assignment.idAsignacion } })).reconocidoEn?.toISOString())
+      .toBe(new Date('2026-09-01T08:00:00.000Z').toISOString());
+
+    // Bitácora: consolidación y cierre.
+    const consolidacion = await db.bitacoraAuditoria.findMany({
+      where: { idUsuario: f.leader.idUsuario, accion: 'SPRINT_HOURS_CONSOLIDATED' },
+    });
+    expect(consolidacion).toHaveLength(1);
+    const detalle = consolidacion[0].detalleJson as { valorNuevo: { consolidadas: Array<{ idParticipacion: number; horasPropuestas: string }> } };
+    expect(detalle.valorNuevo.consolidadas).toHaveLength(4);
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'SPRINT_CLOSED' } })).toBe(1);
+
+    // Notificaciones persistidas para los cuatro, incluido el de propuesta 0.
+    const notificaciones = await db.notificacion.findMany({
+      where: { idUsuario: { in: scope.userIds }, tipoNotificacion: 'HORAS_CONSOLIDADAS' },
+    });
+    expect(notificaciones.map((n) => n.idUsuario).sort()).toEqual(
+      [f.memberA.idUsuario, retirado.idUsuario, completado.idUsuario, enCero.idUsuario].sort(),
+    );
+    expect(notifyClosed).toHaveBeenCalledTimes(1);
+
+    // Segundo cierre: 409 y nada duplicado.
+    await expectStatus(409, () => service.closeSprint(f.project.idProyecto, f.sprint.idSprint, f.leader.idUsuario));
+    expect(await db.horasParticipacion.count({ where: { idSprint: f.sprint.idSprint } })).toBe(4);
+    expect(await db.notificacion.count({ where: { idUsuario: { in: scope.userIds }, tipoNotificacion: 'HORAS_CONSOLIDADAS' } })).toBe(4);
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'SPRINT_CLOSED' } })).toBe(1);
+    expect(notifyClosed).toHaveBeenCalledTimes(1);
+  });
 });

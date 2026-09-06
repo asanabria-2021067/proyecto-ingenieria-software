@@ -31,10 +31,16 @@ export function flowAStack(db: PrismaClient) {
   const notifyParticipants = vi.fn().mockResolvedValue(undefined);
   const notifyFinalization = vi.fn().mockResolvedValue(undefined);
   const notifyClosed = vi.fn().mockResolvedValue(undefined);
+  // El gateway no participa: la persistencia es lo real, el socket es doble.
+  const realNotifications = new NotificationsService(prisma, undefined as never);
   const notifications = {
     notifyProjectActiveParticipants: notifyParticipants,
     notifySprintFinalizationStarted: notifyFinalization,
     notifySprintClosed: notifyClosed,
+    // La persistencia de filas de notificación SÍ es real: forma parte de la
+    // transacción de dominio y es justo lo que C080/C081 verifican.
+    persistTemplateTx: realNotifications.persistTemplateTx.bind(realNotifications),
+    persistUsersTx: realNotifications.persistUsersTx.bind(realNotifications),
   } as unknown as NotificationsService;
   const timeRecords = new TimeRecordsService(
     prisma,
@@ -46,6 +52,7 @@ export function flowAStack(db: PrismaClient) {
     audit,
   );
   const projectHours = new ProjectHoursSummaryService(prisma);
+  const recognition = new HoursRecognitionService(prisma);
   const service = new SprintsService(
     prisma,
     context,
@@ -57,13 +64,14 @@ export function flowAStack(db: PrismaClient) {
     audit,
     timeRecords,
     projectHours,
+    recognition,
   );
   return {
     service,
     runner,
     audit,
     timeRecords,
-    recognition: new HoursRecognitionService(prisma),
+    recognition,
     notifyParticipants,
     notifyFinalization,
     notifyClosed,
@@ -72,6 +80,7 @@ export function flowAStack(db: PrismaClient) {
 
 export async function cleanupFlowAFixture(db: PrismaClient, scope: IntegrationCleanupScope) {
   await db.bitacoraAuditoria.deleteMany({ where: { idUsuario: { in: scope.userIds ?? [] } } });
+  await db.notificacion.deleteMany({ where: { idUsuario: { in: scope.userIds ?? [] } } });
   const ajustes = await db.ajusteHoraTarea.findMany({
     where: { idAsignacion: { in: scope.assignmentIds ?? [] } },
     orderBy: { idAjusteHora: 'desc' },

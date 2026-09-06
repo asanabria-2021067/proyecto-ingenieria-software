@@ -17,6 +17,15 @@ export interface CalculateRecognizableHoursInput {
 }
 
 /**
+ * C080: el orquestador de cierre pasa UN instante para todo el lote, de modo
+ * que la consolidación completa de un Sprint quede sellada con la misma marca
+ * temporal. Omitido, cada llamada usa el suyo (Flow B, reconocimiento suelto).
+ */
+export interface RecognizeParticipationHoursInput extends CalculateRecognizableHoursInput {
+  reconocidoEn?: Date;
+}
+
+/**
  * Resultado de `recognizeParticipationHours` (SYNC GATE 1). `horasReconocidas`
  * es el DELTA reconocido en ESTA llamada (0 si no había nada elegible — un
  * no-op real, no una reescritura a 0 de un total ya persistido).
@@ -210,7 +219,7 @@ export class HoursRecognitionService {
    */
   async recognizeParticipationHours(
     tx: TxClient,
-    input: CalculateRecognizableHoursInput,
+    input: RecognizeParticipationHoursInput,
   ): Promise<RecognizeParticipationHoursResult> {
     const { participationId, sprintId } = input;
 
@@ -265,7 +274,7 @@ export class HoursRecognitionService {
     // §12.3: CAS sobre TODOS los ids con una FECHA COMÚN. El conteo exacto es
     // la garantía: si alguien consumió uno de estos tramos entretanto, se
     // aborta en vez de persistir un total parcial.
-    const reconocidoEn = new Date();
+    const reconocidoEn = input.reconocidoEn ?? new Date();
     const marcado = await tx.asignacionTarea.updateMany({
       where: { idAsignacion: { in: idsAsignaciones }, reconocidoEn: null },
       data: { reconocidoEn },
