@@ -54,6 +54,11 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
     return assertClosureAvailable(this.config.get<ClosureAvailability>('closure'));
   }
 
+  /** Nombre de cuenta configurado, expuesto para reconstruir una identidad ya persistida. */
+  cloudNameForIdentity(): string {
+    return this.cloudName();
+  }
+
   /** Nombre de cuenta configurado; parte de toda identidad remota. */
   protected cloudName(): string {
     const { cloudName } = this.availability();

@@ -624,7 +624,17 @@ describe('S7 environment foundation (TC03)', () => {
       // Las cinco operaciones que necesitan almacenamiento.
       const operaciones: Array<[string, () => unknown]> = [
         ['reserva', () => tickets.assertAvailable()],
-        ['firma de ticket', () => tickets.sign()],
+        [
+          'firma de ticket',
+          () =>
+            tickets.sign({
+              purpose: 'upload',
+              documentId: 900,
+              projectId: 41,
+              revisionId: 12,
+              actorId: 7,
+            }),
+        ],
         ['upload', () => adaptador.uploadImmutable(identidad, Buffer.from('x'), firmados)],
         ['lectura de contenido', () => adaptador.readCiphertext(identidad, 1000)],
         ['generación de informe', () => crypto.seal(Buffer.from('%PDF-1.7\n'), contextoAad)],
