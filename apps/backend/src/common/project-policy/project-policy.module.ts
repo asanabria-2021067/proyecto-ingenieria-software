@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProjectIdResolverService } from './project-id-resolver.service';
+import { ProjectTransactionService } from './project-transaction.service';
 
 /**
  * Sprint 7 (06 v2 §38/§39): módulo compartido de política de proyecto.
@@ -11,7 +12,7 @@ import { ProjectIdResolverService } from './project-id-resolver.service';
  */
 @Module({
   imports: [PrismaModule],
-  providers: [ProjectIdResolverService],
-  exports: [ProjectIdResolverService],
+  providers: [ProjectIdResolverService, ProjectTransactionService],
+  exports: [ProjectIdResolverService, ProjectTransactionService],
 })
 export class ProjectPolicyModule {}
