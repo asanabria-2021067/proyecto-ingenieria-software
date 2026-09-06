@@ -62,21 +62,26 @@ export async function cleanupTimeFixture(db: PrismaClient, scope: IntegrationCle
  * asignación activa de la tarea, y que la caché del tramo ajeno no se mueve.
  */
 export async function timeLifecycleFixture(db: PrismaClient, scope: IntegrationCleanupScope) {
+  // El scope se ACUMULA en vez de reasignarse: T05-C necesita cuatro escenarios
+  // independientes dentro de una sola prueba y todos deben limpiarse al final.
+  const collect = <K extends keyof IntegrationCleanupScope>(key: K, ids: number[]) => {
+    scope[key] = [...(scope[key] ?? []), ...ids];
+  };
   const leader = await fixtures.createIntegrationUser(db);
   const owner = await fixtures.createIntegrationUser(db);
   const successor = await fixtures.createIntegrationUser(db);
-  scope.userIds = [leader.idUsuario, owner.idUsuario, successor.idUsuario];
+  collect('userIds', [leader.idUsuario, owner.idUsuario, successor.idUsuario]);
   const project = await fixtures.createIntegrationProject(db, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
-  scope.projectIds = [project.idProyecto];
+  collect('projectIds', [project.idProyecto]);
   const role = await fixtures.createIntegrationProjectRole(db, project.idProyecto, { cupos: 3 });
-  scope.roleIds = [role.idRolProyecto];
+  collect('roleIds', [role.idRolProyecto]);
   const ownerParticipation = await fixtures.createIntegrationParticipation(db, owner.idUsuario, role.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
   const successorParticipation = await fixtures.createIntegrationParticipation(db, successor.idUsuario, role.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
-  scope.participationIds = [ownerParticipation.idParticipacion, successorParticipation.idParticipacion];
+  collect('participationIds', [ownerParticipation.idParticipacion, successorParticipation.idParticipacion]);
   const sprint = await fixtures.createIntegrationSprint(db, project.idProyecto);
-  scope.sprintIds = [sprint.idSprint];
+  collect('sprintIds', [sprint.idSprint]);
   const task = await fixtures.createIntegrationTask(db, project.idProyecto, leader.idUsuario, sprint.idSprint);
-  scope.taskIds = [task.idTarea];
+  collect('taskIds', [task.idTarea]);
   const closedAt = new Date('2026-09-01T12:00:00.000Z');
   const closed = await fixtures.createIntegrationTaskAssignment(db, task.idTarea, owner.idUsuario, leader.idUsuario, {
     idParticipacion: ownerParticipation.idParticipacion,
@@ -87,7 +92,7 @@ export async function timeLifecycleFixture(db: PrismaClient, scope: IntegrationC
     idParticipacion: successorParticipation.idParticipacion,
     horasReales: '4.00',
   });
-  scope.assignmentIds = [closed.idAsignacion, open.idAsignacion];
+  collect('assignmentIds', [closed.idAsignacion, open.idAsignacion]);
   const ownerRecord = await db.registroTiempoTarea.create({
     data: {
       idAsignacion: closed.idAsignacion,
