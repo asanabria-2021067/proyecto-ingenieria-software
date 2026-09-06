@@ -31,7 +31,6 @@ import {
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
-import { TimeRecordsService } from '../time-records/time-records.service';
 import { ProjectHoursSummaryService } from './project-hours-summary.service';
 import { HoursRecognitionService } from './hours-recognition.service';
 
@@ -70,11 +69,6 @@ export class SprintsService {
     // las suites existentes construyen SprintsService directamente con 4
     // argumentos posicionales; en producción SprintsModule siempre lo provee.
     private readonly bitacoraEventos?: BitacoraEventosService,
-    // C075: la normalización previa de cachés granulares vacías vive en el
-    // ÚNICO writer de `AsignacionTarea.horasReales`. Sprints no calcula ni
-    // escribe esa columna por su cuenta; delega en él con su propio `tx`.
-    // Opcional por el mismo motivo posicional que `bitacoraEventos`.
-    private readonly timeRecords?: TimeRecordsService,
     // C079 (§40): el detalle por integrante lo compone el proveedor de
     // agregación de horas; Sprints solo decide quién puede leerlo.
     private readonly projectHours?: ProjectHoursSummaryService,
@@ -153,7 +147,10 @@ export class SprintsService {
     // La normalización precede a F3 y F4: materializa a 0 los tramos cerrados
     // granulares sin registros para que ambos predicados evalúen el estado
     // definitivo, y no uno en el que una caché NULL se escapa del contraste.
-    await this.timeRecords?.normalizeClosedGranularTx(tx, { projectId, sprintId });
+    // C155 (§39/§48): la normalización previa vive en el servicio de
+    // reconocimiento, que Sprints YA compone. Sprints sigue sin calcular ni
+    // escribir `horasReales` por su cuenta: delega con su propio `tx`.
+    await this.recognition?.normalizeClosedGranularTx(tx, { projectId, sprintId });
 
     const conHoras = await tx.asignacionTarea.findMany({
       where: { horasReales: { not: null }, tarea: { idProyecto: projectId, idSprint: sprintId } },

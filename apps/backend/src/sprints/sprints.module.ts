@@ -8,10 +8,9 @@ import { ProjectHoursSummaryService } from './project-hours-summary.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BitacoraModule } from '../bitacora/bitacora.module';
 import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
-import { TimeRecordsModule } from '../time-records/time-records.module';
 
 @Module({
-  imports: [NotificationsModule, BitacoraModule, ProjectPolicyModule, TimeRecordsModule],
+  imports: [NotificationsModule, BitacoraModule, ProjectPolicyModule],
   controllers: [SprintsController],
   providers: [
     SprintsContextService,

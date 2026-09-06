@@ -1269,7 +1269,7 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
     expect(sano.blockers.map((row) => row.code)).not.toContain('LEGACY_SIN_CONCILIAR');
   });
   it('T24-B: un tramo LEGACY conserva su importe, rechaza nuevas entradas granulares y se reporta por separado', async () => {
-    const { service, timeRecords, runner } = flowAStack(prisma);
+    const { service, timeRecords, recognition, runner } = flowAStack(prisma);
 
     // ── 1. Una entrada granular sobre el tramo LEGACY se rechaza.
     await expect(
@@ -1289,7 +1289,7 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
       data: { desasignadaEn: new Date('2026-04-20T00:00:00.000Z') },
     });
     await runner.run(legacyCase.projectId, legacyCase.leaderId, 'test.normalize', ({ tx }) =>
-      timeRecords.normalizeClosedGranularTx(tx, {
+      recognition.normalizeClosedGranularTx(tx, {
         projectId: legacyCase.projectId,
         sprintId: legacyCase.sprintId,
       }),

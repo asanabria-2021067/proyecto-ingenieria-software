@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LEADERSHIP_CHANGED, NotificationsGateway, SPRINT_HOURS_ADJUSTED } from './notifications.gateway';
@@ -42,7 +42,9 @@ export class NotificationsService {
 
   constructor(
     private prisma: PrismaService,
-    @Inject(forwardRef(() => NotificationsGateway))
+    // Sin `forwardRef` (06 v2 §48): NotificationsGateway inyecta únicamente
+    // JwtService, así que nunca existió un ciclo que ocultar. Envolverlo
+    // disfrazaría de circular una dependencia que es de un solo sentido.
     private gateway: NotificationsGateway,
   ) {}
 
