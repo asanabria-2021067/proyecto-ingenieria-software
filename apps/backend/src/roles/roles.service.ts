@@ -1,4 +1,5 @@
 import { TimeRecordsService } from '../time-records/time-records.service';
+import { ProjectEligibilityService } from '../eligibility/project-eligibility.service';
 import {
   Injectable,
   Logger,
@@ -44,6 +45,9 @@ export class RolesService {
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly timeRecords: TimeRecordsService,
+    // C086: opcional por el mismo motivo posicional que en el resto del
+    // dominio; en producción RolesModule siempre lo provee.
+    private readonly eligibility?: ProjectEligibilityService,
   ) {}
 
   // ───────────────────────── helpers ─────────────────────────
@@ -403,12 +407,18 @@ export class RolesService {
         return { idParticipacion: existente.idParticipacion, yaParticipaba: true as const, proyecto, rol };
       }
 
-      // Cupo disponible.
-      const activos = await tx.participacionProyecto.count({
-        where: { idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
-      });
-      if (activos >= rol.cupos) {
-        throw new ConflictException('El rol ya alcanzó su límite de cupos activos');
+      // C086 (§17/§23 §18.1): la elegibilidad decide en un solo sitio, para que
+      // nadie active una vía de nueva participación eludiendo una salida
+      // abierta. Conserva las reglas vigentes de cupo e idempotencia.
+      if (this.eligibility) {
+        await this.eligibility.assertCanSelfAssignRole(tx, { projectId, roleId, userId });
+      } else {
+        const activos = await tx.participacionProyecto.count({
+          where: { idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
+        });
+        if (activos >= rol.cupos) {
+          throw new ConflictException('El rol ya alcanzó su límite de cupos activos');
+        }
       }
 
       let participacion: { idParticipacion: number };

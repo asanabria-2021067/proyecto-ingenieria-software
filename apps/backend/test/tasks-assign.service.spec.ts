@@ -230,7 +230,12 @@ describe('TasksService.assign', () => {
 
       await service.assign(5, 42, 1, DTO);
 
-      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, 6, tx);
+      // C086: asignar es crear una asignación NUEVA, así que pasa por la
+      // elegibilidad del destino con el actor que la ejecuta.
+      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, 6, tx, {
+        nuevaAsignacion: true,
+        actorId: 1,
+      });
     });
 
     it('tarea sin rol: rolEfectivo es null', async () => {
@@ -239,7 +244,10 @@ describe('TasksService.assign', () => {
 
       await service.assign(5, 42, 1, DTO);
 
-      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, null, tx);
+      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, null, tx, {
+        nuevaAsignacion: true,
+        actorId: 1,
+      });
     });
 
     it('candidato activo en el rol exacto: permitido (tarea con rol)', async () => {
@@ -655,7 +663,10 @@ describe('TasksService.assign', () => {
       await service.assign(5, 42, 1, DTO);
 
       expect(auth.assertCanAssignTask).toHaveBeenCalledWith(5, 42, 1, tx);
-      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, null, tx);
+      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, null, tx, {
+        nuevaAsignacion: true,
+        actorId: 1,
+      });
       expect(context.getActiveAssignment).toHaveBeenCalledWith(42, tx);
     });
   });

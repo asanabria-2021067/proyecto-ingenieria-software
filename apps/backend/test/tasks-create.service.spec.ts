@@ -128,7 +128,13 @@ describe('TasksService.create', () => {
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(auth.assertCanCreateTask).toHaveBeenCalledWith(5, 1, tx);
-      expect(relations.validateCreateTaskRelations).toHaveBeenCalledWith(5, BASE_DTO, tx);
+      // C086: la asignación inicial también pasa por la elegibilidad, así que
+      // el actor viaja con el DTO hacia el resolutor de la FK.
+      expect(relations.validateCreateTaskRelations).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ ...BASE_DTO, actorId: expect.any(Number) }),
+        tx,
+      );
       expect(tx.tarea.create).toHaveBeenCalledTimes(1);
       expect(tx.asignacionTarea.create).not.toHaveBeenCalled();
       expect(tx.tareaEtiqueta.createMany).not.toHaveBeenCalled();
@@ -447,7 +453,11 @@ describe('TasksService.create', () => {
       await service.create(5, 1, DTO_COMPLETO);
 
       expect(auth.assertCanCreateTask).toHaveBeenCalledWith(5, 1, tx);
-      expect(relations.validateCreateTaskRelations).toHaveBeenCalledWith(5, DTO_COMPLETO, tx);
+      expect(relations.validateCreateTaskRelations).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ ...DTO_COMPLETO, actorId: expect.any(Number) }),
+        tx,
+      );
     });
 
     it('la notificación ocurre después de resolver $transaction, no dentro de ella (Tarea 34: tarea con rol y asignado -> solo notifyRoleMembers)', async () => {

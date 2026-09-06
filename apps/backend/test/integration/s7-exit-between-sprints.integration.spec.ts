@@ -3,6 +3,7 @@ import { HttpException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import { exitStack } from './setup/exit-flow';
+import { tasksStack } from './setup/tasks-stack';
 import * as fixtures from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 
@@ -192,5 +193,112 @@ describeIntegration('S7 salidas entre Sprints', () => {
     expect((await db.participacionProyecto.findUniqueOrThrow({ where: { idParticipacion: pPendiente.idParticipacion } })).estadoParticipacion).toBe('ACTIVO');
     expect(await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: tramo.idAsignacion } })).toEqual(tramoAntes);
     expect(await db.horasParticipacion.count({ where: { idParticipacion: { in: scope.participationIds } } })).toBe(0);
+  });
+
+  it('T11-B: una salida abierta excluye al destinatario de nuevas asignaciones sin impedir que el saliente entregue su trabajo', async () => {
+    const leader = await fixtures.createIntegrationUser(db);
+    const usuarioA = await fixtures.createIntegrationUser(db);
+    const usuarioB = await fixtures.createIntegrationUser(db);
+    const usuarioC = await fixtures.createIntegrationUser(db);
+    scope.userIds = [leader.idUsuario, usuarioA.idUsuario, usuarioB.idUsuario, usuarioC.idUsuario];
+    const project = await fixtures.createIntegrationProject(db, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+    scope.projectIds = [project.idProyecto];
+    const role = await fixtures.createIntegrationProjectRole(db, project.idProyecto, { cupos: 5 });
+    const otroRol = await fixtures.createIntegrationProjectRole(db, project.idProyecto, { cupos: 5 });
+    scope.roleIds = [role.idRolProyecto, otroRol.idRolProyecto];
+    const pA = await fixtures.createIntegrationParticipation(db, usuarioA.idUsuario, role.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+    const pB = await fixtures.createIntegrationParticipation(db, usuarioB.idUsuario, role.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+    const pC = await fixtures.createIntegrationParticipation(db, usuarioC.idUsuario, role.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+    scope.participationIds = [pA.idParticipacion, pB.idParticipacion, pC.idParticipacion];
+    const sprint = await fixtures.createIntegrationSprint(db, project.idProyecto, { estado: 'ACTIVO' });
+    scope.sprintIds = [sprint.idSprint];
+
+    const { service: exit } = exitStack(db);
+    const { tasks, roles, eligibility } = tasksStack(db);
+
+    // A tiene su tarea con horas; después abre su salida (PREPARACION).
+    const tareaDeA = await fixtures.createIntegrationTask(db, project.idProyecto, leader.idUsuario, sprint.idSprint, { idRolProyecto: role.idRolProyecto });
+    scope.taskIds = [tareaDeA.idTarea];
+    await tasks.assign(project.idProyecto, tareaDeA.idTarea, leader.idUsuario, { idUsuario: usuarioA.idUsuario });
+    const tramoDeA = await db.asignacionTarea.findFirstOrThrow({ where: { idTarea: tareaDeA.idTarea, desasignadaEn: null } });
+    scope.assignmentIds = [tramoDeA.idAsignacion];
+    expect(tramoDeA.idParticipacion).toBe(pA.idParticipacion);
+
+    const salidaA = await exit.createSolicitudSalida(project.idProyecto, usuarioA.idUsuario, 'T11-B: A entra en preparación de salida');
+    const salidaB = await exit.createSolicitudSalida(project.idProyecto, usuarioB.idUsuario, 'T11-B: B espera resolución del líder');
+    solicitudIds = [salidaA.idSolicitud, salidaB.idSolicitud];
+    await exit.continueExitPreparation(project.idProyecto, usuarioB.idUsuario);
+
+    // --- Nuevas asignaciones a A y a B: rechazadas con su motivo ---
+    const nueva = await fixtures.createIntegrationTask(db, project.idProyecto, leader.idUsuario, sprint.idSprint, { idRolProyecto: role.idRolProyecto });
+    scope.taskIds = [...scope.taskIds, nueva.idTarea];
+    for (const destino of [usuarioA.idUsuario, usuarioB.idUsuario]) {
+      const cuerpo = await expectStatus(409, () =>
+        tasks.assign(project.idProyecto, nueva.idTarea, leader.idUsuario, { idUsuario: destino }),
+      );
+      expect(cuerpo).toMatchObject({ code: 'DESTINO_INELEGIBLE' });
+      expect((cuerpo as { motivos: string[] }).motivos).toContain('SALIDA_EN_CURSO');
+    }
+    expect(await db.asignacionTarea.count({ where: { idTarea: nueva.idTarea } })).toBe(0);
+
+    // --- C sí puede recibirla, con la FK de participación correcta ---
+    await tasks.assign(project.idProyecto, nueva.idTarea, leader.idUsuario, { idUsuario: usuarioC.idUsuario });
+    const tramoDeC = await db.asignacionTarea.findFirstOrThrow({ where: { idTarea: nueva.idTarea, desasignadaEn: null } });
+    scope.assignmentIds = [...scope.assignmentIds, tramoDeC.idAsignacion];
+    expect(tramoDeC.idParticipacion).toBe(pC.idParticipacion);
+
+    // --- A SÍ puede reportar, cerrar y entregar su trabajo durante PREPARACION ---
+    await db.registroTiempoTarea.create({
+      data: { idAsignacion: tramoDeA.idAsignacion, idUsuario: usuarioA.idUsuario, horas: '2.50', fecha: new Date('2026-09-05') },
+    });
+    await tasks.assign(project.idProyecto, tareaDeA.idTarea, usuarioA.idUsuario, { idUsuario: usuarioC.idUsuario });
+    const tramoCerradoDeA = await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: tramoDeA.idAsignacion } });
+    expect(tramoCerradoDeA.desasignadaEn).not.toBeNull();
+    // El reporte de A queda materializado por el writer único al cerrarse.
+    expect(tramoCerradoDeA.horasReales?.toFixed(2)).toBe('2.50');
+    const sucesorDeA = await db.asignacionTarea.findFirstOrThrow({ where: { idTarea: tareaDeA.idTarea, desasignadaEn: null } });
+    scope.assignmentIds = [...scope.assignmentIds, sucesorDeA.idAsignacion];
+    expect(sucesorDeA.idUsuario).toBe(usuarioC.idUsuario);
+
+    // --- A no abre ninguna vía nueva de participación con su salida abierta ---
+    // La autoasignación es del líder (403 para A), y además la elegibilidad la
+    // rechazaría por sí sola: §18.1 no depende de qué ruta se intente.
+    await expectStatus(403, () =>
+      roles.selfAssign(project.idProyecto, otroRol.idRolProyecto, usuarioA.idUsuario),
+    );
+    const veredicto = await db.$transaction((tx) =>
+      eligibility.evaluateSelfAssignRole(tx, {
+        projectId: project.idProyecto, roleId: otroRol.idRolProyecto, userId: usuarioA.idUsuario,
+      }),
+    );
+    expect(veredicto.elegible).toBe(false);
+    expect(veredicto.motivos).toContain('SALIDA_EN_CURSO');
+    expect(await db.participacionProyecto.count({ where: { idUsuario: usuarioA.idUsuario, idRolProyecto: otroRol.idRolProyecto } })).toBe(0);
+
+    // --- Crear una tarea con asignación inicial a B se rechaza sin crearla ---
+    const tareasAntes = await db.tarea.count({ where: { idProyecto: project.idProyecto } });
+    await expectStatus(409, () =>
+      tasks.create(project.idProyecto, leader.idUsuario, {
+        tituloTarea: 'T11-B: tarea que no debe existir',
+        idRolProyecto: role.idRolProyecto,
+        idUsuarioAsignado: usuarioB.idUsuario,
+      }),
+    );
+    expect(await db.tarea.count({ where: { idProyecto: project.idProyecto } })).toBe(tareasAntes);
+
+    // --- Una tarea sin sucesor queda sin asignación activa y admite HECHO ---
+    const huerfana = await fixtures.createIntegrationTask(db, project.idProyecto, leader.idUsuario, sprint.idSprint, { idRolProyecto: role.idRolProyecto });
+    scope.taskIds = [...scope.taskIds, huerfana.idTarea];
+    const tramoHuerfano = await fixtures.createIntegrationTaskAssignment(db, huerfana.idTarea, usuarioA.idUsuario, leader.idUsuario, {
+      idParticipacion: pA.idParticipacion,
+      desasignadaEn: new Date('2026-09-06T10:00:00.000Z'),
+      horasReales: '1.00',
+    });
+    scope.assignmentIds = [...scope.assignmentIds, tramoHuerfano.idAsignacion];
+    expect(await db.asignacionTarea.count({ where: { idTarea: huerfana.idTarea, desasignadaEn: null } })).toBe(0);
+    // HECHO se apoya en la asignación HISTÓRICA, no en una activa.
+    await db.tarea.update({ where: { idTarea: huerfana.idTarea }, data: { estadoTarea: 'HECHO' } });
+    expect((await db.tarea.findUniqueOrThrow({ where: { idTarea: huerfana.idTarea } })).estadoTarea).toBe('HECHO');
+    expect(await db.asignacionTarea.count({ where: { idTarea: huerfana.idTarea } })).toBe(1);
   });
 });
