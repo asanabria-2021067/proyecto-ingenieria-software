@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import { HttpException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
+import { createBarrier, useSecondClient, withDeadline } from './setup/concurrency';
 import { adjustmentFixture, adjustmentsStack, cleanupAdjustmentFixture } from './setup/adjustments';
 import type { IntegrationCleanupScope } from './setup/cleanup';
 import { ProjectHoursSummaryService } from '../../src/sprints/project-hours-summary.service';
@@ -26,6 +27,7 @@ async function expectStatus(status: number, fn: () => Promise<unknown>): Promise
 describeIntegration('S7 ajustes de horas del líder', () => {
   let db: PrismaClient;
   let scope: IntegrationCleanupScope;
+  const second = useSecondClient();
   beforeAll(async () => { db = createIntegrationPrismaClient(); await db.$connect(); });
   beforeEach(() => { scope = {}; });
   afterEach(async () => { vi.restoreAllMocks(); await cleanupAdjustmentFixture(db, scope); });
@@ -147,5 +149,85 @@ describeIntegration('S7 ajustes de horas del líder', () => {
     expect(historial).toHaveLength(1);
     expect(historial[0].vigente).toBe(false);
     expect(historial[0].deltaHoras).toBe('-1.50');
+  });
+
+  it('T07-C: dos ajustes concurrentes sobre el mismo tramo dejan un único vigente', async () => {
+    const f = await adjustmentFixture(db, scope);
+    const a = adjustmentsStack(db);
+    const b = adjustmentsStack(second());
+
+    const entered = createBarrier(1);
+    const release = createBarrier(1);
+    const competing = createBarrier(1);
+    // A queda retenida DESPUÉS de sus reads y de su escritura, antes de commitear.
+    const originalAudit = a.audit.registrarEvento.bind(a.audit);
+    vi.spyOn(a.audit, 'registrarEvento').mockImplementation(async (input) => {
+      await originalAudit(input);
+      await entered.arrive();
+      await withDeadline(release.wait(), 8000, 'liberar el primer ajuste');
+    });
+    const lockB = b.runner.lockProjectTx.bind(b.runner);
+    vi.spyOn(b.runner, 'lockProjectTx').mockImplementation(async (...args) => {
+      await competing.arrive();
+      return lockB(...args);
+    });
+
+    const primera = a.service.upsert(f.project.idProyecto, f.sprint.idSprint, f.assignment.idAsignacion, f.leader.idUsuario, {
+      deltaHoras: '-1.50', justificacion: 'primera corrección',
+    });
+    let segunda: ReturnType<typeof b.service.upsert> | undefined;
+    try {
+      await withDeadline(entered.wait(), 8000, 'reads internos del primer ajuste');
+      segunda = b.service.upsert(f.project.idProyecto, f.sprint.idSprint, f.assignment.idAsignacion, f.leader.idUsuario, {
+        deltaHoras: '+2.00', justificacion: 'segunda corrección',
+      });
+      await withDeadline(competing.wait(), 8000, 'segunda conexión');
+      // Mientras A no commitea, la segunda conexión no ve ningún ajuste.
+      expect(await second().ajusteHoraTarea.count({ where: { idAsignacion: f.assignment.idAsignacion } })).toBe(0);
+    } finally {
+      await release.arrive();
+    }
+
+    const ganador = await withDeadline(primera, 10000, 'primer ajuste');
+    let perdedorConflicto = false;
+    let sucesor: Awaited<ReturnType<typeof b.service.upsert>> | undefined;
+    try {
+      sucesor = await withDeadline(segunda!, 10000, 'segundo ajuste');
+    } catch (error) {
+      if (!(error instanceof HttpException) || error.getStatus() !== 409) throw error;
+      perdedorConflicto = true;
+    }
+
+    // Sea cual sea la rama, jamás hay dos vigentes.
+    const vigentes = await db.ajusteHoraTarea.findMany({ where: { idAsignacion: f.assignment.idAsignacion, anuladoEn: null } });
+    expect(vigentes).toHaveLength(1);
+    const eventosAjuste = await db.bitacoraAuditoria.count({
+      where: { idUsuario: f.leader.idUsuario, accion: 'TASK_HOURS_ADJUSTED' },
+    });
+    if (perdedorConflicto) {
+      expect(vigentes[0].idAjusteHora).toBe(ganador.idAjusteHora);
+      expect(eventosAjuste).toBe(1);
+    } else {
+      // La perdedora encadenó correctamente sobre la ganadora, sin duplicar vigencia.
+      expect(sucesor!.idAjusteAnterior).toBe(ganador.idAjusteHora);
+      expect(vigentes[0].idAjusteHora).toBe(sucesor!.idAjusteHora);
+      expect(eventosAjuste).toBe(2);
+    }
+
+    vi.restoreAllMocks();
+
+    // Doble reversión concurrente: una anula, la otra no encuentra vigente.
+    const [, ] = await withDeadline(
+      Promise.all([
+        a.service.revert(f.project.idProyecto, f.sprint.idSprint, f.assignment.idAsignacion, f.leader.idUsuario),
+        b.service.revert(f.project.idProyecto, f.sprint.idSprint, f.assignment.idAsignacion, f.leader.idUsuario),
+      ]),
+      15000,
+      'reversiones concurrentes',
+    );
+    expect(await db.ajusteHoraTarea.count({ where: { idAsignacion: f.assignment.idAsignacion, anuladoEn: null } })).toBe(0);
+    expect(
+      await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'TASK_HOURS_ADJUSTMENT_REVERTED' } }),
+    ).toBe(1);
   });
 });
