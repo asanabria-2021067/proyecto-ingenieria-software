@@ -26,6 +26,7 @@ import { TasksService } from '../../src/tasks/tasks.service';
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * X1 — regresión cross-flow: reconocimiento anticipado de horas (B10) al
@@ -53,7 +54,8 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     { notifyFromTemplate: vi.fn() } as unknown as NotificationsService,
     tasksContext,
     new ProjectTransactionService(prismaService),
-    new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService));
 }
 
 function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {

@@ -34,6 +34,7 @@ import { TasksController } from '../../src/tasks/tasks.controller';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 const LONG_CONTENT = 'avance '.repeat(40);
 
@@ -111,7 +112,8 @@ describeIntegration(
         notifications,
         tasksContext,
         new ProjectTransactionService(prismaService),
-        new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+        new ProjectReadPolicyService(prismaService));
       tasksController = new TasksController(tasksService);
     });
 

@@ -7,7 +7,7 @@ import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import { TasksService } from '../src/tasks/tasks.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
-import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 const PROJECT_ID = 5;
 const TASK_ID = 42;
@@ -117,7 +117,8 @@ function makeService(options: { prisma?: ReturnType<typeof makePrisma>; context?
     {} as unknown as NotificationsService,
     context as unknown as TasksContextService,
     new ProjectTransactionService(prisma as unknown as PrismaService),
-    makeProjectPolicyDouble());
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble());
   return { context, prisma, service, tx: prisma.tx };
 }
 

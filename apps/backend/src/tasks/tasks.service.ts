@@ -25,6 +25,7 @@ import {
   type ProjectTransactionContext,
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
@@ -267,6 +268,8 @@ export class TasksService {
     // el lock.
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
+    // C041 (06 v2 §34): política de lectura histórica para `findAll`/`findOne`.
+    private readonly readPolicy: ProjectReadPolicyService,
     // T-164: opcional únicamente porque las suites de test existentes
     // construyen TasksService directamente (sin contenedor de Nest) con
     // argumentos posicionales — en producción, TasksModule siempre lo provee
@@ -281,25 +284,57 @@ export class TasksService {
     return ctx.project;
   }
 
+  /**
+   * C041 (06 v2 §34/§41 E044): el tablero conserva su autorización actual
+   * (líder o participante activo) y añade el ámbito por actor de la política
+   * de lectura; la conjunción nunca amplía lo que ya se veía. El filtro
+   * operativo `eliminadoEn: null` se conserva: la proyección histórica de
+   * aportes eliminados es otra lectura, no esta.
+   */
   async findAll(projectId: number, userId: number): Promise<TareaPublica[]> {
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'tareas',
+    });
     await this.tasksAuthorization.assertCanListProjectTasks(projectId, userId);
 
     const rows = await this.prisma.tarea.findMany({
-      where: { idProyecto: projectId, eliminadoEn: null },
+      where: {
+        idProyecto: projectId,
+        eliminadoEn: null,
+        ...this.tasksContext.taskScopeWhere(userId, this.readPolicy.scopeForActor(decision)),
+      },
       select: TASK_SELECT,
     });
 
     return rows.map(mapTarea).sort(compareTareas);
   }
 
+  /**
+   * C041 (06 v2 §34/§41 E045): igual que el tablero, con el Sprint de la
+   * tarea como entidad de la decisión: un actor limitado a Sprints cerrados
+   * no puede abrir el detalle de una tarea de un Sprint vigente.
+   */
   async findOne(projectId: number, taskId: number, userId: number): Promise<TareaPublica> {
-    await this.tasksAuthorization.assertCanReadTask(projectId, taskId, userId);
+    const tarea = await this.tasksAuthorization.assertCanReadTask(projectId, taskId, userId);
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'tareas',
+      entitySprintId: tarea?.idSprint ?? null,
+    });
 
     // Se repiten los filtros de proyecto y soft delete aunque
     // assertCanReadTask ya validó la tarea, para cubrir el caso de que
     // cambie entre la autorización y esta lectura final.
     const row = await this.prisma.tarea.findFirst({
-      where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
+      where: {
+        idTarea: taskId,
+        idProyecto: projectId,
+        eliminadoEn: null,
+        ...this.tasksContext.taskScopeWhere(userId, this.readPolicy.scopeForActor(decision)),
+      },
       select: TASK_SELECT,
     });
 

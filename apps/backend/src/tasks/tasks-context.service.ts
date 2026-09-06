@@ -128,6 +128,25 @@ export class TasksContextService {
   }
 
   /**
+   * C041 (06 v2 §34): filtro adicional de `Tarea` derivado de la decisión de
+   * lectura ya resuelta por `ProjectReadPolicyService`. Se aplica en la
+   * consulta, nunca sobre el DTO: el ámbito de Sprint restringe las tareas a
+   * los estados que la matriz permite al actor, y `ownOnly` (participante
+   * histórico o exlíder) las acota a aquellas en las que el actor tuvo una
+   * asignación. Un actor sin restricciones produce `{}` y la consulta queda
+   * exactamente como antes.
+   */
+  taskScopeWhere(
+    userId: number,
+    scope: { sprintWhere: Prisma.SprintWhereInput; ownOnly: boolean },
+  ): Prisma.TareaWhereInput {
+    return {
+      ...(Object.keys(scope.sprintWhere).length > 0 ? { sprint: scope.sprintWhere } : {}),
+      ...(scope.ownOnly ? { asignaciones: { some: { idUsuario: userId } } } : {}),
+    };
+  }
+
+  /**
    * Hito no tiene soft delete en el schema actual (sin columna eliminadoEn),
    * por lo que no se aplica ningún filtro de eliminación: solo existencia y
    * pertenencia al proyecto.

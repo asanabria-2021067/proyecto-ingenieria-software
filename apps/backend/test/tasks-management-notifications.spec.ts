@@ -8,7 +8,7 @@ import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import { TasksService } from '../src/tasks/tasks.service';
 import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
-import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * Tarea 34: integra las mutaciones de gestión de tareas (crear, editar,
@@ -77,7 +77,8 @@ function makeService(
     notifications as NotificationsService,
     context as TasksContextService,
     new ProjectTransactionService(prisma as unknown as PrismaService),
-    makeProjectPolicyDouble());
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble());
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {

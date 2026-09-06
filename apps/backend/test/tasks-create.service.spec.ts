@@ -8,7 +8,7 @@ import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
 import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
-import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -78,7 +78,7 @@ function makeService(
   relations: TasksRelationsService,
   notifications: NotificationsService,
 ) {
-  return new TasksService(prisma, auth, relations, notifications, makeContext(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+  return new TasksService(prisma, auth, relations, notifications, makeContext(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 }
 
 const BASE_DTO = {
