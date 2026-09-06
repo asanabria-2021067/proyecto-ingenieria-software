@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EstadoProyecto, EstadoSprint, Prisma, type OrigenReporteTramo } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksContextService } from '../tasks/tasks-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -93,6 +93,47 @@ function mapRegistroTiempo(row: TimeRecordRow): RegistroTiempoTareaPublico {
     creadoEn: row.creadoEn,
     usuario: row.usuario,
   };
+}
+
+/**
+ * C067 (06 v2 §46 TaskHoursSummary + §8): proyección de lectura de las horas
+ * de una tarea. Los importes viajan como string decimal de dos posiciones —
+ * nunca como number — para que ningún consumidor pierda escala por el camino.
+ *
+ * `horasLegacyNoGranulares` existe precisamente para NO hacer pasar un importe
+ * histórico sin registros por una suma de RegistroTiempoTarea: se informa
+ * aparte y no participa en la regla de sobreestimación de §10.
+ */
+export interface TramoHorasResumen {
+  idAsignacion: number;
+  usuario: UsuarioResumenPublico;
+  idParticipacion: number | null;
+  rolHistorico: { idRolProyecto: number; nombreRol: string } | null;
+  abierto: boolean;
+  origen: OrigenReporteTramo;
+  /** SUM de registros efectivos de ESTE tramo. Un tramo LEGACY reporta 0.00. */
+  reportadas: string;
+  /** Delta del ajuste vigente del líder, o null si no hay ninguno. */
+  ajuste: string | null;
+  /** Caché del tramo + delta vigente (06 v2 §8). */
+  propuestas: string;
+  reconocidoEn: Date | null;
+  /** Justificaciones de exceso de los registros que este lector puede ver. */
+  justificaciones: string[];
+}
+
+export interface TaskHoursSummary {
+  taskId: number;
+  sprintId: number;
+  estimacion: number | null;
+  horasReportadasTarea: string;
+  horasLegacyNoGranulares: string;
+  restantes: string | null;
+  sobreEstimacion: string | null;
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeRevocar: boolean;
+  tramos: TramoHorasResumen[];
 }
 
 /**
@@ -592,35 +633,160 @@ export class TimeRecordsService {
     return registro;
   }
 
+  /**
+   * C067 (06 v2 §9/§34/§41 E055): la visibilidad la decide el PERFIL que
+   * devuelve la política, no una comparación local con `creadoPor`. Los
+   * registros revocados no se filtran: el autor ve los suyos y el líder los ve
+   * todos, porque una revocación es evidencia conservada, no una fila borrada.
+   */
   async findAllForTask(
     projectId: number,
     taskId: number,
     userId: number,
   ): Promise<RegistroTiempoTareaPublico[]> {
     const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId);
-    // C049 (§34/§41 E055): la política decide el acceso; el filtro por autor
-    // que ya distingue líder de integrante se conserva tal cual.
-    await this.readPolicy.assertRead(undefined, {
+    const decision = await this.readPolicy.assertRead(undefined, {
       projectId,
       actorId: userId,
       scope: 'horas',
       entitySprintId: tarea.idSprint,
     });
-    await this.tasksContext.assertActiveProjectParticipant(projectId, userId);
-
-    const proyecto = await this.tasksContext.getProjectOrThrow(projectId);
-    const esLider = proyecto.creadoPor === userId;
 
     const rows = await this.prisma.registroTiempoTarea.findMany({
       where: {
         asignacion: { idTarea: tarea.idTarea },
-        ...(esLider ? {} : { idUsuario: userId }),
+        ...(this.seesEveryRecord(decision) ? {} : { idUsuario: userId }),
       },
       orderBy: [{ fecha: 'desc' }, { idRegistroTiempo: 'desc' }],
       select: TIME_RECORD_SELECT,
     });
 
     return rows.map(mapRegistroTiempo);
+  }
+
+  /** Solo el líder actual y el administrador leen los registros de terceros. */
+  private seesEveryRecord(decision: { profile: string }): boolean {
+    return decision.profile === 'LIDER' || decision.profile === 'ADMIN';
+  }
+
+  /**
+   * C067 (06 v2 §46 TaskHoursSummary / §41 E059): captura de lectura de las
+   * horas de una tarea. No escribe nada: los indicadores se derivan del estado
+   * actual, de modo que subir la estimación a mano recalcula el restante y el
+   * exceso sin inventar ninguna obligación retroactiva ni tocar una
+   * justificación ya almacenada.
+   */
+  async getTaskHoursSummary(
+    projectId: number,
+    taskId: number,
+    userId: number,
+  ): Promise<TaskHoursSummary> {
+    const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId);
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'horas',
+      entitySprintId: tarea.idSprint,
+    });
+    const verTodo = this.seesEveryRecord(decision);
+
+    const [tramos, sprintAmbiente, sprintEntidad] = await Promise.all([
+      this.prisma.asignacionTarea.findMany({
+        where: { idTarea: tarea.idTarea },
+        orderBy: { idAsignacion: 'asc' },
+        select: {
+          idAsignacion: true,
+          idParticipacion: true,
+          desasignadaEn: true,
+          origenReporte: true,
+          horasReales: true,
+          reconocidoEn: true,
+          idUsuario: true,
+          usuario: { select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } },
+          participacion: {
+            select: { rolProyecto: { select: { idRolProyecto: true, nombreRol: true } } },
+          },
+          registrosTiempo: {
+            select: { idUsuario: true, horas: true, revocadoEn: true, justificacionExceso: true },
+          },
+          ajustes: {
+            where: { anuladoEn: null },
+            select: { deltaHoras: true },
+          },
+        },
+      }),
+      this.prisma.sprint.findFirst({
+        where: { idProyecto: projectId, estado: { in: [EstadoSprint.ACTIVO, EstadoSprint.EN_FINALIZACION] } },
+        select: { estado: true },
+      }),
+      this.prisma.sprint.findUnique({ where: { idSprint: tarea.idSprint }, select: { estado: true } }),
+    ]);
+
+    let reportadasTarea = new Prisma.Decimal(0);
+    let legacy = new Prisma.Decimal(0);
+    const proyeccion: TramoHorasResumen[] = tramos.map((tramo) => {
+      const efectivos = tramo.registrosTiempo.filter((registro) => registro.revocadoEn === null);
+      const reportadas = efectivos.reduce((acc, registro) => acc.plus(registro.horas), new Prisma.Decimal(0));
+      reportadasTarea = reportadasTarea.plus(reportadas);
+      if (tramo.origenReporte === 'LEGACY') {
+        legacy = legacy.plus(tramo.horasReales ?? 0);
+      }
+      const delta = tramo.ajustes[0]?.deltaHoras ?? null;
+      const cache = tramo.horasReales ?? new Prisma.Decimal(0);
+      return {
+        idAsignacion: tramo.idAsignacion,
+        usuario: tramo.usuario,
+        idParticipacion: tramo.idParticipacion,
+        rolHistorico: tramo.participacion?.rolProyecto ?? null,
+        abierto: tramo.desasignadaEn === null,
+        origen: tramo.origenReporte,
+        reportadas: reportadas.toFixed(2),
+        ajuste: delta ? delta.toFixed(2) : null,
+        propuestas: cache.plus(delta ?? 0).toFixed(2),
+        reconocidoEn: tramo.reconocidoEn,
+        justificaciones: tramo.registrosTiempo
+          .filter((registro) => verTodo || registro.idUsuario === userId)
+          .map((registro) => registro.justificacionExceso)
+          .filter((texto): texto is string => texto !== null),
+      };
+    });
+
+    // §10: el legacy NO entra en los indicadores de sobreestimación.
+    const indicadores = computeHoursIndicators(reportadasTarea, tarea.tiempoEstimadoHoras ?? null);
+    const ventanaAbierta =
+      (decision.project.estadoProyecto === EstadoProyecto.PUBLICADO ||
+        decision.project.estadoProyecto === EstadoProyecto.EN_PROGRESO) &&
+      sprintAmbiente?.estado === EstadoSprint.ACTIVO &&
+      sprintEntidad?.estado === EstadoSprint.ACTIVO;
+    const tramoPropioAbierto = tramos.some(
+      (tramo) =>
+        tramo.idUsuario === userId &&
+        tramo.desasignadaEn === null &&
+        tramo.origenReporte === 'GRANULAR' &&
+        tramo.reconocidoEn === null,
+    );
+    const registroPropioMutable = tramos.some(
+      (tramo) =>
+        tramo.origenReporte === 'GRANULAR' &&
+        tramo.reconocidoEn === null &&
+        tramo.registrosTiempo.some(
+          (registro) => registro.idUsuario === userId && registro.revocadoEn === null,
+        ),
+    );
+
+    return {
+      taskId: tarea.idTarea,
+      sprintId: tarea.idSprint,
+      estimacion: tarea.tiempoEstimadoHoras ?? null,
+      horasReportadasTarea: reportadasTarea.toFixed(2),
+      horasLegacyNoGranulares: legacy.toFixed(2),
+      restantes: indicadores.restantes?.toFixed(2) ?? null,
+      sobreEstimacion: indicadores.sobreEstimacion?.toFixed(2) ?? null,
+      puedeCrear: ventanaAbierta && tramoPropioAbierto,
+      puedeEditar: ventanaAbierta && registroPropioMutable,
+      puedeRevocar: ventanaAbierta && registroPropioMutable,
+      tramos: proyeccion,
+    };
   }
 
   /**

@@ -72,16 +72,17 @@ function setup(txOverrides: Record<string, unknown> = {}) {
     notifyTaskHoursLogged: vi.fn().mockResolvedValue(undefined),
   };
 
+  const readPolicy = makeProjectReadPolicyDouble();
   const service = new TimeRecordsService(
     prisma as unknown as PrismaService,
     tasksContext as unknown as TasksContextService,
     notifications as unknown as NotificationsService,
     makeProjectTransactionDouble({ tx }),
     makeProjectPolicyDouble(),
-    makeProjectReadPolicyDouble(),
+    readPolicy,
   );
 
-  return { prisma, tasksContext, notifications, tx, service };
+  return { prisma, tasksContext, notifications, tx, service, readPolicy };
 }
 
 describe('TimeRecordsService (HU-142 / T-170)', () => {
@@ -227,7 +228,12 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
     });
 
     it('un integrante que no es líder solo recibe sus propios registros', async () => {
-      const { prisma, service } = setup();
+      const { prisma, service, readPolicy } = setup();
+      // C067: la visibilidad la decide el PERFIL devuelto por la política de
+      // lectura, no una comparación local con `creadoPor`.
+      (readPolicy.assertRead as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        profile: 'PARTICIPANTE_ACTIVO', sprintEstados: null, ownOnly: false, isAdmin: false,
+      });
 
       await service.findAllForTask(PROJECT_ID, TASK_ID, ASSIGNEE_ID);
 
