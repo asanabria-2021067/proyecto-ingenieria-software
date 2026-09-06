@@ -10,7 +10,7 @@ import { ProjectIdResolverService } from '../../../src/common/project-policy/pro
 import { ProjectCloseReadinessService } from '../../../src/project-closure/project-close-readiness.service';
 import { ProjectClosureService } from '../../../src/project-closure/project-closure.service';
 import { ProjectClosureReportService } from '../../../src/project-closure/project-closure-report.service';
-import { closureDocumentsStack, closureConfig } from './closure-storage';
+import { closureDocumentsStack, closureConfig, pdfFixture } from './closure-storage';
 import * as fixtures from './fixtures';
 import { cleanupIntegrationFixtures } from './cleanup';
 import type { ClosureCleanupScope } from './closure-storage';
@@ -41,6 +41,18 @@ export function closureLifecycleStack(db: PrismaClient) {
     audit,
   );
   return { closure, readiness, runner, policy, audit, report, documentos, notifications, gateway };
+}
+
+export async function closureReadyFixture(db: PrismaClient, scope: ClosureCleanupScope) {
+  const f = await proyectoListoParaGenerar(db, scope);
+  const stack = closureLifecycleStack(db);
+  const generated = await stack.report.generateAutoReport(f.project.idProyecto, f.leader.idUsuario, f.revision.idRevisionCierre);
+  const grant = await stack.documentos.service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+    revisionId: f.revision.idRevisionCierre, nombreArchivo: 'evidencia.pdf',
+  });
+  await stack.documentos.service.uploadAndAttach(f.project.idProyecto, f.leader.idUsuario, grant.ticket, await pdfFixture());
+  const dto = { revisionId: f.revision.idRevisionCierre, confirmado: true, expectedFingerprint: generated.fingerprintEjecucion };
+  return { ...f, stack, generated, dto };
 }
 
 /**
