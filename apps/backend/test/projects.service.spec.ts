@@ -6,6 +6,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { EstadoProyectoCreador } from '../src/projects/dto/update-estado-proyecto.dto';
 import { ProjectsService } from '../src/projects/projects.service';
+import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
 
 function makePrisma() {
   const defaultTx = {
@@ -49,14 +50,27 @@ function makePrisma() {
   };
 }
 
+/** C031: los writers abren el runner de proyecto; el doble entrega el propio doble de Prisma como `tx`. */
+function makeNotifications(overrides: Record<string, unknown> = {}) {
+  return {
+    persistTemplateTx: vi.fn(),
+    persistAdminsTx: vi.fn(),
+    persistUsersTx: vi.fn(),
+    publishEffects: vi.fn(),
+    ...overrides,
+  };
+}
+
 function makeService(
   prisma: ReturnType<typeof makePrisma>,
-  notifications: Partial<NotificationsService> = {},
+  notifications: Partial<NotificationsService> | Record<string, unknown> = {},
 ) {
   return new ProjectsService(
     prisma as unknown as PrismaService,
-    notifications as unknown as NotificationsService,
+    makeNotifications(notifications as Record<string, unknown>) as unknown as NotificationsService,
     {} as unknown as Cache,
+    makeProjectTransactionDouble({ tx: prisma }),
+    makeProjectPolicyDouble(),
   );
 }
 
@@ -202,14 +216,21 @@ describe('ProjectsService', () => {
       },
       revisionProyecto: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
     };
-    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as typeof prisma.$transaction;
-    const notifications = { notifyAdminsFromTemplate: vi.fn(), isAdmin: vi.fn() };
+    prisma.proyecto.findUnique.mockResolvedValue(tx.proyecto.findUnique.getMockImplementation()?.() ?? null);
+    const notifications = makeNotifications({ isAdmin: vi.fn() });
     const service = makeService(prisma, notifications);
 
     const result = await service.submitForReview(1, 1);
 
     expect(result.estadoProyecto).toBe(EstadoProyecto.EN_REVISION);
-    expect(notifications.notifyAdminsFromTemplate).toHaveBeenCalled();
+    // C031: la notificación a admins se persiste con el `tx` del runner y se publica después del commit.
+    expect(notifications.persistAdminsTx).toHaveBeenCalledWith(
+      prisma,
+      'PROYECTO_EN_REVISION',
+      expect.objectContaining({ projectId: 1, numeroEnvio: 1 }),
+      expect.objectContaining({ add: expect.any(Function) }),
+    );
+    expect(prisma.revisionProyecto.create).toHaveBeenCalled();
   });
 
   it('resubmit falla si estado no es observado', async () => {
@@ -395,12 +416,19 @@ describe('ProjectsService', () => {
           tituloProyecto: 'P',
         });
         prisma.participacionProyecto.findMany.mockResolvedValue([]);
-        const notifications = { notifyFromTemplate: vi.fn() };
+        const notifications = makeNotifications();
         const service = makeService(prisma, notifications);
 
         const result = await service.changeEstado(1, 1, EstadoProyectoCreador.CERRADO);
 
         expect(result.estadoProyecto).toBe(EstadoProyecto.CERRADO);
+        expect(notifications.persistTemplateTx).toHaveBeenCalledWith(
+          prisma,
+          [1],
+          'CAMBIO_ESTADO_PROYECTO',
+          expect.objectContaining({ newStatus: EstadoProyecto.CERRADO }),
+          expect.objectContaining({ add: expect.any(Function) }),
+        );
       });
     });
   });
