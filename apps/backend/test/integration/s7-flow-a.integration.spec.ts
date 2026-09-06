@@ -254,4 +254,81 @@ describeIntegration('S7 Flow A — consolidación de Sprint', () => {
     expect((await db.sprint.findUniqueOrThrow({ where: { idSprint: f.sprint.idSprint } })).estado).toBe('EN_FINALIZACION');
     expect(await db.horasParticipacion.count({ where: { idSprint: null } })).toBe(0);
   });
+
+  it('T08-D: la propuesta incorpora el ajuste vigente y una base desactualizada bloquea el cierre con AJUSTE_DESACTUALIZADO', async () => {
+    const f = await flowAFixture(db, scope, 'EN_FINALIZACION');
+    const { service, recognition } = flowAStack(db);
+    const base = { projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, leaderId: f.leader.idUsuario };
+
+    const tramoA = await closedTask(db, scope, { ...base, userId: f.memberA.idUsuario, participationId: f.participationA.idParticipacion, horasReales: '6.00' });
+    await backWithEntries(db, { assignmentId: tramoA.assignment.idAsignacion, userId: f.memberA.idUsuario, horas: '6.00' });
+    await db.tarea.update({ where: { idTarea: tramoA.task.idTarea }, data: { tiempoEstimadoHoras: 5 } });
+    await closedTask(db, scope, { ...base, userId: f.memberB.idUsuario, participationId: f.participationB.idParticipacion, horasReales: '2.00' });
+
+    // Ajuste vigente de +2.00 con base 6.00, coherente con la caché.
+    const ajuste = await db.ajusteHoraTarea.create({
+      data: {
+        idAsignacion: tramoA.assignment.idAsignacion,
+        deltaHoras: '2.00', horasBase: '6.00',
+        justificacion: 'dos horas verificadas de más', idAutor: f.leader.idUsuario,
+      },
+    });
+
+    const resumen = await service.getSprintClosingSummary(f.project.idProyecto, f.sprint.idSprint, f.leader.idUsuario);
+    expect(resumen.estadoSprint).toBe('EN_FINALIZACION');
+    const deA = resumen.participantes.find((p) => p.idUsuario === f.memberA.idUsuario)!;
+    // Reportadas, legacy, exceso y propuestas coexisten sin ningún total editable.
+    expect(deA.totales).toMatchObject({
+      tareasDistintas: 1, estimacionAsociada: 5, reportadas: '6.00', legacy: '0.00',
+      exceso: '1.00', propuestas: '8.00', filasPendientes: 1, filasConsumidas: 0,
+    });
+    expect(deA.totales!.tramos[0]).toMatchObject({
+      idAsignacion: tramoA.assignment.idAsignacion, reportadas: '6.00',
+      ajuste: '2.00', justificacionAjuste: 'dos horas verificadas de más', propuestas: '8.00',
+    });
+    expect(resumen.blockers?.map((b) => b.code)).not.toContain('AJUSTE_DESACTUALIZADO');
+    expect(Object.keys(deA.totales!)).not.toContain('horasAprobadasEditable');
+
+    // El detalle por integrante desglosa sus tramos.
+    const detalle = await service.getSprintMemberDetail(f.project.idProyecto, f.sprint.idSprint, f.memberA.idUsuario, f.leader.idUsuario);
+    expect(detalle.tramos.map((t) => t.idAsignacion)).toEqual([tramoA.assignment.idAsignacion]);
+    expect(detalle.tramos[0]).toMatchObject({ cache: '6.00', ajuste: '2.00', propuestas: '8.00' });
+
+    // La caché cambia por debajo sin actualizar el ajuste: base desactualizada.
+    await db.asignacionTarea.update({ where: { idAsignacion: tramoA.assignment.idAsignacion }, data: { horasReales: '7.00' } });
+    const conBlocker = await service.getSprintClosingSummary(f.project.idProyecto, f.sprint.idSprint, f.leader.idUsuario);
+    expect(conBlocker.blockers?.find((b) => b.code === 'AJUSTE_DESACTUALIZADO')).toMatchObject({
+      ids: [tramoA.assignment.idAsignacion], cantidad: 1,
+    });
+
+    const conflicto = await expectStatus(409, () =>
+      db.$transaction((tx) =>
+        recognition.recognizeParticipationHours(tx, {
+          projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, participationId: f.participationA.idParticipacion,
+        }),
+      ),
+    );
+    expect(conflicto).toMatchObject({ code: 'AJUSTE_DESACTUALIZADO' });
+    // Cero escrituras al rechazar.
+    expect((await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: tramoA.assignment.idAsignacion } })).reconocidoEn).toBeNull();
+    expect(await db.horasParticipacion.count({ where: { idSprint: f.sprint.idSprint } })).toBe(0);
+
+    // Se corrige el ajuste sobre la base observada y ahora sí consolida.
+    await db.asignacionTarea.update({ where: { idAsignacion: tramoA.assignment.idAsignacion }, data: { horasReales: '6.00' } });
+    expect((await db.ajusteHoraTarea.findUniqueOrThrow({ where: { idAjusteHora: ajuste.idAjusteHora } })).horasBase.toFixed(2)).toBe('6.00');
+
+    const resultado = await db.$transaction((tx) =>
+      recognition.recognizeParticipationHours(tx, {
+        projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, participationId: f.participationA.idParticipacion,
+      }),
+    );
+    expect(resultado.horasReportadas.toFixed(2)).toBe('6.00');
+    expect(resultado.horasPropuestas.toFixed(2)).toBe('8.00');
+    const agregado = await db.horasParticipacion.findFirstOrThrow({
+      where: { idParticipacion: f.participationA.idParticipacion, idSprint: f.sprint.idSprint },
+    });
+    expect(agregado.horasReportadas.toFixed(2)).toBe('6.00');
+    expect(agregado.horasCalculadas?.toFixed(2)).toBe('8.00');
+    expect(agregado.horasAprobadas).toBeNull();
+  });
 });
