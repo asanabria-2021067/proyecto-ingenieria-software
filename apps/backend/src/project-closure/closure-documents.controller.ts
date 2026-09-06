@@ -2,13 +2,18 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
+  Header,
   Param,
   ParseIntPipe,
   Post,
+  Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -48,6 +53,51 @@ export class ClosureDocumentsController {
     @Body() dto: ReserveDocumentDto,
   ) {
     return this.documents.reserve(projectId, user.userId, dto);
+  }
+
+  /** E109: permiso de lectura; la URL es del backend, nunca del proveedor. */
+  @Get(':documentId/url')
+  readUrl(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('documentId', ParseIntPipe) documentId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.documents.getReadUrl(projectId, documentId, user.userId);
+  }
+
+  /**
+   * E110: bytes del documento, servidos INLINE por el backend.
+   *
+   * Nunca redirige al origen: la respuesta lleva el PDF ya descifrado y
+   * verificado, con cabeceras que impiden que un intermediario lo guarde o
+   * que el navegador adivine otro tipo de contenido. Un `Range` recibe la
+   * respuesta completa: con diez megabytes de techo no hace falta descifrado
+   * parcial.
+   */
+  @Get(':documentId/contenido')
+  @Header('Content-Type', 'application/pdf')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async readContent(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('documentId', ParseIntPipe) documentId: number,
+    @CurrentUser() user: { userId: number },
+    @Query('ticket') ticket: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { bytes, nombreArchivo } = await this.documents.readContent(
+      projectId,
+      documentId,
+      user.userId,
+      ticket,
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${nombreArchivo.replace(/[^A-Za-z0-9._-]/g, '_')}"`,
+    );
+    res.setHeader('Content-Length', String(bytes.length));
+    res.status(200).end(bytes);
   }
 
   /** E107: multipart `{ticket,file}` con el límite exacto del contrato. */
