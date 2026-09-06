@@ -151,6 +151,26 @@ export class TimeRecordsService {
     return hours;
   }
 
+  async normalizeClosedGranularTx(
+    tx: Prisma.TransactionClient,
+    scope: { projectId: number; sprintId: number },
+  ): Promise<void> {
+    const assignments = await tx.asignacionTarea.findMany({
+      where: {
+        tarea: { idProyecto: scope.projectId, idSprint: scope.sprintId },
+        desasignadaEn: { not: null },
+        reconocidoEn: null,
+        origenReporte: 'GRANULAR',
+        horasReales: null,
+        registrosTiempo: { none: { revocadoEn: null } },
+      },
+      select: { idAsignacion: true },
+    });
+    for (const assignment of assignments) {
+      await this.recalculateAssignment(tx, assignment.idAsignacion);
+    }
+  }
+
   async create(
     projectId: number,
     taskId: number,
