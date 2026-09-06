@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BACKEND_ENV_PATH, buildEnvOptions, resolveBackendEnvPath } from '../src/config/env.options';
+import { validateEnvironment } from '../src/config/environment.validation';
 
 /**
  * TC03 — foundation única de environment (06 v2 §51.1 y §47). Cada caso usa
- * fixtures sintéticos en un directorio temporal: nunca lee ni escribe el
- * apps/backend/.env real y no expone ningún secreto.
+ * fixtures sintéticos (directorio temporal o entornos en memoria): nunca lee
+ * ni escribe el apps/backend/.env real y no expone ningún secreto.
  */
 
 type ProcessEnvSnapshot = Record<string, string | undefined>;
@@ -30,6 +32,52 @@ function restoreProcessEnv(snapshot: ProcessEnvSnapshot): void {
       process.env[key] = value;
     }
   }
+}
+
+const LOGGER_METHODS = ['log', 'warn', 'error', 'debug', 'verbose'] as const;
+
+function captureLogger(): { calls: unknown[][]; restore: () => void } {
+  const calls: unknown[][] = [];
+  const spies = LOGGER_METHODS.map((method) =>
+    vi.spyOn(Logger.prototype, method).mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+    }),
+  );
+  return { calls, restore: () => spies.forEach((spy) => spy.mockRestore()) };
+}
+
+function collectStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') {
+    out.push(value);
+  } else if (Array.isArray(value)) {
+    value.forEach((item) => collectStrings(item, out));
+  } else if (value !== null && typeof value === 'object') {
+    Object.values(value).forEach((item) => collectStrings(item, out));
+  }
+  return out;
+}
+
+// Material sintético y determinista: nunca un secreto real.
+const SYNTHETIC_KEK = Buffer.alloc(32, 1).toString('base64');
+const SYNTHETIC_HMAC = Buffer.alloc(32, 2).toString('base64');
+const SYNTHETIC_API_SECRET = 'synthetic-cloudinary-secret-for-tests';
+const SYNTHETIC_SECRETS = [SYNTHETIC_KEK, SYNTHETIC_HMAC, SYNTHETIC_API_SECRET];
+
+function leakedSecrets(haystack: string[]): string[] {
+  return SYNTHETIC_SECRETS.filter((secret) => haystack.some((text) => text.includes(secret)));
+}
+
+function completeClosureEnvironment(): Record<string, string> {
+  return {
+    NODE_ENV: 'development',
+    FRONTEND_URL: 'http://localhost:3000',
+    CLOUDINARY_CLOUD_NAME: 'demo-cloud',
+    CLOUDINARY_API_KEY: '123456789012345',
+    CLOUDINARY_API_SECRET: SYNTHETIC_API_SECRET,
+    CLOSURE_KEKS: JSON.stringify({ 'kek-2026-09': SYNTHETIC_KEK }),
+    CLOSURE_ACTIVE_KEY_ID: 'kek-2026-09',
+    CLOSURE_TICKET_HMAC_SECRET: SYNTHETIC_HMAC,
+  };
 }
 
 describe('S7 environment foundation (TC03)', () => {
@@ -65,9 +113,10 @@ describe('S7 environment foundation (TC03)', () => {
     return { backendDir, backendEnvPath, rootEnvPath };
   }
 
-  it('TC03-A: BACKEND_ENV_PATH resuelve apps/backend/.env desde src y dist, ignora el .env de la raíz y respeta el entorno ya inyectado', () => {
+  it('TC03-A: BACKEND_ENV_PATH resuelve apps/backend/.env desde src y dist, ignora el .env de la raíz y respeta el entorno ya inyectado', async () => {
     const fixture = createFixtureRepository();
     process.env.NODE_ENV = 'development';
+    process.env.FRONTEND_URL = 'http://localhost:3000';
     process.env.S7_TC03_PRECEDENCE = 'from-process';
     delete process.env.S7_TC03_FILE_ONLY;
     delete process.env.S7_TC03_ROOT_ONLY;
@@ -97,7 +146,12 @@ describe('S7 environment foundation (TC03)', () => {
     expect(fixtureOptions.envFilePath).toBe(fixture.backendEnvPath);
     expect(JSON.stringify(fixtureOptions)).not.toContain(fixture.rootEnvPath);
 
-    ConfigModule.forRoot(fixtureOptions);
+    const logger = captureLogger();
+    try {
+      await ConfigModule.forRoot(fixtureOptions);
+    } finally {
+      logger.restore();
+    }
     const config = new ConfigService();
 
     expect(process.env.S7_TC03_PRECEDENCE).toBe('from-process');
@@ -106,5 +160,81 @@ describe('S7 environment foundation (TC03)', () => {
     expect(config.get<string>('S7_TC03_FILE_ONLY')).toBe('backend-file-value');
     expect(process.env.S7_TC03_ROOT_ONLY).toBeUndefined();
     expect(config.get<string>('S7_TC03_ROOT_ONLY')).toBeUndefined();
+  });
+
+  it('TC03-B: validateEnvironment deriva disponibilidad de Closure sin emitir valores y permite arrancar el resto del backend', () => {
+    const logger = captureLogger();
+    try {
+      // (1) Entorno completo y válido.
+      const complete = validateEnvironment(completeClosureEnvironment());
+      expect(complete.closure.disponible).toBe(true);
+      expect(complete.closure.deliveryMode).toBe('authenticated');
+      expect(complete.closure.prefix).toBe('uvgenius/cierre');
+      expect(complete.closure.faltantes).toEqual([]);
+      expect(complete.closure.motivos).toEqual([]);
+      expect(complete.closure.cloudName).toBe('demo-cloud');
+      expect(complete.closure.activeKeyId).toBe('kek-2026-09');
+      expect(complete.closure.keyIds).toEqual(['kek-2026-09']);
+      expect(complete.app).toEqual({
+        nodeEnv: 'development',
+        port: 3001,
+        frontendUrl: 'http://localhost:3000',
+        cookieSecure: false,
+        redis: { host: 'localhost', port: 6379 },
+      });
+
+      // (2) Sin las tres variables criptográficas: no lanza, solo marca no disponible.
+      const {
+        CLOSURE_KEKS: _keks,
+        CLOSURE_ACTIVE_KEY_ID: _activeKeyId,
+        CLOSURE_TICKET_HMAC_SECRET: _hmac,
+        ...withoutCryptoSecrets
+      } = completeClosureEnvironment();
+      const partial = validateEnvironment(withoutCryptoSecrets);
+      expect(partial.closure.disponible).toBe(false);
+      expect(partial.closure.faltantes).toEqual([
+        'CLOSURE_KEKS',
+        'CLOSURE_ACTIVE_KEY_ID',
+        'CLOSURE_TICKET_HMAC_SECRET',
+      ]);
+      expect(partial.closure.motivos).toEqual([]);
+      expect(partial.closure.deliveryMode).toBe('authenticated');
+      expect(partial.app.frontendUrl).toBe('http://localhost:3000');
+
+      // (3) Clave activa inexistente y HMAC igual a una KEK.
+      const inconsistent = validateEnvironment({
+        ...completeClosureEnvironment(),
+        CLOSURE_ACTIVE_KEY_ID: 'kek-inexistente',
+        CLOSURE_TICKET_HMAC_SECRET: SYNTHETIC_KEK,
+      });
+      expect(inconsistent.closure.disponible).toBe(false);
+      expect(inconsistent.closure.faltantes).toEqual([]);
+      expect(inconsistent.closure.motivos).toEqual(['ACTIVE_KEY_ID_NO_EN_KEKS', 'HMAC_NO_INDEPENDIENTE']);
+
+      // Ningún campo derivado ni ningún argumento del logger contiene material de clave.
+      for (const result of [complete, partial, inconsistent]) {
+        expect(leakedSecrets(collectStrings(result.closure))).toEqual([]);
+        expect(leakedSecrets(collectStrings(result.app))).toEqual([]);
+      }
+      const loggedText = collectStrings(logger.calls);
+      expect(loggedText.length).toBeGreaterThan(0);
+      expect(leakedSecrets(loggedText)).toEqual([]);
+      expect(loggedText.some((text) => text.includes('CLOSURE_KEKS'))).toBe(true);
+      expect(loggedText.some((text) => text.includes('HMAC_NO_INDEPENDIENTE'))).toBe(true);
+
+      // Las validaciones vigentes del backend se conservan con el mismo mensaje.
+      const { FRONTEND_URL: _frontendUrl, ...withoutFrontendUrl } = completeClosureEnvironment();
+      expect(() => validateEnvironment(withoutFrontendUrl)).toThrow(
+        'FRONTEND_URL environment variable is required',
+      );
+      expect(() => validateEnvironment({ ...completeClosureEnvironment(), FRONTEND_URL: '*' })).toThrow(
+        'FRONTEND_URL cannot allow every origin',
+      );
+      expect(() =>
+        validateEnvironment({ ...completeClosureEnvironment(), FRONTEND_URL: 'ftp://example.com' }),
+      ).toThrow('FRONTEND_URL must use http or https');
+    } finally {
+      logger.restore();
+    }
   });
 });
