@@ -7,6 +7,8 @@ import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import type { UpdateTaskDto } from '../src/tasks/dto/update-task.dto';
 import { TasksService } from '../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -16,6 +18,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   const prisma = {
     tx,
     $transaction: vi.fn(),
@@ -95,7 +100,7 @@ function makeService(opts: {
   const relations = opts.relations ?? makeRelations();
   const notifications = opts.notifications ?? makeNotifications();
   const context = opts.context ?? makeContext();
-  const service = new TasksService(prisma, auth, relations, notifications, context);
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -702,7 +707,7 @@ describe('TasksService.update', () => {
         orden.push('lectura_final');
         return tareaRow({ idRolProyecto: 6 });
       });
-      const service = new TasksService(prisma, auth, relations, makeNotifications(), context);
+      const service = new TasksService(prisma, auth, relations, makeNotifications(), context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
 
       await service.update(5, 42, 1, { idRolProyecto: 6, idsEtiquetas: [1] });
 

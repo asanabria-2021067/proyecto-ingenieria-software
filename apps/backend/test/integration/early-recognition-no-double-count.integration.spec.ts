@@ -23,6 +23,9 @@ import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.s
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 
 /**
  * X1 — regresión cross-flow: reconocimiento anticipado de horas (B10) al
@@ -49,7 +52,8 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     new TasksRelationsService(prismaService, tasksContext),
     { notifyFromTemplate: vi.fn() } as unknown as NotificationsService,
     tasksContext,
-  );
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
 }
 
 function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
@@ -139,7 +143,7 @@ describeIntegration(
       const member = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, member.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const role = await createIntegrationProjectRole(prisma, project.idProyecto, {

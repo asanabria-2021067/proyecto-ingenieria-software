@@ -7,6 +7,8 @@ import type { TasksRelationsService } from '../src/tasks/tasks-relations.service
 import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -27,6 +29,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   const prisma = {
     tx,
     $transaction: vi.fn(),
@@ -73,7 +78,7 @@ function makeService(
   relations: TasksRelationsService,
   notifications: NotificationsService,
 ) {
-  return new TasksService(prisma, auth, relations, notifications, makeContext());
+  return new TasksService(prisma, auth, relations, notifications, makeContext(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
 }
 
 const BASE_DTO = {

@@ -19,6 +19,9 @@ import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
 import { TimeRecordsService } from '../../src/time-records/time-records.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 
 function decimalToNumber(value: unknown): number {
   return Number(value);
@@ -32,7 +35,8 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     {} as unknown as TasksRelationsService,
     {} as unknown as NotificationsService,
     new TasksContextService(prismaService),
-  );
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
 }
 
 function makeTimeRecordsService(prisma: PrismaClient): TimeRecordsService {
@@ -89,7 +93,7 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const assignee = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, assignee.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, assignee.idUsuario);
@@ -143,7 +147,7 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const otro = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, assignee.idUsuario, otro.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, assignee.idUsuario);
@@ -186,7 +190,7 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const assignee = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, assignee.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, assignee.idUsuario);
@@ -251,7 +255,7 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const userA = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, userA.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, userA.idUsuario);
