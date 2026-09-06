@@ -8,7 +8,7 @@ import {
   closureLifecycleStack,
   proyectoListoParaGenerar,
 } from './setup/closure-lifecycle';
-import type { ClosureCleanupScope } from './setup/closure-storage';
+import { pdfFixture, type ClosureCleanupScope } from './setup/closure-storage';
 import { GenerateReportDto } from '../../src/project-closure/dto/closure.dto';
 
 const pipe = new ValidationPipe({
@@ -56,6 +56,37 @@ describeIntegration('S7 frescura del informe de cierre', () => {
   });
   afterAll(async () => {
     await db.$disconnect();
+  });
+
+  it('T25-B: cambiar un dato operativo tras generar el informe rechaza el envío con INFORME_DESACTUALIZADO y deja las postulaciones intactas', async () => {
+    const f = await proyectoListoParaGenerar(db, scope);
+    const { report, documentos, readiness, runner } = closureLifecycleStack(db);
+    const generated = await report.generateAutoReport(f.project.idProyecto, f.leader.idUsuario, f.revision.idRevisionCierre);
+    const grant = await documentos.service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+      revisionId: f.revision.idRevisionCierre, nombreArchivo: 'evidencia.pdf',
+    });
+    await documentos.service.uploadAndAttach(f.project.idProyecto, f.leader.idUsuario, grant.ticket, await pdfFixture());
+    const pending = await db.postulacion.create({ data: {
+      idRolProyecto: f.role.idRolProyecto, idUsuarioPostulante: f.leader.idUsuario, justificacion: 'Postulación de prueba',
+    } });
+    const evaluate = () => runner.run(f.project.idProyecto, f.leader.idUsuario, 'test.readiness', ({ tx }) =>
+      readiness.assertReady(tx, f.project.idProyecto, { phase: 'REQUEST', revisionId: f.revision.idRevisionCierre, expectedFingerprint: generated.fingerprintEjecucion }));
+    expect((await evaluate()).canSubmit).toBe(true);
+    await db.$transaction(async (tx) => {
+      await tx.rolProyecto.update({ where: { idRolProyecto: f.role.idRolProyecto }, data: { nombreRol: 'Rol actualizado' } });
+      await tx.registroTiempoTarea.updateMany({ where: { idAsignacion: f.asignacion.idAsignacion }, data: { horas: '5.00' } });
+      await tx.asignacionTarea.update({ where: { idAsignacion: f.asignacion.idAsignacion }, data: { horasReales: '5.00' } });
+      await tx.horasParticipacion.updateMany({ where: { idParticipacion: f.participacion.idParticipacion }, data: { horasReportadas: '5.00', horasCalculadas: '5.00' } });
+    });
+    const error = await expectStatus(409, evaluate);
+    expect(error).toMatchObject({ blockers: expect.arrayContaining([expect.objectContaining({ code: 'INFORME_DESACTUALIZADO' })]) });
+    expect(await db.postulacion.findUniqueOrThrow({ where: { idPostulacion: pending.idPostulacion } })).toEqual(pending);
+    expect((await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } })).estadoProyecto).toBe('EN_PROGRESO');
+    expect((await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: f.revision.idRevisionCierre } })).estadoRevision).toBe('BORRADOR');
+    const refreshed = await report.generateAutoReport(f.project.idProyecto, f.leader.idUsuario, f.revision.idRevisionCierre);
+    expect(refreshed.fingerprintEjecucion).not.toBe(generated.fingerprintEjecucion);
+    expect((await readiness.evaluate(undefined, f.project.idProyecto, { phase: 'REQUEST', revisionId: f.revision.idRevisionCierre, expectedFingerprint: refreshed.fingerprintEjecucion })).canSubmit).toBe(true);
+    expect((await db.postulacion.findUniqueOrThrow({ where: { idPostulacion: pending.idPostulacion } })).estadoPostulacion).toBe('PENDIENTE');
   });
 
   it('T25-A: la generación automática captura bajo lock, renderiza fuera y vincula el slot 0 tras comparar la huella', async () => {
