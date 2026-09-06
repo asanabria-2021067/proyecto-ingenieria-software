@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EstadoProyecto } from '@prisma/client';
 import { ComentariosService } from '../src/comentarios/comentarios.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 /**
  * Tarea 29: cobertura focalizada de los destinatarios de notificaciones de
@@ -56,6 +61,20 @@ function setupHappyPath(prisma: ReturnType<typeof makePrisma>) {
   prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
 }
 
+/** C036: ComentariosService recibe el protocolo de proyecto; aquí solo se ejercita el canal de tarea. */
+function buildService(
+  prisma: ReturnType<typeof makePrisma>,
+  notifications: ReturnType<typeof makeNotifications>,
+) {
+  return new ComentariosService(
+    prisma,
+    notifications,
+    makeProjectTransactionDouble({ tx: prisma }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
+  );
+}
+
 describe('ComentariosService — destinatarios de notificaciones de comentarios de tarea (Tarea 29)', () => {
   describe('asignado activo', () => {
     it('consulta la asignación activa con idTarea y desasignadaEn: null, y notifica solo al asignado', async () => {
@@ -63,7 +82,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       setupHappyPath(prisma);
       prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: ASSIGNEE_A });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -83,7 +102,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       setupHappyPath(prisma);
       prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: ASSIGNEE_A });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -98,7 +117,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       setupHappyPath(prisma);
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -110,7 +129,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       setupHappyPath(prisma);
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -125,7 +144,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       setupHappyPath(prisma);
       prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: AUTHOR_ID });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -145,7 +164,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -165,7 +184,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: ASSIGNEE_A });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -182,7 +201,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       // que la única fila existente está cerrada y por lo tanto no la satisface.
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -197,7 +216,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       // histórico, sin importar cuántas filas cerradas existan.
       prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: ASSIGNEE_B });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -210,7 +229,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       const prisma = makePrisma();
       setupHappyPath(prisma);
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       // Comentario 1: A está asignado activamente.
       prisma.asignacionTarea.findFirst.mockResolvedValueOnce({ idUsuario: ASSIGNEE_A });
@@ -252,7 +271,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
         { idUsuario: 105 },
       ]);
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       prisma.asignacionTarea.findFirst.mockResolvedValueOnce({ idUsuario: ASSIGNEE_A });
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'x');
@@ -277,7 +296,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.create.mockRejectedValue(new Error('fallo de escritura'));
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await expect(service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola')).rejects.toThrow(
         'fallo de escritura',
@@ -298,7 +317,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.create(AUTHOR_ID, { idProyecto: PROJECT_ID, contenido: 'Hola' });
 
@@ -318,7 +337,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.create(AUTHOR_ID, { idHito: 3, contenido: 'Hola' });
 
@@ -350,7 +369,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
         ...makeNotifications(),
         notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
       } as unknown as ReturnType<typeof makeNotifications>;
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 
@@ -388,7 +407,7 @@ describe('ComentariosService — destinatarios de notificaciones de comentarios 
         ...makeNotifications(),
         notifyRoleMembers: vi.fn().mockResolvedValue(undefined),
       } as unknown as ReturnType<typeof makeNotifications>;
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, AUTHOR_ID, 'Hola');
 

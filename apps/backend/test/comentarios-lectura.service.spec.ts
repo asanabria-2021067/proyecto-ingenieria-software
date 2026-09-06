@@ -1,6 +1,11 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { ComentariosService } from '../src/comentarios/comentarios.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 function makePrisma() {
   return {
@@ -12,9 +17,14 @@ function makePrisma() {
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
+  // C036: la política de lectura es un doble permisivo; la autorización
+  // existente del canal sigue siendo la que estas pruebas fijan.
   return new ComentariosService(
     prisma as unknown as ConstructorParameters<typeof ComentariosService>[0],
     {} as ConstructorParameters<typeof ComentariosService>[1],
+    makeProjectTransactionDouble({ tx: prisma }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 }
 

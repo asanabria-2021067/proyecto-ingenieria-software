@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EstadoProyecto } from '@prisma/client';
 import { ComentariosService } from '../src/comentarios/comentarios.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 /**
  * Tarea 28: cobertura focalizada de los métodos contextualizados de
@@ -43,6 +48,20 @@ function tareaFila() {
   return { idTarea: TASK_ID, idProyecto: PROJECT_ID, creadaPor: TASK_CREATOR_ID };
 }
 
+/** C036: ComentariosService recibe el protocolo de proyecto; aquí solo se ejercita el canal de tarea. */
+function buildService(
+  prisma: ReturnType<typeof makePrisma>,
+  notifications: ReturnType<typeof makeNotifications>,
+) {
+  return new ComentariosService(
+    prisma,
+    notifications,
+    makeProjectTransactionDouble({ tx: prisma }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
+  );
+}
+
 describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
   describe('validación contextual proyecto+tarea', () => {
     it('proyecto y tarea válidos: la consulta usa exactamente idTarea+idProyecto+eliminadoEn:null+proyecto.eliminadoEn:null', async () => {
@@ -51,7 +70,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
 
@@ -69,7 +88,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
     it('proyecto inexistente, proyecto eliminado, tarea inexistente, tarea eliminada o tarea de otro proyecto: 404 (la consulta única los hace indistinguibles)', async () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'x')).rejects.toBeInstanceOf(
         NotFoundException,
@@ -84,7 +103,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LEADER_ID });
       prisma.comentario.findMany.mockResolvedValue([]);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await service.findByTareaEnProyecto(PROJECT_ID, TASK_ID, LEADER_ID);
 
@@ -100,7 +119,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LEADER_ID });
       prisma.comentario.findMany.mockResolvedValue([{ idComentario: 1 }]);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       const result = await service.findByTareaEnProyecto(PROJECT_ID, TASK_ID, LEADER_ID);
       expect(result).toEqual([{ idComentario: 1 }]);
@@ -111,7 +130,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LEADER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(service.findByTareaEnProyecto(PROJECT_ID, TASK_ID, EXTERNO_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -126,7 +145,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       // participación de otro proyecto nunca la satisface, así que el fake
       // se limita a simular ese resultado (null) sin reinterpretar la regla.
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.findByTareaEnProyecto(PROJECT_ID, TASK_ID, PARTICIPANT_ID),
@@ -143,7 +162,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: 3 });
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       const result = await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, '  Hola equipo  ');
 
@@ -182,7 +201,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
 
@@ -200,7 +219,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: PARTICIPANT_ID });
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
 
@@ -215,7 +234,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
 
@@ -231,7 +250,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.asignacionTarea.findFirst.mockResolvedValue({ idUsuario: 3 });
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
       const notifications = makeNotifications();
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'Hola');
 
@@ -245,7 +264,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.asignacionTarea.findFirst.mockResolvedValue(null);
       prisma.comentario.create.mockResolvedValue({ idComentario: COMMENT_ID });
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       // createForTask solo acepta `contenido: string` (no un DTO con IDs propios):
       // no hay forma estructural de que un valor adicional altere idTarea/idProyecto.
@@ -259,7 +278,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
     it('tarea eliminada o relación cruzada (otro proyecto): 404, no crea el comentario', async () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'no debería crearse'),
@@ -272,7 +291,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.createForTask(PROJECT_ID, TASK_ID, EXTERNO_ID, 'no debería crearse'),
@@ -293,7 +312,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.update.mockResolvedValue({ idComentario: COMMENT_ID, contenido: 'editado' });
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       const result = await service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, {
         contenido: 'editado',
@@ -314,7 +333,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.comentario.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.updateForTask(PROJECT_ID, TASK_ID, 999999, COMMENT_AUTHOR_ID, { contenido: 'x' }),
@@ -326,7 +345,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.comentario.findFirst.mockResolvedValue(null); // pertenece a otra tarea: el filtro idTarea lo excluye
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' }),
@@ -337,7 +356,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
     it('comentario de otro proyecto (tarea no pertenece a projectId): 404 antes de consultar el comentario', async () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(null); // la tarea no pertenece a este proyecto
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' }),
@@ -349,7 +368,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
     it('tarea eliminada: 404, ni siquiera consulta el comentario', async () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' }),
@@ -361,7 +380,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.comentario.findFirst.mockResolvedValue(comentarioFila({ idAutor: COMMENT_AUTHOR_ID }));
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, EXTERNO_ID, { contenido: 'x' }),
@@ -375,7 +394,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.comentario.findFirst.mockResolvedValue(comentarioFila());
       prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.CERRADO, creadoPor: LEADER_ID });
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(
         service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, { contenido: 'x' }),
@@ -396,7 +415,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       prisma.proyecto.findUnique.mockResolvedValue({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: LEADER_ID });
       prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
       prisma.comentario.update.mockResolvedValue({ idComentario: COMMENT_ID, eliminadoEn: new Date() });
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await service.removeForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID);
 
@@ -412,7 +431,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.comentario.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(service.removeForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -423,7 +442,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
     it('tarea eliminada: 404', async () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(null);
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(service.removeForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -435,7 +454,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.comentario.findFirst.mockResolvedValue(comentarioFila({ idAutor: COMMENT_AUTHOR_ID }));
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await expect(service.removeForTask(PROJECT_ID, TASK_ID, COMMENT_ID, EXTERNO_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -465,7 +484,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
         orden.push('escritura');
         return { idComentario: COMMENT_ID };
       });
-      const service = new ComentariosService(prisma, makeNotifications());
+      const service = buildService(prisma, makeNotifications());
 
       await service.updateForTask(PROJECT_ID, TASK_ID, COMMENT_ID, COMMENT_AUTHOR_ID, {
         contenido: 'x',
@@ -498,7 +517,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       notifications.notifyUsers.mockImplementation(async () => {
         orden.push('notificacion');
       });
-      const service = new ComentariosService(prisma, notifications);
+      const service = buildService(prisma, notifications);
 
       await service.createForTask(PROJECT_ID, TASK_ID, PARTICIPANT_ID, 'x');
 
