@@ -43,6 +43,7 @@ const TASK_ASSIGNMENT: ProjectWriteMetadata = { ...TASK_WRITE, family: 'TAREA_AS
 export class TasksController {
   constructor(private tasksService: TasksService) {}
 
+  /** E044: tablero del proyecto; el alcance por actor (§34) lo aplica el servicio. */
   @Get()
   findAll(
     @Param('projectId', ParseIntPipe) projectId: number,
@@ -51,6 +52,7 @@ export class TasksController {
     return this.tasksService.findAll(projectId, user.userId);
   }
 
+  /** E045: detalle de una tarea; mismo alcance §34, con el Sprint de la tarea como entidad. */
   @Get(':taskId')
   findOne(
     @Param('projectId', ParseIntPipe) projectId: number,
