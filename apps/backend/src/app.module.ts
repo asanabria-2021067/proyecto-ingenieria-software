@@ -29,6 +29,7 @@ import { ProgressRecordsModule } from './progress-records/progress-records.modul
 import { TimeRecordsModule } from './time-records/time-records.module';
 import { SprintsModule } from './sprints/sprints.module';
 import { TaskHourAdjustmentsModule } from './task-hour-adjustments/task-hour-adjustments.module';
+import { LeadershipModule } from './leadership/leadership.module';
 import { ExitRequestsModule } from './exit-requests/exit-requests.module';
 import { TeamModule } from './team/team.module';
 import { SocialModule } from './social/social.module';
@@ -87,6 +88,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
     TimeRecordsModule,
     SprintsModule,
     TaskHourAdjustmentsModule,
+    LeadershipModule,
     ExitRequestsModule,
     TeamModule,
     SocialModule,
