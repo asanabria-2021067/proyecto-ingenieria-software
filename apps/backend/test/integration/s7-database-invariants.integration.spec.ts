@@ -45,6 +45,7 @@ describeIntegration('S7 database invariants (T38)', () => {
   let prisma: PrismaClient;
   let scope: IntegrationCleanupScope;
   let hoursIds: number[];
+  let recordIds: number[];
 
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
@@ -58,9 +59,13 @@ describeIntegration('S7 database invariants (T38)', () => {
   beforeEach(() => {
     scope = {};
     hoursIds = [];
+    recordIds = [];
   });
 
   afterEach(async () => {
+    if (recordIds.length > 0) {
+      await prisma.registroTiempoTarea.deleteMany({ where: { idRegistroTiempo: { in: recordIds } } });
+    }
     if (hoursIds.length > 0) {
       await prisma.horasParticipacion.deleteMany({ where: { idRegistroHoras: { in: hoursIds } } });
     }
@@ -101,7 +106,7 @@ describeIntegration('S7 database invariants (T38)', () => {
     });
     hoursIds.push(hours.idRegistroHoras);
 
-    return { assignment, hours };
+    return { leader, assignment, hours };
   }
 
   it('T38-A: CK04, CK05 y CK31 rechazan cache negativa, LEGACY sin importe y horas de participación negativas', async () => {
@@ -159,5 +164,73 @@ describeIntegration('S7 database invariants (T38)', () => {
     });
     expect(boundaryHours.horasCalculadas).toBeNull();
     expect(boundaryHours.horasAprobadas).toBeNull();
+  });
+  it('T38-B: CK01, CK02 y CK03 rechazan horas no positivas, revocación incoherente y revocador distinto del autor', async () => {
+    const { leader, assignment } = await seedAssignmentWithHours();
+    const authorId = leader.idUsuario;
+    const assignmentId = assignment.idAsignacion;
+    const otherUser = await createIntegrationUser(prisma);
+    scope.userIds = [...(scope.userIds ?? []), otherUser.idUsuario];
+
+    // Registro efectivo de referencia del autor, con nota y justificación.
+    const record = await prisma.registroTiempoTarea.create({
+      data: {
+        idAsignacion: assignmentId,
+        idUsuario: authorId,
+        horas: '1.25',
+        fecha: new Date('2026-09-02T00:00:00.000Z'),
+        nota: 'nota de referencia',
+        justificacionExceso: 'cruza la estimación de la tarea',
+      },
+    });
+    recordIds.push(record.idRegistroTiempo);
+    const recordId = record.idRegistroTiempo;
+
+    // Cinco contraejemplos, cada uno en su propia transacción revertida.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_01',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO registro_tiempo_tarea (id_asignacion, id_usuario, horas, fecha) VALUES (${assignmentId}, ${authorId}, 0, DATE '2026-09-03')`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_01',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO registro_tiempo_tarea (id_asignacion, id_usuario, horas, fecha) VALUES (${assignmentId}, ${authorId}, -2, DATE '2026-09-03')`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_02',
+      (tx) => tx.$executeRaw`UPDATE registro_tiempo_tarea SET revocado_en = NOW() WHERE id_registro_tiempo = ${recordId}`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_02',
+      (tx) =>
+        tx.$executeRaw`UPDATE registro_tiempo_tarea SET revocado_por = ${authorId} WHERE id_registro_tiempo = ${recordId}`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_03',
+      (tx) =>
+        tx.$executeRaw`UPDATE registro_tiempo_tarea SET revocado_en = NOW(), revocado_por = ${otherUser.idUsuario} WHERE id_registro_tiempo = ${recordId}`,
+    );
+
+    // Tras los rechazos el registro sigue efectivo e intacto.
+    const untouched = await prisma.registroTiempoTarea.findUniqueOrThrow({ where: { idRegistroTiempo: recordId } });
+    expect(untouched.revocadoEn).toBeNull();
+    expect(untouched.revocadoPor).toBeNull();
+    expect(await prisma.registroTiempoTarea.count({ where: { idAsignacion: assignmentId } })).toBe(1);
+
+    // La revocación coherente (fecha + revocador = autor) se acepta y conserva importe, fecha, nota y justificación.
+    await prisma.$executeRaw`UPDATE registro_tiempo_tarea SET revocado_en = NOW(), revocado_por = ${authorId} WHERE id_registro_tiempo = ${recordId}`;
+    const revoked = await prisma.registroTiempoTarea.findUniqueOrThrow({ where: { idRegistroTiempo: recordId } });
+    expect(revoked.revocadoEn).not.toBeNull();
+    expect(revoked.revocadoPor).toBe(authorId);
+    expect(Number(revoked.horas)).toBe(1.25);
+    expect(revoked.fecha.toISOString()).toBe('2026-09-02T00:00:00.000Z');
+    expect(revoked.nota).toBe('nota de referencia');
+    expect(revoked.justificacionExceso).toBe('cruza la estimación de la tarea');
   });
 });
