@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { PDFDocument } from 'pdf-lib';
 import { ConfigService } from '@nestjs/config';
 import {
   buildClosureAad,
@@ -25,6 +26,72 @@ import {
   type ClosureExecutionInput,
   type ClosurePresentation,
 } from '../src/project-closure/closure-report-model';
+import {
+  A4_HEIGHT_PT,
+  A4_WIDTH_PT,
+  CLOSURE_REPORT_FONT,
+  ProjectClosureReportService,
+} from '../src/project-closure/project-closure-report.service';
+
+/**
+ * Modelo con 300 contribuciones repartidas entre una tarea viva y una tarea
+ * ELIMINADA, con nombres acentuados y no latinos.
+ */
+function modeloConContribuciones(cantidad: number): ClosureExecutionInput {
+  const base = entradaEjecucion('directa');
+  const nombresRol = ['Coordinaci\u00f3n', '\u0418\u043d\u0436\u0435\u043d\u0435\u0440', '\u5f00\u53d1\u8005', 'An\u00e1lisis'];
+  const participaciones = nombresRol.map((nombreRol, indice) => ({
+    idParticipacion: 900 + indice,
+    idUsuario: 300 + indice,
+    idRolProyecto: 8,
+    nombreRol,
+    estadoParticipacion: 'ACTIVO',
+    fechaIngreso: '2026-01-16T00:00:00.000Z',
+    fechaSalida: null,
+  }));
+
+  const tramoDe = (indice: number) => ({
+    idAsignacion: 1000 + indice,
+    idUsuario: 300 + (indice % nombresRol.length),
+    idParticipacion: 900 + (indice % nombresRol.length),
+    origenReporte: indice % 7 === 0 ? 'LEGACY' : 'GRANULAR',
+    horasReportadas: ((indice % 9) + 1).toFixed(2),
+    reconocidoEn: null,
+    registros: [],
+    ajustes:
+      indice % 5 === 0
+        ? [{ idAjusteHora: 5000 + indice, deltaHoras: '-0.25', horasBase: '2.00', justificacion: 'ajuste', anuladoEn: null }]
+        : [],
+  });
+
+  const mitad = Math.floor(cantidad / 2);
+  return {
+    ...base,
+    participaciones,
+    tareas: [
+      {
+        idTarea: 40,
+        tituloTarea: 'Tarea viva con acentuaci\u00f3n',
+        idSprint: 12,
+        idRolProyecto: 8,
+        estadoTarea: 'HECHO',
+        eliminada: false,
+        estimacionHoras: '20.00',
+        tramos: Array.from({ length: mitad }, (_valor, indice) => tramoDe(indice)),
+      },
+      {
+        idTarea: 55,
+        tituloTarea: 'Tarea eliminada \u5df2\u5220\u9664',
+        idSprint: 30,
+        idRolProyecto: 8,
+        estadoTarea: 'HECHO',
+        eliminada: true,
+        estimacionHoras: '15.00',
+        tramos: Array.from({ length: cantidad - mitad }, (_valor, indice) => tramoDe(mitad + indice)),
+      },
+    ],
+  };
+}
 
 /** Presentación estrecha: solo nombres externos usados por ESE informe. */
 const presentacionBase: ClosurePresentation = {
@@ -519,6 +586,81 @@ describe('S7 informe canónico y criptografía de cierre', () => {
     });
     expect(Object.keys(contextoOficial.aprobacion ?? {}).sort()).toEqual(
       ['adminId', 'fechaAprobacion', 'revisionId'].sort(),
+    );
+  });
+
+  it('T40-C: el render conserva todas las contribuciones, repite cabeceras al paginar y escribe Unicode con la fuente embebida', async () => {
+    const service = new ProjectClosureReportService();
+    const modelo = projectClosureModel(modeloConContribuciones(300));
+    const contexto = buildReportContext({
+      cicloRevisionOrigenId: 12,
+      presentacion: presentacionBase,
+      variante: 'AUTOMATICO',
+      fechaGeneracion: '2026-09-06T12:00:00.000Z',
+    });
+
+    // Ninguna petición de red durante el render.
+    const fetchEspia = vi.spyOn(globalThis, 'fetch');
+
+    const { pdf, resumen } = service.render(modelo, contexto);
+
+    expect(fetchEspia).not.toHaveBeenCalled();
+    fetchEspia.mockRestore();
+
+    // PDF válido, A4 y multipágina.
+    const documento = await PDFDocument.load(pdf);
+    expect(pdf.subarray(0, 5).toString('utf8')).toBe('%PDF-');
+    expect(documento.getPageCount()).toBeGreaterThan(1);
+    expect(documento.getPageCount()).toBe(resumen.paginas);
+    for (const pagina of documento.getPages()) {
+      expect(pagina.getWidth()).toBeCloseTo(A4_WIDTH_PT, 1);
+      expect(pagina.getHeight()).toBeCloseTo(A4_HEIGHT_PT, 1);
+    }
+
+    // Las 300 contribuciones están, incluidas las de la tarea eliminada.
+    expect(resumen.filasContribucion).toBe(300);
+    const filasEliminadas = resumen.textosRenderizados.filter((texto) =>
+      texto.includes('Tarea eliminada'),
+    );
+    expect(filasEliminadas.length).toBe(150);
+
+    // La cabecera se repite en CADA página de la tabla.
+    expect(resumen.encabezadoPorPagina.length).toBe(resumen.paginas);
+    for (const cabecera of resumen.encabezadoPorPagina) {
+      expect(cabecera).toEqual(['Tarea', 'Estado', 'Integrante', 'Origen', 'Reportadas', 'Ajuste', 'Eliminada']);
+    }
+
+    // El texto acentuado y no latino llega intacto: ni un glifo sustituido.
+    const textos = resumen.textosRenderizados.join('\n');
+    expect(textos).toContain('acentuaci\u00f3n');
+    expect(textos).toContain('\u5df2\u5220\u9664');
+    expect(textos).toContain('\u0418\u043d\u0436\u0435\u043d\u0435\u0440');
+    expect(textos).toContain('\u5f00\u53d1\u8005');
+    expect(textos).not.toContain('?????');
+    expect(textos).not.toContain('\ufffd');
+
+    // La fuente embebida viaja dentro del PDF; no se usa una estándar.
+    expect(pdf.includes(Buffer.from(CLOSURE_REPORT_FONT, 'utf8'))).toBe(true);
+
+    // Los metadatos usan la fecha FIJA del contexto, no `now()`.
+    expect(documento.getCreationDate()?.toISOString()).toBe('2026-09-06T12:00:00.000Z');
+    expect(documento.getSubject()).toBe('AUTOMATICO');
+    // Y siguen al contexto, no al reloj: otro contexto, otra fecha.
+    const contextoAntiguo = buildReportContext({
+      cicloRevisionOrigenId: 12,
+      presentacion: presentacionBase,
+      variante: 'AUTOMATICO',
+      fechaGeneracion: '2025-01-02T08:30:00.000Z',
+    });
+    const conFechaAntigua = await PDFDocument.load(service.render(modelo, contextoAntiguo).pdf);
+    expect(conFechaAntigua.getCreationDate()?.toISOString()).toBe('2025-01-02T08:30:00.000Z');
+
+    // Dos renders del mismo modelo producen el MISMO modelo renderizado,
+    // aunque los bytes puedan diferir.
+    const segundo = service.render(modelo, contexto);
+    expect(segundo.resumen).toEqual(resumen);
+    expect((await PDFDocument.load(segundo.pdf)).getCreationDate()?.toISOString()).toBe(
+      '2026-09-06T12:00:00.000Z',
     );
   });
 });
