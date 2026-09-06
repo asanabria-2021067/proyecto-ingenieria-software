@@ -624,4 +624,84 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
     expect(ausentes).toEqual([]);
     expect(CANONICAL_OPERATIONS).toHaveLength(118);
   }, 30_000);
+  it('C158: toda ruta de escritura participante declara su policy explícita y la cobertura son 66 usos', async () => {
+    const { AppModule } = await import('../src/app.module');
+    const { PROJECT_WRITE_METADATA_KEY } = await import(
+      '../src/common/guards/project-write.metadata'
+    );
+    const graph = await collectModuleGraph(AppModule as Type<unknown>);
+    const routes = collectRoutes(graph.modules);
+
+    // ── El inventario de cobertura de §41: sesenta y seis usos explícitos.
+    //    Se cuenta sobre el código fuente, no sobre la metadata resuelta, para
+    //    que el número describa decisiones escritas por alguien.
+    const declaraciones = listTypeScriptFiles(SRC_ROOT).reduce((total, file) => {
+      const matches = fs.readFileSync(file, 'utf8').match(/@ProjectWrite\(/g);
+      return total + (matches?.length ?? 0);
+    }, 0);
+    expect(declaraciones).toBe(66);
+
+    // ── Ninguna ruta participante depende del default restrictivo.
+    //
+    //    §32 conserva ese default por compatibilidad, pero §41 exige que toda
+    //    ruta afectada lo declare: un default silencioso es una decisión que
+    //    nadie tomó. Quedan fuera únicamente las categorías congeladas —
+    //    lecturas, creación de proyecto, acuse personal y barrido— más las
+    //    rutas ya retiradas, que no existen.
+    const MUTANTES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+    const EXCLUIDAS: Array<[string, string]> = [
+      // Creación de proyecto: todavía no hay proyecto sobre el que decidir.
+      ['POST', '/proyectos'],
+      // E039 — acuse personal de mensajes de revisión: escritura por usuario,
+      // sin lock de proyecto y sin cambio de dominio ni de Sprint (§32).
+      ['PATCH', '/mensajes-revision/proyectos/:p/marcar-leidos'],
+      // Barrido técnico de almacenamiento: no es una escritura de dominio.
+      ['POST', '/admin/storage/cierre/barrido'],
+    ];
+    const esExcluida = (route: RouteEntry): boolean =>
+      EXCLUIDAS.some(([method, normalized]) => route.method === method && route.normalized === normalized);
+
+    // Solo se exige a las rutas del inventario canónico: auth, chat, social y
+    // catálogos no son escrituras participantes de un proyecto.
+    const canonicas = new Set(
+      CANONICAL_OPERATIONS.map(([method, normalized]) => `${method} ${normalized}`),
+    );
+
+    const sinPolicy: string[] = [];
+    for (const route of routes) {
+      if (!MUTANTES.has(route.method)) continue;
+      if (!canonicas.has(`${route.method} ${route.normalized}`)) continue;
+      if (esExcluida(route)) continue;
+
+      const controller = [...graph.modules.values()]
+        .flatMap((moduleClass) => metadataOf(moduleClass, MODULE_METADATA.CONTROLLERS) as Type<unknown>[])
+        .find((candidate) => candidate.name === route.controller);
+      if (!controller) continue;
+      const handler = (controller.prototype as Record<string, unknown>)[route.handler];
+      const enHandler = Reflect.getMetadata(PROJECT_WRITE_METADATA_KEY, handler as object);
+      const enController = Reflect.getMetadata(PROJECT_WRITE_METADATA_KEY, controller);
+      if (enHandler === undefined && enController === undefined) {
+        sinPolicy.push(`${route.method} ${route.path} (${route.controller}.${route.handler})`);
+      }
+    }
+    expect(sinPolicy).toEqual([]);
+
+    // ── Toda metadata declarada está completa: sin `source`, `states` o
+    //    `sprint` el guard no puede rechazar temprano y la policy del service
+    //    no tendría con qué repetir la decisión.
+    for (const route of routes) {
+      const controller = [...graph.modules.values()]
+        .flatMap((moduleClass) => metadataOf(moduleClass, MODULE_METADATA.CONTROLLERS) as Type<unknown>[])
+        .find((candidate) => candidate.name === route.controller);
+      if (!controller) continue;
+      const handler = (controller.prototype as Record<string, unknown>)[route.handler];
+      const metadata = Reflect.getMetadata(PROJECT_WRITE_METADATA_KEY, handler as object) as
+        | { source?: unknown; states?: unknown; sprint?: unknown }
+        | undefined;
+      if (metadata === undefined) continue;
+      expect(metadata.source, `${route.path}: source`).toBeDefined();
+      expect(Array.isArray(metadata.states), `${route.path}: states`).toBe(true);
+      expect(metadata.sprint, `${route.path}: sprint`).toBeDefined();
+    }
+  }, 30_000);
 });
