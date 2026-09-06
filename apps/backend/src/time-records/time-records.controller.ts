@@ -14,7 +14,11 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 
-/** C028: registro de horas en P/E con Sprint ambiente ACTIVO (06 v2 §32). */
+/**
+ * C049 (06 v2 §32/§41 E055–E056): el alta de horas es del propietario del
+ * tramo, en P/E con Sprint ambiente ACTIVO; la entidad (Sprint de la tarea)
+ * también debe estar ACTIVO y la verifica el servicio dentro del lock.
+ */
 const TIME_WRITE: ProjectWriteMetadata = {
   source: { kind: 'param', name: 'projectId' },
   states: ['P', 'E'],
@@ -29,6 +33,7 @@ import { TimeRecordsService } from './time-records.service';
 export class TimeRecordsController {
   constructor(private readonly timeRecordsService: TimeRecordsService) {}
 
+  /** E055: horas de la tarea; alcance §34 en el servicio. */
   @Get()
   findAll(
     @Param('projectId', ParseIntPipe) projectId: number,
@@ -38,6 +43,7 @@ export class TimeRecordsController {
     return this.timeRecordsService.findAllForTask(projectId, taskId, user.userId);
   }
 
+  /** E056: registrar horas sobre el tramo propio. */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(ProjectWriteGuard)
