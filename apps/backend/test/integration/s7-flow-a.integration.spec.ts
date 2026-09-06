@@ -159,4 +159,99 @@ describeIntegration('S7 Flow A — consolidación de Sprint', () => {
     expect((await db.participacionProyecto.findUniqueOrThrow({ where: { idParticipacion: participacionCompletado.idParticipacion } })).estadoParticipacion).toBe('COMPLETADO');
     expect(await db.horasParticipacion.count({ where: { idSprint: f.sprint.idSprint } })).toBe(0);
   });
+
+  it('T08-C: el reconocimiento marca los tramos con conteo exacto y deja un agregado PENDIENTE con reportadas y propuestas separadas', async () => {
+    const f = await flowAFixture(db, scope, 'EN_FINALIZACION');
+    const { recognition } = flowAStack(db);
+    const base = { projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, leaderId: f.leader.idUsuario };
+
+    // Tres tramos cerrados de A, uno de ellos de una tarea eliminada.
+    const t1 = await closedTask(db, scope, { ...base, userId: f.memberA.idUsuario, participationId: f.participationA.idParticipacion, horasReales: '3.00' });
+    const t2 = await closedTask(db, scope, { ...base, userId: f.memberA.idUsuario, participationId: f.participationA.idParticipacion, horasReales: '2.00' });
+    const t3 = await closedTask(db, scope, { ...base, userId: f.memberA.idUsuario, participationId: f.participationA.idParticipacion, horasReales: '1.50', eliminada: true });
+    // Un tramo ABIERTO de A que no debe entrar en el reconocimiento.
+    const abierto = await closedTask(db, scope, { ...base, userId: f.memberA.idUsuario, participationId: f.participationA.idParticipacion, horasReales: '9.00', abierta: true });
+    // Ajuste vigente de +0.50 sobre t2, con base igual a su caché.
+    await db.ajusteHoraTarea.create({
+      data: {
+        idAsignacion: t2.assignment.idAsignacion,
+        deltaHoras: '0.50',
+        horasBase: '2.00',
+        justificacion: 'media hora verificada de más',
+        idAutor: f.leader.idUsuario,
+      },
+    });
+
+    // Un agregado APROBADA de OTRO Sprint que no debe tocarse.
+    const otroSprint = await db.sprint.create({ data: { idProyecto: f.project.idProyecto, numero: 9, estado: 'CERRADO' } });
+    f.collect('sprintIds', [otroSprint.idSprint]);
+    const intocable = await db.horasParticipacion.create({
+      data: {
+        idParticipacion: f.participationA.idParticipacion, idSprint: otroSprint.idSprint,
+        periodoInicio: new Date('2026-01-01'), periodoFin: new Date('2026-01-31'),
+        horasReportadas: '7.00', horasCalculadas: '7.00', horasAprobadas: '7.00', estadoHoras: 'APROBADA',
+      },
+    });
+
+    const resultado = await db.$transaction((tx) =>
+      recognition.recognizeParticipationHours(tx, {
+        projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, participationId: f.participationA.idParticipacion,
+      }),
+    );
+
+    expect(resultado.idsAsignacionesReconocidas.sort()).toEqual(
+      [t1.assignment.idAsignacion, t2.assignment.idAsignacion, t3.assignment.idAsignacion].sort(),
+    );
+    const marcados = await db.asignacionTarea.findMany({
+      where: { idAsignacion: { in: resultado.idsAsignacionesReconocidas } },
+    });
+    // Una sola fecha común para todo el lote.
+    const fechas = new Set(marcados.map((fila) => fila.reconocidoEn!.toISOString()));
+    expect(fechas.size).toBe(1);
+    // El tramo abierto no se marca.
+    expect((await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: abierto.assignment.idAsignacion } })).reconocidoEn).toBeNull();
+
+    const agregado = await db.horasParticipacion.findFirstOrThrow({
+      where: { idParticipacion: f.participationA.idParticipacion, idSprint: f.sprint.idSprint },
+    });
+    expect(agregado.estadoHoras).toBe('PENDIENTE');
+    // Reportadas = suma de cachés; propuestas = suma de (caché + ajuste vigente).
+    expect(agregado.horasReportadas.toFixed(2)).toBe('6.50');
+    expect(agregado.horasCalculadas?.toFixed(2)).toBe('7.00');
+    // Reconocer NO acredita.
+    expect(agregado.horasAprobadas).toBeNull();
+    expect(agregado.fechaAprobacion).toBeNull();
+    expect(agregado.aprobadoPor).toBeNull();
+    expect(agregado.idSprint).not.toBeNull();
+    // El agregado del otro Sprint queda intacto.
+    expect(await db.horasParticipacion.findUniqueOrThrow({ where: { idRegistroHoras: intocable.idRegistroHoras } })).toEqual(intocable);
+
+    // Participación sin tramos elegibles: no-op real, sin fila cero ficticia.
+    const vacio = await db.$transaction((tx) =>
+      recognition.recognizeParticipationHours(tx, {
+        projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, participationId: f.participationB.idParticipacion,
+      }),
+    );
+    expect(vacio.horasParticipacion).toBeNull();
+    expect(await db.horasParticipacion.count({ where: { idParticipacion: f.participationB.idParticipacion } })).toBe(0);
+
+    // Agregado APROBADA del MISMO Sprint: 409 sin escribir.
+    await db.horasParticipacion.update({ where: { idRegistroHoras: agregado.idRegistroHoras }, data: { estadoHoras: 'APROBADA' } });
+    const nuevo = await closedTask(db, scope, { ...base, userId: f.memberA.idUsuario, participationId: f.participationA.idParticipacion, horasReales: '1.00' });
+    await expectStatus(409, () =>
+      db.$transaction((tx) =>
+        recognition.recognizeParticipationHours(tx, {
+          projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, participationId: f.participationA.idParticipacion,
+        }),
+      ),
+    );
+    // Cero escrituras: el tramo nuevo sigue sin reconocer y el agregado no cambió.
+    expect((await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: nuevo.assignment.idAsignacion } })).reconocidoEn).toBeNull();
+    const tras409 = await db.horasParticipacion.findUniqueOrThrow({ where: { idRegistroHoras: agregado.idRegistroHoras } });
+    expect(tras409.horasReportadas.toFixed(2)).toBe('6.50');
+    expect(tras409.horasCalculadas?.toFixed(2)).toBe('7.00');
+    // El Sprint nunca cambia de estado por reconocer.
+    expect((await db.sprint.findUniqueOrThrow({ where: { idSprint: f.sprint.idSprint } })).estado).toBe('EN_FINALIZACION');
+    expect(await db.horasParticipacion.count({ where: { idSprint: null } })).toBe(0);
+  });
 });

@@ -77,8 +77,16 @@ function makeRootPrismaSpy() {
   };
 }
 
-function tramo(idAsignacion: number, horasReales: number) {
-  return { idAsignacion, horasReales: new Prisma.Decimal(horasReales) };
+/**
+ * C077: el tramo llega con su cadena de ajustes vigentes, porque la propuesta
+ * es caché + ajuste vigente válido. Sin ajustes, propuesta = reporte.
+ */
+function tramo(
+  idAsignacion: number,
+  horasReales: number,
+  ajustes: Array<{ horasBase: Prisma.Decimal; deltaHoras: Prisma.Decimal }> = [],
+) {
+  return { idAsignacion, horasReales: new Prisma.Decimal(horasReales), ajustes };
 }
 
 function makeTx() {
@@ -272,6 +280,8 @@ describe('HoursRecognitionService', () => {
 
       expect(resultado).toEqual({
         horasReconocidas: 0,
+        horasReportadas: new Prisma.Decimal(0),
+        horasPropuestas: new Prisma.Decimal(0),
         idsAsignacionesReconocidas: [],
         horasParticipacion: null,
       });
@@ -316,6 +326,9 @@ describe('HoursRecognitionService', () => {
         idRegistroHoras: 501,
         idParticipacion: PARTICIPATION_ID,
         idSprint: SPRINT_ID,
+        // C077 (§12.3): solo se incrementa un agregado PENDIENTE y con
+        // procedencia calculada; cualquier otro estado es 409.
+        estadoHoras: 'PENDIENTE',
         horasCalculadas: new Prisma.Decimal(10),
       };
       tx.horasParticipacion.findFirst.mockResolvedValue(filaExistente);
@@ -325,9 +338,13 @@ describe('HoursRecognitionService', () => {
       const resultado = await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(resultado.horasReconocidas).toBe(4);
+      // §8: en reconocimientos sucesivos se incrementan AMBAS columnas.
       expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
         where: { idRegistroHoras: 501 },
-        data: { horasCalculadas: { increment: expect.any(Prisma.Decimal) } },
+        data: {
+          horasReportadas: { increment: expect.any(Prisma.Decimal) },
+          horasCalculadas: { increment: expect.any(Prisma.Decimal) },
+        },
       });
       const incremento = tx.horasParticipacion.update.mock.calls[0][0].data.horasCalculadas.increment;
       expect(incremento.toNumber()).toBe(4);
@@ -382,7 +399,10 @@ describe('HoursRecognitionService', () => {
 
       expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
         where: { idRegistroHoras: 777 },
-        data: { horasCalculadas: { increment: expect.any(Prisma.Decimal) } },
+        data: {
+          horasReportadas: { increment: expect.any(Prisma.Decimal) },
+          horasCalculadas: { increment: expect.any(Prisma.Decimal) },
+        },
       });
       expect(resultado.horasParticipacion).toEqual({ ...filaGanadora, horasCalculadas: new Prisma.Decimal(8) });
     });
@@ -434,9 +454,15 @@ describe('HoursRecognitionService', () => {
           desasignadaEn: { not: null },
           horasReales: { not: null },
           reconocidoEn: null,
+          // C077 (§12.1): un origen sin conciliar no es un reporte utilizable.
+          origenReporte: { not: 'POR_CONCILIAR' },
           tarea: { idProyecto: 7, idSprint: 8 },
         },
-        select: { idAsignacion: true, horasReales: true },
+        select: {
+          idAsignacion: true,
+          horasReales: true,
+          ajustes: { where: { anuladoEn: null }, select: { horasBase: true, deltaHoras: true } },
+        },
       });
     });
   });
