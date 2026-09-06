@@ -63,6 +63,35 @@ async function expectUniqueViolation(prisma: PrismaClient, indexName: string, sq
 }
 
 const HEX64 = '0123456789abcdef'.repeat(4);
+const MAX_DOCUMENT_SIZE = 10485760;
+
+type SqlValue = string | number | null | { raw: string };
+
+function sqlLiteral(value: SqlValue): string {
+  if (value === null) {
+    return 'NULL';
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  if (typeof value === 'object') {
+    return value.raw;
+  }
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/** INSERT literal sobre documento_cierre a partir de columnas de fixture (nunca entrada externa). */
+function documentInsertSql(fields: Record<string, SqlValue>, returning = false): string {
+  const columns = Object.keys(fields)
+    .map((column) => `"${column}"`)
+    .join(', ');
+  const values = Object.values(fields).map(sqlLiteral).join(', ');
+  return `INSERT INTO documento_cierre (${columns}) VALUES (${values})${returning ? ' RETURNING id_documento_cierre' : ''}`;
+}
+
+const JSONB = (json: string): SqlValue => ({ raw: `'${json}'::jsonb` });
+const NOW_PLUS_HOUR: SqlValue = { raw: "NOW() + INTERVAL '1 hour'" };
+const NOW: SqlValue = { raw: 'NOW()' };
 
 describeIntegration('S7 database invariants (T38)', () => {
   let prisma: PrismaClient;
@@ -617,5 +646,104 @@ describeIntegration('S7 database invariants (T38)', () => {
     });
     expect(approved.informeOficial?.idDocumentoCierre).toBe(officialId);
     expect(approved.documentos).toHaveLength(0);
+  });
+  it('T38-F: DocumentoCierre exige proveedor, tipo de recurso, metadata por estado, límite 10485760 y una sola generación de informe por revisión', async () => {
+    const leader = await createIntegrationUser(prisma);
+    scope.userIds = [leader.idUsuario];
+    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    scope.projectIds = [project.idProyecto];
+    const P = project.idProyecto;
+    const L = leader.idUsuario;
+    const draftRows = await prisma.$queryRaw<Array<{ id_revision_cierre: number }>>`INSERT INTO revision_cierre_proyecto (id_proyecto, numero_revision) VALUES (${P}, 1) RETURNING id_revision_cierre`;
+    const draftId = draftRows[0].id_revision_cierre;
+    revisionIds.push(draftId);
+
+    const reserved = (name: string, overrides: Record<string, SqlValue> = {}): Record<string, SqlValue> => ({
+      id_proyecto: P,
+      id_revision_origen: draftId,
+      tipo_documento: 'EVIDENCIA_LIDER',
+      external_id: `uvgenius/cierre/${P}/${name}.enc`,
+      delivery_type: 'authenticated',
+      nombre_archivo: `${name}.pdf`,
+      id_autor: L,
+      reserva_expira_en: NOW_PLUS_HOUR,
+      ...overrides,
+    });
+    const loaded: Record<string, SqlValue> = {
+      tamano_bytes: 1024,
+      tamano_cifrado_bytes: 1024,
+      checksum_sha256: HEX64,
+      checksum_cifrado_sha256: HEX64,
+      crypto_metadata: JSONB('{"format":"aes-256-gcm-v1"}'),
+      carga_iniciada_en: NOW,
+      carga_limite_en: NOW_PLUS_HOUR,
+    };
+    const insertAccepted = async (fields: Record<string, SqlValue>): Promise<number> => {
+      const rows = await prisma.$queryRawUnsafe<Array<{ id_documento_cierre: number }>>(
+        documentInsertSql(fields, true),
+      );
+      documentIds.push(rows[0].id_documento_cierre);
+      return rows[0].id_documento_cierre;
+    };
+    const rejectBy = (constraint: string, fields: Record<string, SqlValue>) =>
+      expectCheckViolation(prisma, constraint, (tx) => tx.$executeRawUnsafe(documentInsertSql(fields)));
+
+    // Reserva válida de evidencia (RESERVADO, expira después de crearse).
+    const reservedId = await insertAccepted(reserved('evidencia-1'));
+    expect(reservedId).toBeGreaterThan(0);
+
+    // CK21/CK22: proveedor, tipo de recurso, modalidad, mime y nombre.
+    await rejectBy('s7_ck_21', reserved('x', { proveedor: 's3' }));
+    await rejectBy('s7_ck_21', reserved('x', { resource_type: 'image' }));
+    await rejectBy('s7_ck_21', reserved('x', { delivery_type: 'public' }));
+    await rejectBy('s7_ck_22', reserved('x', { mime_type: 'text/plain' }));
+    await rejectBy('s7_ck_22', reserved('x', { nombre_archivo: '   ' }));
+    // CK23/CK24: metadata exigida por estado.
+    await rejectBy('s7_ck_23', reserved('x', { estado_documento: 'EN_CARGA', carga_iniciada_en: NOW, carga_limite_en: NOW_PLUS_HOUR }));
+    await rejectBy('s7_ck_24', reserved('x', { ...loaded, estado_documento: 'DISPONIBLE' }));
+    // CK25: orden y presencia de las marcas de purga.
+    await rejectBy('s7_ck_25', reserved('x', { estado_documento: 'PURGA_PENDIENTE', purga_solicitada_en: NOW, purgado_en: NOW }));
+    await rejectBy('s7_ck_25', reserved('x', { estado_documento: 'PURGADO', purga_solicitada_en: NOW, purgado_en: { raw: "NOW() - INTERVAL '1 hour'" } }));
+    // CK26: evidencia sin huellas; informe cargado con las cuatro columnas de reporte.
+    await rejectBy('s7_ck_26', reserved('x', { fingerprint_ejecucion: HEX64 }));
+    await rejectBy('s7_ck_26', reserved('x', { ...loaded, tipo_documento: 'INFORME_AUTOMATICO', estado_documento: 'DISPONIBLE', asset_id: 'asset', version_remota: '1', disponible_en: NOW }));
+    // CK27/CK28/CK29/CK32: expiración, hex, límite inclusivo y ventana de carga.
+    await rejectBy('s7_ck_27', reserved('x', { reserva_expira_en: { raw: "NOW() - INTERVAL '1 hour'" } }));
+    await rejectBy('s7_ck_28', reserved('x', { checksum_sha256: HEX64.slice(0, 63) }));
+    await rejectBy('s7_ck_29', reserved('x', { tamano_bytes: 0, tamano_cifrado_bytes: 0 }));
+    await rejectBy('s7_ck_29', reserved('x', { tamano_bytes: MAX_DOCUMENT_SIZE + 1, tamano_cifrado_bytes: MAX_DOCUMENT_SIZE + 1 }));
+    await rejectBy('s7_ck_29', reserved('x', { tamano_bytes: 1024, tamano_cifrado_bytes: 1025 }));
+    await rejectBy('s7_ck_32', reserved('x', { carga_iniciada_en: NOW }));
+
+    // Límite inclusivo exacto: 10485760 bytes de PDF y de ciphertext se aceptan.
+    const maxSizedId = await insertAccepted(reserved('evidencia-max', { tamano_bytes: MAX_DOCUMENT_SIZE, tamano_cifrado_bytes: MAX_DOCUMENT_SIZE }));
+    const maxSized = await prisma.documentoCierre.findUniqueOrThrow({ where: { idDocumentoCierre: maxSizedId } });
+    expect(Number(maxSized.tamanoBytes)).toBe(MAX_DOCUMENT_SIZE);
+    expect(Number(maxSized.tamanoCifradoBytes)).toBe(MAX_DOCUMENT_SIZE);
+
+    // UNIQUE(proveedor, external_id).
+    await expectUniqueViolation(
+      prisma,
+      'documento_cierre_proveedor_external_id_key',
+      documentInsertSql(reserved('evidencia-1', { nombre_archivo: 'otro-nombre.pdf' })),
+    );
+
+    // Dos reservas de evidencia en la misma revisión son legales; el índice parcial solo serializa informes.
+    const secondEvidenceId = await insertAccepted(reserved('evidencia-2'));
+    expect(secondEvidenceId).toBeGreaterThan(0);
+    const automaticId = await insertAccepted(reserved('informe-auto-1', { tipo_documento: 'INFORME_AUTOMATICO' }));
+    await expectUniqueViolation(
+      prisma,
+      's7_informe_en_generacion',
+      documentInsertSql(reserved('informe-auto-2', { tipo_documento: 'INFORME_AUTOMATICO' })),
+    );
+
+    // Un automático ya DISPONIBLE no bloquea reservar el oficial ni un segundo automático.
+    await prisma.$executeRaw`UPDATE documento_cierre SET estado_documento = 'DISPONIBLE', tamano_bytes = 1024, tamano_cifrado_bytes = 1024, checksum_sha256 = ${HEX64}, checksum_cifrado_sha256 = ${HEX64}, crypto_metadata = '{"format":"aes-256-gcm-v1"}'::jsonb, carga_iniciada_en = NOW(), carga_limite_en = NOW() + INTERVAL '1 hour', asset_id = 'asset-auto', version_remota = '1', disponible_en = NOW(), generator_version = 'closure-report-v1', fingerprint_ejecucion = ${HEX64}, fingerprint_modelo = ${HEX64}, contexto_reporte = '{"schemaVersion":1}'::jsonb WHERE id_documento_cierre = ${automaticId}`;
+    const officialId = await insertAccepted(reserved('informe-oficial', { tipo_documento: 'INFORME_OFICIAL_FINAL' }));
+    expect(officialId).toBeGreaterThan(0);
+    const secondAutomaticId = await insertAccepted(reserved('informe-auto-2', { tipo_documento: 'INFORME_AUTOMATICO' }));
+    expect(secondAutomaticId).toBeGreaterThan(0);
+    expect(await prisma.documentoCierre.count({ where: { idRevisionOrigen: draftId } })).toBe(6);
   });
 });
