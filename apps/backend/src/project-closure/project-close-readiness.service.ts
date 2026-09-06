@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { captureClosureExecution } from './closure-execution-capture';
-import { computeExecutionFingerprint, type ClosureReportContext } from './closure-report-model';
+import { matchesStoredExecutionFingerprint, type ClosureReportContext } from './closure-report-model';
 
 /** Versión del generador; entra en la huella de ejecución. */
 export const CLOSURE_GENERATOR_VERSION = 'closure-report/1.0.0';
@@ -339,15 +339,15 @@ export class ProjectCloseReadinessService {
       if (executionFingerprint !== null) {
         const contexto = disponiblesAutomaticos[0].documento.contextoReporte as unknown as ClosureReportContext | null;
         const capturado = await captureClosureExecution(db, projectId);
-        const actual = contexto?.schemaVersion === 1 && contexto.presentacion
-          ? computeExecutionFingerprint({
+        const matchesStored = contexto?.schemaVersion === 1 && contexto.presentacion
+          ? matchesStoredExecutionFingerprint({
           generatorVersion: CLOSURE_GENERATOR_VERSION,
           projectId,
           cicloRevisionOrigenId: contexto.cicloRevisionOrigenId,
           datosEjecucion: capturado.ejecucion,
           presentacion: contexto.presentacion,
-        }) : null;
-        if (actual !== executionFingerprint ||
+        }, executionFingerprint) : false;
+        if (!matchesStored ||
           (input.expectedFingerprint !== undefined && input.expectedFingerprint !== executionFingerprint)) {
           bloquear(
             'INFORME_DESACTUALIZADO',
