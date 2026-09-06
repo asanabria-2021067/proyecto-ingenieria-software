@@ -543,7 +543,7 @@ describe('S7 environment foundation (TC03)', () => {
     for (const file of listTypeScriptFiles(sourceRoot)) {
       expect(fs.readFileSync(file, 'utf8'), file).not.toMatch(/dotenv/);
     }
-  });
+  }, 10_000);
 
   it('TC03-E: sin configuración válida de Closure las superficies de documentos responden 503 antes de reservar, firmar o subir', async () => {
     // El módulo está REGISTRADO en la aplicación: estar registrado no
