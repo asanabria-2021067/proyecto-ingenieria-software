@@ -198,4 +198,155 @@ describeIntegration('S7 carreras de liderazgo', () => {
       }),
     ).toBe(0);
   });
+
+  it('T16: dos administradores con el mismo expectedLeaderId producen un solo historial', async () => {
+    /**
+     * Corre a los dos administradores sobre conexiones distintas con la MISMA
+     * expectativa de líder. El primero queda retenido tras sus reads internos;
+     * el segundo espera el lock y solo entra cuando el primero ya commiteó.
+     */
+    const correr = async (
+      f: Awaited<ReturnType<typeof leadershipRaceFixture>>,
+      appealId?: number,
+    ) => {
+      const primero = leadershipStack(db);
+      const segundo = leadershipStack(second());
+      const leidos = createBarrier(1);
+      const liberar = createBarrier(1);
+      const original = primero.eligibility.assertLeadershipCandidate.bind(primero.eligibility);
+      vi.spyOn(primero.eligibility, 'assertLeadershipCandidate').mockImplementation(
+        async (...args) => {
+          await original(...args);
+          await leidos.arrive();
+          await withDeadline(liberar.wait(), 8000, 'liberar al primer administrador');
+        },
+      );
+
+      const payload = {
+        idLiderNuevo: f.successor.idUsuario,
+        expectedLeaderId: f.leader.idUsuario,
+        motivo: 'Ambos administradores aplican la misma expectativa de liderazgo.',
+      };
+      const uno = primero.service.transfer(f.project.idProyecto, f.admin.idUsuario, payload, appealId);
+      uno.catch(() => undefined);
+      await withDeadline(leidos.wait(), 8000, 'reads internos del primer administrador');
+
+      const dos = segundo.service.transfer(
+        f.project.idProyecto,
+        f.secondAdmin.idUsuario,
+        payload,
+        appealId,
+      );
+      dos.catch(() => undefined);
+      // Mientras el primero retiene el lock, el segundo no ha escrito nada.
+      expect(
+        await second().historialLiderazgo.count({ where: { idProyecto: f.project.idProyecto } }),
+      ).toBe(0);
+
+      await liberar.arrive();
+      const ganador = await withDeadline(uno, 10000, 'primer administrador');
+      const conflicto = await expectConflict(() => dos);
+      expect((conflicto.getResponse() as { code?: string }).code).toBe('LIDER_INESPERADO');
+      return { ganador, primero, segundo };
+    };
+
+    // ── Escenario 1: ambos aceptan la MISMA apelación ──────────────────────
+    const conApelacion = await leadershipRaceFixture(db, scope);
+    const apelacion = await db.apelacionLiderazgo.create({
+      data: {
+        idProyecto: conApelacion.project.idProyecto,
+        idLiderSolicitante: conApelacion.leader.idUsuario,
+        asunto: 'Solicito transferir el liderazgo',
+        mensaje: 'Dos administradores revisan esta solicitud a la vez.',
+        idCandidatoPropuesto: conApelacion.successor.idUsuario,
+      },
+    });
+    const aceptacion = await correr(conApelacion, apelacion.idApelacion);
+
+    const historialApelacion = await db.historialLiderazgo.findMany({
+      where: { idProyecto: conApelacion.project.idProyecto },
+    });
+    expect(historialApelacion).toHaveLength(1);
+    expect(historialApelacion[0].idHistorialLiderazgo).toBe(aceptacion.ganador.historialId);
+    // La UNIQUE de historial.id_apelacion protege este caso, pero el CAS del
+    // líder es lo que impide dos cambios; ambos deben sostenerse.
+    expect(historialApelacion[0].idApelacion).toBe(apelacion.idApelacion);
+    const resuelta = await db.apelacionLiderazgo.findUniqueOrThrow({
+      where: { idApelacion: apelacion.idApelacion },
+    });
+    expect(resuelta.estadoApelacion).toBe('ACEPTADA');
+    expect(resuelta.idAdminResolutor).toBe(conApelacion.admin.idUsuario);
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_APPEAL_ACCEPTED', idObjeto: String(apelacion.idApelacion) },
+      }),
+    ).toBe(1);
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: {
+          accion: 'LEADERSHIP_CHANGED',
+          idObjeto: String(conApelacion.project.idProyecto),
+        },
+      }),
+    ).toBe(1);
+    expect(
+      await db.notificacion.count({
+        where: {
+          tipoNotificacion: 'LIDERAZGO_ACTUALIZADO',
+          idUsuario: { in: [conApelacion.leader.idUsuario, conApelacion.successor.idUsuario] },
+        },
+      }),
+    ).toBe(2);
+    expect(
+      aceptacion.primero.gateway.emitToUsers.mock.calls.filter(
+        (llamada) => llamada[0] === 'LEADERSHIP_CHANGED',
+      ),
+    ).toHaveLength(1);
+    expect(
+      aceptacion.segundo.gateway.emitToUsers.mock.calls.filter(
+        (llamada) => llamada[0] === 'LEADERSHIP_CHANGED',
+      ),
+    ).toHaveLength(0);
+    vi.restoreAllMocks();
+
+    // ── Escenario 2: ambos aplican el cambio DIRECTO ──────────────────────
+    const directo = await leadershipRaceFixture(db, scope);
+    const cambio = await correr(directo);
+
+    const historialDirecto = await db.historialLiderazgo.findMany({
+      where: { idProyecto: directo.project.idProyecto },
+    });
+    // Sin apelación no hay UNIQUE que ayude: aquí solo el CAS del líder evita
+    // el segundo historial.
+    expect(historialDirecto).toHaveLength(1);
+    expect(historialDirecto[0].idApelacion).toBeNull();
+    expect(historialDirecto[0].idHistorialLiderazgo).toBe(cambio.ganador.historialId);
+    expect(
+      (await db.proyecto.findUniqueOrThrow({ where: { idProyecto: directo.project.idProyecto } }))
+        .creadoPor,
+    ).toBe(directo.successor.idUsuario);
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_CHANGED', idObjeto: String(directo.project.idProyecto) },
+      }),
+    ).toBe(1);
+    expect(
+      await db.notificacion.count({
+        where: {
+          tipoNotificacion: 'LIDERAZGO_ACTUALIZADO',
+          idUsuario: { in: [directo.leader.idUsuario, directo.successor.idUsuario] },
+        },
+      }),
+    ).toBe(2);
+    expect(
+      cambio.primero.gateway.emitToUsers.mock.calls.filter(
+        (llamada) => llamada[0] === 'LEADERSHIP_CHANGED',
+      ),
+    ).toHaveLength(1);
+    expect(
+      cambio.segundo.gateway.emitToUsers.mock.calls.filter(
+        (llamada) => llamada[0] === 'LEADERSHIP_CHANGED',
+      ),
+    ).toHaveLength(0);
+  });
 });
