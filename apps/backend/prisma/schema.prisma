@@ -156,6 +156,20 @@ enum OrigenReporteTramo {
   POR_CONCILIAR
 }
 
+/// S7 M4 (06 v2 §19): ciclo de vida de una apelación de liderazgo.
+enum EstadoApelacionLiderazgo {
+  PENDIENTE
+  ACEPTADA
+  DENEGADA
+  CANCELADA
+}
+
+/// S7 M4 (06 v2 §18/§20): procedencia de un cambio de líder registrado en el historial.
+enum OrigenCambioLiderazgo {
+  SOLICITUD_LIDER
+  CAMBIO_ADMINISTRATIVO
+}
+
 enum TipoCertificado {
   HORAS_BECA
   EXTENSION
@@ -272,6 +286,12 @@ model Usuario {
   registrosTiempoRevocados         RegistroTiempoTarea[]      @relation("RegistroTiempoRevocador")
   ajustesAutor                     AjusteHoraTarea[]          @relation("AjusteHoraAutor")
   ajustesAnulados                  AjusteHoraTarea[]          @relation("AjusteHoraAnulador")
+  apelacionesSolicitadas           ApelacionLiderazgo[]       @relation("ApelacionSolicitante")
+  apelacionesComoCandidato         ApelacionLiderazgo[]       @relation("ApelacionCandidato")
+  apelacionesResueltas             ApelacionLiderazgo[]       @relation("ApelacionResolutor")
+  liderazgosAnteriores             HistorialLiderazgo[]       @relation("HistorialLiderAnterior")
+  liderazgosNuevos                 HistorialLiderazgo[]       @relation("HistorialLiderNuevo")
+  cambiosLiderazgoAdministrados    HistorialLiderazgo[]       @relation("HistorialAdmin")
   amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
   amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
   siguiendo                        Seguimiento[]              @relation("Siguiendo")
@@ -531,6 +551,8 @@ model Proyecto {
   sprints           Sprint[]
   conversaciones    Conversacion[]
 
+  apelacionesLiderazgo ApelacionLiderazgo[]
+  historialLiderazgo   HistorialLiderazgo[]
   @@map("proyecto")
 }
 
@@ -878,6 +900,62 @@ model AjusteHoraTarea {
   @@index([idAsignacion, anuladoEn])
   @@index([idAutor])
   @@map("ajuste_hora_tarea")
+}
+
+/// S7 M4 (06 v2 §19/§35): solicitud del líder actual para transferir el
+/// liderazgo a un candidato elegible. Una pendiente por proyecto y líder
+/// (índice parcial s7_apelacion_pendiente, SQL manual). Inmutable en texto
+/// tras crearse; se retiene después de resolverse. No persiste idHistorial:
+/// el historial navega hacia la apelación por su propia FK única.
+model ApelacionLiderazgo {
+  idApelacion          Int                      @id @default(autoincrement()) @map("id_apelacion")
+  idProyecto           Int                      @map("id_proyecto")
+  idLiderSolicitante   Int                      @map("id_lider_solicitante")
+  asunto               String                   @db.VarChar(200)
+  mensaje              String                   @db.Text
+  idCandidatoPropuesto Int                      @map("id_candidato_propuesto")
+  estadoApelacion      EstadoApelacionLiderazgo @default(PENDIENTE) @map("estado_apelacion")
+  creadaEn             DateTime                 @default(now()) @map("creada_en")
+  resueltaEn           DateTime?                @map("resuelta_en")
+  idAdminResolutor     Int?                     @map("id_admin_resolutor")
+  mensajeResolucion    String?                  @map("mensaje_resolucion") @db.Text
+
+  proyecto           Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict, onUpdate: Cascade)
+  liderSolicitante   Usuario             @relation("ApelacionSolicitante", fields: [idLiderSolicitante], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  candidatoPropuesto Usuario             @relation("ApelacionCandidato", fields: [idCandidatoPropuesto], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  adminResolutor     Usuario?            @relation("ApelacionResolutor", fields: [idAdminResolutor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  historial          HistorialLiderazgo? @relation("ApelacionHistorial")
+
+  @@index([idProyecto, estadoApelacion])
+  @@index([estadoApelacion, creadaEn])
+  @@index([idLiderSolicitante])
+  @@map("apelacion_liderazgo")
+}
+
+/// S7 M4 (06 v2 §20/§35): hecho append-only de cambio de líder (anterior,
+/// nuevo, admin, motivo, origen). idApelacion es una FK única real hacia la
+/// apelación aceptada; el candidato sugerido se lee a través de ella y no se
+/// duplica aquí. Sin fila fundacional ficticia, sin UPDATE ni DELETE.
+model HistorialLiderazgo {
+  idHistorialLiderazgo Int                   @id @default(autoincrement()) @map("id_historial_liderazgo")
+  idProyecto           Int                   @map("id_proyecto")
+  idLiderAnterior      Int                   @map("id_lider_anterior")
+  idLiderNuevo         Int                   @map("id_lider_nuevo")
+  idAdminResponsable   Int                   @map("id_admin_responsable")
+  motivo               String                @db.Text
+  origen               OrigenCambioLiderazgo
+  idApelacion          Int?                  @unique @map("id_apelacion")
+  registradoEn         DateTime              @default(now()) @map("registrado_en")
+
+  proyecto         Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict, onUpdate: Cascade)
+  liderAnterior    Usuario             @relation("HistorialLiderAnterior", fields: [idLiderAnterior], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  liderNuevo       Usuario             @relation("HistorialLiderNuevo", fields: [idLiderNuevo], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  adminResponsable Usuario             @relation("HistorialAdmin", fields: [idAdminResponsable], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  apelacion        ApelacionLiderazgo? @relation("ApelacionHistorial", fields: [idApelacion], references: [idApelacion], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([idProyecto, registradoEn])
+  @@index([idLiderNuevo])
+  @@map("historial_liderazgo")
 }
 
 model Etiqueta {
