@@ -240,3 +240,34 @@ export async function cleanupLeadershipFixture(
   });
   await cleanupIntegrationFixtures(db, scope);
 }
+
+/**
+ * C101/C102 (06 v2 §42/§47 T15–T16): escenario mínimo de las carreras de
+ * liderazgo. Un proyecto operativo con líder A, un sucesor B activo y un
+ * administrador: lo único que cambia entre pruebas es quién commitea primero.
+ */
+export async function leadershipRaceFixture(db: PrismaClient, scope: LeadershipCleanupScope) {
+  const leader = await fixtures.createIntegrationUser(db);
+  const successor = await fixtures.createIntegrationUser(db);
+  collectInto(scope, 'userIds', [leader.idUsuario, successor.idUsuario]);
+  const admin = await createIntegrationAdmin(db, scope);
+  const secondAdmin = await createIntegrationAdmin(db, scope);
+
+  const project = await fixtures.createIntegrationProject(db, leader.idUsuario, {
+    estadoProyecto: 'EN_PROGRESO',
+  });
+  collectInto(scope, 'projectIds', [project.idProyecto]);
+  const role = await fixtures.createIntegrationProjectRole(db, project.idProyecto, { cupos: 4 });
+  collectInto(scope, 'roleIds', [role.idRolProyecto]);
+  const participation = await fixtures.createIntegrationParticipation(
+    db,
+    successor.idUsuario,
+    role.idRolProyecto,
+    { estadoParticipacion: 'ACTIVO' },
+  );
+  collectInto(scope, 'participationIds', [participation.idParticipacion]);
+  const sprint = await fixtures.createIntegrationSprint(db, project.idProyecto, { estado: 'ACTIVO' });
+  collectInto(scope, 'sprintIds', [sprint.idSprint]);
+
+  return { leader, successor, admin, secondAdmin, project, role, participation, sprint };
+}
