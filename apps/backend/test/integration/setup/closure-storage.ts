@@ -6,6 +6,7 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { BitacoraEventosService } from '../../../src/bitacora/bitacora-eventos.service';
 import { ProjectTransactionService } from '../../../src/common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../../../src/common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../../../src/common/project-policy/project-read-policy.service';
 import { ProjectIdResolverService } from '../../../src/common/project-policy/project-id-resolver.service';
 import { ClosureTicketService } from '../../../src/storage/closure-ticket.service';
 import { ClosureCryptoService } from '../../../src/storage/closure-crypto.service';
@@ -116,6 +117,7 @@ export function closureDocumentsStack(
   const prisma = db as unknown as PrismaService;
   const runner = new ProjectTransactionService(prisma);
   const policy = new ProjectPolicyService(new ProjectIdResolverService(prisma));
+  const readPolicy = new ProjectReadPolicyService(prisma);
   const tickets = new ClosureTicketService(config);
   const crypto = new ClosureCryptoService(config);
   const adapter = new CloudinaryClosureStorageAdapter(config);
@@ -125,6 +127,7 @@ export function closureDocumentsStack(
     prisma,
     runner,
     policy,
+    readPolicy,
     tickets,
     crypto,
     adapter,
@@ -132,7 +135,7 @@ export function closureDocumentsStack(
     storage,
     audit,
   );
-  return { service, tickets, crypto, adapter, storage, audit, runner, policy, pdfValidation };
+  return { service, tickets, crypto, adapter, storage, audit, runner, policy, readPolicy, pdfValidation };
 }
 
 export interface ClosureCleanupScope extends IntegrationCleanupScope {

@@ -13,3 +13,15 @@ export interface UploadGrant {
   expiraEn: Date;
   maxBytes: number;
 }
+
+/**
+ * C117 (06 v2 §41 `ReadGrant`): permiso de LECTURA. Es una URL del backend y
+ * su vencimiento; nunca una URL del proveedor ni una firma remota. El ticket
+ * por sí solo no autoriza: el contenido exige además la sesión del mismo
+ * usuario y sus permisos ACTUALES.
+ */
+export interface ReadGrant {
+  documentId: number;
+  url: string;
+  expiraEn: Date;
+}

@@ -486,4 +486,139 @@ describeIntegration('S7 seguridad del almacenamiento de cierre', () => {
       await db.documentoRevisionCierre.count({ where: { idDocumentoCierre: enviado.documentId } }),
     ).toBe(1);
   });
+
+  it('T29-A: el contenido protegido exige ticket vigente y el mismo usuario autenticado, y nunca redirige al origen', async () => {
+    const f = await closureDraftFixture(db, scope);
+    const { service, tickets, storage } = closureDocumentsStack(db);
+    scope.documentIds = [];
+    const pdf = await pdfFixture();
+
+    const grant = await service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+      revisionId: f.revision.idRevisionCierre,
+      nombreArchivo: 'evidencia protegida.pdf',
+    });
+    scope.documentIds.push(grant.documentId);
+    const documento = await service.uploadAndAttach(
+      f.project.idProyecto,
+      f.leader.idUsuario,
+      grant.ticket,
+      pdf,
+    );
+    expect(documento.estadoDocumento).toBe('DISPONIBLE');
+
+    // El permiso de lectura es una URL DEL BACKEND que caduca a los 300 s.
+    const antes = Date.now();
+    const lectura = await service.getReadUrl(
+      f.project.idProyecto,
+      grant.documentId,
+      f.leader.idUsuario,
+    );
+    const ttl = (lectura.expiraEn.getTime() - antes) / 1000;
+    expect(ttl).toBeGreaterThan(290);
+    expect(ttl).toBeLessThanOrEqual(300);
+    expect(lectura.url.startsWith(`/proyectos/${f.project.idProyecto}/cierre/documentos/`)).toBe(true);
+    expect(lectura.url).toContain('/contenido?ticket=');
+    // Ni una URL del proveedor, ni una firma, ni un secreto.
+    for (const prohibido of ['cloudinary', 'res.cloudinary.com', 'http://', 'https://', 'signature', 'api_key']) {
+      expect(lectura.url).not.toContain(prohibido);
+    }
+    const ticketLectura = decodeURIComponent(lectura.url.split('ticket=')[1]);
+
+    // Único caso autorizado: mismo usuario, ticket vigente.
+    const contenido = await service.readContent(
+      f.project.idProyecto,
+      grant.documentId,
+      f.leader.idUsuario,
+      ticketLectura,
+    );
+    // Bytes descifrados y VERIFICADOS contra la huella registrada.
+    expect(contenido.bytes.equals(pdf)).toBe(true);
+    expect(contenido.bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(contenido.nombreArchivo).toBe('evidencia protegida.pdf');
+    // Lo que viajó del proveedor era ciphertext, no el PDF.
+    const leidoDelProveedor = await storage.readCiphertext.mock.results.at(-1)!.value;
+    expect((leidoDelProveedor as Buffer).equals(pdf)).toBe(false);
+
+    // Otro usuario autenticado con el ticket del líder: sin bytes.
+    await expectStatus(401, () =>
+      service.readContent(f.project.idProyecto, grant.documentId, f.otro.idUsuario, ticketLectura),
+    );
+    // Un usuario cualquiera con SU propio ticket tampoco: los permisos
+    // actuales se consultan además del ticket.
+    const suTicket = tickets.sign({
+      purpose: 'read',
+      documentId: grant.documentId,
+      projectId: f.project.idProyecto,
+      revisionId: f.revision.idRevisionCierre,
+      actorId: f.otro.idUsuario,
+      checksum: documento.checksumSha256 ?? '',
+    });
+    await expectStatus(403, () =>
+      service.readContent(f.project.idProyecto, grant.documentId, f.otro.idUsuario, suTicket.ticket),
+    );
+
+    // Ticket expirado, manipulado y de otro propósito: nada de bytes.
+    const expirado = tickets.sign(
+      {
+        purpose: 'read',
+        documentId: grant.documentId,
+        projectId: f.project.idProyecto,
+        revisionId: f.revision.idRevisionCierre,
+        actorId: f.leader.idUsuario,
+        checksum: documento.checksumSha256 ?? '',
+      },
+      -1,
+    );
+    const manipulado = `${ticketLectura.slice(0, -2)}${ticketLectura.slice(-2) === 'AA' ? 'BB' : 'AA'}`;
+    const deSubida = tickets.sign({
+      purpose: 'upload',
+      documentId: grant.documentId,
+      projectId: f.project.idProyecto,
+      revisionId: f.revision.idRevisionCierre,
+      actorId: f.leader.idUsuario,
+    });
+    for (const [caso, valor] of [
+      ['expirado', expirado.ticket],
+      ['manipulado', manipulado],
+      ['de propósito upload', deSubida.ticket],
+    ] as const) {
+      const respuesta = await expectStatus(401, () =>
+        service.readContent(f.project.idProyecto, grant.documentId, f.leader.idUsuario, valor),
+      );
+      expect(JSON.stringify(respuesta), caso).not.toContain('%PDF');
+    }
+
+    // Un ticket de OTRO documento tampoco sirve para este.
+    const otroGrant = await service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+      revisionId: f.revision.idRevisionCierre,
+      nombreArchivo: 'otro.pdf',
+    });
+    scope.documentIds.push(otroGrant.documentId);
+    const ticketDeOtro = tickets.sign({
+      purpose: 'read',
+      documentId: otroGrant.documentId,
+      projectId: f.project.idProyecto,
+      revisionId: f.revision.idRevisionCierre,
+      actorId: f.leader.idUsuario,
+      checksum: '',
+    });
+    await expectStatus(401, () =>
+      service.readContent(
+        f.project.idProyecto,
+        grant.documentId,
+        f.leader.idUsuario,
+        ticketDeOtro.ticket,
+      ),
+    );
+
+    // Un documento que no está DISPONIBLE no se lee.
+    await expectStatus(409, () =>
+      service.getReadUrl(f.project.idProyecto, otroGrant.documentId, f.leader.idUsuario),
+    );
+
+    // La respuesta del servicio son BYTES, no una redirección ni una URL.
+    expect(Buffer.isBuffer(contenido.bytes)).toBe(true);
+    expect(JSON.stringify(Object.keys(contenido))).not.toContain('url');
+    expect(JSON.stringify(Object.keys(contenido))).not.toContain('location');
+  });
 });
