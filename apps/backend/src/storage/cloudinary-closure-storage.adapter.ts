@@ -1,7 +1,7 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary';
+import { v2 as cloudinary, type ResourceApiResponse, type UploadApiResponse } from 'cloudinary';
 import {
   CLOSURE_DEFAULT_PREFIX,
   type ClosureAvailability,
@@ -21,7 +21,7 @@ import {
 } from './closure-storage.port';
 
 /**
- * C103/C106/C107 (06 v2 §26/§27/§39): adaptador Cloudinary del puerto de cierre.
+ * C103/C106/C107/C114 (06 v2 §26/§27/§39): adaptador Cloudinary del puerto de cierre.
  *
  * Resuelve credenciales y modalidad desde la configuración YA VALIDADA
  * (`closure` de `validateEnvironment`), nunca leyendo `process.env` por su
@@ -36,6 +36,9 @@ import {
  */
 /** §27: el proveedor no puede retener una operación de cierre más de un minuto. */
 export const CLOSURE_REMOTE_TIMEOUT_MS = 60_000;
+
+/** §27: el objeto remoto no es el que se envió; el documento no se vincula. */
+export const ASSET_NO_COINCIDE = 'ASSET_NO_COINCIDE';
 
 @Injectable()
 export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
@@ -191,12 +194,26 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
       }),
     );
 
-    return {
+    const confirmada: ClosureRemoteIdentity = {
       ...identity,
       deliveryType: type,
       assetId: respuesta.asset_id ?? null,
       version: respuesta.version === undefined ? null : String(respuesta.version),
     };
+
+    // §27: el etag se compara ENTRE LAS DOS RESPUESTAS del proveedor, que es
+    // el único punto donde ambas existen. Nunca se interpreta como SHA-256 del
+    // PDF ni se persiste como columna.
+    const descriptor = await this.verifyAsset(confirmada);
+    const etagSubida = typeof respuesta.etag === 'string' ? respuesta.etag : undefined;
+    if (etagSubida && descriptor.etag && etagSubida !== descriptor.etag) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: ASSET_NO_COINCIDE,
+        message: 'El objeto remoto no coincide con el que se acaba de subir',
+      });
+    }
+    return confirmada;
   }
 
   private uploadStream(
@@ -234,14 +251,55 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
     }
   }
 
-  async verifyAsset(_identity: ClosureRemoteIdentity): Promise<ClosureAssetDescriptor> {
+  /**
+   * Metadatos del asset según la API AUTENTICADA del proveedor. Nunca se
+   * construyen desde el cuerpo de una petición del cliente ni desde una URL
+   * aportada por el usuario: solo desde datos de servidor.
+   */
+  async verifyAsset(identity: ClosureRemoteIdentity): Promise<ClosureAssetDescriptor> {
     this.availability();
-    throw new ServiceUnavailableException('La verificación remota todavía no está habilitada');
+    const recurso = await this.callProvider('verificación', () =>
+      cloudinary.api.resource(identity.publicId, {
+        resource_type: CLOSURE_RESOURCE_TYPE,
+        type: identity.deliveryType,
+        timeout: CLOSURE_REMOTE_TIMEOUT_MS,
+      }),
+    );
+    const descriptor = recurso as ResourceApiResponse['resources'][number] & {
+      asset_id?: string;
+      etag?: string;
+      bytes?: number;
+      version?: number | string;
+    };
+    return {
+      assetId: descriptor.asset_id ?? '',
+      publicId: descriptor.public_id,
+      resourceType: descriptor.resource_type,
+      deliveryType: descriptor.type,
+      version: descriptor.version === undefined ? '' : String(descriptor.version),
+      bytes: descriptor.bytes ?? 0,
+      ...(descriptor.etag ? { etag: descriptor.etag } : {}),
+    };
   }
 
-  async readCiphertext(_identity: ClosureRemoteIdentity, _timeoutMs: number): Promise<Buffer> {
+  /**
+   * Descarga el objeto remoto EXACTO con una URL firmada de servidor. Esa URL
+   * jamás se devuelve al navegador: quien lee bytes de cierre es el backend.
+   */
+  async readCiphertext(identity: ClosureRemoteIdentity, timeoutMs: number): Promise<Buffer> {
     this.availability();
-    throw new ServiceUnavailableException('La lectura remota todavía no está habilitada');
+    const url = cloudinary.utils.private_download_url(identity.publicId, '', {
+      resource_type: CLOSURE_RESOURCE_TYPE,
+      type: identity.deliveryType,
+      expires_at: Math.floor(Date.now() / 1000) + 300,
+    });
+    return this.callProvider('lectura', async () => {
+      const respuesta = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      if (!respuesta.ok) {
+        throw new Error(`descarga rechazada con ${respuesta.status}`);
+      }
+      return Buffer.from(await respuesta.arrayBuffer());
+    });
   }
 
   async destroy(_identity: ClosureRemoteIdentity): Promise<ClosureDestroyOutcome> {
