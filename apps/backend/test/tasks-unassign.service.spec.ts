@@ -8,7 +8,7 @@ import type { NotificationsService } from '../src/notifications/notifications.se
 import { TasksService } from '../src/tasks/tasks.service';
 import { NOTIFICATION_TEMPLATES } from '../src/notifications/templates/notification.templates';
 import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
-import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -82,7 +82,7 @@ function makeService(opts: {
   const relations = makeRelations();
   const notifications = opts.notifications ?? makeNotifications();
   const context = opts.context ?? makeContext();
-  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -407,7 +407,7 @@ describe('TasksService.unassign', () => {
       };
       const notifications = notificationsLiteral as typeof notificationsLiteral & NotificationsService;
       const relations = makeRelations();
-      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.unassign(5, 42, 1);
 

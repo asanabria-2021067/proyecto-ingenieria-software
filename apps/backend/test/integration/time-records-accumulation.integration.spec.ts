@@ -22,6 +22,7 @@ import { TimeRecordsService } from '../../src/time-records/time-records.service'
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 function decimalToNumber(value: unknown): number {
   return Number(value);
@@ -36,7 +37,8 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     {} as unknown as NotificationsService,
     new TasksContextService(prismaService),
     new ProjectTransactionService(prismaService),
-    new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService));
 }
 
 function makeTimeRecordsService(prisma: PrismaClient): TimeRecordsService {

@@ -8,7 +8,7 @@ import type { NotificationsService } from '../src/notifications/notifications.se
 import type { UpdateTaskDto } from '../src/tasks/dto/update-task.dto';
 import { TasksService } from '../src/tasks/tasks.service';
 import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
-import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -100,7 +100,7 @@ function makeService(opts: {
   const relations = opts.relations ?? makeRelations();
   const notifications = opts.notifications ?? makeNotifications();
   const context = opts.context ?? makeContext();
-  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -707,7 +707,7 @@ describe('TasksService.update', () => {
         orden.push('lectura_final');
         return tareaRow({ idRolProyecto: 6 });
       });
-      const service = new TasksService(prisma, auth, relations, makeNotifications(), context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+      const service = new TasksService(prisma, auth, relations, makeNotifications(), context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.update(5, 42, 1, { idRolProyecto: 6, idsEtiquetas: [1] });
 

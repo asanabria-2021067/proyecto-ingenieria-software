@@ -26,6 +26,7 @@ import type { CreateTaskDto } from '../../src/tasks/dto/create-task.dto';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real A3: demuestra que ProjectWriteGuard (SYNC GATE 2) protege
@@ -100,7 +101,8 @@ describeIntegration(
         makeFakeNotifications(),
         tasksContext,
         new ProjectTransactionService(prismaService),
-        new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+        new ProjectReadPolicyService(prismaService));
       controller = new TasksController(tasksService);
 
       const resolver = new ProjectIdResolverService(prismaService);
