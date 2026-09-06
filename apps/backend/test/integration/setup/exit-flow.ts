@@ -28,19 +28,20 @@ export function exitStack(db: PrismaClient) {
     realNotifications.notifyFromTemplate.bind(realNotifications),
   );
   const audit = new BitacoraEventosService();
+  const runner = new ProjectTransactionService(prisma);
   const service = new ExitRequestsService(
     prisma,
     { notifyFromTemplate } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
-    new ProjectTransactionService(prisma),
+    runner,
     new ProjectPolicyService(new ProjectIdResolverService(prisma)),
     new ProjectReadPolicyService(prisma),
     new HoursRecognitionService(prisma),
     new SprintsContextService(prisma),
     audit,
   );
-  return { service, notifyFromTemplate, audit };
+  return { service, notifyFromTemplate, audit, runner };
 }
 
 /**

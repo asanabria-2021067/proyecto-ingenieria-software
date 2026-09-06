@@ -8,7 +8,8 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 import { canonicalDigest } from '../../src/project-closure/closure-report-model';
 import { createIntegrationUser } from './setup/fixtures';
-import { createIntegrationAdmin } from './setup/leadership';
+import { createIntegrationAdmin, leadershipStack } from './setup/leadership';
+import { exitStack } from './setup/exit-flow';
 import { createBarrier, useSecondClient, withDeadline } from './setup/concurrency';
 import { flowAStack } from './setup/flow-a';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
@@ -60,6 +61,58 @@ describeIntegration('S7 carreras y preparación del cierre', () => {
   });
   afterAll(async () => {
     await db.$disconnect();
+  });
+
+  it('T13-A: una mutación hija intercalada impide entrar en EN_SOLICITUD_CIERRE con un blocker nuevo', async () => {
+    for (const kind of ['exit', 'appeal']) for (const closureFirst of [true, false]) {
+      const f = await closureReadyFixture(db, scope);
+      const exits = exitStack(second());
+      const leadership = leadershipStack(second());
+      const childRunner = kind === 'exit' ? exits.runner : leadership.runner;
+      const mutate = () => kind === 'exit'
+        ? exits.service.createSolicitudSalida(f.project.idProyecto, f.miembro.idUsuario, 'Solicitud durante cierre')
+        : leadership.service.createAppeal(f.project.idProyecto, f.leader.idUsuario, {
+          asunto: 'Revisión de liderazgo', mensaje: 'Solicito transferir el liderazgo', idCandidatoPropuesto: f.miembro.idUsuario,
+        });
+      const pending = await db.postulacion.create({ data: { idRolProyecto: f.role.idRolProyecto,
+        idUsuarioPostulante: f.leader.idUsuario, justificacion: 'Pendiente ante carrera hija' } });
+      const entered = createBarrier(1);
+      const contender = createBarrier(1);
+      if (closureFirst) {
+        const evaluate = f.stack.readiness.assertReady.bind(f.stack.readiness);
+        vi.spyOn(f.stack.readiness, 'assertReady').mockImplementationOnce(async (...args) => {
+          const result = await evaluate(...args); await entered.arrive(); await contender.wait(); return result;
+        });
+        const run = childRunner.run.bind(childRunner);
+        vi.spyOn(childRunner, 'run').mockImplementationOnce(async (...args) => { await contender.arrive(); return run(...args); });
+        const submit = f.stack.closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto);
+        await withDeadline(entered.wait(), 5000);
+        await withDeadline(Promise.all([submit, expectStatus(409, mutate)]), 10000);
+      } else {
+        const runChild = childRunner.run.bind(childRunner);
+        vi.spyOn(childRunner, 'run').mockImplementationOnce((id, actor, operation, callback, options) =>
+          runChild(id, actor, operation, async (ctx) => {
+            const result = await callback(ctx); await entered.arrive(); await contender.wait(); return result;
+          }, options));
+        const run = f.stack.runner.run.bind(f.stack.runner);
+        vi.spyOn(f.stack.runner, 'run').mockImplementationOnce(async (...args) => { await contender.arrive(); return run(...args); });
+        const mutation = mutate();
+        await withDeadline(entered.wait(), 5000);
+        const [, error] = await withDeadline(Promise.all([mutation, expectStatus(409, () => f.stack.closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto))]), 10000);
+        expect(error).toMatchObject({ blockers: expect.arrayContaining([expect.objectContaining({ code: kind === 'exit' ? 'SALIDAS_ABIERTAS' : 'APELACION_PENDIENTE' })]) });
+        expect(await db.postulacion.findUniqueOrThrow({ where: { idPostulacion: pending.idPostulacion } })).toEqual(pending);
+        expect(await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: f.dto.revisionId } })).toMatchObject({ estadoRevision: 'BORRADOR', fingerprintEntrega: null });
+      }
+      const project = await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } });
+      const exitRows = await db.solicitudSalidaProyecto.findMany({ where: { idProyecto: f.project.idProyecto }, select: { idSolicitud: true } });
+      scope.exitRequestIds = [...(scope.exitRequestIds ?? []), ...exitRows.map((row) => row.idSolicitud)];
+      expect(project.estadoProyecto).toBe(closureFirst ? 'EN_SOLICITUD_CIERRE' : 'EN_PROGRESO');
+      if (closureFirst) {
+        expect(await db.solicitudSalidaProyecto.count({ where: { idProyecto: project.idProyecto, estadoSolicitud: { in: ['PREPARACION', 'PENDIENTE_LIDER'] } } })).toBe(0);
+        expect(await db.apelacionLiderazgo.count({ where: { idProyecto: project.idProyecto, estadoApelacion: 'PENDIENTE' } })).toBe(0);
+      }
+      vi.restoreAllMocks();
+    }
   });
 
   it('T12: requestClose frente a startSprint termina con cierre y arranque rechazado, o con arranque previo y cierre rechazado', async () => {
