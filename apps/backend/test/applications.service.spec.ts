@@ -6,26 +6,51 @@ import type { NotificationsService } from '../src/notifications/notifications.se
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { UpdateEstadoPostulacionDto } from '../src/applications/dto/update-estado-postulacion.dto';
 import { ApplicationsService } from '../src/applications/applications.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  withProjectLock,
+} from './helpers/project-policy.double';
 
 type NotificationsDouble = Partial<{
   notifyUsers: ReturnType<typeof vi.fn>;
   persistTemplateTx: ReturnType<typeof vi.fn>;
+  persistUsersTx: ReturnType<typeof vi.fn>;
   publishEffects: ReturnType<typeof vi.fn>;
 }>;
 
 function makeNotifications(): NotificationsDouble {
-  return { notifyUsers: vi.fn(), persistTemplateTx: vi.fn(), publishEffects: vi.fn() };
+  return {
+    notifyUsers: vi.fn(),
+    persistTemplateTx: vi.fn(),
+    // C043: la resolución persiste la notificación dentro de la transacción.
+    persistUsersTx: vi.fn(),
+    publishEffects: vi.fn(),
+  };
 }
 
+/**
+ * C043: el servicio corre sobre el protocolo con el runner REAL sobre el
+ * `$transaction` mockeado, de modo que las aserciones existentes sobre la
+ * transacción y sobre `prisma._tx` siguen siendo exactamente las mismas. El
+ * estado del proyecto lo entrega ahora la fila bloqueada, de la que dependen
+ * las validaciones de estado y de cupo.
+ */
 function makeService(
   prisma: ReturnType<typeof makePrisma>,
   notifications: NotificationsDouble = makeNotifications(),
   eventEmitter: Partial<{ emit: ReturnType<typeof vi.fn> }> = { emit: vi.fn() },
+  estadoProyecto: EstadoProyecto = EstadoProyecto.PUBLICADO,
 ) {
+  withProjectLock(prisma._tx, { estadoProyecto });
   return new ApplicationsService(
     prisma as unknown as PrismaService,
     notifications as unknown as NotificationsService,
     eventEmitter as unknown as EventEmitter2,
+    new ProjectTransactionService(prisma as unknown as PrismaService),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 }
 
@@ -36,19 +61,23 @@ function makePrisma() {
       create: vi.fn(),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUniqueOrThrow: vi.fn(),
+      // C043: duplicado y retiro también se evalúan bajo el lock.
+      findFirst: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     participacionProyecto: {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({ idParticipacion: 1 }),
       update: vi.fn().mockResolvedValue({ idParticipacion: 1 }),
+      // C043: el cupo se cuenta dentro de la transacción.
+      count: vi.fn(),
     },
   };
   return {
     usuario: { findUnique: vi.fn() },
     rolProyecto: { findUnique: vi.fn() },
-    participacionProyecto: { count: vi.fn(), ...tx.participacionProyecto },
+    participacionProyecto: { ...tx.participacionProyecto },
     postulacion: {
-      findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -145,10 +174,10 @@ describe('ApplicationsService', () => {
     prisma.rolProyecto.findUnique.mockResolvedValue({
       idRolProyecto: 2,
       cupos: 1,
-      proyecto: { estadoProyecto: EstadoProyecto.EN_PROGRESO },
+      proyecto: { idProyecto: 5, estadoProyecto: EstadoProyecto.EN_PROGRESO },
     });
     prisma.participacionProyecto.count.mockResolvedValue(1);
-    const service = makeService(prisma);
+    const service = makeService(prisma, makeNotifications(), { emit: vi.fn() }, EstadoProyecto.EN_PROGRESO);
     await expect(
       service.create({ idRolProyecto: 2, justificacion: '' }, 1),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -185,7 +214,7 @@ describe('ApplicationsService', () => {
     const prisma = makePrisma();
     mockPostulacionPendiente(prisma);
     prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
-    const notifications = { notifyUsers: vi.fn() };
+    const notifications = { notifyUsers: vi.fn(), persistUsersTx: vi.fn(), publishEffects: vi.fn() };
     const service = makeService(prisma, notifications);
 
     const result = await service.updateEstado(
@@ -208,7 +237,15 @@ describe('ApplicationsService', () => {
       data: { idUsuario: 4, idRolProyecto: 2, idPostulacion: 1, estadoParticipacion: 'ACTIVO' },
     });
     expect(prisma._tx.participacionProyecto.update).not.toHaveBeenCalled();
-    expect(notifications.notifyUsers).toHaveBeenCalled();
+    // C043: la notificación al postulante se persiste dentro de la misma
+    // transacción que resuelve, y el socket se publica tras el commit.
+    expect(notifications.persistUsersTx).toHaveBeenCalledWith(
+      prisma._tx,
+      [4],
+      expect.objectContaining({ tipoNotificacion: 'POSTULACION_RESUELTA' }),
+      expect.objectContaining({ add: expect.any(Function) }),
+    );
+    expect(notifications.publishEffects).toHaveBeenCalledTimes(1);
   });
 
   it('updateEstado (ACEPTADA) reactiva una participación RETIRADO existente en vez de duplicarla', async () => {
