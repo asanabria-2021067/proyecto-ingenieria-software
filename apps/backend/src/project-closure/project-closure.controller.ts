@@ -16,7 +16,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import type { ClosurePhase } from './project-close-readiness.service';
-import { GenerateReportDto } from './dto/closure.dto';
+import { GenerateReportDto, RequestCloseDto } from './dto/closure.dto';
 import { ProjectClosureReportService } from './project-closure-report.service';
 import { ProjectClosureService } from './project-closure.service';
 import { ProjectCloseReadinessService } from './project-close-readiness.service';
@@ -38,7 +38,7 @@ const CLOSURE_PREPARATION_WRITE: ProjectWriteMetadata = {
 
 const FASES: ClosurePhase[] = ['REQUEST', 'RESUBMIT', 'APPROVE'];
 
-@Controller('proyectos/:projectId/cierre')
+@Controller('proyectos/:projectId')
 @UseGuards(JwtAuthGuard)
 export class ProjectClosureController {
   constructor(
@@ -49,7 +49,7 @@ export class ProjectClosureController {
   ) {}
 
   /** E103: crea el borrador de cierre o devuelve el existente. */
-  @Post('preparacion')
+  @Post('cierre/preparacion')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ProjectWriteGuard)
   @ProjectWrite(CLOSURE_PREPARATION_WRITE)
@@ -67,7 +67,7 @@ export class ProjectClosureController {
    * las consulta el servidor. Aceptarlas del cliente permitiría entregar un
    * informe con cifras que nadie verificó.
    */
-  @Post('informe-automatico')
+  @Post('cierre/informe-automatico')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ProjectWriteGuard)
   @ProjectWrite(CLOSURE_PREPARATION_WRITE)
@@ -80,7 +80,19 @@ export class ProjectClosureController {
   }
 
   /** E104: qué falta para cerrar. Consultar no cambia nada. */
-  @Get('readiness')
+  @Post('solicitar-cierre')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite({ ...CLOSURE_PREPARATION_WRITE, family: 'CIERRE_ENVIO' })
+  requestClose(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: RequestCloseDto,
+  ) {
+    return this.closure.requestClose(projectId, user.userId, dto);
+  }
+
+  @Get('cierre/readiness')
   readiness(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },

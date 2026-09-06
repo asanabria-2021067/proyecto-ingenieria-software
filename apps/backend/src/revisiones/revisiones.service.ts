@@ -56,15 +56,17 @@ export class RevisionesService {
         },
         orderBy: { enviadaEn: 'desc' },
       }),
-      this.prisma.proyecto.findMany({
-        where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE },
+      this.prisma.revisionCierreProyecto.findMany({
+        where: { estadoRevision: 'ENVIADA', proyecto: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null } },
         select: {
+          idRevisionCierre: true,
           idProyecto: true,
-          tituloProyecto: true,
-          creadoPor: true,
-          fechaActualizacion: true,
+          numeroRevision: true,
+          enviadaEn: true,
+          fingerprintEntrega: true,
+          proyecto: { select: { tituloProyecto: true, creadoPor: true } },
         },
-        orderBy: { fechaActualizacion: 'desc' },
+        orderBy: { enviadaEn: 'desc' },
       }),
       this.prisma.proyecto.findMany({
         where: { estadoProyecto: EstadoProyecto.OBSERVADO, eliminadoEn: null },
