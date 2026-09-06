@@ -15,6 +15,7 @@ import {
   ADVERTENCIA_APELACION_SIN_PARTICIPACION,
 } from '../../src/leadership/leadership-read.service';
 import { CreateLeadershipAppealDto } from '../../src/leadership/dto/create-leadership-appeal.dto';
+import { DenyAppealDto } from '../../src/leadership/dto/deny-appeal.dto';
 
 /** Misma configuración que apps/backend/src/main.ts: el 400 lo produce el pipe real. */
 const pipe = new ValidationPipe({
@@ -29,6 +30,13 @@ function parseAppeal(plain: unknown): Promise<CreateLeadershipAppealDto> {
     type: 'body',
     metatype: CreateLeadershipAppealDto,
   }) as Promise<CreateLeadershipAppealDto>;
+}
+
+function parseDenial(plain: unknown): Promise<DenyAppealDto> {
+  return pipe.transform(plain, {
+    type: 'body',
+    metatype: DenyAppealDto,
+  }) as Promise<DenyAppealDto>;
 }
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
@@ -365,5 +373,81 @@ describeIntegration('S7 liderazgo y Q1', () => {
       (await db.proyecto.findUniqueOrThrow({ where: { idProyecto: entregado.idProyecto } })).creadoPor,
     ).toBe(f.leaderConParticipacion.idUsuario);
     expect(await db.historialLiderazgo.count()).toBe(0);
+  });
+
+  it('T20-C: denegar una apelación exige admin y motivo, no cambia el líder y notifica al autor aunque ya no participe', async () => {
+    const f = await leadershipFixture(db, scope);
+    const { service } = leadershipStack(db);
+    // A lidera el proyecto y NO tiene participación activa: la respuesta a su
+    // apelación le llega igual.
+    const lider = f.leaderSinParticipacion.idUsuario;
+    expect(
+      await db.participacionProyecto.count({
+        where: { idUsuario: lider, rolProyecto: { idProyecto: f.project.idProyecto } },
+      }),
+    ).toBe(0);
+
+    const apelacion = await service.createAppeal(f.project.idProyecto, lider, {
+      asunto: 'Transferencia solicitada',
+      mensaje: 'Solicito que se designe un nuevo líder para el proyecto.',
+      idCandidatoPropuesto: f.elegible.idUsuario,
+    });
+
+    const denegar = async (actorId: number, payload: unknown) =>
+      service.denyAppeal(
+        f.project.idProyecto,
+        apelacion.idApelacion,
+        actorId,
+        await parseDenial(payload),
+      );
+
+    // Denegar es potestad del administrador, no del equipo.
+    await expectStatus(403, () =>
+      denegar(f.elegible.idUsuario, { mensajeResolucion: 'no procede' }),
+    );
+    // Sin motivo y con un motivo en blanco: el payload no es válido.
+    await expectStatus(400, () => denegar(f.admin.idUsuario, {}));
+    await expectStatus(400, () => denegar(f.admin.idUsuario, { mensajeResolucion: '   ' }));
+
+    const denegada = await denegar(f.admin.idUsuario, {
+      mensajeResolucion: 'El proyecto está a mitad de Sprint; se revisará al cierre.',
+    });
+    expect(denegada.estadoApelacion).toBe('DENEGADA');
+    expect(denegada.resueltaEn).not.toBeNull();
+    expect(denegada.idAdminResolutor).toBe(f.admin.idUsuario);
+    expect(denegada.mensajeResolucion).toBe(
+      'El proyecto está a mitad de Sprint; se revisará al cierre.',
+    );
+
+    // El liderazgo y las participaciones quedan exactamente donde estaban.
+    expect(
+      (await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } })).creadoPor,
+    ).toBe(lider);
+    expect(await db.historialLiderazgo.count()).toBe(0);
+
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_APPEAL_DENIED', idObjeto: String(apelacion.idApelacion) },
+      }),
+    ).toBe(1);
+    const avisos = await db.notificacion.findMany({
+      where: { idUsuario: lider, tipoNotificacion: 'APELACION_LIDERAZGO_RESUELTA' },
+    });
+    expect(avisos).toHaveLength(1);
+
+    // Repetir la denegación es un conflicto sin segundo evento ni aviso.
+    await expectStatus(409, () =>
+      denegar(f.admin.idUsuario, { mensajeResolucion: 'insistiendo sobre lo ya resuelto' }),
+    );
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_APPEAL_DENIED', idObjeto: String(apelacion.idApelacion) },
+      }),
+    ).toBe(1);
+    expect(
+      await db.notificacion.count({
+        where: { idUsuario: lider, tipoNotificacion: 'APELACION_LIDERAZGO_RESUELTA' },
+      }),
+    ).toBe(1);
   });
 });
