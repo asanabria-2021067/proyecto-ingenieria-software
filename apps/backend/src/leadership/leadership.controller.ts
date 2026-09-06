@@ -7,12 +7,14 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
+import { ApelacionPageQueryDto, LeadershipPageQueryDto } from './dto/appeal-page.query';
 import { CreateLeadershipAppealDto } from './dto/create-leadership-appeal.dto';
 import { LeadershipReadService } from './leadership-read.service';
 import { LeadershipService } from './leadership.service';
@@ -62,6 +64,26 @@ export class LeadershipController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.leadershipRead.candidates(undefined, { projectId, actorId: user.userId });
+  }
+
+  /** E095: historia de liderazgo del proyecto, filtrada por lector. */
+  @Get('historial')
+  history(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+    @Query() query: LeadershipPageQueryDto,
+  ) {
+    return this.leadershipRead.history(undefined, { projectId, actorId: user.userId, query });
+  }
+
+  /** E096: apelaciones del proyecto; el autor conserva la suya. */
+  @Get('apelaciones')
+  appeals(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+    @Query() query: ApelacionPageQueryDto,
+  ) {
+    return this.leadershipRead.appeals(undefined, { projectId, actorId: user.userId, query });
   }
 
   /** E097: el líder actual solicita que se transfiera su liderazgo. */
