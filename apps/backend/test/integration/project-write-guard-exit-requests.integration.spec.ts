@@ -96,7 +96,9 @@ describeIntegration(
         notifications,
         exitAuthorization,
         exitContext,
-      );
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+        new ProjectReadPolicyService(prismaService));
       exitController = new ExitRequestsController(exitService);
 
       const tasksContext = new TasksContextService(prismaService);

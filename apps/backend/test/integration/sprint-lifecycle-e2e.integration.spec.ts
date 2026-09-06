@@ -149,7 +149,15 @@ describeIntegration(
 
       const exitContext = new ExitRequestsContextService(prismaService);
       const exitAuthorization = new ExitRequestsAuthorizationService(exitContext);
-      const exitService = new ExitRequestsService(prismaService, notifications, exitAuthorization, exitContext);
+      const exitService = new ExitRequestsService(
+        prismaService,
+        notifications,
+        exitAuthorization,
+        exitContext,
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+        new ProjectReadPolicyService(prismaService),
+      );
       exitController = new ExitRequestsController(exitService);
 
       const sprintsAuthorization = new SprintsAuthorizationService(sprintsContext);
