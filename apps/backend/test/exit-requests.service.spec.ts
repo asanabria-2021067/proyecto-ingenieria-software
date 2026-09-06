@@ -8,6 +8,8 @@ import { ExitRequestsContextService } from '../src/exit-requests/exit-requests.c
 import { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { HoursRecognitionService } from '../src/sprints/hours-recognition.service';
 import { SprintsContextService } from '../src/sprints/sprints-context.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * Tarea 5: el índice parcial `solicitud_salida_proyecto_pendiente_unique` (a
@@ -74,6 +76,9 @@ function makePrisma() {
   // prisma como tx deja las aserciones sobre solicitudSalidaProyecto.updateMany /
   // participacionProyecto.updateMany apuntando a los mismos spies de arriba.
   prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb(prisma));
+  // C044: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del lock
+  // del proyecto sobre el cliente transaccional antes del callback.
+  withProjectLock(prisma);
   return prisma;
 }
 
@@ -105,9 +110,11 @@ function makeService(
     } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
+    new ProjectTransactionService(prisma as unknown as PrismaService),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
     hoursRecognition,
-    new SprintsContextService(prisma as unknown as PrismaService),
-  );
+    new SprintsContextService(prisma as unknown as PrismaService));
 }
 
 const LIDER_ID = 1;
