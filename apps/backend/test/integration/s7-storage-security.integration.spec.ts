@@ -5,11 +5,15 @@ import { createIntegrationPrismaClient, describeIntegration } from './setup/data
 import { useSecondClient } from './setup/concurrency';
 import {
   cleanupClosureFixture,
+  closureConfig,
   closureDocumentsStack,
   closureDraftFixture,
+  pdfCifradoPorElUsuario,
   pdfFixture,
+  pdfSinPaginas,
   type ClosureCleanupScope,
 } from './setup/closure-storage';
+import { ClosurePdfValidationService } from '../../src/storage/closure-pdf-validation.service';
 import { MAX_DOCUMENT_SIZE } from '../../src/project-closure/project-closure-documents.service';
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
@@ -51,7 +55,7 @@ describeIntegration('S7 seguridad del almacenamiento de cierre', () => {
   it('T30-A: un ticket consumido no puede reutilizarse y el reintento del mismo actor es idempotente sin volver a subir', async () => {
     const f = await closureDraftFixture(db, scope);
     const { service, tickets, storage } = closureDocumentsStack(db);
-    const pdf = pdfFixture();
+    const pdf = await pdfFixture();
 
     // La reserva entrega un permiso de aplicación, no una firma del proveedor.
     const grant = await service.reserve(f.project.idProyecto, f.leader.idUsuario, {
@@ -200,7 +204,7 @@ describeIntegration('S7 seguridad del almacenamiento de cierre', () => {
   it('T30-B: un 200 que devuelve el asset anterior no confirma el documento y produce ASSET_NO_COINCIDE', async () => {
     const f = await closureDraftFixture(db, scope);
     const { service, storage } = closureDocumentsStack(db);
-    const pdf = pdfFixture();
+    const pdf = await pdfFixture();
     scope.documentIds = [];
 
     const reservar = async (nombre: string) => {
@@ -354,5 +358,132 @@ describeIntegration('S7 seguridad del almacenamiento de cierre', () => {
     expect(persistido.checksumCifradoSha256).not.toBe('etag-sintetico');
     // Y no existe ninguna columna etag en el modelo.
     expect(Object.keys(persistido)).not.toContain('etag');
+  });
+
+  it('T30-C: contenido no PDF, PDF cifrado por el usuario o ilegible se rechaza con 422 sin vincular ni sustituir el documento enviado', async () => {
+    const f = await closureDraftFixture(db, scope);
+    const { service, storage } = closureDocumentsStack(db);
+    scope.documentIds = [];
+    const pdfValido = await pdfFixture();
+
+    const reservar = async (nombre: string) => {
+      const grant = await service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+        revisionId: f.revision.idRevisionCierre,
+        nombreArchivo: nombre,
+      });
+      scope.documentIds!.push(grant.documentId);
+      return grant;
+    };
+    const liberar = async (documentId: number) => {
+      await db.documentoCierre.delete({ where: { idDocumentoCierre: documentId } });
+      scope.documentIds = scope.documentIds!.filter((id) => id !== documentId);
+    };
+
+    // Un documento ya enviado en una revisión anterior: nada de lo que siga
+    // puede tocarlo.
+    const enviado = await reservar('enviado.pdf');
+    const documentoEnviado = await service.uploadAndAttach(
+      f.project.idProyecto,
+      f.leader.idUsuario,
+      enviado.ticket,
+      pdfValido,
+    );
+    const enviadoPersistido = await db.documentoCierre.findUniqueOrThrow({
+      where: { idDocumentoCierre: enviado.documentId },
+    });
+    const subidasTrasElEnviado = storage.uploadImmutable.mock.calls.length;
+
+    // Cuatro contenidos que NO son un PDF utilizable.
+    const textoPlano = Buffer.from('esto no es un pdf, es texto plano\n', 'utf8');
+    const cuerpoCorrupto = Buffer.concat([
+      Buffer.from('%PDF-1.7\n', 'latin1'),
+      Buffer.from('contenido que no forma un documento\n'.repeat(20), 'latin1'),
+    ]);
+    // Cifrado por el USUARIO, no por nosotros: se rechaza en vez de intentar
+    // abrirlo de todos modos.
+    const cifradoPorElUsuario = await pdfCifradoPorElUsuario();
+    const sinPaginas = pdfSinPaginas();
+
+    const invalidos: Array<[string, Buffer]> = [
+      ['texto plano', textoPlano],
+      ['cuerpo corrupto', cuerpoCorrupto],
+      ['cifrado por el usuario', cifradoPorElUsuario],
+      ['cero páginas', sinPaginas],
+    ];
+
+    for (const [caso, contenido] of invalidos) {
+      const grant = await reservar(`invalido-${caso}.pdf`);
+      await expectStatus(422, () =>
+        service.uploadAndAttach(f.project.idProyecto, f.leader.idUsuario, grant.ticket, contenido),
+      );
+      const fila = await db.documentoCierre.findUniqueOrThrow({
+        where: { idDocumentoCierre: grant.documentId },
+      });
+      // La reserva no avanza ni se vincula, y nada llegó al proveedor.
+      expect(fila.estadoDocumento, caso).toBe('RESERVADO');
+      expect(
+        await db.documentoRevisionCierre.count({ where: { idDocumentoCierre: grant.documentId } }),
+        caso,
+      ).toBe(0);
+      expect(storage.uploadImmutable.mock.calls.length, caso).toBe(subidasTrasElEnviado);
+      await liberar(grant.documentId);
+    }
+
+    // El válido sí se acepta.
+    const bueno = await reservar('valido.pdf');
+    const aceptado = await service.uploadAndAttach(
+      f.project.idProyecto,
+      f.leader.idUsuario,
+      bueno.ticket,
+      pdfValido,
+    );
+    expect(aceptado.estadoDocumento).toBe('DISPONIBLE');
+
+    // Un parseo que se pasa del presupuesto se corta y devuelve 422 sin
+    // colgar el proceso. El presupuesto se reduce a propósito: lo que se
+    // verifica es el corte, no cuánto tarda un PDF concreto.
+    const validadorImpaciente = new ClosurePdfValidationService(1, 2);
+    const lento = closureDocumentsStack(db, closureConfig(), validadorImpaciente);
+    const grantLento = await lento.service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+      revisionId: f.revision.idRevisionCierre,
+      nombreArchivo: 'lento.pdf',
+    });
+    scope.documentIds.push(grantLento.documentId);
+    await expectStatus(422, () =>
+      lento.service.uploadAndAttach(
+        f.project.idProyecto,
+        f.leader.idUsuario,
+        grantLento.ticket,
+        pdfValido,
+      ),
+    );
+    expect(
+      (await db.documentoCierre.findUniqueOrThrow({ where: { idDocumentoCierre: grantLento.documentId } }))
+        .estadoDocumento,
+    ).toBe('RESERVADO');
+    await liberar(grantLento.documentId);
+
+    // Tres validaciones simultáneas: como mucho dos parsean a la vez.
+    const validadorConcurrente = new ClosurePdfValidationService(10_000, 2);
+    const resultados = await Promise.all([
+      validadorConcurrente.assertValidPdf(pdfValido),
+      validadorConcurrente.assertValidPdf(pdfValido),
+      validadorConcurrente.assertValidPdf(pdfValido),
+    ]);
+    expect(resultados.every((resultado) => resultado.paginas >= 1)).toBe(true);
+    expect(validadorConcurrente.maxSimultaneos).toBeLessThanOrEqual(2);
+
+    // El documento enviado conserva bytes, checksum y vínculo: el original
+    // nunca se reescribe.
+    const enviadoAhora = await db.documentoCierre.findUniqueOrThrow({
+      where: { idDocumentoCierre: enviado.documentId },
+    });
+    expect(enviadoAhora.checksumSha256).toBe(enviadoPersistido.checksumSha256);
+    expect(enviadoAhora.tamanoBytes).toBe(enviadoPersistido.tamanoBytes);
+    expect(enviadoAhora.estadoDocumento).toBe('DISPONIBLE');
+    expect(documentoEnviado.checksumSha256).toBe(enviadoPersistido.checksumSha256);
+    expect(
+      await db.documentoRevisionCierre.count({ where: { idDocumentoCierre: enviado.documentId } }),
+    ).toBe(1);
   });
 });
