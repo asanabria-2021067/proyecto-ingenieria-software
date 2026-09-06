@@ -47,7 +47,7 @@ import { ProjectReadPolicyService } from '../../src/common/project-policy/projec
  *      checkpoint atraviesa la metadata GUARDS_METADATA real del handler y
  *      ejecuta el guard real, nunca una llamada directa al service que se
  *      saltaría el guard
- *   -> revisión real de horas (A7 adjustRecognizedHours) + SprintClosingSummary
+ *   -> revisión real de horas (agregado ya acreditado) + SprintClosingSummary
  *      real (A8)
  *   -> closeSprint real -> CERRADO (A9), inmutable ante una segunda
  *      transición
@@ -437,18 +437,15 @@ describeIntegration(
           periodoFin: new Date('2026-01-31'),
           horasReportadas: HORAS_REALES,
           horasCalculadas: HORAS_REALES,
+          // C074: el líder ya no edita el total reconocido. La acreditación es
+          // potestad exclusiva de approveClosure (06 v2 §31), así que el
+          // importe aprobado forma parte del estado de partida del fixture, no
+          // de una llamada del líder que ya no existe.
+          horasAprobadas: HORAS_REALES,
         },
       });
       scope.horasParticipacionIds = [horasCalculadas.idRegistroHoras];
-
-      const ajustada = await sprintsService.adjustRecognizedHours(
-        project.idProyecto,
-        sprint.idSprint,
-        participation.idParticipacion,
-        leader.idUsuario,
-        { horasAprobadas: HORAS_REALES },
-      );
-      expect(Number(ajustada.horasAprobadas)).toBe(HORAS_REALES);
+      expect(Number(horasCalculadas.horasAprobadas)).toBe(HORAS_REALES);
 
       const resumen = await sprintsService.getSprintClosingSummary(
         project.idProyecto,

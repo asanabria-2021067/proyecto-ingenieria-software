@@ -38,16 +38,6 @@ export class SprintsAuthorizationService {
     return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
   }
 
-  /** Ajustar horas reconocidas (A7): exclusivo del líder, parte de la gestión del Sprint. */
-  async assertCanAdjustRecognizedHours(
-    projectId: number,
-    sprintId: number,
-    userId: number,
-    tx?: TxClient,
-  ) {
-    return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
-  }
-
   /**
    * Ver resumen de cierre del Sprint (A8): exclusivo del líder, misma regla
    * de acceso que gestionar el Sprint (finalizar/cerrar/ajustar horas). A
