@@ -5,7 +5,11 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { ProjectsController } from '../src/projects/projects.controller';
 import { ProjectsService } from '../src/projects/projects.service';
-import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 // Integration test for HU-59 (T-234): GET /proyectos/destacados
 // Real ProjectsController + real ProjectsService wired together, against an
@@ -81,6 +85,7 @@ function makeController(dataset: ProyectoRow[]) {
     makeFakeCache() as unknown as Cache,
     makeProjectTransactionDouble({ tx: {} }),
     makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
   return new ProjectsController(service);
 }
