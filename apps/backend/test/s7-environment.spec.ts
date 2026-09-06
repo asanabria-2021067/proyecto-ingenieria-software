@@ -3,7 +3,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Logger } from '@nestjs/common';
+import type { DynamicModule, ForwardReference, Type } from '@nestjs/common';
+import { MODULE_METADATA } from '@nestjs/common/constants';
+import { CACHE_MODULE_OPTIONS, CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { BACKEND_ENV_PATH, buildEnvOptions, resolveBackendEnvPath } from '../src/config/env.options';
 import { ServiceUnavailableException } from '@nestjs/common';
 import {
@@ -83,6 +87,103 @@ function completeClosureEnvironment(): Record<string, string> {
     CLOSURE_ACTIVE_KEY_ID: 'kek-2026-09',
     CLOSURE_TICKET_HMAC_SECRET: SYNTHETIC_HMAC,
   };
+}
+
+// ---- TC03-D: introspección del grafo de módulos sin @nestjs/testing (el repo no lo instala).
+
+type ModuleEntry = Type<unknown> | DynamicModule | Promise<DynamicModule> | ForwardReference;
+
+interface AsyncOptionsProvider {
+  provide: unknown;
+  useFactory: (...args: unknown[]) => unknown;
+  inject?: unknown[];
+}
+
+function isDynamicModule(value: unknown): value is DynamicModule {
+  return typeof value === 'object' && value !== null && 'module' in value;
+}
+
+async function resolveModuleEntry(entry: ModuleEntry): Promise<Type<unknown> | DynamicModule> {
+  const awaited = await entry;
+  if (typeof awaited === 'object' && awaited !== null && 'forwardRef' in awaited) {
+    return (awaited as ForwardReference).forwardRef() as Type<unknown>;
+  }
+  return awaited as Type<unknown> | DynamicModule;
+}
+
+function moduleImportsOf(moduleClass: Type<unknown>): ModuleEntry[] {
+  return (Reflect.getMetadata(MODULE_METADATA.IMPORTS, moduleClass) ?? []) as ModuleEntry[];
+}
+
+async function collectModuleGraph(root: Type<unknown>) {
+  const classes = new Set<Type<unknown>>();
+  const dynamics: DynamicModule[] = [];
+
+  const visit = async (entry: ModuleEntry): Promise<void> => {
+    const resolved = await resolveModuleEntry(entry);
+    let moduleClass: Type<unknown>;
+    let dynamicImports: ModuleEntry[] = [];
+    if (isDynamicModule(resolved)) {
+      dynamics.push(resolved);
+      moduleClass = resolved.module;
+      dynamicImports = (resolved.imports ?? []) as ModuleEntry[];
+    } else {
+      moduleClass = resolved;
+    }
+    const firstVisit = !classes.has(moduleClass);
+    classes.add(moduleClass);
+    for (const child of dynamicImports) {
+      await visit(child);
+    }
+    if (firstVisit) {
+      for (const child of moduleImportsOf(moduleClass)) {
+        await visit(child);
+      }
+    }
+  };
+
+  await visit(root);
+  return { classes, dynamics };
+}
+
+function findDynamicImport(hostModule: Type<unknown>, moduleClass: Type<unknown>): DynamicModule {
+  const dynamic = moduleImportsOf(hostModule).find(
+    (entry): entry is DynamicModule => isDynamicModule(entry) && entry.module === moduleClass,
+  );
+  if (!dynamic) {
+    throw new Error(`${hostModule.name} no importa ${moduleClass.name} como módulo dinámico`);
+  }
+  return dynamic;
+}
+
+function findAsyncOptionsProvider(
+  hostModule: Type<unknown>,
+  moduleClass: Type<unknown>,
+  token: unknown,
+): AsyncOptionsProvider {
+  const dynamic = findDynamicImport(hostModule, moduleClass);
+  const provider = (dynamic.providers ?? []).find(
+    (candidate): candidate is AsyncOptionsProvider =>
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      'provide' in candidate &&
+      (candidate as { provide: unknown }).provide === token &&
+      'useFactory' in candidate,
+  );
+  if (!provider) {
+    throw new Error(`${hostModule.name}: ${moduleClass.name} no registra un provider async de opciones`);
+  }
+  return provider;
+}
+
+function listTypeScriptFiles(directory: string): string[] {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return listTypeScriptFiles(fullPath);
+    }
+    return entry.name.endsWith('.ts') ? [fullPath] : [];
+  });
 }
 
 describe('S7 environment foundation (TC03)', () => {
@@ -319,6 +420,115 @@ describe('S7 environment foundation (TC03)', () => {
       expect(leakedSecrets(loggedText)).toEqual([]);
     } finally {
       logger.restore();
+    }
+  });
+  it('TC03-D: ningún consumidor lee el entorno antes de ConfigModule.forRoot y las factories Jwt/Cache reciben ConfigService', async () => {
+    // Arrange: un process.env mínimo válido antes del arranque; con NODE_ENV=test el .env real nunca se lee.
+    process.env.NODE_ENV = 'test';
+    process.env.FRONTEND_URL = 'http://localhost:3000';
+    process.env.JWT_SECRET = 'synthetic-jwt-secret-for-tests';
+    process.env.REDIS_HOST = 'redis.test.local';
+    process.env.REDIS_PORT = '6380';
+
+    const watchedKeys = new Set(['JWT_SECRET', 'REDIS_HOST', 'REDIS_PORT']);
+    const readsBeforeForRoot: string[] = [];
+    let forRootStarted = false;
+    const originalForRoot = ConfigModule.forRoot;
+    const forRootSpy = vi.spyOn(ConfigModule, 'forRoot').mockImplementation((options) => {
+      forRootStarted = true;
+      return originalForRoot.call(ConfigModule, options);
+    });
+    const realEnv = process.env;
+    process.env = new Proxy(realEnv, {
+      get(target, property) {
+        if (!forRootStarted && typeof property === 'string' && watchedKeys.has(property)) {
+          readsBeforeForRoot.push(property);
+        }
+        return Reflect.get(target, property);
+      },
+    });
+    const logger = captureLogger();
+
+    // Act: importar el grafo completo de la aplicación con el espía instalado.
+    let AppModule: Type<unknown> | undefined;
+    let forRootCalls = 0;
+    try {
+      ({ AppModule } = await import('../src/app.module'));
+      forRootCalls = forRootSpy.mock.calls.length;
+    } finally {
+      process.env = realEnv;
+      forRootSpy.mockRestore();
+      logger.restore();
+    }
+    if (!AppModule) {
+      throw new Error('AppModule no se pudo importar');
+    }
+
+    // Cero lecturas de las claves vigiladas durante la fase de import; una sola carga.
+    expect(readsBeforeForRoot).toEqual([]);
+    expect(forRootCalls).toBe(1);
+
+    // Exactamente una registración global de ConfigModule en todo el grafo.
+    const graph = await collectModuleGraph(AppModule);
+    const configRegistrations = graph.dynamics.filter((entry) => entry.module === ConfigModule);
+    expect(configRegistrations).toHaveLength(1);
+    expect(configRegistrations[0].global).toBe(true);
+
+    const { AuthModule } = await import('../src/auth/auth.module');
+    const { AdminModule } = await import('../src/admin/admin.module');
+    const { NotificationsModule } = await import('../src/notifications/notifications.module');
+    const { ChatModule } = await import('../src/chat/chat.module');
+    for (const hostModule of [AuthModule, AdminModule, NotificationsModule, ChatModule]) {
+      expect(moduleImportsOf(hostModule).includes(ConfigModule)).toBe(false);
+    }
+
+    // Las cinco factories reciben ConfigService y sus valores provienen del validador.
+    const validated = validateEnvironment({
+      NODE_ENV: 'test',
+      FRONTEND_URL: 'http://localhost:3000',
+      JWT_SECRET: 'validator-jwt-secret',
+      REDIS_HOST: 'redis.validator.local',
+      REDIS_PORT: '6390',
+      PORT: '4100',
+    });
+    const configService = new ConfigService(validated);
+    expect(configService.get<number>('app.port')).toBe(4100);
+
+    const jwtExpectations: Array<[Type<unknown>, string]> = [
+      [AuthModule, '24h'],
+      [AdminModule, '24h'],
+      [NotificationsModule, '7d'],
+      [ChatModule, '7d'],
+    ];
+    for (const [hostModule, expiresIn] of jwtExpectations) {
+      const provider = findAsyncOptionsProvider(hostModule, JwtModule, 'JWT_MODULE_OPTIONS');
+      expect(provider.inject).toEqual([ConfigService]);
+      expect(await provider.useFactory(configService)).toEqual({
+        secret: 'validator-jwt-secret',
+        signOptions: { expiresIn },
+      });
+    }
+
+    const cacheProvider = findAsyncOptionsProvider(AppModule, CacheModule, CACHE_MODULE_OPTIONS);
+    expect(cacheProvider.inject).toEqual([ConfigService]);
+    const cacheOptions = (await cacheProvider.useFactory(configService)) as Record<string, unknown>;
+    expect(cacheOptions).toMatchObject({ host: 'redis.validator.local', port: 6390, ttl: 300 });
+    // El store es el namespace de cache-manager-redis-store, igual que antes (bajo vitest puede colgar de `default`).
+    const store = cacheOptions.store as { redisStore?: unknown; default?: { redisStore?: unknown } };
+    expect(typeof (store.redisStore ?? store.default?.redisStore)).toBe('function');
+    expect(findDynamicImport(AppModule, CacheModule).global).toBe(true);
+
+    // main.ts obtiene el puerto vía ConfigService tras NestFactory.create; ningún dotenv paralelo en src/.
+    const sourceRoot = path.join(__dirname, '../src');
+    const mainSource = fs.readFileSync(path.join(sourceRoot, 'main.ts'), 'utf8');
+    const createIndex = mainSource.indexOf('await NestFactory.create(AppModule)');
+    const configIndex = mainSource.indexOf('app.get(ConfigService)');
+    expect(createIndex).toBeGreaterThanOrEqual(0);
+    expect(configIndex).toBeGreaterThan(createIndex);
+    expect(mainSource).toMatch(/configService\.get<number>\('app\.port'/);
+    expect(mainSource).not.toContain('process.env.PORT');
+    for (const file of listTypeScriptFiles(sourceRoot)) {
+      expect(fs.readFileSync(file, 'utf8'), file).not.toMatch(/dotenv/);
     }
   });
 });

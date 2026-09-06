@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MODULE_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+// AppModule registra ConfigModule.forRoot al importarse y el validador único
+// exige FRONTEND_URL; este spec solo inspecciona metadata, así que fija un
+// valor sintético antes de que se evalúe el import (vi.hoisted).
+vi.hoisted(() => {
+  process.env.FRONTEND_URL ??= 'http://localhost:3000';
+});
 import { AppModule } from '../src/app.module';
 import { LabelsModule } from '../src/labels/labels.module';
 import { LabelsController } from '../src/labels/labels.controller';
