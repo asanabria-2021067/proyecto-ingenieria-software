@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { captureClosureExecution } from './closure-execution-capture';
-import { computeExecutionFingerprint } from './closure-report-model';
+import { computeExecutionFingerprint, type ClosureReportContext } from './closure-report-model';
 
 /** Versión del generador; entra en la huella de ejecución. */
 export const CLOSURE_GENERATOR_VERSION = 'closure-report/1.0.0';
@@ -78,6 +78,7 @@ export interface CloseReadinessSummary {
 export interface EvaluateReadinessInput {
   phase: ClosurePhase;
   revisionId?: number | null;
+  expectedFingerprint?: string;
 }
 
 @Injectable()
@@ -287,6 +288,7 @@ export class ProjectCloseReadinessService {
               estadoDocumento: true,
               mimeType: true,
               fingerprintEjecucion: true,
+              contextoReporte: true,
             },
           },
         },
@@ -330,15 +332,18 @@ export class ProjectCloseReadinessService {
       // ejecución cambió después de generar el informe, la entrega describe
       // un proyecto que ya no existe.
       if (executionFingerprint !== null) {
+        const contexto = disponiblesAutomaticos[0].documento.contextoReporte as unknown as ClosureReportContext | null;
         const capturado = await captureClosureExecution(db, projectId);
-        const actual = computeExecutionFingerprint({
+        const actual = contexto?.schemaVersion === 1 && contexto.presentacion
+          ? computeExecutionFingerprint({
           generatorVersion: CLOSURE_GENERATOR_VERSION,
           projectId,
-          cicloRevisionOrigenId: revision.idRevisionCierre,
+          cicloRevisionOrigenId: contexto.cicloRevisionOrigenId,
           datosEjecucion: capturado.ejecucion,
-          presentacion: capturado.presentacion,
-        });
-        if (actual !== executionFingerprint) {
+          presentacion: contexto.presentacion,
+        }) : null;
+        if (actual !== executionFingerprint ||
+          (input.expectedFingerprint !== undefined && input.expectedFingerprint !== executionFingerprint)) {
           bloquear(
             'INFORME_DESACTUALIZADO',
             'El informe automático no refleja la ejecución actual del proyecto',
