@@ -16,8 +16,9 @@ import {
  *
  * Resuelve credenciales y modalidad desde la configuración YA VALIDADA
  * (`closure` de `validateEnvironment`), nunca leyendo `process.env` por su
- * cuenta ni llamando a `dotenv`. No conoce Prisma ni ningún módulo de
- * dominio: su única responsabilidad es hablar con el proveedor.
+ * cuenta ni cargando el archivo de entorno por segunda vez. No conoce Prisma
+ * ni ningún módulo de dominio: su única responsabilidad es hablar con el
+ * proveedor.
  *
  * Esqueleto en C103: la construcción de identidad llega en C106, la
  * configuración y política de degradación en C107, y las cuatro operaciones
