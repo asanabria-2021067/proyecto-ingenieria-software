@@ -197,4 +197,36 @@ describeIntegration('S7 time concurrency', () => {
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.autor.idUsuario, accion: 'TIME_RECORD_EDITED' } })).toBe(0);
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'EXIT_REQUEST_APPROVED' } })).toBe(1);
   });
+
+  it('T03-A: la revocación que gana la carrera excluye el registro del consumo', async () => {
+    const f = await raceFixture(db, scope, ['4.00', '2.00']);
+    solicitudIds = [f.solicitud.idSolicitud];
+    const revocable = f.registros[1];
+
+    const { resultadoPrimera, resultadoSegunda } = await correrCarrera(f, 'autor', (stack) =>
+      stack.service.revoke(f.project.idProyecto, f.task.idTarea, revocable.idRegistroTiempo, f.autor.idUsuario),
+    );
+    expect(resultadoPrimera.ok).toBe(true);
+    expect(resultadoSegunda.ok).toBe(true);
+
+    const revocado = await db.registroTiempoTarea.findUniqueOrThrow({ where: { idRegistroTiempo: revocable.idRegistroTiempo } });
+    expect(revocado.revocadoEn).not.toBeNull();
+    expect(revocado.revocadoPor).toBe(f.autor.idUsuario);
+    // La revocación es lógica: el importe se conserva como evidencia.
+    expect(revocado.horas.toFixed(2)).toBe('2.00');
+
+    const tramo = await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: f.assignment.idAsignacion } });
+    // Recalculada sin el revocado y SIN reabrir el tramo.
+    expect(tramo.horasReales?.toFixed(2)).toBe('4.00');
+    expect(tramo.desasignadaEn).not.toBeNull();
+    expect(tramo.reconocidoEn).not.toBeNull();
+
+    const agregados = await db.horasParticipacion.findMany({ where: { idParticipacion: f.participacion.idParticipacion } });
+    expect(agregados).toHaveLength(1);
+    expect(agregados[0].horasReportadas.toFixed(2)).toBe('4.00');
+    expect(agregados[0].horasCalculadas?.toFixed(2)).toBe('4.00');
+
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.autor.idUsuario, accion: 'TIME_RECORD_REVOKED' } })).toBe(1);
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'EXIT_REQUEST_APPROVED' } })).toBe(1);
+  });
 });
