@@ -21,6 +21,7 @@ import {
   projectClosureModel,
   buildReportContext,
   computeExecutionFingerprint,
+  matchesStoredExecutionFingerprint,
   computeModelFingerprint,
   type ClosureExecutionContext,
   type ClosureExecutionInput,
@@ -533,6 +534,15 @@ describe('S7 informe canónico y criptografía de cierre', () => {
       fila.idParticipacion === 90 ? { ...fila, nombreRol: 'Coordinaci\u00f3n' } : fila,
     );
     expect(computeExecutionFingerprint(contextoEjecucion(rolRenombrado))).not.toBe(base);
+
+    // El modelo legado separa nombre/apellido, pero el contexto histórico
+    // conserva el label completo. Una edición externa se valida encontrando
+    // la división histórica que reproduce el digest, incluso con nombres
+    // compuestos, sin aceptar un cambio operativo.
+    const perfilActual = entradaEjecucion('directa');
+    perfilActual.lider = { ...perfilActual.lider, nombre: 'Ana María', apellido: 'López' };
+    expect(matchesStoredExecutionFingerprint(contextoEjecucion(perfilActual), base)).toBe(true);
+    expect(matchesStoredExecutionFingerprint(contextoEjecucion(rolRenombrado), base)).toBe(false);
 
     // 9) Una hora reportada distinta cambia la ejecución.
     const horaDistinta = entradaEjecucion('directa');
