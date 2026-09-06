@@ -170,6 +170,31 @@ enum OrigenCambioLiderazgo {
   CAMBIO_ADMINISTRATIVO
 }
 
+/// S7 M5 (06 v2 §24): ciclo de vida de una revisión de cierre de proyecto.
+enum EstadoRevisionCierre {
+  BORRADOR
+  ENVIADA
+  APROBADA
+  CORRECCION_DOCUMENTAL
+  DEVUELTA_A_EJECUCION
+}
+
+/// S7 M5 (06 v2 §25): tipo de documento de cierre.
+enum TipoDocumentoCierre {
+  INFORME_AUTOMATICO
+  EVIDENCIA_LIDER
+  INFORME_OFICIAL_FINAL
+}
+
+/// S7 M5 (06 v2 §25): estado técnico de un documento/reserva de cierre.
+enum EstadoDocumentoCierre {
+  RESERVADO
+  EN_CARGA
+  DISPONIBLE
+  PURGA_PENDIENTE
+  PURGADO
+}
+
 enum TipoCertificado {
   HORAS_BECA
   EXTENSION
@@ -292,6 +317,9 @@ model Usuario {
   liderazgosAnteriores             HistorialLiderazgo[]       @relation("HistorialLiderAnterior")
   liderazgosNuevos                 HistorialLiderazgo[]       @relation("HistorialLiderNuevo")
   cambiosLiderazgoAdministrados    HistorialLiderazgo[]       @relation("HistorialAdmin")
+  cierresSolicitados               RevisionCierreProyecto[]   @relation("RevisionCierreSolicitante")
+  cierresRevisados                 RevisionCierreProyecto[]   @relation("RevisionCierreRevisor")
+  documentosCierreCreados          DocumentoCierre[]          @relation("DocumentoCierreAutor")
   amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
   amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
   siguiendo                        Seguimiento[]              @relation("Siguiendo")
@@ -553,6 +581,8 @@ model Proyecto {
 
   apelacionesLiderazgo ApelacionLiderazgo[]
   historialLiderazgo   HistorialLiderazgo[]
+  revisionesCierre     RevisionCierreProyecto[]
+  documentosCierre     DocumentoCierre[]
   @@map("proyecto")
 }
 
@@ -956,6 +986,110 @@ model HistorialLiderazgo {
   @@index([idProyecto, registradoEn])
   @@index([idLiderNuevo])
   @@map("historial_liderazgo")
+}
+
+/// S7 M5 (06 v2 §24/§35): revisión de cierre propia del proyecto, numerada
+/// por proyecto. A lo sumo una BORRADOR y una ENVIADA por proyecto (índices
+/// parciales s7_revision_borrador / s7_revision_enviada, SQL manual). ENVIADA
+/// congela solicitante, fecha, fingerprintEntrega y documentos; el admin
+/// resuelve una sola vez. idDocumentoOficial es la relación separada del
+/// informe oficial: nunca pasa por el puente de entrega.
+model RevisionCierreProyecto {
+  idRevisionCierre    Int                  @id @default(autoincrement()) @map("id_revision_cierre")
+  idProyecto          Int                  @map("id_proyecto")
+  numeroRevision      Int                  @map("numero_revision")
+  estadoRevision      EstadoRevisionCierre @default(BORRADOR) @map("estado_revision")
+  idSolicitante       Int?                 @map("id_solicitante")
+  enviadaEn           DateTime?            @map("enviada_en")
+  fingerprintEntrega  String?              @map("fingerprint_entrega") @db.Char(64)
+  idRevisor           Int?                 @map("id_revisor")
+  comentarioRevisor   String?              @map("comentario_revisor") @db.Text
+  resueltaEn          DateTime?            @map("resuelta_en")
+  idDocumentoOficial  Int?                 @unique @map("id_documento_oficial")
+  creadaEn            DateTime             @default(now()) @map("creada_en")
+
+  proyecto             Proyecto                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict, onUpdate: Cascade)
+  solicitante          Usuario?                  @relation("RevisionCierreSolicitante", fields: [idSolicitante], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  revisor              Usuario?                  @relation("RevisionCierreRevisor", fields: [idRevisor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  informeOficial       DocumentoCierre?          @relation("InformeOficial", fields: [idDocumentoOficial], references: [idDocumentoCierre], onDelete: Restrict, onUpdate: Cascade)
+  documentos           DocumentoRevisionCierre[]
+  documentosOriginados DocumentoCierre[]         @relation("DocumentoOrigen")
+
+  @@unique([idProyecto, numeroRevision])
+  @@index([idProyecto, estadoRevision])
+  @@index([estadoRevision, enviadaEn])
+  @@map("revision_cierre_proyecto")
+}
+
+/// S7 M5 (06 v2 §25–§27/§35): documento de cierre y, a la vez, reserva
+/// técnica de carga (RESERVADO → EN_CARGA → DISPONIBLE → PURGA_PENDIENTE →
+/// PURGADO; nunca se borra la fila). Identidad remota Cloudinary
+/// (proveedor/externalId/resourceType/deliveryType, assetId/versionRemota
+/// tras confirmar), metadata criptográfica AES-256-GCM en cryptoMetadata
+/// (sin claves en claro) y huellas del informe. Límite único por archivo:
+/// 10485760 bytes (CK29, SQL manual).
+model DocumentoCierre {
+  idDocumentoCierre     Int                   @id @default(autoincrement()) @map("id_documento_cierre")
+  idProyecto            Int                   @map("id_proyecto")
+  idRevisionOrigen      Int                   @map("id_revision_origen")
+  tipoDocumento         TipoDocumentoCierre   @map("tipo_documento")
+  proveedor             String                @default("cloudinary") @db.VarChar(32)
+  externalId            String                @map("external_id") @db.VarChar(255)
+  resourceType          String                @default("raw") @map("resource_type") @db.VarChar(16)
+  deliveryType          String                @map("delivery_type") @db.VarChar(16)
+  assetId               String?               @map("asset_id") @db.VarChar(255)
+  versionRemota         String?               @map("version_remota") @db.VarChar(64)
+  nombreArchivo         String                @map("nombre_archivo") @db.VarChar(255)
+  mimeType              String                @default("application/pdf") @map("mime_type") @db.VarChar(127)
+  tamanoBytes           BigInt?               @map("tamano_bytes")
+  tamanoCifradoBytes    BigInt?               @map("tamano_cifrado_bytes")
+  checksumSha256        String?               @map("checksum_sha256") @db.Char(64)
+  checksumCifradoSha256 String?               @map("checksum_cifrado_sha256") @db.Char(64)
+  cryptoMetadata        Json?                 @map("crypto_metadata")
+  generatorVersion      String?               @map("generator_version") @db.VarChar(64)
+  fingerprintEjecucion  String?               @map("fingerprint_ejecucion") @db.Char(64)
+  fingerprintModelo     String?               @map("fingerprint_modelo") @db.Char(64)
+  contextoReporte       Json?                 @map("contexto_reporte")
+  idAutor               Int                   @map("id_autor")
+  creadoEn              DateTime              @default(now()) @map("creado_en")
+  estadoDocumento       EstadoDocumentoCierre @default(RESERVADO) @map("estado_documento")
+  reservaExpiraEn       DateTime              @map("reserva_expira_en")
+  cargaIniciadaEn       DateTime?             @map("carga_iniciada_en")
+  cargaLimiteEn         DateTime?             @map("carga_limite_en")
+  disponibleEn          DateTime?             @map("disponible_en")
+  purgaSolicitadaEn     DateTime?             @map("purga_solicitada_en")
+  purgadoEn             DateTime?             @map("purgado_en")
+
+  proyecto       Proyecto                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict, onUpdate: Cascade)
+  revisionOrigen RevisionCierreProyecto    @relation("DocumentoOrigen", fields: [idRevisionOrigen], references: [idRevisionCierre], onDelete: Restrict, onUpdate: Cascade)
+  autor          Usuario                   @relation("DocumentoCierreAutor", fields: [idAutor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  revisiones     DocumentoRevisionCierre[]
+  oficialDe      RevisionCierreProyecto?   @relation("InformeOficial")
+
+  @@unique([proveedor, externalId])
+  @@index([idProyecto, tipoDocumento])
+  @@index([estadoDocumento, creadoEn])
+  @@index([idRevisionOrigen, tipoDocumento])
+  @@map("documento_cierre")
+}
+
+/// S7 M5 (06 v2 §25/§35): puente de entrega revisión ↔ documento. Orden 0 =
+/// informe automático; 1…10 = evidencias del líder (CK30, SQL manual). El
+/// informe oficial NO se vincula por esta tabla.
+model DocumentoRevisionCierre {
+  idDocumentoRevision Int      @id @default(autoincrement()) @map("id_documento_revision")
+  idRevisionCierre    Int      @map("id_revision_cierre")
+  idDocumentoCierre   Int      @map("id_documento_cierre")
+  orden               Int
+  vinculadoEn         DateTime @default(now()) @map("vinculado_en")
+
+  revision  RevisionCierreProyecto @relation(fields: [idRevisionCierre], references: [idRevisionCierre], onDelete: Restrict, onUpdate: Cascade)
+  documento DocumentoCierre        @relation(fields: [idDocumentoCierre], references: [idDocumentoCierre], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([idRevisionCierre, idDocumentoCierre])
+  @@unique([idRevisionCierre, orden])
+  @@index([idDocumentoCierre])
+  @@map("documento_revision_cierre")
 }
 
 model Etiqueta {
