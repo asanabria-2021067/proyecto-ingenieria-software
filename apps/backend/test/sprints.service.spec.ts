@@ -72,7 +72,11 @@ function makePrisma(tx = makeTx()) {
     tx,
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
-    sprint: { findFirst: vi.fn(), findMany: vi.fn() },
+    // C079: el resumen de cierre compone su desglose por tramos con dos
+    // consultas adicionales (estado del Sprint + tramos del Sprint), aparte
+    // de la agregación de HU-D1, que no cambia.
+    sprint: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn().mockResolvedValue({ estado: 'EN_FINALIZACION' }) },
+    asignacionTarea: { findMany: vi.fn().mockResolvedValue([]) },
     hito: { findMany: vi.fn() },
     // A12: getSprintDetail usa esto para calcular `porcentaje` por Hito
     // (TODAS las tareas vigentes del Hito en el proyecto). Por defecto []
@@ -706,10 +710,17 @@ describe('SprintsService', () => {
 
       const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
-      expect(result).toEqual({
-        idProyecto: PROJECT_ID,
-        idSprint: SPRINT_ID,
-        participantes: filas,
+      // C079: el resumen se extiende de forma ADITIVA — las filas agregadas de
+      // HU-D1 siguen llegando sin transformar, con su desglose por tramos al
+      // lado y sin ningún total editable.
+      expect(result.idProyecto).toBe(PROJECT_ID);
+      expect(result.idSprint).toBe(SPRINT_ID);
+      expect(result.estadoSprint).toBe('EN_FINALIZACION');
+      expect(result.blockers).toEqual([]);
+      expect(result.participantes).toHaveLength(filas.length);
+      result.participantes.forEach((participante, indice) => {
+        expect(participante).toMatchObject(filas[indice]);
+        expect(participante.totales).toMatchObject({ tareasDistintas: 0, tramos: [] });
       });
       expect(authorization.assertCanViewClosingSummary).toHaveBeenCalledWith(
         PROJECT_ID,
@@ -892,7 +903,13 @@ describe('SprintsService', () => {
 
       const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
-      expect(result).toEqual({ idProyecto: PROJECT_ID, idSprint: SPRINT_ID, participantes: [] });
+      expect(result).toEqual({
+        idProyecto: PROJECT_ID,
+        idSprint: SPRINT_ID,
+        estadoSprint: 'EN_FINALIZACION',
+        participantes: [],
+        blockers: [],
+      });
     });
 
     it('Sprint ajeno al proyecto: propaga NotFoundException sin ejecutar la consulta agregada', async () => {
@@ -951,7 +968,7 @@ describe('SprintsService', () => {
       expect(sqlArg.strings.join('')).not.toContain(String(SPRINT_ID));
     });
 
-    it('query count: exactamente 2 consultas de base de datos (contexto+autorización + agregación), sin crecer con N participantes', async () => {
+    it('query count: exactamente 4 consultas de base de datos (contexto+autorización + agregación + estado + tramos), sin crecer con N participantes', async () => {
       async function contarQueriesParaNParticipantes(n: number) {
         const sprintFilas = Array.from({ length: n }, (_, i) => participanteRaw({ idUsuario: 100 + i }));
         const sprintFindFirst = vi.fn().mockResolvedValue({
@@ -960,8 +977,11 @@ describe('SprintsService', () => {
           proyecto: { creadoPor: LIDER_ID, eliminadoEn: null },
         });
         const queryRaw = vi.fn().mockResolvedValue(sprintFilas);
+        const sprintFindUnique = vi.fn().mockResolvedValue({ estado: 'EN_FINALIZACION' });
+        const tramosFindMany = vi.fn().mockResolvedValue([]);
         const prisma = {
-          sprint: { findFirst: sprintFindFirst },
+          sprint: { findFirst: sprintFindFirst, findUnique: sprintFindUnique },
+          asignacionTarea: { findMany: tramosFindMany },
           $queryRaw: queryRaw,
         } as unknown as PrismaService;
 
@@ -975,8 +995,13 @@ describe('SprintsService', () => {
         const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
         expect(result.participantes).toHaveLength(n);
+        // C079: el presupuesto pasa de 2 a 4 consultas (autorización,
+        // agregación de HU-D1, estado del Sprint y tramos del Sprint). Lo que
+        // este caso fija sigue siendo lo importante: NO crece con N.
         expect(sprintFindFirst).toHaveBeenCalledTimes(1);
         expect(queryRaw).toHaveBeenCalledTimes(1);
+        expect(sprintFindUnique).toHaveBeenCalledTimes(1);
+        expect(tramosFindMany).toHaveBeenCalledTimes(1);
       }
 
       await contarQueriesParaNParticipantes(1);

@@ -5,7 +5,13 @@ import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
-import { SprintClosingSummaryDto, SprintClosingSummaryParticipantDto } from './dto/sprint-closing-summary.dto';
+import {
+  SprintClosingBlockerDto,
+  SprintClosingMemberTotalsDto,
+  SprintClosingSummaryDto,
+  SprintClosingSummaryParticipantDto,
+  SprintClosingTramoDto,
+} from './dto/sprint-closing-summary.dto';
 import {
   SprintDetailDto,
   SprintDetailHitoDto,
@@ -26,6 +32,7 @@ import {
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { TimeRecordsService } from '../time-records/time-records.service';
+import { ProjectHoursSummaryService } from './project-hours-summary.service';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): iniciar, finalizar y cerrar un Sprint
@@ -34,6 +41,19 @@ import { TimeRecordsService } from '../time-records/time-records.service';
  * `ACTIVO`/`EN_FINALIZACION`; el cuerpo de consolidación de `closeSprint` se
  * conserva tal cual hasta su propio commit.
  */
+/** Participante que aparece por su agregado pero no tiene tramos en el Sprint. */
+const SIN_TRAMOS: SprintClosingMemberTotalsDto = {
+  tareasDistintas: 0,
+  estimacionAsociada: null,
+  reportadas: '0.00',
+  legacy: '0.00',
+  exceso: '0.00',
+  propuestas: '0.00',
+  filasPendientes: 0,
+  filasConsumidas: 0,
+  tramos: [],
+};
+
 @Injectable()
 export class SprintsService {
   constructor(
@@ -54,6 +74,9 @@ export class SprintsService {
     // escribe esa columna por su cuenta; delega en él con su propio `tx`.
     // Opcional por el mismo motivo posicional que `bitacoraEventos`.
     private readonly timeRecords?: TimeRecordsService,
+    // C079 (§40): el detalle por integrante lo compone el proveedor de
+    // agregación de horas; Sprints solo decide quién puede leerlo.
+    private readonly projectHours?: ProjectHoursSummaryService,
   ) {}
 
   /**
@@ -521,7 +544,177 @@ export class SprintsService {
       ORDER BY u.apellido, u.nombre, u.id_usuario
     `);
 
-    return { idProyecto: projectId, idSprint: sprintId, participantes };
+    // C079 (§46): el desglose por tramos y ajustes se compone APARTE de la
+    // consulta de HU-D1, que no cambia. Así el contrato anterior se conserva
+    // intacto y lo nuevo se añade encima en vez de reescribirlo.
+    const { totalesPorUsuario, blockers, estadoSprint } = await this.buildClosingBreakdown(
+      projectId,
+      sprintId,
+    );
+
+    return {
+      idProyecto: projectId,
+      idSprint: sprintId,
+      estadoSprint,
+      participantes: participantes.map((participante) => ({
+        ...participante,
+        totales: totalesPorUsuario.get(participante.idUsuario) ?? SIN_TRAMOS,
+      })),
+      blockers,
+    };
+  }
+
+  /**
+   * C079 (06 v2 §22/§46): composición del desglose de cierre. Es LECTURA pura
+   * — no recalcula ni escribe nada — y mantiene separadas las cuatro capas que
+   * §16 no considera intercambiables: reportado, legacy, ajustado y propuesto.
+   *
+   * Los blockers se devuelven con sus identificadores porque un impedimento
+   * sin decir CUÁL fila lo causa obliga al líder a adivinar.
+   */
+  private async buildClosingBreakdown(projectId: number, sprintId: number) {
+    const [sprint, tramos] = await Promise.all([
+      this.prisma.sprint.findUnique({ where: { idSprint: sprintId }, select: { estado: true } }),
+      this.prisma.asignacionTarea.findMany({
+        // Sin filtro de `eliminadoEn` (§15/§22): el conjunto histórico incluye
+        // los tramos de tareas eliminadas, que también deben consolidarse.
+        where: { tarea: { idProyecto: projectId, idSprint: sprintId } },
+        orderBy: { idAsignacion: 'asc' },
+        select: {
+          idAsignacion: true,
+          idTarea: true,
+          idUsuario: true,
+          idParticipacion: true,
+          desasignadaEn: true,
+          origenReporte: true,
+          horasReales: true,
+          reconocidoEn: true,
+          tarea: { select: { tituloTarea: true, eliminadoEn: true, tiempoEstimadoHoras: true } },
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+          ajustes: { where: { anuladoEn: null }, select: { horasBase: true, deltaHoras: true, justificacion: true } },
+        },
+      }),
+    ]);
+
+    const cero = new Prisma.Decimal(0);
+    const totalesPorUsuario = new Map<number, SprintClosingMemberTotalsDto>();
+    const acumulado = new Map<number, {
+      reportadas: Prisma.Decimal; legacy: Prisma.Decimal; propuestas: Prisma.Decimal;
+      tareas: Map<number, number | null>; pendientes: number; consumidas: number;
+      tramos: SprintClosingTramoDto[];
+    }>();
+    const sinParticipacion: number[] = [];
+    const sinConsolidar: number[] = [];
+    const basesDesactualizadas: number[] = [];
+
+    for (const tramo of tramos) {
+      const cache = tramo.horasReales ?? cero;
+      const granulares = tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), cero);
+      const legacyTramo = tramo.origenReporte === 'LEGACY' ? cache : cero;
+      const vigente = tramo.ajustes[0] ?? null;
+      if (vigente && !vigente.horasBase.equals(cache)) {
+        basesDesactualizadas.push(tramo.idAsignacion);
+      }
+      if (tramo.idParticipacion === null) {
+        sinParticipacion.push(tramo.idAsignacion);
+      }
+      if (tramo.reconocidoEn === null && tramo.desasignadaEn !== null && tramo.horasReales !== null) {
+        sinConsolidar.push(tramo.idAsignacion);
+      }
+
+      const fila = acumulado.get(tramo.idUsuario) ?? {
+        reportadas: cero, legacy: cero, propuestas: cero,
+        tareas: new Map<number, number | null>(), pendientes: 0, consumidas: 0,
+        tramos: [] as SprintClosingTramoDto[],
+      };
+      fila.reportadas = fila.reportadas.plus(granulares);
+      fila.legacy = fila.legacy.plus(legacyTramo);
+      fila.propuestas = fila.propuestas.plus(cache).plus(vigente?.deltaHoras ?? cero);
+      fila.tareas.set(tramo.idTarea, tramo.tarea.tiempoEstimadoHoras);
+      if (tramo.reconocidoEn === null) fila.pendientes += 1; else fila.consumidas += 1;
+      fila.tramos.push({
+        idAsignacion: tramo.idAsignacion,
+        idTarea: tramo.idTarea,
+        tituloTarea: tramo.tarea.tituloTarea,
+        tareaEliminada: tramo.tarea.eliminadoEn !== null,
+        idParticipacion: tramo.idParticipacion,
+        abierto: tramo.desasignadaEn === null,
+        origen: tramo.origenReporte,
+        reportadas: granulares.toFixed(2),
+        ajuste: vigente ? vigente.deltaHoras.toFixed(2) : null,
+        justificacionAjuste: vigente?.justificacion ?? null,
+        propuestas: cache.plus(vigente?.deltaHoras ?? cero).toFixed(2),
+        reconocidoEn: tramo.reconocidoEn,
+      });
+      acumulado.set(tramo.idUsuario, fila);
+    }
+
+    for (const [idUsuario, fila] of acumulado) {
+      const estimaciones = [...fila.tareas.values()].filter((valor): valor is number => valor !== null);
+      const estimacionAsociada = estimaciones.length > 0 ? estimaciones.reduce((a, b) => a + b, 0) : null;
+      const reportadasTotales = fila.reportadas.plus(fila.legacy);
+      totalesPorUsuario.set(idUsuario, {
+        tareasDistintas: fila.tareas.size,
+        estimacionAsociada,
+        reportadas: fila.reportadas.toFixed(2),
+        legacy: fila.legacy.toFixed(2),
+        exceso:
+          estimacionAsociada === null
+            ? '0.00'
+            : Prisma.Decimal.max(reportadasTotales.minus(estimacionAsociada), 0).toFixed(2),
+        propuestas: fila.propuestas.toFixed(2),
+        filasPendientes: fila.pendientes,
+        filasConsumidas: fila.consumidas,
+        tramos: fila.tramos,
+      });
+    }
+
+    const blockers: SprintClosingBlockerDto[] = [];
+    if (sinParticipacion.length > 0) {
+      blockers.push({
+        code: 'TRAMOS_SIN_PARTICIPACION',
+        message: 'Hay tramos sin participación resuelta; no puede saberse a quién acreditarlos',
+        ids: sinParticipacion,
+        cantidad: sinParticipacion.length,
+      });
+    }
+    if (basesDesactualizadas.length > 0) {
+      blockers.push({
+        code: 'AJUSTE_DESACTUALIZADO',
+        message: 'Hay ajustes vigentes calculados sobre un reporte distinto del actual',
+        ids: basesDesactualizadas,
+        cantidad: basesDesactualizadas.length,
+      });
+    }
+    if (sinConsolidar.length > 0) {
+      blockers.push({
+        code: 'HORAS_SIN_CONSOLIDAR',
+        message: 'Hay tramos cerrados con horas todavía no consolidadas',
+        ids: sinConsolidar,
+        cantidad: sinConsolidar.length,
+      });
+    }
+
+    return { totalesPorUsuario, blockers, estadoSprint: sprint?.estado };
+  }
+
+  /**
+   * C079 (§41 E069): detalle por integrante dentro del Sprint. La decisión de
+   * lectura es la misma del resumen; el desglose lo compone el proveedor de
+   * agregación, que no escribe nada.
+   */
+  async getSprintMemberDetail(projectId: number, sprintId: number, userId: number, actorId: number) {
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
+    await this.sprintsAuthorization.assertCanViewClosingSummary(projectId, sprintId, actorId);
+    if (!this.projectHours) {
+      throw new NotFoundException('El detalle por integrante no está disponible');
+    }
+    return this.projectHours.sprintMemberDetail(undefined, { sprintId, userId });
   }
 
   /**
