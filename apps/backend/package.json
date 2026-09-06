@@ -18,6 +18,7 @@
     "prisma:studio": "prisma studio",
     "prisma:push": "prisma db push",
     "prisma:seed": "prisma db seed",
+    "legacy:s7": "tsx scripts/sprint7-legacy.ts",
     "k6:project-listing": "node scripts/run-k6.js project-listing",
     "k6:kanban": "node scripts/run-k6.js kanban-operations",
     "k6:socket-io": "node scripts/run-k6.js socket-io",
