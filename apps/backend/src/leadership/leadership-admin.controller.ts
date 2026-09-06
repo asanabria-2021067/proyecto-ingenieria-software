@@ -50,6 +50,20 @@ export class LeadershipAdminController {
     return this.leadershipRead.adminInbox(undefined, { actorId: user.userId, query });
   }
 
+  /** E100: aceptar la apelación por el MISMO motor que el cambio directo. */
+  @Post('proyectos/:projectId/liderazgo/apelaciones/:appealId/aceptar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(LEADERSHIP_ADMIN_WRITE)
+  acceptAppeal(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('appealId', ParseIntPipe) appealId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: TransferLeadershipDto,
+  ) {
+    return this.leadership.transfer(projectId, user.userId, dto, appealId);
+  }
+
   /** E102: cambio administrativo directo, sin cooperación del saliente. */
   @Post('proyectos/:projectId/liderazgo/cambiar')
   @HttpCode(HttpStatus.OK)
