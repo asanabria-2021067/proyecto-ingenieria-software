@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import {
+  Prisma,
   TipoProyecto,
   type EstadoParticipacion,
   type EstadoProyecto,
   type EstadoSprint,
   type EstadoTarea,
+  type OrigenReporteTramo,
 } from '@prisma/client';
 
 /**
@@ -161,13 +163,37 @@ export async function createIntegrationTask(
   });
 }
 
+interface IntegrationTaskAssignmentOverrides {
+  idParticipacion?: number;
+  desasignadaEn?: Date | null;
+  horasReales?: Prisma.Decimal | string | number | null;
+  origenReporte?: OrigenReporteTramo;
+  reconocidoEn?: Date | null;
+}
+
+/**
+ * Los overrides existen porque las suites de tiempo del Sprint 7 necesitan
+ * tramos cerrados, consumidos o de origen distinto de GRANULAR como punto de
+ * partida: son estados que el producto alcanza por sus propias rutas, y
+ * fabricarlos a mano en cada suite duplicaría el mismo `update` posterior.
+ */
 export async function createIntegrationTaskAssignment(
   prisma: PrismaClient,
   idTarea: number,
   idUsuario: number,
   asignadoPor: number,
+  overrides: IntegrationTaskAssignmentOverrides = {},
 ) {
   return prisma.asignacionTarea.create({
-    data: { idTarea, idUsuario, asignadoPor },
+    data: {
+      idTarea,
+      idUsuario,
+      asignadoPor,
+      ...(overrides.idParticipacion !== undefined ? { idParticipacion: overrides.idParticipacion } : {}),
+      ...(overrides.desasignadaEn !== undefined ? { desasignadaEn: overrides.desasignadaEn } : {}),
+      ...(overrides.horasReales !== undefined ? { horasReales: overrides.horasReales } : {}),
+      ...(overrides.origenReporte !== undefined ? { origenReporte: overrides.origenReporte } : {}),
+      ...(overrides.reconocidoEn !== undefined ? { reconocidoEn: overrides.reconocidoEn } : {}),
+    },
   });
 }
