@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import type { ClosureAvailability } from '../config/environment.validation';
+import { assertClosureAvailable } from './closure-ticket.service';
 
 /**
  * C104/C105 (06 v2 §27): cifrado autenticado de los documentos de cierre.
@@ -143,6 +145,9 @@ export class ClosureCryptoService {
    * reutilizarse para otro documento ni bajo otra clave.
    */
   seal(plaintext: Buffer, context: ClosureAadContext): ClosureSealedDocument {
+    // Gate único (§51.1): sellar un documento con configuración inválida
+    // significaría inventar una clave, y ese documento sería irrecuperable.
+    assertClosureAvailable(this.config.get<ClosureAvailability>('closure'));
     const cifrado = this.encrypt(plaintext, context);
     const { keyId, kek } = this.activeKek();
     const iv = randomBytes(CLOSURE_IV_BYTES);

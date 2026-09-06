@@ -222,9 +222,24 @@ function fixtureKek(seed: number): string {
 }
 
 function cryptoService(keks: Record<string, string>, activeKeyId: string): ClosureCryptoService {
+  // Despliegue configurado: el gate de disponibilidad (C112) exige la sección
+  // `closure` derivada del validador, y sellar sin ella es 503 por contrato.
   const valores: Record<string, unknown> = {
     CLOSURE_KEKS: JSON.stringify(keks),
     CLOSURE_ACTIVE_KEY_ID: activeKeyId,
+    closure: {
+      disponible: true,
+      faltantes: [],
+      motivos: [],
+      cloudName: 'cuenta-sintetica',
+      prefix: 'uvgenius/cierre',
+      deliveryMode: 'authenticated',
+      activeKeyId,
+      keyIds: Object.keys(keks),
+      cleanupDisponible: false,
+      sweeperAdminId: null,
+      motivosCleanup: ['SWEEPER_ADMIN_ID_AUSENTE'],
+    },
   };
   const config = { get: (clave: string) => valores[clave] } as unknown as ConfigService;
   return new ClosureCryptoService(config);

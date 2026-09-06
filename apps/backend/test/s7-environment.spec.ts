@@ -13,8 +13,21 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import {
   assertSweeperAdmin,
   validateEnvironment,
+  type ClosureAvailability,
   type SweeperAdminReader,
 } from '../src/config/environment.validation';
+import { StorageModule } from '../src/storage/storage.module';
+import {
+  CLOSURE_NOT_CONFIGURED_CODE,
+  ClosureTicketService,
+} from '../src/storage/closure-ticket.service';
+import { ClosureCryptoService } from '../src/storage/closure-crypto.service';
+import { CloudinaryClosureStorageAdapter } from '../src/storage/cloudinary-closure-storage.adapter';
+import { ProjectClosureReportService } from '../src/project-closure/project-closure-report.service';
+import {
+  buildReportContext,
+  projectClosureModel,
+} from '../src/project-closure/closure-report-model';
 
 /**
  * TC03 — foundation única de environment (06 v2 §51.1 y §47). Cada caso usa
@@ -529,6 +542,167 @@ describe('S7 environment foundation (TC03)', () => {
     expect(mainSource).not.toContain('process.env.PORT');
     for (const file of listTypeScriptFiles(sourceRoot)) {
       expect(fs.readFileSync(file, 'utf8'), file).not.toMatch(/dotenv/);
+    }
+  });
+
+  it('TC03-E: sin configuración válida de Closure las superficies de documentos responden 503 antes de reservar, firmar o subir', async () => {
+    // El módulo está REGISTRADO en la aplicación: estar registrado no
+    // significa poder operar, y eso es justo lo que se comprueba abajo.
+    // `AppModule` se importa perezosamente porque su ConfigModule valida el
+    // entorno al evaluarse; el fixture mínimo evita tocar el .env real.
+    process.env.FRONTEND_URL ??= 'http://localhost:3000';
+    const { AppModule } = await import('../src/app.module');
+    expect(moduleImportsOf(AppModule as Type<unknown>)).toContain(StorageModule);
+    const providersDeStorage = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, StorageModule) ??
+      []) as unknown[];
+    expect(providersDeStorage).toContain(ClosureTicketService);
+    expect(providersDeStorage).toContain(ClosureCryptoService);
+    expect(providersDeStorage).toContain(CloudinaryClosureStorageAdapter);
+
+    // Los cuatro motivos de indisponibilidad del contrato, cada uno derivado
+    // por el validador real a partir de un entorno sintético.
+    const base = {
+      FRONTEND_URL: 'http://localhost:3000',
+      CLOUDINARY_CLOUD_NAME: 'cuenta',
+      CLOUDINARY_API_KEY: '123456789012345',
+      CLOUDINARY_API_SECRET: 'secreto-sintetico',
+      CLOSURE_KEKS: JSON.stringify({ k1: Buffer.alloc(32, 1).toString('base64') }),
+      CLOSURE_ACTIVE_KEY_ID: 'k1',
+      CLOSURE_TICKET_HMAC_SECRET: Buffer.alloc(32, 9).toString('base64'),
+    };
+    const escenarios: Array<[string, Record<string, unknown>]> = [
+      ['KEKs ausentes', { ...base, CLOSURE_KEKS: undefined }],
+      ['activeKeyId fuera del conjunto', { ...base, CLOSURE_ACTIVE_KEY_ID: 'k9' }],
+      ['HMAC ausente', { ...base, CLOSURE_TICKET_HMAC_SECRET: undefined }],
+      ['credenciales Cloudinary ausentes', { ...base, CLOUDINARY_API_SECRET: undefined }],
+    ];
+
+    for (const [escenario, crudo] of escenarios) {
+      const validado = validateEnvironment(crudo);
+      const closure = validado.closure as ClosureAvailability;
+      expect(closure.disponible, escenario).toBe(false);
+
+      // Prisma y el SDK espiados: nada debe llegar a ellos.
+      const escrituras = vi.fn();
+      const prismaEspia = { documentoCierre: { create: escrituras, update: escrituras } };
+      // `StorageModule` declara exactamente estos providers y `AppModule` lo
+      // importa; se construyen con el mismo ConfigService que resolvería la
+      // inyección, sin añadir una dependencia de testing al backend.
+      const configFalso = {
+        get: (clave: string) => (validado as Record<string, unknown>)[clave],
+      } as unknown as ConfigService;
+      const tickets = new ClosureTicketService(configFalso);
+      const crypto = new ClosureCryptoService(configFalso);
+      const adaptador = new CloudinaryClosureStorageAdapter(configFalso);
+      const uploadEspia = vi.spyOn(
+        adaptador as unknown as { uploadStream: (...args: unknown[]) => Promise<unknown> },
+        'uploadStream' as never,
+      );
+
+      const identidad = {
+        proveedor: 'cloudinary' as const,
+        cloudName: 'cuenta',
+        publicId: 'uvgenius/cierre/41/0b6f0f2c-6a1a-4f0e-9d1a-3f0f7f1c9a11.enc',
+        resourceType: 'raw' as const,
+        deliveryType: 'authenticated' as const,
+      };
+      const firmados = {
+        publicId: identidad.publicId,
+        timestamp: 1,
+        type: 'authenticated' as const,
+        overwrite: false as const,
+        signature: 'x',
+        apiKey: 'y',
+      };
+      const contextoAad = {
+        projectId: 41,
+        documentId: 900,
+        publicId: identidad.publicId,
+        tipoDocumento: 'INFORME_AUTOMATICO',
+      };
+
+      // Las cinco operaciones que necesitan almacenamiento.
+      const operaciones: Array<[string, () => unknown]> = [
+        ['reserva', () => tickets.assertAvailable()],
+        ['firma de ticket', () => tickets.sign()],
+        ['upload', () => adaptador.uploadImmutable(identidad, Buffer.from('x'), firmados)],
+        ['lectura de contenido', () => adaptador.readCiphertext(identidad, 1000)],
+        ['generación de informe', () => crypto.seal(Buffer.from('%PDF-1.7\n'), contextoAad)],
+      ];
+
+      for (const [nombre, ejecutar] of operaciones) {
+        let fallo: unknown;
+        try {
+          await ejecutar();
+        } catch (error) {
+          fallo = error;
+        }
+        const etiqueta = `${escenario} / ${nombre}`;
+        expect(fallo, etiqueta).toBeInstanceOf(ServiceUnavailableException);
+        const cuerpo = (fallo as ServiceUnavailableException).getResponse() as {
+          statusCode: number;
+          code: string;
+          faltantes?: string[];
+          motivos?: string[];
+        };
+        expect((fallo as ServiceUnavailableException).getStatus(), etiqueta).toBe(503);
+        expect(cuerpo.code, etiqueta).toBe(CLOSURE_NOT_CONFIGURED_CODE);
+        // El diagnóstico nombra variables y motivos, nunca valores.
+        const serializado = JSON.stringify(cuerpo);
+        for (const valor of Object.values(base)) {
+          expect(serializado, etiqueta).not.toContain(String(valor));
+        }
+      }
+
+      // Ni una fila escrita, ni una llamada al SDK, ni una clave inventada.
+      expect(escrituras, escenario).not.toHaveBeenCalled();
+      expect(uploadEspia, escenario).not.toHaveBeenCalled();
+      expect(prismaEspia.documentoCierre.create).not.toHaveBeenCalled();
+      expect(closure.activeKeyId === 'k9' || closure.keyIds.length <= 1).toBe(true);
+
+      // Lo que NO necesita almacenamiento sigue funcionando: el render del
+      // informe y la lectura de metadata autorizada no se bloquean.
+      const render = new ProjectClosureReportService().render(
+        projectClosureModel({
+          proyecto: {
+            idProyecto: 41,
+            tituloProyecto: 'Proyecto',
+            descripcionProyecto: null,
+            objetivos: null,
+            tipoProyecto: 'ACADEMICO_HORAS_BECA',
+            modalidad: null,
+            ubicacion: null,
+            contexto: null,
+            recursoExterno: null,
+            fechaInicio: null,
+            fechaFin: null,
+            estadoProyecto: 'EN_PROGRESO',
+          },
+          lider: { idUsuario: 7, nombre: 'Ana', apellido: 'L\u00f3pez' },
+          liderazgo: [],
+          sprintsCerrados: [],
+          hitos: [],
+          tareas: [],
+          participaciones: [],
+          propuestasPorParticipante: [],
+          totales: { horasReportadas: '0.00', horasLegacy: '0.00', horasPropuestas: '0.00', tareasDistintas: 0 },
+        }),
+        buildReportContext({
+          cicloRevisionOrigenId: 12,
+          presentacion: { usuarios: [], catalogos: [] },
+          variante: 'AUTOMATICO',
+          fechaGeneracion: '2026-09-06T12:00:00.000Z',
+        }),
+      );
+      expect(render.pdf.subarray(0, 5).toString('utf8'), escenario).toBe('%PDF-');
+
+      // Lectura de metadata no secreta autorizada: nombre de cuenta, prefijo y
+      // modalidad viajan; ninguna clave lo hace.
+      expect(closure.prefix).toBe('uvgenius/cierre');
+      expect(JSON.stringify(closure)).not.toContain(base.CLOSURE_TICKET_HMAC_SECRET);
+      expect(JSON.stringify(closure)).not.toContain(Buffer.alloc(32, 1).toString('base64'));
+
+      uploadEspia.mockRestore();
     }
   });
 });
