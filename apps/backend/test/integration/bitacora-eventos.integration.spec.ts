@@ -9,6 +9,7 @@ import { BitacoraContextService } from '../../src/bitacora/bitacora-context.serv
 import { BitacoraConsultaService } from '../../src/bitacora/bitacora-consulta.service';
 import { TipoEventoBitacora } from '../../src/bitacora/tipos-evento-bitacora';
 import type { PrismaService } from '../../src/prisma/prisma.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * T-165 (bloque de tests bundlado por la HU junto al frontend, pero de
@@ -33,7 +34,11 @@ describeIntegration('Bitácora semántica de Sprint — PostgreSQL real (sin hu�
     prisma = createIntegrationPrismaClient();
     bitacoraEventos = new BitacoraEventosService();
     const context = new BitacoraContextService(prisma as unknown as PrismaService);
-    bitacoraConsulta = new BitacoraConsultaService(prisma as unknown as PrismaService, context);
+    bitacoraConsulta = new BitacoraConsultaService(
+      prisma as unknown as PrismaService,
+      context,
+      new ProjectReadPolicyService(prisma as unknown as PrismaService),
+    );
     await prisma.$connect();
   });
 
