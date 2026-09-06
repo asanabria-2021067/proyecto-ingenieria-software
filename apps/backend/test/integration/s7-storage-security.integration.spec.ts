@@ -196,4 +196,163 @@ describeIntegration('S7 seguridad del almacenamiento de cierre', () => {
     ).toBe('RESERVADO');
     expect(storage.uploadImmutable).toHaveBeenCalledTimes(1);
   });
+
+  it('T30-B: un 200 que devuelve el asset anterior no confirma el documento y produce ASSET_NO_COINCIDE', async () => {
+    const f = await closureDraftFixture(db, scope);
+    const { service, storage } = closureDocumentsStack(db);
+    const pdf = pdfFixture();
+    scope.documentIds = [];
+
+    const reservar = async (nombre: string) => {
+      const grant = await service.reserve(f.project.idProyecto, f.leader.idUsuario, {
+        revisionId: f.revision.idRevisionCierre,
+        nombreArchivo: nombre,
+      });
+      scope.documentIds!.push(grant.documentId);
+      return grant;
+    };
+
+    // Un documento correcto y ya DISPONIBLE: es el histórico que no debe
+    // alterarse pase lo que pase después.
+    const bueno = await reservar('historico.pdf');
+    const historico = await service.uploadAndAttach(
+      f.project.idProyecto,
+      f.leader.idUsuario,
+      bueno.ticket,
+      pdf,
+    );
+    expect(historico.estadoDocumento).toBe('DISPONIBLE');
+    const historicoPersistido = await db.documentoCierre.findUniqueOrThrow({
+      where: { idDocumentoCierre: bueno.documentId },
+    });
+    const uploadsTrasElHistorico = storage.uploadImmutable.mock.calls.length;
+
+    const originalUpload = storage.uploadImmutable.getMockImplementation()!;
+    const originalVerify = storage.verifyAsset.getMockImplementation()!;
+    const originalRead = storage.readCiphertext.getMockImplementation()!;
+    const restaurar = () => {
+      storage.uploadImmutable.mockImplementation(originalUpload);
+      storage.verifyAsset.mockImplementation(originalVerify);
+      storage.readCiphertext.mockImplementation(originalRead);
+    };
+
+    // Cuatro formas de que el objeto remoto NO sea el que se envió.
+    const escenarios: Array<[string, () => void]> = [
+      [
+        'el proveedor conservó el asset anterior con bytes distintos del mismo tamaño',
+        () => {
+          storage.uploadImmutable.mockImplementation(async (identity, ciphertext, params) => {
+            // 200 «correcto», pero lo almacenado es otro contenido igual de largo.
+            const suplantado = Buffer.alloc((ciphertext as Buffer).length, 0x41);
+            return originalUpload(identity, suplantado, params);
+          });
+        },
+      ],
+      [
+        'api.resource devuelve otra modalidad de entrega',
+        () => {
+          storage.verifyAsset.mockImplementation(async (identity) => ({
+            ...(await originalVerify(identity)),
+            deliveryType: 'upload',
+          }));
+        },
+      ],
+      [
+        'la descarga devuelve un SHA-256 distinto',
+        () => {
+          storage.readCiphertext.mockImplementation(async (identity) => {
+            const bytes = (await originalRead(identity)) as Buffer;
+            const alterado = Buffer.from(bytes);
+            alterado[0] ^= 0xff;
+            return alterado;
+          });
+        },
+      ],
+      [
+        'el assetId no cruza con la respuesta del upload',
+        () => {
+          storage.verifyAsset.mockImplementation(async (identity) => ({
+            ...(await originalVerify(identity)),
+            assetId: 'asset-de-otro-objeto',
+          }));
+        },
+      ],
+    ];
+
+    for (const [caso, programar] of escenarios) {
+      restaurar();
+      programar();
+      const grant = await reservar(`fallido-${escenarios.indexOf(escenarios.find(([c]) => c === caso)!)}.pdf`);
+      const respuesta = await expectStatus(409, () =>
+        service.uploadAndAttach(f.project.idProyecto, f.leader.idUsuario, grant.ticket, pdf),
+      );
+      expect(respuesta, caso).toMatchObject({ code: 'ASSET_NO_COINCIDE' });
+
+      const fallido = await db.documentoCierre.findUniqueOrThrow({
+        where: { idDocumentoCierre: grant.documentId },
+      });
+      // No llega a DISPONIBLE y no se vincula al borrador.
+      expect(fallido.estadoDocumento, caso).not.toBe('DISPONIBLE');
+      expect(fallido.disponibleEn, caso).toBeNull();
+      expect(
+        await db.documentoRevisionCierre.count({ where: { idDocumentoCierre: grant.documentId } }),
+        caso,
+      ).toBe(0);
+      expect(
+        await db.bitacoraAuditoria.count({
+          where: { accion: 'CLOSURE_DOCUMENT_ADDED', idObjeto: String(grant.documentId) },
+        }),
+        caso,
+      ).toBe(0);
+
+      // Nunca se reintenta con overwrite, ni se reutiliza el publicId, ni se
+      // destruye el objeto para forzar la carga.
+      for (const llamada of storage.uploadImmutable.mock.calls) {
+        expect((llamada[2] as { overwrite: boolean }).overwrite, caso).toBe(false);
+      }
+      expect(storage.destroy, caso).not.toHaveBeenCalled();
+      const identificadores = storage.uploadImmutable.mock.calls.map(
+        (llamada) => (llamada[0] as { publicId: string }).publicId,
+      );
+      expect(new Set(identificadores).size, caso).toBe(identificadores.length);
+
+      // El documento histórico queda EXACTAMENTE como estaba.
+      const historicoAhora = await db.documentoCierre.findUniqueOrThrow({
+        where: { idDocumentoCierre: bueno.documentId },
+      });
+      expect(historicoAhora.checksumSha256, caso).toBe(historicoPersistido.checksumSha256);
+      expect(historicoAhora.assetId, caso).toBe(historicoPersistido.assetId);
+      expect(historicoAhora.versionRemota, caso).toBe(historicoPersistido.versionRemota);
+      expect(historicoAhora.estadoDocumento, caso).toBe('DISPONIBLE');
+
+      // La reserva fallida queda como candidata a purga, no se reaprovecha.
+      await db.documentoCierre.delete({ where: { idDocumentoCierre: grant.documentId } });
+      scope.documentIds = scope.documentIds!.filter((id) => id !== grant.documentId);
+    }
+
+    // Y con el proveedor comportándose, la carga sí se confirma.
+    restaurar();
+    const correcto = await reservar('correcto.pdf');
+    const documento = await service.uploadAndAttach(
+      f.project.idProyecto,
+      f.leader.idUsuario,
+      correcto.ticket,
+      pdf,
+    );
+    expect(documento.estadoDocumento).toBe('DISPONIBLE');
+    expect(documento.assetId).not.toBeNull();
+    expect(documento.versionRemota).not.toBeNull();
+    expect(storage.verifyAsset).toHaveBeenCalled();
+    expect(storage.readCiphertext).toHaveBeenCalled();
+    expect(storage.uploadImmutable.mock.calls.length).toBeGreaterThan(uploadsTrasElHistorico);
+
+    // El etag no es el hash del PDF: nunca se persiste como checksum.
+    const persistido = await db.documentoCierre.findUniqueOrThrow({
+      where: { idDocumentoCierre: correcto.documentId },
+    });
+    expect(persistido.checksumSha256).not.toBe('etag-sintetico');
+    expect(persistido.checksumCifradoSha256).not.toBe('etag-sintetico');
+    // Y no existe ninguna columna etag en el modelo.
+    expect(Object.keys(persistido)).not.toContain('etag');
+  });
 });

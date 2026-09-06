@@ -18,9 +18,17 @@ import {
 } from '../common/project-policy/project-transaction.service';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
-import { ClosureCryptoService, type ClosureCryptoMetadata } from '../storage/closure-crypto.service';
+import {
+  ClosureCryptoService,
+  sha256Hex,
+  type ClosureCryptoMetadata,
+} from '../storage/closure-crypto.service';
 import { ClosureTicketService } from '../storage/closure-ticket.service';
-import { CloudinaryClosureStorageAdapter } from '../storage/cloudinary-closure-storage.adapter';
+import {
+  ASSET_NO_COINCIDE,
+  CLOSURE_REMOTE_TIMEOUT_MS,
+  CloudinaryClosureStorageAdapter,
+} from '../storage/cloudinary-closure-storage.adapter';
 import {
   CLOUDINARY_CLOSURE_PORT,
   type ClosureRemoteIdentity,
@@ -30,7 +38,7 @@ import { ReserveDocumentDto } from './dto/reserve-document.dto';
 import type { UploadGrant } from './dto/upload-grant.dto';
 
 /**
- * C113 (06 v2 §25/§26/§27): carga mediada de documentos de cierre.
+ * C113/C114 (06 v2 §25/§26/§27): carga mediada de documentos de cierre.
  *
  * La secuencia es deliberada: una transacción BREVE reserva, el trabajo caro
  * —hash, cifrado y transferencia— ocurre FUERA de cualquier lock, y una
@@ -326,7 +334,10 @@ export class ProjectClosureDocumentsService {
     };
     const firmados = this.adapter.signUploadParams(identidad);
     const confirmada = await this.storage.uploadImmutable(identidad, sellado.ciphertext, firmados);
-    await this.verifyRemote(confirmada, sellado.checksumCifradoSha256, sellado.tamanoCifradoBytes);
+    await this.verifyRemote(identidad, confirmada, {
+      checksumCifradoSha256: sellado.checksumCifradoSha256,
+      tamanoCifradoBytes: sellado.tamanoCifradoBytes,
+    });
 
     // Tx breve 2: revalidar y vincular.
     return this.projectTx.run(projectId, actorId, 'closure-documents.finish-upload', async (ctx) => {
@@ -393,17 +404,68 @@ export class ProjectClosureDocumentsService {
   }
 
   /**
-   * Verificación remota. En C113 comprueba lo que el propio upload devolvió;
-   * la corroboración completa contra el proveedor llega con su contrato.
+   * Verificación remota completa (§27).
+   *
+   * Un HTTP 200 NO prueba que los bytes enviados se hayan almacenado: con
+   * `overwrite=false` el proveedor puede responder éxito devolviendo el asset
+   * anterior. Por eso se compara la identidad contra la reserva, se cruzan
+   * assetId y version con la API de recursos y, decisivamente, se DESCARGA el
+   * objeto para comparar su longitud y su SHA-256 con el ciphertext local.
+   *
+   * Ante cualquier discrepancia se responde 409 y se detiene: no se reintenta
+   * con `overwrite=true`, no se reutiliza el publicId y no se destruye el
+   * objeto para forzar la carga. Todo esto ocurre FUERA de transacción.
    */
   protected async verifyRemote(
+    reserva: ClosureRemoteIdentity,
     confirmada: ClosureRemoteIdentity,
-    _checksumCifrado: string,
-    _tamanoCifrado: number,
+    esperado: { checksumCifradoSha256: string; tamanoCifradoBytes: number },
   ): Promise<void> {
-    if (confirmada.resourceType !== 'raw') {
-      throw new ConflictException('El recurso remoto no coincide con la reserva');
+    const conflicto = (detalle: string): never => {
+      throw new ConflictException({
+        statusCode: 409,
+        code: ASSET_NO_COINCIDE,
+        message: `El objeto remoto no corresponde al documento reservado (${detalle})`,
+      });
+    };
+
+    if (
+      confirmada.publicId !== reserva.publicId ||
+      confirmada.resourceType !== reserva.resourceType ||
+      confirmada.deliveryType !== reserva.deliveryType
+    ) {
+      conflicto('identidad');
     }
+
+    const descriptor = await this.storage.verifyAsset(confirmada);
+    if (
+      descriptor.publicId !== reserva.publicId ||
+      descriptor.resourceType !== reserva.resourceType ||
+      descriptor.deliveryType !== reserva.deliveryType ||
+      descriptor.bytes !== esperado.tamanoCifradoBytes
+    ) {
+      conflicto('metadatos');
+    }
+    // El cruce entre la respuesta de carga y la de recursos: si el proveedor
+    // conservó un asset anterior, aquí deja de coincidir.
+    if (
+      (confirmada.assetId ?? '') !== descriptor.assetId ||
+      (confirmada.version ?? '') !== descriptor.version
+    ) {
+      conflicto('identificador de asset');
+    }
+
+    // Prueba decisiva: los bytes reales que quedaron guardados. Un recurso
+    // preexistente con contenido distinto —aunque mida lo mismo— falla aquí.
+    const remoto = await this.storage.readCiphertext(confirmada, CLOSURE_REMOTE_TIMEOUT_MS);
+    if (
+      remoto.length !== esperado.tamanoCifradoBytes ||
+      sha256Hex(remoto) !== esperado.checksumCifradoSha256
+    ) {
+      conflicto('contenido');
+    }
+    // `etag` nunca se interpreta como el SHA-256 del PDF ni se persiste: su
+    // única función es cruzar las dos respuestas del proveedor.
   }
 
   /** Metadata pública del documento; nunca metadata criptográfica. */
