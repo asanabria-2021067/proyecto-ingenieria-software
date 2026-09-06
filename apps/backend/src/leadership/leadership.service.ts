@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EstadoApelacionLiderazgo, Prisma } from '@prisma/client';
+import { EstadoApelacionLiderazgo, OrigenCambioLiderazgo, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -19,9 +19,10 @@ import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { CreateLeadershipAppealDto } from './dto/create-leadership-appeal.dto';
 import { DenyAppealDto } from './dto/deny-appeal.dto';
+import { TransferLeadershipDto } from './dto/transfer-leadership.dto';
 
 /**
- * C091/C093/C094/C095 (06 v2 §18/§19): escrituras de liderazgo — ciclo de vida de la
+ * C091/C093–C097 (06 v2 §18/§19): escrituras de liderazgo — ciclo de vida de la
  * apelación y el motor ÚNICO de cambio de líder.
  *
  * `Proyecto.creadoPor` es la única fuente de verdad sobre quién lidera: este
@@ -29,6 +30,28 @@ import { DenyAppealDto } from './dto/deny-appeal.dto';
  * ni participación fabricada. Perder el liderazgo no crea ni destruye
  * membresía; lo que el saliente conserva se deriva de su participación real.
  */
+
+
+/**
+ * Resultado DERIVADO de una transferencia (§6). `efectoSaliente` describe lo
+ * que el saliente conserva según su participación real en el momento del
+ * commit; no es una columna de estado ni una decisión que alguien haya
+ * guardado antes desde la interfaz.
+ */
+export interface LeadershipChangeResult {
+  historialId: number;
+  liderAnteriorId: number;
+  liderNuevoId: number;
+  salienteTieneParticipacionActiva: boolean;
+  efectoSaliente: 'INTEGRANTE_NORMAL' | 'SIN_MEMBRESIA_OPERATIVA';
+}
+
+/**
+ * §18: un cambio directo caduca la solicitud de autoridad del saliente. No se
+ * deniega ni se acepta — nadie resolvió su petición: dejó de tener objeto.
+ */
+export const MOTIVO_CANCELACION_AUTOMATICA =
+  'Cancelada automáticamente porque el liderazgo del proyecto cambió antes de resolverla.';
 
 export interface ApelacionPublica {
   idApelacion: number;
@@ -243,6 +266,292 @@ export class LeadershipService {
       return cancelada;
     });
   }
+
+  /**
+   * E102 / E100 (§18): ORQUESTACIÓN ÚNICA de un cambio de liderazgo. Los dos
+   * controllers administrativos —cambio directo y aceptación de apelación—
+   * entran exactamente por aquí. No existe un segundo motor: dos caminos para
+   * mover `Proyecto.creadoPor` serían dos reglas de concurrencia distintas
+   * sobre la misma fila.
+   */
+  async transfer(
+    projectId: number,
+    actorId: number,
+    dto: TransferLeadershipDto,
+    appealId?: number,
+  ): Promise<LeadershipChangeResult> {
+    return this.projectTx.run(projectId, actorId, 'leadership.transfer', async (ctx) =>
+      this.changeLeaderTx(ctx, {
+        projectId,
+        adminId: actorId,
+        newLeaderId: dto.idLiderNuevo,
+        expectedLeaderId: dto.expectedLeaderId,
+        appealId,
+        motivo: dto.motivo,
+      }),
+    );
+  }
+
+  /**
+   * El motor. Secuencia exacta de §18, toda dentro del lock del proyecto:
+   * validar admin → estado P/E → líder esperado → sucesor elegible → releer
+   * Q1 → CAS de `creadoPor` → historial → bitácora → notificaciones. El
+   * socket sale después del commit, desde el buffer de efectos.
+   *
+   * NO toca participaciones, roles, tareas ni horas: perder o ganar el
+   * liderazgo no mueve una sola fila de trabajo del equipo.
+   */
+  private async changeLeaderTx(
+    ctx: ProjectTransactionContext,
+    input: {
+      projectId: number;
+      adminId: number;
+      newLeaderId: number;
+      expectedLeaderId: number;
+      appealId?: number;
+      motivo: string;
+    },
+  ): Promise<LeadershipChangeResult> {
+    const { tx } = ctx;
+    const project = this.lockedProject(ctx);
+    await this.policy.assertAdminTx(tx, input.adminId);
+    await this.policy.assertWriteTx(tx, project, 'LIDERAZGO', input.adminId);
+
+    const motivo = input.motivo?.trim() ?? '';
+    if (motivo.length === 0 || motivo.length > 5000) {
+      throw new BadRequestException('motivo debe tener entre 1 y 5000 caracteres');
+    }
+
+    // Precondición de concurrencia, no un dato informativo: una intención
+    // formada contra otro líder no se aplica al que hay ahora.
+    if (project.creadoPor !== input.expectedLeaderId) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'LIDER_INESPERADO',
+        message: 'El liderazgo del proyecto cambió; vuelve a consultarlo',
+      });
+    }
+
+    const liderAnteriorId = project.creadoPor;
+    // La lista de candidatos que vio la interfaz es informativa: la
+    // elegibilidad que decide se comprueba AQUÍ, bajo el lock.
+    await this.eligibility.assertLeadershipCandidate(tx, {
+      projectId: input.projectId,
+      userId: input.newLeaderId,
+      liderActualId: liderAnteriorId,
+    });
+
+    // Q1 se relee con el estado actual, no con el que existía al apelar.
+    const participacionesSaliente = await tx.participacionProyecto.findMany({
+      where: {
+        idUsuario: liderAnteriorId,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto: input.projectId },
+      },
+      select: { idParticipacion: true, idRolProyecto: true },
+    });
+    const salienteTieneParticipacionActiva = participacionesSaliente.length > 0;
+
+    const movido = await tx.proyecto.updateMany({
+      where: { idProyecto: input.projectId, creadoPor: input.expectedLeaderId },
+      data: { creadoPor: input.newLeaderId },
+    });
+    if (movido.count !== 1) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'LIDER_INESPERADO',
+        message: 'El liderazgo del proyecto cambió; vuelve a consultarlo',
+      });
+    }
+
+    const historial = await tx.historialLiderazgo.create({
+      data: {
+        idProyecto: input.projectId,
+        idLiderAnterior: liderAnteriorId,
+        idLiderNuevo: input.newLeaderId,
+        idAdminResponsable: input.adminId,
+        motivo,
+        origen: OrigenCambioLiderazgo.CAMBIO_ADMINISTRATIVO,
+      },
+      select: { idHistorialLiderazgo: true },
+    });
+
+    // Cambio directo: la solicitud pendiente del saliente caduca en la MISMA
+    // transacción, para no dejar viva una petición de una autoridad que ya no
+    // existe.
+    await this.autoCancelPendingAppealTx(tx, {
+      projectId: input.projectId,
+      liderAnteriorId,
+      adminId: input.adminId,
+    });
+
+    await this.bitacoraEventos.registrarEvento({
+      tx,
+      tipoEvento: TipoEventoBitacora.LEADERSHIP_CHANGED,
+      idActor: input.adminId,
+      idProyecto: input.projectId,
+      tipoEntidad: 'PROYECTO',
+      idEntidad: input.projectId,
+      valorAnterior: { creadoPor: liderAnteriorId },
+      valorNuevo: {
+        creadoPor: input.newLeaderId,
+        idHistorialLiderazgo: historial.idHistorialLiderazgo,
+        origen: OrigenCambioLiderazgo.CAMBIO_ADMINISTRATIVO,
+        motivo,
+        // Evidencia del efecto observado, no insumo de decisiones futuras.
+        participacionesObservadas: participacionesSaliente.map((fila) => fila.idParticipacion),
+        salienteTieneParticipacionActiva,
+      },
+    });
+
+    const equipoActivo = await this.persistLeadershipNotificationsTx(ctx, {
+      projectId: input.projectId,
+      liderAnteriorId,
+      liderNuevoId: input.newLeaderId,
+      salienteTieneParticipacionActiva,
+    });
+
+    ctx.effects.add({
+      key: `realtime:leadership:${input.projectId}`,
+      publish: () =>
+        this.notifications.notifyLeadershipChanged(
+          [liderAnteriorId, input.newLeaderId, ...equipoActivo],
+          {
+            projectId: input.projectId,
+            historialId: historial.idHistorialLiderazgo,
+            liderAnteriorId,
+            liderNuevoId: input.newLeaderId,
+            origen: OrigenCambioLiderazgo.CAMBIO_ADMINISTRATIVO,
+          },
+        ),
+    });
+
+    return {
+      historialId: historial.idHistorialLiderazgo,
+      liderAnteriorId,
+      liderNuevoId: input.newLeaderId,
+      salienteTieneParticipacionActiva,
+      efectoSaliente: salienteTieneParticipacionActiva
+        ? 'INTEGRANTE_NORMAL'
+        : 'SIN_MEMBRESIA_OPERATIVA',
+    };
+  }
+
+  /** §18: la pendiente del saliente caduca sin resolverse a favor ni en contra. */
+  private async autoCancelPendingAppealTx(
+    tx: Prisma.TransactionClient,
+    input: { projectId: number; liderAnteriorId: number; adminId: number },
+  ): Promise<void> {
+    const pendiente = await tx.apelacionLiderazgo.findFirst({
+      where: {
+        idProyecto: input.projectId,
+        idLiderSolicitante: input.liderAnteriorId,
+        estadoApelacion: EstadoApelacionLiderazgo.PENDIENTE,
+      },
+      select: APELACION_SELECT,
+    });
+    if (!pendiente) {
+      return;
+    }
+    const cancelada = await this.resolveAppealTx(tx, {
+      appealId: pendiente.idApelacion,
+      estado: EstadoApelacionLiderazgo.CANCELADA,
+      idAdminResolutor: input.adminId,
+      mensajeResolucion: MOTIVO_CANCELACION_AUTOMATICA,
+    });
+    await this.bitacoraEventos.registrarEvento({
+      tx,
+      tipoEvento: TipoEventoBitacora.LEADERSHIP_APPEAL_CANCELLED,
+      idActor: input.adminId,
+      idProyecto: input.projectId,
+      tipoEntidad: 'APELACION_LIDERAZGO',
+      idEntidad: pendiente.idApelacion,
+      valorAnterior: snapshotApelacion(pendiente),
+      valorNuevo: snapshotApelacion(cancelada),
+    });
+  }
+
+  /**
+   * §44: `LIDERAZGO_ACTUALIZADO` para el saliente, el nuevo líder y cada
+   * usuario del equipo activo UNA sola vez. El saliente y el sucesor se
+   * excluyen de la lista de equipo para que nadie reciba dos filas por estar
+   * en dos grupos, y el texto del saliente explica su efecto Q1 real.
+   *
+   * Devuelve el equipo activo restante para que el emisor realtime alcance a
+   * la misma audiencia sin volver a consultarla.
+   */
+  private async persistLeadershipNotificationsTx(
+    ctx: ProjectTransactionContext,
+    input: {
+      projectId: number;
+      liderAnteriorId: number;
+      liderNuevoId: number;
+      salienteTieneParticipacionActiva: boolean;
+    },
+  ): Promise<number[]> {
+    const { tx } = ctx;
+    const [proyecto, anterior, nuevo, equipo] = await Promise.all([
+      tx.proyecto.findUniqueOrThrow({
+        where: { idProyecto: input.projectId },
+        select: { tituloProyecto: true },
+      }),
+      tx.usuario.findUniqueOrThrow({
+        where: { idUsuario: input.liderAnteriorId },
+        select: { nombre: true, apellido: true },
+      }),
+      tx.usuario.findUniqueOrThrow({
+        where: { idUsuario: input.liderNuevoId },
+        select: { nombre: true, apellido: true },
+      }),
+      tx.participacionProyecto.findMany({
+        where: {
+          estadoParticipacion: 'ACTIVO',
+          rolProyecto: { idProyecto: input.projectId },
+          idUsuario: { notIn: [input.liderAnteriorId, input.liderNuevoId] },
+        },
+        distinct: ['idUsuario'],
+        select: { idUsuario: true },
+      }),
+    ]);
+
+    const previousLeaderName = `${anterior.nombre} ${anterior.apellido}`.trim();
+    const newLeaderName = `${nuevo.nombre} ${nuevo.apellido}`.trim();
+    const base = {
+      projectTitle: proyecto.tituloProyecto,
+      projectId: input.projectId,
+      previousLeaderName,
+      newLeaderName,
+    };
+
+    await this.notifications.persistTemplateTx(
+      tx,
+      [input.liderAnteriorId],
+      'LIDERAZGO_ACTUALIZADO',
+      {
+        ...base,
+        audiencia: 'SALIENTE',
+        salienteConservaMembresia: input.salienteTieneParticipacionActiva,
+      },
+      ctx.effects,
+    );
+    await this.notifications.persistTemplateTx(
+      tx,
+      [input.liderNuevoId],
+      'LIDERAZGO_ACTUALIZADO',
+      { ...base, audiencia: 'NUEVO' },
+      ctx.effects,
+    );
+    const equipoIds = equipo.map((fila) => fila.idUsuario);
+    await this.notifications.persistTemplateTx(
+      tx,
+      equipoIds,
+      'LIDERAZGO_ACTUALIZADO',
+      { ...base, audiencia: 'EQUIPO' },
+      ctx.effects,
+    );
+    return equipoIds;
+  }
+
 
   /**
    * E101 (§19): un administrador deniega la apelación.

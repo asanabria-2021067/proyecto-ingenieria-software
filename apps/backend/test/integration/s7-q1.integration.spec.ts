@@ -21,6 +21,7 @@ import {
 } from '../../src/leadership/leadership-read.service';
 import { CreateLeadershipAppealDto } from '../../src/leadership/dto/create-leadership-appeal.dto';
 import { DenyAppealDto } from '../../src/leadership/dto/deny-appeal.dto';
+import { MOTIVO_CANCELACION_AUTOMATICA } from '../../src/leadership/leadership.service';
 
 /** Misma configuración que apps/backend/src/main.ts: el 400 lo produce el pipe real. */
 const pipe = new ValidationPipe({
@@ -645,5 +646,138 @@ describeIntegration('S7 liderazgo y Q1', () => {
       actorId: f.retirado.idUsuario,
     });
     expect(historialCerrado.total).toBe(1);
+  });
+
+  it('T19-B: el admin transfiere el liderazgo sin cooperación del saliente y cancela su apelación pendiente en la misma transacción', async () => {
+    const f = await leadershipFixture(db, scope);
+    const { service, read, gateway } = leadershipStack(db);
+    const a = f.leaderSinParticipacion.idUsuario;
+    const b = f.elegible.idUsuario;
+
+    const apelacion = await service.createAppeal(f.project.idProyecto, a, {
+      asunto: 'Solicito dejar el liderazgo',
+      mensaje: 'No puedo sostener la coordinación durante este ciclo.',
+      idCandidatoPropuesto: b,
+    });
+
+    // Foto exacta de todo lo que la transferencia NO debe tocar.
+    const snapshot = async () => ({
+      participaciones: await db.participacionProyecto.findMany({
+        where: { rolProyecto: { idProyecto: f.project.idProyecto } },
+        orderBy: { idParticipacion: 'asc' },
+      }),
+      roles: await db.rolProyecto.findMany({
+        where: { idProyecto: f.project.idProyecto },
+        orderBy: { idRolProyecto: 'asc' },
+      }),
+      tareas: await db.tarea.findMany({
+        where: { idProyecto: f.project.idProyecto },
+        orderBy: { idTarea: 'asc' },
+      }),
+      asignaciones: await db.asignacionTarea.findMany({
+        where: { tarea: { idProyecto: f.project.idProyecto } },
+        orderBy: { idAsignacion: 'asc' },
+      }),
+      registros: await db.registroTiempoTarea.findMany({
+        where: { asignacion: { tarea: { idProyecto: f.project.idProyecto } } },
+        orderBy: { idRegistroTiempo: 'asc' },
+      }),
+    });
+    const antes = await snapshot();
+
+    // El admin ve la advertencia que le corresponde antes de confirmar.
+    const contexto = await read.context(undefined, {
+      projectId: f.project.idProyecto,
+      actorId: f.admin.idUsuario,
+    });
+    expect(contexto.advertenciaAdmin).toBe(ADVERTENCIA_ADMIN_SIN_PARTICIPACION);
+
+    const resultado = await service.transfer(f.project.idProyecto, f.admin.idUsuario, {
+      idLiderNuevo: b,
+      expectedLeaderId: a,
+      motivo: 'El líder actual dejó de participar y el proyecto necesita conducción.',
+    });
+    expect(resultado.liderAnteriorId).toBe(a);
+    expect(resultado.liderNuevoId).toBe(b);
+    expect(resultado.salienteTieneParticipacionActiva).toBe(false);
+    expect(resultado.efectoSaliente).toBe('SIN_MEMBRESIA_OPERATIVA');
+
+    // El liderazgo se movió sin que A hiciera nada.
+    expect(
+      (await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.project.idProyecto } })).creadoPor,
+    ).toBe(b);
+
+    const historial = await db.historialLiderazgo.findMany({
+      where: { idProyecto: f.project.idProyecto },
+    });
+    expect(historial).toHaveLength(1);
+    expect(historial[0].idHistorialLiderazgo).toBe(resultado.historialId);
+    expect(historial[0].origen).toBe('CAMBIO_ADMINISTRATIVO');
+    expect(historial[0].idApelacion).toBeNull();
+    expect(historial[0].idAdminResponsable).toBe(f.admin.idUsuario);
+
+    // La apelación de A caducó en la MISMA transacción, con motivo automático.
+    const caducada = await db.apelacionLiderazgo.findUniqueOrThrow({
+      where: { idApelacion: apelacion.idApelacion },
+    });
+    expect(caducada.estadoApelacion).toBe('CANCELADA');
+    expect(caducada.resueltaEn).not.toBeNull();
+    expect(caducada.mensajeResolucion).toBe(MOTIVO_CANCELACION_AUTOMATICA);
+
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_CHANGED', idObjeto: String(f.project.idProyecto) },
+      }),
+    ).toBe(1);
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_APPEAL_CANCELLED', idObjeto: String(apelacion.idApelacion) },
+      }),
+    ).toBe(1);
+
+    // Una fila de LIDERAZGO_ACTUALIZADO por destinatario: A, B y cada usuario
+    // del equipo activo, exactamente una vez.
+    const avisos = await db.notificacion.findMany({
+      where: { tipoNotificacion: 'LIDERAZGO_ACTUALIZADO', idUsuario: { in: scope.userIds ?? [] } },
+    });
+    const destinatarios = avisos.map((fila) => fila.idUsuario).sort((x, y) => x - y);
+    expect(destinatarios).toEqual(
+      [a, b, f.conSalidaAbierta.idUsuario, f.deshabilitado.idUsuario].sort((x, y) => x - y),
+    );
+    expect(new Set(destinatarios).size).toBe(destinatarios.length);
+
+    // Realtime post-commit: una sola emisión, ya con la transacción cerrada.
+    const emisiones = gateway.emitToUsers.mock.calls.filter(
+      (llamada) => llamada[0] === 'LEADERSHIP_CHANGED',
+    );
+    expect(emisiones).toHaveLength(1);
+    expect(emisiones[0][2]).toMatchObject({
+      projectId: f.project.idProyecto,
+      liderAnteriorId: a,
+      liderNuevoId: b,
+    });
+
+    // Un sucesor no elegible no recibe el liderazgo.
+    await expectStatus(409, () =>
+      service.transfer(f.project.idProyecto, f.admin.idUsuario, {
+        idLiderNuevo: f.conSalidaAbierta.idUsuario,
+        expectedLeaderId: b,
+        motivo: 'Intento con un candidato que tiene una salida abierta.',
+      }),
+    );
+
+    // Repetir con el líder esperado ya obsoleto es un conflicto sin segundo
+    // historial.
+    await expectStatus(409, () =>
+      service.transfer(f.project.idProyecto, f.admin.idUsuario, {
+        idLiderNuevo: f.deshabilitado.idUsuario,
+        expectedLeaderId: a,
+        motivo: 'Reintento con una intención antigua.',
+      }),
+    );
+    expect(await db.historialLiderazgo.count({ where: { idProyecto: f.project.idProyecto } })).toBe(1);
+
+    // Participaciones, roles, tareas, asignaciones y horas: idénticas.
+    expect(await snapshot()).toEqual(antes);
   });
 });
