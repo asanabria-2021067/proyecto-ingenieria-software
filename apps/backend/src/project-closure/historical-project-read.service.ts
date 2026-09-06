@@ -34,7 +34,7 @@ const GRUPOS: Readonly<
 const SPRINT_OPERABLE: EstadoSprint[] = [EstadoSprint.ACTIVO, EstadoSprint.EN_FINALIZACION];
 
 /**
- * C121/C122/C123 (06 v2 §34/§40/§46): lecturas históricas y administrativas de proyecto.
+ * C121/C122/C123/C126 (06 v2 §15/§34/§40/§46): lecturas históricas y administrativas de proyecto.
  *
  * Es un servicio de LECTURA sin ninguna ruta de escritura: componer la vista
  * de un proyecto cerrado no puede, por definición, alterarlo. Cada método
@@ -389,13 +389,26 @@ export class HistoricalProjectReadService {
     };
   }
 
-  /** §15: proyección de las contribuciones de tareas eliminadas. */
+  /**
+   * E119 (§15): contribuciones de tareas ELIMINADAS.
+   *
+   * Una tarea borrada desaparece del tablero, no de la historia. Esta
+   * proyección devuelve cada tramo con su rol histórico, sus registros
+   * efectivos y revocados, sus ajustes y lo que se consumió, marcado como
+   * contribución histórica para que nadie lo confunda con trabajo operable.
+   */
   async deletedContributions(
     projectId: number,
     actorId: number,
+    sprintId?: number,
   ): Promise<Array<Record<string, unknown>>> {
-    await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'historico' });
-    return this.deletedContributionsTx(projectId);
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId,
+      scope: 'historico',
+      ...(sprintId === undefined ? {} : { entitySprintId: sprintId }),
+    });
+    return this.deletedContributionsTx(projectId, sprintId);
   }
 
   /**
@@ -405,9 +418,16 @@ export class HistoricalProjectReadService {
    */
   protected async deletedContributionsTx(
     projectId: number,
+    sprintId?: number,
   ): Promise<Array<Record<string, unknown>>> {
     const tramos = await this.prisma.asignacionTarea.findMany({
-      where: { tarea: { idProyecto: projectId, eliminadoEn: { not: null } } },
+      where: {
+        tarea: {
+          idProyecto: projectId,
+          eliminadoEn: { not: null },
+          ...(sprintId === undefined ? {} : { idSprint: sprintId }),
+        },
+      },
       orderBy: { idAsignacion: 'asc' },
       select: {
         idAsignacion: true,
@@ -416,25 +436,98 @@ export class HistoricalProjectReadService {
         horasReales: true,
         origenReporte: true,
         reconocidoEn: true,
+        fechaAsignacion: true,
         desasignadaEn: true,
-        tarea: { select: { idTarea: true, tituloTarea: true, idSprint: true, eliminadoEn: true } },
+        usuario: { select: { idUsuario: true, nombre: true, apellido: true } },
+        participacion: {
+          select: {
+            idParticipacion: true,
+            estadoParticipacion: true,
+            rolProyecto: { select: { idRolProyecto: true, nombreRol: true } },
+          },
+        },
+        tarea: {
+          select: { idTarea: true, tituloTarea: true, idSprint: true, eliminadoEn: true },
+        },
+        registrosTiempo: {
+          orderBy: { idRegistroTiempo: 'asc' },
+          select: {
+            idRegistroTiempo: true,
+            horas: true,
+            fecha: true,
+            justificacionExceso: true,
+            revocadoEn: true,
+          },
+        },
+        ajustes: {
+          orderBy: { idAjusteHora: 'asc' },
+          select: {
+            idAjusteHora: true,
+            deltaHoras: true,
+            horasBase: true,
+            justificacion: true,
+            anuladoEn: true,
+          },
+        },
       },
     });
-    return tramos.map((tramo) => ({
-      idAsignacion: tramo.idAsignacion,
-      idUsuario: tramo.idUsuario,
-      idParticipacion: tramo.idParticipacion,
-      horasReportadas: tramo.horasReales?.toFixed(2) ?? '0.00',
-      origenReporte: tramo.origenReporte,
-      reconocidoEn: tramo.reconocidoEn,
-      desasignadaEn: tramo.desasignadaEn,
-      tarea: {
-        idTarea: tramo.tarea.idTarea,
-        tituloTarea: tramo.tarea.tituloTarea,
-        idSprint: tramo.tarea.idSprint,
-      },
-      razonDeInvisibilidad: 'TAREA_ELIMINADA',
-      eliminadaEn: tramo.tarea.eliminadoEn,
-    }));
+
+    return tramos.map((tramo) => {
+      const efectivos = tramo.registrosTiempo.filter((registro) => registro.revocadoEn === null);
+      const revocados = tramo.registrosTiempo.filter((registro) => registro.revocadoEn !== null);
+      const vigente = tramo.ajustes.find((ajuste) => ajuste.anuladoEn === null);
+      return {
+        idAsignacion: tramo.idAsignacion,
+        tarea: {
+          idTarea: tramo.tarea.idTarea,
+          tituloTarea: tramo.tarea.tituloTarea,
+          idSprint: tramo.tarea.idSprint,
+        },
+        usuario: tramo.usuario,
+        // El rol es el HISTÓRICO del tramo, tomado de su participación: el rol
+        // actual de la tarea no describe el trabajo que ya ocurrió.
+        rolHistorico: tramo.participacion
+          ? {
+              idParticipacion: tramo.participacion.idParticipacion,
+              idRolProyecto: tramo.participacion.rolProyecto.idRolProyecto,
+              nombreRol: tramo.participacion.rolProyecto.nombreRol,
+              estadoParticipacion: tramo.participacion.estadoParticipacion,
+            }
+          : null,
+        asignadaEn: tramo.fechaAsignacion,
+        desasignadaEn: tramo.desasignadaEn,
+        cache: tramo.horasReales?.toFixed(2) ?? null,
+        origenReporte: tramo.origenReporte,
+        registrosEfectivos: efectivos.map((registro) => ({
+          idRegistroTiempo: registro.idRegistroTiempo,
+          horas: registro.horas.toFixed(2),
+          fecha: registro.fecha,
+          justificacionExceso: registro.justificacionExceso,
+        })),
+        registrosRevocados: revocados.map((registro) => ({
+          idRegistroTiempo: registro.idRegistroTiempo,
+          horas: registro.horas.toFixed(2),
+          fecha: registro.fecha,
+          revocadoEn: registro.revocadoEn,
+        })),
+        ajustes: tramo.ajustes.map((ajuste) => ({
+          idAjusteHora: ajuste.idAjusteHora,
+          deltaHoras: ajuste.deltaHoras.toFixed(2),
+          horasBase: ajuste.horasBase.toFixed(2),
+          justificacion: ajuste.justificacion,
+          anuladoEn: ajuste.anuladoEn,
+          vigente: ajuste.anuladoEn === null,
+        })),
+        ajusteVigente: vigente?.deltaHoras.toFixed(2) ?? null,
+        // Lo consumido es lo que ya entró en un agregado; si el tramo no se
+        // reconoció, no hay importe consumido que reportar.
+        importeConsumido: tramo.reconocidoEn === null ? null : (tramo.horasReales?.toFixed(2) ?? null),
+        reconocidoEn: tramo.reconocidoEn,
+        eliminadaEn: tramo.tarea.eliminadoEn,
+        /** Marca explícita: se lee, no se opera. */
+        contribucionHistorica: true,
+        razonDeInvisibilidad: 'TAREA_ELIMINADA',
+      };
+    });
   }
 }
