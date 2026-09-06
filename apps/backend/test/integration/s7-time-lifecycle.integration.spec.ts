@@ -152,4 +152,59 @@ describeIntegration('S7 time lifecycle', () => {
     expect(await db.registroTiempoTarea.count({ where: { idAsignacion: f.closed.idAsignacion } })).toBe(1);
     expect(realtime).toHaveBeenCalledTimes(1);
   });
+
+  it('T05-B: un tramo con reconocidoEn no admite edición ni revocación', async () => {
+    const f = await timeLifecycleFixture(db, scope);
+    const segundo = await db.registroTiempoTarea.create({
+      data: {
+        idAsignacion: f.closed.idAsignacion,
+        idUsuario: f.owner.idUsuario,
+        horas: '1.50',
+        fecha: new Date('2026-08-31T00:00:00.000Z'),
+      },
+    });
+    // El tramo se marca consumido igual que lo dejaría Flow A/Flow B, junto a
+    // su agregado PENDIENTE: es el estado que debe quedar intacto.
+    await db.asignacionTarea.update({
+      where: { idAsignacion: f.closed.idAsignacion },
+      data: { horasReales: '3.50', reconocidoEn: new Date('2026-09-02T10:00:00.000Z') },
+    });
+    const agregado = await db.horasParticipacion.create({
+      data: {
+        idParticipacion: f.ownerParticipation.idParticipacion,
+        idSprint: f.sprint.idSprint,
+        periodoInicio: new Date('2026-08-01T00:00:00.000Z'),
+        periodoFin: new Date('2026-09-02T00:00:00.000Z'),
+        horasReportadas: '3.50',
+        horasCalculadas: '3.50',
+      },
+    });
+
+    const { service, realtime } = timeStack(db);
+    const registrosAntes = await db.registroTiempoTarea.findMany({
+      where: { idAsignacion: f.closed.idAsignacion },
+      orderBy: { idRegistroTiempo: 'asc' },
+    });
+    const tramoAntes = await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: f.closed.idAsignacion } });
+
+    for (const recordId of [f.ownerRecord.idRegistroTiempo, segundo.idRegistroTiempo]) {
+      await expectStatus(409, () =>
+        service.update(f.project.idProyecto, f.task.idTarea, recordId, f.owner.idUsuario, { horas: 1 }),
+      );
+      await expectStatus(409, () =>
+        service.revoke(f.project.idProyecto, f.task.idTarea, recordId, f.owner.idUsuario),
+      );
+    }
+
+    expect(
+      await db.registroTiempoTarea.findMany({
+        where: { idAsignacion: f.closed.idAsignacion },
+        orderBy: { idRegistroTiempo: 'asc' },
+      }),
+    ).toEqual(registrosAntes);
+    expect(await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: f.closed.idAsignacion } })).toEqual(tramoAntes);
+    expect(await db.horasParticipacion.findUniqueOrThrow({ where: { idRegistroHoras: agregado.idRegistroHoras } })).toEqual(agregado);
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.owner.idUsuario } })).toBe(0);
+    expect(realtime).not.toHaveBeenCalled();
+  });
 });
