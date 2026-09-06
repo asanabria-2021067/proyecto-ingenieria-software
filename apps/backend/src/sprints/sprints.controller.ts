@@ -91,6 +91,18 @@ export class SprintsController {
     return this.sprintsService.getSprintClosingSummary(projectId, sprintId, user.userId);
   }
 
+  /** E069: detalle de cierre de un integrante concreto dentro del Sprint. */
+  @Get(':sprintId/resumen-cierre/miembros/:userId')
+  @HttpCode(HttpStatus.OK)
+  getClosingMemberDetail(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Param('userId', ParseIntPipe) userId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.getSprintMemberDetail(projectId, sprintId, userId, user.userId);
+  }
+
   /**
    * T-173: registrada ANTES de `detail(':sprintId')` a propósito — Nest/Express
    * matchea rutas en orden de registro, y `analytics` (segmento literal)

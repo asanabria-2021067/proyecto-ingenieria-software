@@ -4,6 +4,7 @@ import { SprintsService } from '../../../src/sprints/sprints.service';
 import { SprintsContextService } from '../../../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../../../src/sprints/sprints-authorization.service';
 import { HoursRecognitionService } from '../../../src/sprints/hours-recognition.service';
+import { ProjectHoursSummaryService } from '../../../src/sprints/project-hours-summary.service';
 import { TimeRecordsService } from '../../../src/time-records/time-records.service';
 import { TasksContextService } from '../../../src/tasks/tasks-context.service';
 import { PrismaService } from '../../../src/prisma/prisma.service';
@@ -44,6 +45,7 @@ export function flowAStack(db: PrismaClient) {
     new ProjectReadPolicyService(prisma),
     audit,
   );
+  const projectHours = new ProjectHoursSummaryService(prisma);
   const service = new SprintsService(
     prisma,
     context,
@@ -54,6 +56,7 @@ export function flowAStack(db: PrismaClient) {
     new ProjectReadPolicyService(prisma),
     audit,
     timeRecords,
+    projectHours,
   );
   return {
     service,
