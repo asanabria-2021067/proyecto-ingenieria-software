@@ -68,6 +68,8 @@ describeIntegration('S7 database invariants (T38)', () => {
   let hoursIds: number[];
   let recordIds: number[];
   let adjustmentIds: number[];
+  let appealIds: number[];
+  let historyIds: number[];
 
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
@@ -83,9 +85,17 @@ describeIntegration('S7 database invariants (T38)', () => {
     hoursIds = [];
     recordIds = [];
     adjustmentIds = [];
+    appealIds = [];
+    historyIds = [];
   });
 
   afterEach(async () => {
+    if (historyIds.length > 0) {
+      await prisma.historialLiderazgo.deleteMany({ where: { idHistorialLiderazgo: { in: historyIds } } });
+    }
+    if (appealIds.length > 0) {
+      await prisma.apelacionLiderazgo.deleteMany({ where: { idApelacion: { in: appealIds } } });
+    }
     if (adjustmentIds.length > 0) {
       // Sucesores antes que antecesores: la FK de cadena es RESTRICT.
       await prisma.ajusteHoraTarea.deleteMany({
@@ -343,5 +353,133 @@ describeIntegration('S7 database invariants (T38)', () => {
     expect(Number(annulled.horasBase)).toBe(4);
     expect(annulled.justificacion).toBe('reduce una hora no evidenciada');
     expect(annulled.anuladoPor).toBe(authorId);
+  });
+  it('T38-D: CK10-CK16, s7_apelacion_pendiente y la unicidad de historial rechazan estados y vínculos imposibles', async () => {
+    const leader = await createIntegrationUser(prisma);
+    const candidateA = await createIntegrationUser(prisma);
+    const candidateB = await createIntegrationUser(prisma);
+    scope.userIds = [leader.idUsuario, candidateA.idUsuario, candidateB.idUsuario];
+    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    scope.projectIds = [project.idProyecto];
+    const P = project.idProyecto;
+    const L = leader.idUsuario;
+    const A = candidateA.idUsuario;
+    const B = candidateB.idUsuario;
+
+    const insertAppeal = async (sql: TemplateStringsArray, ...values: unknown[]): Promise<number> => {
+      const rows = await prisma.$queryRaw<Array<{ id_apelacion: number }>>(sql, ...values);
+      appealIds.push(rows[0].id_apelacion);
+      return rows[0].id_apelacion;
+    };
+    const insertHistory = async (sql: TemplateStringsArray, ...values: unknown[]): Promise<number> => {
+      const rows = await prisma.$queryRaw<Array<{ id_historial_liderazgo: number }>>(sql, ...values);
+      historyIds.push(rows[0].id_historial_liderazgo);
+      return rows[0].id_historial_liderazgo;
+    };
+
+    // Apelación pendiente válida del líder actual proponiendo al candidato A.
+    const pendingId = await insertAppeal`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto) VALUES (${P}, ${L}, 'Transferencia de liderazgo', 'Solicito transferir el liderazgo por carga académica.', ${A}) RETURNING id_apelacion`;
+
+    // CK10: asunto o mensaje en blanco (filas resueltas para no depender del índice parcial).
+    await expectCheckViolation(
+      prisma,
+      's7_ck_10',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto, estado_apelacion, resuelta_en) VALUES (${P}, ${L}, '   ', 'mensaje', ${A}, 'CANCELADA', NOW())`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_10',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto, estado_apelacion, resuelta_en) VALUES (${P}, ${L}, 'Asunto', '', ${A}, 'CANCELADA', NOW())`,
+    );
+    // CK11: PENDIENTE con resuelta_en; ACEPTADA sin admin resolutor.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_11',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto, estado_apelacion, resuelta_en) VALUES (${P}, ${B}, 'Asunto', 'Mensaje', ${A}, 'PENDIENTE', NOW())`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_11',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto, estado_apelacion, resuelta_en) VALUES (${P}, ${B}, 'Asunto', 'Mensaje', ${A}, 'ACEPTADA', NOW())`,
+    );
+    // CK12: DENEGADA sin mensaje de resolución.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_12',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto, estado_apelacion, resuelta_en, id_admin_resolutor) VALUES (${P}, ${B}, 'Asunto', 'Mensaje', ${A}, 'DENEGADA', NOW(), ${L})`,
+    );
+    // CK13: solicitante igual al candidato.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_13',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto, estado_apelacion, resuelta_en) VALUES (${P}, ${B}, 'Asunto', 'Mensaje', ${B}, 'CANCELADA', NOW())`,
+    );
+    // CANCELADA sin admin resolutor debe aceptarse (el líder cancela su propia solicitud).
+    const cancelledId = await insertAppeal`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto, estado_apelacion, resuelta_en) VALUES (${P}, ${B}, 'Asunto', 'Mensaje', ${A}, 'CANCELADA', NOW()) RETURNING id_apelacion`;
+    expect(cancelledId).toBeGreaterThan(0);
+
+    // s7_apelacion_pendiente: segunda PENDIENTE del mismo proyecto y líder; otra pendiente de OTRO líder sí se acepta.
+    await expectUniqueViolation(
+      prisma,
+      's7_apelacion_pendiente',
+      `INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto) VALUES (${P}, ${L}, 'Segunda pendiente', 'Mensaje', ${B})`,
+    );
+    const otherLeaderPendingId = await insertAppeal`INSERT INTO apelacion_liderazgo (id_proyecto, id_lider_solicitante, asunto, mensaje, id_candidato_propuesto) VALUES (${P}, ${B}, 'Pendiente de otro líder', 'Mensaje', ${A}) RETURNING id_apelacion`;
+    expect(otherLeaderPendingId).toBeGreaterThan(0);
+
+    // CK14: origen y apelación deben corresponderse en ambos sentidos.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_14',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO historial_liderazgo (id_proyecto, id_lider_anterior, id_lider_nuevo, id_admin_responsable, motivo, origen, id_apelacion) VALUES (${P}, ${L}, ${A}, ${L}, 'motivo', 'CAMBIO_ADMINISTRATIVO', ${pendingId})`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_14',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO historial_liderazgo (id_proyecto, id_lider_anterior, id_lider_nuevo, id_admin_responsable, motivo, origen, id_apelacion) VALUES (${P}, ${L}, ${A}, ${L}, 'motivo', 'SOLICITUD_LIDER', NULL)`,
+    );
+    // CK15: líder anterior igual al nuevo. CK16: motivo en blanco.
+    await expectCheckViolation(
+      prisma,
+      's7_ck_15',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO historial_liderazgo (id_proyecto, id_lider_anterior, id_lider_nuevo, id_admin_responsable, motivo, origen) VALUES (${P}, ${L}, ${L}, ${L}, 'motivo', 'CAMBIO_ADMINISTRATIVO')`,
+    );
+    await expectCheckViolation(
+      prisma,
+      's7_ck_16',
+      (tx) =>
+        tx.$executeRaw`INSERT INTO historial_liderazgo (id_proyecto, id_lider_anterior, id_lider_nuevo, id_admin_responsable, motivo, origen) VALUES (${P}, ${L}, ${A}, ${L}, '   ', 'CAMBIO_ADMINISTRATIVO')`,
+    );
+
+    // Aceptar la pendiente habilita un historial SOLICITUD_LIDER enlazado; la FK única impide un segundo.
+    await prisma.$executeRaw`UPDATE apelacion_liderazgo SET estado_apelacion = 'ACEPTADA', resuelta_en = NOW(), id_admin_resolutor = ${L} WHERE id_apelacion = ${pendingId}`;
+    const linkedHistoryId = await insertHistory`INSERT INTO historial_liderazgo (id_proyecto, id_lider_anterior, id_lider_nuevo, id_admin_responsable, motivo, origen, id_apelacion) VALUES (${P}, ${L}, ${A}, ${L}, 'Apelación aceptada', 'SOLICITUD_LIDER', ${pendingId}) RETURNING id_historial_liderazgo`;
+    expect(linkedHistoryId).toBeGreaterThan(0);
+    await expectUniqueViolation(
+      prisma,
+      'historial_liderazgo_id_apelacion_key',
+      `INSERT INTO historial_liderazgo (id_proyecto, id_lider_anterior, id_lider_nuevo, id_admin_responsable, motivo, origen, id_apelacion) VALUES (${P}, ${A}, ${B}, ${L}, 'Duplica la apelación', 'SOLICITUD_LIDER', ${pendingId})`,
+    );
+    const directChangeId = await insertHistory`INSERT INTO historial_liderazgo (id_proyecto, id_lider_anterior, id_lider_nuevo, id_admin_responsable, motivo, origen) VALUES (${P}, ${A}, ${B}, ${L}, 'Cambio administrativo directo', 'CAMBIO_ADMINISTRATIVO') RETURNING id_historial_liderazgo`;
+    expect(directChangeId).toBeGreaterThan(0);
+
+    // Estado final: tres apelaciones (aceptada, cancelada, pendiente de otro líder) y dos hechos de historial.
+    expect(await prisma.apelacionLiderazgo.count({ where: { idProyecto: P } })).toBe(3);
+    expect(await prisma.historialLiderazgo.count({ where: { idProyecto: P } })).toBe(2);
+    const accepted = await prisma.apelacionLiderazgo.findUniqueOrThrow({
+      where: { idApelacion: pendingId },
+      include: { historial: true },
+    });
+    expect(accepted.estadoApelacion).toBe('ACEPTADA');
+    expect(accepted.historial?.idHistorialLiderazgo).toBe(linkedHistoryId);
   });
 });
