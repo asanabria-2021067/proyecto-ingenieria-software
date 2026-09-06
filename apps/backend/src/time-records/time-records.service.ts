@@ -96,6 +96,42 @@ function mapRegistroTiempo(row: TimeRecordRow): RegistroTiempoTareaPublico {
 }
 
 /**
+ * C065 (06 v2 §10): la obligación de justificar es EXACTA — solo la operación
+ * que cruza el umbral la exige: `antes <= estimación AND después > estimación`.
+ * Con estimación nula no hay umbral y nunca se exige nada. Una reducción o una
+ * revocación jamás pueden cumplir el predicado, así que corregir a la baja
+ * nunca queda bloqueado.
+ */
+function crossesEstimate(
+  antes: Prisma.Decimal,
+  despues: Prisma.Decimal,
+  estimacion: number | null,
+): boolean {
+  if (estimacion === null) {
+    return false;
+  }
+  const umbral = new Prisma.Decimal(estimacion);
+  return antes.lte(umbral) && despues.gt(umbral);
+}
+
+/**
+ * C065 (06 v2 §10): indicadores derivados del total efectivo. Sin estimación
+ * no existe ni restante ni exceso — son `null`, nunca `0`, porque «no hay
+ * umbral» y «el umbral se cumple justo» son estados distintos.
+ */
+export function computeHoursIndicators(total: Prisma.Decimal, estimacion: number | null) {
+  if (estimacion === null) {
+    return { total, restantes: null, sobreEstimacion: null };
+  }
+  const umbral = new Prisma.Decimal(estimacion);
+  return {
+    total,
+    restantes: Prisma.Decimal.max(umbral.minus(total), 0),
+    sobreEstimacion: Prisma.Decimal.max(total.minus(umbral), 0),
+  };
+}
+
+/**
  * C061 (06 v2 §9 UPDATE): la bitácora de una edición debe mostrar el antes y
  * el después completos del registro, no solo los campos enviados. Decimal se
  * serializa con toFixed(2) para que el detalle JSON conserve la escala
@@ -238,6 +274,17 @@ export class TimeRecordsService {
         throw new ConflictException('El tramo no admite nuevos registros granulares');
       }
 
+      // §10: el umbral se evalúa DESPUÉS del lock, contra el total efectivo
+      // real de la tarea en esta misma vista, nunca contra un total leído antes.
+      const antes = await this.sumTaskEffectiveTx(tx, taskId);
+      const justificacion = dto.justificacionExceso?.trim() ?? null;
+      this.assertExcessJustification(
+        antes,
+        antes.plus(dto.horas),
+        tarea.tiempoEstimadoHoras ?? null,
+        justificacion,
+      );
+
       const nuevoRegistro = await tx.registroTiempoTarea.create({
         data: {
           idAsignacion: asignacionActiva.idAsignacion,
@@ -245,6 +292,7 @@ export class TimeRecordsService {
           horas: dto.horas,
           fecha: new Date(`${dto.fecha}T00:00:00.000Z`),
           nota: dto.nota ?? null,
+          justificacionExceso: justificacion,
         },
         select: TIME_RECORD_SELECT,
       });
@@ -274,6 +322,46 @@ export class TimeRecordsService {
     await this.notifyHoursLogged(projectId, taskId, userId, registro);
 
     return registro;
+  }
+
+  /**
+   * C065 (06 v2 §10): total efectivo de la TAREA, no del tramo — la
+   * sobreestimación se mide contra todo lo acumulado por cualquier persona en
+   * cualquier tramo. Se excluyen los revocados por el filtro y los ajustes del
+   * líder por construcción: viven en AjusteHoraTarea, otra tabla. Los tramos
+   * LEGACY tampoco entran, porque no tienen registros granulares que sumar.
+   */
+  private async sumTaskEffectiveTx(
+    tx: Prisma.TransactionClient,
+    taskId: number,
+  ): Promise<Prisma.Decimal> {
+    const sum = await tx.registroTiempoTarea.aggregate({
+      where: { asignacion: { idTarea: taskId }, revocadoEn: null },
+      _sum: { horas: true },
+    });
+    return new Prisma.Decimal(sum._sum.horas ?? 0);
+  }
+
+  /**
+   * C065 (06 v2 §10): exige texto solo a la operación que cruza. El texto ya
+   * llega recortado por el DTO; aquí se vuelve a comprobar porque el servicio
+   * también se invoca desde suites que no pasan por el ValidationPipe, y una
+   * justificación en blanco no es una justificación.
+   */
+  private assertExcessJustification(
+    antes: Prisma.Decimal,
+    despues: Prisma.Decimal,
+    estimacion: number | null,
+    justificacion: string | null | undefined,
+  ): void {
+    if (!crossesEstimate(antes, despues, estimacion)) {
+      return;
+    }
+    if (typeof justificacion !== 'string' || justificacion.trim().length === 0) {
+      throw new BadRequestException(
+        'Este registro cruza la estimación de la tarea: se requiere justificacionExceso',
+      );
+    }
   }
 
   /**
