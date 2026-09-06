@@ -247,6 +247,9 @@ export class ProjectClosureDocumentsService {
     if (!Buffer.isBuffer(file) || file.length === 0) {
       throw new BadRequestException('No se recibió el archivo del documento');
     }
+    // §25: el límite es INCLUSIVO y se aplica sobre los bytes realmente
+    // recibidos. No se descuenta ningún margen criptográfico porque no
+    // existe: el ciphertext mide exactamente lo mismo que el PDF.
     if (file.length > MAX_DOCUMENT_SIZE) {
       throw new PayloadTooLargeException({
         statusCode: 413,
