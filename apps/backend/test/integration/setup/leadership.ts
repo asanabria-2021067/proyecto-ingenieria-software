@@ -11,6 +11,7 @@ import { ProjectReadPolicyService } from '../../../src/common/project-policy/pro
 import { ProjectEligibilityService } from '../../../src/eligibility/project-eligibility.service';
 import { LeadershipReadService } from '../../../src/leadership/leadership-read.service';
 import { LeadershipService } from '../../../src/leadership/leadership.service';
+import { TeamService } from '../../../src/team/team.service';
 import * as fixtures from './fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './cleanup';
 
@@ -36,6 +37,21 @@ export function leadershipStack(db: PrismaClient) {
   const read = new LeadershipReadService(prisma, readPolicy, eligibility, policy);
   const service = new LeadershipService(prisma, runner, policy, eligibility, notifications, audit);
   return { read, service, runner, policy, readPolicy, eligibility, notifications, gateway, audit };
+}
+
+/**
+ * C100: lector de equipo real. `findTeam` decide con `ProjectReadPolicyService`
+ * y Prisma; los dos services de postulaciones y salidas no intervienen en esa
+ * lectura, así que no se construyen.
+ */
+export function teamStack(db: PrismaClient): TeamService {
+  const prisma = db as unknown as PrismaService;
+  return new TeamService(
+    prisma,
+    undefined as never,
+    undefined as never,
+    new ProjectReadPolicyService(prisma),
+  );
 }
 
 /** IDs adicionales que el cleanup de liderazgo debe recoger. */

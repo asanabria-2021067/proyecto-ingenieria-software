@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { HttpException, ValidationPipe } from '@nestjs/common';
-import type { PrismaClient } from '@prisma/client';
+import { EstadoParticipacion, type PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import {
   cleanupLeadershipFixture,
@@ -20,6 +20,7 @@ import {
 } from './setup/fixtures';
 import { tasksStack } from './setup/tasks-stack';
 import { exitStack } from './setup/exit-flow';
+import { teamStack } from './setup/leadership';
 import {
   ADVERTENCIA_ADMIN_SIN_PARTICIPACION,
   ADVERTENCIA_APELACION_SIN_PARTICIPACION,
@@ -1051,5 +1052,144 @@ describeIntegration('S7 liderazgo y Q1', () => {
         idCandidatoPropuesto: f.leaderSinParticipacion.idUsuario,
       }),
     );
+  });
+
+  it('T18-A: el exlíder sin participación pierde el acceso operativo y no se le crean filas artificiales', async () => {
+    const f = await leadershipFixture(db, scope);
+    const { service, read, readPolicy } = leadershipStack(db);
+    const { tasks, timeRecords } = tasksStack(db);
+    const { service: exits } = exitStack(db);
+    const team = teamStack(db);
+    const a = f.leaderSinParticipacion.idUsuario;
+    const b = f.elegible.idUsuario;
+
+    const conteos = async () => ({
+      participaciones: await db.participacionProyecto.count({
+        where: { rolProyecto: { idProyecto: f.project.idProyecto } },
+      }),
+      roles: await db.rolProyecto.count({ where: { idProyecto: f.project.idProyecto } }),
+      salidas: await db.solicitudSalidaProyecto.count({ where: { idProyecto: f.project.idProyecto } }),
+    });
+    const antes = await conteos();
+
+    const apelacion = await service.createAppeal(f.project.idProyecto, a, {
+      asunto: 'Solicito dejar el liderazgo',
+      mensaje: 'No participo en ningún rol y prefiero entregar la conducción.',
+      idCandidatoPropuesto: b,
+    });
+    const resultado = await service.transfer(f.project.idProyecto, f.admin.idUsuario, {
+      idLiderNuevo: b,
+      expectedLeaderId: a,
+      motivo: 'El líder no tiene participación activa en el proyecto.',
+    });
+    expect(resultado.efectoSaliente).toBe('SIN_MEMBRESIA_OPERATIVA');
+
+    // Ni una participación, rol o solicitud de salida se fabricó por la
+    // transferencia: no existe membresía sintética de exlíder.
+    expect(await conteos()).toEqual(antes);
+
+    // Cinco operaciones del equipo, cinco negativas.
+    await expectStatus(403, () =>
+      tasks.create(f.project.idProyecto, a, {
+        tituloTarea: 'Tarea de un exlíder sin participación',
+        fechaLimite: '2026-12-01',
+      }),
+    );
+    await expectStatus(403, () =>
+      tasks.assign(f.project.idProyecto, f.task.idTarea, a, { idUsuario: b }),
+    );
+    await expectStatus(403, () =>
+      timeRecords.create(f.project.idProyecto, f.task.idTarea, a, {
+        horas: 1,
+        fecha: '2026-09-06',
+      }),
+    );
+    await expectStatus(403, () =>
+      exits.createSolicitudSalida(f.project.idProyecto, a, 'Salida sin participación previa.'),
+    );
+    await expectStatus(403, () => team.findTeam(f.project.idProyecto, a));
+
+    // Lo que sí conserva: sus propias apelaciones y sus hechos de liderazgo.
+    const apelacionesPropias = await read.appeals(undefined, {
+      projectId: f.project.idProyecto,
+      actorId: a,
+    });
+    expect(apelacionesPropias.items.map((fila) => fila.idApelacion)).toEqual([
+      apelacion.idApelacion,
+    ]);
+    const historialPropio = await read.history(undefined, {
+      projectId: f.project.idProyecto,
+      actorId: a,
+    });
+    expect(historialPropio.total).toBe(1);
+    expect(historialPropio.items[0].idHistorialLiderazgo).toBe(resultado.historialId);
+
+    // Y nada más: el resto del proyecto sigue cerrado para él.
+    for (const scopeProhibido of ['equipo', 'documentos', 'bitacora'] as const) {
+      await expectStatus(403, () =>
+        readPolicy.assertRead(undefined, {
+          projectId: f.project.idProyecto,
+          actorId: a,
+          scope: scopeProhibido,
+        }),
+      );
+    }
+
+    // Segundo escenario: un exlíder cuya participación quedó RETIRADO conserva
+    // exactamente la lectura histórica que §34 le permite.
+    const exLiderRetirado = await createIntegrationUser(db);
+    collectInto(scope, 'userIds', [exLiderRetirado.idUsuario]);
+    const segundo = await createIntegrationProject(db, exLiderRetirado.idUsuario, {
+      estadoProyecto: 'EN_PROGRESO',
+    });
+    collectInto(scope, 'projectIds', [segundo.idProyecto]);
+    const rolSegundo = await createIntegrationProjectRole(db, segundo.idProyecto, { cupos: 3 });
+    collectInto(scope, 'roleIds', [rolSegundo.idRolProyecto]);
+    const retirada = await createIntegrationParticipation(
+      db,
+      exLiderRetirado.idUsuario,
+      rolSegundo.idRolProyecto,
+      { estadoParticipacion: 'RETIRADO' },
+    );
+    const sucesorSegundo = await createIntegrationParticipation(db, b, rolSegundo.idRolProyecto, {
+      estadoParticipacion: 'ACTIVO',
+    });
+    collectInto(scope, 'participationIds', [retirada.idParticipacion, sucesorSegundo.idParticipacion]);
+
+    await service.transfer(segundo.idProyecto, f.admin.idUsuario, {
+      idLiderNuevo: b,
+      expectedLeaderId: exLiderRetirado.idUsuario,
+      motivo: 'El líder ya se había retirado de su rol.',
+    });
+    // Su participación retirada sigue exactamente como estaba.
+    expect(
+      await db.participacionProyecto.findUniqueOrThrow({
+        where: { idParticipacion: retirada.idParticipacion },
+      }),
+    ).toEqual(retirada);
+
+    const decision = await readPolicy.assertRead(undefined, {
+      projectId: segundo.idProyecto,
+      actorId: exLiderRetirado.idUsuario,
+      scope: 'tareas',
+    });
+    expect(decision.profile).toBe('PARTICIPANTE_HISTORICO');
+    expect(decision.ownOnly).toBe(true);
+    expect(decision.sprintEstados).toEqual(['CERRADO']);
+    // Y nada más que eso.
+    for (const scopeProhibido of ['liderazgo', 'documentos', 'bitacora'] as const) {
+      await expectStatus(403, () =>
+        readPolicy.assertRead(undefined, {
+          projectId: segundo.idProyecto,
+          actorId: exLiderRetirado.idUsuario,
+          scope: scopeProhibido,
+        }),
+      );
+    }
+
+    // No existe rol, estado ni operación de exlíder en ninguna parte.
+    expect(Object.values(EstadoParticipacion)).toEqual(['ACTIVO', 'RETIRADO', 'COMPLETADO']);
+    const operaciones = Object.getOwnPropertyNames(Object.getPrototypeOf(service));
+    expect(operaciones.some((nombre) => /expuls|expel|exlider/i.test(nombre))).toBe(false);
   });
 });
