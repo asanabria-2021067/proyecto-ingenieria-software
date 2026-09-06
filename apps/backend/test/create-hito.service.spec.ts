@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ProjectsService } from '../src/projects/projects.service';
 import { CreateHitoDto } from '../src/projects/dto/create-hito.dto';
+import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
 
 type HitoTxOverrides = Partial<{
   findFirst: ReturnType<typeof vi.fn>;
@@ -28,10 +29,14 @@ function makePrisma(tx = makeTx()) {
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
+  // C031: el runner entrega como `tx` el doble de hitos junto con las consultas de autorización.
+  const tx = { ...prisma.tx, proyecto: prisma.proyecto, participacionProyecto: prisma.participacionProyecto };
   return new ProjectsService(
     prisma as unknown as ConstructorParameters<typeof ProjectsService>[0],
     {} as ConstructorParameters<typeof ProjectsService>[1],
     {} as ConstructorParameters<typeof ProjectsService>[2],
+    makeProjectTransactionDouble({ tx }),
+    makeProjectPolicyDouble(),
   );
 }
 
