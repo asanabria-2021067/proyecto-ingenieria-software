@@ -146,4 +146,124 @@ describe('S7 sobreestimación (06 v2 §10)', () => {
     expect(sobreUmbral.restantes?.toFixed(2)).toBe('0.00');
     expect(sobreUmbral.sobreEstimacion?.toFixed(2)).toBe('2.00');
   });
+
+});
+
+/**
+ * C066: la tabla antes/después de §10 solo se puede probar con un total que
+ * evoluciona, así que este doble mantiene los registros en memoria y responde
+ * `aggregate` sumando los efectivos. Es un almacén mínimo, no una reimplementación
+ * de Prisma: solo las operaciones que `update` y `revoke` ejecutan.
+ */
+function setupStore(options: { estimacion: number | null; registros: Array<{ id: number; horas: string; justificacionExceso?: string }> }) {
+  const filas = options.registros.map((r) => ({
+    idRegistroTiempo: r.id,
+    idAsignacion: ASSIGNMENT_ID,
+    idUsuario: ASSIGNEE_ID,
+    horas: new Prisma.Decimal(r.horas),
+    fecha: new Date('2026-09-01T00:00:00.000Z'),
+    nota: null as string | null,
+    justificacionExceso: r.justificacionExceso ?? null,
+    editadoEn: null as Date | null,
+    revocadoEn: null as Date | null,
+    revocadoPor: null as number | null,
+    creadoEn: new Date('2026-09-01T12:00:00.000Z'),
+    usuario: { idUsuario: ASSIGNEE_ID, nombre: 'Ana', apellido: 'Lopez', fotoUrl: null },
+  }));
+  const buscar = (id: number) => filas.find((f) => f.idRegistroTiempo === id);
+  const efectivos = () => filas.filter((f) => f.revocadoEn === null);
+  const total = () => efectivos().reduce((acc, f) => acc.plus(f.horas), new Prisma.Decimal(0));
+
+  const tx = {
+    registroTiempoTarea: {
+      findFirst: vi.fn(async ({ where }: { where: { idRegistroTiempo: number } }) => buscar(where.idRegistroTiempo) ?? null),
+      findUniqueOrThrow: vi.fn(async ({ where }: { where: { idRegistroTiempo: number } }) => buscar(where.idRegistroTiempo)!),
+      aggregate: vi.fn(async () => ({ _sum: { horas: total() } })),
+      update: vi.fn(async ({ where, data }: { where: { idRegistroTiempo: number }; data: Record<string, unknown> }) => {
+        const fila = buscar(where.idRegistroTiempo)!;
+        if (data.horas !== undefined) fila.horas = new Prisma.Decimal(data.horas as number);
+        if (data.fecha !== undefined) fila.fecha = data.fecha as Date;
+        if (data.nota !== undefined) fila.nota = data.nota as string | null;
+        if (data.justificacionExceso !== undefined) fila.justificacionExceso = data.justificacionExceso as string;
+        if (data.editadoEn !== undefined) fila.editadoEn = data.editadoEn as Date;
+        return fila;
+      }),
+      updateMany: vi.fn(async ({ where, data }: { where: { idRegistroTiempo: number; revocadoEn: null }; data: Record<string, unknown> }) => {
+        const fila = buscar(where.idRegistroTiempo)!;
+        if (fila.revocadoEn !== null) return { count: 0 };
+        fila.revocadoEn = data.revocadoEn as Date;
+        fila.revocadoPor = data.revocadoPor as number;
+        return { count: 1 };
+      }),
+    },
+    asignacionTarea: {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({
+        origenReporte: 'GRANULAR', horasReales: null, reconocidoEn: null, desasignadaEn: null,
+      }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+  };
+  const tasksContext = {
+    getTaskInProjectOrThrow: vi.fn().mockResolvedValue({
+      idTarea: TASK_ID, idProyecto: PROJECT_ID, idSprint: 1, tiempoEstimadoHoras: options.estimacion,
+    }),
+    assertActiveProjectParticipant: vi.fn().mockResolvedValue(undefined),
+    getProjectOrThrow: vi.fn().mockResolvedValue({ idProyecto: PROJECT_ID, creadoPor: 0 }),
+  };
+  const service = new TimeRecordsService(
+    { $transaction: vi.fn() } as unknown as PrismaService,
+    tasksContext as unknown as TasksContextService,
+    { notifyTaskHoursLogged: vi.fn().mockResolvedValue(undefined) } as unknown as NotificationsService,
+    makeProjectTransactionDouble({ tx }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
+  );
+  return { service, tx, filas, total };
+}
+
+describe('S7 sobreestimación — corrección a la baja (06 v2 §10)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('T06-B: reducir o revocar no crea una obligación nueva de justificación', async () => {
+    // Estimación 10; registros de 9 y de 3 (este último cruzó y lleva justificación).
+    const { service, filas, total } = setupStore({
+      estimacion: 10,
+      registros: [
+        { id: 1, horas: '9.00' },
+        { id: 2, horas: '3.00', justificacionExceso: 'cruce original' },
+      ],
+    });
+    expect(total().toFixed(2)).toBe('12.00');
+
+    // Editar 3 → 2 sin justificación: aceptado, total 11, justificación conservada.
+    await service.update(PROJECT_ID, TASK_ID, 2, ASSIGNEE_ID, { horas: 2 });
+    expect(total().toFixed(2)).toBe('11.00');
+    expect(filas[1].justificacionExceso).toBe('cruce original');
+    expect(computeHoursIndicators(total(), 10).sobreEstimacion?.toFixed(2)).toBe('1.00');
+
+    // Revocar el registro de 2 sin justificación: aceptado, total 9.
+    await service.revoke(PROJECT_ID, TASK_ID, 2, ASSIGNEE_ID);
+    expect(total().toFixed(2)).toBe('9.00');
+    expect(filas[1].revocadoEn).not.toBeNull();
+    // La revocación conserva el importe y la justificación como evidencia.
+    expect(filas[1].horas.toFixed(2)).toBe('2.00');
+    expect(filas[1].justificacionExceso).toBe('cruce original');
+    const bajoUmbral = computeHoursIndicators(total(), 10);
+    expect(bajoUmbral.restantes?.toFixed(2)).toBe('1.00');
+    expect(bajoUmbral.sobreEstimacion?.toFixed(2)).toBe('0.00');
+
+    // Editar 9 → 11 SÍ cruza (antes 9 ≤ 10, después 11 > 10) y exige texto.
+    await expect(
+      service.update(PROJECT_ID, TASK_ID, 1, ASSIGNEE_ID, { horas: 11 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(total().toFixed(2)).toBe('9.00');
+
+    // Con justificación válida se acepta y los indicadores se recalculan.
+    await service.update(PROJECT_ID, TASK_ID, 1, ASSIGNEE_ID, { horas: 11, justificacionExceso: 'alcance ampliado' });
+    expect(total().toFixed(2)).toBe('11.00');
+    expect(filas[0].justificacionExceso).toBe('alcance ampliado');
+    expect(computeHoursIndicators(total(), 10).sobreEstimacion?.toFixed(2)).toBe('1.00');
+  });
 });
