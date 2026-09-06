@@ -6,6 +6,8 @@ import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble } from './helpers/project-policy.double';
 
 /**
  * Integración de las tres capas reales (TasksService + TasksAuthorizationService
@@ -98,7 +100,8 @@ function makeStack(prisma: ReturnType<typeof makeIsolatedPrisma>) {
     {} as unknown as TasksRelationsService,
     {} as unknown as NotificationsService,
     context,
-  );
+    new ProjectTransactionService(prisma as unknown as PrismaService),
+    makeProjectPolicyDouble());
   return service;
 }
 

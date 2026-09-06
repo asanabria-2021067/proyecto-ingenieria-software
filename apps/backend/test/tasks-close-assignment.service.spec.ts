@@ -6,6 +6,8 @@ import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import { TasksService } from '../src/tasks/tasks.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 const PROJECT_ID = 5;
 const TASK_ID = 42;
@@ -85,6 +87,9 @@ function makeTx() {
 type TxMock = ReturnType<typeof makeTx>;
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   return {
     tx,
     $transaction: vi.fn(async (callback: (tx: TxMock) => Promise<unknown>) => callback(tx)),
@@ -111,7 +116,8 @@ function makeService(options: { prisma?: ReturnType<typeof makePrisma>; context?
     {} as unknown as TasksRelationsService,
     {} as unknown as NotificationsService,
     context as unknown as TasksContextService,
-  );
+    new ProjectTransactionService(prisma as unknown as PrismaService),
+    makeProjectPolicyDouble());
   return { context, prisma, service, tx: prisma.tx };
 }
 

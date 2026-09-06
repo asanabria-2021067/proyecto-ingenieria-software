@@ -24,9 +24,11 @@ import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 
 /**
- * C028: metadata explícita que reproduce el comportamiento vigente del guard
- * (P/E + Sprint ambiente ACTIVO, proyecto en `params.projectId`). La policy
- * definitiva por familia (§32) se declara en los commits de adaptación.
+ * C040 (06 v2 §32/§41 E046–E052): metadata definitiva por familia en los
+ * siete handlers de escritura. El proyecto se resuelve desde
+ * `params.projectId`; toda escritura de tarea exige P/E con Sprint ambiente
+ * ACTIVO, y el servicio exige además, tras el lock, que la tarea afectada
+ * pertenezca a un Sprint ACTIVO (todas las operaciones menos crear).
  */
 const TASK_WRITE: ProjectWriteMetadata = {
   source: { kind: 'param', name: 'projectId' },

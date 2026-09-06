@@ -7,6 +7,8 @@ import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization
 import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import { TasksService } from '../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * Tarea 34: integra las mutaciones de gestión de tareas (crear, editar,
@@ -42,6 +44,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   return {
     tx,
     usuario: { findUnique: vi.fn().mockResolvedValue({ nombre: 'Actor', apellido: 'Prueba' }) },
@@ -71,7 +76,8 @@ function makeService(
     relations as TasksRelationsService,
     notifications as NotificationsService,
     context as TasksContextService,
-  );
+    new ProjectTransactionService(prisma as unknown as PrismaService),
+    makeProjectPolicyDouble());
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {

@@ -18,6 +18,9 @@ import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.s
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 
 function makeTasksService(prisma: PrismaClient): TasksService {
   const prismaService = prisma as unknown as PrismaService;
@@ -27,7 +30,8 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     {} as unknown as TasksRelationsService,
     {} as unknown as NotificationsService,
     new TasksContextService(prismaService),
-  );
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
 }
 
 function longContent(label: string): string {
@@ -78,7 +82,7 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
     const assignee = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, assignee.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, assignee.idUsuario);
@@ -135,7 +139,7 @@ describeIntegration('B3 inmutabilidad de horas e histórico multi-tramo (Postgre
     const userB = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, userA.idUsuario, userB.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const participantA = await createActiveParticipant(prisma, project.idProyecto, userA.idUsuario);

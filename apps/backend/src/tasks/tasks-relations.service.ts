@@ -35,6 +35,13 @@ export interface CreateTaskRelationsInput {
   idUsuarioAsignado?: number;
 }
 
+/**
+ * C040 (06 v2 §32/§40): la validación de relaciones (hito, rol y el conjunto
+ * completo de `idsEtiquetas`) corre con el `tx` del runner por proyecto, así
+ * que la mutación indirecta de etiquetas desde `create`/`update` queda
+ * acotada al mismo proyecto y al mismo lock que la escritura de la tarea.
+ * Este servicio nunca abre una transacción propia.
+ */
 @Injectable()
 export class TasksRelationsService {
   constructor(
