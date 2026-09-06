@@ -10,6 +10,7 @@ import { ProjectCloseReadinessService } from './project-close-readiness.service'
 import { CLOSURE_GENERATOR_VERSION } from './project-close-readiness.service';
 import { ProjectClosureReportService } from './project-closure-report.service';
 import { ProjectClosureDocumentsService } from './project-closure-documents.service';
+import { canonicalJson } from './closure-report-model';
 import type {
   ApproveClosureDto,
   ClosureResult,
@@ -165,7 +166,7 @@ export class ProjectClosureReviewService {
         fingerprintModelo: capture.fingerprintModelo,
         contextoReporte: capture.contexto as unknown as Prisma.InputJsonValue,
       });
-      return { capture, documentId: document.idDocumentoCierre, deliveryFingerprint: revision.fingerprintEntrega,
+      return { capture, document, documentId: document.idDocumentoCierre, deliveryFingerprint: revision.fingerprintEntrega,
         numeroRevision: revision.numeroRevision };
     });
     const rendered = this.report.renderOfficial(phaseOne.capture);
@@ -183,6 +184,123 @@ export class ProjectClosureReviewService {
       });
       if (recorded.count !== 1) throw new ConflictException('La reserva oficial cambió');
     });
-    throw new ConflictException('La fase final de aprobación todavía no está habilitada');
+    return this.projectTx.run(projectId, actorId, 'closure.approve.finalize', async ({ tx, project, effects }) => {
+      if (!project) throw new NotFoundException('Proyecto no encontrado');
+      await this.policy.assertWriteTx(tx, project, 'CIERRE_VEREDICTO', actorId);
+      const revision = await tx.revisionCierreProyecto.findFirst({
+        where: { idRevisionCierre: dto.revisionId, idProyecto: projectId },
+        select: { idRevisionCierre: true, numeroRevision: true, estadoRevision: true, fingerprintEntrega: true },
+      });
+      if (!revision || revision.estadoRevision !== 'ENVIADA' ||
+          revision.fingerprintEntrega !== dto.expectedFingerprint ||
+          revision.fingerprintEntrega !== phaseOne.deliveryFingerprint) {
+        throw new ConflictException('La revisión o su entrega cambiaron');
+      }
+      await this.readiness.assertReady(tx, projectId, { phase: 'APPROVE', revisionId: dto.revisionId });
+      const rebuilt = await this.report.buildOfficialModelTx(tx, {
+        projectId, revisionId: dto.revisionId, adminId: actorId, fechaAprobacion,
+      });
+      if (rebuilt.fingerprintEjecucion !== phaseOne.capture.fingerprintEjecucion ||
+          rebuilt.fingerprintModelo !== phaseOne.capture.fingerprintModelo ||
+          canonicalJson(rebuilt.contexto) !== canonicalJson(phaseOne.capture.contexto)) {
+        throw new ConflictException('El contexto oficial cambió durante la aprobación');
+      }
+      const expectedHours = phaseOne.capture.targetHours.map((row) => ({
+        idRegistroHoras: row.idRegistroHoras, idParticipacion: row.idParticipacion, horasCalculadas: row.horasCalculadas,
+      }));
+      const currentHours = await tx.horasParticipacion.findMany({
+        where: { participacion: { rolProyecto: { idProyecto: projectId } }, estadoHoras: 'PENDIENTE' },
+        orderBy: { idRegistroHoras: 'asc' },
+        select: { idRegistroHoras: true, idParticipacion: true, horasCalculadas: true, idSprint: true },
+      });
+      if (currentHours.some((row) => row.horasCalculadas === null || row.idSprint === null) ||
+          canonicalJson(currentHours.map((row) => ({ idRegistroHoras: row.idRegistroHoras,
+            idParticipacion: row.idParticipacion, horasCalculadas: row.horasCalculadas?.toFixed(2) }))) !== canonicalJson(expectedHours)) {
+        throw new ConflictException('Las horas objetivo cambiaron durante la aprobación');
+      }
+      const document = await tx.documentoCierre.findFirst({
+        where: { idDocumentoCierre: phaseOne.documentId, idProyecto: projectId, idRevisionOrigen: dto.revisionId,
+          tipoDocumento: 'INFORME_OFICIAL_FINAL', estadoDocumento: 'EN_CARGA' },
+      });
+      if (!document || document.idAutor !== actorId || document.externalId !== uploaded.identidad.publicId ||
+          document.proveedor !== uploaded.identidad.proveedor || document.resourceType !== uploaded.identidad.resourceType ||
+          document.deliveryType !== uploaded.identidad.deliveryType || document.assetId !== (uploaded.identidad.assetId ?? null) ||
+          document.versionRemota !== (uploaded.identidad.version ?? null) || Number(document.tamanoBytes) !== uploaded.tamanoBytes ||
+          Number(document.tamanoCifradoBytes) !== uploaded.tamanoCifradoBytes || document.checksumSha256 !== uploaded.checksumSha256 ||
+          document.checksumCifradoSha256 !== uploaded.checksumCifradoSha256 ||
+          canonicalJson(document.cryptoMetadata) !== canonicalJson(uploaded.metadata) ||
+          document.fingerprintEjecucion !== rebuilt.fingerprintEjecucion || document.fingerprintModelo !== rebuilt.fingerprintModelo ||
+          canonicalJson(document.contextoReporte) !== canonicalJson(rebuilt.contexto)) {
+        throw new ConflictException('El resultado del proveedor no corresponde a la reserva oficial');
+      }
+
+      let credited = 0;
+      if (expectedHours.length > 0) {
+        credited = await tx.$executeRaw(Prisma.sql`
+          UPDATE horas_participacion
+          SET horas_aprobadas = horas_calculadas,
+              estado_horas = 'APROBADA',
+              aprobado_por = ${actorId},
+              fecha_aprobacion = ${fechaAprobacion}
+          WHERE id_registro_horas IN (${Prisma.join(expectedHours.map((row) => row.idRegistroHoras))})
+            AND estado_horas = 'PENDIENTE'
+            AND horas_calculadas IS NOT NULL
+        `);
+      }
+      if (credited !== expectedHours.length) throw new ConflictException('La acreditación no alcanzó el conteo exacto');
+
+      const participations = await tx.participacionProyecto.findMany({
+        where: { rolProyecto: { idProyecto: projectId } },
+        orderBy: { idParticipacion: 'asc' }, select: { idParticipacion: true, idUsuario: true, estadoParticipacion: true },
+      });
+      const activeIds = participations.filter((row) => row.estadoParticipacion === 'ACTIVO').map((row) => row.idParticipacion);
+      const completed = activeIds.length === 0 ? { count: 0 } : await tx.participacionProyecto.updateMany({
+        where: { idParticipacion: { in: activeIds }, estadoParticipacion: 'ACTIVO' }, data: { estadoParticipacion: 'COMPLETADO' },
+      });
+      if (completed.count !== activeIds.length) throw new ConflictException('La compleción no alcanzó el conteo exacto');
+
+      const available = await tx.documentoCierre.updateMany({
+        where: { idDocumentoCierre: phaseOne.documentId, estadoDocumento: 'EN_CARGA' },
+        data: { estadoDocumento: 'DISPONIBLE', disponibleEn: fechaAprobacion },
+      });
+      const approved = await tx.revisionCierreProyecto.updateMany({
+        where: { idRevisionCierre: dto.revisionId, idProyecto: projectId, estadoRevision: 'ENVIADA', fingerprintEntrega: dto.expectedFingerprint },
+        data: { estadoRevision: 'APROBADA', idRevisor: actorId, resueltaEn: fechaAprobacion,
+          comentarioRevisor: dto.comentario?.trim() || null, idDocumentoOficial: phaseOne.documentId },
+      });
+      const closed = await tx.proyecto.updateMany({
+        where: { idProyecto: projectId, estadoProyecto: 'EN_SOLICITUD_CIERRE', eliminadoEn: null },
+        data: { estadoProyecto: 'CERRADO' },
+      });
+      if (available.count !== 1 || approved.count !== 1 || closed.count !== 1) {
+        throw new ConflictException('La finalización atómica no alcanzó el conteo exacto');
+      }
+
+      await this.audit.registrarEvento({ tx, tipoEvento: TipoEventoBitacora.PROJECT_CLOSE_REVIEW_APPROVED,
+        idActor: actorId, idProyecto: projectId, tipoEntidad: 'REVISION_CIERRE', idEntidad: dto.revisionId,
+        valorAnterior: { estadoRevision: 'ENVIADA' }, valorNuevo: { estadoRevision: 'APROBADA',
+          documentoOficialId: phaseOne.documentId, fechaAprobacion, fingerprintModelo: rebuilt.fingerprintModelo } });
+      await this.audit.registrarEvento({ tx, tipoEvento: TipoEventoBitacora.PROJECT_HOURS_CREDITED,
+        idActor: actorId, idProyecto: projectId, tipoEntidad: 'PROYECTO', idEntidad: projectId,
+        valorAnterior: null, valorNuevo: { ids: expectedHours.map((row) => row.idRegistroHoras), cantidad: credited, fechaAprobacion } });
+      const { tituloProyecto: projectTitle } = await tx.proyecto.findUniqueOrThrow({ where: { idProyecto: projectId } });
+      const historicalUsers = [...new Set([project.creadoPor, ...participations.map((row) => row.idUsuario)])];
+      await this.notifications.persistTemplateTx(tx, historicalUsers, 'CIERRE_APROBADO', { projectId, projectTitle }, effects);
+      for (const userId of [...new Set(participations.map((row) => row.idUsuario))]) {
+        const participationIds = new Set(participations.filter((row) => row.idUsuario === userId).map((row) => row.idParticipacion));
+        const total = expectedHours.filter((row) => participationIds.has(row.idParticipacion))
+          .reduce((sum, row) => sum.plus(row.horasCalculadas), new Prisma.Decimal(0));
+        await this.notifications.persistTemplateTx(tx, [userId], 'HORAS_ACREDITADAS', {
+          projectId, projectTitle, horasAcreditadas: total.toFixed(2),
+        }, effects);
+      }
+      await this.notifications.deferClosureEventsTx(tx, effects, projectId, project.creadoPor, dto.revisionId, 'CERRADO');
+      await this.beforeApprovalPhaseTwoCommit();
+      return { projectId, estadoProyecto: 'CERRADO', revisionId: dto.revisionId,
+        numeroRevision: revision.numeroRevision, fingerprintEntrega: revision.fingerprintEntrega,
+        informeOficialId: phaseOne.documentId, cantidades: { horasAcreditadas: credited, participacionesCompletadas: completed.count } };
+    }, { publish: (effects) => this.notifications.publishEffects(effects) });
   }
+
+  protected async beforeApprovalPhaseTwoCommit(): Promise<void> {}
 }
