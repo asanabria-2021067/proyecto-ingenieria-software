@@ -58,7 +58,11 @@ function makeForeignKeyError() {
 function makeTx() {
   return {
     sprint: { findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
-    tarea: { count: vi.fn() },
+    tarea: { count: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    // C075 (§12): finalizar revalida F1–F4 sobre el conjunto histórico, así
+    // que el doble expone las consultas de tramos que esas revalidaciones
+    // hacen. Por defecto todo vacío = los cuatro predicados se cumplen.
+    asignacionTarea: { findMany: vi.fn().mockResolvedValue([]) },
     horasParticipacion: { findFirst: vi.fn(), update: vi.fn() },
   };
 }
@@ -380,6 +384,11 @@ describe('SprintsService', () => {
   });
 
   describe('finalizeSprint', () => {
+    /** Tarea HECHO con traza: el estado por sí solo no satisface F1. */
+    function tareaHecha(idTarea: number, overrides: Record<string, unknown> = {}) {
+      return { idTarea, estadoTarea: 'HECHO', _count: { asignaciones: 1 }, ...overrides };
+    }
+
     function sprintActivo(overrides: Record<string, unknown> = {}) {
       return {
         idSprint: SPRINT_ID,
@@ -396,7 +405,7 @@ describe('SprintsService', () => {
       const sprint = sprintActivo();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 1 });
       const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
       tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
@@ -425,7 +434,7 @@ describe('SprintsService', () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.count.mockResolvedValue(1); // una tarea EN_PROGRESO cuenta como no-HECHO
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { estadoTarea: 'EN_PROGRESO' })]);
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
@@ -443,7 +452,7 @@ describe('SprintsService', () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.count.mockResolvedValue(1);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { estadoTarea: 'POR_HACER' })]);
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
@@ -452,14 +461,13 @@ describe('SprintsService', () => {
       await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
       );
-      expect(tx.tarea.count).toHaveBeenCalledWith({
-        where: {
-          idProyecto: PROJECT_ID,
-          idSprint: SPRINT_ID,
-          eliminadoEn: null,
-          estadoTarea: { not: 'HECHO' },
-        },
-      });
+      // F1 sigue mirando solo el conjunto vigente: una tarea eliminada no
+      // cuenta como pendiente (a diferencia de F2, que sí la incluye).
+      expect(tx.tarea.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { idProyecto: PROJECT_ID, idSprint: SPRINT_ID, eliminadoEn: null },
+        }),
+      );
     });
 
     it('caso 4: Sprint EN_FINALIZACION rechaza sin notificar', async () => {
@@ -476,7 +484,7 @@ describe('SprintsService', () => {
       await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
       );
-      expect(tx.tarea.count).not.toHaveBeenCalled();
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
       expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
     });
 
@@ -527,7 +535,7 @@ describe('SprintsService', () => {
       await expect(
         service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID),
       ).rejects.toBeInstanceOf(NotFoundException);
-      expect(tx.tarea.count).not.toHaveBeenCalled();
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
       expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
     });
 
@@ -536,7 +544,7 @@ describe('SprintsService', () => {
       const sprint = sprintActivo();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 1 });
       const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
       tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
@@ -555,7 +563,7 @@ describe('SprintsService', () => {
       const sprint = sprintActivo();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 1 });
       const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
       tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
@@ -592,7 +600,7 @@ describe('SprintsService', () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 1 });
       // Simula un fallo dentro de la transacción DESPUÉS del updateMany (p.
       // ej. la relectura final falla) — el callback de $transaction
@@ -617,7 +625,7 @@ describe('SprintsService', () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 0 }); // otra transacción ya ganó la carrera
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
@@ -1206,9 +1214,10 @@ describe('SprintsService', () => {
 
       expect(tx.horasParticipacion.findFirst).not.toHaveBeenCalled();
       expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-      // makeTx() tampoco expone asignacionTarea: si closeSprint intentara
-      // tocarla, la llamada fallaría con TypeError antes de llegar aquí.
-      expect((tx as unknown as Record<string, unknown>).asignacionTarea).toBeUndefined();
+      // C075: `asignacionTarea` ya existe en el doble porque finalizar la
+      // consulta para F2–F4. Lo que este caso fija es que CERRAR, en este
+      // punto del plan, todavía no la toca.
+      expect(tx.asignacionTarea.findMany).not.toHaveBeenCalled();
     });
 
     it('terminalidad: una segunda llamada a closeSprint sobre un Sprint ya CERRADO se rechaza (mismo caso 3, verificado explícitamente como "terminal")', async () => {
