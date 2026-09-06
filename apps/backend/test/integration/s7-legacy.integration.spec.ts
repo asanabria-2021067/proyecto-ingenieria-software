@@ -77,6 +77,17 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
     memberId: 0,
   };
 
+  // T24-B: tramo LEGACY con importe histórico y sin registros.
+  const legacyCase = {
+    projectId: 0,
+    sprintId: 0,
+    taskId: 0,
+    legacyAssignmentId: 0,
+    participationId: 0,
+    leaderId: 0,
+    memberId: 0,
+  };
+
   // T22-A: caso inequívoco — FK ausente pero demostrable, no consumido y sin
   // agregado previo (fila 2 de la tabla de 06 v2 §14).
   const unequivocal = {
@@ -671,6 +682,68 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
       });
     }
 
+    // ────────────────────────────────────────────────────────────────────────
+    // T24-B: tramo LEGACY de 9.00 sin registros, abierto.
+    // ────────────────────────────────────────────────────────────────────────
+    const legacyLeader = await createIntegrationUser(prisma);
+    const legacyMember = await createIntegrationUser(prisma);
+    scope.userIds.push(legacyLeader.idUsuario, legacyMember.idUsuario);
+    legacyCase.leaderId = legacyLeader.idUsuario;
+    legacyCase.memberId = legacyMember.idUsuario;
+
+    const legacyProject = await createIntegrationProject(prisma, legacyLeader.idUsuario, {
+      estadoProyecto: 'EN_PROGRESO',
+    });
+    legacyCase.projectId = legacyProject.idProyecto;
+    scope.projectIds.push(legacyProject.idProyecto);
+    const legacyRole = await createIntegrationProjectRole(prisma, legacyProject.idProyecto, {
+      cupos: 3,
+    });
+    scope.roleIds.push(legacyRole.idRolProyecto);
+    const legacyParticipation = await createIntegrationParticipation(
+      prisma,
+      legacyMember.idUsuario,
+      legacyRole.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    scope.participationIds.push(legacyParticipation.idParticipacion);
+    legacyCase.participationId = legacyParticipation.idParticipacion;
+
+    const legacySprint = await createIntegrationSprint(prisma, legacyProject.idProyecto, {
+      numero: 1,
+      estado: 'ACTIVO',
+    });
+    legacyCase.sprintId = legacySprint.idSprint;
+    scope.sprintIds.push(legacySprint.idSprint);
+    const legacyTask = await createIntegrationTask(
+      prisma,
+      legacyProject.idProyecto,
+      legacyLeader.idUsuario,
+      legacySprint.idSprint,
+      { estadoTarea: 'HECHO', idRolProyecto: legacyRole.idRolProyecto },
+    );
+    legacyCase.taskId = legacyTask.idTarea;
+    scope.taskIds.push(legacyTask.idTarea);
+    // Estimación deliberadamente pequeña: si el legacy contase para la
+    // sobreestimación, la dispararía. No debe hacerlo.
+    await prisma.tarea.update({
+      where: { idTarea: legacyTask.idTarea },
+      data: { tiempoEstimadoHoras: 5 },
+    });
+    const legacyAssignment = await createIntegrationTaskAssignment(
+      prisma,
+      legacyTask.idTarea,
+      legacyMember.idUsuario,
+      legacyLeader.idUsuario,
+      {
+        idParticipacion: legacyParticipation.idParticipacion,
+        horasReales: '9.00',
+        origenReporte: 'LEGACY',
+      },
+    );
+    legacyCase.legacyAssignmentId = legacyAssignment.idAsignacion;
+    scope.assignmentIds.push(legacyAssignment.idAsignacion);
+
     // ── Proyecto SANO de control: nada que conciliar.
     const controlProject = await createIntegrationProject(prisma, adminId, {
       estadoProyecto: 'EN_PROGRESO',
@@ -1194,5 +1267,108 @@ describeIntegration('S7 conciliación legacy (T23)', () => {
     //    afectado por la disputa de otro proyecto.
     const sano = await readiness.evaluate(undefined, healthyProjectId, { phase: 'REQUEST' });
     expect(sano.blockers.map((row) => row.code)).not.toContain('LEGACY_SIN_CONCILIAR');
+  });
+  it('T24-B: un tramo LEGACY conserva su importe, rechaza nuevas entradas granulares y se reporta por separado', async () => {
+    const { service, timeRecords, runner } = flowAStack(prisma);
+
+    // ── 1. Una entrada granular sobre el tramo LEGACY se rechaza.
+    await expect(
+      timeRecords.create(legacyCase.projectId, legacyCase.taskId, legacyCase.memberId, {
+        horas: 2,
+        fecha: '2026-04-12',
+      }),
+    ).rejects.toBeDefined();
+    const sinRegistros = await prisma.registroTiempoTarea.count({
+      where: { idAsignacion: legacyCase.legacyAssignmentId },
+    });
+    expect(sinRegistros).toBe(0);
+
+    // ── 2. Al cerrar el tramo, la caché sigue en 9.00 y NO se normaliza a 0.
+    await prisma.asignacionTarea.update({
+      where: { idAsignacion: legacyCase.legacyAssignmentId },
+      data: { desasignadaEn: new Date('2026-04-20T00:00:00.000Z') },
+    });
+    await runner.run(legacyCase.projectId, legacyCase.leaderId, 'test.normalize', ({ tx }) =>
+      timeRecords.normalizeClosedGranularTx(tx, {
+        projectId: legacyCase.projectId,
+        sprintId: legacyCase.sprintId,
+      }),
+    );
+    const trasCerrar = await prisma.asignacionTarea.findUniqueOrThrow({
+      where: { idAsignacion: legacyCase.legacyAssignmentId },
+    });
+    expect(trasCerrar.horasReales?.toFixed(2)).toBe('9.00');
+    expect(trasCerrar.origenReporte).toBe('LEGACY');
+
+    // ── 3. El flujo normal abre OTRO tramo del mismo usuario y acepta 3.00.
+    const nuevoTramo = await createIntegrationTaskAssignment(
+      prisma,
+      legacyCase.taskId,
+      legacyCase.memberId,
+      legacyCase.leaderId,
+      { idParticipacion: legacyCase.participationId },
+    );
+    scope.assignmentIds.push(nuevoTramo.idAsignacion);
+    await timeRecords.create(legacyCase.projectId, legacyCase.taskId, legacyCase.memberId, {
+      horas: 3,
+      fecha: '2026-04-21',
+    });
+    const nuevoDespues = await prisma.asignacionTarea.findUniqueOrThrow({
+      where: { idAsignacion: nuevoTramo.idAsignacion },
+    });
+    expect(nuevoDespues.horasReales?.toFixed(2)).toBe('3.00');
+    expect(nuevoDespues.origenReporte).toBe('GRANULAR');
+
+    // ── 4. El resumen expone los dos importes SEPARADOS.
+    const resumen = await timeRecords.getTaskHoursSummary(
+      legacyCase.projectId,
+      legacyCase.taskId,
+      legacyCase.leaderId,
+    );
+    expect(resumen.horasReportadasTarea).toBe('3.00');
+    expect(resumen.horasLegacyNoGranulares).toBe('9.00');
+    // Estimación 5.00 contra 3.00 granulares: NO hay sobreestimación, porque
+    // el legacy no entra en la regla aunque 9 + 3 la superaría con creces.
+    expect(resumen.sobreEstimacion).toBe('0.00');
+    expect(resumen.restantes).toBe('2.00');
+
+    // ── 5. La consolidación incluye ambos importes sin confundir su origen.
+    //    El tramo granular se cierra por la vía normal antes de finalizar.
+    await prisma.asignacionTarea.update({
+      where: { idAsignacion: nuevoTramo.idAsignacion },
+      data: { desasignadaEn: new Date('2026-04-22T00:00:00.000Z') },
+    });
+    await service.finalizeSprint(legacyCase.projectId, legacyCase.sprintId, legacyCase.leaderId);
+    const cierre = await service.getSprintClosingSummary(
+      legacyCase.projectId,
+      legacyCase.sprintId,
+      legacyCase.leaderId,
+    );
+    const miembro = cierre.participantes.find((row) => row.idUsuario === legacyCase.memberId);
+    expect(miembro).toBeDefined();
+    const totales = miembro?.totales;
+    expect(totales).toBeDefined();
+    expect(totales?.reportadas).toBe('3.00');
+    expect(totales?.legacy).toBe('9.00');
+    // La propuesta suma ambos, pero cada tramo conserva su procedencia.
+    expect(totales?.propuestas).toBe('12.00');
+    const origenes = (totales?.tramos ?? []).map((tramo) => tramo.origen).sort();
+    expect(origenes).toEqual(['GRANULAR', 'LEGACY']);
+
+    // ── 6. La CLI no fabrica registros para convertir el tramo LEGACY.
+    const antesDiagnose = await prisma.registroTiempoTarea.count({
+      where: { idAsignacion: legacyCase.legacyAssignmentId },
+    });
+    const report = await diagnose(prisma, { projectId: legacyCase.projectId });
+    const clasificado = report.clasificacion.find(
+      (row) => row.idAsignacion === legacyCase.legacyAssignmentId,
+    );
+    expect(clasificado?.origenSugerido).toBe('LEGACY');
+    expect(clasificado?.motivo).toBe('SIN_REGISTROS_CACHE_NO_NULA');
+    const despuesDiagnose = await prisma.registroTiempoTarea.count({
+      where: { idAsignacion: legacyCase.legacyAssignmentId },
+    });
+    expect(despuesDiagnose).toBe(antesDiagnose);
+    expect(despuesDiagnose).toBe(0);
   });
 });
