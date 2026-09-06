@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import type { ConfigModuleOptions } from '@nestjs/config';
+import { validateEnvironment } from './environment.validation';
 
 /**
  * Foundation única de environment (06 v2 §51.1). La fuente local autoritativa
@@ -29,7 +30,7 @@ export function shouldIgnoreEnvFile(nodeEnv: string | undefined): boolean {
 export type EnvironmentValidator = NonNullable<ConfigModuleOptions['validate']>;
 
 export interface BuildEnvOptionsInput {
-  /** Validador central de entorno; se enlaza por defecto en la foundation. */
+  /** Validador central de entorno; por defecto `validateEnvironment`. */
   validate?: EnvironmentValidator;
   /** Solo para pruebas: archivo de fixture en lugar de BACKEND_ENV_PATH. */
   envFilePath?: string;
@@ -44,6 +45,6 @@ export function buildEnvOptions(input: BuildEnvOptionsInput = {}): ConfigModuleO
     isGlobal: true,
     envFilePath: input.envFilePath ?? BACKEND_ENV_PATH,
     ignoreEnvFile: shouldIgnoreEnvFile(nodeEnv),
-    ...(input.validate !== undefined ? { validate: input.validate } : {}),
+    validate: input.validate ?? validateEnvironment,
   };
 }
