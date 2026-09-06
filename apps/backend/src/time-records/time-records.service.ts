@@ -4,11 +4,21 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksContextService } from '../tasks/tasks-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { CreateTimeRecordDto } from './dto/create-time-record.dto';
 
 const TIME_RECORD_SELECT = {
@@ -98,7 +108,21 @@ export class TimeRecordsService {
     private readonly prisma: PrismaService,
     private readonly tasksContext: TasksContextService,
     private readonly notifications: NotificationsService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
+    // Opcional por el mismo motivo que en Tasks/Sprints: las suites existentes
+    // construyen el servicio con argumentos posicionales; en producción
+    // TimeRecordsModule siempre lo provee vía BitacoraModule.
+    private readonly bitacoraEventos?: BitacoraEventosService,
   ) {}
+
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
 
   async create(
     projectId: number,
@@ -106,8 +130,12 @@ export class TimeRecordsService {
     userId: number,
     dto: CreateTimeRecordDto,
   ): Promise<RegistroTiempoTareaPublico> {
-    const registro = await this.prisma.$transaction(async (tx) => {
-      await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
+    const registro = await this.projectTx.run(projectId, userId, 'time-records.create', async (ctx) => {
+      const { tx } = ctx;
+      // C049 (§9): las precondiciones y la suma efectiva ocurren DESPUÉS del
+      // lock del proyecto, así que dos registros concurrentes ven un orden
+      // completo en vez de competir por la misma caché del tramo.
+      const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
 
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
       if (!asignacionActiva) {
@@ -120,6 +148,9 @@ export class TimeRecordsService {
       }
 
       await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'REGISTRO_TIEMPO', userId, {
+        sprintId: tarea?.idSprint ?? null,
+      });
 
       const nuevoRegistro = await tx.registroTiempoTarea.create({
         data: {
@@ -148,6 +179,23 @@ export class TimeRecordsService {
         );
       }
 
+      // C049: el evento se persiste en la MISMA transacción que el registro;
+      // si algo posterior falla, no queda un evento huérfano.
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_HOURS_LOGGED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: tarea?.idSprint ?? null,
+        tipoEntidad: 'TAREA',
+        idEntidad: taskId,
+        valorNuevo: {
+          idAsignacion: asignacionActiva.idAsignacion,
+          idRegistroTiempo: nuevoRegistro.idRegistroTiempo,
+          horas: dto.horas,
+        },
+      });
+
       return mapRegistroTiempo(nuevoRegistro);
     });
 
@@ -162,6 +210,14 @@ export class TimeRecordsService {
     userId: number,
   ): Promise<RegistroTiempoTareaPublico[]> {
     const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId);
+    // C049 (§34/§41 E055): la política decide el acceso; el filtro por autor
+    // que ya distingue líder de integrante se conserva tal cual.
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'horas',
+      entitySprintId: tarea.idSprint,
+    });
     await this.tasksContext.assertActiveProjectParticipant(projectId, userId);
 
     const proyecto = await this.tasksContext.getProjectOrThrow(projectId);

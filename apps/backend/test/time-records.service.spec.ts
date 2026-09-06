@@ -5,6 +5,11 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { TimeRecordsService } from '../src/time-records/time-records.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 const PROJECT_ID = 10;
 const TASK_ID = 20;
@@ -66,6 +71,9 @@ function setup(txOverrides: Record<string, unknown> = {}) {
     prisma as unknown as PrismaService,
     tasksContext as unknown as TasksContextService,
     notifications as unknown as NotificationsService,
+    makeProjectTransactionDouble({ tx }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 
   return { prisma, tasksContext, notifications, tx, service };
