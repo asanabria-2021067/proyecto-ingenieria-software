@@ -1,12 +1,10 @@
 import {
-  Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -15,7 +13,6 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { SprintsService } from './sprints.service';
-import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): ciclo de vida del Sprint. El proyecto se
@@ -81,24 +78,6 @@ export class SprintsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.sprintsService.closeSprint(projectId, sprintId, user.userId);
-  }
-
-  @Patch(':sprintId/horas/:participacionId')
-  @HttpCode(HttpStatus.OK)
-  adjustHours(
-    @Param('projectId', ParseIntPipe) projectId: number,
-    @Param('sprintId', ParseIntPipe) sprintId: number,
-    @Param('participacionId', ParseIntPipe) participacionId: number,
-    @Body() dto: AdjustRecognizedHoursDto,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.sprintsService.adjustRecognizedHours(
-      projectId,
-      sprintId,
-      participacionId,
-      user.userId,
-      dto,
-    );
   }
 
   /** E066: resumen de cierre (líder actual mientras el Sprint no esté cerrado). */
