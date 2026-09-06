@@ -13,8 +13,13 @@ import {
   createIntegrationParticipation,
   createIntegrationProject,
   createIntegrationProjectRole,
+  createIntegrationSprint,
+  createIntegrationTask,
+  createIntegrationTaskAssignment,
   createIntegrationUser,
 } from './setup/fixtures';
+import { tasksStack } from './setup/tasks-stack';
+import { exitStack } from './setup/exit-flow';
 import {
   ADVERTENCIA_ADMIN_SIN_PARTICIPACION,
   ADVERTENCIA_APELACION_SIN_PARTICIPACION,
@@ -919,5 +924,132 @@ describeIntegration('S7 liderazgo y Q1', () => {
     expect(
       await db.historialLiderazgo.count({ where: { idProyecto: f.project.idProyecto } }),
     ).toBe(1);
+  });
+
+  it('T17: el exlíder con participación conserva sus filas, sus permisos de rol y su salida normal', async () => {
+    const f = await leadershipFixture(db, scope);
+    const { service } = leadershipStack(db);
+    const { tasks, timeRecords } = tasksStack(db);
+    const { service: exits } = exitStack(db);
+    // A lidera el gemelo con DOS participaciones activas.
+    const a = f.leaderConParticipacion.idUsuario;
+
+    const sucesor = await createIntegrationUser(db);
+    collectInto(scope, 'userIds', [sucesor.idUsuario]);
+    const participacionSucesor = await createIntegrationParticipation(
+      db,
+      sucesor.idUsuario,
+      f.twinRoleA.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    collectInto(scope, 'participationIds', [participacionSucesor.idParticipacion]);
+
+    const sprint = await createIntegrationSprint(db, f.twin.idProyecto, { estado: 'ACTIVO' });
+    collectInto(scope, 'sprintIds', [sprint.idSprint]);
+    const participacionesDeA = await db.participacionProyecto.findMany({
+      where: {
+        idUsuario: a,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto: f.twin.idProyecto },
+      },
+      orderBy: { idRolProyecto: 'asc' },
+    });
+    expect(participacionesDeA).toHaveLength(2);
+
+    const tareas = [];
+    for (const participacion of participacionesDeA) {
+      const tarea = await createIntegrationTask(db, f.twin.idProyecto, a, sprint.idSprint, {
+        idRolProyecto: participacion.idRolProyecto,
+      });
+      collectInto(scope, 'taskIds', [tarea.idTarea]);
+      const asignacion = await createIntegrationTaskAssignment(db, tarea.idTarea, a, a, {
+        idParticipacion: participacion.idParticipacion,
+      });
+      collectInto(scope, 'assignmentIds', [asignacion.idAsignacion]);
+      tareas.push({ tarea, asignacion });
+    }
+    await timeRecords.create(f.twin.idProyecto, tareas[0].tarea.idTarea, a, {
+      horas: 3,
+      fecha: '2026-09-05',
+      nota: 'Trabajo previo al cambio de liderazgo',
+    });
+
+    // Foto exacta de todo lo que A tiene antes de perder el liderazgo.
+    const filasDeA = async () => ({
+      participaciones: await db.participacionProyecto.findMany({
+        where: { idUsuario: a, rolProyecto: { idProyecto: f.twin.idProyecto } },
+        orderBy: { idParticipacion: 'asc' },
+      }),
+      asignaciones: await db.asignacionTarea.findMany({
+        where: { idUsuario: a, tarea: { idProyecto: f.twin.idProyecto } },
+        orderBy: { idAsignacion: 'asc' },
+      }),
+      registros: await db.registroTiempoTarea.findMany({
+        where: { idUsuario: a, asignacion: { tarea: { idProyecto: f.twin.idProyecto } } },
+        orderBy: { idRegistroTiempo: 'asc' },
+      }),
+    });
+    const antes = await filasDeA();
+
+    const resultado = await service.transfer(f.twin.idProyecto, f.admin.idUsuario, {
+      idLiderNuevo: sucesor.idUsuario,
+      expectedLeaderId: a,
+      motivo: 'Cambio de conducción acordado con el equipo.',
+    });
+    expect(resultado.salienteTieneParticipacionActiva).toBe(true);
+    expect(resultado.efectoSaliente).toBe('INTEGRANTE_NORMAL');
+    expect(
+      (await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.twin.idProyecto } })).creadoPor,
+    ).toBe(sucesor.idUsuario);
+
+    // Ni una fila de A cambió: la transferencia no toca la membresía.
+    expect(await filasDeA()).toEqual(antes);
+
+    // Sigue siendo un integrante ordinario: reporta horas y cierra su tramo.
+    const registro = await timeRecords.create(f.twin.idProyecto, tareas[1].tarea.idTarea, a, {
+      horas: 2,
+      fecha: '2026-09-06',
+      nota: 'Trabajo posterior al cambio de liderazgo',
+    });
+    expect(Number(registro.horas)).toBe(2);
+    await tasks.closeAssignment(
+      f.twin.idProyecto,
+      tareas[1].tarea.idTarea,
+      tareas[1].asignacion.idAsignacion,
+      a,
+      {
+        contenidoAvance:
+          'Cierre del tramo con el detalle completo del trabajo realizado durante el Sprint, incluyendo el alcance cubierto, las decisiones tomadas, los pendientes que quedan para el siguiente ciclo y la evidencia asociada al avance reportado por el integrante.',
+      },
+    );
+    const cerrado = await db.asignacionTarea.findUniqueOrThrow({
+      where: { idAsignacion: tareas[1].asignacion.idAsignacion },
+    });
+    expect(cerrado.desasignadaEn).not.toBeNull();
+
+    // La salida ordinaria le queda disponible ahora que no lidera.
+    const salida = await exits.createSolicitudSalida(
+      f.twin.idProyecto,
+      a,
+      'Dejo el proyecto tras entregar el liderazgo.',
+    );
+    collectInto(scope, 'exitRequestIds', [salida.idSolicitud]);
+    expect(salida.estadoSolicitud).toBe('PREPARACION');
+
+    // No conserva ningún permiso de líder: no puede transferir el liderazgo.
+    await expectStatus(403, () =>
+      service.transfer(f.twin.idProyecto, a, {
+        idLiderNuevo: f.leaderSinParticipacion.idUsuario,
+        expectedLeaderId: sucesor.idUsuario,
+        motivo: 'Intento de un exlíder que ya no manda.',
+      }),
+    );
+    await expectStatus(403, () =>
+      service.createAppeal(f.twin.idProyecto, a, {
+        asunto: 'Intento de apelación de un exlíder',
+        mensaje: 'Ya no es el líder actual del proyecto.',
+        idCandidatoPropuesto: f.leaderSinParticipacion.idUsuario,
+      }),
+    );
   });
 });
