@@ -8,10 +8,20 @@ import { ValidationPipe } from '@nestjs/common';
 import { AdminProjectsQueryDto } from '../../src/project-closure/dto/admin-projects-query.dto';
 import { createIntegrationAdmin } from './setup/leadership';
 import {
+  createIntegrationParticipation,
   createIntegrationProject,
+  createIntegrationProjectRole,
   createIntegrationSprint,
   createIntegrationUser,
 } from './setup/fixtures';
+import { ProjectsService } from '../../src/projects/projects.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
+import type { PrismaService } from '../../src/prisma/prisma.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
+import type { ProjectWriteFamily } from '../../src/common/guards/project-write.metadata';
 
 /** Mismo pipe que main.ts: la paginación inválida la rechaza el borde. */
 const pipe = new ValidationPipe({
@@ -298,5 +308,105 @@ describeIntegration('S7 lectura histórica de proyectos', () => {
     const consultaActivos = await parseAdminQuery({ grupo: 'activos' });
     await expectStatus(403, () => service.adminList(exLider.idUsuario, consultaActivos));
     await expectStatus(403, () => service.adminDetail(exLider.idUsuario, vivo.idProyecto));
+  });
+
+  it('T35-C: el externo no accede al histórico, el GET público no cubre CERRADO y ninguna escritura funciona en S o C', async () => {
+    const f = await closedProjectFixture(db, scope);
+    const { service, readPolicy } = historicalStack(db);
+    const prisma = db as unknown as PrismaService;
+
+    const publicado = await createIntegrationProject(db, f.leader.idUsuario, {
+      estadoProyecto: 'PUBLICADO',
+    });
+    const enCierre = await createIntegrationProject(db, f.leader.idUsuario, {
+      estadoProyecto: 'EN_SOLICITUD_CIERRE',
+    });
+    scope.projectIds = [...(scope.projectIds ?? []), publicado.idProyecto, enCierre.idProyecto];
+    const rolCierre = await createIntegrationProjectRole(db, enCierre.idProyecto, { cupos: 3 });
+    scope.roleIds = [...(scope.roleIds ?? []), rolCierre.idRolProyecto];
+    const participante = await createIntegrationUser(db);
+    scope.userIds = [...(scope.userIds ?? []), participante.idUsuario];
+    const participacion = await createIntegrationParticipation(
+      db,
+      participante.idUsuario,
+      rolCierre.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    scope.participationIds = [...(scope.participationIds ?? []), participacion.idParticipacion];
+
+    // El GET público responde solo para el proyecto PUBLICADO.
+    const projects = new ProjectsService(
+      prisma,
+      undefined as unknown as NotificationsService,
+      { get: async () => undefined, set: async () => undefined } as never,
+      new ProjectTransactionService(prisma),
+      new ProjectPolicyService(new ProjectIdResolverService(prisma)),
+      new ProjectReadPolicyService(prisma),
+    );
+    expect((await projects.findOne(publicado.idProyecto)).idProyecto).toBe(publicado.idProyecto);
+    // Cerrar un proyecto no lo publica: el endpoint público no se amplía.
+    await expectStatus(404, () => projects.findOne(f.project.idProyecto));
+    await expectStatus(404, () => projects.findOne(enCierre.idProyecto));
+
+    // El externo no lee ninguna superficie privada del proyecto cerrado.
+    await expectStatus(403, () =>
+      service.historicalProject(f.project.idProyecto, f.externo.idUsuario),
+    );
+    for (const scopeProhibido of ['equipo', 'documentos', 'bitacora'] as const) {
+      const respuesta = await expectStatus(403, () =>
+        readPolicy.assertRead(undefined, {
+          projectId: f.project.idProyecto,
+          actorId: f.externo.idUsuario,
+          scope: scopeProhibido,
+        }),
+      );
+      // La negativa no filtra miembros ni documentos privados.
+      const cuerpo = JSON.stringify(respuesta);
+      expect(cuerpo, scopeProhibido).not.toContain('evidencia');
+      expect(cuerpo, scopeProhibido).not.toContain(String(f.completado.idUsuario));
+    }
+
+    // Diez escrituras participantes contra S y C: todas rechazadas por el
+    // catálogo congelado, que es el único punto donde se decide.
+    const policy = new ProjectPolicyService(new ProjectIdResolverService(prisma));
+    const familias: ProjectWriteFamily[] = [
+      'TAREA_WRITE',
+      'REGISTRO_TIEMPO',
+      'COMENTARIO_TAREA',
+      'ETIQUETA_TAREA',
+      'AVANCE',
+    ];
+    const proyectosCongelados = [
+      { id: enCierre.idProyecto, estado: 'EN_SOLICITUD_CIERRE' as const },
+      { id: f.project.idProyecto, estado: 'CERRADO' as const },
+    ];
+    const tareasAntes = await db.tarea.count();
+    const registrosAntes = await db.registroTiempoTarea.count();
+    let rechazos = 0;
+
+    for (const proyecto of proyectosCongelados) {
+      for (const familia of familias) {
+        await expectStatus(409, () =>
+          db.$transaction(async (tx) =>
+            policy.assertWriteTx(
+              tx,
+              {
+                idProyecto: proyecto.id,
+                creadoPor: f.leader.idUsuario,
+                estadoProyecto: proyecto.estado,
+                eliminadoEn: null,
+              },
+              familia,
+              participante.idUsuario,
+            ),
+          ),
+        );
+        rechazos += 1;
+      }
+    }
+    expect(rechazos).toBe(10);
+    // Cero cambios: ninguna de las diez llegó a escribir.
+    expect(await db.tarea.count()).toBe(tareasAntes);
+    expect(await db.registroTiempoTarea.count()).toBe(registrosAntes);
   });
 });
