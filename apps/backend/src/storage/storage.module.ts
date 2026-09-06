@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CloudinaryClosureStorageAdapter } from './cloudinary-closure-storage.adapter';
 import { ClosureCryptoService } from './closure-crypto.service';
 import { ClosureTicketService } from './closure-ticket.service';
+import { ClosurePdfValidationService } from './closure-pdf-validation.service';
 import { CLOUDINARY_CLOSURE_PORT } from './closure-storage.port';
 
 /**
@@ -20,6 +21,7 @@ import { CLOUDINARY_CLOSURE_PORT } from './closure-storage.port';
     CloudinaryClosureStorageAdapter,
     ClosureCryptoService,
     ClosureTicketService,
+    ClosurePdfValidationService,
     { provide: CLOUDINARY_CLOSURE_PORT, useExisting: CloudinaryClosureStorageAdapter },
   ],
   exports: [
@@ -27,6 +29,7 @@ import { CLOUDINARY_CLOSURE_PORT } from './closure-storage.port';
     CloudinaryClosureStorageAdapter,
     ClosureCryptoService,
     ClosureTicketService,
+    ClosurePdfValidationService,
   ],
 })
 export class StorageModule {}
