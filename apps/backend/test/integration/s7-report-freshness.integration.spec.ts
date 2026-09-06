@@ -7,9 +7,12 @@ import {
   cleanupClosureLifecycle,
   closureLifecycleStack,
   proyectoListoParaGenerar,
+  closureReadyFixture,
 } from './setup/closure-lifecycle';
 import { pdfFixture, type ClosureCleanupScope } from './setup/closure-storage';
 import { GenerateReportDto } from '../../src/project-closure/dto/closure.dto';
+import { createIntegrationAdmin } from './setup/leadership';
+import { flowAStack } from './setup/flow-a';
 
 const pipe = new ValidationPipe({
   whitelist: true,
@@ -87,6 +90,43 @@ describeIntegration('S7 frescura del informe de cierre', () => {
     expect(refreshed.fingerprintEjecucion).not.toBe(generated.fingerprintEjecucion);
     expect((await readiness.evaluate(undefined, f.project.idProyecto, { phase: 'REQUEST', revisionId: f.revision.idRevisionCierre, expectedFingerprint: refreshed.fingerprintEjecucion })).canSubmit).toBe(true);
     expect((await db.postulacion.findUniqueOrThrow({ where: { idPostulacion: pending.idPostulacion } })).estadoPostulacion).toBe('PENDIENTE');
+  });
+
+  it('T26-A: la corrección documental crea el borrador siguiente heredando los vínculos y conserva intacta la entrega anterior', async () => {
+    const f = await closureReadyFixture(db, scope);
+    const { closure, review, documentos, gateway } = f.stack;
+    const admin = await createIntegrationAdmin(db, scope);
+    for (let n = 0; n < 2; n++) {
+      const grant = await documentos.service.reserve(f.project.idProyecto, f.leader.idUsuario, { revisionId: f.dto.revisionId, nombreArchivo: `extra-${n}.pdf` });
+      await documentos.service.uploadAndAttach(f.project.idProyecto, f.leader.idUsuario, grant.ticket, await pdfFixture());
+    }
+    await closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto);
+    const links = await db.documentoRevisionCierre.findMany({ where: { idRevisionCierre: f.dto.revisionId }, orderBy: { orden: 'asc' }, include: { documento: true } });
+    for (const comentario of [undefined, '  ']) await expectStatus(400, () => review.requestDocumentaryCorrection(f.project.idProyecto, admin.idUsuario, { revisionId: f.dto.revisionId, comentario: comentario! }));
+    await expectStatus(403, () => review.requestDocumentaryCorrection(f.project.idProyecto, f.leader.idUsuario, { revisionId: f.dto.revisionId, comentario: 'Corrija evidencia' }));
+    gateway.emitToUsers.mockClear();
+    const corrected = await review.requestDocumentaryCorrection(f.project.idProyecto, admin.idUsuario, { revisionId: f.dto.revisionId, comentario: '  Corrija evidencia  ' });
+    const draftLinks = await db.documentoRevisionCierre.findMany({ where: { idRevisionCierre: corrected.revisionId }, orderBy: { orden: 'asc' } });
+    expect(draftLinks.map(({ idDocumentoCierre, orden }) => ({ idDocumentoCierre, orden }))).toEqual(links.map(({ idDocumentoCierre, orden }) => ({ idDocumentoCierre, orden })));
+    expect(corrected).toMatchObject({ numeroRevision: 2, estadoProyecto: 'EN_SOLICITUD_CIERRE' });
+    const old = await closure.getRevision(f.project.idProyecto, admin.idUsuario, 1);
+    expect(old).toMatchObject({ estadoRevision: 'CORRECCION_DOCUMENTAL', comentarioRevisor: 'Corrija evidencia', idRevisor: admin.idUsuario, resueltaEn: expect.any(Date), informeOficial: null });
+    expect(old.documentosEnviados).toHaveLength(4);
+    expect((await closure.listRevisions(f.project.idProyecto, f.leader.idUsuario)).items).toHaveLength(2);
+    const evidence = links[1].idDocumentoCierre;
+    const read = await documentos.service.getReadUrl(f.project.idProyecto, evidence, f.leader.idUsuario);
+    const before = await documentos.service.readContent(f.project.idProyecto, evidence, f.leader.idUsuario, new URL(read.url, 'http://localhost').searchParams.get('ticket')!);
+    await documentos.service.detach(f.project.idProyecto, f.leader.idUsuario, corrected.revisionId, evidence);
+    expect(await db.documentoCierre.findUniqueOrThrow({ where: { idDocumentoCierre: evidence } })).toEqual(links[1].documento);
+    const after = await documentos.service.readContent(f.project.idProyecto, evidence, f.leader.idUsuario, new URL(read.url, 'http://localhost').searchParams.get('ticket')!);
+    expect(after.bytes).toEqual(before.bytes);
+    await expectStatus(409, () => documentos.service.detach(f.project.idProyecto, f.leader.idUsuario, f.dto.revisionId, evidence));
+    await expectStatus(409, () => documentos.service.detach(f.project.idProyecto, f.leader.idUsuario, corrected.revisionId, links[0].idDocumentoCierre));
+    expect(await closure.getRevision(f.project.idProyecto, admin.idUsuario, 1)).toEqual(old);
+    await expectStatus(409, () => flowAStack(db).service.startSprint(f.project.idProyecto, f.leader.idUsuario));
+    expect(await db.notificacion.count({ where: { idUsuario: f.leader.idUsuario, tipoNotificacion: 'CIERRE_CORRECCION_DOCUMENTAL' } })).toBe(1);
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'CLOSURE_DOCUMENT_REMOVED' } })).toBe(1);
+    expect(gateway.emitToUsers.mock.calls.map((call) => call[0])).toEqual(['CLOSURE_REVIEW_UPDATED']);
   });
 
   it('T25-A: la generación automática captura bajo lock, renderiza fuera y vincula el slot 0 tras comparar la huella', async () => {
