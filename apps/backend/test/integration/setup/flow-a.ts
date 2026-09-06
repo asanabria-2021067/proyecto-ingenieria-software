@@ -70,6 +70,7 @@ export function flowAStack(db: PrismaClient) {
     service,
     runner,
     audit,
+    notifications,
     timeRecords,
     recognition,
     notifyParticipants,
