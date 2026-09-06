@@ -6,7 +6,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -506,11 +506,19 @@ export class RolesService {
 
         // Asignaciones activas del usuario en tareas del rol abandonado (mismo
         // proyecto, no eliminadas). Solo esas se cierran, con un único timestamp.
+        // C056 (06 v2 §32): además, el tramo debe pertenecer a un Sprint ACTIVO
+        // —la exigencia de entidad de `ROL_RETIRO`—, de modo que retirarse de un
+        // rol nunca reescribe un tramo que quedó en un Sprint ya cerrado.
         const asignaciones = await tx.asignacionTarea.findMany({
           where: {
             idUsuario: userId,
             desasignadaEn: null,
-            tarea: { idProyecto: projectId, idRolProyecto: roleId, eliminadoEn: null },
+            tarea: {
+              idProyecto: projectId,
+              idRolProyecto: roleId,
+              eliminadoEn: null,
+              sprint: { estado: EstadoSprint.ACTIVO },
+            },
           },
           select: { idAsignacion: true },
         });
