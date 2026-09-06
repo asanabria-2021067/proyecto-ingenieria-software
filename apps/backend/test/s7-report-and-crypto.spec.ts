@@ -27,6 +27,7 @@ import {
   type ClosureExecutionInput,
   type ClosurePresentation,
 } from '../src/project-closure/closure-report-model';
+import { CLOSURE_GENERATOR_VERSION } from '../src/project-closure/project-close-readiness.service';
 import {
   A4_HEIGHT_PT,
   A4_WIDTH_PT,
@@ -109,7 +110,7 @@ function contextoEjecucion(
   presentacion: ClosurePresentation = presentacionBase,
 ): ClosureExecutionContext {
   return {
-    generatorVersion: 'closure-report/1.0.0',
+    generatorVersion: CLOSURE_GENERATOR_VERSION,
     projectId: 41,
     cicloRevisionOrigenId: 12,
     datosEjecucion: ejecucion,
