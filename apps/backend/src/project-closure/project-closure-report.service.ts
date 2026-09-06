@@ -121,6 +121,7 @@ export interface OfficialReportCapture {
   oficial: ClosureOfficialContext;
   fingerprintEjecucion: string;
   fingerprintModelo: string;
+  targetHours: Array<{ idRegistroHoras: number; idParticipacion: number; horasCalculadas: string }>;
 }
 
 @Injectable()
@@ -317,11 +318,12 @@ export class ProjectClosureReportService {
     const aggregates = await tx.horasParticipacion.findMany({
       where: { participacion: { rolProyecto: { idProyecto: input.projectId } } },
       orderBy: [{ idParticipacion: 'asc' }, { idRegistroHoras: 'asc' }],
-      select: { idParticipacion: true, horasCalculadas: true },
+      select: { idRegistroHoras: true, idParticipacion: true, horasCalculadas: true, estadoHoras: true, idSprint: true },
     });
     const totals = new Map<number, Prisma.Decimal>();
     for (const row of aggregates) {
       if (row.horasCalculadas === null) throw new ConflictException('Todas las horas deben estar calculadas');
+      if (row.estadoHoras === 'PENDIENTE' && row.idSprint === null) throw new ConflictException('Existen horas pendientes sin Sprint conciliado');
       totals.set(row.idParticipacion, (totals.get(row.idParticipacion) ?? new Prisma.Decimal(0)).plus(row.horasCalculadas));
     }
     const oficial: ClosureOfficialContext = {
@@ -349,6 +351,11 @@ export class ProjectClosureReportService {
       oficial,
       fingerprintEjecucion: automatic.fingerprintEjecucion,
       fingerprintModelo,
+      targetHours: aggregates.filter((row) => row.estadoHoras === 'PENDIENTE').map((row) => ({
+        idRegistroHoras: row.idRegistroHoras,
+        idParticipacion: row.idParticipacion,
+        horasCalculadas: row.horasCalculadas!.toFixed(2),
+      })),
     };
   }
 
