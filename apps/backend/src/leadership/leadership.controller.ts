@@ -76,4 +76,17 @@ export class LeadershipController {
   ) {
     return this.leadership.createAppeal(projectId, user.userId, dto);
   }
+
+  /** E098: el autor retira su propia apelación mientras siga liderando. */
+  @Post('apelaciones/:appealId/cancelar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(LEADERSHIP_WRITE)
+  cancelAppeal(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('appealId', ParseIntPipe) appealId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.leadership.cancelAppeal(projectId, appealId, user.userId);
+  }
 }

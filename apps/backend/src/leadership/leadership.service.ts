@@ -20,7 +20,7 @@ import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { CreateLeadershipAppealDto } from './dto/create-leadership-appeal.dto';
 
 /**
- * C091/C093 (06 v2 §18/§19): escrituras de liderazgo — ciclo de vida de la
+ * C091/C093/C094 (06 v2 §18/§19): escrituras de liderazgo — ciclo de vida de la
  * apelación y el motor ÚNICO de cambio de líder.
  *
  * `Proyecto.creadoPor` es la única fuente de verdad sobre quién lidera: este
@@ -192,6 +192,108 @@ export class LeadershipService {
       );
 
       return creada;
+    });
+  }
+
+  /**
+   * E098 (§19): el líder que apeló retira su propia solicitud.
+   *
+   * Cancelar exige ser el AUTOR y seguir liderando: una apelación es la
+   * petición de una autoridad concreta y, cuando esa autoridad ya cambió de
+   * manos, dejar de sostenerla no es decisión del antiguo líder ni del nuevo.
+   * El administrador tampoco cancela por aquí — resuelve denegando (E101).
+   */
+  async cancelAppeal(
+    projectId: number,
+    appealId: number,
+    actorId: number,
+  ): Promise<ApelacionPublica> {
+    return this.projectTx.run(projectId, actorId, 'leadership.cancelAppeal', async (ctx) => {
+      const { tx } = ctx;
+      const project = this.lockedProject(ctx);
+      await this.policy.assertWriteTx(tx, project, 'LIDERAZGO', actorId);
+
+      const apelacion = await this.loadAppealTx(tx, projectId, appealId);
+      if (apelacion.idLiderSolicitante !== actorId) {
+        throw new ForbiddenException('Solo el autor de la apelación puede cancelarla');
+      }
+      this.assertCurrentLeader(project, actorId);
+
+      // CK11 admite `idAdminResolutor` nulo justamente en este estado: una
+      // cancelación no la resuelve un administrador.
+      const cancelada = await this.resolveAppealTx(tx, {
+        appealId,
+        estado: EstadoApelacionLiderazgo.CANCELADA,
+        idAdminResolutor: null,
+        mensajeResolucion: null,
+      });
+
+      await this.bitacoraEventos.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.LEADERSHIP_APPEAL_CANCELLED,
+        idActor: actorId,
+        idProyecto: projectId,
+        tipoEntidad: 'APELACION_LIDERAZGO',
+        idEntidad: appealId,
+        valorAnterior: snapshotApelacion(apelacion),
+        valorNuevo: snapshotApelacion(cancelada),
+      });
+
+      return cancelada;
+    });
+  }
+
+  /** La apelación debe pertenecer al proyecto de la ruta; un cruce es 404, no 403. */
+  private async loadAppealTx(
+    tx: Prisma.TransactionClient,
+    projectId: number,
+    appealId: number,
+  ): Promise<ApelacionRow> {
+    const apelacion = await tx.apelacionLiderazgo.findFirst({
+      where: { idApelacion: appealId, idProyecto: projectId },
+      select: APELACION_SELECT,
+    });
+    if (!apelacion) {
+      throw new NotFoundException(
+        `Apelación con id ${appealId} no encontrada en el proyecto ${projectId}`,
+      );
+    }
+    return apelacion;
+  }
+
+  /**
+   * CAS `PENDIENTE → <estado terminal>`. Contar la fila actualizada es lo que
+   * convierte una repetición en 409 en vez de un segundo efecto: la segunda
+   * llamada no encuentra ya una apelación pendiente que resolver.
+   */
+  private async resolveAppealTx(
+    tx: Prisma.TransactionClient,
+    input: {
+      appealId: number;
+      estado: EstadoApelacionLiderazgo;
+      idAdminResolutor: number | null;
+      mensajeResolucion: string | null;
+    },
+  ): Promise<ApelacionRow> {
+    const actualizado = await tx.apelacionLiderazgo.updateMany({
+      where: { idApelacion: input.appealId, estadoApelacion: EstadoApelacionLiderazgo.PENDIENTE },
+      data: {
+        estadoApelacion: input.estado,
+        resueltaEn: new Date(),
+        idAdminResolutor: input.idAdminResolutor,
+        mensajeResolucion: input.mensajeResolucion,
+      },
+    });
+    if (actualizado.count !== 1) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'APELACION_NO_PENDIENTE',
+        message: 'La apelación ya no está pendiente',
+      });
+    }
+    return tx.apelacionLiderazgo.findUniqueOrThrow({
+      where: { idApelacion: input.appealId },
+      select: APELACION_SELECT,
     });
   }
 
