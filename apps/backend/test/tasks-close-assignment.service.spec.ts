@@ -1,5 +1,9 @@
 import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import type { ValidationPipe } from '@nestjs/common';
+import { TasksController } from '../src/tasks/tasks.controller';
+import { CloseAssignmentDto } from '../src/tasks/dto/close-assignment.dto';
 import { describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
@@ -17,7 +21,6 @@ const ACTOR_ID = 3;
 const OTHER_USER_ID = 4;
 const LONG_CONTENT = 'avance '.repeat(34);
 const VALID_DTO = {
-  horasReales: 2.5,
   contenidoAvance: LONG_CONTENT,
   marcarComoHecha: true,
 };
@@ -124,25 +127,12 @@ function makeService(options: { prisma?: ReturnType<typeof makePrisma>; context?
 }
 
 describe('TasksService.closeAssignment', () => {
-  it('rechaza horasReales ausentes o inválidas sin cerrar tramo, crear avance ni marcar HECHO', async () => {
-    const { service, tx } = makeService();
-
-    await expect(
-      service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, {
-        contenidoAvance: LONG_CONTENT,
-      } as never),
-    ).rejects.toBeInstanceOf(BadRequestException);
-
-    await expect(
-      service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, {
-        horasReales: -1,
-        contenidoAvance: LONG_CONTENT,
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-
-    expect(tx.asignacionTarea.updateMany).not.toHaveBeenCalled();
-    expect(tx.registroAvanceAsignacion.create).not.toHaveBeenCalled();
-    expect(tx.tarea.update).not.toHaveBeenCalled();
+  it('rechaza horasReales mediante el pipe local y acepta el cierre sin importe manual', async () => {
+    const args = Reflect.getMetadata(ROUTE_ARGS_METADATA, TasksController, 'closeAssignment') as Record<string, { pipes: ValidationPipe[] }>;
+    const pipe = args['3:4'].pipes[0];
+    const metadata = { type: 'body' as const, metatype: CloseAssignmentDto };
+    await expect(pipe.transform({ contenidoAvance: LONG_CONTENT, horasReales: 8 }, metadata)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(pipe.transform({ contenidoAvance: LONG_CONTENT }, metadata)).resolves.toMatchObject({ contenidoAvance: LONG_CONTENT.trim() });
   });
 
   it('rechaza avance ausente o menor de 200 caracteres significativos sin escritura parcial', async () => {
@@ -157,7 +147,6 @@ describe('TasksService.closeAssignment', () => {
 
     await expect(
       service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, {
-        horasReales: 1,
         contenidoAvance: contenidoCortoConEspacios,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -209,13 +198,11 @@ describe('TasksService.closeAssignment', () => {
     const { service, tx } = makeService();
 
     await service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, {
-      horasReales: 3,
       contenidoAvance: LONG_CONTENT,
       marcarComoHecha: false,
     });
 
     await service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, {
-      horasReales: 4,
       contenidoAvance: LONG_CONTENT,
     });
 
@@ -304,7 +291,6 @@ describe('TasksService.closeAssignment', () => {
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'EN_PROGRESO' }));
 
       await service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, {
-        horasReales: 3,
         contenidoAvance: LONG_CONTENT,
         marcarComoHecha: false,
       });

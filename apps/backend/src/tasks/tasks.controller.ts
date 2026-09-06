@@ -11,6 +11,7 @@ import {
   Patch,
   Post,
   UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -144,7 +145,7 @@ export class TasksController {
     @Param('taskId', ParseIntPipe) taskId: number,
     @Param() params: { assignmentId?: string },
     @CurrentUser() user: { userId: number },
-    @Body() dto: CloseAssignmentDto,
+    @Body(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true })) dto: CloseAssignmentDto,
   ) {
     const assignmentId = Number(params.assignmentId);
     if (!Number.isInteger(assignmentId)) {

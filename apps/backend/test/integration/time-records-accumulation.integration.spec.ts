@@ -230,7 +230,6 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     });
 
     await tasks.closeAssignment(project.idProyecto, task.idTarea, assignment.idAsignacion, assignee.idUsuario, {
-      horasReales: 99,
       contenidoAvance: longContent('cierre manual ignora el acumulado granular'),
       marcarComoHecha: false,
     });
@@ -284,7 +283,6 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const tramo1 = await createIntegrationTaskAssignment(prisma, task.idTarea, userA.idUsuario, leader.idUsuario);
     await timeRecords.create(project.idProyecto, task.idTarea, userA.idUsuario, { horas: 3, fecha: '2026-08-10' });
     await tasks.closeAssignment(project.idProyecto, task.idTarea, tramo1.idAsignacion, userA.idUsuario, {
-      horasReales: 3,
       contenidoAvance: longContent('tramo 1 cerrado'),
       marcarComoHecha: false,
     });

@@ -109,12 +109,10 @@ describeIntegration('B3 cierre concurrente de AsignacionTarea (PostgreSQL real)'
 
     const service = makeTasksService(prisma);
     const requestA = {
-      horasReales: 3,
       contenidoAvance: longContent('request A horas 3'),
       marcarComoHecha: false,
     };
     const requestB = {
-      horasReales: 7,
       contenidoAvance: longContent('request B horas 7'),
       marcarComoHecha: false,
     };

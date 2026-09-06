@@ -286,8 +286,9 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
     expect(bitacora.registrarEvento).not.toHaveBeenCalled();
   });
 
-  it('closeAssignment(): registra TASK_HOURS_LOGGED con las horas reportadas', async () => {
+  it('closeAssignment(): registra ASSIGNMENT_CLOSED con la caché calculada', async () => {
     const tx = makeTx();
+    tx.registroAvanceAsignacion.create.mockResolvedValue({ idRegistroAvance: 77 });
     tx.asignacionTarea.findFirst.mockResolvedValue({
       idAsignacion: 1,
       idTarea: TASK_ID,
@@ -314,15 +315,14 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
       makeTimeRecordsDouble(), bitacora);
 
     await service.closeAssignment(PROJECT_ID, TASK_ID, 1, ACTOR_ID, {
-      horasReales: 4,
       contenidoAvance: 'x'.repeat(200),
     });
 
     expect(bitacora.registrarEvento).toHaveBeenCalledWith(
       expect.objectContaining({
-        tipoEvento: 'TASK_HOURS_LOGGED',
+        tipoEvento: 'ASSIGNMENT_CLOSED',
         idSprint: 3,
-        valorNuevo: { idAsignacion: 1, horasReales: '0' },
+        valorNuevo: expect.objectContaining({ idAsignacion: 1, horasReales: '0' }),
       }),
     );
   });
