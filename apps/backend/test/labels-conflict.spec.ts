@@ -3,6 +3,7 @@ import { ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { LabelsService } from '../src/labels/labels.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
 
 /**
  * Tarea 31: el índice único compuesto `Etiqueta(idProyecto,
@@ -81,17 +82,21 @@ function makePrisma() {
     proyecto: { findFirst: vi.fn().mockResolvedValue({ idProyecto: PROJECT_ID, creadoPor: LEADER_ID }) },
     participacionProyecto: { findFirst: vi.fn() },
     etiqueta: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-    tareaEtiqueta: { deleteMany: vi.fn() },
-    $transaction: vi.fn(),
+    tareaEtiqueta: { deleteMany: vi.fn(), count: vi.fn().mockResolvedValue(0) },
   };
   return prisma as typeof prisma & PrismaService;
+}
+
+/** C035: el doble del runner entrega el mismo mock como `tx`; la policy es no-op. */
+function makeService(prisma: ReturnType<typeof makePrisma>) {
+  return new LabelsService(prisma, makeProjectTransactionDouble({ tx: prisma }), makeProjectPolicyDouble());
 }
 
 describe('LabelsService — detección de conflicto Prisma en creación (Tarea 31)', () => {
   it('P2002 exacto de Etiqueta(idProyecto, nombreNormalizado) se traduce a ConflictException', async () => {
     const prisma = makePrisma();
     prisma.etiqueta.create.mockRejectedValue(makeLabelNameCollisionError());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -101,7 +106,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
   it('el mensaje público no expone metadata de Prisma', async () => {
     const prisma = makePrisma();
     prisma.etiqueta.create.mockRejectedValue(makeLabelNameCollisionError());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     try {
       await service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' });
@@ -120,7 +125,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const prisma = makePrisma();
     const error = makeOtherModelP2002Error();
     prisma.etiqueta.create.mockRejectedValue(error);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -131,7 +136,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const prisma = makePrisma();
     const error = makeLabelOtherTargetP2002Error();
     prisma.etiqueta.create.mockRejectedValue(error);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -142,7 +147,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const prisma = makePrisma();
     const error = makeLabelNoTargetP2002Error();
     prisma.etiqueta.create.mockRejectedValue(error);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -153,7 +158,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const prisma = makePrisma();
     const error = makeForeignKeyError();
     prisma.etiqueta.create.mockRejectedValue(error);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -164,7 +169,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const prisma = makePrisma();
     const error = makeRecordNotFoundError();
     prisma.etiqueta.create.mockRejectedValue(error);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -175,7 +180,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const prisma = makePrisma();
     const error = makeConnectionError();
     prisma.etiqueta.create.mockRejectedValue(error);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -186,7 +191,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     const prisma = makePrisma();
     const error = new Error('fallo inesperado');
     prisma.etiqueta.create.mockRejectedValue(error);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -198,7 +203,7 @@ describe('LabelsService — detección de conflicto Prisma en creación (Tarea 3
     async (valorLanzado) => {
       const prisma = makePrisma();
       prisma.etiqueta.create.mockRejectedValue(valorLanzado);
-      const service = new LabelsService(prisma);
+      const service = makeService(prisma);
 
       await expect(
         service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Backend', color: '#10B981' }),
@@ -220,7 +225,7 @@ describe('LabelsService — detección de conflicto Prisma en edición (Tarea 31
     const prisma = makePrisma();
     stubEtiquetaActual(prisma);
     prisma.etiqueta.update.mockRejectedValue(makeLabelNameCollisionError());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' }),
@@ -232,7 +237,7 @@ describe('LabelsService — detección de conflicto Prisma en edición (Tarea 31
     stubEtiquetaActual(prisma);
     const error = makeOtherModelP2002Error();
     prisma.etiqueta.update.mockRejectedValue(error);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' }),
@@ -244,7 +249,7 @@ describe('LabelsService — detección de conflicto Prisma en edición (Tarea 31
     stubEtiquetaActual(prisma);
     const errorFk = makeForeignKeyError();
     prisma.etiqueta.update.mockRejectedValueOnce(errorFk);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' }),
@@ -267,7 +272,7 @@ describe('LabelsService — carrera concurrente (Tarea 31)', () => {
       }
       throw makeLabelNameCollisionError();
     });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     const [resultadoA, resultadoB] = await Promise.allSettled([
       service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' }),
@@ -287,7 +292,7 @@ describe('LabelsService — carrera concurrente (Tarea 31)', () => {
     const prisma = makePrisma();
     const ganadora = { idEtiqueta: 1, nombreEtiqueta: 'Frontend', color: '#10B981' };
     prisma.etiqueta.create.mockResolvedValueOnce(ganadora).mockRejectedValueOnce(makeLabelNameCollisionError());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.create(PROJECT_ID, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' });
     await expect(
@@ -303,7 +308,7 @@ describe('LabelsService — carrera concurrente (Tarea 31)', () => {
     prisma.etiqueta.create
       .mockResolvedValueOnce({ idEtiqueta: 1, nombreEtiqueta: 'Frontend', color: '#10B981' })
       .mockResolvedValueOnce({ idEtiqueta: 2, nombreEtiqueta: 'Frontend', color: '#000000' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     const [a, b] = await Promise.all([
       service.create(5, LEADER_ID, { nombreEtiqueta: 'Frontend', color: '#10B981' }),
