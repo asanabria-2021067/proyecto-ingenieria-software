@@ -7,9 +7,19 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { UpdateEstadoPostulacionDto } from '../src/applications/dto/update-estado-postulacion.dto';
 import { ApplicationsService } from '../src/applications/applications.service';
 
+type NotificationsDouble = Partial<{
+  notifyUsers: ReturnType<typeof vi.fn>;
+  persistTemplateTx: ReturnType<typeof vi.fn>;
+  publishEffects: ReturnType<typeof vi.fn>;
+}>;
+
+function makeNotifications(): NotificationsDouble {
+  return { notifyUsers: vi.fn(), persistTemplateTx: vi.fn(), publishEffects: vi.fn() };
+}
+
 function makeService(
   prisma: ReturnType<typeof makePrisma>,
-  notifications: Partial<{ notifyUsers: ReturnType<typeof vi.fn> }> = { notifyUsers: vi.fn() },
+  notifications: NotificationsDouble = makeNotifications(),
   eventEmitter: Partial<{ emit: ReturnType<typeof vi.fn> }> = { emit: vi.fn() },
 ) {
   return new ApplicationsService(
@@ -22,6 +32,8 @@ function makeService(
 function makePrisma() {
   const tx = {
     postulacion: {
+      // C030: la creación ocurre dentro de la transacción; el mismo doble se expone en la raíz.
+      create: vi.fn(),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUniqueOrThrow: vi.fn(),
     },
@@ -37,7 +49,6 @@ function makePrisma() {
     participacionProyecto: { count: vi.fn(), ...tx.participacionProyecto },
     postulacion: {
       findFirst: vi.fn(),
-      create: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -49,29 +60,74 @@ function makePrisma() {
 }
 
 describe('ApplicationsService', () => {
-  it('create crea postulación válida', async () => {
+  it('create crea postulación válida y persiste la notificación al líder en la misma transacción', async () => {
     const prisma = makePrisma();
     prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 1 });
     prisma.rolProyecto.findUnique.mockResolvedValue({
       idRolProyecto: 2,
       cupos: 3,
-      proyecto: { estadoProyecto: EstadoProyecto.PUBLICADO },
+      proyecto: { idProyecto: 5, estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: 9, tituloProyecto: 'Proyecto X' },
     });
     prisma.postulacion.findFirst.mockResolvedValue(null);
-    prisma.postulacion.create.mockResolvedValue({ idPostulacion: 10 });
+    const creada = {
+      idPostulacion: 10,
+      postulante: { nombre: 'Ana', apellido: 'Pérez' },
+      rolProyecto: { nombreRol: 'Backend' },
+    };
+    prisma.postulacion.create.mockResolvedValue(creada);
     const eventEmitter = { emit: vi.fn() };
-    const service = makeService(prisma, { notifyUsers: vi.fn() }, eventEmitter);
+    const notifications = makeNotifications();
+    const service = makeService(prisma, notifications, eventEmitter);
 
     const result = await service.create(
       { idRolProyecto: 2, justificacion: 'Quiero aportar' },
       1,
     );
 
-    expect(result).toEqual({ idPostulacion: 10 });
+    expect(result).toEqual(creada);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(notifications.persistTemplateTx).toHaveBeenCalledTimes(1);
+    expect(notifications.persistTemplateTx).toHaveBeenCalledWith(
+      prisma._tx,
+      [9],
+      'NUEVA_POSTULACION',
+      expect.objectContaining({
+        userName: 'Ana Pérez',
+        roleName: 'Backend',
+        projectTitle: 'Proyecto X',
+        projectId: 5,
+        applicationId: 10,
+        roleId: 2,
+      }),
+      expect.objectContaining({ add: expect.any(Function) }),
+    );
+    expect(notifications.publishEffects).toHaveBeenCalledTimes(1);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'application.created',
       expect.objectContaining({ userId: 1, applicationId: 10, roleId: 2 }),
     );
+  });
+
+  it('create no notifica cuando el líder es el propio postulante', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 9 });
+    prisma.rolProyecto.findUnique.mockResolvedValue({
+      idRolProyecto: 2,
+      cupos: 3,
+      proyecto: { idProyecto: 5, estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: 9, tituloProyecto: 'Proyecto X' },
+    });
+    prisma.postulacion.findFirst.mockResolvedValue(null);
+    prisma.postulacion.create.mockResolvedValue({
+      idPostulacion: 11,
+      postulante: { nombre: 'Líder', apellido: 'Propio' },
+      rolProyecto: { nombreRol: 'Backend' },
+    });
+    const notifications = makeNotifications();
+    const service = makeService(prisma, notifications);
+
+    await service.create({ idRolProyecto: 2, justificacion: 'Quiero aportar' }, 9);
+
+    expect(notifications.persistTemplateTx).not.toHaveBeenCalled();
   });
 
   it('create falla si usuario no existe', async () => {
