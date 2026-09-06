@@ -395,7 +395,7 @@ describe('RolesService.selfAssign', () => {
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
   });
 
-  it('cupo lleno ⇒ 400', async () => {
+  it('cupo lleno ⇒ 409', async () => {
     const prisma = makePrisma();
     armar(prisma, { cupos: 1 });
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
@@ -403,7 +403,7 @@ describe('RolesService.selfAssign', () => {
     const service = makeService(prisma);
 
     await expect(service.selfAssign(PROJECT_ID, ROLE_ID, LEADER_ID)).rejects.toBeInstanceOf(
-      BadRequestException,
+      ConflictException,
     );
     expect(prisma.participacionProyecto.create).not.toHaveBeenCalled();
   });
