@@ -1,11 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
-import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
 import { SprintClosingSummaryDto, SprintClosingSummaryParticipantDto } from './dto/sprint-closing-summary.dto';
 import {
   SprintDetailDto,
@@ -252,83 +251,12 @@ export class SprintsService {
   }
 
   /**
-   * A7: ajusta/aprueba el registro de reconocimiento de horas ya existente
-   * (HorasParticipacion) para una participación dentro de un Sprint —
-   * `horasCalculadas` (persistido por A5/proceso de cálculo previo) es la
-   * única fuente de comparación; A7 nunca la recalcula ni toca
-   * AsignacionTarea.horasReales.
-   *
-   * Aislamiento cross-project: la búsqueda exige simultáneamente
-   * idParticipacion + idSprint (ya validado contra projectId por
-   * `assertCanAdjustRecognizedHours` vía `getSprintInProjectOrThrow`) +
-   * participacion.rolProyecto.idProyecto === projectId, para no confiar
-   * únicamente en participacionId como identificador.
-   *
-   * La comparación usa Prisma.Decimal.equals (no floating point) porque
-   * horasCalculadas/horasAprobadas son columnas Decimal(6,2).
-   *
-   * `horasCalculadas === null` (A7.1) nunca se trata como 0: A7 ajusta un
-   * cálculo ya persistido, no lo inventa. Sin una base de cálculo real
-   * todavía no hay nada que aprobar, así que se rechaza con
-   * BadRequestException en vez de asumir silenciosamente un 0 que
-   * permitiría "aprobar" horas sobre un reconocimiento inexistente.
-   */
-  async adjustRecognizedHours(
-    projectId: number,
-    sprintId: number,
-    participationId: number,
-    userId: number,
-    dto: AdjustRecognizedHoursDto,
-  ) {
-    return this.prisma.$transaction(async (tx) => {
-      await this.sprintsAuthorization.assertCanAdjustRecognizedHours(projectId, sprintId, userId, tx);
-
-      const registro = await tx.horasParticipacion.findFirst({
-        where: {
-          idParticipacion: participationId,
-          idSprint: sprintId,
-          participacion: { rolProyecto: { idProyecto: projectId } },
-        },
-      });
-      if (!registro) {
-        throw new NotFoundException(
-          `No existe un registro de horas para la participación ${participationId} en el Sprint ${sprintId} del proyecto ${projectId}`,
-        );
-      }
-
-      if (registro.horasCalculadas === null) {
-        throw new BadRequestException(
-          'No hay horas calculadas disponibles para ajustar en este registro',
-        );
-      }
-
-      const horasCalculadas = registro.horasCalculadas;
-      const horasAprobadas = new Prisma.Decimal(dto.horasAprobadas);
-      const requiereJustificacion = !horasAprobadas.equals(horasCalculadas);
-
-      if (requiereJustificacion && !dto.justificacionAjuste?.trim()) {
-        throw new BadRequestException(
-          'justificacionAjuste es obligatoria cuando horasAprobadas difiere de horasCalculadas',
-        );
-      }
-
-      return tx.horasParticipacion.update({
-        where: { idRegistroHoras: registro.idRegistroHoras },
-        data: {
-          horasAprobadas: dto.horasAprobadas,
-          justificacionAjuste: dto.justificacionAjuste?.trim() ?? null,
-        },
-      });
-    });
-  }
-
-  /**
    * A8: read-model de revisión/finalización de horas del Sprint
    * (SprintClosingSummary), person-centric — cada participante aparece una
    * única vez sin importar cuántos roles tenga en el proyecto (mismo
    * invariante que ProjectsService.getTeamSummary /
    * TeamSummaryMemberDto). Puramente de lectura: nunca recalcula horas
-   * (A5), nunca invoca `adjustRecognizedHours` (A7), nunca toca
+   * (A5), nunca escribe el agregado de horas, nunca toca
    * `AsignacionTarea.horasReales` ni marca tramos como reconocidos.
    *
    * Presupuesto de ≤2 queries por invocación, independiente del número de
