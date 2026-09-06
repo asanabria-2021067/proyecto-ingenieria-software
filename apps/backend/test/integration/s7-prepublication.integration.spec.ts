@@ -16,6 +16,7 @@ import {
   createIntegrationParticipation,
   createIntegrationSprint,
   createIntegrationTask,
+  createIntegrationTaskAssignment,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { ProjectWriteGuard } from '../../src/common/guards/project-write.guard';
@@ -26,6 +27,16 @@ import { RolesController } from '../../src/roles/roles.controller';
 import { RolesService } from '../../src/roles/roles.service';
 import { LabelsController } from '../../src/labels/labels.controller';
 import { LabelsService } from '../../src/labels/labels.service';
+import { TasksController } from '../../src/tasks/tasks.controller';
+import { TasksService } from '../../src/tasks/tasks.service';
+import { TasksContextService } from '../../src/tasks/tasks-context.service';
+import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.service';
+import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
+import { TaskLabelsController } from '../../src/labels/task-labels.controller';
+import { ProgressRecordsController } from '../../src/progress-records/progress-records.controller';
+import { ProgressRecordsService } from '../../src/progress-records/progress-records.service';
+import { TimeRecordsController } from '../../src/time-records/time-records.controller';
+import { TimeRecordsService } from '../../src/time-records/time-records.service';
 import { ProjectsController } from '../../src/projects/projects.controller';
 import { ProjectsService } from '../../src/projects/projects.service';
 import { calcularProgresoHito } from '../../src/common/hito-progreso';
@@ -78,6 +89,10 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
   let prisma: PrismaClient;
   let rolesController: RolesController;
   let labelsController: LabelsController;
+  let taskLabelsController: TaskLabelsController;
+  let tasksController: TasksController;
+  let progressController: ProgressRecordsController;
+  let timeRecordsController: TimeRecordsController;
   let projectsController: ProjectsController;
   let comentariosController: ComentariosController;
   let tareaComentariosController: TareaComentariosController;
@@ -98,7 +113,37 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
     rolesController = new RolesController(
       new RolesService(prismaService, makeFakeNotifications(), projectTx, policy),
     );
-    labelsController = new LabelsController(new LabelsService(prismaService, projectTx, policy));
+    const labelsService = new LabelsService(prismaService, projectTx, policy);
+    labelsController = new LabelsController(labelsService);
+    taskLabelsController = new TaskLabelsController(labelsService);
+
+    const tasksContext = new TasksContextService(prismaService);
+    const readPolicy = new ProjectReadPolicyService(prismaService);
+    tasksController = new TasksController(
+      new TasksService(
+        prismaService,
+        new TasksAuthorizationService(tasksContext),
+        new TasksRelationsService(prismaService, tasksContext),
+        makeFakeNotifications(),
+        tasksContext,
+        projectTx,
+        policy,
+        readPolicy,
+      ),
+    );
+    progressController = new ProgressRecordsController(
+      new ProgressRecordsService(prismaService, tasksContext, projectTx, policy),
+    );
+    timeRecordsController = new TimeRecordsController(
+      new TimeRecordsService(
+        prismaService,
+        tasksContext,
+        makeFakeNotifications(),
+        projectTx,
+        policy,
+        readPolicy,
+      ),
+    );
 
     projectsController = new ProjectsController(
       new ProjectsService(
@@ -810,5 +855,295 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
       completado: 0,
     });
     expect(avance.tareas.porcentaje).toBe(50);
+  });
+
+  it('T33-D: prepublicación rechaza crear tareas, avances, asignaciones y etiquetas de tarea, y rechaza al externo en toda la superficie', async () => {
+    const leader = await createIntegrationUser(prisma);
+    const asignado = await createIntegrationUser(prisma);
+    const externo = await createIntegrationUser(prisma);
+    scope.userIds = [leader.idUsuario, asignado.idUsuario, externo.idUsuario];
+
+    // Proyecto con historia legacy: Sprint ACTIVO backfillado, tarea, tramo
+    // abierto y una etiqueta. Nada de eso habilita operar en prepublicación.
+    const project = await createIntegrationProject(prisma, leader.idUsuario, {
+      estadoProyecto: 'BORRADOR',
+    });
+    scope.projectIds = [project.idProyecto];
+    const projectId = project.idProyecto;
+
+    const rol = await createIntegrationProjectRole(prisma, projectId, { cupos: 2 });
+    scope.roleIds = [rol.idRolProyecto];
+    const participacion = await createIntegrationParticipation(
+      prisma,
+      asignado.idUsuario,
+      rol.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    scope.participationIds = [participacion.idParticipacion];
+
+    const sprintLegacy = await createIntegrationSprint(prisma, projectId, { estado: 'ACTIVO' });
+    scope.sprintIds = [sprintLegacy.idSprint];
+    const tareaLegacy = await createIntegrationTask(
+      prisma,
+      projectId,
+      leader.idUsuario,
+      sprintLegacy.idSprint,
+      { idRolProyecto: rol.idRolProyecto },
+    );
+    scope.taskIds = [tareaLegacy.idTarea];
+    const tramoLegacy = await createIntegrationTaskAssignment(
+      prisma,
+      tareaLegacy.idTarea,
+      asignado.idUsuario,
+      leader.idUsuario,
+    );
+    scope.assignmentIds = [tramoLegacy.idAsignacion];
+
+    const etiqueta = await prisma.etiqueta.create({
+      data: {
+        idProyecto: projectId,
+        nombreEtiqueta: 'Legacy',
+        nombreNormalizado: 'legacy',
+        color: '#10B981',
+      },
+    });
+    labelIds.push(etiqueta.idEtiqueta);
+
+    const conteosAntes = {
+      tareas: await prisma.tarea.count({ where: { idProyecto: projectId } }),
+      avances: await prisma.registroAvanceAsignacion.count({
+        where: { idAsignacion: tramoLegacy.idAsignacion },
+      }),
+      asignaciones: await prisma.asignacionTarea.count({ where: { idTarea: tareaLegacy.idTarea } }),
+      etiquetasDeTarea: await prisma.tareaEtiqueta.count({ where: { idTarea: tareaLegacy.idTarea } }),
+      horas: await prisma.registroTiempoTarea.count({
+        where: { idAsignacion: tramoLegacy.idAsignacion },
+      }),
+    };
+
+    const contenidoAvance = 'Avance de prueba con contenido suficientemente largo. '.repeat(6);
+
+    async function esperarRechazo(accion: () => Promise<unknown>): Promise<unknown> {
+      let rejection: unknown;
+      try {
+        await accion();
+      } catch (error) {
+        rejection = error;
+      }
+      return rejection;
+    }
+
+    for (const estadoProyecto of ESTADOS_PREPUBLICACION) {
+      await prisma.proyecto.update({
+        where: { idProyecto: projectId },
+        data: { estadoProyecto },
+      });
+
+      // El Sprint legacy sigue ACTIVO: aun así ninguna operación se abre.
+      const sprintSigueActivo = await prisma.sprint.findUnique({
+        where: { idSprint: sprintLegacy.idSprint },
+        select: { estado: true },
+      });
+      expect(sprintSigueActivo?.estado).toBe('ACTIVO');
+
+      const rechazos = [
+        await esperarRechazo(() =>
+          runThroughRealGuard(TasksController, TasksController.prototype.create, projectId, () =>
+            tasksController.create(
+              projectId,
+              { userId: leader.idUsuario },
+              { tituloTarea: 'Tarea prohibida', fechaLimite: '2099-01-01', prioridad: 'MEDIA' },
+            ),
+          ),
+        ),
+        await esperarRechazo(() =>
+          runThroughRealGuard(
+            ProgressRecordsController,
+            ProgressRecordsController.prototype.create,
+            projectId,
+            () =>
+              progressController.create(
+                projectId,
+                tareaLegacy.idTarea,
+                tramoLegacy.idAsignacion,
+                { userId: asignado.idUsuario },
+                { contenido: contenidoAvance },
+              ),
+            {
+              params: {
+                taskId: String(tareaLegacy.idTarea),
+                assignmentId: String(tramoLegacy.idAsignacion),
+              },
+            },
+          ),
+        ),
+        await esperarRechazo(() =>
+          runThroughRealGuard(TasksController, TasksController.prototype.assign, projectId, () =>
+            tasksController.assign(
+              projectId,
+              tareaLegacy.idTarea,
+              { userId: leader.idUsuario },
+              { idUsuario: asignado.idUsuario },
+            ),
+            { params: { taskId: String(tareaLegacy.idTarea) } },
+          ),
+        ),
+        await esperarRechazo(() =>
+          runThroughRealGuard(
+            TaskLabelsController,
+            TaskLabelsController.prototype.attach,
+            projectId,
+            () =>
+              taskLabelsController.attach(
+                projectId,
+                tareaLegacy.idTarea,
+                etiqueta.idEtiqueta,
+                { userId: leader.idUsuario },
+              ),
+            {
+              params: {
+                taskId: String(tareaLegacy.idTarea),
+                labelId: String(etiqueta.idEtiqueta),
+              },
+            },
+          ),
+        ),
+        await esperarRechazo(() =>
+          runThroughRealGuard(
+            TimeRecordsController,
+            TimeRecordsController.prototype.create,
+            projectId,
+            () =>
+              timeRecordsController.create(
+                projectId,
+                tareaLegacy.idTarea,
+                { userId: asignado.idUsuario },
+                { horas: 1, fecha: '2026-08-20' },
+              ),
+            { params: { taskId: String(tareaLegacy.idTarea) } },
+          ),
+        ),
+      ];
+
+      for (const rechazo of rechazos) {
+        expect(rechazo).toBeInstanceOf(ConflictException);
+      }
+
+      expect({
+        tareas: await prisma.tarea.count({ where: { idProyecto: projectId } }),
+        avances: await prisma.registroAvanceAsignacion.count({
+          where: { idAsignacion: tramoLegacy.idAsignacion },
+        }),
+        asignaciones: await prisma.asignacionTarea.count({ where: { idTarea: tareaLegacy.idTarea } }),
+        etiquetasDeTarea: await prisma.tareaEtiqueta.count({
+          where: { idTarea: tareaLegacy.idTarea },
+        }),
+        horas: await prisma.registroTiempoTarea.count({
+          where: { idAsignacion: tramoLegacy.idAsignacion },
+        }),
+      }).toEqual(conteosAntes);
+    }
+
+    // El externo queda fuera de toda la superficie. Se comprueba con el
+    // proyecto ya operativo porque en B/R/O el estado rechaza antes que el
+    // actor: allí nadie escribe, ni siquiera el líder.
+    await prisma.proyecto.update({
+      where: { idProyecto: projectId },
+      data: { estadoProyecto: EstadoProyecto.EN_PROGRESO },
+    });
+
+    const rechazosExterno = [
+      await esperarRechazo(() =>
+        runThroughRealGuard(TasksController, TasksController.prototype.create, projectId, () =>
+          tasksController.create(
+            projectId,
+            { userId: externo.idUsuario },
+            { tituloTarea: 'Tarea de un ajeno', fechaLimite: '2099-01-01', prioridad: 'MEDIA' },
+          ),
+        ),
+      ),
+      await esperarRechazo(() =>
+        runThroughRealGuard(
+          ProgressRecordsController,
+          ProgressRecordsController.prototype.create,
+          projectId,
+          () =>
+            progressController.create(
+              projectId,
+              tareaLegacy.idTarea,
+              tramoLegacy.idAsignacion,
+              { userId: externo.idUsuario },
+              { contenido: contenidoAvance },
+            ),
+          {
+            params: {
+              taskId: String(tareaLegacy.idTarea),
+              assignmentId: String(tramoLegacy.idAsignacion),
+            },
+          },
+        ),
+      ),
+      await esperarRechazo(() =>
+        runThroughRealGuard(TasksController, TasksController.prototype.assign, projectId, () =>
+          tasksController.assign(
+            projectId,
+            tareaLegacy.idTarea,
+            { userId: externo.idUsuario },
+            { idUsuario: externo.idUsuario },
+          ),
+          { params: { taskId: String(tareaLegacy.idTarea) } },
+        ),
+      ),
+      await esperarRechazo(() =>
+        runThroughRealGuard(
+          TaskLabelsController,
+          TaskLabelsController.prototype.attach,
+          projectId,
+          () =>
+            taskLabelsController.attach(projectId, tareaLegacy.idTarea, etiqueta.idEtiqueta, {
+              userId: externo.idUsuario,
+            }),
+          {
+            params: {
+              taskId: String(tareaLegacy.idTarea),
+              labelId: String(etiqueta.idEtiqueta),
+            },
+          },
+        ),
+      ),
+      await esperarRechazo(() =>
+        runThroughRealGuard(
+          TimeRecordsController,
+          TimeRecordsController.prototype.create,
+          projectId,
+          () =>
+            timeRecordsController.create(
+              projectId,
+              tareaLegacy.idTarea,
+              { userId: externo.idUsuario },
+              { horas: 1, fecha: '2026-08-20' },
+            ),
+          { params: { taskId: String(tareaLegacy.idTarea) } },
+        ),
+      ),
+    ];
+
+    for (const rechazo of rechazosExterno) {
+      expect(rechazo).toBeInstanceOf(ForbiddenException);
+    }
+
+    expect({
+      tareas: await prisma.tarea.count({ where: { idProyecto: projectId } }),
+      avances: await prisma.registroAvanceAsignacion.count({
+        where: { idAsignacion: tramoLegacy.idAsignacion },
+      }),
+      asignaciones: await prisma.asignacionTarea.count({ where: { idTarea: tareaLegacy.idTarea } }),
+      etiquetasDeTarea: await prisma.tareaEtiqueta.count({
+        where: { idTarea: tareaLegacy.idTarea },
+      }),
+      horas: await prisma.registroTiempoTarea.count({
+        where: { idAsignacion: tramoLegacy.idAsignacion },
+      }),
+    }).toEqual(conteosAntes);
   });
 });
