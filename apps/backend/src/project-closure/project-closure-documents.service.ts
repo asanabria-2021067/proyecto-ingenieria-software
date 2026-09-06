@@ -40,7 +40,7 @@ import { ReserveDocumentDto } from './dto/reserve-document.dto';
 import type { ReadGrant, UploadGrant } from './dto/upload-grant.dto';
 
 /**
- * C113/C114/C117 (06 v2 §25/§26/§27): carga mediada de documentos de cierre.
+ * C113/C114/C117/C130 (06 v2 §25/§26/§27/§28): carga mediada de documentos de cierre.
  *
  * La secuencia es deliberada: una transacción BREVE reserva, el trabajo caro
  * —hash, cifrado y transferencia— ocurre FUERA de cualquier lock, y una
@@ -474,6 +474,129 @@ export class ProjectClosureDocumentsService {
     // `etag` nunca se interpreta como el SHA-256 del PDF ni se persiste: su
     // única función es cruzar las dos respuestas del proveedor.
   }
+
+  /**
+   * C130 (§28): reserva la fila de un documento GENERADO por el servidor.
+   *
+   * A diferencia de una evidencia, aquí no hay ticket ni multipart: el
+   * documento lo produce el backend. La reserva ocurre dentro de la
+   * transacción de captura del caller para que exista fila antes de cualquier
+   * I/O, y CK26 exige que un informe traiga ya su versión de generador, sus
+   * dos huellas y su contexto.
+   *
+   * El índice parcial `s7_informe_en_generacion` impide dos informes del
+   * mismo tipo en curso para una revisión: una generación concurrente choca
+   * en la base, no en una comprobación optimista.
+   */
+  async reserveGeneratedTx(
+    tx: Prisma.TransactionClient,
+    input: {
+      projectId: number;
+      revisionId: number;
+      tipoDocumento: TipoDocumentoCierre;
+      nombreArchivo: string;
+      actorId: number;
+      generatorVersion: string;
+      fingerprintEjecucion: string;
+      fingerprintModelo: string;
+      contextoReporte: Prisma.InputJsonValue;
+    },
+  ): Promise<ClosureDocumentPublic> {
+    this.tickets.assertAvailable();
+    const identidad = this.adapter.buildIdentity(input.projectId);
+    try {
+      const fila = await tx.documentoCierre.create({
+        data: {
+          idProyecto: input.projectId,
+          idRevisionOrigen: input.revisionId,
+          tipoDocumento: input.tipoDocumento,
+          proveedor: identidad.proveedor,
+          externalId: identidad.publicId,
+          resourceType: identidad.resourceType,
+          deliveryType: identidad.deliveryType,
+          nombreArchivo: input.nombreArchivo,
+          idAutor: input.actorId,
+          reservaExpiraEn: new Date(Date.now() + 600_000),
+          generatorVersion: input.generatorVersion,
+          fingerprintEjecucion: input.fingerprintEjecucion,
+          fingerprintModelo: input.fingerprintModelo,
+          contextoReporte: input.contextoReporte,
+        },
+        select: DOCUMENTO_SELECT,
+      });
+      return mapDocumento(fila);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException({
+          statusCode: 409,
+          code: RESERVA_NO_DISPONIBLE,
+          message: 'Ya hay un informe de este tipo en generación para la revisión',
+        });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * C130 (§26/§28): cifra, sube y VERIFICA un documento generado.
+   *
+   * Ocurre íntegramente FUERA de transacción: cifrar diez megabytes y
+   * transferirlos por red no puede hacerse con el proyecto bloqueado. Devuelve
+   * lo que la transacción de finalización necesita para confirmar.
+   */
+  async uploadGenerated(
+    documentId: number,
+    projectId: number,
+    pdf: Buffer,
+  ): Promise<{
+    identidad: ClosureRemoteIdentity;
+    checksumSha256: string;
+    tamanoBytes: number;
+    checksumCifradoSha256: string;
+    tamanoCifradoBytes: number;
+    metadata: ClosureCryptoMetadata;
+  }> {
+    this.tickets.assertAvailable();
+    if (pdf.length > MAX_DOCUMENT_SIZE) {
+      throw new PayloadTooLargeException({
+        statusCode: 413,
+        code: DOCUMENTO_DEMASIADO_GRANDE,
+        message: 'El documento generado supera el tamaño máximo permitido',
+      });
+    }
+    const documento = await this.prisma.documentoCierre.findFirstOrThrow({
+      where: { idDocumentoCierre: documentId, idProyecto: projectId },
+      select: DOCUMENTO_SELECT,
+    });
+    const sellado = this.crypto.seal(pdf, {
+      projectId,
+      documentId,
+      publicId: documento.externalId,
+      tipoDocumento: documento.tipoDocumento,
+    });
+    const identidad: ClosureRemoteIdentity = {
+      proveedor: 'cloudinary',
+      cloudName: this.adapter.cloudNameForIdentity(),
+      publicId: documento.externalId,
+      resourceType: 'raw',
+      deliveryType: documento.deliveryType as ClosureRemoteIdentity['deliveryType'],
+    };
+    const firmados = this.adapter.signUploadParams(identidad);
+    const confirmada = await this.storage.uploadImmutable(identidad, sellado.ciphertext, firmados);
+    await this.verifyRemote(identidad, confirmada, {
+      checksumCifradoSha256: sellado.checksumCifradoSha256,
+      tamanoCifradoBytes: sellado.tamanoCifradoBytes,
+    });
+    return {
+      identidad: confirmada,
+      checksumSha256: sellado.checksumSha256,
+      tamanoBytes: sellado.tamanoBytes,
+      checksumCifradoSha256: sellado.checksumCifradoSha256,
+      tamanoCifradoBytes: sellado.tamanoCifradoBytes,
+      metadata: sellado.metadata,
+    };
+  }
+
 
   /**
    * E109 (§26): permiso de lectura. Devuelve una URL DEL BACKEND y un ticket

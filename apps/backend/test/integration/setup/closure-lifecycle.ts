@@ -6,6 +6,8 @@ import { ProjectPolicyService } from '../../../src/common/project-policy/project
 import { ProjectIdResolverService } from '../../../src/common/project-policy/project-id-resolver.service';
 import { ProjectCloseReadinessService } from '../../../src/project-closure/project-close-readiness.service';
 import { ProjectClosureService } from '../../../src/project-closure/project-closure.service';
+import { ProjectClosureReportService } from '../../../src/project-closure/project-closure-report.service';
+import { closureDocumentsStack, closureConfig } from './closure-storage';
 import * as fixtures from './fixtures';
 import { cleanupIntegrationFixtures } from './cleanup';
 import type { ClosureCleanupScope } from './closure-storage';
@@ -22,7 +24,18 @@ export function closureLifecycleStack(db: PrismaClient) {
   const readiness = new ProjectCloseReadinessService(prisma);
   const audit = new BitacoraEventosService();
   const closure = new ProjectClosureService(prisma, runner, policy, readiness, audit);
-  return { closure, readiness, runner, policy, audit };
+  // El almacenamiento va mockeado: lo que se prueba es el protocolo de
+  // captura, render y vínculo, no la capacidad del proveedor.
+  const documentos = closureDocumentsStack(db, closureConfig());
+  const report = new ProjectClosureReportService(
+    prisma,
+    runner,
+    policy,
+    readiness,
+    documentos.service,
+    audit,
+  );
+  return { closure, readiness, runner, policy, audit, report, documentos };
 }
 
 /**
@@ -142,4 +155,108 @@ export async function cleanupClosureLifecycle(
     where: { idParticipacion: { in: scope.participationIds ?? [] } },
   });
   await cleanupIntegrationFixtures(db, scope);
+}
+
+/**
+ * Proyecto EN_PROGRESO listo para generar su informe: Sprint cerrado, tarea
+ * hecha con su tramo cerrado y consolidado, sin salidas ni apelaciones, y con
+ * su borrador ya creado. Le faltan las evidencias a propósito: la generación
+ * debe poder ocurrir antes que ellas.
+ */
+export async function proyectoListoParaGenerar(db: PrismaClient, scope: ClosureCleanupScope) {
+  const collect = <K extends keyof ClosureCleanupScope>(clave: K, ids: number[]) => {
+    scope[clave] = [...((scope[clave] ?? []) as number[]), ...ids] as ClosureCleanupScope[K];
+  };
+  const leader = await fixtures.createIntegrationUser(db);
+  const miembro = await fixtures.createIntegrationUser(db);
+  collect('userIds', [leader.idUsuario, miembro.idUsuario]);
+
+  const project = await fixtures.createIntegrationProject(db, leader.idUsuario, {
+    estadoProyecto: 'EN_PROGRESO',
+  });
+  collect('projectIds', [project.idProyecto]);
+  const role = await fixtures.createIntegrationProjectRole(db, project.idProyecto, { cupos: 4 });
+  collect('roleIds', [role.idRolProyecto]);
+  const participacion = await fixtures.createIntegrationParticipation(
+    db,
+    miembro.idUsuario,
+    role.idRolProyecto,
+    { estadoParticipacion: 'ACTIVO' },
+  );
+  collect('participationIds', [participacion.idParticipacion]);
+
+  const sprint = await fixtures.createIntegrationSprint(db, project.idProyecto, {
+    estado: 'CERRADO',
+  });
+  collect('sprintIds', [sprint.idSprint]);
+  const tarea = await fixtures.createIntegrationTask(
+    db,
+    project.idProyecto,
+    leader.idUsuario,
+    sprint.idSprint,
+    { estadoTarea: 'HECHO' },
+  );
+  collect('taskIds', [tarea.idTarea]);
+  const asignacion = await fixtures.createIntegrationTaskAssignment(
+    db,
+    tarea.idTarea,
+    miembro.idUsuario,
+    leader.idUsuario,
+    {
+      idParticipacion: participacion.idParticipacion,
+      desasignadaEn: new Date('2026-05-01T10:00:00.000Z'),
+      horasReales: '4.00',
+      reconocidoEn: new Date('2026-05-02T10:00:00.000Z'),
+    },
+  );
+  collect('assignmentIds', [asignacion.idAsignacion]);
+  await db.registroTiempoTarea.create({
+    data: {
+      idAsignacion: asignacion.idAsignacion,
+      idUsuario: miembro.idUsuario,
+      horas: '4.00',
+      fecha: new Date('2026-04-20'),
+    },
+  });
+  // Agregado consolidado y todavía PENDIENTE: acreditar es del administrador.
+  await db.horasParticipacion.create({
+    data: {
+      idParticipacion: participacion.idParticipacion,
+      idSprint: sprint.idSprint,
+      periodoInicio: new Date('2026-04-01'),
+      periodoFin: new Date('2026-04-30'),
+      horasReportadas: '4.00',
+      horasCalculadas: '4.00',
+      estadoHoras: 'PENDIENTE',
+    },
+  });
+
+  const revision = await db.revisionCierreProyecto.create({
+    data: { idProyecto: project.idProyecto, numeroRevision: 1, estadoRevision: 'BORRADOR' },
+  });
+  collect('revisionIds', [revision.idRevisionCierre]);
+
+  // Un proyecto y una revisión ajenos, para probar el cruce de identificadores.
+  const otroProyecto = await fixtures.createIntegrationProject(db, leader.idUsuario, {
+    estadoProyecto: 'EN_PROGRESO',
+  });
+  collect('projectIds', [otroProyecto.idProyecto]);
+  const revisionAjena = await db.revisionCierreProyecto.create({
+    data: { idProyecto: otroProyecto.idProyecto, numeroRevision: 1, estadoRevision: 'BORRADOR' },
+  });
+  collect('revisionIds', [revisionAjena.idRevisionCierre]);
+
+  return {
+    leader,
+    miembro,
+    project,
+    role,
+    participacion,
+    sprint,
+    tarea,
+    asignacion,
+    revision,
+    otroProyecto,
+    revisionAjena,
+  };
 }
