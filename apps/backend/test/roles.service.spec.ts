@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { RolesService } from '../src/roles/roles.service';
+import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
 
 const LEADER_ID = 1;
 const OTHER_USER_ID = 2;
@@ -85,6 +86,18 @@ function makeNotifications() {
   return notifications as typeof notifications & NotificationsService;
 }
 
+/**
+ * C034: RolesService corre sobre el protocolo transaccional. El doble del
+ * runner entrega el mismo mock de Prisma como `tx` y la policy es no-op.
+ */
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  notifications: ReturnType<typeof makeNotifications> = makeNotifications(),
+  projectTx = makeProjectTransactionDouble({ tx: prisma }),
+) {
+  return new RolesService(prisma, notifications, projectTx, makeProjectPolicyDouble());
+}
+
 function knownError(code: string) {
   return new Prisma.PrismaClientKnownRequestError('mock', {
     code,
@@ -98,7 +111,7 @@ describe('RolesService.createRole', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.create.mockResolvedValue(rolConStats());
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     const res = await service.createRole(PROJECT_ID, { nombreRol: 'Frontend', cupos: 2 }, LEADER_ID);
 
@@ -110,7 +123,7 @@ describe('RolesService.createRole', () => {
   it('un no-líder recibe 403', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(
       service.createRole(PROJECT_ID, { nombreRol: 'X', cupos: 1 }, OTHER_USER_ID),
@@ -121,7 +134,7 @@ describe('RolesService.createRole', () => {
   it('proyecto inexistente ⇒ 404', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(
       service.createRole(PROJECT_ID, { nombreRol: 'X', cupos: 1 }, LEADER_ID),
@@ -132,7 +145,7 @@ describe('RolesService.createRole', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.carrera.findUnique.mockResolvedValue(null);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(
       service.createRole(PROJECT_ID, { nombreRol: 'X', cupos: 1, idCarreraRequerida: 7 }, LEADER_ID),
@@ -143,7 +156,7 @@ describe('RolesService.createRole', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.habilidad.findMany.mockResolvedValue([]); // ninguna encontrada
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(
       service.createRole(
@@ -164,7 +177,7 @@ describe('RolesService.updateRole', () => {
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase());
     prisma.rolProyecto.update.mockResolvedValue(rolBase({ nombreRol: 'Frontend Web' }));
     prisma.rolProyecto.findUniqueOrThrow.mockResolvedValue(rolConStats({ nombreRol: 'Frontend Web' }));
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     const res = await service.updateRole(PROJECT_ID, ROLE_ID, { nombreRol: 'Frontend Web' }, LEADER_ID);
 
@@ -183,7 +196,7 @@ describe('RolesService.updateRole', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase({ cupos: 3 }));
     prisma.participacionProyecto.count.mockResolvedValue(2); // 2 activos
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(
       service.updateRole(PROJECT_ID, ROLE_ID, { cupos: 1 }, LEADER_ID),
@@ -198,7 +211,7 @@ describe('RolesService.updateRole', () => {
     prisma.participacionProyecto.count.mockResolvedValue(2);
     prisma.rolProyecto.update.mockResolvedValue(rolBase({ cupos: 2 }));
     prisma.rolProyecto.findUniqueOrThrow.mockResolvedValue(rolConStats({ cupos: 2 }));
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     const res = await service.updateRole(PROJECT_ID, ROLE_ID, { cupos: 2 }, LEADER_ID);
     expect(res.cupos).toBe(2);
@@ -208,7 +221,7 @@ describe('RolesService.updateRole', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(null);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(
       service.updateRole(PROJECT_ID, ROLE_ID, { nombreRol: 'X' }, LEADER_ID),
@@ -221,7 +234,7 @@ describe('RolesService.updateRole', () => {
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase());
     prisma.habilidad.findMany.mockResolvedValue([{ idHabilidad: 5 }]);
     prisma.rolProyecto.findUniqueOrThrow.mockResolvedValue(rolConStats());
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await service.updateRole(
       PROJECT_ID,
@@ -244,7 +257,7 @@ describe('RolesService.updateRole', () => {
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase({ nombreRol: 'Frontend' }));
     prisma.rolProyecto.update.mockResolvedValue(rolBase());
     prisma.rolProyecto.findUniqueOrThrow.mockResolvedValue(rolConStats());
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     await service.updateRole(PROJECT_ID, ROLE_ID, { nombreRol: 'Frontend' }, LEADER_ID);
     expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
@@ -266,7 +279,7 @@ describe('RolesService.deleteRole', () => {
   it('elimina un rol nunca utilizado (sin relaciones)', async () => {
     const prisma = makePrisma();
     armarVacio(prisma);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     const res = await service.deleteRole(PROJECT_ID, ROLE_ID, LEADER_ID);
     expect(res).toEqual({ idRolProyecto: ROLE_ID, eliminado: true });
@@ -277,13 +290,14 @@ describe('RolesService.deleteRole', () => {
     const prisma = makePrisma();
     armarVacio(prisma);
     prisma.requisitoHabilidadRol.deleteMany.mockResolvedValue({ count: 2 }); // tenía 2 habilidades
-    const service = new RolesService(prisma, makeNotifications());
+    const projectTx = makeProjectTransactionDouble({ tx: prisma });
+    const service = makeService(prisma, makeNotifications(), projectTx);
 
     const res = await service.deleteRole(PROJECT_ID, ROLE_ID, LEADER_ID);
 
     expect(res).toEqual({ idRolProyecto: ROLE_ID, eliminado: true });
-    // Ambas operaciones dentro de la misma transacción.
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    // Ambas operaciones dentro de la misma transacción del protocolo (C034).
+    expect(projectTx.run).toHaveBeenCalledTimes(1);
     expect(prisma.requisitoHabilidadRol.deleteMany).toHaveBeenCalledWith({
       where: { idRolProyecto: ROLE_ID },
     });
@@ -302,12 +316,13 @@ describe('RolesService.deleteRole', () => {
       const prisma = makePrisma();
       armarVacio(prisma);
       prisma[modelo].count.mockResolvedValue(1);
-      const service = new RolesService(prisma, makeNotifications());
+      const service = makeService(prisma);
 
       await expect(service.deleteRole(PROJECT_ID, ROLE_ID, LEADER_ID)).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      // C034: los conteos corren dentro del lock; nada llega a borrarse.
+      expect(prisma.requisitoHabilidadRol.deleteMany).not.toHaveBeenCalled();
       expect(prisma.rolProyecto.delete).not.toHaveBeenCalled();
     },
   );
@@ -317,19 +332,20 @@ describe('RolesService.deleteRole', () => {
     armarVacio(prisma);
     // El borrado de requisitos ocurre, pero el del rol falla dentro del tx.
     prisma.rolProyecto.delete.mockRejectedValue(new Error('fallo de BD'));
-    const service = new RolesService(prisma, makeNotifications());
+    const projectTx = makeProjectTransactionDouble({ tx: prisma });
+    const service = makeService(prisma, makeNotifications(), projectTx);
 
     await expect(service.deleteRole(PROJECT_ID, ROLE_ID, LEADER_ID)).rejects.toThrow('fallo de BD');
-    // La transacción envuelve ambas operaciones: un fallo revierte todo (no
-    // hay borrado parcial persistido).
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    // La transacción del protocolo envuelve ambas operaciones: un fallo
+    // revierte todo (no hay borrado parcial persistido).
+    expect(projectTx.run).toHaveBeenCalledTimes(1);
   });
 
   it('un no-líder recibe 403', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase());
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.deleteRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -350,7 +366,7 @@ describe('RolesService.selfAssign', () => {
     prisma.participacionProyecto.findFirst.mockResolvedValue(null); // no existente
     prisma.participacionProyecto.count.mockResolvedValue(0); // cupo disponible
     prisma.participacionProyecto.create.mockResolvedValue({ idParticipacion: 500 });
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     const res = await service.selfAssign(PROJECT_ID, ROLE_ID, LEADER_ID);
 
@@ -369,7 +385,7 @@ describe('RolesService.selfAssign', () => {
     const notifications = makeNotifications();
     armar(prisma);
     prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 42 });
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     const res = await service.selfAssign(PROJECT_ID, ROLE_ID, LEADER_ID);
 
@@ -384,7 +400,7 @@ describe('RolesService.selfAssign', () => {
     armar(prisma, { cupos: 1 });
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
     prisma.participacionProyecto.count.mockResolvedValue(1); // lleno
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.selfAssign(PROJECT_ID, ROLE_ID, LEADER_ID)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -395,7 +411,7 @@ describe('RolesService.selfAssign', () => {
   it('un no-líder recibe 403', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.selfAssign(PROJECT_ID, ROLE_ID, OTHER_USER_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -406,7 +422,7 @@ describe('RolesService.selfAssign', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(null);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.selfAssign(PROJECT_ID, ROLE_ID, LEADER_ID)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -419,7 +435,7 @@ describe('RolesService.selfAssign', () => {
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
     prisma.participacionProyecto.count.mockResolvedValue(0);
     prisma.participacionProyecto.create.mockRejectedValue(knownError('P2002'));
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.selfAssign(PROJECT_ID, ROLE_ID, LEADER_ID)).rejects.toBeInstanceOf(
       ConflictException,
@@ -433,7 +449,7 @@ describe('RolesService.selfAssign', () => {
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
     prisma.participacionProyecto.count.mockResolvedValue(0);
     prisma.participacionProyecto.create.mockResolvedValue({ idParticipacion: 1 });
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     await service.selfAssign(PROJECT_ID, ROLE_ID, LEADER_ID);
 
@@ -453,7 +469,7 @@ describe('RolesService.selfAssign', () => {
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
     prisma.participacionProyecto.count.mockResolvedValue(0);
     prisma.participacionProyecto.create.mockResolvedValue({ idParticipacion: 1 });
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     await expect(service.selfAssign(PROJECT_ID, ROLE_ID, LEADER_ID)).resolves.toMatchObject({
       yaParticipaba: false,
@@ -482,7 +498,7 @@ describe('RolesService.leaveRole', () => {
   it('abandona un rol conservando otro: RETIRADO + cierra sus asignaciones', async () => {
     const prisma = makePrisma();
     armarConDosRoles(prisma, [11, 12]);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     const res = await service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID);
 
@@ -504,7 +520,7 @@ describe('RolesService.leaveRole', () => {
   it('cierra asignaciones solo del rol abandonado (filtra por idRolProyecto)', async () => {
     const prisma = makePrisma();
     armarConDosRoles(prisma, [11]);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID);
 
@@ -522,7 +538,7 @@ describe('RolesService.leaveRole', () => {
   it('sin tareas del rol: RETIRADO igual, no llama updateMany', async () => {
     const prisma = makePrisma();
     armarConDosRoles(prisma, []);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     const res = await service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID);
     expect(res.tareasDesasignadas).toBe(0);
@@ -535,7 +551,7 @@ describe('RolesService.leaveRole', () => {
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase());
     prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 900 });
     prisma.participacionProyecto.count.mockResolvedValue(0); // ningún otro rol
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -548,7 +564,7 @@ describe('RolesService.leaveRole', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(rolBase());
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -559,7 +575,7 @@ describe('RolesService.leaveRole', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findFirst.mockResolvedValue(null);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -572,7 +588,7 @@ describe('RolesService.leaveRole', () => {
     armarConDosRoles(prisma, [11, 12]);
     // El líder recibe; el actor (OTHER_USER_ID) se excluye.
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: OTHER_USER_ID }]);
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     await service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID);
 
@@ -587,7 +603,7 @@ describe('RolesService.leaveRole', () => {
     const notifications = makeNotifications();
     armarConDosRoles(prisma, [11, 12, 13]);
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: OTHER_USER_ID }]);
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     await service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID);
 
@@ -602,7 +618,7 @@ describe('RolesService.leaveRole', () => {
     notifications.notifyUsers.mockRejectedValue(new Error('gateway caído'));
     armarConDosRoles(prisma, [11]);
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: LEADER_ID }]);
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     await expect(service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID)).resolves.toMatchObject({
       estadoParticipacion: 'RETIRADO',
@@ -613,7 +629,7 @@ describe('RolesService.leaveRole', () => {
   it('no elimina la participación: solo la marca RETIRADO', async () => {
     const prisma = makePrisma();
     armarConDosRoles(prisma, []);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await service.leaveRole(PROJECT_ID, ROLE_ID, OTHER_USER_ID);
 
@@ -631,7 +647,7 @@ describe('RolesService.leaveRole', () => {
     armarConDosRoles(prisma, []);
     // Solo el líder sería destinatario, pero es el actor ⇒ cero destinatarios.
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: LEADER_ID }]);
-    const service = new RolesService(prisma, notifications);
+    const service = makeService(prisma, notifications);
 
     await service.leaveRole(PROJECT_ID, ROLE_ID, LEADER_ID);
     expect(notifications.notifyUsers).not.toHaveBeenCalled();
@@ -651,7 +667,7 @@ describe('RolesService.listRoles', () => {
       { idRolProyecto: ROLE_ID },
       { idRolProyecto: OTHER_ROLE_ID },
     ]);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     const res = await service.listRoles(PROJECT_ID, LEADER_ID);
 
@@ -667,7 +683,7 @@ describe('RolesService.listRoles', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyecto());
     prisma.rolProyecto.findMany.mockResolvedValue([]);
     prisma.participacionProyecto.findMany.mockResolvedValue([]);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     await expect(service.listRoles(PROJECT_ID, OTHER_USER_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -681,7 +697,7 @@ describe('RolesService.listRoles', () => {
       rolConStats({ idRolProyecto: ROLE_ID, participaciones: [{ idUsuario: OTHER_USER_ID }] }),
     ]);
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idRolProyecto: ROLE_ID }]);
-    const service = new RolesService(prisma, makeNotifications());
+    const service = makeService(prisma);
 
     const res = await service.listRoles(PROJECT_ID, OTHER_USER_ID);
     expect(res.roles[0].isMine).toBe(true);
