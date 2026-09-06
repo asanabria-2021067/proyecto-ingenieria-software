@@ -1,7 +1,7 @@
 import { Injectable, ForbiddenException, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsGateway, SPRINT_HOURS_ADJUSTED } from './notifications.gateway';
+import { LEADERSHIP_CHANGED, NotificationsGateway, SPRINT_HOURS_ADJUSTED } from './notifications.gateway';
 import {
   NOTIFICATION_TEMPLATES,
   NotificationTemplateKey,
@@ -473,6 +473,30 @@ export class NotificationsService {
       );
     }
   }
+
+  /**
+   * C097 (06 v2 §45): efecto realtime del cambio de liderazgo. Se emite
+   * SIEMPRE post-commit desde el buffer del runner, con IDs mínimos: el
+   * cliente recomputa permisos contra el servidor, así que el socket no
+   * transporta autorización ni datos privados de nadie.
+   */
+  async notifyLeadershipChanged(
+    userIds: number[],
+    payload: {
+      projectId: number;
+      historialId: number;
+      liderAnteriorId: number;
+      liderNuevoId: number;
+      origen: string;
+    },
+  ): Promise<void> {
+    const recipients = [...new Set(userIds)];
+    if (recipients.length === 0 || !this.gateway?.server) {
+      return;
+    }
+    await this.gateway.emitToUsers(LEADERSHIP_CHANGED, recipients, payload);
+  }
+
 
   /**
    * C071 (06 v2 §45): efecto realtime del ajuste del líder. Se emite SIEMPRE
