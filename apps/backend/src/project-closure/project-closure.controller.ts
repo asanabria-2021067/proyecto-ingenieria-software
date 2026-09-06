@@ -16,7 +16,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import type { ClosurePhase } from './project-close-readiness.service';
-import { CorrectionDto, GenerateReportDto, RequestCloseDto, ResubmitClosureDto, ReturnExecutionDto } from './dto/closure.dto';
+import { ApproveClosureDto, CorrectionDto, GenerateReportDto, RequestCloseDto, ResubmitClosureDto, ReturnExecutionDto } from './dto/closure.dto';
 import { ProjectClosureReportService } from './project-closure-report.service';
 import { ProjectClosureService } from './project-closure.service';
 import { ProjectCloseReadinessService } from './project-close-readiness.service';
@@ -47,6 +47,14 @@ export class ProjectClosureController {
     protected readonly review: ProjectClosureReviewService,
     protected readonly report: ProjectClosureReportService,
   ) {}
+
+  @Post('aprobar-cierre')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_VEREDICTO' })
+  approve(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: ApproveClosureDto) {
+    return this.review.approveClosure(projectId, user.userId, dto);
+  }
 
   @Post('rechazar-cierre')
   @HttpCode(HttpStatus.OK)
