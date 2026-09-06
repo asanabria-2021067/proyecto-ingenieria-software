@@ -27,6 +27,10 @@ export interface CalculateRecognizableHoursInput {
  */
 export interface RecognizeParticipationHoursResult {
   horasReconocidas: number;
+  /** C077 (§12.2): suma de cachés — lo que el integrante reportó. */
+  horasReportadas: Prisma.Decimal;
+  /** C077 (§12.2): suma de (caché + ajuste vigente válido) — lo que se propone. */
+  horasPropuestas: Prisma.Decimal;
   idsAsignacionesReconocidas: number[];
   horasParticipacion: Prisma.HorasParticipacionGetPayload<Record<string, never>> | null;
 }
@@ -210,28 +214,61 @@ export class HoursRecognitionService {
   ): Promise<RecognizeParticipationHoursResult> {
     const { participationId, sprintId } = input;
 
+    // §12.1: tramos cerrados, con caché, no consumidos, con FK y origen
+    // resueltos. La tarea puede estar eliminada: las horas trabajadas no
+    // desaparecen porque después se borrara la tarea.
     const elegibles = await tx.asignacionTarea.findMany({
-      where: this.buildEligibleAssignmentsWhere(input),
-      select: { idAsignacion: true, horasReales: true },
+      where: {
+        ...this.buildEligibleAssignmentsWhere(input),
+        origenReporte: { not: 'POR_CONCILIAR' },
+      },
+      select: {
+        idAsignacion: true,
+        horasReales: true,
+        ajustes: { where: { anuladoEn: null }, select: { horasBase: true, deltaHoras: true } },
+      },
     });
 
     if (elegibles.length === 0) {
-      return { horasReconocidas: 0, idsAsignacionesReconocidas: [], horasParticipacion: null };
+      // No-op REAL: ni fila cero ficticia ni reescritura de un total correcto.
+      return {
+        horasReconocidas: 0,
+        horasReportadas: new Prisma.Decimal(0),
+        horasPropuestas: new Prisma.Decimal(0),
+        idsAsignacionesReconocidas: [],
+        horasParticipacion: null,
+      };
     }
 
     const idsAsignaciones = elegibles.map((a) => a.idAsignacion);
-    const totalDecimal = elegibles.reduce(
-      (acumulado, a) => acumulado.plus(a.horasReales ?? new Prisma.Decimal(0)),
-      new Prisma.Decimal(0),
-    );
-    const horasReconocidas = totalDecimal.toNumber();
+    let horasReportadas = new Prisma.Decimal(0);
+    let horasPropuestas = new Prisma.Decimal(0);
+    for (const tramo of elegibles) {
+      const cache = tramo.horasReales ?? new Prisma.Decimal(0);
+      horasReportadas = horasReportadas.plus(cache);
+      const vigente = tramo.ajustes[0];
+      if (vigente && !vigente.horasBase.equals(cache)) {
+        // §11: la base del ajuste es la evidencia del reporte que el líder vio.
+        // Si el reporte cambió después, aplicar el delta sobre otro importe
+        // sería una aproximación inventada. Se rechaza y el líder relee.
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'AJUSTE_DESACTUALIZADO',
+          message: 'Un ajuste vigente se calculó sobre un reporte distinto del actual',
+          idAsignacion: tramo.idAsignacion,
+        });
+      }
+      horasPropuestas = horasPropuestas.plus(cache).plus(vigente?.deltaHoras ?? 0);
+    }
+    const horasReconocidas = horasReportadas.toNumber();
 
+    // §12.3: CAS sobre TODOS los ids con una FECHA COMÚN. El conteo exacto es
+    // la garantía: si alguien consumió uno de estos tramos entretanto, se
+    // aborta en vez de persistir un total parcial.
+    const reconocidoEn = new Date();
     const marcado = await tx.asignacionTarea.updateMany({
-      where: {
-        idAsignacion: { in: idsAsignaciones },
-        reconocidoEn: null,
-      },
-      data: { reconocidoEn: new Date() },
+      where: { idAsignacion: { in: idsAsignaciones }, reconocidoEn: null },
+      data: { reconocidoEn },
     });
 
     if (marcado.count !== idsAsignaciones.length) {
@@ -248,42 +285,68 @@ export class HoursRecognitionService {
 
     let horasParticipacion;
     if (existente) {
+      if (existente.estadoHoras !== 'PENDIENTE') {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'AGREGADO_NO_PENDIENTE',
+          message: 'El agregado de horas de esta participación ya no está pendiente',
+          idRegistroHoras: existente.idRegistroHoras,
+        });
+      }
+      if (existente.horasCalculadas === null) {
+        // Fila legacy sin procedencia: no se sabe qué compone su total, así
+        // que incrementarla mezclaría un cálculo nuevo con un origen opaco.
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'AGREGADO_LEGACY_SIN_PROCEDENCIA',
+          message: 'El agregado existente no tiene procedencia calculada y no puede incrementarse',
+          idRegistroHoras: existente.idRegistroHoras,
+        });
+      }
+      // §8: en reconocimientos sucesivos se incrementan AMBAS columnas.
       horasParticipacion = await tx.horasParticipacion.update({
         where: { idRegistroHoras: existente.idRegistroHoras },
-        data: { horasCalculadas: { increment: totalDecimal } },
+        data: {
+          horasReportadas: { increment: horasReportadas },
+          horasCalculadas: { increment: horasPropuestas },
+        },
       });
     } else {
       try {
         horasParticipacion = await tx.horasParticipacion.create({
           data: {
             idParticipacion: participationId,
+            // Nunca una fila con idSprint NULL (§8).
             idSprint: sprintId,
             periodoInicio: hoy,
             periodoFin: hoy,
-            horasReportadas: totalDecimal,
-            horasCalculadas: totalDecimal,
+            horasReportadas,
+            horasCalculadas: horasPropuestas,
+            // horasAprobadas/fechaAprobacion/aprobadoPor NO se tocan:
+            // reconocer no es acreditar. Solo approveClosure acredita (§31).
           },
         });
       } catch (error) {
         if (!this.isHorasParticipacionSprintCollision(error)) {
           throw error;
         }
-        // Otra transacción creó la fila (idParticipacion, idSprint)
-        // concurrentemente entre nuestro findFirst y este create — se
-        // convierte en un increment sobre la fila ganadora, en vez de
-        // propagar el P2002 crudo.
         const ganadora = await tx.horasParticipacion.findFirstOrThrow({
           where: { idParticipacion: participationId, idSprint: sprintId },
         });
         horasParticipacion = await tx.horasParticipacion.update({
           where: { idRegistroHoras: ganadora.idRegistroHoras },
-          data: { horasCalculadas: { increment: totalDecimal } },
+          data: {
+            horasReportadas: { increment: horasReportadas },
+            horasCalculadas: { increment: horasPropuestas },
+          },
         });
       }
     }
 
     return {
       horasReconocidas,
+      horasReportadas,
+      horasPropuestas,
       idsAsignacionesReconocidas: idsAsignaciones,
       horasParticipacion,
     };
