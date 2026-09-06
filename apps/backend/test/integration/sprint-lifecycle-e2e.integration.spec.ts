@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
@@ -136,7 +137,7 @@ describeIntegration(
         tasksContext,
         new ProjectTransactionService(prismaService),
         new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-        new ProjectReadPolicyService(prismaService));
+        new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
       tasksController = new TasksController(tasksService);
 
       const progressService = new ProgressRecordsService(
@@ -199,6 +200,7 @@ describeIntegration(
       // los `deleteMany` redundantes que ese helper repite después sobre
       // los mismos IDs ya borrados son no-ops seguros (count: 0).
       if (assignmentIds.length > 0) {
+        await prisma.registroTiempoTarea.deleteMany({ where: { idAsignacion: { in: assignmentIds } } });
         await prisma.asignacionTarea.deleteMany({ where: { idAsignacion: { in: assignmentIds } } });
       }
       const taskIds = scope.taskIds ?? [];
@@ -285,6 +287,9 @@ describeIntegration(
       expect(asignacion.idParticipacion).toBe(participation.idParticipacion);
 
       // --- C. Cierre real del tramo (A12: marcarComoHecha sincroniza el Hito) ---
+      await prisma.registroTiempoTarea.create({
+        data: { idAsignacion: asignacion.idAsignacion, idUsuario: collaborator.idUsuario, horas: HORAS_REALES, fecha: new Date('2026-09-06') },
+      });
       await runThroughRealGuard(tasksController, 'closeAssignment', project.idProyecto, () =>
         tasksController.closeAssignment(
           project.idProyecto,

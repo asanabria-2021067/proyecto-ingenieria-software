@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from './helpers/time-records.fixture';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
@@ -48,7 +49,7 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
       prismaService,
       fakeNotifications,
       new ProjectTransactionService(prismaService),
-      new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+      new ProjectPolicyService(new ProjectIdResolverService(prismaService)), makeTimeRecordsService(prismaService),
     );
     await prisma.$connect();
   });

@@ -1,3 +1,4 @@
+import { TimeRecordsService } from '../time-records/time-records.service';
 import {
   Injectable,
   Logger,
@@ -42,6 +43,7 @@ export class RolesService {
     private readonly notifications: NotificationsService,
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
+    private readonly timeRecords: TimeRecordsService,
   ) {}
 
   // ───────────────────────── helpers ─────────────────────────
@@ -524,6 +526,9 @@ export class RolesService {
         });
         const idsAsignacion = asignaciones.map((a) => a.idAsignacion);
         if (idsAsignacion.length > 0) {
+          for (const idAsignacion of idsAsignacion) {
+            await this.timeRecords.recalculateAssignment(tx, idAsignacion);
+          }
           await tx.asignacionTarea.updateMany({
             where: { idAsignacion: { in: idsAsignacion } },
             data: { desasignadaEn: timestampRetiro },
