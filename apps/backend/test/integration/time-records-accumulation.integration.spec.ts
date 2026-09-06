@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
