@@ -42,6 +42,7 @@ function parseTipoEventoParam(value: string | undefined): TipoEventoBitacoraValo
 export class BitacoraController {
   constructor(private readonly bitacoraConsulta: BitacoraConsultaService) {}
 
+  /** E091: bitácora del proyecto; la audiencia (líder/admin) la decide §34. */
   @Get()
   findAll(
     @Param('projectId', ParseIntPipe) projectId: number,
