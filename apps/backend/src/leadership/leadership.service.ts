@@ -22,7 +22,7 @@ import { DenyAppealDto } from './dto/deny-appeal.dto';
 import { TransferLeadershipDto } from './dto/transfer-leadership.dto';
 
 /**
- * C091/C093–C097 (06 v2 §18/§19): escrituras de liderazgo — ciclo de vida de la
+ * C091/C093–C098 (06 v2 §18/§19): escrituras de liderazgo — ciclo de vida de la
  * apelación y el motor ÚNICO de cambio de líder.
  *
  * `Proyecto.creadoPor` es la única fuente de verdad sobre quién lidera: este
@@ -352,6 +352,23 @@ export class LeadershipService {
     });
     const salienteTieneParticipacionActiva = participacionesSaliente.length > 0;
 
+    // Rama de aceptación: la apelación se resuelve ANTES de mover el
+    // liderazgo, para que una apelación ya resuelta por otra conexión aborte
+    // el cambio en lugar de dejar historia sin solicitud.
+    const aceptada =
+      input.appealId === undefined
+        ? null
+        : await this.acceptAppealTx(tx, {
+            projectId: input.projectId,
+            appealId: input.appealId,
+            expectedLeaderId: input.expectedLeaderId,
+            adminId: input.adminId,
+          });
+    const origen =
+      aceptada === null
+        ? OrigenCambioLiderazgo.CAMBIO_ADMINISTRATIVO
+        : OrigenCambioLiderazgo.SOLICITUD_LIDER;
+
     const movido = await tx.proyecto.updateMany({
       where: { idProyecto: input.projectId, creadoPor: input.expectedLeaderId },
       data: { creadoPor: input.newLeaderId },
@@ -371,19 +388,24 @@ export class LeadershipService {
         idLiderNuevo: input.newLeaderId,
         idAdminResponsable: input.adminId,
         motivo,
-        origen: OrigenCambioLiderazgo.CAMBIO_ADMINISTRATIVO,
+        origen,
+        // CK14: `SOLICITUD_LIDER` ⇔ hay apelación. La FK es el ÚNICO enlace
+        // entre apelación e historia; el candidato sugerido se lee por ella.
+        idApelacion: aceptada?.idApelacion ?? null,
       },
       select: { idHistorialLiderazgo: true },
     });
 
-    // Cambio directo: la solicitud pendiente del saliente caduca en la MISMA
-    // transacción, para no dejar viva una petición de una autoridad que ya no
-    // existe.
-    await this.autoCancelPendingAppealTx(tx, {
-      projectId: input.projectId,
-      liderAnteriorId,
-      adminId: input.adminId,
-    });
+    if (aceptada === null) {
+      // Cambio directo: la solicitud pendiente del saliente caduca en la MISMA
+      // transacción, para no dejar viva una petición de una autoridad que ya no
+      // existe.
+      await this.autoCancelPendingAppealTx(tx, {
+        projectId: input.projectId,
+        liderAnteriorId,
+        adminId: input.adminId,
+      });
+    }
 
     await this.bitacoraEventos.registrarEvento({
       tx,
@@ -396,13 +418,38 @@ export class LeadershipService {
       valorNuevo: {
         creadoPor: input.newLeaderId,
         idHistorialLiderazgo: historial.idHistorialLiderazgo,
-        origen: OrigenCambioLiderazgo.CAMBIO_ADMINISTRATIVO,
+        origen,
+        idApelacion: aceptada?.idApelacion ?? null,
         motivo,
         // Evidencia del efecto observado, no insumo de decisiones futuras.
         participacionesObservadas: participacionesSaliente.map((fila) => fila.idParticipacion),
         salienteTieneParticipacionActiva,
       },
     });
+
+    if (aceptada !== null) {
+      const proyecto = await tx.proyecto.findUniqueOrThrow({
+        where: { idProyecto: input.projectId },
+        select: { tituloProyecto: true },
+      });
+      const sucesor = await tx.usuario.findUniqueOrThrow({
+        where: { idUsuario: input.newLeaderId },
+        select: { nombre: true, apellido: true },
+      });
+      await this.notifications.persistTemplateTx(
+        tx,
+        [aceptada.idLiderSolicitante],
+        'APELACION_LIDERAZGO_RESUELTA',
+        {
+          projectTitle: proyecto.tituloProyecto,
+          projectId: input.projectId,
+          appealId: aceptada.idApelacion,
+          accepted: true,
+          newLeaderName: `${sucesor.nombre} ${sucesor.apellido}`.trim(),
+        },
+        ctx.effects,
+      );
+    }
 
     const equipoActivo = await this.persistLeadershipNotificationsTx(ctx, {
       projectId: input.projectId,
@@ -421,7 +468,7 @@ export class LeadershipService {
             historialId: historial.idHistorialLiderazgo,
             liderAnteriorId,
             liderNuevoId: input.newLeaderId,
-            origen: OrigenCambioLiderazgo.CAMBIO_ADMINISTRATIVO,
+            origen,
           },
         ),
     });
@@ -436,6 +483,45 @@ export class LeadershipService {
         : 'SIN_MEMBRESIA_OPERATIVA',
     };
   }
+
+  /**
+   * §18/§19: la apelación aceptada debe pertenecer al proyecto y al líder
+   * ESPERADO, y seguir pendiente. El candidato que sugirió permanece
+   * inmutable: el administrador puede designar a otro sucesor elegible sin
+   * reescribir lo que el saliente pidió, porque la sugerencia es un hecho
+   * histórico y no una instrucción vinculante.
+   */
+  private async acceptAppealTx(
+    tx: Prisma.TransactionClient,
+    input: { projectId: number; appealId: number; expectedLeaderId: number; adminId: number },
+  ): Promise<ApelacionRow> {
+    const apelacion = await this.loadAppealTx(tx, input.projectId, input.appealId);
+    if (apelacion.idLiderSolicitante !== input.expectedLeaderId) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'APELACION_DE_OTRO_LIDER',
+        message: 'La apelación no corresponde al líder esperado del proyecto',
+      });
+    }
+    const aceptada = await this.resolveAppealTx(tx, {
+      appealId: input.appealId,
+      estado: EstadoApelacionLiderazgo.ACEPTADA,
+      idAdminResolutor: input.adminId,
+      mensajeResolucion: null,
+    });
+    await this.bitacoraEventos.registrarEvento({
+      tx,
+      tipoEvento: TipoEventoBitacora.LEADERSHIP_APPEAL_ACCEPTED,
+      idActor: input.adminId,
+      idProyecto: input.projectId,
+      tipoEntidad: 'APELACION_LIDERAZGO',
+      idEntidad: input.appealId,
+      valorAnterior: snapshotApelacion(apelacion),
+      valorNuevo: snapshotApelacion(aceptada),
+    });
+    return aceptada;
+  }
+
 
   /** §18: la pendiente del saliente caduca sin resolverse a favor ni en contra. */
   private async autoCancelPendingAppealTx(

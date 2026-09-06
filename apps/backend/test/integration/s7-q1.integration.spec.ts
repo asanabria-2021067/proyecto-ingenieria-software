@@ -780,4 +780,144 @@ describeIntegration('S7 liderazgo y Q1', () => {
     // Participaciones, roles, tareas, asignaciones y horas: idénticas.
     expect(await snapshot()).toEqual(antes);
   });
+
+  it('T20-D: aceptar una apelación relee la participación actual y admite un sucesor distinto del sugerido', async () => {
+    const f = await leadershipFixture(db, scope);
+    const { service, gateway } = leadershipStack(db);
+    // A lidera el proyecto gemelo y, al apelar, participa en dos roles.
+    const a = f.leaderConParticipacion.idUsuario;
+
+    const sugerido = await createIntegrationUser(db);
+    const sucesor = await createIntegrationUser(db);
+    collectInto(scope, 'userIds', [sugerido.idUsuario, sucesor.idUsuario]);
+    const participacionesCandidatos = await Promise.all([
+      createIntegrationParticipation(db, sugerido.idUsuario, f.twinRoleA.idRolProyecto, {
+        estadoParticipacion: 'ACTIVO',
+      }),
+      createIntegrationParticipation(db, sucesor.idUsuario, f.twinRoleA.idRolProyecto, {
+        estadoParticipacion: 'ACTIVO',
+      }),
+    ]);
+    collectInto(
+      scope,
+      'participationIds',
+      participacionesCandidatos.map((fila) => fila.idParticipacion),
+    );
+
+    const apelacion = await service.createAppeal(f.twin.idProyecto, a, {
+      asunto: 'Solicito transferir el liderazgo',
+      mensaje: 'Propongo a un integrante que conoce el proyecto.',
+      idCandidatoPropuesto: sugerido.idUsuario,
+    });
+    expect(apelacion.idCandidatoPropuesto).toBe(sugerido.idUsuario);
+    // Al apelar, A SÍ tenía participación activa.
+    expect(
+      await db.participacionProyecto.count({
+        where: {
+          idUsuario: a,
+          estadoParticipacion: 'ACTIVO',
+          rolProyecto: { idProyecto: f.twin.idProyecto },
+        },
+      }),
+    ).toBe(2);
+
+    // Entre la creación y la aceptación, A deja de participar. Ningún flujo
+    // normal permite a un líder abandonar su ÚLTIMO rol (RolesService.leaveRole
+    // lo rechaza) ni usar la salida ordinaria (reservada a quien no lidera),
+    // así que el estado se prepara aquí: lo que la prueba verifica es que la
+    // aceptación lea el estado ACTUAL, no cómo se llegó a él.
+    await db.participacionProyecto.updateMany({
+      where: { idUsuario: a, rolProyecto: { idProyecto: f.twin.idProyecto } },
+      data: { estadoParticipacion: 'RETIRADO', fechaSalida: new Date() },
+    });
+
+    const resultado = await service.transfer(
+      f.twin.idProyecto,
+      f.admin.idUsuario,
+      {
+        idLiderNuevo: sucesor.idUsuario,
+        expectedLeaderId: a,
+        motivo: 'Se acepta la apelación y se designa a un sucesor elegible.',
+      },
+      apelacion.idApelacion,
+    );
+
+    // El sucesor designado puede diferir del sugerido.
+    expect(resultado.liderNuevoId).toBe(sucesor.idUsuario);
+    expect(resultado.liderNuevoId).not.toBe(sugerido.idUsuario);
+    // Q1 se resolvió con el estado ACTUAL, no con el del momento de apelar, y
+    // la variación no bloqueó la transferencia.
+    expect(resultado.salienteTieneParticipacionActiva).toBe(false);
+    expect(resultado.efectoSaliente).toBe('SIN_MEMBRESIA_OPERATIVA');
+
+    const resuelta = await db.apelacionLiderazgo.findUniqueOrThrow({
+      where: { idApelacion: apelacion.idApelacion },
+    });
+    expect(resuelta.estadoApelacion).toBe('ACEPTADA');
+    expect(resuelta.resueltaEn).not.toBeNull();
+    expect(resuelta.idAdminResolutor).toBe(f.admin.idUsuario);
+    // El candidato sugerido permanece inmutable como hecho histórico.
+    expect(resuelta.idCandidatoPropuesto).toBe(sugerido.idUsuario);
+
+    const historial = await db.historialLiderazgo.findUniqueOrThrow({
+      where: { idHistorialLiderazgo: resultado.historialId },
+    });
+    expect(historial.origen).toBe('SOLICITUD_LIDER');
+    expect(historial.idApelacion).toBe(apelacion.idApelacion);
+    expect(historial.idLiderNuevo).toBe(sucesor.idUsuario);
+    expect(
+      (await db.proyecto.findUniqueOrThrow({ where: { idProyecto: f.twin.idProyecto } })).creadoPor,
+    ).toBe(sucesor.idUsuario);
+
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_APPEAL_ACCEPTED', idObjeto: String(apelacion.idApelacion) },
+      }),
+    ).toBe(1);
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: { accion: 'LEADERSHIP_CHANGED', idObjeto: String(f.twin.idProyecto) },
+      }),
+    ).toBe(1);
+    expect(
+      await db.notificacion.count({
+        where: { idUsuario: a, tipoNotificacion: 'APELACION_LIDERAZGO_RESUELTA' },
+      }),
+    ).toBe(1);
+    expect(
+      gateway.emitToUsers.mock.calls.filter((llamada) => llamada[0] === 'LEADERSHIP_CHANGED'),
+    ).toHaveLength(1);
+
+    // Segundo proyecto: la apelación existe, pero el liderazgo ya cambió y la
+    // intención antigua no se aplica al líder nuevo.
+    const vieja = await service.createAppeal(
+      f.project.idProyecto,
+      f.leaderSinParticipacion.idUsuario,
+      {
+        asunto: 'Apelación previa al cambio',
+        mensaje: 'Se resolverá cuando el liderazgo ya haya cambiado.',
+        idCandidatoPropuesto: f.elegible.idUsuario,
+      },
+    );
+    await service.transfer(f.project.idProyecto, f.admin.idUsuario, {
+      idLiderNuevo: f.elegible.idUsuario,
+      expectedLeaderId: f.leaderSinParticipacion.idUsuario,
+      motivo: 'Cambio administrativo previo a la aceptación tardía.',
+    });
+    await expectStatus(409, () =>
+      service.transfer(
+        f.project.idProyecto,
+        f.admin.idUsuario,
+        {
+          idLiderNuevo: f.deshabilitado.idUsuario,
+          expectedLeaderId: f.leaderSinParticipacion.idUsuario,
+          motivo: 'Aceptación tardía con un líder esperado obsoleto.',
+        },
+        vieja.idApelacion,
+      ),
+    );
+    expect(
+      await db.historialLiderazgo.count({ where: { idProyecto: f.project.idProyecto } }),
+    ).toBe(1);
+  });
 });
