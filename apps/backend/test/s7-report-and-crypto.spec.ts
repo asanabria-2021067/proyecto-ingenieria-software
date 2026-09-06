@@ -8,7 +8,9 @@ import {
   CLOSURE_IV_BYTES,
   CLOSURE_TAG_BYTES,
   sha256Hex,
+  CLOSURE_CRYPTO_KEY_UNAVAILABLE,
   type ClosureAadContext,
+  type ClosureCryptoMetadata,
 } from '../src/storage/closure-crypto.service';
 
 /**
@@ -121,5 +123,83 @@ describe('S7 informe canónico y criptografía de cierre', () => {
     expect(
       service.decrypt(cifradoSegundo.ciphertext, cifradoSegundo, contextoSegundo).equals(segundo),
     ).toBe(true);
+  });
+
+  it('T40-E: la DEK se envuelve con la KEK activa y la rotación conserva la lectura de documentos anteriores', () => {
+    const k1 = fixtureKek(11);
+    const k2 = fixtureKek(22);
+    const primero = Buffer.from('%PDF-1.7\ninforme sellado con la primera clave\n%%EOF\n', 'utf8');
+    const segundo = Buffer.from('%PDF-1.7\ninforme sellado tras la rotación\n%%EOF\n', 'utf8');
+    const contextoSegundo: ClosureAadContext = { ...contextoBase, documentId: 901 };
+
+    // Antes de rotar: la clave activa es k1.
+    const conK1 = cryptoService({ k1 }, 'k1');
+    const selladoPrimero = conK1.seal(primero, contextoBase);
+
+    // La metadata contiene EXACTAMENTE los siete campos del schema cerrado.
+    expect(Object.keys(selladoPrimero.metadata).sort()).toEqual(
+      ['format', 'iv', 'keyId', 'tag', 'wrapIv', 'wrapTag', 'wrappedDek'].sort(),
+    );
+    expect(selladoPrimero.metadata.format).toBe(CLOSURE_CRYPTO_FORMAT);
+    expect(selladoPrimero.metadata.keyId).toBe('k1');
+    // base64 canónico con las longitudes del contrato.
+    const longitudes: Array<[keyof ClosureCryptoMetadata, number]> = [
+      ['wrappedDek', CLOSURE_DEK_BYTES],
+      ['wrapIv', CLOSURE_IV_BYTES],
+      ['wrapTag', CLOSURE_TAG_BYTES],
+      ['iv', CLOSURE_IV_BYTES],
+      ['tag', CLOSURE_TAG_BYTES],
+    ];
+    for (const [campo, bytes] of longitudes) {
+      const valor = selladoPrimero.metadata[campo] as string;
+      const decodificado = Buffer.from(valor, 'base64');
+      expect(decodificado, `${campo} no mide ${bytes} bytes`).toHaveLength(bytes);
+      expect(decodificado.toString('base64'), `${campo} no es base64 canónico`).toBe(valor);
+    }
+    // Ninguna clave en claro viaja en la metadata.
+    const serializada = JSON.stringify(selladoPrimero.metadata);
+    expect(serializada).not.toContain(k1);
+    expect(serializada).not.toContain(Buffer.from(k1, 'base64').toString('hex'));
+
+    expect(conK1.open(selladoPrimero.ciphertext, selladoPrimero.metadata, contextoBase).equals(primero)).toBe(true);
+
+    // Rotación: k2 pasa a ser la activa y k1 se CONSERVA.
+    const rotado = cryptoService({ k1, k2 }, 'k2');
+    const selladoSegundo = rotado.seal(segundo, contextoSegundo);
+    expect(selladoSegundo.metadata.keyId).toBe('k2');
+    // Ambos documentos siguen leyéndose, cada uno con su propia clave.
+    expect(
+      rotado.open(selladoPrimero.ciphertext, selladoPrimero.metadata, contextoBase, {
+        checksumSha256: selladoPrimero.checksumSha256,
+        tamanoBytes: selladoPrimero.tamanoBytes,
+      }).equals(primero),
+    ).toBe(true);
+    expect(
+      rotado.open(selladoSegundo.ciphertext, selladoSegundo.metadata, contextoSegundo).equals(segundo),
+    ).toBe(true);
+
+    // Retirar k1 vuelve ilegible el primero: error explícito, sin material y
+    // sin tocar la metadata, que sigue intacta para un futuro rescate.
+    const antes = JSON.stringify(selladoPrimero.metadata);
+    const sinK1 = cryptoService({ k2 }, 'k2');
+    let fallo: unknown;
+    let emitido: Buffer | undefined;
+    try {
+      emitido = sinK1.open(selladoPrimero.ciphertext, selladoPrimero.metadata, contextoBase);
+    } catch (error) {
+      fallo = error;
+    }
+    expect(emitido).toBeUndefined();
+    expect((fallo as Error).message).toBe(CLOSURE_CRYPTO_KEY_UNAVAILABLE);
+    expect((fallo as Error).message).not.toContain(k1);
+    expect(JSON.stringify(selladoPrimero.metadata)).toBe(antes);
+    // El documento nuevo sí se lee: perder una clave antigua no rompe el resto.
+    expect(
+      sinK1.open(selladoSegundo.ciphertext, selladoSegundo.metadata, contextoSegundo).equals(segundo),
+    ).toBe(true);
+
+    // El servicio no borra nada: no existe ninguna operación de purga aquí.
+    const operaciones = Object.getOwnPropertyNames(Object.getPrototypeOf(sinK1));
+    expect(operaciones.some((nombre) => /delete|purg|destroy|borrar/i.test(nombre))).toBe(false);
   });
 });
