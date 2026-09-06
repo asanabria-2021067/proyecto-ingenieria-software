@@ -18,8 +18,37 @@ import {
   ClosureCanonicalizationError,
   CLOSURE_REPORT_MODEL_SCHEMA,
   projectClosureModel,
+  buildReportContext,
+  computeExecutionFingerprint,
+  computeModelFingerprint,
+  type ClosureExecutionContext,
   type ClosureExecutionInput,
+  type ClosurePresentation,
 } from '../src/project-closure/closure-report-model';
+
+/** Presentación estrecha: solo nombres externos usados por ESE informe. */
+const presentacionBase: ClosurePresentation = {
+  usuarios: [
+    { id: 21, nombre: 'Ana L\u00f3pez' },
+    { id: 7, nombre: 'Ren\u00e9 Mart\u00ednez' },
+  ],
+  catalogos: [{ tipo: 'CARRERA', id: 3, nombre: 'Ingenier\u00eda en Sistemas' }],
+};
+
+function contextoEjecucion(
+  ejecucion: ClosureExecutionInput = entradaEjecucion('directa'),
+  ambiente: ClosureExecutionContext['ambiente'] = undefined,
+  presentacion: ClosurePresentation = presentacionBase,
+): ClosureExecutionContext {
+  return {
+    generatorVersion: 'closure-report/1.0.0',
+    projectId: 41,
+    cicloRevisionOrigenId: 12,
+    datosEjecucion: ejecucion,
+    presentacion,
+    ambiente,
+  };
+}
 
 /**
  * Entrada de ejecución completa. `variante` permite construir la MISMA
@@ -381,6 +410,115 @@ describe('S7 informe canónico y criptografía de cierre', () => {
     expect(() => canonicalJson({ a: 1, b: undefined })).toThrow(ClosureCanonicalizationError);
     expect(() => canonicalJson({ nivel: { profundo: [1, undefined] } })).toThrow(
       ClosureCanonicalizationError,
+    );
+  });
+
+  it('T40-B: la huella de ejecución excluye estado transitorio y presentación mientras la huella de modelo distingue automático de oficial', () => {
+    const base = computeExecutionFingerprint(contextoEjecucion());
+    expect(base).toMatch(/^[0-9a-f]{64}$/);
+
+    // 1) El estado del proyecto pasa de E a S por el propio cierre.
+    const enSolicitud = entradaEjecucion('directa');
+    enSolicitud.proyecto.estadoProyecto = 'EN_SOLICITUD_CIERRE';
+    expect(computeExecutionFingerprint(contextoEjecucion(enSolicitud))).toBe(base);
+
+    // 2..7) Ruido del pipeline que la huella recibe y descarta.
+    const ambientes: Array<[string, ClosureExecutionContext['ambiente']]> = [
+      ['fechaActualizacion', { fechaActualizacion: '2026-09-06T18:00:00.000Z' }],
+      ['postulaciones', { postulaciones: [{ idPostulacion: 5, estado: 'PENDIENTE' }] }],
+      ['documentos', { documentos: [{ idDocumentoCierre: 3, estado: 'DISPONIBLE' }] }],
+      ['número del borrador nuevo', { numeroBorradorNuevo: 4 }],
+      ['eventos del pipeline', { eventosPipeline: [{ accion: 'CLOSURE_AUTOREPORT_GENERATED' }] }],
+      ['membresía derivada del cierre', { membresiaDerivadaDelCierre: [{ idParticipacion: 90, estado: 'COMPLETADO' }] }],
+    ];
+    for (const [caso, ambiente] of ambientes) {
+      expect(computeExecutionFingerprint(contextoEjecucion(undefined, ambiente)), caso).toBe(base);
+    }
+
+    // 7) El nombre de perfil de un usuario externo cambió en la base, pero la
+    // huella se recalcula con la presentación ALMACENADA, así que no varía.
+    expect(
+      computeExecutionFingerprint(
+        contextoEjecucion(undefined, {
+          perfilesActuales: [{ id: 21, nombre: 'Ana L\u00f3pez Solares' }],
+        }),
+      ),
+    ).toBe(base);
+
+    // 8) El nombre de un rol DEL PROYECTO sí es dato operativo.
+    const rolRenombrado = entradaEjecucion('directa');
+    rolRenombrado.participaciones = rolRenombrado.participaciones.map((fila) =>
+      fila.idParticipacion === 90 ? { ...fila, nombreRol: 'Coordinaci\u00f3n' } : fila,
+    );
+    expect(computeExecutionFingerprint(contextoEjecucion(rolRenombrado))).not.toBe(base);
+
+    // 9) Una hora reportada distinta cambia la ejecución.
+    const horaDistinta = entradaEjecucion('directa');
+    horaDistinta.totales.horasReportadas = '4.50';
+    expect(computeExecutionFingerprint(contextoEjecucion(horaDistinta))).not.toBe(base);
+
+    // Cambiar la presentación almacenada sí cambia la huella: forma parte del
+    // sobre, y por eso se captura una sola vez y se guarda.
+    const otraPresentacion: ClosurePresentation = {
+      ...presentacionBase,
+      usuarios: [{ id: 21, nombre: 'Ana L\u00f3pez Solares' }, { id: 7, nombre: 'Ren\u00e9 Mart\u00ednez' }],
+    };
+    expect(computeExecutionFingerprint(contextoEjecucion(undefined, undefined, otraPresentacion))).not.toBe(base);
+
+    // La huella de modelo distingue automático de oficial.
+    const modelo = projectClosureModel(entradaEjecucion('directa'));
+    const automatico = computeModelFingerprint({
+      modelo,
+      fingerprintEjecucion: base,
+      variante: 'AUTOMATICO',
+    });
+    const oficial = computeModelFingerprint({
+      modelo,
+      fingerprintEjecucion: base,
+      variante: 'OFICIAL',
+      oficial: {
+        revisionId: 12,
+        adminId: 1,
+        fechaAprobacion: '2026-09-10T15:00:00.000Z',
+        horasFinales: [{ idParticipacion: 90, horas: '3.00' }],
+        manifiestoEntrega: [{ documentId: 3, orden: 0, checksumSha256: 'a'.repeat(64) }],
+      },
+    });
+    expect(automatico).toMatch(/^[0-9a-f]{64}$/);
+    expect(oficial).not.toBe(automatico);
+    // Y el oficial exige su contexto: no se finge una aprobación.
+    expect(() =>
+      computeModelFingerprint({ modelo, fingerprintEjecucion: base, variante: 'OFICIAL' }),
+    ).toThrow();
+
+    // `contextoReporte` cumple el schema cerrado y no lleva datos de ejecución.
+    const contexto = buildReportContext({
+      cicloRevisionOrigenId: 12,
+      presentacion: presentacionBase,
+      variante: 'AUTOMATICO',
+      fechaGeneracion: '2026-09-06T12:00:00.000Z',
+    });
+    expect(Object.keys(contexto).sort()).toEqual(
+      ['cicloRevisionOrigenId', 'fechaGeneracion', 'presentacion', 'schemaVersion', 'variante'].sort(),
+    );
+    expect(contexto.schemaVersion).toBe(1);
+    expect(contexto.fechaGeneracion).toBe('2026-09-06T12:00:00.000Z');
+    expect(Object.keys(contexto.presentacion).sort()).toEqual(['catalogos', 'usuarios']);
+    const serializado = JSON.stringify(contexto);
+    expect(serializado).not.toContain('datosEjecucion');
+    expect(serializado).not.toContain('tramos');
+    expect(serializado).not.toContain('horasReportadas');
+
+    // La variante oficial añade la aprobación al contexto, sin más.
+    const contextoOficial = buildReportContext({
+      cicloRevisionOrigenId: 12,
+      presentacion: presentacionBase,
+      variante: 'OFICIAL',
+      fechaGeneracion: '2026-09-10T15:00:00.000Z',
+      aprobacion: { adminId: 1, fechaAprobacion: '2026-09-10T15:00:00.000Z', revisionId: 12 },
+    });
+    expect(Object.keys(contextoOficial.aprobacion ?? {}).sort()).toEqual(
+      ['adminId', 'fechaAprobacion', 'revisionId'].sort(),
     );
   });
 });
