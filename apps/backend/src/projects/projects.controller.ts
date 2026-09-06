@@ -196,38 +196,6 @@ export class ProjectsController {
     return this.projectsService.resubmit(id, user.userId);
   }
 
-  @Post(':id/solicitar-cierre')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  requestClose(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.projectsService.requestClose(id, user.userId);
-  }
-
-
-  @Post(':id/aprobar-cierre')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  approveClosure(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.projectsService.approveClosure(id, user.userId);
-  }
-
-
-  @Post(':id/rechazar-cierre')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  rejectClosure(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.projectsService.rejectClosure(id, user.userId);
-  }
-
   @Post(':id/hitos')
   @UseGuards(JwtAuthGuard, ProjectWriteGuard)
   @ProjectWrite(PROJECT_MILESTONE)
