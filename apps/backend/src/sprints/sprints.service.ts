@@ -25,6 +25,7 @@ import {
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { TimeRecordsService } from '../time-records/time-records.service';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): iniciar, finalizar y cerrar un Sprint
@@ -48,7 +49,130 @@ export class SprintsService {
     // las suites existentes construyen SprintsService directamente con 4
     // argumentos posicionales; en producción SprintsModule siempre lo provee.
     private readonly bitacoraEventos?: BitacoraEventosService,
+    // C075: la normalización previa de cachés granulares vacías vive en el
+    // ÚNICO writer de `AsignacionTarea.horasReales`. Sprints no calcula ni
+    // escribe esa columna por su cuenta; delega en él con su propio `tx`.
+    // Opcional por el mismo motivo posicional que `bitacoraEventos`.
+    private readonly timeRecords?: TimeRecordsService,
   ) {}
+
+  /**
+   * C075 (06 v2 §12): las cuatro revalidaciones de finalización, siempre bajo
+   * el lock y siempre sobre el conjunto HISTÓRICO. El detalle importa:
+   *
+   *   F1 — las tareas operativas están HECHO y con traza: un HECHO sin
+   *        ninguna asignación histórica no es trabajo realizado, es una
+   *        casilla marcada.
+   *   F2 — NINGUNA asignación del Sprint sigue abierta, **incluidas las de
+   *        tareas eliminadas**: borrar la tarea no cierra el tramo, y un
+   *        tramo abierto al consolidar dejaría horas fuera del corte.
+   *   F3 — toda asignación con horas tiene participación resuelta y origen
+   *        determinado: sin eso no se sabe a quién ni bajo qué rol acreditar.
+   *   F4 — las cachés granulares coinciden con el SUM efectivo.
+   *
+   * La normalización de tramos cerrados sin registros corre entre F2 y F3:
+   * después de saber que nada sigue abierto y antes de contrastar atribución
+   * y cuadre, para que ambos vean el estado definitivo y no uno donde una
+   * caché NULL se escapa del contraste.
+   *
+   * Devuelve los conteos satisfechos para que la bitácora deje constancia de
+   * QUÉ se revalidó, no solo de que se revalidó.
+   */
+  private async assertFinalizationPredicatesTx(
+    tx: Prisma.TransactionClient,
+    projectId: number,
+    sprintId: number,
+  ): Promise<{ f1: number; f2: number; f3: number; f4: number }> {
+    const tareas = await tx.tarea.findMany({
+      where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
+      select: { idTarea: true, estadoTarea: true, _count: { select: { asignaciones: true } } },
+    });
+    const pendientes = tareas.filter((tarea) => tarea.estadoTarea !== EstadoTarea.HECHO);
+    if (pendientes.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F1_TAREAS_PENDIENTES',
+        message: 'No se puede finalizar el Sprint mientras existan tareas pendientes',
+        idsTarea: pendientes.map((tarea) => tarea.idTarea),
+      });
+    }
+    const sinTraza = tareas.filter((tarea) => tarea._count.asignaciones === 0);
+    if (sinTraza.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F1_HECHO_SIN_TRAZA',
+        message: 'Hay tareas marcadas como HECHO sin ninguna asignación histórica',
+        idsTarea: sinTraza.map((tarea) => tarea.idTarea),
+      });
+    }
+
+    // F2: SIN filtro de `eliminadoEn` — ese es exactamente el caso que se
+    // escapaba y el que este predicado existe para atrapar.
+    const abiertas = await tx.asignacionTarea.findMany({
+      where: { desasignadaEn: null, tarea: { idProyecto: projectId, idSprint: sprintId } },
+      select: { idAsignacion: true, idTarea: true },
+    });
+    if (abiertas.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F2_ASIGNACIONES_ABIERTAS',
+        message: 'No se puede finalizar el Sprint mientras existan asignaciones abiertas',
+        idsAsignacion: abiertas.map((fila) => fila.idAsignacion),
+        idsTarea: [...new Set(abiertas.map((fila) => fila.idTarea))],
+      });
+    }
+
+    // La normalización precede a F3 y F4: materializa a 0 los tramos cerrados
+    // granulares sin registros para que ambos predicados evalúen el estado
+    // definitivo, y no uno en el que una caché NULL se escapa del contraste.
+    await this.timeRecords?.normalizeClosedGranularTx(tx, { projectId, sprintId });
+
+    const conHoras = await tx.asignacionTarea.findMany({
+      where: { horasReales: { not: null }, tarea: { idProyecto: projectId, idSprint: sprintId } },
+      select: { idAsignacion: true, idParticipacion: true, origenReporte: true },
+    });
+    const malAtribuidas = conHoras.filter(
+      (fila) => fila.idParticipacion === null || fila.origenReporte === 'POR_CONCILIAR',
+    );
+    if (malAtribuidas.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F3_ATRIBUCION_INCOMPLETA',
+        message: 'Hay tramos con horas sin participación resuelta u origen sin conciliar',
+        idsAsignacion: malAtribuidas.map((fila) => fila.idAsignacion),
+      });
+    }
+
+    const granulares = await tx.asignacionTarea.findMany({
+      where: {
+        origenReporte: 'GRANULAR',
+        reconocidoEn: null,
+        tarea: { idProyecto: projectId, idSprint: sprintId },
+      },
+      select: {
+        idAsignacion: true,
+        horasReales: true,
+        registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+      },
+    });
+    const descuadradas = granulares.filter((tramo) => {
+      const suma = tramo.registrosTiempo.reduce(
+        (acc, fila) => acc.plus(fila.horas),
+        new Prisma.Decimal(0),
+      );
+      return tramo.horasReales === null || !tramo.horasReales.equals(suma);
+    });
+    if (descuadradas.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F4_CACHE_DESCUADRADA',
+        message: 'Hay cachés granulares que no coinciden con la suma efectiva de registros',
+        idsAsignacion: descuadradas.map((tramo) => tramo.idAsignacion),
+      });
+    }
+
+    return { f1: tareas.length, f2: abiertas.length, f3: conHoras.length, f4: granulares.length };
+  }
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
     if (!ctx.project) {
@@ -186,25 +310,9 @@ export class SprintsService {
         throw new ConflictException('El Sprint ya no está en estado ACTIVO');
       }
 
-      // Tarea.eliminadoEn: null — mismo filtro de soft delete que el resto
-      // del dominio tasks/ ya aplica (TasksContextService.getTaskInProjectOrThrow,
-      // TasksService.findAll/findOne): una tarea eliminada no cuenta como
-      // pendiente. Un Sprint sin ninguna tarea (0 relevantes) cumple
-      // trivialmente "0 tareas no-HECHO" — A4 no introduce una regla de
-      // "mínimo una tarea" que Foundation/A1-A3 nunca definieron.
-      const tareasPendientes = await tx.tarea.count({
-        where: {
-          idProyecto: projectId,
-          idSprint: sprintId,
-          eliminadoEn: null,
-          estadoTarea: { not: EstadoTarea.HECHO },
-        },
-      });
-      if (tareasPendientes > 0) {
-        throw new ConflictException(
-          'No se puede finalizar el Sprint mientras existan tareas pendientes',
-        );
-      }
+      // C075 (§12): las cuatro revalidaciones completas, no solo el conteo de
+      // tareas pendientes. Cualquiera que falle aborta con cero escrituras.
+      const predicados = await this.assertFinalizationPredicatesTx(tx, projectId, sprintId);
 
       const actualizado = await tx.sprint.updateMany({
         where: {
@@ -230,6 +338,25 @@ export class SprintsService {
           `No se pudo leer el Sprint con id ${sprintId} recién finalizado dentro de la transacción`,
         );
       }
+
+      // El actor queda en la bitácora: `Sprint` no tiene columna de
+      // «finalizado por» y este commit no introduce migraciones. La fila
+      // guarda la FECHA; el evento guarda QUIÉN y QUÉ se revalidó.
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.SPRINT_FINALIZED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintId,
+        tipoEntidad: 'SPRINT',
+        idEntidad: sprintId,
+        valorAnterior: { estado: EstadoSprint.ACTIVO },
+        valorNuevo: {
+          estado: EstadoSprint.EN_FINALIZACION,
+          fechaFinalizacionIniciada: filaFinal.fechaFinalizacionIniciada?.toISOString() ?? null,
+          predicados,
+        },
+      });
 
       return filaFinal;
       },
