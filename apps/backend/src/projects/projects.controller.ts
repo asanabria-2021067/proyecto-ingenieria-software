@@ -20,6 +20,28 @@ import { UpdateEstadoProyectoDto } from './dto/update-estado-proyecto.dto';
 import { CreateHitoDto } from './dto/create-hito.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ProjectWriteGuard } from '../common/guards/project-write.guard';
+import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
+
+/**
+ * C031 (06 v2 §32/§41): metadata de las rutas de escritura de proyecto. El
+ * proyecto se resuelve desde `params.id`; el ambiente de Sprint es `ANY`.
+ */
+const PROJECT_EDIT: ProjectWriteMetadata = {
+  source: { kind: 'param', name: 'id' },
+  states: ['B', 'O', 'P', 'E'],
+  sprint: 'ANY',
+  family: 'PROYECTO_EDICION',
+};
+const PROJECT_STATE_CHANGE: ProjectWriteMetadata = { ...PROJECT_EDIT, states: ['B', 'P', 'E'] };
+const PROJECT_SUBMIT: ProjectWriteMetadata = { ...PROJECT_EDIT, states: ['B'], family: 'PUBLICACION_ENVIO' };
+const PROJECT_RESUBMIT: ProjectWriteMetadata = { ...PROJECT_EDIT, states: ['O'], family: 'PUBLICACION_ENVIO' };
+const PROJECT_MILESTONE: ProjectWriteMetadata = {
+  ...PROJECT_EDIT,
+  states: ['B', 'R', 'O', 'P', 'E'],
+  family: 'HITO_CREATE',
+};
+const PROJECT_DELETE: ProjectWriteMetadata = { ...PROJECT_EDIT, states: ['B', 'O'] };
 
 @Controller('proyectos')
 export class ProjectsController {
@@ -118,7 +140,8 @@ export class ProjectsController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_EDIT)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() data: UpdateProjectDto,
@@ -128,7 +151,8 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_EDIT)
   patch(
     @Param('id', ParseIntPipe) id: number,
     @Body() data: UpdateProjectDto,
@@ -138,7 +162,8 @@ export class ProjectsController {
   }
 
   @Patch(':id/estado')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_STATE_CHANGE)
   @HttpCode(HttpStatus.OK)
   changeEstado(
     @Param('id', ParseIntPipe) id: number,
@@ -149,7 +174,8 @@ export class ProjectsController {
   }
 
   @Post(':id/enviar-revision')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_SUBMIT)
   @HttpCode(HttpStatus.OK)
   submitForReview(
     @Param('id', ParseIntPipe) id: number,
@@ -159,7 +185,8 @@ export class ProjectsController {
   }
 
   @Post(':id/reenviar')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_RESUBMIT)
   @HttpCode(HttpStatus.OK)
   resubmit(
     @Param('id', ParseIntPipe) id: number,
@@ -201,7 +228,8 @@ export class ProjectsController {
   }
 
   @Post(':id/hitos')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_MILESTONE)
   @HttpCode(HttpStatus.CREATED)
   createHito(
     @Param('id', ParseIntPipe) id: number,
@@ -225,7 +253,8 @@ export class ProjectsController {
   // -------------------------------------------------
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_DELETE)
   @HttpCode(HttpStatus.OK)
   delete(
     @Param('id', ParseIntPipe) id: number,

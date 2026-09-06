@@ -13,6 +13,9 @@ import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { ProjectsService } from '../../src/projects/projects.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsService } from '../../src/sprints/sprints.service';
@@ -72,7 +75,14 @@ describeIntegration(
       const prismaService = prisma as unknown as PrismaService;
       const notifications = makeFakeNotifications();
 
-      projectsService = new ProjectsService(prismaService, notifications, makeFakeCacheManager());
+      const resolver = new ProjectIdResolverService(prismaService);
+      projectsService = new ProjectsService(
+        prismaService,
+        notifications,
+        makeFakeCacheManager(),
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(resolver),
+      );
 
       const sprintsContext = new SprintsContextService(prismaService);
       const sprintsAuthorization = new SprintsAuthorizationService(sprintsContext);

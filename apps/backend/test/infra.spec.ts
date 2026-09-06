@@ -3,6 +3,7 @@ import { JwtStrategy } from '../src/auth/jwt.strategy';
 import { DraftInactivityService } from '../src/projects/draft-inactivity.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
+import { makeProjectTransactionDouble } from './helpers/project-policy.double';
 
 describe('Infra', () => {
   it('JwtStrategy validate mapea payload de usuario activo', async () => {
@@ -42,15 +43,24 @@ describe('Infra', () => {
         update: vi.fn(),
       },
     };
-    const notifications = { notifyFromTemplate: vi.fn() };
+    // C031: la cancelación relee el borrador antes de adquirir el padre y persiste la notificación con `tx`.
+    prisma.proyecto.findFirst = vi.fn().mockImplementation(async () => (await prisma.proyecto.findMany())[0]);
+    const notifications = { notifyFromTemplate: vi.fn(), persistTemplateTx: vi.fn() };
     const service = new DraftInactivityService(
       prisma as unknown as PrismaService,
       notifications as unknown as NotificationsService,
+      makeProjectTransactionDouble({ tx: prisma, project: { estadoProyecto: 'BORRADOR', eliminadoEn: null } }),
     );
 
     await (service as unknown as { runDailyCheck: () => Promise<void> }).runDailyCheck();
 
     expect(prisma.proyecto.update).toHaveBeenCalled();
-    expect(notifications.notifyFromTemplate).toHaveBeenCalled();
+    expect(notifications.persistTemplateTx).toHaveBeenCalledWith(
+      prisma,
+      [9],
+      'PROYECTO_ACTUALIZADO',
+      expect.objectContaining({ reason: 'draft_inactivity_cancelled' }),
+      expect.objectContaining({ add: expect.any(Function) }),
+    );
   });
 });
