@@ -210,10 +210,51 @@ export class ProjectClosureService {
 
   /** E113: reenvía tras una corrección documental. */
   resubmit(
-    _projectId: number,
-    _actorId: number,
-    _dto: ResubmitClosureDto,
+    projectId: number,
+    actorId: number,
+    dto: ResubmitClosureDto,
   ): Promise<ClosureResult> {
-    return Promise.reject(new Error('resubmit todavía no está implementado'));
+    if (dto.confirmado !== true) throw new BadRequestException('Debe confirmar el reenvío');
+    return this.projectTx.run(projectId, actorId, 'closure.resubmit', async ({ tx, project, effects }) => {
+      if (!project) throw new NotFoundException('Proyecto no encontrado');
+      this.policy.assertProjectState(project, ['S']);
+      await this.policy.assertActorTx(tx, project, 'LIDER', actorId);
+      const ready = await this.readinessService.assertReady(tx, projectId, {
+        phase: 'RESUBMIT', revisionId: dto.revisionId, expectedFingerprint: dto.expectedFingerprint,
+      });
+      await this.policy.assertWriteTx(tx, project, 'CIERRE_ENVIO', actorId);
+      const revision = await tx.revisionCierreProyecto.findFirst({
+        where: { idRevisionCierre: dto.revisionId, idProyecto: projectId, estadoRevision: 'BORRADOR' },
+      });
+      if (!revision) throw new ConflictException('El borrador ya no admite reenvío');
+      const links = await tx.documentoRevisionCierre.findMany({
+        where: { idRevisionCierre: dto.revisionId }, orderBy: [{ orden: 'asc' }, { idDocumentoCierre: 'asc' }],
+        include: { documento: true },
+      });
+      const fingerprintEntrega = canonicalDigest({
+        revisionId: dto.revisionId, executionFingerprint: ready.executionFingerprint,
+        documentos: links.map((link) => ({ id: link.idDocumentoCierre, checksum: link.documento.checksumSha256, orden: link.orden })),
+      });
+      const sent = await tx.revisionCierreProyecto.updateMany({
+        where: { idRevisionCierre: dto.revisionId, idProyecto: projectId, estadoRevision: 'BORRADOR' },
+        data: { estadoRevision: 'ENVIADA', idSolicitante: actorId, enviadaEn: new Date(), fingerprintEntrega },
+      });
+      if (sent.count !== 1) throw new ConflictException('La entrega cambió');
+      const { tituloProyecto: projectTitle } = await tx.proyecto.findUniqueOrThrow({ where: { idProyecto: projectId } });
+      await this.notifications.persistAdminsTx(tx, 'SOLICITUD_CIERRE_PROYECTO', {
+        projectId, projectTitle, revisionId: dto.revisionId, numeroRevision: revision.numeroRevision,
+      }, effects);
+      await this.bitacoraEventos.registrarEvento({
+        tx, tipoEvento: TipoEventoBitacora.PROJECT_CLOSE_DOCUMENTS_SUBMITTED,
+        idActor: actorId, idProyecto: projectId, tipoEntidad: 'REVISION_CIERRE', idEntidad: dto.revisionId,
+        valorAnterior: { estadoRevision: 'BORRADOR' },
+        valorNuevo: { estadoRevision: 'ENVIADA', revisionId: dto.revisionId, fingerprintEntrega,
+          documentos: links.map((link) => ({ id: link.idDocumentoCierre, checksum: link.documento.checksumSha256, orden: link.orden })) },
+      });
+      await this.notifications.deferClosureEventsTx(tx, effects, projectId, project.creadoPor, dto.revisionId);
+      return { projectId, estadoProyecto: 'EN_SOLICITUD_CIERRE', revisionId: dto.revisionId,
+        numeroRevision: revision.numeroRevision, fingerprintEntrega, informeOficialId: null,
+        cantidades: { documentosEnviados: links.length } };
+    }, { publish: (effects) => this.notifications.publishEffects(effects) });
   }
 }
