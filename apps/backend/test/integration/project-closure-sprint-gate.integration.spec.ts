@@ -88,7 +88,7 @@ describeIntegration(
 
       const sprintsContext = new SprintsContextService(prismaService);
       const sprintsAuthorization = new SprintsAuthorizationService(sprintsContext);
-      sprintsService = new SprintsService(prismaService, sprintsContext, sprintsAuthorization, notifications);
+      sprintsService = new SprintsService(prismaService, sprintsContext, sprintsAuthorization, notifications, new ProjectTransactionService(prismaService), new ProjectPolicyService(new ProjectIdResolverService(prismaService)));
     });
 
     afterAll(async () => {
@@ -107,7 +107,7 @@ describeIntegration(
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       await markProjectInProgress(prisma, project.idProyecto);
 
@@ -208,7 +208,7 @@ describeIntegration(
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       await markProjectInProgress(prisma, project.idProyecto);
 

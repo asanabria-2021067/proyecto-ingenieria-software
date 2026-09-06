@@ -12,16 +12,44 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ProjectWriteGuard } from '../common/guards/project-write.guard';
+import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { SprintsService } from './sprints.service';
 import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
+
+/**
+ * C045 (06 v2 §32/§41 E060–E062): ciclo de vida del Sprint. El proyecto se
+ * resuelve desde `params.projectId` y las tres operaciones exigen P/E; el
+ * ambiente distingue cada una: iniciar solo sin Sprint operable, finalizar
+ * con un Sprint ACTIVO y cerrar con uno EN_FINALIZACION.
+ */
+const SPRINT_START: ProjectWriteMetadata = {
+  source: { kind: 'param', name: 'projectId' },
+  states: ['P', 'E'],
+  sprint: 'NONE_OPERABLE',
+  family: 'SPRINT_START',
+};
+const SPRINT_FINALIZE: ProjectWriteMetadata = {
+  ...SPRINT_START,
+  sprint: 'ACTIVO',
+  family: 'SPRINT_FINALIZE',
+};
+const SPRINT_CLOSE: ProjectWriteMetadata = {
+  ...SPRINT_START,
+  sprint: 'EN_FINALIZACION',
+  family: 'SPRINT_CLOSE',
+};
 
 @Controller('proyectos/:projectId/sprints')
 @UseGuards(JwtAuthGuard)
 export class SprintsController {
   constructor(private readonly sprintsService: SprintsService) {}
 
+  /** E060: iniciar Sprint (líder, sin Sprint operable). */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(SPRINT_START)
   start(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
@@ -29,8 +57,11 @@ export class SprintsController {
     return this.sprintsService.startSprint(projectId, user.userId);
   }
 
+  /** E061: finalizar el Sprint ACTIVO. */
   @Post(':sprintId/finalizar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(SPRINT_FINALIZE)
   finalize(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('sprintId', ParseIntPipe) sprintId: number,
@@ -39,8 +70,11 @@ export class SprintsController {
     return this.sprintsService.finalizeSprint(projectId, sprintId, user.userId);
   }
 
+  /** E062: cerrar el Sprint EN_FINALIZACION. */
   @Post(':sprintId/cerrar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(SPRINT_CLOSE)
   close(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('sprintId', ParseIntPipe) sprintId: number,

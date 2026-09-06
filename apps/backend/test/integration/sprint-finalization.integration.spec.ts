@@ -14,6 +14,9 @@ import { SprintsContextService } from '../../src/sprints/sprints-context.service
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 
 /**
  * Integración real A4: SprintsService.finalizeSprint contra PostgreSQL real
@@ -48,7 +51,8 @@ describeIntegration(
           context,
           authorization,
           notifications as unknown as NotificationsService,
-        ),
+          new ProjectTransactionService(prisma as unknown as PrismaService),
+          new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService))),
         notifications,
       };
     }
@@ -73,7 +77,7 @@ describeIntegration(
     it('tarea pendiente: finalizeSprint rechaza con ConflictException y el Sprint permanece ACTIVO sin fechaFinalizacionIniciada', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
       scope.sprintIds = [sprint.idSprint];
@@ -101,7 +105,7 @@ describeIntegration(
     it('todas las tareas HECHO: finalizeSprint transiciona a EN_FINALIZACION y persiste fechaFinalizacionIniciada', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
       scope.sprintIds = [sprint.idSprint];
@@ -123,7 +127,7 @@ describeIntegration(
     it('concurrencia real: exactamente una de dos finalizaciones simultáneas gana, con exactamente una notificación', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
       scope.sprintIds = [sprint.idSprint];
