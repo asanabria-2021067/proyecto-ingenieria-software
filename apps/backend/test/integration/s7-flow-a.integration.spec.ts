@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import { backWithEntries, cleanupFlowAFixture, closedTask, flowAFixture, flowAStack } from './setup/flow-a';
 import type { IntegrationCleanupScope } from './setup/cleanup';
+import { createIntegrationParticipation, createIntegrationUser } from './setup/fixtures';
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
   try {
@@ -104,5 +105,58 @@ describeIntegration('S7 Flow A — consolidación de Sprint', () => {
     );
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'SPRINT_FINALIZED' } })).toBe(1);
     expect(notifyFinalization).toHaveBeenCalledTimes(1);
+  });
+
+  it('T08-B: la lista de participaciones elegibles se deriva de los tramos e incluye retirados y completados con contribuciones no consumidas', async () => {
+    const f = await flowAFixture(db, scope, 'EN_FINALIZACION');
+    const { recognition } = flowAStack(db);
+
+    // Un tercer y cuarto miembro: uno RETIRADO y otro COMPLETADO, ambos con
+    // contribuciones que nadie ha consumido todavía.
+    const retirado = await createIntegrationUser(db);
+    const completado = await createIntegrationUser(db);
+    f.collect('userIds', [retirado.idUsuario, completado.idUsuario]);
+    const participacionRetirado = await createIntegrationParticipation(db, retirado.idUsuario, f.role.idRolProyecto, { estadoParticipacion: 'RETIRADO' });
+    const participacionCompletado = await createIntegrationParticipation(db, completado.idUsuario, f.role.idRolProyecto, { estadoParticipacion: 'COMPLETADO' });
+    f.collect('participationIds', [participacionRetirado.idParticipacion, participacionCompletado.idParticipacion]);
+
+    const base = {
+      projectId: f.project.idProyecto, sprintId: f.sprint.idSprint, leaderId: f.leader.idUsuario,
+    };
+    // A: participante ACTIVO con horas → elegible.
+    await closedTask(db, scope, { ...base, userId: f.memberA.idUsuario, participationId: f.participationA.idParticipacion, horasReales: '3.00' });
+    // RETIRADO con horas no consumidas → elegible.
+    await closedTask(db, scope, { ...base, userId: retirado.idUsuario, participationId: participacionRetirado.idParticipacion, horasReales: '2.00' });
+    // COMPLETADO con horas no consumidas → elegible.
+    await closedTask(db, scope, { ...base, userId: completado.idUsuario, participationId: participacionCompletado.idParticipacion, horasReales: '1.00' });
+    // B: tramo YA consumido por una salida anticipada → NO elegible.
+    await closedTask(db, scope, {
+      ...base, userId: f.memberB.idUsuario, participationId: f.participationB.idParticipacion,
+      horasReales: '4.00', reconocidoEn: new Date('2026-09-01T08:00:00.000Z'),
+    });
+    // El participante B no tiene ningún otro tramo, y hay un quinto miembro
+    // ACTIVO sin ningún tramo en absoluto.
+    const sinTramos = await createIntegrationUser(db);
+    f.collect('userIds', [sinTramos.idUsuario]);
+    const participacionSinTramos = await createIntegrationParticipation(db, sinTramos.idUsuario, f.role.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+    f.collect('participationIds', [participacionSinTramos.idParticipacion]);
+
+    const elegibles = await db.$transaction((tx) =>
+      recognition.listEligibleParticipationsTx(tx, { projectId: f.project.idProyecto, sprintId: f.sprint.idSprint }),
+    );
+
+    const esperadas = [
+      f.participationA.idParticipacion,
+      participacionRetirado.idParticipacion,
+      participacionCompletado.idParticipacion,
+    ].sort((a, b) => a - b);
+    expect(elegibles).toEqual(esperadas);
+    // El activo sin tramos no aparece; el consumido por Flow B tampoco.
+    expect(elegibles).not.toContain(participacionSinTramos.idParticipacion);
+    expect(elegibles).not.toContain(f.participationB.idParticipacion);
+    // Enumerar no escribe: ningún estado de participación cambió.
+    expect((await db.participacionProyecto.findUniqueOrThrow({ where: { idParticipacion: participacionRetirado.idParticipacion } })).estadoParticipacion).toBe('RETIRADO');
+    expect((await db.participacionProyecto.findUniqueOrThrow({ where: { idParticipacion: participacionCompletado.idParticipacion } })).estadoParticipacion).toBe('COMPLETADO');
+    expect(await db.horasParticipacion.count({ where: { idSprint: f.sprint.idSprint } })).toBe(0);
   });
 });
