@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { ProgressRecordsService } from '../src/progress-records/progress-records.service';
+import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
 
 const PROJECT_ID = 10;
 const TASK_ID = 20;
@@ -10,6 +11,8 @@ const ASSIGNMENT_ID = 30;
 const RECORD_ID = 40;
 const AUTHOR_ID = 50;
 const OTHER_USER_ID = 60;
+// C042: las validaciones de contexto ocurren dentro del `run` del protocolo,
+// por eso reciben el cliente transaccional (aquí, el mismo mock de Prisma).
 const LONG_CONTENT = 'a'.repeat(200);
 const UPDATED_CONTENT = 'b'.repeat(220);
 
@@ -30,9 +33,13 @@ function setup() {
     assertActiveProjectParticipant: vi.fn(),
   };
 
+  // C042: el servicio corre sobre el protocolo; el doble del runner entrega
+  // este mismo mock como `tx` y la policy es no-op.
   const service = new ProgressRecordsService(
     prisma as unknown as PrismaService,
     tasksContext as unknown as TasksContextService,
+    makeProjectTransactionDouble({ tx: prisma }),
+    makeProjectPolicyDouble(),
   );
 
   prisma.asignacionTarea.findFirst.mockResolvedValue({
@@ -79,12 +86,12 @@ describe('ProgressRecordsService', () => {
       contenido: LONG_CONTENT,
     });
 
-    expect(tasksContext.getTaskInProjectOrThrow).toHaveBeenCalledWith(PROJECT_ID, TASK_ID);
+    expect(tasksContext.getTaskInProjectOrThrow).toHaveBeenCalledWith(PROJECT_ID, TASK_ID, prisma);
     expect(prisma.asignacionTarea.findFirst).toHaveBeenCalledWith({
       where: { idAsignacion: ASSIGNMENT_ID, idTarea: TASK_ID },
       select: { idAsignacion: true, idTarea: true, idUsuario: true },
     });
-    expect(tasksContext.assertActiveProjectParticipant).toHaveBeenCalledWith(PROJECT_ID, AUTHOR_ID);
+    expect(tasksContext.assertActiveProjectParticipant).toHaveBeenCalledWith(PROJECT_ID, AUTHOR_ID, prisma);
     expect(prisma.registroAvanceAsignacion.create).toHaveBeenCalledWith({
       data: { idAsignacion: ASSIGNMENT_ID, idAutor: AUTHOR_ID, contenido: LONG_CONTENT },
     });
@@ -101,12 +108,12 @@ describe('ProgressRecordsService', () => {
       contenido: UPDATED_CONTENT,
     });
 
-    expect(tasksContext.getTaskInProjectOrThrow).toHaveBeenCalledWith(PROJECT_ID, TASK_ID);
+    expect(tasksContext.getTaskInProjectOrThrow).toHaveBeenCalledWith(PROJECT_ID, TASK_ID, prisma);
     expect(prisma.registroAvanceAsignacion.findFirst).toHaveBeenCalledWith({
       where: { idRegistroAvance: RECORD_ID, idAsignacion: ASSIGNMENT_ID },
       select: { idRegistroAvance: true, idAsignacion: true, idAutor: true },
     });
-    expect(tasksContext.assertActiveProjectParticipant).toHaveBeenCalledWith(PROJECT_ID, AUTHOR_ID);
+    expect(tasksContext.assertActiveProjectParticipant).toHaveBeenCalledWith(PROJECT_ID, AUTHOR_ID, prisma);
     expect(prisma.registroAvanceAsignacion.update).toHaveBeenCalledWith({
       where: { idRegistroAvance: RECORD_ID },
       data: { contenido: UPDATED_CONTENT, editadoEn: now },
@@ -158,7 +165,7 @@ describe('ProgressRecordsService', () => {
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
-    expect(tasksContext.assertActiveProjectParticipant).toHaveBeenCalledWith(PROJECT_ID, AUTHOR_ID);
+    expect(tasksContext.assertActiveProjectParticipant).toHaveBeenCalledWith(PROJECT_ID, AUTHOR_ID, prisma);
     expect(prisma.registroAvanceAsignacion.update).not.toHaveBeenCalled();
   });
 

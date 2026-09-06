@@ -139,7 +139,12 @@ describeIntegration(
         new ProjectReadPolicyService(prismaService));
       tasksController = new TasksController(tasksService);
 
-      const progressService = new ProgressRecordsService(prismaService, tasksContext);
+      const progressService = new ProgressRecordsService(
+        prismaService,
+        tasksContext,
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+      );
       progressController = new ProgressRecordsController(progressService);
 
       const exitContext = new ExitRequestsContextService(prismaService);
