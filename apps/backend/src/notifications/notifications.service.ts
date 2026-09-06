@@ -1,7 +1,7 @@
 import { Injectable, ForbiddenException, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsGateway } from './notifications.gateway';
+import { NotificationsGateway, SPRINT_HOURS_ADJUSTED } from './notifications.gateway';
 import {
   NOTIFICATION_TEMPLATES,
   NotificationTemplateKey,
@@ -469,6 +469,38 @@ export class NotificationsService {
     if (this.gateway?.server) {
       await this.gateway.notifyTaskHoursLogged(
         participaciones.map((p) => p.idUsuario),
+        payload,
+      );
+    }
+  }
+
+  /**
+   * C071 (06 v2 §45): efecto realtime del ajuste del líder. Se emite SIEMPRE
+   * post-commit desde el buffer del runner — nunca dentro de la transacción —
+   * y no persiste ninguna fila de notificación: §44 no cataloga notificación
+   * para el ajuste, solo el evento en vivo para quien está mirando el cierre.
+   */
+  async notifySprintHoursAdjusted(
+    idProyecto: number,
+    actorId: number,
+    payload: { projectId: number; sprintId: number; idAsignacion: number },
+    tx?: TxClient,
+  ): Promise<void> {
+    const db = tx ?? this.prisma;
+    const participaciones = await db.participacionProyecto.findMany({
+      where: {
+        estadoParticipacion: 'ACTIVO',
+        idUsuario: { not: actorId },
+        rolProyecto: { idProyecto },
+      },
+      distinct: ['idUsuario'],
+      select: { idUsuario: true },
+    });
+
+    if (this.gateway?.server) {
+      await this.gateway.emitToUsers(
+        SPRINT_HOURS_ADJUSTED,
+        participaciones.map((fila) => fila.idUsuario),
         payload,
       );
     }
