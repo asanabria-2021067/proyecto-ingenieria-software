@@ -1,5 +1,7 @@
-import { Controller, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AdminProjectsQueryDto } from './dto/admin-projects-query.dto';
 import { HistoricalProjectReadService } from './historical-project-read.service';
 
 /**
@@ -12,4 +14,19 @@ import { HistoricalProjectReadService } from './historical-project-read.service'
 @UseGuards(JwtAuthGuard)
 export class AdminProjectsController {
   constructor(protected readonly historical: HistoricalProjectReadService) {}
+
+  /** E116: bandeja por grupo, paginada. */
+  @Get()
+  list(@CurrentUser() user: { userId: number }, @Query() query: AdminProjectsQueryDto) {
+    return this.historical.adminList(user.userId, query);
+  }
+
+  /** E117: detalle; en vivo solo Sprints cerrados, en cerrado el histórico. */
+  @Get(':projectId')
+  detail(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.historical.adminDetail(user.userId, projectId);
+  }
 }

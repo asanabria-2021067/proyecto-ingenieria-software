@@ -4,6 +4,29 @@ import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import { closedProjectFixture, cleanupHistoricalFixture, historicalStack } from './setup/historical-read';
 import type { ClosureCleanupScope } from './setup/closure-storage';
+import { ValidationPipe } from '@nestjs/common';
+import { AdminProjectsQueryDto } from '../../src/project-closure/dto/admin-projects-query.dto';
+import { createIntegrationAdmin } from './setup/leadership';
+import {
+  createIntegrationProject,
+  createIntegrationSprint,
+  createIntegrationUser,
+} from './setup/fixtures';
+
+/** Mismo pipe que main.ts: la paginación inválida la rechaza el borde. */
+const pipe = new ValidationPipe({
+  whitelist: true,
+  forbidNonWhitelisted: true,
+  transform: true,
+  transformOptions: { enableImplicitConversion: true },
+});
+
+function parseAdminQuery(plain: unknown): Promise<AdminProjectsQueryDto> {
+  return pipe.transform(plain, {
+    type: 'query',
+    metatype: AdminProjectsQueryDto,
+  }) as Promise<AdminProjectsQueryDto>;
+}
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
   try {
@@ -126,5 +149,154 @@ describeIntegration('S7 lectura histórica de proyectos', () => {
     await expectStatus(403, () =>
       service.historicalProject(f.project.idProyecto, f.externo.idUsuario),
     );
+  });
+
+  it('T35-B: el administrador ve los cuatro grupos y solo Sprints cerrados, y el exlíder sin participación solo sus propios hechos', async () => {
+    const f = await closedProjectFixture(db, scope);
+    const { service, readPolicy, bitacora } = historicalStack(db);
+    const admin = await createIntegrationAdmin(db, scope);
+
+    // Un proyecto por grupo, además del cerrado del fixture.
+    const vivo = await createIntegrationProject(db, f.leader.idUsuario, {
+      estadoProyecto: 'EN_PROGRESO',
+    });
+    const enRevision = await createIntegrationProject(db, f.leader.idUsuario, {
+      estadoProyecto: 'EN_REVISION',
+    });
+    const enCierre = await createIntegrationProject(db, f.leader.idUsuario, {
+      estadoProyecto: 'EN_SOLICITUD_CIERRE',
+    });
+    scope.projectIds = [
+      ...(scope.projectIds ?? []),
+      vivo.idProyecto,
+      enRevision.idProyecto,
+      enCierre.idProyecto,
+    ];
+    const sprintActivo = await createIntegrationSprint(db, vivo.idProyecto, { estado: 'ACTIVO' });
+    const sprintCerrado = await createIntegrationSprint(db, vivo.idProyecto, {
+      estado: 'CERRADO',
+      numero: 2,
+    });
+    scope.sprintIds = [...(scope.sprintIds ?? []), sprintActivo.idSprint, sprintCerrado.idSprint];
+
+    // Los cuatro grupos mapean exactamente sus estados.
+    const grupos: Array<[AdminProjectsQueryDto['grupo'], number, string]> = [
+      ['activos', vivo.idProyecto, 'MONITOREAR'],
+      ['revision', enRevision.idProyecto, 'REVISAR_PUBLICACION'],
+      ['cierres', enCierre.idProyecto, 'REVISAR_CIERRE'],
+      ['cerrados', f.project.idProyecto, 'CONSULTAR_HISTORICO'],
+    ];
+    for (const [grupo, esperado, accion] of grupos) {
+      const pagina = await service.adminList(admin.idUsuario, await parseAdminQuery({ grupo }));
+      expect(pagina.page, grupo).toBe(1);
+      expect(pagina.limit, grupo).toBe(20);
+      const fila = pagina.items.find((item) => item.idProyecto === esperado);
+      expect(fila, grupo).toBeDefined();
+      expect(fila!.accion, grupo).toBe(accion);
+      expect((fila!.lider as { idUsuario: number }).idUsuario, grupo).toBe(f.leader.idUsuario);
+      expect(typeof fila!.usuariosActivos, grupo).toBe('number');
+      // Ninguna fila del grupo pertenece a otro estado.
+      const estados = new Set(pagina.items.map((item) => item.estadoProyecto));
+      for (const estado of estados) {
+        expect(
+          grupo === 'activos'
+            ? ['PUBLICADO', 'EN_PROGRESO']
+            : grupo === 'revision'
+              ? ['EN_REVISION', 'OBSERVADO']
+              : grupo === 'cierres'
+                ? ['EN_SOLICITUD_CIERRE']
+                : ['CERRADO'],
+          grupo,
+        ).toContain(estado as string);
+      }
+    }
+
+    // El Sprint ambiente viaja como RESUMEN, sin detalle.
+    const activos = await service.adminList(
+      admin.idUsuario,
+      await parseAdminQuery({ grupo: 'activos' }),
+    );
+    const filaViva = activos.items.find((item) => item.idProyecto === vivo.idProyecto)!;
+    expect(filaViva.sprintAmbiente).toMatchObject({
+      idSprint: sprintActivo.idSprint,
+      estado: 'ACTIVO',
+    });
+    expect(Object.keys(filaViva.sprintAmbiente as object).sort()).toEqual([
+      'estado',
+      'idSprint',
+      'numero',
+    ]);
+
+    // Paginación fuera de rango: la rechaza el borde, y el default es 20.
+    await expectStatus(400, () => parseAdminQuery({ grupo: 'activos', limit: 51 }));
+    await expectStatus(400, () => parseAdminQuery({ grupo: 'activos', page: 0 }));
+    await expectStatus(400, () => parseAdminQuery({ grupo: 'inventado' }));
+
+    // Detalle de un proyecto VIVO: resumen, miembros y liderazgo, y de los
+    // Sprints solo los cerrados.
+    const detalleVivo = await service.adminDetail(admin.idUsuario, vivo.idProyecto);
+    expect(detalleVivo.resumen).toBeDefined();
+    expect(detalleVivo.miembros).toBeDefined();
+    expect(detalleVivo.liderazgo).toBeDefined();
+    const sprintsVistos = detalleVivo.sprints as Array<{ idSprint: number; estado: string }>;
+    expect(sprintsVistos.map((sprint) => sprint.idSprint)).toEqual([sprintCerrado.idSprint]);
+    expect(sprintsVistos.every((sprint) => sprint.estado === 'CERRADO')).toBe(true);
+    expect(Object.values(detalleVivo.permisos as Record<string, boolean>).every((v) => v === false)).toBe(
+      true,
+    );
+
+    // El detalle de un Sprint ACTIVO se le niega al administrador.
+    await expectStatus(403, () =>
+      readPolicy.assertRead(undefined, {
+        projectId: vivo.idProyecto,
+        actorId: admin.idUsuario,
+        scope: 'sprints',
+        entitySprintId: sprintActivo.idSprint,
+      }),
+    );
+
+    // Detalle de un proyecto CERRADO: histórico completo.
+    const detalleCerrado = await service.adminDetail(admin.idUsuario, f.project.idProyecto);
+    expect(detalleCerrado.informeOficial).toBeDefined();
+    expect(detalleCerrado.sprintsCerrados).toBeDefined();
+
+    // La bitácora admite al administrador además del líder.
+    const eventosAdmin = await bitacora.listEventos(vivo.idProyecto, admin.idUsuario, {
+      page: 1,
+      limit: 20,
+    });
+    expect(Array.isArray(eventosAdmin.data)).toBe(true);
+
+    // Un exlíder sin participación: solo sus propios hechos de liderazgo.
+    const exLider = await createIntegrationUser(db);
+    scope.userIds = [...(scope.userIds ?? []), exLider.idUsuario];
+    await db.historialLiderazgo.create({
+      data: {
+        idProyecto: vivo.idProyecto,
+        idLiderAnterior: exLider.idUsuario,
+        idLiderNuevo: f.leader.idUsuario,
+        idAdminResponsable: admin.idUsuario,
+        motivo: 'Cambio administrativo previo.',
+        origen: 'CAMBIO_ADMINISTRATIVO',
+      },
+    });
+
+    const suLiderazgo = await readPolicy.assertRead(undefined, {
+      projectId: vivo.idProyecto,
+      actorId: exLider.idUsuario,
+      scope: 'liderazgo',
+    });
+    expect(suLiderazgo.profile).toBe('EXLIDER_SIN_PARTICIPACION');
+    expect(suLiderazgo.ownOnly).toBe(true);
+    // Y nada más: ni bitácora, ni histórico general, ni bandeja administrativa.
+    await expectStatus(403, () =>
+      bitacora.listEventos(vivo.idProyecto, exLider.idUsuario, { page: 1, limit: 20 }),
+    );
+    await expectStatus(403, () =>
+      service.historicalProject(vivo.idProyecto, exLider.idUsuario),
+    );
+    const consultaActivos = await parseAdminQuery({ grupo: 'activos' });
+    await expectStatus(403, () => service.adminList(exLider.idUsuario, consultaActivos));
+    await expectStatus(403, () => service.adminDetail(exLider.idUsuario, vivo.idProyecto));
   });
 });
