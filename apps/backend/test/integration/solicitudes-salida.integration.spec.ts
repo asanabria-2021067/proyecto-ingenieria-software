@@ -14,6 +14,10 @@ import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setu
 import { ExitRequestsAuthorizationService } from '../../src/exit-requests/exit-requests.authorization.service';
 import { ExitRequestsContextService } from '../../src/exit-requests/exit-requests.context.service';
 import { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real T-111 (Tarea 7): concurrencia real de
@@ -49,7 +53,9 @@ describeIntegration(
         fakeNotifications,
         new ExitRequestsAuthorizationService(context),
         context,
-      );
+        new ProjectTransactionService(prisma as unknown as PrismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
+        new ProjectReadPolicyService(prisma as unknown as PrismaService));
       await prisma.$connect();
     });
 
@@ -85,7 +91,7 @@ describeIntegration(
       const member = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, member.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const role = await createIntegrationProjectRole(prisma, project.idProyecto);

@@ -1,12 +1,21 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+type Db = Prisma.TransactionClient | PrismaService;
+
+/**
+ * C044 (06 v2 §13/§40): todas las consultas de contexto aceptan el cliente
+ * transaccional del runner por proyecto; dentro de una escritura siempre se
+ * pasa `tx`, de modo que proyecto, participación y solicitud se leen bajo el
+ * mismo lock que decide. Este servicio nunca abre una transacción propia.
+ */
 @Injectable()
 export class ExitRequestsContextService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getProjectOrThrow(idProyecto: number) {
-    const proyecto = await this.prisma.proyecto.findFirst({
+  async getProjectOrThrow(idProyecto: number, db: Db = this.prisma) {
+    const proyecto = await db.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
       select: { idProyecto: true, creadoPor: true },
     });
@@ -16,8 +25,8 @@ export class ExitRequestsContextService {
     return proyecto;
   }
 
-  async getLeaderProjectOrThrow(idProyecto: number) {
-    const proyecto = await this.prisma.proyecto.findFirst({
+  async getLeaderProjectOrThrow(idProyecto: number, db: Db = this.prisma) {
+    const proyecto = await db.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
       select: { idProyecto: true, estadoProyecto: true, creadoPor: true, tituloProyecto: true },
     });
@@ -27,8 +36,8 @@ export class ExitRequestsContextService {
     return proyecto;
   }
 
-  async getActiveParticipation(idProyecto: number, idUsuario: number) {
-    return this.prisma.participacionProyecto.findFirst({
+  async getActiveParticipation(idProyecto: number, idUsuario: number, db: Db = this.prisma) {
+    return db.participacionProyecto.findFirst({
       where: {
         idUsuario,
         estadoParticipacion: 'ACTIVO',
@@ -38,8 +47,8 @@ export class ExitRequestsContextService {
     });
   }
 
-  async getPendingSolicitudSalidaOrThrow(idProyecto: number, idSolicitud: number) {
-    const solicitud = await this.prisma.solicitudSalidaProyecto.findFirst({
+  async getPendingSolicitudSalidaOrThrow(idProyecto: number, idSolicitud: number, db: Db = this.prisma) {
+    const solicitud = await db.solicitudSalidaProyecto.findFirst({
       where: { idSolicitud, idProyecto },
     });
     if (!solicitud) {
