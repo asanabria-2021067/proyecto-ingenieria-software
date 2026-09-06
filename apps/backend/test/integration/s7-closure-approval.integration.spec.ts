@@ -7,7 +7,7 @@ import { createIntegrationPrismaClient, describeIntegration } from './setup/data
 import { cleanupClosureLifecycle, closureReadyFixture } from './setup/closure-lifecycle';
 import { pdfFixture, type ClosureCleanupScope } from './setup/closure-storage';
 import { createIntegrationAdmin } from './setup/leadership';
-import { createIntegrationParticipation, createIntegrationUser } from './setup/fixtures';
+import { createIntegrationParticipation, createIntegrationProject, createIntegrationProjectRole, createIntegrationSprint, createIntegrationUser } from './setup/fixtures';
 import { useSecondClient } from './setup/concurrency';
 
 const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
@@ -20,7 +20,7 @@ async function expectStatus(status: number, fn: () => Promise<unknown>): Promise
   throw new Error(`Se esperaba HTTP ${status}`);
 }
 
-async function readyForApproval(db: PrismaClient, scope: ClosureCleanupScope) {
+async function readyForApproval(db: PrismaClient, scope: ClosureCleanupScope, includeNoContribution = false) {
   const f = await closureReadyFixture(db, scope);
   const admin = await createIntegrationAdmin(db, scope);
   const retiredUser = await createIntegrationUser(db);
@@ -31,6 +31,13 @@ async function readyForApproval(db: PrismaClient, scope: ClosureCleanupScope) {
     idParticipacion: retired.idParticipacion, periodoInicio: new Date('2026-09-01'), periodoFin: new Date('2026-09-02'),
     horasReportadas: '2.00', horasCalculadas: '2.00', estadoHoras: 'PENDIENTE', idSprint: f.sprint.idSprint,
   } });
+  let noContribution: Awaited<ReturnType<typeof createIntegrationParticipation>> | null = null;
+  if (includeNoContribution) {
+    const user = await createIntegrationUser(db);
+    scope.userIds = [...(scope.userIds ?? []), user.idUsuario];
+    noContribution = await createIntegrationParticipation(db, user.idUsuario, f.role.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+    scope.participationIds = [...(scope.participationIds ?? []), noContribution.idParticipacion];
+  }
   const evidence = await f.stack.documentos.service.reserve(f.project.idProyecto, f.leader.idUsuario, {
     revisionId: f.dto.revisionId, nombreArchivo: 'segunda-evidencia-aprobacion.pdf',
   });
@@ -39,7 +46,7 @@ async function readyForApproval(db: PrismaClient, scope: ClosureCleanupScope) {
   const submitted = await f.stack.closure.requestClose(f.project.idProyecto, f.leader.idUsuario, {
     ...f.dto, expectedFingerprint: refreshed.fingerprintEjecucion,
   });
-  return { ...f, admin, retired, retiredUser, approveDto: {
+  return { ...f, admin, retired, retiredUser, noContribution, approveDto: {
     revisionId: f.dto.revisionId, expectedFingerprint: submitted.fingerprintEntrega!,
   } };
 }
@@ -187,5 +194,59 @@ describeIntegration('S7 aprobación del cierre', () => {
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: failed.admin.idUsuario, accion: { in: ['PROJECT_CLOSE_REVIEW_APPROVED', 'PROJECT_HOURS_CREDITED'] } } })).toBe(0);
     expect(await db.notificacion.count({ where: { idUsuario: { in: [failed.leader.idUsuario, failed.miembro.idUsuario, failed.retiredUser.idUsuario] }, tipoNotificacion: { in: ['CIERRE_APROBADO', 'HORAS_ACREDITADAS'] } } })).toBe(0);
     expect(failed.stack.gateway.emitToUsers).not.toHaveBeenCalled();
+  });
+
+  it('T27-C: la acreditación copia columna a columna con el admin y la fecha de fase 1, respeta el conteo exacto y no toca filas ajenas', async () => {
+    const f = await readyForApproval(db, scope, true);
+    const noContribution = f.noContribution!;
+
+    const foreignProject = await createIntegrationProject(db, f.leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+    const foreignRole = await createIntegrationProjectRole(db, foreignProject.idProyecto, { cupos: 2 });
+    const foreignParticipation = await createIntegrationParticipation(db, f.miembro.idUsuario, foreignRole.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+    const foreignSprint = await createIntegrationSprint(db, foreignProject.idProyecto, { estado: 'CERRADO' });
+    const foreignSprintTwo = await createIntegrationSprint(db, foreignProject.idProyecto, { estado: 'CERRADO', numero: 2 });
+    scope.projectIds = [...(scope.projectIds ?? []), foreignProject.idProyecto];
+    scope.roleIds = [...(scope.roleIds ?? []), foreignRole.idRolProyecto];
+    scope.participationIds = [...(scope.participationIds ?? []), foreignParticipation.idParticipacion];
+    scope.sprintIds = [...(scope.sprintIds ?? []), foreignSprint.idSprint, foreignSprintTwo.idSprint];
+    const previousDate = new Date('2026-08-31T10:00:00.000Z');
+    const previouslyApproved = await db.horasParticipacion.create({ data: {
+      idParticipacion: foreignParticipation.idParticipacion, periodoInicio: new Date('2026-08-01'), periodoFin: new Date('2026-08-02'),
+      horasReportadas: '7.00', horasCalculadas: '7.00', horasAprobadas: '7.00', estadoHoras: 'APROBADA',
+      aprobadoPor: f.admin.idUsuario, fechaAprobacion: previousDate, idSprint: foreignSprint.idSprint,
+    } });
+    const foreignPending = await db.horasParticipacion.create({ data: {
+      idParticipacion: foreignParticipation.idParticipacion, periodoInicio: new Date('2026-08-03'), periodoFin: new Date('2026-08-04'),
+      horasReportadas: '1.00', horasCalculadas: '1.00', estadoHoras: 'PENDIENTE', idSprint: foreignSprintTwo.idSprint,
+    } });
+    await expectStatus(400, () => pipe.transform({ ...f.approveDto, horasAprobadas: 999, fechaAprobacion: '2020-01-01' }, {
+      type: 'body', metatype: ApproveClosureDto,
+    }));
+    const result = await f.stack.review.approveClosure(f.project.idProyecto, f.admin.idUsuario, f.approveDto);
+    const revision = await db.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: f.dto.revisionId } });
+    const targets = await db.horasParticipacion.findMany({
+      where: { participacion: { rolProyecto: { idProyecto: f.project.idProyecto } } }, orderBy: { idRegistroHoras: 'asc' },
+    });
+    expect(result.cantidades.horasAcreditadas).toBe(targets.length);
+    for (const row of targets) expect(row).toMatchObject({ estadoHoras: 'APROBADA', aprobadoPor: f.admin.idUsuario, fechaAprobacion: revision.resueltaEn });
+    expect(targets.every((row) => row.horasAprobadas?.equals(row.horasCalculadas!) === true)).toBe(true);
+    expect(await db.horasParticipacion.count({ where: { idParticipacion: noContribution.idParticipacion } })).toBe(0);
+    expect(await db.participacionProyecto.findUniqueOrThrow({ where: { idParticipacion: noContribution.idParticipacion } })).toMatchObject({ estadoParticipacion: 'COMPLETADO' });
+    expect(await db.participacionProyecto.findUniqueOrThrow({ where: { idParticipacion: f.retired.idParticipacion } })).toMatchObject({ estadoParticipacion: 'RETIRADO' });
+    expect(await db.horasParticipacion.findUniqueOrThrow({ where: { idRegistroHoras: previouslyApproved.idRegistroHoras } })).toEqual(previouslyApproved);
+    expect(await db.horasParticipacion.findUniqueOrThrow({ where: { idRegistroHoras: foreignPending.idRegistroHoras } })).toEqual(foreignPending);
+
+    const unreconciled = await readyForApproval(db, scope);
+    await db.horasParticipacion.updateMany({
+      where: { participacion: { rolProyecto: { idProyecto: unreconciled.project.idProyecto } }, estadoHoras: 'PENDIENTE' },
+      data: { idSprint: null },
+    });
+    await expectStatus(409, () => unreconciled.stack.review.approveClosure(
+      unreconciled.project.idProyecto, unreconciled.admin.idUsuario, unreconciled.approveDto,
+    ));
+    expect(await db.horasParticipacion.count({ where: {
+      participacion: { rolProyecto: { idProyecto: unreconciled.project.idProyecto } }, estadoHoras: 'APROBADA',
+    } })).toBe(0);
+    expect((await db.proyecto.findUniqueOrThrow({ where: { idProyecto: unreconciled.project.idProyecto } })).estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
   });
 });
