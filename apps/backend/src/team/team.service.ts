@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ApplicationsService } from '../applications/applications.service';
 import { ExitRequestsService } from '../exit-requests/exit-requests.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamSummaryMemberDto, TeamSummaryRoleDto } from './dto/team-summary-member.dto';
 import { TeamSummaryResponseDto } from './dto/team-summary-response.dto';
@@ -42,12 +43,20 @@ type MemberDetailSprintGroup = {
   }[];
 };
 
+/**
+ * C047 (06 v2 §17/§34/§41 E080–E084): los cinco lectores de equipo reciben al
+ * actor y resuelven su acceso con la política de lectura compartida. Las dos
+ * listas de pendientes son del líder actual. La lista de integrantes deja de
+ * filtrar a los históricos: los conserva anotando si siguen siendo elegibles
+ * para recibir trabajo y, si no, por qué.
+ */
 @Injectable()
 export class TeamService {
   constructor(
     private prisma: PrismaService,
     private applicationsService: ApplicationsService,
     private exitRequestsService: ExitRequestsService,
+    private readonly readPolicy: ProjectReadPolicyService,
   ) {}
 
   /**
@@ -60,16 +69,29 @@ export class TeamService {
     return value ? value.toISOString().slice(0, 10) : null;
   }
 
-  async findTeam(idProyecto: number) {
-    return this.prisma.participacionProyecto.findMany({
+  /**
+   * C047 (§17/§41 E081): la lista conserva a los integrantes históricos en vez
+   * de filtrarlos, y anota por cada uno si puede recibir trabajo hoy
+   * (`elegible`) y, cuando no, el motivo. La elegibilidad completa de §18.1
+   * llega en su propio commit; aquí se anota exclusivamente lo que el estado
+   * de la participación ya determina.
+   */
+  async findTeam(idProyecto: number, actorId: number) {
+    await this.readPolicy.assertRead(undefined, {
+      projectId: idProyecto,
+      actorId,
+      scope: 'equipo',
+    });
+
+    const participaciones = await this.prisma.participacionProyecto.findMany({
       where: {
         rolProyecto: { idProyecto },
-        estadoParticipacion: 'ACTIVO',
       },
       select: {
         idParticipacion: true,
         estadoParticipacion: true,
         fechaIngreso: true,
+        fechaSalida: true,
         usuario: {
           select: {
             idUsuario: true,
@@ -91,6 +113,15 @@ export class TeamService {
         fechaIngreso: 'asc',
       },
     });
+
+    return participaciones.map((participacion) => ({
+      ...participacion,
+      elegible: participacion.estadoParticipacion === 'ACTIVO',
+      motivoNoElegible:
+        participacion.estadoParticipacion === 'ACTIVO'
+          ? null
+          : `PARTICIPACION_${participacion.estadoParticipacion}`,
+    }));
   }
 
   /**
@@ -101,6 +132,12 @@ export class TeamService {
    * liderazgo": liderazgo de quien consulta, membresía de idUsuario.
    */
   async findTeamMemberDetail(idProyecto: number, idUsuario: number, userId: number) {
+    // C047 (§41 E082): política de lectura antes del liderazgo actual.
+    await this.readPolicy.assertRead(undefined, {
+      projectId: idProyecto,
+      actorId: userId,
+      scope: 'equipo',
+    });
     await this.requireOwner(idProyecto, userId);
 
     // Todas las participaciones del usuario en el proyecto (activas e
@@ -301,6 +338,11 @@ export class TeamService {
    * consulta fija; nunca dentro de un loop por miembro.
    */
   async getTeamSummary(idProyecto: number, userId: number): Promise<TeamSummaryResponseDto> {
+    await this.readPolicy.assertRead(undefined, {
+      projectId: idProyecto,
+      actorId: userId,
+      scope: 'equipo',
+    });
     const proyecto = await this.requireOwner(idProyecto, userId);
 
     // El líder no tiene ParticipacionProyecto propia (ver comentario sobre
@@ -469,13 +511,23 @@ export class TeamService {
     };
   }
 
+  /**
+   * C047 (§41 E080): lista de pendientes del proyecto, exclusiva del líder
+   * actual (`requireOwner`), leída con el actor para que el dominio de
+   * postulaciones nunca devuelva solicitudes de terceros.
+   */
   async getPendingPostulations(
     idProyecto: number,
     userId: number,
   ): Promise<ApplicationSummary[]> {
+    await this.readPolicy.assertRead(undefined, {
+      projectId: idProyecto,
+      actorId: userId,
+      scope: 'equipo',
+    });
     await this.requireOwner(idProyecto, userId);
 
-    const postulaciones = await this.applicationsService.findAll();
+    const postulaciones = await this.applicationsService.findAll(userId);
     return postulaciones.filter(
       (postulacion) =>
         postulacion.estadoPostulacion === 'PENDIENTE' &&
@@ -491,6 +543,11 @@ export class TeamService {
    * Nunca consulta `Prisma.solicitudSalidaProyecto` directamente.
    */
   async getPendingExitRequests(idProyecto: number, userId: number): Promise<PendingLeaderReview[]> {
+    await this.readPolicy.assertRead(undefined, {
+      projectId: idProyecto,
+      actorId: userId,
+      scope: 'equipo',
+    });
     return this.exitRequestsService.getPendingLeaderReviews(idProyecto, userId);
   }
 
