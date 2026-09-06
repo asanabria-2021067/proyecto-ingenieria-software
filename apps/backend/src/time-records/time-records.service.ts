@@ -450,11 +450,12 @@ export class TimeRecordsService {
       });
     }
 
-    await this.tasksContext.assertActiveProjectParticipant(project.idProyecto, userId, tx);
-    await this.policy.assertWriteTx(tx, project, 'REGISTRO_TIEMPO', userId, {
-      sprintId: tarea.idSprint,
-    });
-
+    // El estado del TRAMO se evalúa antes que la participación a propósito.
+    // Quien ya demostró ser el autor merece el diagnóstico específico —«esto
+    // ya se consolidó»— y no el genérico «ya no participas»: cuando una salida
+    // aprobada consume el tramo, retira la participación en la misma
+    // transacción, y ambos predicados fallan a la vez. El informativo es el
+    // consumo, que es lo que realmente impide la corrección.
     const assignment = await tx.asignacionTarea.findUniqueOrThrow({
       where: { idAsignacion: actual.idAsignacion },
       select: { origenReporte: true, reconocidoEn: true },
@@ -462,6 +463,11 @@ export class TimeRecordsService {
     if (assignment.origenReporte !== 'GRANULAR' || assignment.reconocidoEn !== null) {
       throw new ConflictException('El tramo no admite cambios sobre sus registros');
     }
+
+    await this.tasksContext.assertActiveProjectParticipant(project.idProyecto, userId, tx);
+    await this.policy.assertWriteTx(tx, project, 'REGISTRO_TIEMPO', userId, {
+      sprintId: tarea.idSprint,
+    });
 
     return actual;
   }
