@@ -150,7 +150,7 @@ export class GenerateReportDto {
 export interface ClosureResult {
   projectId: number;
   estadoProyecto: string;
-  revisionId: number;
+  revisionId: number | null;
   numeroRevision: number;
   fingerprintEntrega: string | null;
   informeOficialId: number | null;

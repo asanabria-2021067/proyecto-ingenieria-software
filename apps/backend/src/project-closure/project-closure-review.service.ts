@@ -82,19 +82,61 @@ export class ProjectClosureReviewService {
 
   /** E115: devolución a ejecución; las horas pendientes siguen pendientes. */
   returnToExecution(
-    _projectId: number,
-    _actorId: number,
-    _dto: ReturnExecutionDto,
+    projectId: number,
+    actorId: number,
+    dto: ReturnExecutionDto,
   ): Promise<ClosureResult> {
-    return Promise.reject(new Error('returnToExecution todavía no está implementado'));
+    return this.projectTx.run(projectId, actorId, 'closure.returnToExecution', async ({ tx, project, effects }) => {
+      if (!project) throw new NotFoundException('Proyecto no encontrado');
+      await this.policy.assertWriteTx(tx, project, 'CIERRE_VEREDICTO', actorId);
+      const comentario = this.requireComment(dto.comentario);
+      const reviewCount = await tx.revisionCierreProyecto.count({ where: { idProyecto: projectId } });
+      const legacy = dto.legacy === true && dto.revisionId == null;
+      let revision: { idRevisionCierre: number; numeroRevision: number; fingerprintEntrega: string | null } | null = null;
+      const fecha = new Date();
+      if (legacy) {
+        if (reviewCount !== 0) throw new ConflictException('El modo legacy solo aplica a proyectos sin revisiones de cierre');
+      } else {
+        if (!Number.isInteger(dto.revisionId)) throw new BadRequestException('revisionId es obligatorio');
+        revision = await tx.revisionCierreProyecto.findFirst({
+          where: { idRevisionCierre: dto.revisionId!, idProyecto: projectId, estadoRevision: 'ENVIADA' },
+          select: { idRevisionCierre: true, numeroRevision: true, fingerprintEntrega: true },
+        });
+        if (!revision) throw new ConflictException('La revisión enviada ya no está vigente');
+        const returned = await tx.revisionCierreProyecto.updateMany({
+          where: { idRevisionCierre: revision.idRevisionCierre, idProyecto: projectId, estadoRevision: 'ENVIADA' },
+          data: { estadoRevision: 'DEVUELTA_A_EJECUCION', idRevisor: actorId, resueltaEn: fecha, comentarioRevisor: comentario },
+        });
+        if (returned.count !== 1) throw new ConflictException('La revisión cambió');
+      }
+      const moved = await tx.proyecto.updateMany({
+        where: { idProyecto: projectId, estadoProyecto: 'EN_SOLICITUD_CIERRE', eliminadoEn: null },
+        data: { estadoProyecto: 'EN_PROGRESO' },
+      });
+      if (moved.count !== 1) throw new ConflictException('El proyecto cambió');
+      const { tituloProyecto: projectTitle } = await tx.proyecto.findUniqueOrThrow({ where: { idProyecto: projectId } });
+      await this.audit.registrarEvento({
+        tx, tipoEvento: TipoEventoBitacora.PROJECT_CLOSE_RETURNED_TO_EXECUTION,
+        idActor: actorId, idProyecto: projectId, tipoEntidad: 'PROYECTO', idEntidad: projectId,
+        valorAnterior: { estadoProyecto: 'EN_SOLICITUD_CIERRE', revisionId: revision?.idRevisionCierre ?? null },
+        valorNuevo: { estadoProyecto: 'EN_PROGRESO', legacy, comentario },
+      });
+      await this.notifications.persistTemplateTx(tx, [project.creadoPor], 'CIERRE_DEVUELTO_A_EJECUCION', {
+        projectId, projectTitle, ...(revision ? { revisionId: revision.idRevisionCierre } : {}), comentario,
+      }, effects);
+      await this.notifications.deferClosureEventsTx(tx, effects, projectId, project.creadoPor, revision?.idRevisionCierre ?? null, 'EN_PROGRESO');
+      return { projectId, estadoProyecto: 'EN_PROGRESO', revisionId: revision?.idRevisionCierre ?? null,
+        numeroRevision: revision?.numeroRevision ?? 0, fingerprintEntrega: revision?.fingerprintEntrega ?? null,
+        informeOficialId: null, cantidades: { revisionesDevueltas: revision ? 1 : 0 } };
+    }, { publish: (effects) => this.notifications.publishEffects(effects) });
   }
 
   /** E112: aprobación; cierra, acredita y completa en una sola transacción. */
-  approveClosure(
-    _projectId: number,
-    _actorId: number,
-    _dto: ApproveClosureDto,
-  ): Promise<ClosureResult> {
-    return Promise.reject(new Error('approveClosure todavía no está implementado'));
+  async approveClosure(projectId: number, actorId: number, _dto: ApproveClosureDto): Promise<ClosureResult> {
+    return this.projectTx.run(projectId, actorId, 'closure.approve.preflight', async ({ tx, project }) => {
+      if (!project) throw new NotFoundException('Proyecto no encontrado');
+      await this.policy.assertWriteTx(tx, project, 'CIERRE_VEREDICTO', actorId);
+      throw new ConflictException('La aprobación exige una revisión enviada por el flujo ordinario');
+    });
   }
 }

@@ -200,7 +200,7 @@ export interface NotificationTemplateData {
   CIERRE_DEVUELTO_A_EJECUCION: {
     projectTitle: string;
     projectId: number;
-    revisionId: number;
+    revisionId?: number;
     comentario: string;
   };
   HORAS_CONSOLIDADAS: {
