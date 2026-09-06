@@ -1,11 +1,13 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
+import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary';
 import {
   CLOSURE_DEFAULT_PREFIX,
   type ClosureAvailability,
 } from '../config/environment.validation';
 import {
+  CLOSURE_DELIVERY_TYPES,
   CLOSURE_RESOURCE_TYPE,
   CLOSURE_STORAGE_EXTENSION,
   CLOSURE_STORAGE_PROVIDER,
@@ -13,11 +15,12 @@ import {
   type ClosureDestroyOutcome,
   type ClosureRemoteIdentity,
   type ClosureSignedUploadParams,
+  type ClosureDeliveryType,
   type ClosureStoragePort,
 } from './closure-storage.port';
 
 /**
- * C103/C106 (06 v2 §26/§27/§39): adaptador Cloudinary del puerto de cierre.
+ * C103/C106/C107 (06 v2 §26/§27/§39): adaptador Cloudinary del puerto de cierre.
  *
  * Resuelve credenciales y modalidad desde la configuración YA VALIDADA
  * (`closure` de `validateEnvironment`), nunca leyendo `process.env` por su
@@ -30,6 +33,9 @@ import {
  * remotas en los commits que las contratan. Mientras tanto ninguna llamada
  * remota es posible.
  */
+/** §27: el proveedor no puede retener una operación de cierre más de un minuto. */
+export const CLOSURE_REMOTE_TIMEOUT_MS = 60_000;
+
 @Injectable()
 export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
   private readonly logger = new Logger(CloudinaryClosureStorageAdapter.name);
@@ -111,12 +117,118 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
   }
 
 
-  uploadImmutable(
-    _identity: ClosureRemoteIdentity,
-    _ciphertext: Buffer,
-    _signedParams: ClosureSignedUploadParams,
+  /**
+   * Modalidad de entrega. Es una decisión de CONFIGURACIÓN, jamás una
+   * reacción a un error: mientras la primaria funcione se conserva, y ningún
+   * fallo transitorio la degrada por su cuenta.
+   */
+  protected deliveryType(): ClosureDeliveryType {
+    const { deliveryMode } = this.availability();
+    if (!(CLOSURE_DELIVERY_TYPES as readonly string[]).includes(deliveryMode)) {
+      throw new ServiceUnavailableException(
+        'CLOSURE_CLOUDINARY_DELIVERY_MODE no es una modalidad de entrega admitida',
+      );
+    }
+    return deliveryMode;
+  }
+
+  private credentials(): { apiKey: string; apiSecret: string } {
+    const apiKey = this.config.get<string>('CLOUDINARY_API_KEY');
+    const apiSecret = this.config.get<string>('CLOUDINARY_API_SECRET');
+    if (!apiKey || !apiSecret) {
+      throw new ServiceUnavailableException('Las credenciales del proveedor no están configuradas');
+    }
+    return { apiKey, apiSecret };
+  }
+
+  /**
+   * Firma de servidor. Estos parámetros NUNCA llegan al navegador: el cliente
+   * recibe un ticket de aplicación propio, no la firma del proveedor ni el
+   * secreto que la produce.
+   *
+   * `overwrite` va congelado en `false`: una carga de cierre no reemplaza
+   * nunca un objeto ya existente.
+   */
+  signUploadParams(identity: ClosureRemoteIdentity): ClosureSignedUploadParams {
+    const { apiKey, apiSecret } = this.credentials();
+    const timestamp = Math.floor(Date.now() / 1000);
+    const type = this.deliveryType();
+    const signature = cloudinary.utils.api_sign_request(
+      { public_id: identity.publicId, timestamp, type, overwrite: false },
+      apiSecret,
+    );
+    return { publicId: identity.publicId, timestamp, type, overwrite: false, signature, apiKey };
+  }
+
+  /**
+   * Sube el ciphertext con la modalidad configurada y `overwrite=false`.
+   *
+   * Devolver sin excepción NO prueba que estos bytes hayan quedado
+   * almacenados: con `overwrite=false` el proveedor puede responder con éxito
+   * conservando un asset anterior. Por eso esta operación solo reporta lo que
+   * el proveedor dijo, y la identidad se corrobora aparte antes de dar el
+   * documento por disponible.
+   */
+  async uploadImmutable(
+    identity: ClosureRemoteIdentity,
+    ciphertext: Buffer,
+    signedParams: ClosureSignedUploadParams,
   ): Promise<ClosureRemoteIdentity> {
-    return Promise.reject(new ServiceUnavailableException('La carga remota todavía no está habilitada'));
+    const type = this.deliveryType();
+    const respuesta = await this.callProvider('carga', () =>
+      this.uploadStream(ciphertext, {
+        public_id: identity.publicId,
+        resource_type: CLOSURE_RESOURCE_TYPE,
+        type,
+        overwrite: false,
+        timestamp: signedParams.timestamp,
+        signature: signedParams.signature,
+        api_key: signedParams.apiKey,
+        timeout: CLOSURE_REMOTE_TIMEOUT_MS,
+      }),
+    );
+
+    return {
+      ...identity,
+      deliveryType: type,
+      assetId: respuesta.asset_id ?? null,
+      version: respuesta.version === undefined ? null : String(respuesta.version),
+    };
+  }
+
+  private uploadStream(
+    ciphertext: Buffer,
+    options: Record<string, unknown>,
+  ): Promise<UploadApiResponse> {
+    return new Promise<UploadApiResponse>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
+        if (error || !result) {
+          reject(error ?? new Error('El proveedor no devolvió un resultado de carga'));
+          return;
+        }
+        resolve(result);
+      });
+      stream.end(ciphertext);
+    });
+  }
+
+  /**
+   * Traduce cualquier fallo del proveedor a indisponibilidad, SIN degradar la
+   * modalidad y SIN filtrar el mensaje original, que puede contener la firma
+   * o parte de las credenciales. Un timeout, un 401, una cuota agotada o un
+   * error de red significan que el cierre no puede operar ahora, no que haya
+   * que guardar el documento de otra manera.
+   */
+  private async callProvider<T>(operacion: string, ejecutar: () => Promise<T>): Promise<T> {
+    try {
+      return await ejecutar();
+    } catch (error) {
+      this.logger.warn(`Fallo del proveedor de almacenamiento durante la ${operacion}`);
+      void error;
+      throw new ServiceUnavailableException(
+        `El almacenamiento de documentos de cierre no está disponible (${operacion})`,
+      );
+    }
   }
 
   verifyAsset(_identity: ClosureRemoteIdentity): Promise<ClosureAssetDescriptor> {
