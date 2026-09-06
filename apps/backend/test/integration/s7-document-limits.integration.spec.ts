@@ -13,6 +13,11 @@ import {
   MAX_DOCUMENT_SIZE,
   MULTIPART_OVERHEAD_BYTES,
 } from '../../src/project-closure/project-closure-documents.service';
+import {
+  cleanupClosureLifecycle,
+  closureLifecycleStack,
+  proyectoListoParaGenerar,
+} from './setup/closure-lifecycle';
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
   try {
@@ -47,6 +52,9 @@ describeIntegration('S7 límites de documentos de cierre', () => {
   });
   afterEach(async () => {
     vi.restoreAllMocks();
+    // El ciclo de cierre borra primero sus agregados de horas: sin eso, el
+    // barrido genérico intentaría borrar Sprints todavía referenciados.
+    await cleanupClosureLifecycle(db, scope);
     await cleanupClosureFixture(db, scope);
   });
   afterAll(async () => {
@@ -163,5 +171,114 @@ describeIntegration('S7 límites de documentos de cierre', () => {
         where: { idRevisionCierre: f.revision.idRevisionCierre },
       }),
     ).toBe(1);
+  });
+
+  it('TC01-B: un informe generado que excede 10485760 bytes devuelve 413, no se vincula y no permite cerrar', async () => {
+    const f = await proyectoListoParaGenerar(db, scope);
+    const { report, readiness, documentos } = closureLifecycleStack(db);
+
+    // Un informe válido primero: deja el slot 0 con un vínculo real.
+    const valido = await report.generateAutoReport(
+      f.project.idProyecto,
+      f.leader.idUsuario,
+      f.revision.idRevisionCierre,
+    );
+    scope.documentIds = [valido.documentId];
+    const slotAntes = await db.documentoRevisionCierre.findFirstOrThrow({
+      where: { idRevisionCierre: f.revision.idRevisionCierre, orden: 0 },
+    });
+    expect(slotAntes.idDocumentoCierre).toBe(valido.documentId);
+    const subidasAntes = documentos.storage.uploadImmutable.mock.calls.length;
+    const documentosAntes = await db.documentoCierre.count({
+      where: { idProyecto: f.project.idProyecto },
+    });
+
+    // El renderer produce un documento por encima del límite. Se interviene
+    // el render —no el modelo— justamente porque el contrato prohíbe recortar
+    // contribuciones para caber: lo que se prueba es el rechazo del Buffer.
+    const renderOriginal = report.render.bind(report);
+    const modeloRenderizado: Array<{ filas: number }> = [];
+    vi.spyOn(report, 'render').mockImplementation((modelo, contexto) => {
+      const resultado = renderOriginal(modelo, contexto);
+      modeloRenderizado.push({ filas: resultado.resumen.filasContribucion });
+      return {
+        resumen: resultado.resumen,
+        pdf: Buffer.concat([
+          resultado.pdf,
+          Buffer.alloc(MAX_DOCUMENT_SIZE + 1 - resultado.pdf.length, 0x20),
+        ]),
+      };
+    });
+
+    const respuesta = await expectStatus(413, () =>
+      report.generateAutoReport(
+        f.project.idProyecto,
+        f.leader.idUsuario,
+        f.revision.idRevisionCierre,
+      ),
+    );
+    expect(respuesta).toMatchObject({ code: 'DOCUMENTO_DEMASIADO_GRANDE' });
+
+    // Ni una llamada al proveedor: el rechazo ocurre antes de cifrar y subir.
+    expect(documentos.storage.uploadImmutable.mock.calls.length).toBe(subidasAntes);
+    // Ninguna contribución se omitió para intentar que cupiera.
+    expect(modeloRenderizado).toHaveLength(1);
+    expect(modeloRenderizado[0].filas).toBe(1);
+
+    // La reserva quedó sin llegar a DISPONIBLE y el slot 0 conserva el
+    // vínculo anterior: la entrega no se degradó.
+    const reservaFallida = await db.documentoCierre.findFirst({
+      where: {
+        idProyecto: f.project.idProyecto,
+        tipoDocumento: 'INFORME_AUTOMATICO',
+        estadoDocumento: 'RESERVADO',
+      },
+    });
+    expect(reservaFallida).not.toBeNull();
+    scope.documentIds.push(reservaFallida!.idDocumentoCierre);
+    expect(await db.documentoCierre.count({ where: { idProyecto: f.project.idProyecto } })).toBe(
+      documentosAntes + 1,
+    );
+    const slotDespues = await db.documentoRevisionCierre.findFirstOrThrow({
+      where: { idRevisionCierre: f.revision.idRevisionCierre, orden: 0 },
+    });
+    expect(slotDespues.idDocumentoCierre).toBe(valido.documentId);
+    expect(
+      await db.bitacoraAuditoria.count({
+        where: {
+          accion: 'CLOSURE_AUTOREPORT_GENERATED',
+          idObjeto: String(reservaFallida!.idDocumentoCierre),
+        },
+      }),
+    ).toBe(0);
+
+    // Con el render de vuelta a la normalidad la generación funciona.
+    vi.restoreAllMocks();
+    // La reserva fallida bloquea el índice parcial hasta que el barrido la
+    // retire; se libera aquí para poder observar la generación siguiente.
+    await db.documentoCierre.delete({
+      where: { idDocumentoCierre: reservaFallida!.idDocumentoCierre },
+    });
+    scope.documentIds = scope.documentIds.filter(
+      (id) => id !== reservaFallida!.idDocumentoCierre,
+    );
+    const reintento = await report.generateAutoReport(
+      f.project.idProyecto,
+      f.leader.idUsuario,
+      f.revision.idRevisionCierre,
+    );
+    scope.documentIds.push(reintento.documentId);
+    expect(
+      (await db.documentoCierre.findUniqueOrThrow({ where: { idDocumentoCierre: reintento.documentId } }))
+        .estadoDocumento,
+    ).toBe('DISPONIBLE');
+
+    // Y sin evidencias el proyecto sigue sin poder solicitar su cierre.
+    const resumen = await readiness.evaluate(undefined, f.project.idProyecto, {
+      phase: 'REQUEST',
+      revisionId: f.revision.idRevisionCierre,
+    });
+    expect(resumen.canSubmit).toBe(false);
+    expect(resumen.blockers.map((blocker) => blocker.code)).toContain('EVIDENCIAS_INVALIDAS');
   });
 });

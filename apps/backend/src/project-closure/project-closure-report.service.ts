@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  PayloadTooLargeException,
+} from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Prisma } from '@prisma/client';
@@ -18,7 +23,11 @@ import { ProjectTransactionService } from '../common/project-policy/project-tran
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
-import { ProjectClosureDocumentsService } from './project-closure-documents.service';
+import {
+  DOCUMENTO_DEMASIADO_GRANDE,
+  MAX_DOCUMENT_SIZE,
+  ProjectClosureDocumentsService,
+} from './project-closure-documents.service';
 import {
   CLOSURE_GENERATOR_VERSION,
   ProjectCloseReadinessService,
@@ -372,6 +381,10 @@ export class ProjectClosureReportService {
 
     // ── Tiempo 2: render, cifrado y subida SIN transacción abierta ──────
     const { pdf } = this.render(capturado.modelo, capturado.contexto);
+    // §25/§28: el Buffer final se valida ANTES de cifrar y de contactar al
+    // proveedor. Un informe demasiado grande se rechaza entero: recortar
+    // contribuciones para que quepa falsearía la entrega.
+    this.assertRenderedSize(pdf);
     const subido = await this.requireDocuments().uploadGenerated(
       capturado.documentId,
       projectId,
@@ -468,6 +481,21 @@ export class ProjectClosureReportService {
         };
       },
     );
+  }
+
+  /**
+   * §25: el límite se aplica a la SALIDA del renderer igual que a una carga
+   * del usuario. Nunca se omite información para caber: si el informe no
+   * entra, el problema es el límite, no los datos.
+   */
+  protected assertRenderedSize(pdf: Buffer): void {
+    if (pdf.length > MAX_DOCUMENT_SIZE) {
+      throw new PayloadTooLargeException({
+        statusCode: 413,
+        code: DOCUMENTO_DEMASIADO_GRANDE,
+        message: 'El informe generado supera el tamaño máximo permitido',
+      });
+    }
   }
 
   private requireRunner(): ProjectTransactionService {
