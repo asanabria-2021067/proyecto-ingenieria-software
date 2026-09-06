@@ -30,6 +30,9 @@ import { TimeRecordsController } from '../../src/time-records/time-records.contr
 import { TimeRecordsService } from '../../src/time-records/time-records.service';
 import { TaskLabelsController } from '../../src/labels/task-labels.controller';
 import { LabelsService } from '../../src/labels/labels.service';
+import { LabelsController } from '../../src/labels/labels.controller';
+import { RolesController } from '../../src/roles/roles.controller';
+import { RolesService } from '../../src/roles/roles.service';
 import { TareaComentariosController } from '../../src/tasks/tarea-comentarios.controller';
 import { ComentariosService } from '../../src/comentarios/comentarios.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
@@ -75,6 +78,8 @@ describeIntegration('T34 — política de escritura por entidad contra PostgreSQ
   let timeRecordsController: TimeRecordsController;
   let taskLabelsController: TaskLabelsController;
   let tareaComentariosController: TareaComentariosController;
+  let labelsController: LabelsController;
+  let rolesController: RolesController;
   let guard: ProjectWriteGuard;
   let scope: IntegrationCleanupScope;
 
@@ -114,8 +119,11 @@ describeIntegration('T34 — política de escritura por entidad contra PostgreSQ
         readPolicy,
       ),
     );
-    taskLabelsController = new TaskLabelsController(
-      new LabelsService(prismaService, projectTx, policy),
+    const labelsService = new LabelsService(prismaService, projectTx, policy);
+    taskLabelsController = new TaskLabelsController(labelsService);
+    labelsController = new LabelsController(labelsService);
+    rolesController = new RolesController(
+      new RolesService(prismaService, makeFakeNotifications(), projectTx, policy),
     );
     tareaComentariosController = new TareaComentariosController(
       new ComentariosService(
@@ -780,5 +788,154 @@ describeIntegration('T34 — política de escritura por entidad contra PostgreSQ
         orderBy: { idEtiqueta: 'asc' },
       }),
     ).toEqual(vinculosAntes);
+  });
+
+  it('T34-C: las mutaciones indirectas no alcanzan filas de un Sprint cerrado', async () => {
+    const env = await montarEscenario();
+    const projectId = env.project.idProyecto;
+
+    // Etiqueta usada por la tarea del Sprint cerrado.
+    const etiqueta = await prisma.etiqueta.create({
+      data: {
+        idProyecto: projectId,
+        nombreEtiqueta: 'Compartida',
+        nombreNormalizado: 'compartida',
+        color: '#10B981',
+      },
+    });
+    await prisma.tareaEtiqueta.create({
+      data: { idTarea: env.tareaHistorica.idTarea, idEtiqueta: etiqueta.idEtiqueta },
+    });
+
+    // El mismo usuario tiene un tramo abierto en el Sprint activo y otro,
+    // también abierto, que quedó en el Sprint cerrado.
+    const tramoVigente = await createIntegrationTaskAssignment(
+      prisma,
+      env.tareaVigente.idTarea,
+      env.miembro.idUsuario,
+      env.leader.idUsuario,
+    );
+    scope.assignmentIds = [...(scope.assignmentIds ?? []), tramoVigente.idAsignacion];
+
+    // Además, una segunda participación del mismo usuario en otro rol: el
+    // retiro acotado exige conservar al menos un rol activo.
+    const otroRol = await createIntegrationProjectRole(prisma, projectId, { cupos: 1 });
+    scope.roleIds = [...(scope.roleIds ?? []), otroRol.idRolProyecto];
+    const otraParticipacion = await createIntegrationParticipation(
+      prisma,
+      env.miembro.idUsuario,
+      otroRol.idRolProyecto,
+      { estadoParticipacion: 'ACTIVO' },
+    );
+    scope.participationIds = [...(scope.participationIds ?? []), otraParticipacion.idParticipacion];
+
+    const vinculoHistoricoAntes = await prisma.tareaEtiqueta.findMany({
+      where: { idTarea: env.tareaHistorica.idTarea },
+      orderBy: { idEtiqueta: 'asc' },
+    });
+    const tramoHistoricoAntes = await prisma.asignacionTarea.findUnique({
+      where: { idAsignacion: env.tramoHistorico.idAsignacion },
+    });
+    const tareaHistoricaAntes = await prisma.tarea.findUnique({
+      where: { idTarea: env.tareaHistorica.idTarea },
+    });
+
+    // --- 1. PATCH de la tarea VIGENTE con idsEtiquetas: solo toca sus vínculos ---
+    await runThroughRealGuard(
+      TasksController,
+      TasksController.prototype.update,
+      projectId,
+      () =>
+        tasksController.update(
+          projectId,
+          env.tareaVigente.idTarea,
+          { userId: env.leader.idUsuario },
+          { idsEtiquetas: [etiqueta.idEtiqueta] },
+        ),
+      { params: { taskId: String(env.tareaVigente.idTarea) } },
+    );
+    expect(
+      await prisma.tareaEtiqueta.count({
+        where: { idTarea: env.tareaVigente.idTarea, idEtiqueta: etiqueta.idEtiqueta },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.tareaEtiqueta.findMany({
+        where: { idTarea: env.tareaHistorica.idTarea },
+        orderBy: { idEtiqueta: 'asc' },
+      }),
+    ).toEqual(vinculoHistoricoAntes);
+
+    // --- 2. DELETE de la etiqueta: 409 por vínculo en Sprint cerrado ---
+    const rechazoEtiqueta = await esperarRechazo(() =>
+      runThroughRealGuard(
+        LabelsController,
+        LabelsController.prototype.remove,
+        projectId,
+        () =>
+          labelsController.remove(projectId, etiqueta.idEtiqueta, { userId: env.leader.idUsuario }),
+        { params: { labelId: String(etiqueta.idEtiqueta) } },
+      ),
+    );
+    expect(rechazoEtiqueta).toBeInstanceOf(ConflictException);
+    expect(await prisma.etiqueta.count({ where: { idEtiqueta: etiqueta.idEtiqueta } })).toBe(1);
+    expect(
+      await prisma.tareaEtiqueta.findMany({
+        where: { idTarea: env.tareaHistorica.idTarea },
+        orderBy: { idEtiqueta: 'asc' },
+      }),
+    ).toEqual(vinculoHistoricoAntes);
+
+    // --- 3. PATCH del rol: conserva IDs históricos y no reasigna tareas pasadas ---
+    const rolEditado = await runThroughRealGuard(
+      RolesController,
+      RolesController.prototype.update,
+      projectId,
+      () =>
+        rolesController.update(
+          projectId,
+          env.rol.idRolProyecto,
+          { nombreRol: 'Rol renombrado' },
+          { userId: env.leader.idUsuario },
+        ),
+      { params: { roleId: String(env.rol.idRolProyecto) } },
+    );
+    expect(rolEditado.idRolProyecto).toBe(env.rol.idRolProyecto);
+    expect(rolEditado.nombreRol).toBe('Rol renombrado');
+    expect(await prisma.tarea.findUnique({ where: { idTarea: env.tareaHistorica.idTarea } })).toEqual(
+      tareaHistoricaAntes,
+    );
+    expect(
+      await prisma.asignacionTarea.findUnique({
+        where: { idAsignacion: env.tramoHistorico.idAsignacion },
+      }),
+    ).toEqual(tramoHistoricoAntes);
+
+    // --- 4. leaveRole: cierra el tramo del Sprint activo, nunca el cerrado ---
+    const retiro = await runThroughRealGuard(
+      RolesController,
+      RolesController.prototype.leave,
+      projectId,
+      () =>
+        rolesController.leave(projectId, env.rol.idRolProyecto, { userId: env.miembro.idUsuario }),
+      { params: { roleId: String(env.rol.idRolProyecto) } },
+    );
+    expect(retiro.estadoParticipacion).toBe('RETIRADO');
+    expect(retiro.tareasDesasignadas).toBe(1);
+
+    const tramoVigenteDespues = await prisma.asignacionTarea.findUnique({
+      where: { idAsignacion: tramoVigente.idAsignacion },
+      select: { desasignadaEn: true },
+    });
+    expect(tramoVigenteDespues?.desasignadaEn).not.toBeNull();
+
+    expect(
+      await prisma.asignacionTarea.findUnique({
+        where: { idAsignacion: env.tramoHistorico.idAsignacion },
+      }),
+    ).toEqual(tramoHistoricoAntes);
+    expect(await prisma.tarea.findUnique({ where: { idTarea: env.tareaHistorica.idTarea } })).toEqual(
+      tareaHistoricaAntes,
+    );
   });
 });
