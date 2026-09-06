@@ -16,6 +16,7 @@ import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { ApelacionPageQueryDto } from './dto/appeal-page.query';
 import { DenyAppealDto } from './dto/deny-appeal.dto';
+import { TransferLeadershipDto } from './dto/transfer-leadership.dto';
 import { LeadershipReadService } from './leadership-read.service';
 import { LeadershipService } from './leadership.service';
 
@@ -47,6 +48,19 @@ export class LeadershipAdminController {
   @Get('liderazgo/apelaciones')
   inbox(@CurrentUser() user: { userId: number }, @Query() query: ApelacionPageQueryDto) {
     return this.leadershipRead.adminInbox(undefined, { actorId: user.userId, query });
+  }
+
+  /** E102: cambio administrativo directo, sin cooperación del saliente. */
+  @Post('proyectos/:projectId/liderazgo/cambiar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(LEADERSHIP_ADMIN_WRITE)
+  changeLeader(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: TransferLeadershipDto,
+  ) {
+    return this.leadership.transfer(projectId, user.userId, dto);
   }
 
   /** E101: denegar la apelación con un motivo, sin tocar el liderazgo. */
