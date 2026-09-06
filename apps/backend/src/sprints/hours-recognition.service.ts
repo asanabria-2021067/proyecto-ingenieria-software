@@ -187,13 +187,12 @@ export class HoursRecognitionService {
    *      a lo sumo una fila por (participación, Sprint) cuando idSprint no
    *      es null. Como esa unicidad es un índice PARCIAL (no un `@@unique`
    *      de Prisma, que no admite condición), no existe `upsert()` nativo
-   *      contra ella: se hace `findFirst` + `create`/`update` explícito, y
-   *      si dos transacciones concurrentes intentan crear la misma fila por
-   *      primera vez, la que pierde la carrera recibe P2002 (reconocido
-   *      específicamente, mismo criterio estrecho que
-   *      `SprintsService.isOperableSprintCollision`) y reintenta como
-   *      `update` con `increment`, en vez de propagar el error crudo.
-   *      `horasCalculadas` se INCREMENTA (nunca se sobrescribe): un
+   *      contra ella: se hace `findFirst` + `create`/`update` explícito.
+   *      C078: bajo el lock del proyecto no hay carrera normal de primera
+   *      creación, así que un P2002 aquí es inesperado y NO se captura —
+   *      aborta la transacción entera en vez de intentar recuperarse dentro
+   *      de una tx PostgreSQL ya fallida.
+   *      Ambas columnas se INCREMENTAN (nunca se sobrescriben): un
    *      reconocimiento repetido que no encuentra tramos nuevos nunca toca
    *      esta fila (ver más abajo), así que el total ya persistido de un
    *      reconocimiento previo nunca se pierde ni se recalcula desde cero.
@@ -201,8 +200,8 @@ export class HoursRecognitionService {
    * Idempotencia de la operación completa: si no hay tramos elegibles
    * (`elegibles.length === 0` — ya sea porque nunca hubo, o porque una
    * llamada previa ya los reconoció todos), el método retorna
-   * inmediatamente `{ horasReconocidas: 0, idsAsignacionesReconocidas: [],
-   * horasParticipacion: null }` SIN tocar `HorasParticipacion` ni
+   * inmediatamente un resultado en cero (reporte y propuesta incluidos)
+   * SIN tocar `HorasParticipacion` ni
    * `AsignacionTarea` — un verdadero no-op, nunca una fila sintética con 0
    * horas ni una sobrescritura del total ya correcto.
    *
