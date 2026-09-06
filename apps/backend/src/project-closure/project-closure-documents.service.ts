@@ -141,6 +141,26 @@ export class ProjectClosureDocumentsService {
   }
 
   /** El borrador debe existir, pertenecer al proyecto y seguir en BORRADOR. */
+  async detach(projectId: number, actorId: number, revisionId: number, documentId: number): Promise<void> {
+    await this.projectTx.run(projectId, actorId, 'closure.detach', async (ctx) => {
+      const { tx } = ctx;
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'CIERRE_EVIDENCIAS', actorId);
+      await this.assertDraftTx(tx, projectId, revisionId);
+      const link = await tx.documentoRevisionCierre.findUnique({
+        where: { idRevisionCierre_idDocumentoCierre: { idRevisionCierre: revisionId, idDocumentoCierre: documentId } },
+        include: { documento: true },
+      });
+      if (!link) return;
+      if (link.documento.tipoDocumento !== 'EVIDENCIA_LIDER' || link.documento.idProyecto !== projectId) {
+        throw new ConflictException('Solo se pueden retirar evidencias del borrador');
+      }
+      await tx.documentoRevisionCierre.delete({ where: { idDocumentoRevision: link.idDocumentoRevision } });
+      await this.bitacoraEventos.registrarEvento({ tx, tipoEvento: TipoEventoBitacora.CLOSURE_DOCUMENT_REMOVED,
+        idActor: actorId, idProyecto: projectId, tipoEntidad: 'DOCUMENTO_CIERRE', idEntidad: documentId,
+        valorAnterior: { revisionId, orden: link.orden }, valorNuevo: null });
+    });
+  }
+
   private async assertDraftTx(
     tx: Prisma.TransactionClient,
     projectId: number,

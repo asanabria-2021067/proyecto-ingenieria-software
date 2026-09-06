@@ -9,6 +9,8 @@ import { ProjectPolicyService } from '../../../src/common/project-policy/project
 import { ProjectIdResolverService } from '../../../src/common/project-policy/project-id-resolver.service';
 import { ProjectCloseReadinessService } from '../../../src/project-closure/project-close-readiness.service';
 import { ProjectClosureService } from '../../../src/project-closure/project-closure.service';
+import { ProjectClosureReviewService } from '../../../src/project-closure/project-closure-review.service';
+import { ProjectReadPolicyService } from '../../../src/common/project-policy/project-read-policy.service';
 import { ProjectClosureReportService } from '../../../src/project-closure/project-closure-report.service';
 import { closureDocumentsStack, closureConfig, pdfFixture } from './closure-storage';
 import * as fixtures from './fixtures';
@@ -28,7 +30,8 @@ export function closureLifecycleStack(db: PrismaClient) {
   const audit = new BitacoraEventosService();
   const gateway = { server: {}, notifyUsers: vi.fn(), emitToUsers: vi.fn() };
   const notifications = new NotificationsService(prisma, gateway as unknown as NotificationsGateway);
-  const closure = new ProjectClosureService(prisma, runner, policy, readiness, audit, notifications);
+  const closure = new ProjectClosureService(prisma, runner, policy, readiness, audit, notifications, new ProjectReadPolicyService(prisma));
+  const review = new ProjectClosureReviewService(prisma, runner, policy, readiness, audit, notifications);
   // El almacenamiento va mockeado: lo que se prueba es el protocolo de
   // captura, render y vínculo, no la capacidad del proveedor.
   const documentos = closureDocumentsStack(db, closureConfig());
@@ -40,7 +43,7 @@ export function closureLifecycleStack(db: PrismaClient) {
     documentos.service,
     audit,
   );
-  return { closure, readiness, runner, policy, audit, report, documentos, notifications, gateway };
+  return { closure, review, readiness, runner, policy, audit, report, documentos, notifications, gateway };
 }
 
 export async function closureReadyFixture(db: PrismaClient, scope: ClosureCleanupScope) {
