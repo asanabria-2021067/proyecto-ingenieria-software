@@ -5,6 +5,12 @@ import { BitacoraModule } from '../bitacora/bitacora.module';
 import { StorageModule } from '../storage/storage.module';
 import { SprintsModule } from '../sprints/sprints.module';
 import { AdminProjectsController } from './admin-projects.controller';
+import { ClosureCleanupService } from './closure-cleanup.service';
+import { ClosureStorageAdminController } from './closure-storage-admin.controller';
+import { ProjectCloseReadinessService } from './project-close-readiness.service';
+import { ProjectClosureController } from './project-closure.controller';
+import { ProjectClosureReviewService } from './project-closure-review.service';
+import { ProjectClosureService } from './project-closure.service';
 import { ClosureDocumentsController } from './closure-documents.controller';
 import { HistoricalProjectController } from './historical-project.controller';
 import { HistoricalProjectReadService } from './historical-project-read.service';
@@ -12,7 +18,7 @@ import { ProjectClosureDocumentsService } from './project-closure-documents.serv
 import { ProjectClosureReportService } from './project-closure-report.service';
 
 /**
- * C111/C113/C121 (06 v2 §38/§39): módulo de cierre de proyecto.
+ * C111/C113/C121/C127 (06 v2 §38/§39): módulo de cierre de proyecto.
  *
  * Importa Storage para hablar con el proveedor a través del puerto, nunca con
  * su SDK directamente, y Policy para autorizar bajo el lock. Todavía no se
@@ -21,11 +27,21 @@ import { ProjectClosureReportService } from './project-closure-report.service';
  */
 @Module({
   imports: [PrismaModule, ProjectPolicyModule, BitacoraModule, StorageModule, SprintsModule],
-  controllers: [ClosureDocumentsController, HistoricalProjectController, AdminProjectsController],
+  controllers: [
+    ClosureDocumentsController,
+    HistoricalProjectController,
+    AdminProjectsController,
+    ProjectClosureController,
+    ClosureStorageAdminController,
+  ],
   providers: [
     ProjectClosureReportService,
     ProjectClosureDocumentsService,
     HistoricalProjectReadService,
+    ProjectCloseReadinessService,
+    ProjectClosureService,
+    ProjectClosureReviewService,
+    ClosureCleanupService,
   ],
   exports: [
     ProjectClosureReportService,
