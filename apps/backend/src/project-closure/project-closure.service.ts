@@ -1,4 +1,6 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
+import { canonicalDigest } from './closure-report-model';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
@@ -34,6 +36,7 @@ export class ProjectClosureService {
     protected readonly policy: ProjectPolicyService,
     protected readonly readinessService: ProjectCloseReadinessService,
     protected readonly bitacoraEventos: BitacoraEventosService,
+    protected readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -110,11 +113,67 @@ export class ProjectClosureService {
 
   /** E105: solicita el cierre y sella la entrega. */
   requestClose(
-    _projectId: number,
-    _actorId: number,
-    _dto: RequestCloseDto,
+    projectId: number,
+    actorId: number,
+    dto: RequestCloseDto,
   ): Promise<ClosureResult> {
-    return Promise.reject(new Error('requestClose todavía no está implementado'));
+    if (dto.confirmado !== true) throw new BadRequestException('Debe confirmar la solicitud');
+    return this.projectTx.run(projectId, actorId, 'closure.requestClose', async ({ tx, project, effects }) => {
+      if (!project) throw new NotFoundException('Proyecto no encontrado');
+      await this.policy.assertWriteTx(tx, project, 'CIERRE_ENVIO', actorId);
+      const ready = await this.readinessService.assertReady(tx, projectId, {
+        phase: 'REQUEST', revisionId: dto.revisionId, expectedFingerprint: dto.expectedFingerprint,
+      });
+      const revision = await tx.revisionCierreProyecto.findUniqueOrThrow({ where: { idRevisionCierre: dto.revisionId } });
+      const links = await tx.documentoRevisionCierre.findMany({
+        where: { idRevisionCierre: dto.revisionId }, orderBy: [{ orden: 'asc' }, { idDocumentoCierre: 'asc' }],
+        include: { documento: true },
+      });
+      const fingerprintEntrega = canonicalDigest({
+        revisionId: dto.revisionId, executionFingerprint: ready.executionFingerprint,
+        documentos: links.map((link) => ({ id: link.idDocumentoCierre, checksum: link.documento.checksumSha256, orden: link.orden })),
+      });
+      const pending = await tx.postulacion.findMany({
+        where: { rolProyecto: { idProyecto: projectId }, estadoPostulacion: 'PENDIENTE' },
+        include: { rolProyecto: { select: { nombreRol: true } } }, orderBy: { idPostulacion: 'asc' },
+      });
+      const fecha = new Date();
+      const moved = await tx.proyecto.updateMany({
+        where: { idProyecto: projectId, estadoProyecto: 'EN_PROGRESO', eliminadoEn: null },
+        data: { estadoProyecto: 'EN_SOLICITUD_CIERRE' },
+      });
+      const sent = await tx.revisionCierreProyecto.updateMany({
+        where: { idRevisionCierre: dto.revisionId, idProyecto: projectId, estadoRevision: 'BORRADOR' },
+        data: { estadoRevision: 'ENVIADA', idSolicitante: actorId, enviadaEn: fecha, fingerprintEntrega },
+      });
+      if (moved.count !== 1 || sent.count !== 1) throw new ConflictException('La entrega cambió');
+      const rejected = await tx.postulacion.updateMany({
+        where: { idPostulacion: { in: pending.map((row) => row.idPostulacion) }, estadoPostulacion: 'PENDIENTE' },
+        data: { estadoPostulacion: 'RECHAZADA', fechaResolucion: fecha, resueltaPor: actorId,
+          comentarioResolucion: 'Rechazada automáticamente por solicitud de cierre del proyecto' },
+      });
+      if (rejected.count !== pending.length) throw new ConflictException('El conteo de postulaciones cambió');
+      const { tituloProyecto: projectTitle } = await tx.proyecto.findUniqueOrThrow({ where: { idProyecto: projectId } });
+      for (const row of pending) {
+        await this.notifications.persistTemplateTx(tx, [row.idUsuarioPostulante], 'POSTULACION_RECHAZADA_POR_CIERRE', {
+          projectId, projectTitle, applicationId: row.idPostulacion, roleName: row.rolProyecto.nombreRol,
+        }, effects);
+      }
+      await this.notifications.persistAdminsTx(tx, 'SOLICITUD_CIERRE_PROYECTO', { projectId, projectTitle }, effects);
+      await this.bitacoraEventos.registrarEvento({ tx, tipoEvento: TipoEventoBitacora.PROJECT_CLOSE_REQUESTED,
+        idActor: actorId, idProyecto: projectId, tipoEntidad: 'REVISION_CIERRE', idEntidad: dto.revisionId,
+        valorAnterior: { estadoProyecto: 'EN_PROGRESO' },
+        valorNuevo: { estadoProyecto: 'EN_SOLICITUD_CIERRE', revisionId: dto.revisionId, fingerprintEntrega },
+      });
+      await this.bitacoraEventos.registrarEvento({ tx, tipoEvento: TipoEventoBitacora.POSTULATIONS_AUTO_REJECTED,
+        idActor: actorId, idProyecto: projectId, tipoEntidad: 'PROYECTO', idEntidad: projectId,
+        valorAnterior: null, valorNuevo: { ids: pending.map((row) => row.idPostulacion), cantidad: rejected.count },
+      });
+      await this.notifications.deferClosureEventsTx(tx, effects, projectId, project.creadoPor, dto.revisionId, 'EN_SOLICITUD_CIERRE');
+      return { projectId, estadoProyecto: 'EN_SOLICITUD_CIERRE', revisionId: dto.revisionId,
+        numeroRevision: revision.numeroRevision, fingerprintEntrega, informeOficialId: null,
+        cantidades: { postulacionesRechazadas: rejected.count } };
+    }, { publish: (effects) => this.notifications.publishEffects(effects) });
   }
 
   /** E113: reenvía tras una corrección documental. */

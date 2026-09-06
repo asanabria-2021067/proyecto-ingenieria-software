@@ -280,6 +280,7 @@ export class ProjectCloseReadinessService {
         where: { idRevisionCierre: revision.idRevisionCierre },
         select: {
           idDocumentoCierre: true,
+          orden: true,
           documento: {
             select: {
               idDocumentoCierre: true,
@@ -301,7 +302,8 @@ export class ProjectCloseReadinessService {
           vinculo.documento.estadoDocumento === 'DISPONIBLE' &&
           vinculo.documento.idProyecto === projectId,
       );
-      if (disponiblesAutomaticos.length !== 1) {
+      if (automaticos.length !== 1 || disponiblesAutomaticos.length !== 1 ||
+          disponiblesAutomaticos[0]?.orden !== 0 || !disponiblesAutomaticos[0]?.documento.fingerprintEjecucion) {
         bloquear(
           'INFORME_INVALIDO',
           'La entrega necesita exactamente un informe automático disponible',
@@ -320,7 +322,10 @@ export class ProjectCloseReadinessService {
           vinculo.documento.mimeType === 'application/pdf' &&
           vinculo.documento.idProyecto === projectId,
       );
-      if (evidenciasValidas.length < 1 || evidenciasValidas.length > 10) {
+      if (evidenciasValidas.length < 1 || evidenciasValidas.length > 10 ||
+          evidenciasValidas.length !== evidencias.length ||
+          vinculos.length !== automaticos.length + evidencias.length ||
+          evidencias.some((link) => link.orden < 1 || link.orden > 10)) {
         bloquear(
           'EVIDENCIAS_INVALIDAS',
           'La entrega necesita entre una y diez evidencias disponibles en PDF',
