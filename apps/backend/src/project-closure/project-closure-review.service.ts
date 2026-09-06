@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
@@ -169,8 +176,18 @@ export class ProjectClosureReviewService {
       return { capture, document, documentId: document.idDocumentoCierre, deliveryFingerprint: revision.fingerprintEntrega,
         numeroRevision: revision.numeroRevision };
     });
-    const rendered = this.report.renderOfficial(phaseOne.capture);
-    const uploaded = await this.documents.uploadGenerated(phaseOne.documentId, projectId, rendered.pdf);
+    let rendered: ReturnType<ProjectClosureReportService['renderOfficial']>;
+    try {
+      rendered = this.report.renderOfficial(phaseOne.capture);
+    } catch (error) {
+      this.rethrowExternalFailure(error, 'No fue posible generar el informe oficial');
+    }
+    let uploaded: Awaited<ReturnType<ProjectClosureDocumentsService['uploadGenerated']>>;
+    try {
+      uploaded = await this.documents.uploadGenerated(phaseOne.documentId, projectId, rendered.pdf);
+    } catch (error) {
+      this.rethrowExternalFailure(error, 'No fue posible almacenar y verificar el informe oficial');
+    }
     await this.projectTx.run(projectId, actorId, 'closure.approve.record-upload', async ({ tx }) => {
       const recorded = await tx.documentoCierre.updateMany({
         where: { idDocumentoCierre: phaseOne.documentId, idProyecto: projectId, idRevisionOrigen: dto.revisionId,
@@ -303,4 +320,9 @@ export class ProjectClosureReviewService {
   }
 
   protected async beforeApprovalPhaseTwoCommit(): Promise<void> {}
+
+  private rethrowExternalFailure(error: unknown, message: string): never {
+    if (error instanceof HttpException) throw error;
+    throw new ServiceUnavailableException(message);
+  }
 }
