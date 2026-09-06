@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import { createBarrier, useSecondClient, withDeadline } from './setup/concurrency';
 import { cleanupTimeFixture, timeFixture, timeStack } from './setup/time-records';
+import { cleanupRaceFixture, exitStack, raceFixture } from './setup/exit-flow';
 import type { IntegrationCleanupScope } from './setup/cleanup';
 
 describeIntegration('S7 time concurrency', () => {
@@ -10,8 +11,13 @@ describeIntegration('S7 time concurrency', () => {
   let scope: IntegrationCleanupScope;
   const second = useSecondClient();
   beforeAll(async () => { db = createIntegrationPrismaClient(); await db.$connect(); });
-  beforeEach(() => { scope = {}; });
-  afterEach(async () => { vi.restoreAllMocks(); await cleanupTimeFixture(db, scope); });
+  let solicitudIds: number[];
+  beforeEach(() => { scope = {}; solicitudIds = []; });
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await cleanupRaceFixture(db, scope, solicitudIds);
+    await cleanupTimeFixture(db, scope);
+  });
   afterAll(async () => { await db.$disconnect(); });
 
   it('T01: dos altas concurrentes conservan ambos registros y la suma completa', async () => {
@@ -71,5 +77,90 @@ describeIntegration('S7 time concurrency', () => {
     expect(new Prisma.Decimal(timestamps[1]).gt(timestamps[0])).toBe(true);
     expect(a.realtime).toHaveBeenCalledTimes(1);
     expect(b.realtime).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * C087–C090 (06 v2 §42/§47 T02-T03): las cuatro carreras entre el autor de
+   * un registro y el consumo de su tramo por una salida aprobada. El lock del
+   * proyecto impone un orden total; lo que se fija aquí es que AMBOS órdenes
+   * producen un resultado coherente, nunca un agregado viejo junto a un
+   * reporte nuevo ni una hora perdida o duplicada.
+   *
+   * `ganador` es la operación que se deja commitear primero; la otra entra
+   * después de que su barrera se libera y encuentra el estado ya confirmado.
+   */
+  async function correrCarrera(
+    fixture: Awaited<ReturnType<typeof raceFixture>>,
+    ganador: 'autor' | 'consumo',
+    operacionDelAutor: (stack: ReturnType<typeof timeStack>) => Promise<unknown>,
+  ) {
+    const autorStack = timeStack(db);
+    const salida = exitStack(second());
+    const entered = createBarrier(1);
+    const release = createBarrier(1);
+
+    const retener = ganador === 'autor' ? autorStack.audit : salida.audit;
+    const originalAudit = retener.registrarEvento.bind(retener);
+    vi.spyOn(retener, 'registrarEvento').mockImplementation(async (input) => {
+      await originalAudit(input);
+      await entered.arrive();
+      await withDeadline(release.wait(), 8000, 'liberar a la operación ganadora');
+    });
+
+    const iniciarAutor = () => operacionDelAutor(autorStack);
+    const iniciarConsumo = () =>
+      salida.service.approveSolicitudSalida(fixture.project.idProyecto, fixture.solicitud.idSolicitud, fixture.leader.idUsuario);
+
+    const primera = ganador === 'autor' ? iniciarAutor() : iniciarConsumo();
+    primera.catch(() => undefined);
+    await withDeadline(entered.wait(), 8000, 'escrituras internas de la ganadora');
+
+    // La perdedora corre en la OTRA conexión física y se queda esperando el
+    // lock del proyecto hasta que la ganadora commitea.
+    const segunda = ganador === 'autor' ? iniciarConsumo() : iniciarAutor();
+    segunda.catch(() => undefined);
+    await release.arrive();
+
+    const resultadoPrimera = await primera.then(
+      (valor) => ({ ok: true as const, valor }),
+      (error: unknown) => ({ ok: false as const, error }),
+    );
+    const resultadoSegunda = await withDeadline(
+      segunda.then(
+        (valor) => ({ ok: true as const, valor }),
+        (error: unknown) => ({ ok: false as const, error }),
+      ),
+      15000,
+      'operación perdedora',
+    );
+    return { resultadoPrimera, resultadoSegunda };
+  }
+
+
+  it('T02-A: la edición que llega antes del reconocimiento queda incluida en el agregado', async () => {
+    const f = await raceFixture(db, scope, ['4.00']);
+    solicitudIds = [f.solicitud.idSolicitud];
+
+    const { resultadoPrimera, resultadoSegunda } = await correrCarrera(f, 'autor', (stack) =>
+      stack.service.update(f.project.idProyecto, f.task.idTarea, f.registros[0].idRegistroTiempo, f.autor.idUsuario, { horas: 6 }),
+    );
+    expect(resultadoPrimera.ok).toBe(true);
+    expect(resultadoSegunda.ok).toBe(true);
+
+    const registro = await db.registroTiempoTarea.findUniqueOrThrow({ where: { idRegistroTiempo: f.registros[0].idRegistroTiempo } });
+    expect(registro.horas.toFixed(2)).toBe('6.00');
+    const tramo = await db.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: f.assignment.idAsignacion } });
+    expect(tramo.horasReales?.toFixed(2)).toBe('6.00');
+    expect(tramo.reconocidoEn).not.toBeNull();
+
+    const agregados = await db.horasParticipacion.findMany({ where: { idParticipacion: f.participacion.idParticipacion } });
+    expect(agregados).toHaveLength(1);
+    // El agregado lleva el importe EDITADO: nunca el viejo junto al nuevo reporte.
+    expect(agregados[0].horasReportadas.toFixed(2)).toBe('6.00');
+    expect(agregados[0].horasCalculadas?.toFixed(2)).toBe('6.00');
+    expect(agregados[0].estadoHoras).toBe('PENDIENTE');
+
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.autor.idUsuario, accion: 'TIME_RECORD_EDITED' } })).toBe(1);
+    expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'EXIT_REQUEST_APPROVED' } })).toBe(1);
   });
 });
