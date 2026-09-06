@@ -4,6 +4,8 @@ import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import { adjustmentFixture, adjustmentsStack, cleanupAdjustmentFixture } from './setup/adjustments';
 import type { IntegrationCleanupScope } from './setup/cleanup';
+import { ProjectHoursSummaryService } from '../../src/sprints/project-hours-summary.service';
+import type { PrismaService } from '../../src/prisma/prisma.service';
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
   try {
@@ -96,5 +98,54 @@ describeIntegration('S7 ajustes de horas del líder', () => {
       await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'TASK_HOURS_ADJUSTED' } }),
     ).toBe(2);
     expect(realtime).toHaveBeenCalledTimes(2);
+  });
+
+  it('T07-B: revertir anula el ajuste vigente y dejar el tramo sin vigente responde 204 sin evento', async () => {
+    const f = await adjustmentFixture(db, scope);
+    const { service, realtime } = adjustmentsStack(db);
+    const vigente = await service.upsert(f.project.idProyecto, f.sprint.idSprint, f.assignment.idAsignacion, f.leader.idUsuario, {
+      deltaHoras: '-1.50',
+      justificacion: 'reporte por encima de lo verificado',
+    });
+    const eventosPrevios = await db.bitacoraAuditoria.count({
+      where: { idUsuario: f.leader.idUsuario, accion: 'TASK_HOURS_ADJUSTMENT_REVERTED' },
+    });
+    expect(eventosPrevios).toBe(0);
+    realtime.mockClear();
+
+    await service.revert(f.project.idProyecto, f.sprint.idSprint, f.assignment.idAsignacion, f.leader.idUsuario);
+
+    const anulado = await db.ajusteHoraTarea.findUniqueOrThrow({ where: { idAjusteHora: vigente.idAjusteHora } });
+    expect(anulado.anuladoEn).not.toBeNull();
+    expect(anulado.anuladoPor).toBe(f.leader.idUsuario);
+    expect(await db.ajusteHoraTarea.count({ where: { idAsignacion: f.assignment.idAsignacion, anuladoEn: null } })).toBe(0);
+
+    // Sin vigente, la propuesta del tramo vuelve a ser exactamente la caché reportada.
+    const resumen = new ProjectHoursSummaryService(db as unknown as PrismaService);
+    const detalle = await resumen.sprintMemberDetail(undefined, { sprintId: f.sprint.idSprint, userId: f.owner.idUsuario });
+    const tramo = detalle.tramos.find((t) => t.idAsignacion === f.assignment.idAsignacion)!;
+    expect(tramo.cache).toBe('6.00');
+    expect(tramo.ajuste).toBeNull();
+    expect(tramo.propuestas).toBe('6.00');
+
+    expect(
+      await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'TASK_HOURS_ADJUSTMENT_REVERTED' } }),
+    ).toBe(1);
+    expect(realtime).toHaveBeenCalledTimes(1);
+
+    // Segunda reversión: sin vigente que anular, ni evento ni filas nuevas.
+    realtime.mockClear();
+    await service.revert(f.project.idProyecto, f.sprint.idSprint, f.assignment.idAsignacion, f.leader.idUsuario);
+    expect(
+      await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'TASK_HOURS_ADJUSTMENT_REVERTED' } }),
+    ).toBe(1);
+    expect(await db.ajusteHoraTarea.count({ where: { idAsignacion: f.assignment.idAsignacion } })).toBe(1);
+    expect(realtime).not.toHaveBeenCalled();
+
+    // La cadena histórica conserva el ajuste anulado.
+    const historial = await service.history(f.project.idProyecto, f.sprint.idSprint, f.assignment.idAsignacion, f.leader.idUsuario);
+    expect(historial).toHaveLength(1);
+    expect(historial[0].vigente).toBe(false);
+    expect(historial[0].deltaHoras).toBe('-1.50');
   });
 });
