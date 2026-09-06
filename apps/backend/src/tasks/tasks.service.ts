@@ -1202,7 +1202,7 @@ export class TasksService {
         throw new ConflictException('La asignación ya fue cerrada');
       }
 
-      await tx.registroAvanceAsignacion.create({
+      const avance = await tx.registroAvanceAsignacion.create({
         data: {
           idAsignacion: assignmentId,
           idAutor: actorUserId,
@@ -1236,14 +1236,20 @@ export class TasksService {
 
       await this.bitacoraEventos?.registrarEvento({
         tx,
-        tipoEvento: TipoEventoBitacora.TASK_HOURS_LOGGED,
+        tipoEvento: TipoEventoBitacora.ASSIGNMENT_CLOSED,
         idActor: actorUserId,
         idProyecto: projectId,
         idSprint: tareaBase.idSprint,
         tipoEntidad: 'TAREA',
         idEntidad: taskId,
         valorAnterior: { horasReales: null },
-        valorNuevo: { idAsignacion: assignmentId, horasReales: horasReales.toString() },
+        valorNuevo: {
+          idAsignacion: assignmentId,
+          horasReales: horasReales.toString(),
+          desasignadaEn: desasignadaEn.toISOString(),
+          tareaHecha: filaFinal.estadoTarea === EstadoTarea.HECHO,
+          idRegistroAvance: avance.idRegistroAvance,
+        },
       });
 
       return filaFinal;
@@ -1277,10 +1283,6 @@ export class TasksService {
   }
 
   private assertValidAssignmentClosureInput(dto: CloseAssignmentDto): void {
-    if (!Number.isFinite(dto.horasReales) || dto.horasReales < 0) {
-      throw new BadRequestException('horasReales debe ser un número válido mayor o igual a 0');
-    }
-
     if (
       typeof dto.contenidoAvance !== 'string' ||
       dto.contenidoAvance.trim().length < MIN_PROGRESS_CONTENT_LENGTH

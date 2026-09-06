@@ -297,7 +297,6 @@ describeIntegration(
           { assignmentId: String(asignacion.idAsignacion) },
           { userId: collaborator.idUsuario },
           {
-            horasReales: HORAS_REALES,
             contenidoAvance: longProgressContent('X3 cierre de tramo en ACTIVO'),
             marcarComoHecha: true,
           },
