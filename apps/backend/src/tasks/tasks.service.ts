@@ -1,3 +1,4 @@
+import { TimeRecordsService } from '../time-records/time-records.service';
 import {
   BadRequestException,
   ConflictException,
@@ -270,6 +271,7 @@ export class TasksService {
     private readonly policy: ProjectPolicyService,
     // C041 (06 v2 §34): política de lectura histórica para `findAll`/`findOne`.
     private readonly readPolicy: ProjectReadPolicyService,
+    private readonly timeRecords: TimeRecordsService,
     // T-164: opcional únicamente porque las suites de test existentes
     // construyen TasksService directamente (sin contenedor de Nest) con
     // argumentos posicionales — en producción, TasksModule siempre lo provee
@@ -812,6 +814,10 @@ export class TasksService {
 
       const eliminadoEn = new Date();
 
+      if (asignacionActiva) {
+        await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion);
+      }
+
       await tx.asignacionTarea.updateMany({
         where: { idTarea: taskId, desasignadaEn: null },
         data: { desasignadaEn: eliminadoEn },
@@ -924,6 +930,7 @@ export class TasksService {
         });
         escribio = true;
       } else if (asignacionActiva.idUsuario !== dto.idUsuario) {
+        await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion);
         const desasignadaEn = new Date();
 
         await tx.asignacionTarea.updateMany({
@@ -1104,6 +1111,7 @@ export class TasksService {
         return { cerrada: false as const };
       }
 
+      await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion);
       const desasignadaEn = new Date();
       const closed = await tx.asignacionTarea.updateMany({
         where: {
@@ -1176,6 +1184,7 @@ export class TasksService {
         sprintId: tareaBase?.idSprint ?? null,
       });
 
+      const horasReales = await this.timeRecords.recalculateAssignment(tx, assignmentId);
       const desasignadaEn = new Date();
       const closed = await tx.asignacionTarea.updateMany({
         where: {
@@ -1185,7 +1194,6 @@ export class TasksService {
           desasignadaEn: null,
         },
         data: {
-          horasReales: dto.horasReales,
           desasignadaEn,
         },
       });
@@ -1235,7 +1243,7 @@ export class TasksService {
         tipoEntidad: 'TAREA',
         idEntidad: taskId,
         valorAnterior: { horasReales: null },
-        valorNuevo: { idAsignacion: assignmentId, horasReales: dto.horasReales },
+        valorNuevo: { idAsignacion: assignmentId, horasReales: horasReales.toString() },
       });
 
       return filaFinal;

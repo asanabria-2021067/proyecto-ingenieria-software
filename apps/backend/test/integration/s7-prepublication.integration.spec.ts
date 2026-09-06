@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import {
   BadRequestException,
@@ -111,7 +112,7 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
     const policy = new ProjectPolicyService(resolver);
 
     rolesController = new RolesController(
-      new RolesService(prismaService, makeFakeNotifications(), projectTx, policy),
+      new RolesService(prismaService, makeFakeNotifications(), projectTx, policy, makeTimeRecordsService(prismaService)),
     );
     const labelsService = new LabelsService(prismaService, projectTx, policy);
     labelsController = new LabelsController(labelsService);
@@ -128,7 +129,7 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
         tasksContext,
         projectTx,
         policy,
-        readPolicy,
+        readPolicy, makeTimeRecordsService(prismaService),
       ),
     );
     progressController = new ProgressRecordsController(

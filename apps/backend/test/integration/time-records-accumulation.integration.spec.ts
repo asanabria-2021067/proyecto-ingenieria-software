@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
@@ -38,7 +39,7 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     new TasksContextService(prismaService),
     new ProjectTransactionService(prismaService),
     new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-    new ProjectReadPolicyService(prismaService));
+    new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
 }
 
 function makeTimeRecordsService(prisma: PrismaClient): TimeRecordsService {

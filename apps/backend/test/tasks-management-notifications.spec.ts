@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
 import type { NotificationsService } from '../src/notifications/notifications.service';
@@ -78,7 +79,7 @@ function makeService(
     context as TasksContextService,
     new ProjectTransactionService(prisma as unknown as PrismaService),
     makeProjectPolicyDouble(),
-    makeProjectReadPolicyDouble());
+    makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {

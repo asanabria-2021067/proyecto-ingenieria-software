@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { ConflictException, HttpStatus, type ExecutionContext } from '@nestjs/common';
@@ -120,7 +121,7 @@ describeIntegration(
         tasksContext,
         new ProjectTransactionService(prismaService),
         new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-        new ProjectReadPolicyService(prismaService));
+        new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
       tasksController = new TasksController(tasksService);
     });
 

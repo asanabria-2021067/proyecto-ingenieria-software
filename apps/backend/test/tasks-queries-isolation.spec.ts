@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TasksService } from '../src/tasks/tasks.service';
@@ -102,7 +103,7 @@ function makeStack(prisma: ReturnType<typeof makeIsolatedPrisma>) {
     context,
     new ProjectTransactionService(prisma as unknown as PrismaService),
     makeProjectPolicyDouble(),
-    makeProjectReadPolicyDouble());
+    makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return service;
 }
 

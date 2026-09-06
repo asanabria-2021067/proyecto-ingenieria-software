@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -118,7 +119,7 @@ function makeService(options: { prisma?: ReturnType<typeof makePrisma>; context?
     context as unknown as TasksContextService,
     new ProjectTransactionService(prisma as unknown as PrismaService),
     makeProjectPolicyDouble(),
-    makeProjectReadPolicyDouble());
+    makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return { context, prisma, service, tx: prisma.tx };
 }
 
@@ -191,7 +192,7 @@ describe('TasksService.closeAssignment', () => {
         idUsuario: ACTOR_ID,
         desasignadaEn: null,
       },
-      data: { horasReales: 2.5, desasignadaEn: expect.any(Date) },
+      data: { desasignadaEn: expect.any(Date) },
     });
     expect(tx.registroAvanceAsignacion.create).toHaveBeenCalledWith({
       data: { idAsignacion: ASSIGNMENT_ID, idAutor: ACTOR_ID, contenido: LONG_CONTENT },
