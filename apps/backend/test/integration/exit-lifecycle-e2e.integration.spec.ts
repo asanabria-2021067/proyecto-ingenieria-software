@@ -67,9 +67,11 @@ function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
     { notifyFromTemplate: vi.fn() } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService),
     new HoursRecognitionService(prismaService),
-    new SprintsContextService(prismaService),
-  );
+    new SprintsContextService(prismaService));
 }
 
 function longProgressContent(label: string): string {
