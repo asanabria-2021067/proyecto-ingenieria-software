@@ -13,11 +13,25 @@ import {
  */
 const uploadResultado = vi.fn();
 const firmar = vi.fn(() => 'firma-sintetica');
+/** `api.resource` refleja por defecto lo que el upload acaba de devolver. */
+const ultimaSubida: { opciones?: Record<string, unknown>; resultado?: Record<string, unknown> } = {};
+const recursoResultado = vi.fn((publicId: string) => ({
+  public_id: publicId,
+  resource_type: 'raw',
+  type: (ultimaSubida.opciones?.type as string) ?? 'authenticated',
+  asset_id: ultimaSubida.resultado?.asset_id,
+  version: ultimaSubida.resultado?.version,
+  bytes: ultimaSubida.resultado?.bytes ?? 0,
+  etag: ultimaSubida.resultado?.etag,
+}));
 
 vi.mock('cloudinary', () => ({
   v2: {
     utils: {
       api_sign_request: (...args: unknown[]) => firmar(...(args as [])),
+    },
+    api: {
+      resource: (publicId: string) => Promise.resolve(recursoResultado(publicId)),
     },
     uploader: {
       upload_stream: (
@@ -27,7 +41,10 @@ vi.mock('cloudinary', () => ({
         const sink = new Writable({ write(_chunk, _encoding, done) { done(); } });
         sink.on('finish', () => {
           try {
-            callback(null, uploadResultado(options));
+            const resultado = uploadResultado(options) as Record<string, unknown>;
+            ultimaSubida.opciones = options;
+            ultimaSubida.resultado = resultado;
+            callback(null, resultado);
           } catch (error) {
             callback(error, undefined);
           }
@@ -79,6 +96,9 @@ describe('S7 adaptador Cloudinary de cierre', () => {
   beforeEach(() => {
     uploadResultado.mockReset();
     firmar.mockClear();
+    recursoResultado.mockClear();
+    delete ultimaSubida.opciones;
+    delete ultimaSubida.resultado;
   });
 
   it('TC02-A: el publicId sigue uvgenius/cierre/<projectId>/<uuid-v4>.enc y nunca se reutiliza', () => {
