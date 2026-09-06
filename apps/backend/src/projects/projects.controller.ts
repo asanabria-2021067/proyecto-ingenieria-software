@@ -33,7 +33,8 @@ const PROJECT_EDIT: ProjectWriteMetadata = {
   sprint: 'ANY',
   family: 'PROYECTO_EDICION',
 };
-const PROJECT_STATE_CHANGE: ProjectWriteMetadata = { ...PROJECT_EDIT, states: ['B', 'P', 'E'] };
+// C032 (§41 E008): solo B→P y P→E; CERRADO ya no es destino del líder.
+const PROJECT_STATE_CHANGE: ProjectWriteMetadata = { ...PROJECT_EDIT, states: ['B', 'P'] };
 const PROJECT_SUBMIT: ProjectWriteMetadata = { ...PROJECT_EDIT, states: ['B'], family: 'PUBLICACION_ENVIO' };
 const PROJECT_RESUBMIT: ProjectWriteMetadata = { ...PROJECT_EDIT, states: ['O'], family: 'PUBLICACION_ENVIO' };
 const PROJECT_MILESTONE: ProjectWriteMetadata = {

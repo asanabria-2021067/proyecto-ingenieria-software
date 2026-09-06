@@ -1044,14 +1044,8 @@ export class ProjectsService {
         `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
       );
     }
-    // A11 / Decisión Bloqueante #2: esta es la transición real que persiste
-    // EstadoProyecto.CERRADO (EN_PROGRESO -> CERRADO, vía
-    // TRANSICIONES_PERMITIDAS) — no `approveClosure`, que en el flujo
-    // administrativo actual persiste CANCELADO, no CERRADO. La invariante
-    // "Proyecto=CERRADO con Sprint operable" se protege aquí.
-    if (nuevoEstado === EstadoProyectoCreador.CERRADO) {
-      await this.assertNoOperableSprint(id, tx);
-    }
+    // C032: el líder ya no puede llevar el proyecto a CERRADO desde esta ruta;
+    // el estado terminal pertenece exclusivamente a la revisión administrativa de cierre.
     const estadoAnterior = proyecto.estadoProyecto;
 
     const actualizado = await tx.proyecto.update({
@@ -1083,8 +1077,7 @@ export class ProjectsService {
 
     if (
       nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
-      nuevoEstado === EstadoProyectoCreador.EN_PROGRESO ||
-      nuevoEstado === EstadoProyectoCreador.CERRADO
+      nuevoEstado === EstadoProyectoCreador.EN_PROGRESO
     ) {
       const participaciones = await tx.participacionProyecto.findMany({
         where: {
