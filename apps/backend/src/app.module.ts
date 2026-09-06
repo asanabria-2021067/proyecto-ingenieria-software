@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import * as redisStore from 'cache-manager-redis-store';
+import { buildEnvOptions } from './config/env.options';
 import { AppController } from './app.controller';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
@@ -33,6 +35,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot(buildEnvOptions()),
     EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot([
       {
@@ -51,12 +54,15 @@ import { BitacoraModule } from './bitacora/bitacora.module';
         limit: 200,
       },
     ]),
-    CacheModule.register({
+    CacheModule.registerAsync({
       isGlobal: true,
-      store: redisStore,
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      ttl: 300,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        store: redisStore,
+        host: config.get<string>('app.redis.host'),
+        port: config.get<number>('app.redis.port'),
+        ttl: 300,
+      }),
     }),
     PrismaModule,
     AuthModule,
