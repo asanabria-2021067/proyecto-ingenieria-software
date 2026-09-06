@@ -72,7 +72,7 @@ describe('ComentariosService', () => {
 
     expect(prisma.tarea.findFirst).toHaveBeenCalledWith({
       where: { idTarea: 7, idProyecto: 1, eliminadoEn: null, proyecto: { eliminadoEn: null } },
-      select: { idTarea: true, idProyecto: true, creadaPor: true },
+      select: { idTarea: true, idProyecto: true, creadaPor: true, idSprint: true },
     });
   });
 
