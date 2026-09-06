@@ -122,7 +122,9 @@ describeIntegration('S7 lectura histórica de proyectos', () => {
       const eliminadas = vista.contribucionesEliminadas as Array<Record<string, unknown>>;
       expect(eliminadas, quien).toHaveLength(1);
       expect(eliminadas[0].razonDeInvisibilidad, quien).toBe('TAREA_ELIMINADA');
-      expect(eliminadas[0].horasReportadas, quien).toBe('3.00');
+      // La proyección de §15 reporta la caché del tramo y su marca histórica.
+      expect(eliminadas[0].cache, quien).toBe('3.00');
+      expect(eliminadas[0].contribucionHistorica, quien).toBe(true);
 
       // Revisiones y el informe oficial SEPARADO de lo enviado.
       const revisiones = vista.revisiones as Array<{
