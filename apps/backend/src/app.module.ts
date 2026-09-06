@@ -9,6 +9,7 @@ import { buildEnvOptions } from './config/env.options';
 import { AppController } from './app.controller';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
+import { ProjectPolicyModule } from './common/project-policy/project-policy.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -65,6 +66,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
       }),
     }),
     PrismaModule,
+    ProjectPolicyModule,
     AuthModule,
     UsersModule,
     ProjectsModule,
