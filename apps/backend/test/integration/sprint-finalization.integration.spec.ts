@@ -21,9 +21,8 @@ import { ProjectTransactionService } from '../../src/common/project-policy/proje
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
-import { TimeRecordsService } from '../../src/time-records/time-records.service';
-import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { BitacoraEventosService } from '../../src/bitacora/bitacora-eventos.service';
+import { HoursRecognitionService } from '../../src/sprints/hours-recognition.service';
 
 /**
  * Integración real A4: SprintsService.finalizeSprint contra PostgreSQL real
@@ -54,17 +53,6 @@ describeIntegration(
       const context = new SprintsContextService(prismaService);
       const authorization = new SprintsAuthorizationService(context);
       const runner = new ProjectTransactionService(prismaService);
-      // C075: la normalización previa de F4 vive en el writer único de la
-      // caché, así que la pila real de finalización debe incluirlo.
-      const timeRecords = new TimeRecordsService(
-        prismaService,
-        new TasksContextService(prismaService),
-        { notifyTaskHoursLogged: async () => undefined } as unknown as NotificationsService,
-        runner,
-        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-        new ProjectReadPolicyService(prismaService),
-        new BitacoraEventosService(),
-      );
       return {
         service: new SprintsService(
           prismaService,
@@ -75,7 +63,8 @@ describeIntegration(
           new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
           new ProjectReadPolicyService(prismaService),
           new BitacoraEventosService(),
-          timeRecords),
+          undefined,
+          new HoursRecognitionService(prismaService)),
         notifications,
       };
     }

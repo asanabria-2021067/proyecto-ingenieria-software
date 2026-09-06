@@ -19,14 +19,13 @@ import { ExitRequestsService } from '../../src/exit-requests/exit-requests.servi
 import { HoursRecognitionService } from '../../src/sprints/hours-recognition.service';
 import { ProjectHoursSummaryService } from '../../src/sprints/project-hours-summary.service';
 import { BitacoraEventosService } from '../../src/bitacora/bitacora-eventos.service';
-import { TimeRecordsService } from '../../src/time-records/time-records.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import { SprintsService } from '../../src/sprints/sprints.service';
 import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.service';
-import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
@@ -92,15 +91,6 @@ function makeSprintsService(prisma: PrismaClient): SprintsService {
     persistUsersTx: realNotifications.persistUsersTx.bind(realNotifications),
   } as unknown as NotificationsService;
   const runner = new ProjectTransactionService(prismaService);
-  const timeRecords = new TimeRecordsService(
-    prismaService,
-    new TasksContextService(prismaService),
-    { notifyTaskHoursLogged: async () => undefined } as unknown as NotificationsService,
-    runner,
-    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
-    new ProjectReadPolicyService(prismaService),
-    new BitacoraEventosService(),
-  );
   return new SprintsService(
     prismaService,
     context,
@@ -110,7 +100,6 @@ function makeSprintsService(prisma: PrismaClient): SprintsService {
     new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
     new ProjectReadPolicyService(prismaService),
     new BitacoraEventosService(),
-    timeRecords,
     new ProjectHoursSummaryService(prismaService),
     new HoursRecognitionService(prismaService));
 }
