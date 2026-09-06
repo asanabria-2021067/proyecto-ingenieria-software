@@ -21,6 +21,7 @@ import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, Ti
 import { NotificationsService } from '../notifications/notifications.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService, type ReadDecision } from '../common/project-policy/project-read-policy.service';
 import {
   ProjectTransactionService,
   type ProjectLockRow,
@@ -269,7 +270,23 @@ export class ProjectsService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
   ) {}
+
+  /**
+   * C033 (06 v2 §34): el detalle aplica el scope de Sprint del lector en la
+   * consulta (p. ej. admin → solo tareas de Sprints CERRADO), no en el DTO.
+   */
+  private detalleSelectParaLector(decision: ReadDecision) {
+    const { sprintWhere } = this.readPolicy.scopeForActor(decision);
+    if (Object.keys(sprintWhere).length === 0) {
+      return proyectoDetalleSelect;
+    }
+    return {
+      ...proyectoDetalleSelect,
+      tareas: { ...proyectoDetalleSelect.tareas, where: { sprint: sprintWhere } },
+    };
+  }
 
   /** Fila del proyecto tomada por el runner; solo es `null` en creación. */
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -375,13 +392,18 @@ export class ProjectsService {
   }
 
   async findOneAdmin(id: number, adminId: number) {
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId: id,
+      actorId: adminId,
+      scope: 'resumen',
+    });
     const isAdmin = await this.notifications.isAdmin(adminId);
     if (!isAdmin) {
       throw new ForbiddenException('Se requieren permisos de administrador');
     }
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
-      select: proyectoDetalleSelect,
+      select: this.detalleSelectParaLector(decision),
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
@@ -390,6 +412,7 @@ export class ProjectsService {
   }
 
   async findOneOwner(id: number, userId: number) {
+    await this.readPolicy.assertRead(undefined, { projectId: id, actorId: userId, scope: 'resumen' });
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
       select: {
@@ -422,6 +445,7 @@ export class ProjectsService {
    * líder del proyecto o un participante activo — nadie más puede consultarlo.
    */
   async getAvance(id: number, userId: number) {
+    await this.readPolicy.assertRead(undefined, { projectId: id, actorId: userId, scope: 'resumen' });
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
       select: {
@@ -1189,6 +1213,7 @@ export class ProjectsService {
   }
 
   async findPostulacionesByProject(idProyecto: number, userId: number) {
+    await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'equipo' });
     await this._requireOwner(idProyecto, userId);
 
     return this.prisma.postulacion.findMany({
