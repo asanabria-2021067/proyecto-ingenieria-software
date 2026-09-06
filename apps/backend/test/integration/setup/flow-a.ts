@@ -62,7 +62,6 @@ export function flowAStack(db: PrismaClient) {
     new ProjectPolicyService(new ProjectIdResolverService(prisma)),
     new ProjectReadPolicyService(prisma),
     audit,
-    timeRecords,
     projectHours,
     recognition,
   );

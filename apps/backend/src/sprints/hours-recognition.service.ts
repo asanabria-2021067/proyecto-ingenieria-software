@@ -49,6 +49,59 @@ export class HoursRecognitionService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * C155 (06 v2 §12/§14/§39/§48): normalización EXCEPCIONAL previa a Flow A.
+   *
+   * Un tramo cerrado, granular, no consumido, sin caché y sin ningún registro
+   * efectivo describe trabajo que terminó sin horas. Consolidar con la caché en
+   * NULL dejaría ese hecho sin materializar, así que se fija a 0 antes de
+   * revalidar F1–F4.
+   *
+   * Vive AQUÍ y no en `TimeRecordsService` porque §39/§48 congelan el grafo:
+   * `Sprints` depende de `Policy + Bitacora + Notifications`, nunca de
+   * `TimeRecords`. Delegar en el writer ordinario obligaba a la arista
+   * `SprintsModule → TimeRecordsModule`, que ese grafo prohíbe.
+   *
+   * Esto NO convierte a este servicio en un segundo writer general de
+   * `horasReales`: la excepción está acotada a los cinco predicados de abajo y
+   * su único resultado posible es `NULL → 0`. El writer ORDINARIO sigue siendo
+   * `TimeRecordsService.recalculateAssignment`, y ninguna otra escritura de esa
+   * columna se autoriza desde aquí.
+   *
+   * Recibe el `tx` del caller: nunca abre transacción propia ni anida otra.
+   */
+  async normalizeClosedGranularTx(
+    tx: TxClient,
+    scope: { projectId: number; sprintId: number },
+  ): Promise<void> {
+    const assignments = await tx.asignacionTarea.findMany({
+      where: {
+        tarea: { idProyecto: scope.projectId, idSprint: scope.sprintId },
+        desasignadaEn: { not: null },
+        reconocidoEn: null,
+        origenReporte: 'GRANULAR',
+        horasReales: null,
+        registrosTiempo: { none: { revocadoEn: null } },
+      },
+      select: { idAsignacion: true },
+    });
+    for (const assignment of assignments) {
+      // Mismo compare-and-set que usaba el writer ordinario: el tramo sigue
+      // siendo granular y sin consumir en el instante de escribir.
+      const updated = await tx.asignacionTarea.updateMany({
+        where: {
+          idAsignacion: assignment.idAsignacion,
+          origenReporte: 'GRANULAR',
+          reconocidoEn: null,
+        },
+        data: { horasReales: new Prisma.Decimal(0) },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException('El tramo cambió durante el recálculo');
+      }
+    }
+  }
+
+  /**
    * Where compartido por `calculateRecognizableHours` (aggregate, cálculo
    * puro) y `recognizeParticipationHours` (findMany + marca productiva) —
    * única fuente de verdad de "qué tramos son reconocibles" (A5), para que
