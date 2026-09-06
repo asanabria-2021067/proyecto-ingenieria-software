@@ -128,7 +128,7 @@ export class ProjectCloseReadinessService {
       ]);
     }
 
-    const [sprints, tramos, tareas, salidas, apelaciones, postulaciones] = await Promise.all([
+    const [sprints, tramos, tareas, salidas, apelaciones, postulaciones, agregados] = await Promise.all([
       db.sprint.findMany({
         where: { idProyecto: projectId },
         select: { idSprint: true, estado: true },
@@ -167,6 +167,15 @@ export class ProjectCloseReadinessService {
         where: { estadoPostulacion: 'PENDIENTE', rolProyecto: { idProyecto: projectId } },
         select: { idPostulacion: true },
       }),
+      // Agregados históricos del proyecto todavía pendientes: su procedencia
+      // debe poder demostrarse antes de cerrar (06 v2 §14/§22).
+      db.horasParticipacion.findMany({
+        where: {
+          estadoHoras: 'PENDIENTE',
+          participacion: { rolProyecto: { idProyecto: projectId } },
+        },
+        select: { idRegistroHoras: true, idParticipacion: true, idSprint: true },
+      }),
     ]);
 
     if (sprints.length === 0) {
@@ -204,12 +213,29 @@ export class ProjectCloseReadinessService {
         sinParticipacion.map((tramo) => tramo.idAsignacion),
       );
     }
+    // LEGACY_SIN_CONCILIAR tiene dos mitades (06 v2 §22): tramos cuya
+    // procedencia sigue en disputa, y agregados pendientes «sin procedencia o
+    // idSprint válida».
+    //
+    // De la segunda mitad se implementa el predicado inequívoco: un agregado
+    // PENDIENTE sin Sprint no puede consumirse ni acreditarse, porque nada
+    // dice a qué período pertenece. NO se exige además que exista un tramo de
+    // esa misma participación en ese mismo Sprint: un agregado legítimo puede
+    // provenir del reconocimiento anticipado de una salida (Flow B, 06 v2 §13),
+    // donde la participación queda RETIRADA y sus horas se consolidan sin que
+    // sobreviva un tramo abierto de ese Sprint. Endurecerlo ahí bloquearía un
+    // cierre correcto, que es exactamente lo que §14 prohíbe hacer con datos
+    // cuya historia sí es demostrable.
     const porConciliar = tramos.filter((tramo) => tramo.origenReporte === 'POR_CONCILIAR');
-    if (porConciliar.length > 0) {
+    const agregadosSinSprint = agregados.filter((agregado) => agregado.idSprint === null);
+    if (porConciliar.length > 0 || agregadosSinSprint.length > 0) {
       bloquear(
         'LEGACY_SIN_CONCILIAR',
-        'Existen tramos legacy sin conciliar',
-        porConciliar.map((tramo) => tramo.idAsignacion),
+        'Existen tramos legacy sin conciliar o agregados pendientes sin Sprint asignado',
+        [
+          ...porConciliar.map((tramo) => tramo.idAsignacion),
+          ...agregadosSinSprint.map((agregado) => agregado.idRegistroHoras),
+        ],
       );
     }
     const sinConsolidar = tramos.filter(

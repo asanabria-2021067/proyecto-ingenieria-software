@@ -14,7 +14,13 @@
  * `apply` y `verify` todavía no están implementados y salen con código
  * distinto de cero para que no puedan confundirse con una conciliación real.
  */
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
+// Helper PURO del dominio de cierre (no importa Nest ni Prisma): reutilizarlo
+// garantiza que la huella del manifiesto se calcule con exactamente la misma
+// canonicalización que el resto de Sprint 7, en vez de con una copia divergente.
+import { canonicalJson } from '../src/project-closure/closure-report-model';
 
 export type LegacyMode = 'diagnose' | 'apply' | 'verify';
 
@@ -501,6 +507,358 @@ export function formatDiagnosis(report: LegacyDiagnosis): string {
   return lines.join('\n');
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Manifiesto y rechazo de ambigüedad (06 v2 §14).
+ *
+ * Regla que gobierna todo este bloque: **un manifiesto no sustituye a la
+ * evidencia**. Que alguien haya escrito una atribución en un fichero no la
+ * convierte en verdad histórica; la CLI vuelve a demostrarla contra la base y,
+ * si no puede, rechaza en vez de adivinar.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export const LEGACY_MANIFEST_VERSION = 'sprint7-legacy-manifest-v1' as const;
+
+export const LEGACY_ACTIONS = [
+  'ENLAZAR',
+  'CONSUMIR_NUEVO',
+  'CONSUMIR_INCREMENTO',
+  'MARCAR_YA_INCLUIDO',
+  'CLASIFICAR_REPORTE',
+] as const;
+export type LegacyAction = (typeof LEGACY_ACTIONS)[number];
+
+export interface LegacyManifestEntry {
+  accion: LegacyAction;
+  idAsignacion: number;
+  /** Participación histórica que el revisor afirma haber demostrado. */
+  idParticipacion: number;
+  /** Agregado afectado cuando la acción lo requiere. */
+  idRegistroHoras: number | null;
+  importeAnterior: string | null;
+  importeEsperado: string;
+}
+
+export interface LegacyManifest {
+  version: string;
+  /** Identificador de la ejecución de diagnóstico sobre la que se construyó. */
+  baseline: string;
+  adminId: number;
+  projectId: number;
+  sprintId: number;
+  /** Evidencia externa identificable revisada por una persona. */
+  evidencia: string;
+  entradas: LegacyManifestEntry[];
+  /** SHA-256 del conjunto esperado (`entradas` canonicalizadas). */
+  sha256: string;
+}
+
+/** Huella del conjunto esperado. Determinista e independiente del entorno. */
+export function manifestEntriesHash(entradas: readonly LegacyManifestEntry[]): string {
+  return createHash('sha256').update(canonicalJson(entradas), 'utf8').digest('hex');
+}
+
+/** Huella del manifiesto completo, para citarla en la bitácora. */
+export function manifestHash(manifest: LegacyManifest): string {
+  const { sha256: _ignored, ...rest } = manifest;
+  return createHash('sha256').update(canonicalJson(rest), 'utf8').digest('hex');
+}
+
+export function loadManifest(path: string): LegacyManifest {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new LegacyCliError(
+      `No se pudo leer el manifiesto "${path}": ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  return validateManifest(parsed);
+}
+
+export function validateManifest(value: unknown): LegacyManifest {
+  const fail = (reason: string): never => {
+    throw new LegacyCliError(`Manifiesto inválido: ${reason}`);
+  };
+  if (typeof value !== 'object' || value === null) fail('no es un objeto');
+  const raw = value as Record<string, unknown>;
+
+  if (raw.version !== LEGACY_MANIFEST_VERSION) {
+    fail(`versión "${String(raw.version)}"; se esperaba "${LEGACY_MANIFEST_VERSION}"`);
+  }
+  for (const field of ['baseline', 'evidencia', 'sha256'] as const) {
+    if (typeof raw[field] !== 'string' || (raw[field] as string).length === 0) {
+      fail(`falta el campo obligatorio "${field}"`);
+    }
+  }
+  for (const field of ['adminId', 'projectId', 'sprintId'] as const) {
+    if (!Number.isInteger(raw[field]) || (raw[field] as number) <= 0) {
+      fail(`"${field}" debe ser un entero positivo`);
+    }
+  }
+  if (!Array.isArray(raw.entradas) || raw.entradas.length === 0) {
+    fail('"entradas" debe ser una lista no vacía');
+  }
+
+  const entradas = (raw.entradas as unknown[]).map((item, index) => {
+    if (typeof item !== 'object' || item === null) fail(`entrada ${index} no es un objeto`);
+    const entry = item as Record<string, unknown>;
+    if (!LEGACY_ACTIONS.includes(entry.accion as LegacyAction)) {
+      fail(`entrada ${index}: acción "${String(entry.accion)}" fuera del enum`);
+    }
+    for (const field of ['idAsignacion', 'idParticipacion'] as const) {
+      if (!Number.isInteger(entry[field]) || (entry[field] as number) <= 0) {
+        fail(`entrada ${index}: "${field}" debe ser un entero positivo`);
+      }
+    }
+    if (
+      entry.idRegistroHoras !== null &&
+      (!Number.isInteger(entry.idRegistroHoras) || (entry.idRegistroHoras as number) <= 0)
+    ) {
+      fail(`entrada ${index}: "idRegistroHoras" debe ser un entero positivo o null`);
+    }
+    if (entry.importeAnterior !== null && typeof entry.importeAnterior !== 'string') {
+      fail(`entrada ${index}: "importeAnterior" debe ser una cadena decimal o null`);
+    }
+    if (typeof entry.importeEsperado !== 'string') {
+      fail(`entrada ${index}: "importeEsperado" debe ser una cadena decimal`);
+    }
+    return {
+      accion: entry.accion as LegacyAction,
+      idAsignacion: entry.idAsignacion as number,
+      idParticipacion: entry.idParticipacion as number,
+      idRegistroHoras: (entry.idRegistroHoras ?? null) as number | null,
+      importeAnterior: (entry.importeAnterior ?? null) as string | null,
+      importeEsperado: entry.importeEsperado as string,
+    } satisfies LegacyManifestEntry;
+  });
+
+  const manifest: LegacyManifest = {
+    version: raw.version as string,
+    baseline: raw.baseline as string,
+    adminId: raw.adminId as number,
+    projectId: raw.projectId as number,
+    sprintId: raw.sprintId as number,
+    evidencia: raw.evidencia as string,
+    entradas,
+    sha256: raw.sha256 as string,
+  };
+
+  const expected = manifestEntriesHash(entradas);
+  if (manifest.sha256 !== expected) {
+    fail(`el SHA-256 declarado no corresponde al conjunto de entradas (esperado ${expected})`);
+  }
+  return manifest;
+}
+
+export interface LegacyRefusal {
+  idAsignacion: number;
+  idParticipacion: number | null;
+  idRegistroHoras: number | null;
+  motivo: string;
+  detalle: string;
+  ids: number[];
+}
+
+/**
+ * Comprueba, contra la base, si cada entrada del manifiesto puede demostrarse.
+ *
+ * Un candidato válido exige el **mismo usuario y proyecto** y evidencia del rol
+ * y la participación **del tramo histórico**. Ni el rol actual de la tarea, ni
+ * una `fechaIngreso` reescrita por reactivación, ni la participación `ACTIVO`
+ * de hoy prueban ese pasado, y ningún MIN/MAX ni «la primera fila» desempata.
+ */
+export async function assessManifest(
+  prisma: Pick<PrismaClient, '$queryRawUnsafe'>,
+  manifest: LegacyManifest,
+): Promise<LegacyRefusal[]> {
+  const refusals: LegacyRefusal[] = [];
+  const assignmentIds = manifest.entradas.map((entry) => entry.idAsignacion);
+
+  const tramos = await prisma.$queryRawUnsafe<
+    Array<{
+      idAsignacion: number;
+      idUsuario: number;
+      idParticipacion: number | null;
+      idProyecto: number;
+      idSprint: number;
+      horasReales: string | null;
+      reconocidoEn: Date | null;
+      estadoProyecto: string;
+      proyectoEliminado: boolean;
+    }>
+  >(`
+    SELECT at.id_asignacion AS "idAsignacion", at.id_usuario AS "idUsuario",
+           at.id_participacion AS "idParticipacion", t.id_proyecto AS "idProyecto",
+           t.id_sprint AS "idSprint", at.horas_reales::text AS "horasReales",
+           at.reconocido_en AS "reconocidoEn", p.estado_proyecto::text AS "estadoProyecto",
+           p.eliminado_en IS NOT NULL AS "proyectoEliminado"
+    FROM asignacion_tarea at
+    JOIN tarea t ON t.id_tarea = at.id_tarea
+    JOIN proyecto p ON p.id_proyecto = t.id_proyecto
+    WHERE at.id_asignacion IN (${assignmentIds.join(',')})
+  `);
+  const byAssignment = new Map(tramos.map((row) => [row.idAsignacion, row]));
+
+  for (const entry of manifest.entradas) {
+    const tramo = byAssignment.get(entry.idAsignacion);
+    const refuse = (motivo: string, detalle: string, ids: number[] = []): void => {
+      refusals.push({
+        idAsignacion: entry.idAsignacion,
+        idParticipacion: entry.idParticipacion,
+        idRegistroHoras: entry.idRegistroHoras,
+        motivo,
+        detalle,
+        ids,
+      });
+    };
+
+    if (!tramo) {
+      refuse('TRAMO_INEXISTENTE', 'El tramo del manifiesto no existe en esta base.');
+      continue;
+    }
+    if (tramo.idProyecto !== manifest.projectId || tramo.idSprint !== manifest.sprintId) {
+      refuse(
+        'TRAMO_FUERA_DE_ALCANCE',
+        `El tramo pertenece al proyecto ${tramo.idProyecto} y al Sprint ${tramo.idSprint}, no a los del manifiesto.`,
+      );
+      continue;
+    }
+    // Proyecto terminal o con soft-delete: se conserva la historia y se excluye
+    // del apply de Sprint 7; su resolución es administrativa e independiente.
+    if (tramo.estadoProyecto === 'CERRADO' || tramo.estadoProyecto === 'CANCELADO' || tramo.proyectoEliminado) {
+      refuse(
+        'PROYECTO_TERMINAL_O_ELIMINADO',
+        `El proyecto está en ${tramo.estadoProyecto}${tramo.proyectoEliminado ? ' con soft-delete' : ''}: no se altera automáticamente.`,
+      );
+      continue;
+    }
+
+    // ── Evidencia de la participación histórica del propio tramo.
+    const candidates = await prisma.$queryRawUnsafe<
+      Array<{
+        idParticipacion: number;
+        idUsuario: number;
+        idProyecto: number;
+        idRolProyecto: number;
+        estadoParticipacion: string;
+        fechaIngreso: Date;
+        fechaSalida: Date | null;
+        reactivada: boolean;
+      }>
+    >(`
+      SELECT pp.id_participacion AS "idParticipacion", pp.id_usuario AS "idUsuario",
+             rp.id_proyecto AS "idProyecto", pp.id_rol_proyecto AS "idRolProyecto",
+             pp.estado_participacion::text AS "estadoParticipacion",
+             pp.fecha_ingreso AS "fechaIngreso", pp.fecha_salida AS "fechaSalida",
+             (pp.fecha_ingreso > at.fecha_asignacion) AS "reactivada"
+      FROM participacion_proyecto pp
+      JOIN rol_proyecto rp ON rp.id_rol_proyecto = pp.id_rol_proyecto
+      JOIN asignacion_tarea at ON at.id_asignacion = ${entry.idAsignacion}
+      WHERE pp.id_usuario = ${tramo.idUsuario} AND rp.id_proyecto = ${tramo.idProyecto}
+      ORDER BY pp.id_participacion
+    `);
+
+    const declared = candidates.find((row) => row.idParticipacion === entry.idParticipacion);
+    if (!declared) {
+      refuse(
+        'PARTICIPACION_NO_CORRESPONDE',
+        'La participación declarada no pertenece al mismo usuario y proyecto que el tramo.',
+        candidates.map((row) => row.idParticipacion),
+      );
+      continue;
+    }
+    // Varias historias de participación con roles distintos: la verdad
+    // histórica no puede deducirse de las filas actuales.
+    const distinctRoles = new Set(candidates.map((row) => row.idRolProyecto));
+    if (candidates.length > 1 && distinctRoles.size > 1) {
+      refuse(
+        'PARTICIPACION_AMBIGUA',
+        `El usuario tuvo ${candidates.length} historias de participación con ${distinctRoles.size} roles distintos; ninguna regla de desempate es admisible.`,
+        candidates.map((row) => row.idParticipacion),
+      );
+      continue;
+    }
+    // fechaIngreso posterior al propio tramo: la fila fue reescrita por una
+    // reactivación y por tanto no prueba el pasado que se le atribuye.
+    if (declared.reactivada) {
+      refuse(
+        'FECHA_INGRESO_REESCRITA',
+        'La fecha de ingreso de la participación es posterior al tramo: fue reescrita por una reactivación y no demuestra ese pasado.',
+        [declared.idParticipacion],
+      );
+      continue;
+    }
+
+    // ── Agregado afectado.
+    if (entry.idRegistroHoras !== null) {
+      const aggregates = await prisma.$queryRawUnsafe<
+        Array<{
+          idRegistroHoras: number;
+          idParticipacion: number;
+          estadoHoras: string;
+          idSprint: number | null;
+          horasReportadas: string;
+        }>
+      >(`
+        SELECT hp.id_registro_horas AS "idRegistroHoras", hp.id_participacion AS "idParticipacion",
+               hp.estado_horas::text AS "estadoHoras", hp.id_sprint AS "idSprint",
+               hp.horas_reportadas::text AS "horasReportadas"
+        FROM horas_participacion hp
+        WHERE hp.id_registro_horas = ${entry.idRegistroHoras}
+      `);
+      const aggregate = aggregates[0];
+      if (!aggregate) {
+        refuse('AGREGADO_INEXISTENTE', 'El agregado declarado no existe.');
+        continue;
+      }
+      if (aggregate.estadoHoras !== 'PENDIENTE') {
+        refuse(
+          'AGREGADO_NO_PENDIENTE',
+          `El agregado está en ${aggregate.estadoHoras}: no se altera automáticamente y su resolución es administrativa.`,
+          [aggregate.idRegistroHoras],
+        );
+        continue;
+      }
+      if (aggregate.idParticipacion !== entry.idParticipacion) {
+        refuse(
+          'AGREGADO_DE_OTRA_PARTICIPACION',
+          'El agregado pertenece a otra participación distinta de la declarada.',
+          [aggregate.idRegistroHoras],
+        );
+        continue;
+      }
+    }
+
+    // ── El importe anterior declarado debe coincidir con el almacenado.
+    const stored = tramo.horasReales;
+    const declaredPrevious = entry.importeAnterior;
+    const same =
+      (stored === null && declaredPrevious === null) ||
+      (stored !== null && declaredPrevious !== null && Number(stored) === Number(declaredPrevious));
+    if (!same) {
+      refuse(
+        'IMPORTE_ANTERIOR_DIVERGENTE',
+        `El manifiesto declara ${declaredPrevious ?? 'null'} pero la base almacena ${stored ?? 'null'}.`,
+      );
+      continue;
+    }
+  }
+
+  return refusals;
+}
+
+export function formatRefusals(refusals: readonly LegacyRefusal[]): string {
+  const lines = [`apply rechazado: ${refusals.length} entrada(s) no demostrables.`];
+  for (const refusal of refusals) {
+    lines.push(
+      `  tramo ${refusal.idAsignacion} [${refusal.motivo}] ${refusal.detalle}` +
+        (refusal.ids.length > 0 ? ` ids=${refusal.ids.join(',')}` : ''),
+    );
+  }
+  lines.push('Ninguna fila fue modificada.');
+  return lines.join('\n');
+}
+
 export async function runCli(argv: readonly string[]): Promise<number> {
   let options: LegacyCliOptions;
   try {
@@ -530,9 +888,22 @@ export async function runCli(argv: readonly string[]): Promise<number> {
         );
         return 0;
       }
-      case 'apply':
-        process.stderr.write('El modo apply todavía no está implementado.\n');
+      case 'apply': {
+        const manifest = loadManifest(options.manifestPath as string);
+        if (manifest.adminId !== options.adminId) {
+          process.stderr.write(
+            `El manifiesto fue revisado por el admin ${manifest.adminId}, no por ${options.adminId}.\n`,
+          );
+          return 5;
+        }
+        const refusals = await assessManifest(prisma, manifest);
+        if (refusals.length > 0) {
+          process.stderr.write(`${formatRefusals(refusals)}\n`);
+          return 9;
+        }
+        process.stderr.write('La aplicación del manifiesto todavía no está implementada.\n');
         return 4;
+      }
       case 'verify':
         process.stderr.write('El modo verify todavía no está implementado.\n');
         return 4;
