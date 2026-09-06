@@ -1,5 +1,6 @@
-import { Controller, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { HistoricalProjectReadService } from './historical-project-read.service';
 
 /**
@@ -13,4 +14,13 @@ import { HistoricalProjectReadService } from './historical-project-read.service'
 @UseGuards(JwtAuthGuard)
 export class HistoricalProjectController {
   constructor(protected readonly historical: HistoricalProjectReadService) {}
+
+  /** E118: proyección histórica completa, según lo que el lector puede ver. */
+  @Get('historico')
+  historicalProject(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.historical.historicalProject(projectId, user.userId);
+  }
 }
