@@ -8,7 +8,7 @@ import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
 import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
-import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * A diferencia de tasks-update.service.spec.ts (que mockea
@@ -253,7 +253,7 @@ function makeService(state: Fixture) {
   const tasksAuthorization = new TasksAuthorizationService(tasksContext);
   const tasksRelations = new TasksRelationsService(db as unknown as PrismaService, tasksContext);
   const notifications = {} as unknown as NotificationsService;
-  const service = new TasksService(db as unknown as PrismaService, tasksAuthorization, tasksRelations, notifications, tasksContext, new ProjectTransactionService(db as unknown as PrismaService), makeProjectPolicyDouble());
+  const service = new TasksService(db as unknown as PrismaService, tasksAuthorization, tasksRelations, notifications, tasksContext, new ProjectTransactionService(db as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
   return { db, service };
 }
 

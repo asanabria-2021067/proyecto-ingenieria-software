@@ -7,7 +7,7 @@ import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
 import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
-import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -73,7 +73,7 @@ function makeService(opts: {
   // previo cuando la tarea no tiene rol; por defecto, sin asignación.
   const contextLiteral = { getActiveAssignment: vi.fn().mockResolvedValue(null) };
   const context = contextLiteral as typeof contextLiteral & TasksContextService;
-  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -322,7 +322,7 @@ describe('TasksService.remove', () => {
         }),
       };
       const context = contextLiteral as typeof contextLiteral & TasksContextService;
-      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.remove(5, 42, 1);
       orden.push('fin_transaccion');

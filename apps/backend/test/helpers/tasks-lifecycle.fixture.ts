@@ -867,6 +867,7 @@ export function setupLifecycleEnv(): LifecycleEnv {
     tasksContext,
     new ProjectTransactionService(db as unknown as PrismaService),
     makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 
   const projectsNotifications = {

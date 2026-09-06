@@ -9,7 +9,7 @@ import type { NotificationsService } from '../src/notifications/notifications.se
 import type { UpdateTaskEstadoDto } from '../src/tasks/dto/update-task-estado.dto';
 import { TasksService } from '../src/tasks/tasks.service';
 import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
-import { makeProjectPolicyDouble, withProjectLock } from './helpers/project-policy.double';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function estadoDto(estadoTarea: string): UpdateTaskEstadoDto {
   return { estadoTarea: estadoTarea as EstadoTarea };
@@ -89,7 +89,7 @@ function makeService(opts: {
   const notifications = opts.notifications ?? makeNotifications();
   const contextLiteral = { getActiveAssignment: vi.fn() };
   const context = contextLiteral as typeof contextLiteral & TasksContextService;
-  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -439,7 +439,7 @@ describe('TasksService.updateEstado', () => {
       const relations = {} as unknown as TasksRelationsService;
       const notifications = makeNotifications();
       const context = {} as unknown as TasksContextService;
-      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
       orden.push('fin_transaccion');
@@ -543,7 +543,7 @@ describe('TasksService.updateEstado', () => {
       const notifications = makeNotifications();
       const relations = {} as unknown as TasksRelationsService;
       const context = {} as unknown as TasksContextService;
-      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.updateEstado(5, 42, 1, estadoDto('HECHO'));
 
@@ -568,7 +568,7 @@ describe('TasksService.updateEstado', () => {
         { idHito: 7, estadoTarea: 'EN_PROGRESO' },
       ]);
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
@@ -584,7 +584,7 @@ describe('TasksService.updateEstado', () => {
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'POR_HACER' }));
       tx.tarea.findMany.mockResolvedValue([{ idHito: 7, estadoTarea: 'POR_HACER' }]);
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble());
+      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.updateEstado(5, 42, 1, estadoDto('POR_HACER'));
 
