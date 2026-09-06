@@ -18,6 +18,7 @@ import {
 function makePrisma() {
   return {
     revisionProyecto: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    revisionCierreProyecto: { findMany: vi.fn().mockResolvedValue([{ idRevisionCierre: 2 }]) },
     proyecto: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     usuario: { findUnique: vi.fn() },
     notificacion: { create: vi.fn() },

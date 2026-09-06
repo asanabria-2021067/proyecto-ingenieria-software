@@ -1,4 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
+import { vi } from 'vitest';
+import { NotificationsService } from '../../../src/notifications/notifications.service';
+import type { NotificationsGateway } from '../../../src/notifications/notifications.gateway';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { BitacoraEventosService } from '../../../src/bitacora/bitacora-eventos.service';
 import { ProjectTransactionService } from '../../../src/common/project-policy/project-transaction.service';
@@ -23,7 +26,9 @@ export function closureLifecycleStack(db: PrismaClient) {
   const policy = new ProjectPolicyService(new ProjectIdResolverService(prisma));
   const readiness = new ProjectCloseReadinessService(prisma);
   const audit = new BitacoraEventosService();
-  const closure = new ProjectClosureService(prisma, runner, policy, readiness, audit);
+  const gateway = { server: {}, notifyUsers: vi.fn(), emitToUsers: vi.fn() };
+  const notifications = new NotificationsService(prisma, gateway as unknown as NotificationsGateway);
+  const closure = new ProjectClosureService(prisma, runner, policy, readiness, audit, notifications);
   // El almacenamiento va mockeado: lo que se prueba es el protocolo de
   // captura, render y vínculo, no la capacidad del proveedor.
   const documentos = closureDocumentsStack(db, closureConfig());
@@ -35,7 +40,7 @@ export function closureLifecycleStack(db: PrismaClient) {
     documentos.service,
     audit,
   );
-  return { closure, readiness, runner, policy, audit, report, documentos };
+  return { closure, readiness, runner, policy, audit, report, documentos, notifications, gateway };
 }
 
 /**

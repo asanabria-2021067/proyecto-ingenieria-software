@@ -85,6 +85,9 @@ export class ApplicationsService {
       async (ctx) => {
       const { tx } = ctx;
       const proyectoBloqueado = this.lockedProject(ctx);
+      if (proyectoBloqueado.estadoProyecto === EstadoProyecto.EN_SOLICITUD_CIERRE) {
+        throw new ConflictException('El proyecto está en solicitud de cierre');
+      }
       const esPublicado = proyectoBloqueado.estadoProyecto === EstadoProyecto.PUBLICADO;
       const esEnProgreso = proyectoBloqueado.estadoProyecto === EstadoProyecto.EN_PROGRESO;
 
