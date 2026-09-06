@@ -33,7 +33,7 @@ export function leadershipStack(db: PrismaClient) {
   const readPolicy = new ProjectReadPolicyService(prisma);
   const eligibility = new ProjectEligibilityService(prisma);
   const audit = new BitacoraEventosService();
-  const read = new LeadershipReadService(prisma, readPolicy, eligibility);
+  const read = new LeadershipReadService(prisma, readPolicy, eligibility, policy);
   const service = new LeadershipService(prisma, runner, policy, eligibility, notifications, audit);
   return { read, service, runner, policy, readPolicy, eligibility, notifications, gateway, audit };
 }
