@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsDateString, IsNumber, IsString, Min, MinLength, ValidateIf } from 'class-validator';
+import { IsDateString, IsNumber, IsString, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 
 /**
  * C061 (06 v2 §9 UPDATE / §41 E057): corrección del autor sobre un registro
@@ -36,5 +36,6 @@ export class UpdateTimeRecordDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MinLength(1, { message: 'justificacionExceso no puede estar vacía si se envía' })
+  @MaxLength(5000)
   justificacionExceso?: string;
 }
