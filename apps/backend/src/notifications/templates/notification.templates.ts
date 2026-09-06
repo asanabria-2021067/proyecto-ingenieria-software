@@ -69,6 +69,8 @@ export interface NotificationTemplateData {
   SOLICITUD_CIERRE_PROYECTO: {
     projectTitle: string;
     projectId: number;
+    revisionId?: number;
+    numeroRevision?: number;
   };
   CIERRE_APROBADO: {
     projectTitle: string;
@@ -281,7 +283,7 @@ export const NOTIFICATION_TEMPLATES = {
   SOLICITUD_CIERRE_PROYECTO: {
     title: 'Solicitud de cierre de proyecto',
     message: (data: NotificationTemplateData['SOLICITUD_CIERRE_PROYECTO']) =>
-      `El líder solicitó cierre para "${data.projectTitle}".`,
+      `El líder solicitó cierre para "${data.projectTitle}"${data.numeroRevision === undefined ? '' : ` con la revisión ${data.numeroRevision}`}.`,
   },
   CIERRE_APROBADO: {
     title: 'Cierre de proyecto aprobado',
