@@ -1,3 +1,4 @@
+import { SetMetadata } from '@nestjs/common';
 import { EstadoProyecto } from '@prisma/client';
 import type { ProjectIdSource } from '../project-policy/project-id-resolver.service';
 
@@ -113,3 +114,15 @@ export const PROJECT_STATE_INVALID_CODE = 'PROYECTO_ESTADO_INVALIDO';
 export const PROJECT_STATE_INVALID_MESSAGE = 'El estado actual del proyecto no permite esta operación';
 export const ENTITY_SPRINT_INVALID_MESSAGE =
   'El Sprint de la entidad afectada no admite esta operación';
+
+/** Clave de Reflector bajo la que `@ProjectWrite` guarda la metadata del handler o del controller. */
+export const PROJECT_WRITE_METADATA_KEY = 'uvgenius:project-write';
+
+/**
+ * Declara la metadata obligatoria de una ruta de escritura participante.
+ * Se combina con `@UseGuards(ProjectWriteGuard)`: el guard lee esta
+ * metadata (handler sobre controller) y, si falta, aplica el default
+ * restrictivo.
+ */
+export const ProjectWrite = (metadata: ProjectWriteMetadata): MethodDecorator & ClassDecorator =>
+  SetMetadata(PROJECT_WRITE_METADATA_KEY, metadata);

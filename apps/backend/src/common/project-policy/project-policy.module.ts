@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { ProjectWriteGuard } from '../guards/project-write.guard';
 import { ProjectIdResolverService } from './project-id-resolver.service';
 import { ProjectPolicyService } from './project-policy.service';
 import { ProjectReadPolicyService } from './project-read-policy.service';
@@ -19,12 +20,14 @@ import { ProjectTransactionService } from './project-transaction.service';
     ProjectTransactionService,
     ProjectPolicyService,
     ProjectReadPolicyService,
+    ProjectWriteGuard,
   ],
   exports: [
     ProjectIdResolverService,
     ProjectTransactionService,
     ProjectPolicyService,
     ProjectReadPolicyService,
+    ProjectWriteGuard,
   ],
 })
 export class ProjectPolicyModule {}

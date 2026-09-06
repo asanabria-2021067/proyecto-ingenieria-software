@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { Prioridad, type PrismaClient } from '@prisma/client';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import {
   createIntegrationUser,
@@ -14,7 +15,8 @@ import {
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { ProjectWriteGuard } from '../../src/common/guards/project-write.guard';
-import { SprintsContextService } from '../../src/sprints/sprints-context.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { TasksController } from '../../src/tasks/tasks.controller';
 import { TasksService } from '../../src/tasks/tasks.service';
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
@@ -33,7 +35,7 @@ import type { NotificationsService } from '../../src/notifications/notifications
  *      TasksController para confirmar que ProjectWriteGuard está decorado
  *      ahí (lo mismo que Nest consultaría en producción antes de invocar el
  *      handler);
- *   2. ejecuta ese guard real, con SprintsContextService real, contra
+ *   2. ejecuta ese guard real, con resolutor y policy reales, contra
  *      PostgreSQL real;
  *   3. si el guard permite continuar, invoca el método real del controller
  *      (respaldado por TasksService real, con sus colaboradores reales
@@ -62,9 +64,15 @@ function makeFakeNotifications() {
   } as unknown as NotificationsService;
 }
 
-function fakeExecutionContext(params: Record<string, unknown>): ExecutionContext {
+function fakeExecutionContext(
+  params: Record<string, unknown>,
+  handler: object,
+  controllerClass: object,
+): ExecutionContext {
   return {
-    switchToHttp: () => ({ getRequest: () => ({ params }) }),
+    switchToHttp: () => ({ getRequest: () => ({ params, body: {} }) }),
+    getHandler: () => handler,
+    getClass: () => controllerClass,
   } as unknown as ExecutionContext;
 }
 
@@ -93,8 +101,8 @@ describeIntegration(
       );
       controller = new TasksController(tasksService);
 
-      const sprintsContext = new SprintsContextService(prismaService);
-      guard = new ProjectWriteGuard(sprintsContext);
+      const resolver = new ProjectIdResolverService(prismaService);
+      guard = new ProjectWriteGuard(new Reflector(), resolver, new ProjectPolicyService(resolver), prismaService);
     });
 
     afterAll(async () => {
@@ -124,14 +132,16 @@ describeIntegration(
       const guards = Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
       expect(guards).toContain(ProjectWriteGuard);
 
-      await guard.canActivate(fakeExecutionContext({ projectId: String(projectId) }));
+      await guard.canActivate(
+        fakeExecutionContext({ projectId: String(projectId) }, handler, TasksController),
+      );
       return action();
     }
 
     it('CREATE TASK: bloqueada sin Sprint operable, permitida en ACTIVO, bloqueada en EN_FINALIZACION', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       scope.sprintIds = [];
       scope.taskIds = [];
@@ -193,7 +203,7 @@ describeIntegration(
     it('EDIT TASK: bloqueada sin Sprint operable, permitida en ACTIVO, bloqueada en EN_FINALIZACION', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, {
@@ -270,7 +280,7 @@ describeIntegration(
       const assignee = await createIntegrationUser(prisma);
       const assigneeB = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, assignee.idUsuario, assigneeB.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const role = await createIntegrationProjectRole(prisma, project.idProyecto);
@@ -406,7 +416,7 @@ describeIntegration(
       const leader = await createIntegrationUser(prisma);
       const assignee = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, assignee.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const role = await createIntegrationProjectRole(prisma, project.idProyecto);

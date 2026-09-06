@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
-import { TipoProyecto, type EstadoParticipacion, type EstadoSprint, type EstadoTarea } from '@prisma/client';
+import {
+  TipoProyecto,
+  type EstadoParticipacion,
+  type EstadoProyecto,
+  type EstadoSprint,
+  type EstadoTarea,
+} from '@prisma/client';
 
 /**
  * Fixtures genéricas de infraestructura para el harness de integración
@@ -35,6 +41,8 @@ interface IntegrationProjectOverrides {
   tituloProyecto?: string;
   descripcionProyecto?: string;
   tipoProyecto?: TipoProyecto;
+  /** S7: estado inicial explícito (por defecto el del schema, BORRADOR); las rutas de escritura operativas exigen P/E. */
+  estadoProyecto?: EstadoProyecto;
 }
 
 export async function createIntegrationProject(
@@ -49,6 +57,7 @@ export async function createIntegrationProject(
         overrides.descripcionProyecto ?? 'Proyecto de integración generado por fixtures de test.',
       tipoProyecto: overrides.tipoProyecto ?? TipoProyecto.ACADEMICO_HORAS_BECA,
       creadoPor,
+      ...(overrides.estadoProyecto !== undefined ? { estadoProyecto: overrides.estadoProyecto } : {}),
     },
   });
 }
