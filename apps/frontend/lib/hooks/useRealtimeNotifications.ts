@@ -17,6 +17,7 @@ import {
   leadershipHistoryPrefix,
 } from '@/lib/query-keys/leadership';
 import { projectMembersQueryKey, projectTeamSummaryQueryKey } from '@/lib/query-keys/members';
+import { adminAppealsPrefix, adminProjectDetailQueryKey, adminProjectsPrefix } from '@/lib/query-keys/admin-projects';
 import { projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
 
 export interface Notification {
@@ -156,6 +157,9 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: historicalProjectQueryKey(payload.projectId) });
       // VIEW-12: el conteo «Cierre pendiente» del panel administrativo (key ya existente).
       queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+      // VIEW-15/16: la bandeja administrativa mueve el proyecto de grupo y el detalle cambia de estado.
+      queryClient.invalidateQueries({ queryKey: adminProjectsPrefix });
+      queryClient.invalidateQueries({ queryKey: adminProjectDetailQueryKey(payload.projectId) });
     };
 
     const handleClosureReviewUpdated = (payload: ClosureReviewUpdatedPayload) => {
@@ -164,6 +168,7 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: closureRevisionsPrefix(payload.projectId) });
       queryClient.invalidateQueries({ queryKey: closureRevisionPrefix(payload.projectId) });
       queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+      queryClient.invalidateQueries({ queryKey: adminProjectsPrefix });
     };
 
     // S7 (F008): un cambio de liderazgo invalida TODO lo que deriva del líder,
@@ -179,6 +184,8 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: ['proyecto', String(payload.projectId)] });
       queryClient.invalidateQueries({ queryKey: projectTeamSummaryQueryKey(payload.projectId) });
       queryClient.invalidateQueries({ queryKey: projectMembersQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: adminProjectDetailQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: adminAppealsPrefix });
     };
 
     newSocket.on('connect', handleConnect);
