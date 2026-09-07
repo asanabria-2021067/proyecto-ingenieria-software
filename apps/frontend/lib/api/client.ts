@@ -66,11 +66,15 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   _retriedAfterRefresh = false,
 ): Promise<T> {
+  // S7 (F005): con un body `FormData` NO se fija `Content-Type`: el navegador
+  // debe generar el `multipart/form-data` con su propio `boundary`. Fijarlo a
+  // mano rompe la carga de documentos de cierre (E107).
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const res = await fetch(joinUrl(getApiUrl(), API_PREFIX, path), {
     ...options,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(options.headers as Record<string, string>),
     },
   });
