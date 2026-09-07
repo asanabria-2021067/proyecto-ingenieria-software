@@ -468,6 +468,41 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     expect(screen.getByRole('button', { name: 'Iniciar Sprint' })).toBeInTheDocument();
   });
 
+  /**
+   * S7: un proyecto en cierre no admite Sprints nuevos. Ofrecer «Iniciar
+   * Sprint» ahí prometía una acción que el backend rechaza, y el aviso
+   * genérico («todavía no hay un Sprint») daba a entender que faltaba crearlo.
+   */
+  it('en solicitud de cierre explica por qué no hay Sprint y no ofrece iniciarlo', () => {
+    (useProjectDetail as any).mockReturnValue({
+      data: { ...proyectoFixture, estadoProyecto: 'EN_SOLICITUD_CIERRE' },
+      isLoading: false,
+      error: null,
+    });
+    mockUseProjectSprints({ sprints: [] });
+
+    renderWorkspace();
+
+    expect(screen.getByText('Este proyecto está en proceso de cierre')).toBeInTheDocument();
+    expect(screen.getByText(/no pueden iniciarse Sprints nuevos/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Iniciar Sprint' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Todavía no hay un Sprint activo en este proyecto')).not.toBeInTheDocument();
+  });
+
+  it('un proyecto cerrado lo dice con sus propias palabras y tampoco ofrece iniciar Sprint', () => {
+    (useProjectDetail as any).mockReturnValue({
+      data: { ...proyectoFixture, estadoProyecto: 'CERRADO' },
+      isLoading: false,
+      error: null,
+    });
+    mockUseProjectSprints({ sprints: [] });
+
+    renderWorkspace();
+
+    expect(screen.getByText('Este proyecto está cerrado')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Iniciar Sprint' })).not.toBeInTheDocument();
+  });
+
   it('Caso 2 — un no-líder sin Sprint ve el Empty state pero nunca el botón "Iniciar Sprint"', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
     mockUseProjectSprints({ sprints: [] });
