@@ -7,12 +7,26 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRightLeft,
+  Award,
+  CheckCircle2,
   Clock,
+  ClipboardCheck,
   ClipboardList,
+  Crown,
+  FileText,
+  Flag,
+  Gavel,
   ListPlus,
+  Lock,
+  MessageSquareWarning,
+  Paperclip,
   Pencil,
   Repeat,
   ScrollText,
+  Trash2,
+  Undo2,
+  Upload,
+  UserMinus,
   UserPlus,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
@@ -36,7 +50,12 @@ import type { EventoBitacoraDto, TipoEventoBitacoraValor } from '@/lib/types/bit
 const LIMITE_POR_PAGINA = 20;
 
 /** Exhaustivo por diseño: un TipoEventoBitacoraValor nuevo en el backend rompe la compilación en vez de mostrarse en blanco. */
-const EVENTO_STYLE: Record<TipoEventoBitacoraValor, { label: string; icon: typeof ClipboardList }> = {
+interface EstiloEvento {
+  label: string;
+  icon: typeof ClipboardList;
+}
+
+const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
   TASK_CREATED: { label: 'Tarea creada', icon: ListPlus },
   TASK_UPDATED: { label: 'Tarea actualizada', icon: Pencil },
   TASK_STATUS_CHANGED: { label: 'Cambio de estado', icon: ArrowRightLeft },
@@ -44,7 +63,47 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, { label: string; icon: typeo
   TASK_REASSIGNED: { label: 'Tarea reasignada', icon: UserPlus },
   TASK_HOURS_LOGGED: { label: 'Horas registradas', icon: Clock },
   SPRINT_STARTED: { label: 'Sprint iniciado', icon: Repeat },
+
+  // ---- Sprint 7 (06 v2 §43) ----
+  TIME_RECORD_EDITED: { label: 'Registro de horas editado', icon: Pencil },
+  TIME_RECORD_REVOKED: { label: 'Registro de horas revocado', icon: Undo2 },
+  ASSIGNMENT_CLOSED: { label: 'Tramo cerrado', icon: CheckCircle2 },
+  TASK_HOURS_ADJUSTED: { label: 'Horas ajustadas', icon: Clock },
+  TASK_HOURS_ADJUSTMENT_REVERTED: { label: 'Ajuste de horas revertido', icon: Undo2 },
+  SPRINT_FINALIZED: { label: 'Sprint en finalización', icon: Flag },
+  SPRINT_CLOSED: { label: 'Sprint cerrado', icon: Lock },
+  SPRINT_HOURS_CONSOLIDATED: { label: 'Horas del Sprint consolidadas', icon: Clock },
+  EXIT_REQUEST_APPROVED: { label: 'Salida aprobada', icon: UserMinus },
+  EXIT_REQUEST_REJECTED: { label: 'Salida rechazada', icon: UserMinus },
+  LEADERSHIP_APPEAL_CREATED: { label: 'Apelación de liderazgo enviada', icon: Gavel },
+  LEADERSHIP_APPEAL_CANCELLED: { label: 'Apelación de liderazgo cancelada', icon: Gavel },
+  LEADERSHIP_APPEAL_ACCEPTED: { label: 'Apelación de liderazgo aceptada', icon: Gavel },
+  LEADERSHIP_APPEAL_DENIED: { label: 'Apelación de liderazgo denegada', icon: Gavel },
+  LEADERSHIP_CHANGED: { label: 'Cambio de liderazgo', icon: Crown },
+  PROJECT_CLOSE_REQUESTED: { label: 'Cierre solicitado', icon: ClipboardCheck },
+  POSTULATIONS_AUTO_REJECTED: { label: 'Postulaciones rechazadas automáticamente', icon: UserMinus },
+  CLOSURE_DRAFT_CREATED: { label: 'Borrador de cierre creado', icon: FileText },
+  CLOSURE_AUTOREPORT_GENERATED: { label: 'Informe automático generado', icon: FileText },
+  CLOSURE_DOCUMENT_ADDED: { label: 'Documento de cierre adjuntado', icon: Paperclip },
+  CLOSURE_DOCUMENT_REMOVED: { label: 'Documento de cierre retirado', icon: Trash2 },
+  PROJECT_CLOSE_DOCUMENTS_SUBMITTED: { label: 'Documentación de cierre enviada', icon: Upload },
+  PROJECT_CLOSE_REVIEW_APPROVED: { label: 'Cierre aprobado', icon: CheckCircle2 },
+  PROJECT_HOURS_CREDITED: { label: 'Horas acreditadas', icon: Award },
+  PROJECT_CLOSE_REVIEW_DOC_CORRECTION: { label: 'Corrección documental solicitada', icon: MessageSquareWarning },
+  PROJECT_CLOSE_RETURNED_TO_EXECUTION: { label: 'Proyecto devuelto a ejecución', icon: Undo2 },
+  CLOSURE_STORAGE_SWEPT: { label: 'Almacenamiento de cierre depurado', icon: Trash2 },
+  LEGACY_HOURS_RECONCILED: { label: 'Horas heredadas reconciliadas', icon: Clock },
 };
+
+/**
+ * La bitácora es un registro histórico: puede contener eventos que este
+ * cliente todavía no conoce, y uno solo no debe tumbar la página entera.
+ * Antes se leía `EVENTO_STYLE[tipo].icon` a pelo y cualquier tipo nuevo del
+ * backend lanzaba, dejando la vista en blanco.
+ */
+function estiloDe(tipoEvento: string): EstiloEvento {
+  return EVENTO_STYLE[tipoEvento as TipoEventoBitacoraValor] ?? { label: tipoEvento, icon: ClipboardList };
+}
 
 function formatearFechaHora(iso: string): string {
   return new Date(iso).toLocaleString('es-GT', {
@@ -108,7 +167,7 @@ function BitacoraItemSkeleton() {
 }
 
 function BitacoraItem({ evento, miembros }: { evento: EventoBitacoraDto; miembros: MiembroResumen[] }) {
-  const estilo = EVENTO_STYLE[evento.tipoEvento];
+  const estilo = estiloDe(evento.tipoEvento);
   const Icon = estilo.icon;
   const actor = evento.actor ? `${evento.actor.nombre} ${evento.actor.apellido}` : 'Alguien';
 
@@ -287,11 +346,13 @@ export default function BitacoraPage() {
 
           {!cargando && !isError && eventos.length > 0 && (
             <>
-              <div className="space-y-3">
+              {/* Región con nombre: separa los eventos del panel de filtros,
+                  que ahora repite las mismas etiquetas en su desplegable. */}
+              <section aria-label="Eventos de la bitácora" className="space-y-3">
                 {eventos.map((evento) => (
                   <BitacoraItem key={evento.idAuditoria} evento={evento} miembros={members} />
                 ))}
-              </div>
+              </section>
 
               {totalPages > 1 && (
                 <div className="mt-6 flex items-center justify-center gap-4">
