@@ -4,8 +4,12 @@
  * y `historical-project-read.service.ts` (`adminList` / `adminDetail`).
  */
 
-/** Los cuatro grupos son fijos y espejan estados concretos; no existe un quinto. */
-export const ADMIN_PROJECT_GROUPS = ['activos', 'revision', 'cierres', 'cerrados'] as const;
+/**
+ * Los grupos de la bandeja espejan estados concretos; no existe uno «todos».
+ * `EN_REVISION`/`OBSERVADO` NO son un grupo aquí: la revisión de publicación
+ * es su propio flujo y vive en `/dashboard/projects/admin/reviews`.
+ */
+export const ADMIN_PROJECT_GROUPS = ['activos', 'cierres', 'cerrados'] as const;
 export type AdminProjectGroup = (typeof ADMIN_PROJECT_GROUPS)[number];
 
 export const ADMIN_PROJECTS_DEFAULT_LIMIT = 20;
@@ -18,7 +22,6 @@ export function isAdminProjectGroup(value: string | null | undefined): value is 
 /** Etiqueta visible de cada grupo (encabezado, breadcrumb y sidebar administrativa). */
 export const ADMIN_PROJECT_GROUP_LABEL: Record<AdminProjectGroup, string> = {
   activos: 'Activos',
-  revision: 'En revisión',
   cierres: 'Solicitudes de cierre',
   cerrados: 'Cerrados',
 };

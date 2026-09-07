@@ -7,7 +7,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Archive,
   Clock,
-  ClipboardList,
   FileSearch,
   FolderKanban,
   FolderOpen,
@@ -41,7 +40,10 @@ export const adminNavEntries: NavEntry[] = [
     icon: FolderKanban,
     items: [
       { href: '/dashboard/admin/proyectos?grupo=activos', label: 'Activos', icon: FolderOpen },
-      { href: '/dashboard/admin/proyectos?grupo=revision', label: 'En revisión', icon: FileSearch },
+      // La revisión de publicación es su propio flujo, no un grupo de la
+      // bandeja: se enlaza aquí para que los cuatro destinos de Proyectos
+      // sigan juntos, y no se repite abajo como entrada suelta.
+      { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: FileSearch },
       { href: '/dashboard/admin/proyectos?grupo=cierres', label: 'Solicitudes de cierre', icon: Clock },
       { href: '/dashboard/admin/proyectos?grupo=cerrados', label: 'Cerrados', icon: Archive },
     ],
@@ -61,7 +63,6 @@ export const adminNavEntries: NavEntry[] = [
       { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
     ],
   },
-  { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: ClipboardList },
 ];
 
 /**
