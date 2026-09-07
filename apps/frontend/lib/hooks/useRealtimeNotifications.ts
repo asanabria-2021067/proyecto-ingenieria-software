@@ -10,6 +10,13 @@ import {
 } from '@/lib/query-keys/closure';
 import { projectDetailQueryKey } from '@/lib/query-keys/project';
 import { historicalProjectQueryKey } from '@/lib/query-keys/historical';
+import {
+  leadershipAppealsPrefix,
+  leadershipCandidatesQueryKey,
+  leadershipContextQueryKey,
+  leadershipHistoryPrefix,
+} from '@/lib/query-keys/leadership';
+import { projectMembersQueryKey, projectTeamSummaryQueryKey } from '@/lib/query-keys/members';
 import { projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
 
 export interface Notification {
@@ -43,6 +50,15 @@ interface SprintHoursAdjustedPayload {
 interface ProjectStateChangedPayload {
   projectId: number;
   estadoProyecto: string;
+}
+
+/** S7 — payload real de `LEADERSHIP_CHANGED`: solo IDs. NUNCA se derivan permisos de él. */
+interface LeadershipChangedPayload {
+  projectId: number;
+  historialId: number;
+  liderAnteriorId: number;
+  liderNuevoId: number;
+  origen: string;
 }
 
 /** S7 — payload real de `CLOSURE_REVIEW_UPDATED`: `{ projectId, revisionId }`. */
@@ -147,6 +163,21 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: closureRevisionPrefix(payload.projectId) });
     };
 
+    // S7 (F008): un cambio de liderazgo invalida TODO lo que deriva del líder,
+    // incluido el detalle del proyecto (`['project', id]`): la sidebar deriva
+    // `isLeader` de `Proyecto.creadoPor` y sin esta invalidación un ex-líder
+    // seguiría viendo destinos de líder hasta recargar. El servidor decide.
+    const handleLeadershipChanged = (payload: LeadershipChangedPayload) => {
+      queryClient.invalidateQueries({ queryKey: leadershipContextQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: leadershipCandidatesQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: leadershipHistoryPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: leadershipAppealsPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: projectDetailQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: ['proyecto', String(payload.projectId)] });
+      queryClient.invalidateQueries({ queryKey: projectTeamSummaryQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: projectMembersQueryKey(payload.projectId) });
+    };
+
     newSocket.on('connect', handleConnect);
     newSocket.on('disconnect', handleDisconnect);
     newSocket.on('connected', handleConnected);
@@ -157,6 +188,7 @@ export function useRealtimeNotifications(enabled: boolean) {
     newSocket.on('SPRINT_HOURS_ADJUSTED', handleSprintHoursAdjusted);
     newSocket.on('PROJECT_STATE_CHANGED', handleProjectStateChanged);
     newSocket.on('CLOSURE_REVIEW_UPDATED', handleClosureReviewUpdated);
+    newSocket.on('LEADERSHIP_CHANGED', handleLeadershipChanged);
 
     const timeoutId = window.setTimeout(() => setSocket(newSocket), 0);
 
@@ -172,6 +204,7 @@ export function useRealtimeNotifications(enabled: boolean) {
       newSocket.off('SPRINT_HOURS_ADJUSTED', handleSprintHoursAdjusted);
       newSocket.off('PROJECT_STATE_CHANGED', handleProjectStateChanged);
       newSocket.off('CLOSURE_REVIEW_UPDATED', handleClosureReviewUpdated);
+      newSocket.off('LEADERSHIP_CHANGED', handleLeadershipChanged);
       newSocket.close();
     };
   }, [enabled, queryClient]);
