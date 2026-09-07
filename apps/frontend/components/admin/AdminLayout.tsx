@@ -2,29 +2,60 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
-  LayoutDashboard,
-  Users,
+  Archive,
+  Clock,
   ClipboardList,
-  ShieldAlert,
+  FileSearch,
+  FolderKanban,
+  FolderOpen,
+  Gavel,
   KeyRound,
+  LayoutDashboard,
+  Settings2,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { UserMenu } from '@/components/dashboard/UserMenu';
-import { SidebarNav, flattenNavEntries, type NavEntry } from '@/components/dashboard/SidebarNav';
+import { SidebarNav, type NavEntry, type NavLeaf } from '@/components/dashboard/SidebarNav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
 
-const adminNavEntries: NavEntry[] = [
+/**
+ * S7 (VIEW-12, F011). Los cuatro grupos de «Proyectos» son EXACTAMENTE los del
+ * backend (`GET /admin/proyectos?grupo=activos|revision|cierres|cerrados`); no
+ * existe un quinto. «Revisiones» se conserva en su ruta: es la bandeja de
+ * revisiones de PUBLICACIÓN (V5 §31.2), un flujo distinto del cierre.
+ */
+export const adminNavEntries: NavEntry[] = [
   { href: '/dashboard/admin', label: 'Panel Admin', icon: LayoutDashboard, exact: true },
   {
     type: 'group',
+    label: 'Proyectos',
+    icon: FolderKanban,
+    items: [
+      { href: '/dashboard/admin/proyectos?grupo=activos', label: 'Activos', icon: FolderOpen },
+      { href: '/dashboard/admin/proyectos?grupo=revision', label: 'En revisión', icon: FileSearch },
+      { href: '/dashboard/admin/proyectos?grupo=cierres', label: 'Solicitudes de cierre', icon: Clock },
+      { href: '/dashboard/admin/proyectos?grupo=cerrados', label: 'Cerrados', icon: Archive },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'Gobernanza',
+    icon: ShieldCheck,
+    items: [{ href: '/dashboard/admin/apelaciones', label: 'Apelaciones', icon: Gavel }],
+  },
+  {
+    type: 'group',
     label: 'Administración',
-    icon: Users,
+    icon: Settings2,
     items: [
       { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
       { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
@@ -33,7 +64,24 @@ const adminNavEntries: NavEntry[] = [
   { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: ClipboardList },
 ];
 
-const adminNavItemsMobile = flattenNavEntries(adminNavEntries);
+/**
+ * Barra inferior móvil: `flattenNavEntries` produciría 9 destinos y la
+ * saturaría. Lista CURADA de 5 (Panel · Proyectos · Apelaciones · Usuarios ·
+ * Perfil, este último vía `UserMenu`); el resto queda accesible desde la
+ * sidebar de escritorio.
+ */
+export const adminNavItemsMobile: NavLeaf[] = [
+  { href: '/dashboard/admin', label: 'Panel Admin', icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/admin/proyectos', label: 'Proyectos', icon: FolderKanban },
+  { href: '/dashboard/admin/apelaciones', label: 'Apelaciones', icon: Gavel },
+  { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
+];
+
+/** `useSearchParams` exige un límite de Suspense en el prerender: se aísla aquí. */
+function AdminSidebarNav() {
+  const searchParams = useSearchParams();
+  return <SidebarNav entries={adminNavEntries} theme="admin" search={searchParams?.toString() ?? ''} />;
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -91,7 +139,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </span>
         </div>
 
-        <SidebarNav entries={adminNavEntries} theme="admin" />
+        <Suspense fallback={<SidebarNav entries={adminNavEntries} theme="admin" />}>
+          <AdminSidebarNav />
+        </Suspense>
 
         <div className="px-3 py-4" style={{ borderTop: '1px solid var(--admin-border)' }}>
           <UserMenu user={user} onLogout={handleLogout} variant="sidebar" theme="admin" />
@@ -124,13 +174,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </main>
 
       {/* Bottom Navigation - Mobile Only */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2">
+      <nav
+        aria-label="Navegación administrativa móvil"
+        className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2"
+      >
         {adminNavItemsMobile.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
+              aria-current={active ? 'page' : undefined}
+              aria-label={label}
               className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ${
                 active ? 'text-primary bg-primary/10' : 'text-outline hover:text-on-surface'
               }`}
