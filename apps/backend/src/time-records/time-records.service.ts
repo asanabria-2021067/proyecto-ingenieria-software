@@ -126,8 +126,14 @@ export interface TramoHorasResumen {
   /** Caché del tramo + delta vigente (06 v2 §8). */
   propuestas: string;
   reconocidoEn: Date | null;
-  /** Justificaciones de exceso de los registros que este lector puede ver. */
-  justificaciones: string[];
+  /**
+   * Justificaciones de exceso de los registros que este lector puede ver.
+   * Cada una arrastra su marca de revocación: para el autor solo llegan las
+   * vigentes, así que siempre viene en `null`; el líder recibe también las de
+   * registros retirados y necesita distinguirlas, porque justifican horas que
+   * ya no cuentan.
+   */
+  justificaciones: Array<{ texto: string; revocadoEn: string | null }>;
 }
 
 export interface TaskHoursSummary {
@@ -743,10 +749,16 @@ export class TimeRecordsService {
         ajuste: delta ? delta.toFixed(2) : null,
         propuestas: cache.plus(delta ?? 0).toFixed(2),
         reconocidoEn: tramo.reconocidoEn,
+        // Mismo criterio que la lista de registros: revocar retira el registro
+        // de la vista de su autor, y con él su justificación. El histórico del
+        // líder las conserva, marcadas.
         justificaciones: tramo.registrosTiempo
-          .filter((registro) => verTodo || registro.idUsuario === userId)
-          .map((registro) => registro.justificacionExceso)
-          .filter((texto): texto is string => texto !== null),
+          .filter((registro) => (verTodo ? true : registro.idUsuario === userId && registro.revocadoEn === null))
+          .filter((registro) => registro.justificacionExceso !== null)
+          .map((registro) => ({
+            texto: registro.justificacionExceso as string,
+            revocadoEn: registro.revocadoEn ? registro.revocadoEn.toISOString() : null,
+          })),
       };
     });
 
