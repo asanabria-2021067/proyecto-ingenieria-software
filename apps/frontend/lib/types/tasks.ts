@@ -170,7 +170,12 @@ export interface TramoHorasResumenDTO {
   ajuste: string | null;
   propuestas: string;
   reconocidoEn: string | null;
-  justificaciones: string[];
+  /**
+   * Justificaciones de exceso visibles para este lector. Cada una arrastra su
+   * marca de revocación: al autor solo le llegan las vigentes; el líder recibe
+   * también las de registros retirados y debe poder distinguirlas.
+   */
+  justificaciones: Array<{ texto: string; revocadoEn: string | null }>;
 }
 
 /**
