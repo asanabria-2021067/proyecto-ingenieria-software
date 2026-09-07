@@ -15,6 +15,54 @@
 @theme inline {
   --color-sparkles-color: var(--sparkles-color);
   --color-gradient-color: var(--gradient-color);
+
+  /*
+   * Alias de los primitivos de shadcn (`components/ui/*`) sobre el sistema de
+   * color real de UVGenius, definido en el `@theme` de abajo.
+   *
+   * Los primitivos vienen escritos contra los nombres de shadcn
+   * (`bg-primary text-primary-foreground`, `bg-destructive`, `border-input`…),
+   * pero este proyecto nombra sus tokens al estilo Material
+   * (`--color-primary` / `--color-on-primary`). Sin estos alias, Tailwind v4
+   * no genera la utilidad y la declaración desaparece del CSS: el botón
+   * conserva `bg-primary` (que sí existe) y pierde su color de texto, así que
+   * hereda el gris oscuro del contenedor — verde oscuro con letra negra.
+   *
+   * Se declaran aquí, en `inline`, para que cada utilidad apunte al token de
+   * tema y no a una copia: al cambiar a oscuro, `.dark` redefine
+   * `--color-on-primary` y el texto del botón lo sigue solo.
+   */
+  --color-background: var(--color-surface);
+  --color-foreground: var(--color-on-surface);
+
+  --color-card: var(--color-surface-container-lowest);
+  --color-card-foreground: var(--color-on-surface);
+  --color-popover: var(--color-surface-container-lowest);
+  --color-popover-foreground: var(--color-on-surface);
+
+  --color-primary-foreground: var(--color-on-primary);
+  --color-secondary-foreground: var(--color-on-secondary);
+
+  --color-muted: var(--color-surface-container);
+  --color-muted-foreground: var(--color-on-surface-variant);
+  --color-accent: var(--color-surface-container-high);
+  --color-accent-foreground: var(--color-on-surface);
+
+  --color-destructive: var(--color-error);
+  --color-destructive-foreground: var(--color-on-error);
+
+  --color-border: var(--color-outline-variant);
+  --color-input: var(--color-outline-variant);
+  --color-ring: var(--color-primary);
+
+  --color-sidebar: var(--color-surface-container-low);
+  --color-sidebar-foreground: var(--color-on-surface);
+  --color-sidebar-primary: var(--color-primary);
+  --color-sidebar-primary-foreground: var(--color-on-primary);
+  --color-sidebar-accent: var(--color-surface-container-high);
+  --color-sidebar-accent-foreground: var(--color-on-surface);
+  --color-sidebar-border: var(--color-outline-variant);
+  --color-sidebar-ring: var(--color-primary);
 }
 
 @theme {
