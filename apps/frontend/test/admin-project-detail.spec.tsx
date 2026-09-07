@@ -151,7 +151,8 @@ describe('VIEW-16 — detalle administrativo (F013)', () => {
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Resumen', 'Miembros', 'Sprints', 'Liderazgo']);
     expect(screen.getByRole('link', { name: 'Activos' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=activos');
     expect(grupoDeEstado('EN_SOLICITUD_CIERRE')).toBe('cierres');
-    expect(grupoDeEstado('EN_REVISION')).toBe('revision');
+    // EN_REVISION/OBSERVADO ya no tienen grupo propio: su bandeja es Revisiones.
+    expect(grupoDeEstado('EN_REVISION')).toBe('activos');
     expect(grupoDeEstado('CERRADO')).toBe('cerrados');
     expect(grupoDeEstado('EN_PROGRESO')).toBe('activos');
   });

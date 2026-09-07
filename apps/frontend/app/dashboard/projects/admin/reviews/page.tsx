@@ -71,17 +71,17 @@ export default function AdminReviewsInboxPage() {
 
   return (
     <>
-      <div className="px-4 pb-12 pt-8 md:px-8">
+      <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
         {/* Header */}
-        <section className="mb-10 flex items-start justify-between">
+        <section className="mb-6 flex items-start justify-between">
           <div>
             <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
               Administración
             </span>
-            <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
+            <h1 className="font-headline text-3xl font-black tracking-tighter text-on-surface md:text-4xl">
               Revisiones
             </h1>
-            <p className="mt-2 max-w-2xl text-base text-tertiary">
+            <p className="mt-2 max-w-2xl text-sm text-tertiary">
               Bandeja de revisiones de publicación. Los cierres de proyecto se resuelven en Solicitudes de cierre.
             </p>
           </div>

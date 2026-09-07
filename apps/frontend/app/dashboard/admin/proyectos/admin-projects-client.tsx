@@ -41,7 +41,6 @@ const ACCION_LABEL: Record<string, string> = {
 
 const EMPTY_LABEL: Record<AdminProjectGroup, string> = {
   activos: 'No hay proyectos activos.',
-  revision: 'No hay proyectos en revisión.',
   cierres: 'No hay solicitudes de cierre pendientes.',
   cerrados: 'No hay proyectos cerrados.',
 };
@@ -57,9 +56,14 @@ function getInitials(nombre: string, apellido: string): string {
 }
 
 /** Destino sugerido por `accion`: navegación, nunca una autoridad de escritura. */
+/**
+ * Destino de «Abrir». Siempre abre ALGO de este proyecto: el cierre cuando la
+ * acción sugerida es revisarlo, y su detalle en cualquier otro caso. Nunca
+ * salta a otra bandeja — llevar «Abrir» a la lista de revisiones sacaba al
+ * administrador del proyecto que acababa de elegir.
+ */
 export function accionHref(item: AdminProjectListItem): string {
   if (item.accion === 'REVISAR_CIERRE') return `/dashboard/admin/proyectos/${item.idProyecto}/cierre`;
-  if (item.accion === 'REVISAR_PUBLICACION') return '/dashboard/projects/admin/reviews';
   return `/dashboard/admin/proyectos/${item.idProyecto}`;
 }
 

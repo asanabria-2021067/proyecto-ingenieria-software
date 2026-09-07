@@ -53,25 +53,35 @@ describe('AdminLayout — shell administrativo S7 (F011)', () => {
     const nav = desktopNav();
 
     expect(nav.getByRole('link', { name: 'Activos' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=activos');
-    expect(nav.getByRole('link', { name: 'En revisión' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=revision');
+    expect(nav.getByRole('link', { name: 'Revisiones' })).toHaveAttribute('href', '/dashboard/projects/admin/reviews');
     expect(nav.getByRole('link', { name: 'Solicitudes de cierre' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cierres');
     expect(nav.getByRole('link', { name: 'Cerrados' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cerrados');
     expect(nav.getByRole('button', { name: /Gobernanza/ })).toBeInTheDocument();
   });
 
-  it('los grupos son exactamente los cuatro del backend, sin un quinto «todos»', () => {
+  it('Proyectos agrupa los tres grupos de la bandeja más la revisión de publicación, sin un «todos»', () => {
     const proyectos = adminNavEntries.find((e) => e.type === 'group' && e.label === 'Proyectos');
     expect(proyectos && proyectos.type === 'group' ? proyectos.items.map((i) => i.href) : []).toEqual([
       '/dashboard/admin/proyectos?grupo=activos',
-      '/dashboard/admin/proyectos?grupo=revision',
+      '/dashboard/projects/admin/reviews',
       '/dashboard/admin/proyectos?grupo=cierres',
       '/dashboard/admin/proyectos?grupo=cerrados',
     ]);
   });
 
-  it('«Revisiones» sigue apuntando a /dashboard/projects/admin/reviews', () => {
+  it('«Revisiones» aparece una sola vez, abre su grupo y ya no queda ningún destino al grupo retirado', () => {
+    // Estando en la propia ruta de Revisiones, el grupo Proyectos se despliega:
+    // la vista quedó integrada entre los otros tres destinos, no suelta.
+    pathnameMock.mockReturnValue('/dashboard/projects/admin/reviews');
+    searchParamsMock.mockReturnValue(new URLSearchParams());
     renderShell();
-    expect(desktopNav().getByRole('link', { name: 'Revisiones' })).toHaveAttribute('href', '/dashboard/projects/admin/reviews');
+    expect(desktopNav().getAllByRole('link', { name: 'Revisiones' })).toHaveLength(1);
+
+    const hrefs = desktopNav()
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('href') ?? '');
+    expect(hrefs.filter((h) => h.includes('grupo=revision'))).toEqual([]);
+    expect(hrefs.filter((h) => h === '/dashboard/projects/admin/reviews')).toHaveLength(1);
   });
 
   it('el grupo que contiene la ruta actual aparece expandido y el destino activo lleva aria-current="page"', () => {
