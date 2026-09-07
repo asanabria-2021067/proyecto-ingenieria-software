@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Clock,
   ListTodo,
+  ScrollText,
   UserCheck,
   UserMinus,
   Users,
@@ -52,6 +53,11 @@ import type { PendingLeaderReviewDto } from '@/lib/types/exit-requests';
 import { PendingPostulationsCard } from '@/components/projects/pending-postulations-card';
 import { PendingExitRequestsCard } from '@/components/projects/pending-exit-requests-card';
 import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
+import { LeadershipCard } from '@/components/leadership/leadership-card';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useLeadershipAppeals, useLeadershipContext, useLeadershipHistory } from '@/hooks/use-leadership';
+import type { ApelacionItemDto } from '@/lib/types/leadership';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'nombre', label: 'Integrante' },
@@ -333,6 +339,118 @@ function filtrarPorGrupo(
   return miembros.filter((miembro) => miembro.grupo === grupo);
 }
 
+
+function formatearFechaCorta(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/**
+ * S7 (VIEW-06, F008) — contexto de liderazgo del proyecto. Para el LÍDER la
+ * acción es «Apelar cambio de liderazgo» (F009 monta el sheet en este
+ * slot); transferir es exclusivo del administrador (VIEW-19) y nunca se
+ * ofrece aquí. Un miembro no recibe ninguna acción.
+ */
+function LeadershipSection({
+  idProyecto,
+  isLeader,
+  onApelar,
+  appealSlot,
+}: {
+  idProyecto: number;
+  isLeader: boolean;
+  onApelar?: () => void;
+  /** F009: sheet de apelación y acciones sobre la apelación pendiente. */
+  appealSlot?: (pendiente: ApelacionItemDto | null) => React.ReactNode;
+}) {
+  const contexto = useLeadershipContext(idProyecto);
+  const historial = useLeadershipHistory(idProyecto, 1);
+  const apelaciones = useLeadershipAppeals(idProyecto, 'PENDIENTE', 1);
+
+  const pendiente = apelaciones.data?.items[0] ?? null;
+  const estado = contexto.data?.estadoProyecto;
+  const estadoPermiteApelar = estado === 'PUBLICADO' || estado === 'EN_PROGRESO';
+  const motivoBloqueo = pendiente
+    ? 'Ya existe una apelación pendiente para este proyecto.'
+    : !estadoPermiteApelar
+      ? 'El estado actual del proyecto no permite apelar el liderazgo.'
+      : null;
+
+  const botonApelar = (
+    <Button
+      type="button"
+      onClick={onApelar}
+      disabled={motivoBloqueo != null || !onApelar}
+      className="h-9 w-full gap-1.5 rounded-md text-xs font-bold sm:w-auto"
+    >
+      Apelar cambio de liderazgo
+    </Button>
+  );
+
+  const action = isLeader
+    ? motivoBloqueo
+      ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0} aria-label={motivoBloqueo} className="inline-flex w-full rounded-md sm:w-auto">
+                {botonApelar}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">{motivoBloqueo}</TooltipContent>
+          </Tooltip>
+        )
+      : botonApelar
+    : undefined;
+
+  if (contexto.isError) return null;
+
+  return (
+    <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <LeadershipCard
+        context={contexto.data}
+        history={historial.data?.items}
+        isLoading={contexto.isPending}
+        action={action}
+      />
+      <section
+        aria-labelledby="apelaciones-pendientes-title"
+        className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm"
+      >
+        <h2 id="apelaciones-pendientes-title" className="flex items-center gap-2 text-base font-bold text-on-surface">
+          <ScrollText className="size-4 text-primary" aria-hidden="true" />
+          Apelaciones pendientes
+        </h2>
+        {apelaciones.isPending ? (
+          <Skeleton className="mt-3 h-20 w-full rounded-lg" />
+        ) : apelaciones.isError ? (
+          <p className="mt-3 text-xs text-tertiary">No fue posible consultar las apelaciones.</p>
+        ) : pendiente ? (
+          <div className="mt-3 space-y-2 rounded-lg border border-outline-variant/40 bg-surface-container-low p-3 text-xs">
+            <p className="text-tertiary">
+              Solicitante{' '}
+              <span className="block text-sm font-semibold text-on-surface">
+                {pendiente.liderSolicitante.nombre} {pendiente.liderSolicitante.apellido}
+              </span>
+            </p>
+            <p className="text-tertiary">
+              Candidato propuesto{' '}
+              <span className="block text-sm font-semibold text-on-surface">
+                {pendiente.candidatoPropuesto.nombre} {pendiente.candidatoPropuesto.apellido}
+              </span>
+            </p>
+            <p className="text-tertiary">
+              Asunto <span className="block text-sm text-on-surface">{pendiente.asunto}</span>
+            </p>
+            <p className="text-[11px] text-tertiary">Enviada el {formatearFechaCorta(pendiente.creadaEn)} · pendiente de resolución administrativa</p>
+            {appealSlot?.(pendiente)}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm italic text-tertiary">No hay apelaciones pendientes.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function MiembrosProyectoPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
@@ -475,6 +593,8 @@ export default function MiembrosProyectoPage() {
           isLoading={isLoading}
         />
       </div>
+
+      <LeadershipSection idProyecto={idProyecto} isLeader={isLeader} />
 
       {isError ? (
         <Empty tone="danger" role="alert">
