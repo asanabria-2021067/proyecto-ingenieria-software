@@ -15,7 +15,7 @@ import { TimeRecordActions } from '@/components/hours/time-record-actions';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { crossesEstimate, useTaskHours } from '@/hooks/use-task-hours';
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
-import type { RegistroTiempoTareaDTO, TaskHoursSummaryDTO } from '@/lib/types/tasks';
+import type { JustificacionExcesoDTO, RegistroTiempoTareaDTO, TaskHoursSummaryDTO } from '@/lib/types/tasks';
 
 export interface TaskHoursSectionProps {
   idProyecto: number;
@@ -27,6 +27,18 @@ export interface TaskHoursSectionProps {
 
 const NO_CREAR_REASON =
   'No puedes registrar horas en esta tarea ahora: necesitas la asignación activa y un Sprint activo.';
+
+/**
+ * Acepta la forma actual y la anterior (texto plano). Un cliente cargado antes
+ * del cambio de forma no debe reventar por recibir la nueva, ni al revés: esta
+ * lista se pinta sin red de seguridad y un objeto donde se espera un string
+ * derriba la página entera.
+ */
+export function normalizarJustificacion(
+  entrada: JustificacionExcesoDTO,
+): { texto: string; revocadoEn: string | null } {
+  return typeof entrada === 'string' ? { texto: entrada, revocadoEn: null } : entrada;
+}
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -568,7 +580,8 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
           </h3>
           <ul className="space-y-1">
             {resumen.tramos.flatMap((tramo) =>
-              tramo.justificaciones.map((justificacion, index) => {
+              tramo.justificaciones.map((entrada, index) => {
+                const justificacion = normalizarJustificacion(entrada);
                 // Justifica horas que ya no cuentan: se conserva como traza,
                 // pero no debe leerse igual que una vigente.
                 const revocada = justificacion.revocadoEn != null;

@@ -27,7 +27,7 @@ vi.mock('../lib/swal', () => ({
   swalCustomClass: {},
 }));
 
-import { TaskHoursSection } from '../components/hours/task-hours-section';
+import { TaskHoursSection, normalizarJustificacion } from '../components/hours/task-hours-section';
 import { crossesEstimate } from '../hooks/use-task-hours';
 import {
   getHorasTarea,
@@ -470,5 +470,52 @@ describe('TaskHoursSection — justificaciones de exceso revocadas', () => {
 
     await esperarCarga();
     expect(screen.queryByText('Justificaciones de exceso')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * `justificaciones` pasó de `string[]` a objetos con su marca de revocación.
+ * Un navegador que aún tuviera el bundle anterior recibía objetos donde
+ * esperaba texto: React no admite un objeto como hijo y la página ENTERA
+ * dejaba de cargar, no solo este apartado. La lectura acepta ambas formas
+ * mientras convivan versiones distintas de cliente y servidor.
+ */
+describe('TaskHoursSection — compatibilidad de la justificación', () => {
+  it('normalizarJustificacion entiende el texto plano anterior y la forma actual', () => {
+    expect(normalizarJustificacion('Hubo retrabajo')).toEqual({ texto: 'Hubo retrabajo', revocadoEn: null });
+    expect(normalizarJustificacion({ texto: 'Retirada', revocadoEn: '2026-09-07T18:00:00.000Z' })).toEqual({
+      texto: 'Retirada',
+      revocadoEn: '2026-09-07T18:00:00.000Z',
+    });
+  });
+
+  it('una justificación en la forma anterior se pinta, no rompe la vista', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(
+      resumen({
+        tramos: [
+          {
+            idAsignacion: 3,
+            usuario: { idUsuario: 1, nombre: 'V', apellido: 'H', fotoUrl: null },
+            idParticipacion: 7,
+            rolHistorico: null,
+            abierto: true,
+            origen: 'GRANULAR' as const,
+            reportadas: '3.00',
+            ajuste: null,
+            propuestas: '3.00',
+            reconocidoEn: null,
+            // Forma anterior: texto plano.
+            justificaciones: ['Se necesitó más tiempo'],
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    await esperarCarga();
+    const texto = screen.getByText('Se necesitó más tiempo');
+    expect(texto).toBeInTheDocument();
+    expect(texto).not.toHaveClass('line-through');
   });
 });
