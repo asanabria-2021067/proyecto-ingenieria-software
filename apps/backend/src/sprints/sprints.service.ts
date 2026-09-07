@@ -602,7 +602,7 @@ export class SprintsService {
           horasReales: true,
           reconocidoEn: true,
           tarea: { select: { tituloTarea: true, eliminadoEn: true, tiempoEstimadoHoras: true } },
-          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, justificacionExceso: true } },
           ajustes: { where: { anuladoEn: null }, select: { horasBase: true, deltaHoras: true, justificacion: true } },
         },
       }),
@@ -622,6 +622,17 @@ export class SprintsService {
     for (const tramo of tramos) {
       const cache = tramo.horasReales ?? cero;
       const granulares = tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), cero);
+      // Sobreestimación DEL TRAMO: lo reportado por encima de la estimación de
+      // su tarea. Sin estimación no hay exceso que medir (no es cero: es que la
+      // pregunta no aplica), y por eso `estimacionTarea` viaja tal cual.
+      const estimacionTarea = tramo.tarea.tiempoEstimadoHoras;
+      const excesoTramo =
+        estimacionTarea === null ? cero : Prisma.Decimal.max(granulares.minus(estimacionTarea), 0);
+      // El estudiante justifica su propio exceso al registrar las horas; un
+      // tramo puede tener varios registros, así que se conservan todas.
+      const justificacionesExceso = tramo.registrosTiempo
+        .map((fila) => fila.justificacionExceso?.trim())
+        .filter((texto): texto is string => !!texto);
       const legacyTramo = tramo.origenReporte === 'LEGACY' ? cache : cero;
       const vigente = tramo.ajustes[0] ?? null;
       if (vigente && !vigente.horasBase.equals(cache)) {
@@ -653,6 +664,9 @@ export class SprintsService {
         abierto: tramo.desasignadaEn === null,
         origen: tramo.origenReporte,
         reportadas: granulares.toFixed(2),
+        estimacionTarea,
+        exceso: excesoTramo.toFixed(2),
+        justificacionExceso: justificacionesExceso.length > 0 ? justificacionesExceso.join(' · ') : null,
         ajuste: vigente ? vigente.deltaHoras.toFixed(2) : null,
         justificacionAjuste: vigente?.justificacion ?? null,
         propuestas: cache.plus(vigente?.deltaHoras ?? cero).toFixed(2),
