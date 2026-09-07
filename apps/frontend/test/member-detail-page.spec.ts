@@ -16,6 +16,14 @@ vi.mock('next/navigation', () => ({
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('../hooks/use-project-member-detail', () => ({ useProjectMemberDetail: vi.fn() }));
+// S7 (F010): elegibilidad e histórico tienen cobertura propia (member-detail-hours.spec.ts);
+// aquí se stubean para que la página siga probándose sin QueryClientProvider.
+vi.mock('../hooks/use-leadership', () => ({
+  useLeadershipCandidates: () => ({ data: undefined, isPending: false, isError: false }),
+}));
+vi.mock('../hooks/use-historical-project', () => ({
+  useHistoricalProject: () => ({ data: undefined, isPending: false, isError: false }),
+}));
 
 import DetalleIntegranteProyectoPage from '../app/dashboard/proyectos/[id]/equipo/[idUsuario]/page';
 import { useProjectDetail } from '../hooks/use-project-detail';
