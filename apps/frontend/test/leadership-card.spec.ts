@@ -30,6 +30,8 @@ vi.mock('../lib/services/leadership', () => ({
   getLeadershipHistory: vi.fn(),
   getLeadershipAppeals: vi.fn(),
   getLeadershipCandidates: vi.fn(),
+  createLeadershipAppeal: vi.fn(),
+  cancelLeadershipAppeal: vi.fn(),
 }));
 
 import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';
