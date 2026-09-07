@@ -34,7 +34,7 @@ vi.mock('../lib/services/leadership', () => ({
   cancelLeadershipAppeal: vi.fn(),
 }));
 
-import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';
+import LiderazgoProyectoPage from '../app/dashboard/proyectos/[id]/liderazgo/page';
 import { LeadershipCard, origenLabel } from '../components/leadership/leadership-card';
 import { useProjectTeam } from '../hooks/use-project-team';
 import { useProjectDetail } from '../hooks/use-project-detail';
@@ -136,10 +136,10 @@ describe('LeadershipCard (componente)', () => {
   });
 });
 
-describe('VIEW-06 — Miembros con liderazgo (F008)', () => {
+describe('VIEW-06 — vista de Liderazgo del proyecto (F008)', () => {
   it('el líder ve «Apelar cambio de liderazgo» y NUNCA «Cambiar liderazgo»', async () => {
     const { wrapper } = createWrapper();
-    render(createElement(MiembrosProyectoPage), { wrapper });
+    render(createElement(LiderazgoProyectoPage), { wrapper });
 
     const boton = await screen.findByRole('button', { name: 'Apelar cambio de liderazgo' });
     expect(boton).toBeInTheDocument();
@@ -151,7 +151,7 @@ describe('VIEW-06 — Miembros con liderazgo (F008)', () => {
   it('con una apelación PENDIENTE el botón queda deshabilitado con tooltip y la card muestra la apelación', async () => {
     (getLeadershipAppeals as any).mockResolvedValue({ items: [apelacion()], total: 1, page: 1, limit: 20 });
     const { wrapper } = createWrapper();
-    render(createElement(MiembrosProyectoPage), { wrapper });
+    render(createElement(LiderazgoProyectoPage), { wrapper });
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Apelar cambio de liderazgo' })).toBeDisabled());
     expect(screen.getByLabelText('Ya existe una apelación pendiente para este proyecto.')).toHaveAttribute('tabindex', '0');
@@ -162,7 +162,7 @@ describe('VIEW-06 — Miembros con liderazgo (F008)', () => {
   it('con el proyecto fuera de PUBLICADO/EN_PROGRESO el botón queda deshabilitado', async () => {
     (getLeadershipContext as any).mockResolvedValue(contexto({ estadoProyecto: 'EN_SOLICITUD_CIERRE' }));
     const { wrapper } = createWrapper();
-    render(createElement(MiembrosProyectoPage), { wrapper });
+    render(createElement(LiderazgoProyectoPage), { wrapper });
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Apelar cambio de liderazgo' })).toBeDisabled());
   });
@@ -170,11 +170,14 @@ describe('VIEW-06 — Miembros con liderazgo (F008)', () => {
   it('si el contexto responde 403, la card se oculta sin romper la página', async () => {
     (getLeadershipContext as any).mockRejectedValue(Object.assign(new Error('Forbidden'), { statusCode: 403 }));
     const { wrapper } = createWrapper();
-    render(createElement(MiembrosProyectoPage), { wrapper });
+    render(createElement(LiderazgoProyectoPage), { wrapper });
 
-    expect(await screen.findByRole('heading', { name: 'Miembros' })).toBeInTheDocument();
+    // La página se sostiene aunque el contexto no se pueda leer…
+    expect(await screen.findByRole('heading', { level: 1, name: 'Liderazgo' })).toBeInTheDocument();
     await waitFor(() => expect(getLeadershipContext).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByText('Liderazgo')).not.toBeInTheDocument();
+    // …y la card, que es lo que depende del contexto, simplemente no aparece.
+    expect(screen.queryByText('Líder actual del proyecto')).not.toBeInTheDocument();
+    expect(screen.queryByText('Historial de liderazgo')).not.toBeInTheDocument();
   });
 });
