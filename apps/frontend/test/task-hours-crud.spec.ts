@@ -54,6 +54,7 @@ function registro(overrides: Partial<RegistroTiempoTareaDTO> = {}): RegistroTiem
     fecha: '2026-08-20',
     nota: null,
     creadoEn: '2026-08-20T12:00:00.000Z',
+    revocadoEn: null,
     usuario: USUARIO,
     ...overrides,
   };
@@ -367,5 +368,48 @@ describe('TaskHoursSection — horas sobreestimadas en el resumen', () => {
     await esperarCarga();
     expect(screen.queryByRole('group', { name: 'Legacy' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('group')).toHaveLength(4);
+  });
+});
+
+/**
+ * Revocar es un borrado lógico. La lista no lo distinguía, así que el líder
+ * —el único que conserva el histórico— veía un registro retirado idéntico a
+ * uno vigente, y con sus botones de editar y revocar encima.
+ */
+describe('TaskHoursSection — registros revocados', () => {
+  it('el registro revocado se marca y aparece tachado', async () => {
+    (getHorasTarea as any).mockResolvedValue([
+      registro({ idRegistroTiempo: 9, horas: 1, revocadoEn: '2026-09-07T18:00:00.000Z' }),
+    ]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen());
+    renderSection();
+
+    await esperarCarga();
+    const marca = screen.getByText('Revocado');
+    const fila = marca.closest('tr') as HTMLElement;
+    expect(within(fila).getByText('1 h')).toHaveClass('line-through');
+  });
+
+  it('no ofrece editar ni revocar sobre algo ya retirado', async () => {
+    (getHorasTarea as any).mockResolvedValue([
+      registro({ idRegistroTiempo: 9, horas: 1, revocadoEn: '2026-09-07T18:00:00.000Z' }),
+    ]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen());
+    renderSection();
+
+    await esperarCarga();
+    expect(screen.queryByRole('button', { name: /^Editar registro/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Revocar registro/ })).not.toBeInTheDocument();
+  });
+
+  it('un registro vigente conserva sus acciones y no se marca', async () => {
+    (getHorasTarea as any).mockResolvedValue([registro({ horas: 3, revocadoEn: null })]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen());
+    renderSection();
+
+    await esperarCarga();
+    expect(screen.queryByText('Revocado')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Editar registro/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Revocar registro/ })).toBeInTheDocument();
   });
 });

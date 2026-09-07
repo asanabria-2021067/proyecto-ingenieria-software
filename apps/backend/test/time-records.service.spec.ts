@@ -239,9 +239,53 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
 
       expect(prisma.registroTiempoTarea.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { asignacion: { idTarea: TASK_ID }, idUsuario: ASSIGNEE_ID },
+          where: { asignacion: { idTarea: TASK_ID }, idUsuario: ASSIGNEE_ID, revocadoEn: null },
         }),
       );
+    });
+
+    /**
+     * Revocar es un borrado lógico: la fila queda con `revocadoEn`. La lista no
+     * lo filtraba para nadie, así que quien retiraba su registro lo seguía
+     * viendo en pantalla —parecía que «Revocar» no hacía nada— aunque los
+     * totales sí lo hubieran descontado.
+     */
+    it('quien solo reporta sus horas deja de ver el registro que revoca', async () => {
+      const { prisma, service, readPolicy } = setup();
+      (readPolicy.assertRead as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        profile: 'PARTICIPANTE_ACTIVO', sprintEstados: null, ownOnly: false, isAdmin: false,
+      });
+
+      await service.findAllForTask(PROJECT_ID, TASK_ID, ASSIGNEE_ID);
+
+      const { where } = prisma.registroTiempoTarea.findMany.mock.calls[0][0];
+      expect(where.revocadoEn).toBeNull();
+    });
+
+    it('el líder conserva el histórico: también los registros revocados', async () => {
+      const { prisma, service } = setup();
+
+      await service.findAllForTask(PROJECT_ID, TASK_ID, LEADER_ID);
+
+      const { where } = prisma.registroTiempoTarea.findMany.mock.calls[0][0];
+      expect(where).not.toHaveProperty('revocadoEn');
+    });
+
+    it('expone la marca de revocación para que el líder distinga lo retirado', async () => {
+      const { prisma, service } = setup();
+      const revocadoEn = new Date('2026-09-07T18:00:00.000Z');
+      prisma.registroTiempoTarea.findMany.mockResolvedValue([
+        {
+          idRegistroTiempo: 9, idAsignacion: 3, idUsuario: ASSIGNEE_ID,
+          horas: { toNumber: () => 1 }, fecha: new Date('2026-09-07T00:00:00.000Z'),
+          nota: null, creadoEn: new Date('2026-09-07T10:00:00.000Z'), revocadoEn,
+          usuario: { idUsuario: ASSIGNEE_ID, nombre: 'V', apellido: 'H', fotoUrl: null },
+        },
+      ] as never);
+
+      const filas = await service.findAllForTask(PROJECT_ID, TASK_ID, LEADER_ID);
+
+      expect(filas[0].revocadoEn).toBe(revocadoEn.toISOString());
     });
 
     it('mapea cada fila a horas number y fecha YYYY-MM-DD (misma regresión que create)', async () => {

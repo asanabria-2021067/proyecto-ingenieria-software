@@ -38,6 +38,7 @@ const TIME_RECORD_SELECT = {
   fecha: true,
   nota: true,
   creadoEn: true,
+  revocadoEn: true,
   usuario: {
     select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
   },
@@ -60,6 +61,12 @@ export interface RegistroTiempoTareaPublico {
   fecha: string;
   nota: string | null;
   creadoEn: Date;
+  /**
+   * Marca de revocación. Solo llega con valor a quien puede ver el histórico
+   * de la tarea (líder y administración); para el autor, un registro revocado
+   * ya no aparece en la lista.
+   */
+  revocadoEn: string | null;
   usuario: UsuarioResumenPublico;
 }
 
@@ -91,6 +98,7 @@ function mapRegistroTiempo(row: TimeRecordRow): RegistroTiempoTareaPublico {
     fecha: toDateOnly(row.fecha),
     nota: row.nota,
     creadoEn: row.creadoEn,
+    revocadoEn: row.revocadoEn ? row.revocadoEn.toISOString() : null,
     usuario: row.usuario,
   };
 }
@@ -641,7 +649,12 @@ export class TimeRecordsService {
     const rows = await this.prisma.registroTiempoTarea.findMany({
       where: {
         asignacion: { idTarea: tarea.idTarea },
-        ...(this.seesEveryRecord(decision) ? {} : { idUsuario: userId }),
+        // Quien solo reporta sus horas ve SU registro vigente: al revocarlo
+        // desaparece de su lista, que es lo que significa retirarlo. El
+        // líder y la administración conservan el histórico completo de la
+        // tarea —incluidos los revocados— porque es la traza que revisan al
+        // cerrar el Sprint.
+        ...(this.seesEveryRecord(decision) ? {} : { idUsuario: userId, revocadoEn: null }),
       },
       orderBy: [{ fecha: 'desc' }, { idRegistroTiempo: 'desc' }],
       select: TIME_RECORD_SELECT,
