@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { EventoBitacoraDto } from '../lib/types/bitacora';
 
@@ -314,5 +314,68 @@ describe('BitacoraPage — paginación', () => {
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
     expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ page: 2 }));
+  });
+});
+
+/**
+ * La bitácora guarda TODO lo que ocurre en el proyecto, incluidos los eventos
+ * que S7 añadió (cierres, liderazgo, ajustes de horas). El catálogo del
+ * frontend se quedó con los siete originales, así que `EVENTO_STYLE[tipo]` era
+ * `undefined` y leer su icono lanzaba: bastaba un Sprint cerrado para dejar la
+ * página en blanco. Ninguna prueba renderizaba un evento de S7.
+ */
+describe('BitacoraPage — eventos de Sprint 7', () => {
+  const CASOS: Array<[string, string]> = [
+    ['SPRINT_CLOSED', 'Sprint cerrado'],
+    ['SPRINT_FINALIZED', 'Sprint en finalización'],
+    ['SPRINT_HOURS_CONSOLIDATED', 'Horas del Sprint consolidadas'],
+    ['LEADERSHIP_CHANGED', 'Cambio de liderazgo'],
+    ['LEADERSHIP_APPEAL_CREATED', 'Apelación de liderazgo enviada'],
+    ['CLOSURE_AUTOREPORT_GENERATED', 'Informe automático generado'],
+    ['TASK_HOURS_ADJUSTED', 'Horas ajustadas'],
+    ['PROJECT_HOURS_CREDITED', 'Horas acreditadas'],
+  ];
+
+  it.each(CASOS)('renderiza «%s» con su etiqueta, sin romper la página', (tipoEvento, etiqueta) => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora({ eventos: [evento({ tipoEvento: tipoEvento as never, tipoEntidad: 'PROYECTO' as never })] });
+
+    renderPage();
+
+    const eventos = screen.getByRole('region', { name: 'Eventos de la bitácora' });
+    expect(within(eventos).getByText(etiqueta)).toBeInTheDocument();
+  });
+
+  it('un evento desconocido no tumba la vista: se muestra con su literal', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora({ eventos: [evento({ tipoEvento: 'EVENTO_DEL_FUTURO' as never })] });
+
+    renderPage();
+
+    const eventos = screen.getByRole('region', { name: 'Eventos de la bitácora' });
+    expect(within(eventos).getByText('EVENTO_DEL_FUTURO')).toBeInTheDocument();
+  });
+
+  it('los eventos de S7 conviven con los originales en la misma lista', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora({
+      eventos: [
+        evento({ idAuditoria: 1, tipoEvento: 'TASK_CREATED' }),
+        evento({ idAuditoria: 2, tipoEvento: 'SPRINT_CLOSED' as never, tipoEntidad: 'SPRINT' }),
+      ],
+      total: 2,
+    });
+
+    renderPage();
+
+    const eventos = screen.getByRole('region', { name: 'Eventos de la bitácora' });
+    expect(within(eventos).getByText('Tarea creada')).toBeInTheDocument();
+    expect(within(eventos).getByText('Sprint cerrado')).toBeInTheDocument();
   });
 });
