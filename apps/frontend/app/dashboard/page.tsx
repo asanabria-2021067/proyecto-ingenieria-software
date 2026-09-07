@@ -14,7 +14,11 @@ import {
   FolderOpen,
   Building2,
   Users,
+  Award,
+  Info,
+  NotebookPen,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
 import {
   Empty,
@@ -48,6 +52,70 @@ import 'react-loading-skeleton/dist/skeleton.css';
 import { useTheme } from 'next-themes';
 import { useFeedSocial } from '@/hooks/use-social';
 import { SocialProjectCard } from '@/components/social/social-project-card';
+
+/**
+ * S7 (VIEW-08): las horas llegan como string decimal del backend; se formatean
+ * SIN pasar por punto flotante. Devuelve `null` si el bloque no vino o es
+ * inválido, para que la card lo muestre como «no disponible» sin romper nada.
+ */
+export function formatearHorasDashboard(value: string | null | undefined): string | null {
+  if (typeof value !== 'string' || !/^-?\d+(\.\d+)?$/.test(value)) return null;
+  const [entera, decimal = ''] = value.split('.');
+  const dec = decimal.replace(/0+$/, '');
+  return dec.length > 0 ? `${entera}.${dec}` : entera;
+}
+
+function HorasKpiCard({
+  id,
+  titulo,
+  valor,
+  ayuda,
+  icon: Icon,
+  tone,
+}: {
+  id: string;
+  titulo: string;
+  valor: string | null;
+  ayuda: string;
+  icon: typeof Award;
+  tone: 'primary' | 'secondary';
+}) {
+  const color = tone === 'primary' ? 'text-primary' : 'text-secondary';
+  return (
+    <div
+      id={id}
+      role="group"
+      aria-label={titulo}
+      className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8"
+    >
+      <div className="relative z-10">
+        <span className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-tertiary">
+          {titulo}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" aria-label={`Qué significa: ${titulo}`} className="rounded-full text-tertiary hover:text-on-surface">
+                <Info className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">{ayuda}</TooltipContent>
+          </Tooltip>
+        </span>
+        {valor === null ? (
+          <span className="block text-base font-semibold text-tertiary">No disponible por ahora</span>
+        ) : (
+          <div className="flex items-baseline gap-1">
+            <span className={`text-5xl font-black leading-none tracking-tighter ${color}`}>{valor}</span>
+            <span className={`text-lg font-bold ${color}`}>h</span>
+          </div>
+        )}
+      </div>
+      <p className="relative z-10 mt-4 text-xs text-on-surface-variant">{ayuda}</p>
+      <div className={`absolute -bottom-4 -right-4 ${tone === 'primary' ? 'text-primary/5' : 'text-secondary/5'}`}>
+        <Icon className="h-16 w-16" />
+      </div>
+    </div>
+  );
+}
 
 const estadoColors: Record<string, string> = {
   PENDIENTE: 'bg-blue-100 text-blue-800',
@@ -130,6 +198,9 @@ export default function DashboardPage() {
   const horasExtension = stats?.horasExtension ?? 0;
   const horasExtensionRequeridas = stats?.horasExtensionRequeridas ?? null;
   const proyectosActivos = stats?.proyectosActivos ?? 0;
+  // VIEW-08: dos métricas SEPARADAS (nunca se suman): significan cosas distintas.
+  const horasAbiertas = formatearHorasDashboard(stats?.horasRegistradasEnProyectosAbiertos);
+  const horasAcreditadas = formatearHorasDashboard(stats?.horasAcreditadas);
   const requiereHorasBeca = horasBecaRequeridas !== null && horasBecaRequeridas > 0;
   const requiereHorasExtension =
     horasExtensionRequeridas !== null && horasExtensionRequeridas > 0;
@@ -249,6 +320,24 @@ export default function DashboardPage() {
             </div>
             <Zap className="absolute -bottom-4 -right-4 h-20 w-20 text-white/10" />
           </div>
+
+          {/* S7 VIEW-08: horas en proyectos abiertos vs. acreditadas (separadas) */}
+          <HorasKpiCard
+            id="stats-horas-abiertas"
+            titulo="Horas registradas en proyectos abiertos"
+            valor={horasAbiertas}
+            ayuda="Horas que registraste en proyectos aún no cerrados. Pueden cambiar hasta que el proyecto se cierre."
+            icon={NotebookPen}
+            tone="secondary"
+          />
+          <HorasKpiCard
+            id="stats-horas-acreditadas"
+            titulo="Horas acreditadas"
+            valor={horasAcreditadas}
+            ayuda="Horas aprobadas por administración al cerrar tus proyectos. Ya no cambian."
+            icon={Award}
+            tone="primary"
+          />
         </div>
 
         {proyectosDeAmigos.length > 0 && (

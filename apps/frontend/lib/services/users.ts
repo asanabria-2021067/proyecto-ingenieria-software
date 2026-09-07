@@ -53,6 +53,15 @@ export interface DashboardStats {
   horasExtensionRequeridas: number | null;
   horasTotal: number;
   proyectosActivos: number;
+  /**
+   * S7 (06 v2 §46): horas por nivel YA calculadas por el backend, como string
+   * decimal. Abiertas = registradas en proyectos no cerrados (pueden cambiar);
+   * acreditadas = aprobadas al cerrar (ya no cambian). NUNCA se suman.
+   * Opcionales: si el proveedor de horas no está disponible el resto del
+   * dashboard debe renderizarse igual.
+   */
+  horasRegistradasEnProyectosAbiertos?: string;
+  horasAcreditadas?: string;
   postulacionesRecientes: {
     idPostulacion: number;
     estadoPostulacion: string;
