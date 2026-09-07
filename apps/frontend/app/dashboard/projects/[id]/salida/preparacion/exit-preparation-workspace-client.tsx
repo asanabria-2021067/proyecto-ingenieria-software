@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Info, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Info, Loader2 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
+import { useExitS7Context, type ExitS7Blocker } from '@/hooks/use-exit-s7-context';
+import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-banner';
 import {
   useContinueExitPreparation,
   useCurrentExitRequest,
@@ -223,17 +225,21 @@ function ExitPreparationProgressCard({
   onContinuar,
   isContinuing,
   continuarError,
+  bloqueoS7 = null,
 }: {
   summary: ExitPreparationSummaryDto;
   onContinuar: () => void;
   isContinuing: boolean;
   continuarError: string | null;
+  /** S7 (F020): bloqueo duro del ciclo (Sprint en finalización, cierre, liderazgo); prevalece sobre `puedeContinuar`. */
+  bloqueoS7?: ExitS7Blocker | null;
 }) {
   const total = summary.blockers.length;
   const prepared = summary.blockers.filter((b) => b.estadoPreparacion === 'COMPLETA').length;
   const porcentaje = total === 0 ? 100 : Math.round((prepared / total) * 100);
   const visual = getProgressVisualState(porcentaje);
-  const puedeContinuar = summary.puedeContinuar;
+  const puedeContinuar = summary.puedeContinuar && bloqueoS7 === null;
+  const motivoBloqueo = bloqueoS7 ? bloqueoS7.titulo : 'Debes preparar todas tus responsabilidades antes de continuar.';
 
   return (
     <div className="mb-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:p-6">
@@ -271,7 +277,7 @@ function ExitPreparationProgressCard({
                   <Info className="size-4" aria-hidden="true" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Debes preparar todas tus responsabilidades antes de continuar.</TooltipContent>
+              <TooltipContent>{motivoBloqueo}</TooltipContent>
             </Tooltip>
           )}
           <Button
@@ -291,6 +297,46 @@ function ExitPreparationProgressCard({
         </p>
       )}
     </div>
+  );
+}
+
+// ─── Bloqueos del ciclo S7 (F020) ────────────────────────────────────────────
+// Cada bloqueo explica qué hacer. Los duros (Sprint EN_FINALIZACION, proyecto
+// EN_SOLICITUD_CIERRE, actor líder) deshabilitan «Continuar»; el de horas es
+// orientación sobre las responsabilidades pendientes (B6 ya lo bloquea).
+function ExitS7Blockers({ blockers }: { blockers: ExitS7Blocker[] }) {
+  if (blockers.length === 0) return null;
+  return (
+    <ul aria-label="Bloqueos para la salida" className="mb-4 space-y-2">
+      {blockers.map((b) => (
+        <li
+          key={b.code}
+          role={b.bloqueante ? 'alert' : 'note'}
+          className={`flex flex-col gap-2 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center ${
+            b.bloqueante
+              ? 'border-amber-500/40 bg-amber-400/10 text-on-surface'
+              : 'border-outline-variant/40 bg-surface-container-low text-on-surface'
+          }`}
+        >
+          <AlertTriangle
+            className={`size-5 shrink-0 ${b.bloqueante ? 'text-amber-700 dark:text-amber-300' : 'text-tertiary'}`}
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">{b.titulo}</p>
+            <p className="text-xs text-on-surface-variant">{b.accion}</p>
+          </div>
+          {b.href && (
+            <Button asChild size="sm" className="h-8 shrink-0 gap-1 rounded-md text-xs font-bold">
+              <Link href={b.href}>
+                {b.hrefLabel ?? 'Ir'}
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -347,6 +393,12 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
   const { summary, isLoading: isLoadingSummary, isError: isErrorSummary, error: summaryError, refetch: refetchSummary } =
     useExitPreparationSummary(idProyecto, esPreparacion);
   const continuarPreparacion = useContinueExitPreparation(idProyecto);
+
+  // S7 (F020): bloqueos del ciclo. El estado del proyecto ya viene cargado;
+  // Sprint operable y liderazgo se consultan con las keys canónicas.
+  const proyectoCerrado = proyecto.estadoProyecto === 'CERRADO';
+  const horasSinConsolidar = Boolean(summary?.blockers.some((b) => !b.tieneHoras));
+  const s7 = useExitS7Context(idProyecto, proyecto.estadoProyecto, horasSinConsolidar, !proyectoCerrado);
 
   const [continuarError, setContinuarError] = useState<string | null>(null);
 
@@ -444,11 +496,23 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
         </div>
       </div>
 
+      {/* S7 (F020): proyecto CERRADO → la salida ya no aplica; nada más se ofrece. */}
+      {proyectoCerrado && (
+        <div className="mb-4 space-y-3">
+          <ReadOnlyProjectBanner fechaCierre={proyecto.fechaActualizacion ?? null} />
+          <p className="text-sm text-on-surface-variant">
+            La salida de rol ya no aplica: el proyecto está cerrado y tus horas quedaron acreditadas.
+          </p>
+        </div>
+      )}
+
+      {!proyectoCerrado && <ExitS7Blockers blockers={s7.blockers} />}
+
       {/* F11.1 — orden de carga: primero se resuelve currentRequest
           (server-authoritative). Mientras esté isLoadingCurrent, nunca se
           renderiza F9 ni F11 — evita el flash "Kanban -> luego Solicitud
           enviada" en carga directa. */}
-      {isLoadingCurrent ? (
+      {proyectoCerrado ? null : isLoadingCurrent ? (
         <ExitPreparationBodySkeleton />
       ) : isErrorCurrent ? (
         <div
@@ -492,6 +556,7 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
               onContinuar={handleContinuar}
               isContinuing={continuarPreparacion.isPending}
               continuarError={continuarError}
+              bloqueoS7={s7.bloqueo}
             />
 
             <div className="min-h-0 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm md:p-5">
