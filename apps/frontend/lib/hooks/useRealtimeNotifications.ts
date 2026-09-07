@@ -160,6 +160,8 @@ export function useRealtimeNotifications(enabled: boolean) {
       // VIEW-15/16: la bandeja administrativa mueve el proyecto de grupo y el detalle cambia de estado.
       queryClient.invalidateQueries({ queryKey: adminProjectsPrefix });
       queryClient.invalidateQueries({ queryKey: adminProjectDetailQueryKey(payload.projectId) });
+      // VIEW-08: al cerrarse un proyecto del usuario sus horas pasan de abiertas a acreditadas.
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     };
 
     const handleClosureReviewUpdated = (payload: ClosureReviewUpdatedPayload) => {
