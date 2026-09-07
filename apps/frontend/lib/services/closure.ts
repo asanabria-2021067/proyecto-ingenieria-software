@@ -52,10 +52,15 @@ export function generateAutoReport(idProyecto: number, input: GenerateReportInpu
 }
 
 /** E106 — reserva el permiso de carga; el cliente nunca recibe firma del proveedor. */
-export function reserveClosureDocument(idProyecto: number, input: ReserveDocumentInput): Promise<UploadGrant> {
+export function reserveClosureDocument(
+  idProyecto: number,
+  input: ReserveDocumentInput,
+  signal?: AbortSignal,
+): Promise<UploadGrant> {
   return apiFetch<UploadGrant>(`/proyectos/${idProyecto}/cierre/documentos/firma`, {
     method: 'POST',
     body: JSON.stringify(input),
+    signal,
   });
 }
 
@@ -65,11 +70,15 @@ export function reserveClosureDocument(idProyecto: number, input: ReserveDocumen
  * que el navegador genera el `boundary`. `grant.uploadUrl` es una ruta del
  * backend; el navegador nunca habla con el proveedor.
  */
-export function uploadClosureDocument(grant: UploadGrant, file: File): Promise<ClosureDocumentPublic> {
+export function uploadClosureDocument(
+  grant: UploadGrant,
+  file: File,
+  signal?: AbortSignal,
+): Promise<ClosureDocumentPublic> {
   const form = new FormData();
   form.append('ticket', grant.ticket);
   form.append('file', file, file.name);
-  return apiFetch<ClosureDocumentPublic>(grant.uploadUrl, { method: 'POST', body: form });
+  return apiFetch<ClosureDocumentPublic>(grant.uploadUrl, { method: 'POST', body: form, signal });
 }
 
 /** E108 — quita una evidencia del borrador. */
