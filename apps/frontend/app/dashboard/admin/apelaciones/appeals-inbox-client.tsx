@@ -361,7 +361,18 @@ export default function AppealsInboxClient() {
         </nav>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+      {/* El detalle va ARRIBA y la tabla debajo, a todo el ancho: en dos
+          columnas la tabla quedaba estrecha y sus siete columnas obligaban a
+          desplazarla en horizontal para leer asunto, fecha y estado. */}
+      <div className="space-y-4">
+        <div>
+          {seleccionada ? (
+            <AppealPanel apelacion={seleccionada} onAceptar={() => setAceptando(seleccionada)} onDenegar={() => setDenegando(seleccionada)} />
+          ) : (
+            <div className={`${CARD} text-sm text-tertiary`}>Selecciona una apelación para ver el mensaje completo y resolverla.</div>
+          )}
+        </div>
+
         <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
           {isError ? (
             <Empty tone="danger" role="alert" className="border-0 shadow-none">
@@ -392,72 +403,70 @@ export default function AppealsInboxClient() {
               </EmptyHeader>
             </Empty>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                    <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Proyecto</TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Líder solicitante</TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Candidato propuesto</TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Asunto</TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Fecha</TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Estado</TableHead>
-                    <TableHead className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-tertiary">
-                      <span className="sr-only">Acciones</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((a) => {
-                    const badge = ESTADO_BADGE[a.estadoApelacion] ?? { label: a.estadoApelacion, className: 'bg-surface-container-high text-on-surface-variant' };
-                    const activa = a.idApelacion === seleccionadaId;
-                    return (
-                      <TableRow key={a.idApelacion} className={`border-outline-variant/40 ${activa ? 'bg-primary/5' : 'hover:bg-surface-container-low'}`}>
-                        <TableCell className="px-4 py-3">
-                          <Link href={`/dashboard/admin/proyectos/${a.idProyecto}`} className="text-sm font-semibold text-primary hover:underline">
-                            Proyecto #{a.idProyecto}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-sm text-on-surface">
-                          <span className="inline-flex items-center gap-2">
-                            <Avatar className="size-7">
-                              <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
-                                {getInitials(a.liderSolicitante.nombre, a.liderSolicitante.apellido)}
-                              </AvatarFallback>
-                            </Avatar>
-                            {a.liderSolicitante.nombre} {a.liderSolicitante.apellido}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-sm text-on-surface">
-                          {a.candidatoPropuesto.nombre} {a.candidatoPropuesto.apellido}
-                        </TableCell>
-                        <TableCell className="max-w-[240px] truncate px-4 py-3 text-sm text-on-surface-variant" title={a.asunto}>
-                          {a.asunto}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap px-4 py-3 text-sm text-on-surface-variant">{formatearFecha(a.creadaEn)}</TableCell>
-                        <TableCell className="px-4 py-3">
-                          <Badge className={`border-transparent text-[11px] font-semibold ${badge.className}`}>{badge.label}</Badge>
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-right">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            aria-expanded={activa}
-                            aria-label={`Revisar apelación #${a.idApelacion}`}
-                            onClick={() => setSeleccionadaId(activa ? null : a.idApelacion)}
-                            className="h-8 gap-1 text-xs font-bold text-primary hover:text-primary"
-                          >
-                            {activa ? 'Ocultar' : 'Revisar'}
-                            <ChevronRight className={`size-3.5 transition-transform ${activa ? 'rotate-90' : ''}`} aria-hidden="true" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
+                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Proyecto</TableHead>
+                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Líder solicitante</TableHead>
+                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Candidato propuesto</TableHead>
+                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Asunto</TableHead>
+                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Fecha</TableHead>
+                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Estado</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-tertiary">
+                    <span className="sr-only">Acciones</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((a) => {
+                  const badge = ESTADO_BADGE[a.estadoApelacion] ?? { label: a.estadoApelacion, className: 'bg-surface-container-high text-on-surface-variant' };
+                  const activa = a.idApelacion === seleccionadaId;
+                  return (
+                    <TableRow key={a.idApelacion} className={`border-outline-variant/40 ${activa ? 'bg-primary/5' : 'hover:bg-surface-container-low'}`}>
+                      <TableCell className="px-4 py-3">
+                        <Link href={`/dashboard/admin/proyectos/${a.idProyecto}`} className="text-sm font-semibold text-primary hover:underline">
+                          Proyecto #{a.idProyecto}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-sm text-on-surface">
+                        <span className="inline-flex items-center gap-2">
+                          <Avatar className="size-7">
+                            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+                              {getInitials(a.liderSolicitante.nombre, a.liderSolicitante.apellido)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {a.liderSolicitante.nombre} {a.liderSolicitante.apellido}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-sm text-on-surface">
+                        {a.candidatoPropuesto.nombre} {a.candidatoPropuesto.apellido}
+                      </TableCell>
+                      <TableCell className="max-w-[520px] truncate px-4 py-3 text-sm text-on-surface-variant" title={a.asunto}>
+                        {a.asunto}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap px-4 py-3 text-sm text-on-surface-variant">{formatearFecha(a.creadaEn)}</TableCell>
+                      <TableCell className="px-4 py-3">
+                        <Badge className={`border-transparent text-[11px] font-semibold ${badge.className}`}>{badge.label}</Badge>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-expanded={activa}
+                          aria-label={`Revisar apelación #${a.idApelacion}`}
+                          onClick={() => setSeleccionadaId(activa ? null : a.idApelacion)}
+                          className="h-8 gap-1 text-xs font-bold text-primary hover:text-primary"
+                        >
+                          {activa ? 'Ocultar' : 'Revisar'}
+                          <ChevronRight className={`size-3.5 transition-transform ${activa ? 'rotate-90' : ''}`} aria-hidden="true" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           )}
 
           {!isPending && !isError && total > 0 && (
@@ -490,14 +499,6 @@ export default function AppealsInboxClient() {
                 </Button>
               </nav>
             </div>
-          )}
-        </div>
-
-        <div>
-          {seleccionada ? (
-            <AppealPanel apelacion={seleccionada} onAceptar={() => setAceptando(seleccionada)} onDenegar={() => setDenegando(seleccionada)} />
-          ) : (
-            <div className={`${CARD} text-sm text-tertiary`}>Selecciona una apelación para ver el mensaje completo y resolverla.</div>
           )}
         </div>
       </div>
