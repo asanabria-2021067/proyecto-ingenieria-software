@@ -12,6 +12,7 @@ import {
   History,
   ListChecks,
   Loader2,
+  Lock,
   Repeat,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
@@ -93,18 +94,32 @@ function SprintCardSkeleton() {
   return <Skeleton className="h-40 w-full rounded-xl" />;
 }
 
+/**
+ * S7 (VIEW-11): con el proyecto en `EN_SOLICITUD_CIERRE` o `CERRADO` no hay
+ * escrituras sobre ningún Sprint; y un Sprint `CERRADO` es histórico para
+ * todos los roles. El backend ya lo impone; aquí solo se retira la
+ * affordance para no ofrecer acciones que fallarían.
+ */
+export function proyectoEsReadOnly(estadoProyecto: string | undefined): boolean {
+  return estadoProyecto === 'EN_SOLICITUD_CIERRE' || estadoProyecto === 'CERRADO';
+}
+
 function SprintCard({
   sprint,
   idProyecto,
   isLeader,
   finalizeSprint,
+  proyectoReadOnly,
 }: {
   sprint: SprintDto;
   idProyecto: number;
   isLeader: boolean;
   finalizeSprint: ReturnType<typeof useFinalizeSprint>;
+  proyectoReadOnly: boolean;
 }) {
   const estilo = ESTADO_SPRINT_STYLE[sprint.estado];
+  const cerrado = sprint.estado === 'CERRADO';
+  const puedeOperar = isLeader && !proyectoReadOnly;
 
   return (
     <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm md:p-6">
@@ -132,7 +147,7 @@ function SprintCard({
               Analítica
             </Link>
           </Button>
-          {sprint.estado === 'ACTIVO' && isLeader && (
+          {sprint.estado === 'ACTIVO' && puedeOperar && (
             <Button
               type="button"
               onClick={() =>
@@ -153,7 +168,7 @@ function SprintCard({
               {finalizeSprint.isPending ? 'Finalizando...' : 'Finalizar'}
             </Button>
           )}
-          {sprint.estado === 'EN_FINALIZACION' && isLeader && (
+          {sprint.estado === 'EN_FINALIZACION' && puedeOperar && (
             <Button
               asChild
               variant="outline"
@@ -164,7 +179,7 @@ function SprintCard({
               </Link>
             </Button>
           )}
-          {sprint.estado === 'CERRADO' && (
+          {cerrado && (
             <Button
               asChild
               variant="outline"
@@ -175,6 +190,14 @@ function SprintCard({
           )}
         </div>
       </div>
+
+      {cerrado && (
+        <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-tertiary">
+          <Lock className="size-3.5" aria-hidden="true" />
+          Sprint cerrado{sprint.fechaCierre ? ` el ${formatearFechaHora(sprint.fechaCierre)}` : ''}: vista histórica de solo
+          lectura, con las horas ya acreditadas.
+        </p>
+      )}
 
       <div className="mt-5 grid grid-cols-2 gap-4 border-t border-outline-variant/30 pt-4 lg:grid-cols-4">
         <MetricBlock icon={Calendar} label="Fecha de inicio" value={formatearFechaHora(sprint.fechaInicio)} />
@@ -203,6 +226,7 @@ export default function SprintListPage() {
 
   const cargando = isLoading || cargandoProyecto || cargandoUsuario;
   const volverAlProyectoHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
+  const proyectoReadOnly = proyectoEsReadOnly(proyecto?.estadoProyecto);
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
@@ -235,6 +259,18 @@ export default function SprintListPage() {
         </Button>
       </div>
       <p className="-mt-6 mb-8 text-sm text-tertiary">Resumen de los sprints del proyecto y su progreso.</p>
+
+      {proyectoReadOnly && (
+        <p
+          role="status"
+          className="mb-6 flex items-center gap-2 rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant"
+        >
+          <Lock className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
+          {proyecto?.estadoProyecto === 'CERRADO'
+            ? 'El proyecto está cerrado: sus Sprints son históricos y de solo lectura.'
+            : 'El proyecto está en solicitud de cierre: los Sprints no admiten cambios.'}
+        </p>
+      )}
 
       {cargando && (
         <div className="space-y-4">
@@ -291,6 +327,7 @@ export default function SprintListPage() {
               idProyecto={idProyecto}
               isLeader={isLeader}
               finalizeSprint={finalizeSprint}
+              proyectoReadOnly={proyectoReadOnly}
             />
           ))}
         </div>
