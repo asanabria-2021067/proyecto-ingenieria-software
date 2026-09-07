@@ -2,6 +2,7 @@ import { apiFetch } from '@/lib/api/client';
 import type {
   ApelacionItemDto,
   CreateLeadershipAppealInput,
+  DenyAppealInput,
   LeadershipCandidatesDto,
   LeadershipContextDto,
   LeadershipHistoryItemDto,
@@ -75,6 +76,38 @@ export function cancelLeadershipAppeal(idProyecto: number, idApelacion: number):
  */
 export function transferLeadership(idProyecto: number, input: TransferLeadershipInput): Promise<unknown> {
   return apiFetch<unknown>(`/admin/proyectos/${idProyecto}/liderazgo/cambiar`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+// ─── Bandeja administrativa de apelaciones (VIEW-18, F015) ───────────────────
+
+/** E099 — bandeja global de apelaciones; `estado` acota, nunca amplía. */
+export function getAdminAppeals(
+  options: { estado?: string; page?: number; limit?: number } = {},
+): Promise<PaginaLiderazgo<ApelacionItemDto>> {
+  const params = new URLSearchParams();
+  params.set('page', String(options.page ?? 1));
+  params.set('limit', String(options.limit ?? 20));
+  if (options.estado) params.set('estado', options.estado);
+  return apiFetch<PaginaLiderazgo<ApelacionItemDto>>(`/admin/liderazgo/apelaciones?${params.toString()}`);
+}
+
+/**
+ * E100 — aceptar la apelación por el MISMO motor que el cambio directo:
+ * exige el `TransferLeadershipDto` completo, incluido `expectedLeaderId`.
+ */
+export function acceptAppeal(idProyecto: number, idApelacion: number, input: TransferLeadershipInput): Promise<unknown> {
+  return apiFetch<unknown>(`/admin/proyectos/${idProyecto}/liderazgo/apelaciones/${idApelacion}/aceptar`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+/** E101 — denegar con `mensajeResolucion` (no `motivo`), sin tocar el liderazgo. */
+export function denyAppeal(idProyecto: number, idApelacion: number, input: DenyAppealInput): Promise<unknown> {
+  return apiFetch<unknown>(`/admin/proyectos/${idProyecto}/liderazgo/apelaciones/${idApelacion}/denegar`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
