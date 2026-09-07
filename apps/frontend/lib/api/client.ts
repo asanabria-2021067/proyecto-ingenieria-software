@@ -87,16 +87,65 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const error = new Error(
-      Array.isArray(body.message) ? body.message.join(', ') : body.message || 'Error del servidor',
-    );
-    (error as any).statusCode = body.statusCode;
-    (error as any).details = body.message;
-    throw error;
+    throw await buildApiError(res);
   }
   if (res.status === 204) {
     return undefined as T;
   }
   return res.json();
+}
+
+/**
+ * Error enriquecido común a `apiFetch` y `apiFetchBlob`: `statusCode`,
+ * `details` (mensaje crudo del backend) y, cuando viaja, el `code` de
+ * dominio (p. ej. `REGISTRO_YA_REVOCADO`, `CLOSURE_NO_CONFIGURADO`) para que
+ * la UI distinga conflictos sin comparar textos.
+ */
+async function buildApiError(res: Response): Promise<Error> {
+  const body = await res.json().catch(() => ({}));
+  const error = new Error(
+    Array.isArray(body.message) ? body.message.join(', ') : body.message || 'Error del servidor',
+  );
+  (error as any).statusCode = body.statusCode ?? res.status;
+  (error as any).details = body.message;
+  if (typeof body.code === 'string') {
+    (error as any).code = body.code;
+  }
+  return error;
+}
+
+/**
+ * S7 (VIEW-20, F004) — lectura de BINARIO servido por el backend (bytes de
+ * un documento de cierre). Misma sesión por cookie (`credentials: 'include'`)
+ * y mismo refresh silencioso en 401 que `apiFetch`; a diferencia de este, no
+ * fija `Content-Type` (no hay cuerpo) y pide `Accept: application/pdf`.
+ * Devuelve un `Blob` que el llamador convierte en `objectURL` local. Nunca
+ * recibe ni devuelve una URL del proveedor: `path` es siempre una ruta del
+ * backend (la de `ReadGrant.url`).
+ */
+export async function apiFetchBlob(
+  path: string,
+  options: RequestInit = {},
+  _retriedAfterRefresh = false,
+): Promise<Blob> {
+  const res = await fetch(joinUrl(getApiUrl(), API_PREFIX, path), {
+    ...options,
+    credentials: 'include',
+    headers: {
+      Accept: 'application/pdf',
+      ...(options.headers as Record<string, string>),
+    },
+  });
+
+  if (res.status === 401 && !_retriedAfterRefresh && !path.startsWith('/auth/')) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      return apiFetchBlob(path, options, true);
+    }
+  }
+
+  if (!res.ok) {
+    throw await buildApiError(res);
+  }
+  return res.blob();
 }
