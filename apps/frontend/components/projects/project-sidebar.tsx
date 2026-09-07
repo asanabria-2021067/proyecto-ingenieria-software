@@ -47,10 +47,16 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
     !!currentUser &&
     members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeChatear = isLeader || esParticipante;
-  // S7 (VIEW-01/VIEW-02): en CERRADO no existe ninguna escritura, tampoco en
-  // la sidebar: se ocultan «Editar Información» y «Editar Roles».
+  // S7 (VIEW-01/VIEW-02): ni en CERRADO ni en EN_SOLICITUD_CIERRE existe
+  // escritura sobre la información del proyecto, tampoco en la sidebar: se
+  // ocultan «Editar Información» y «Editar Roles».
+  //
+  // Mientras solo se comprobaba CERRADO, un proyecto en solicitud de cierre
+  // seguía ofreciendo «Editar Información»; el formulario rechaza ese estado y
+  // redirige nada más abrirse, perdiendo el `returnTo`, así que «Volver»
+  // dejaba al líder en un listado ajeno en vez de en su proyecto.
   const estadoProyecto = proyecto?.estadoProyecto;
-  const proyectoCerrado = estadoProyecto === 'CERRADO';
+  const admiteEditarInformacion = estadoProyecto !== 'CERRADO' && estadoProyecto !== 'EN_SOLICITUD_CIERRE';
   const cierreDisponible = estadoProyecto === 'EN_PROGRESO' || estadoProyecto === 'EN_SOLICITUD_CIERRE';
 
   const navItems: NavItem[] = [
@@ -64,7 +70,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
   ];
 
   if (isLeader) {
-    if (!proyectoCerrado) {
+    if (admiteEditarInformacion) {
       navItems.push({
         href: `/dashboard/projects/mine/form?id=${idProyecto}`,
         label: 'Editar Información',
@@ -76,7 +82,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
       label: 'Revisiones Pasadas',
       icon: History,
     });
-    if (!proyectoCerrado) {
+    if (admiteEditarInformacion) {
       navItems.push({
         href: `/dashboard/projects/${idProyecto}?openRoles=1`,
         label: 'Editar Roles',
