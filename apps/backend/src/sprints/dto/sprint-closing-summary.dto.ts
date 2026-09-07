@@ -114,6 +114,12 @@ export interface SprintClosingTramoDto {
   abierto: boolean;
   origen: string;
   reportadas: string;
+  /** Estimación de la tarea del tramo; `null` cuando no se estimó. */
+  estimacionTarea: number | null;
+  /** Reportado por encima de la estimación; `'0.00'` si no la supera o no hay estimación. */
+  exceso: string;
+  /** Lo que el ESTUDIANTE argumentó al exceder su estimación, no el líder. */
+  justificacionExceso: string | null;
   ajuste: string | null;
   justificacionAjuste: string | null;
   propuestas: string;
