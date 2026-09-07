@@ -7,6 +7,7 @@ import {
   Kanban,
   ListChecks,
   Users,
+  Crown,
   Rocket,
   ClipboardCheck,
   Pencil,
@@ -105,6 +106,12 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         href: `/dashboard/proyectos/${idProyecto}/miembros`,
         label: 'Miembros',
         icon: Users,
+      },
+      // S7 (VIEW-06): el liderazgo salió de «Miembros» a su propia vista.
+      {
+        href: `/dashboard/proyectos/${idProyecto}/liderazgo`,
+        label: 'Liderazgo',
+        icon: Crown,
       },
       {
         href: `/dashboard/proyectos/${idProyecto}/sprints`,

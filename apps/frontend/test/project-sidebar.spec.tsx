@@ -95,6 +95,24 @@ describe('ProjectSidebar', () => {
     );
   });
 
+  it('el liderazgo tiene su propio destino, separado de «Miembros» (S7 VIEW-06)', () => {
+    mockLeader();
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /liderazgo/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/liderazgo',
+    );
+  });
+
+  it('un integrante (no líder) no ve el destino de liderazgo, igual que no ve «Miembros»', () => {
+    mockParticipante();
+    renderSidebar();
+
+    expect(screen.queryByRole('link', { name: /liderazgo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /miembros/i })).not.toBeInTheDocument();
+  });
+
   it('al entrar al Tablero (ruta anidada bajo Resumen) solo un NavItem queda activo', () => {
     mockLeader();
     pathnameMock.mockReturnValue('/dashboard/projects/42/kanban');
