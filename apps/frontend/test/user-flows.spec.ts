@@ -4,7 +4,8 @@ vi.mock('../lib/api/client', () => ({ apiFetch: vi.fn() }));
 
 import { apiFetch } from '../lib/api/client';
 import { login } from '../lib/services/auth';
-import { createProject, getMyProjects, requestProjectClosure, searchProjects, submitProjectForReview } from '../lib/services/projects';
+import { createProject, getMyProjects, searchProjects, submitProjectForReview } from '../lib/services/projects';
+import { requestClose } from '../lib/services/closure';
 import { getConteoNoLeidas, getNotificaciones, marcarTodasLeidas } from '../lib/services/notifications';
 
 describe('simulación de procesos de usuario', () => {
@@ -18,7 +19,8 @@ describe('simulación de procesos de usuario', () => {
     const auth = await login({ correo: 'lider@uvg.edu', contrasena: '123456' });
     const created = await createProject({ tituloProyecto: 'X' } as any);
     const submitted = await submitProjectForReview(created.idProyecto);
-    const closeReq = await requestProjectClosure(submitted.idProyecto);
+    // S7: el cierre se solicita desde la preparación del cierre (VIEW-13) con confirmación fuerte.
+    const closeReq = await requestClose(submitted.idProyecto, { revisionId: 1, confirmado: true, expectedFingerprint: 'a'.repeat(64) });
 
     expect(auth.mensaje).toBe('Sesión iniciada');
     expect(closeReq.estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
