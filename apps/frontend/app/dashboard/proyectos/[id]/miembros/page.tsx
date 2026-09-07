@@ -54,9 +54,17 @@ import { PendingPostulationsCard } from '@/components/projects/pending-postulati
 import { PendingExitRequestsCard } from '@/components/projects/pending-exit-requests-card';
 import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
 import { LeadershipCard } from '@/components/leadership/leadership-card';
+import { LeadershipAppealSheet } from '@/components/leadership/leadership-appeal-sheet';
+import { getApiErrorMessage } from '@/components/projects/api-error';
+import uvgSwal from '@/lib/swal';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useLeadershipAppeals, useLeadershipContext, useLeadershipHistory } from '@/hooks/use-leadership';
+import {
+  useLeadershipAppealMutations,
+  useLeadershipAppeals,
+  useLeadershipContext,
+  useLeadershipHistory,
+} from '@/hooks/use-leadership';
 import type { ApelacionItemDto } from '@/lib/types/leadership';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
@@ -353,18 +361,53 @@ function formatearFechaCorta(iso: string): string {
 function LeadershipSection({
   idProyecto,
   isLeader,
-  onApelar,
-  appealSlot,
+  idUsuarioActual,
 }: {
   idProyecto: number;
   isLeader: boolean;
-  onApelar?: () => void;
-  /** F009: sheet de apelación y acciones sobre la apelación pendiente. */
-  appealSlot?: (pendiente: ApelacionItemDto | null) => React.ReactNode;
+  idUsuarioActual: number | null;
 }) {
   const contexto = useLeadershipContext(idProyecto);
   const historial = useLeadershipHistory(idProyecto, 1);
   const apelaciones = useLeadershipAppeals(idProyecto, 'PENDIENTE', 1);
+  // F009: el sheet de apelación se monta en el slot previsto por F008 y la
+  // apelación pendiente propia puede cancelarse mientras se siga liderando.
+  const [apelacionAbierta, setApelacionAbierta] = useState(false);
+  const { cancel } = useLeadershipAppealMutations(idProyecto);
+  const onApelar = isLeader ? () => setApelacionAbierta(true) : undefined;
+
+  const cancelarApelacion = async (pendiente: ApelacionItemDto) => {
+    const { isConfirmed } = await uvgSwal.fire({
+      icon: 'warning',
+      title: '¿Cancelar la apelación?',
+      text: 'Se retirará tu solicitud de cambio de liderazgo. Podrás enviar otra más adelante.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cancelar',
+      cancelButtonText: 'Volver',
+    });
+    if (!isConfirmed) return;
+    cancel.mutate(
+      { idApelacion: pendiente.idApelacion },
+      {
+        onError: (err) =>
+          void uvgSwal.fire({ icon: 'error', title: 'No se pudo cancelar', text: getApiErrorMessage(err, 'leadership') }),
+      },
+    );
+  };
+
+  const appealSlot = (pendiente: ApelacionItemDto | null) =>
+    pendiente && isLeader && idUsuarioActual != null && pendiente.liderSolicitante.idUsuario === idUsuarioActual ? (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={cancel.isPending}
+        onClick={() => void cancelarApelacion(pendiente)}
+        className="mt-2 h-8 w-full rounded-md border-error/40 text-xs font-semibold text-error hover:bg-error/10 hover:text-error"
+      >
+        {cancel.isPending ? 'Cancelando…' : 'Cancelar apelación'}
+      </Button>
+    ) : null;
 
   const pendiente = apelaciones.data?.items[0] ?? null;
   const estado = contexto.data?.estadoProyecto;
@@ -405,6 +448,9 @@ function LeadershipSection({
 
   return (
     <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {isLeader && (
+        <LeadershipAppealSheet projectId={idProyecto} open={apelacionAbierta} onOpenChange={setApelacionAbierta} />
+      )}
       <LeadershipCard
         context={contexto.data}
         history={historial.data?.items}
@@ -594,7 +640,7 @@ export default function MiembrosProyectoPage() {
         />
       </div>
 
-      <LeadershipSection idProyecto={idProyecto} isLeader={isLeader} />
+      <LeadershipSection idProyecto={idProyecto} isLeader={isLeader} idUsuarioActual={currentUser?.idUsuario ?? null} />
 
       {isError ? (
         <Empty tone="danger" role="alert">

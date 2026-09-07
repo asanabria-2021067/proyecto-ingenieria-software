@@ -1,13 +1,17 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { closeReadinessPrefix } from '@/lib/query-keys/closure';
 import {
+  leadershipAppealsPrefix,
   leadershipAppealsQueryKey,
   leadershipCandidatesQueryKey,
   leadershipContextQueryKey,
   leadershipHistoryQueryKey,
 } from '@/lib/query-keys/leadership';
 import {
+  cancelLeadershipAppeal,
+  createLeadershipAppeal,
   getLeadershipAppeals,
   getLeadershipCandidates,
   getLeadershipContext,
@@ -15,6 +19,7 @@ import {
 } from '@/lib/services/leadership';
 import type {
   ApelacionItemDto,
+  CreateLeadershipAppealInput,
   LeadershipCandidatesDto,
   LeadershipContextDto,
   LeadershipHistoryItemDto,
@@ -65,4 +70,33 @@ export function useLeadershipAppeals(idProyecto: number, estado?: string, page =
     enabled: enabled && isValidId(idProyecto),
     retry: false,
   });
+}
+
+/**
+ * VIEW-17 (F009) — crear / cancelar la apelación del líder. Tras cualquiera
+ * de las dos se invalidan las apelaciones (prefijo), el contexto, los
+ * candidatos y el readiness del cierre (una apelación pendiente es el
+ * blocker `APELACION_PENDIENTE`).
+ */
+export function useLeadershipAppealMutations(idProyecto: number) {
+  const queryClient = useQueryClient();
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: leadershipAppealsPrefix(idProyecto) });
+    queryClient.invalidateQueries({ queryKey: leadershipContextQueryKey(idProyecto) });
+    queryClient.invalidateQueries({ queryKey: leadershipCandidatesQueryKey(idProyecto) });
+    queryClient.invalidateQueries({ queryKey: closeReadinessPrefix(idProyecto) });
+  };
+
+  const create = useMutation({
+    mutationFn: (input: CreateLeadershipAppealInput) => createLeadershipAppeal(idProyecto, input),
+    onSuccess: invalidate,
+  });
+
+  const cancel = useMutation({
+    mutationFn: ({ idApelacion }: { idApelacion: number }) => cancelLeadershipAppeal(idProyecto, idApelacion),
+    onSuccess: invalidate,
+  });
+
+  return { create, cancel, invalidate };
 }
