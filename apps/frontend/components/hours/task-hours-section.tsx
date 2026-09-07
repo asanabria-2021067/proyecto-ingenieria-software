@@ -118,7 +118,16 @@ function KpiRow({ resumen }: { resumen: TaskHoursSummaryDTO }) {
         value={restantes == null ? '—' : `${formatearDecimal(restantes)} h`}
         tone={restantes != null && esNegativo(restantes) ? 'negative' : 'default'}
       />
-      <Kpi icon={TrendingUp} label="Legacy" value={`${formatearDecimal(resumen.horasLegacyNoGranulares)} h`} />
+      {/* Lo reportado por encima de la estimación. Sin estimación no hay
+          umbral que exceder, así que es `null` («—»), no un cero. El origen
+          legacy de las horas ya se distingue en el cierre del Sprint, donde
+          sí decide algo; aquí solo restaba espacio a lo que el líder revisa. */}
+      <Kpi
+        icon={TrendingUp}
+        label="Horas sobreestimadas"
+        value={resumen.sobreEstimacion == null ? '—' : `${formatearDecimal(resumen.sobreEstimacion)} h`}
+        tone={resumen.sobreEstimacion != null && Number(resumen.sobreEstimacion) > 0 ? 'negative' : 'default'}
+      />
     </div>
   );
 }
