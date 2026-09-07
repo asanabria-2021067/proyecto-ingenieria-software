@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { projectSprintsQueryKey, sprintClosingSummaryQueryKey } from '@/lib/query-keys/sprints';
+import {
+  closeReadinessPrefix,
+  closureDraftQueryKey,
+  closureRevisionPrefix,
+  closureRevisionsPrefix,
+} from '@/lib/query-keys/closure';
+import { projectDetailQueryKey } from '@/lib/query-keys/project';
 import { projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
 
 export interface Notification {
@@ -29,6 +36,18 @@ interface SprintHoursAdjustedPayload {
   projectId: number;
   sprintId: number;
   idAsignacion: number;
+}
+
+/** S7 — payload real de `PROJECT_STATE_CHANGED`: `{ projectId, estadoProyecto }`. Solo se usa `projectId`. */
+interface ProjectStateChangedPayload {
+  projectId: number;
+  estadoProyecto: string;
+}
+
+/** S7 — payload real de `CLOSURE_REVIEW_UPDATED`: `{ projectId, revisionId }`. */
+interface ClosureReviewUpdatedPayload {
+  projectId: number;
+  revisionId: number;
 }
 
 export function useRealtimeNotifications(enabled: boolean) {
@@ -108,6 +127,21 @@ export function useRealtimeNotifications(enabled: boolean) {
       });
     };
 
+    // S7 (F005): el estado del proyecto NUNCA se deriva del payload
+    // (`estadoProyecto` viaja solo como diagnóstico); se invalida el detalle
+    // y el readiness para que el servidor vuelva a decidir.
+    const handleProjectStateChanged = (payload: ProjectStateChangedPayload) => {
+      queryClient.invalidateQueries({ queryKey: projectDetailQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: closeReadinessPrefix(payload.projectId) });
+    };
+
+    const handleClosureReviewUpdated = (payload: ClosureReviewUpdatedPayload) => {
+      queryClient.invalidateQueries({ queryKey: closureDraftQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: closeReadinessPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: closureRevisionsPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: closureRevisionPrefix(payload.projectId) });
+    };
+
     newSocket.on('connect', handleConnect);
     newSocket.on('disconnect', handleDisconnect);
     newSocket.on('connected', handleConnected);
@@ -116,6 +150,8 @@ export function useRealtimeNotifications(enabled: boolean) {
     newSocket.on('SPRINT_CLOSED', handleSprintClosed);
     newSocket.on('TASK_HOURS_LOGGED', handleTaskHoursLogged);
     newSocket.on('SPRINT_HOURS_ADJUSTED', handleSprintHoursAdjusted);
+    newSocket.on('PROJECT_STATE_CHANGED', handleProjectStateChanged);
+    newSocket.on('CLOSURE_REVIEW_UPDATED', handleClosureReviewUpdated);
 
     const timeoutId = window.setTimeout(() => setSocket(newSocket), 0);
 
@@ -129,6 +165,8 @@ export function useRealtimeNotifications(enabled: boolean) {
       newSocket.off('SPRINT_CLOSED', handleSprintClosed);
       newSocket.off('TASK_HOURS_LOGGED', handleTaskHoursLogged);
       newSocket.off('SPRINT_HOURS_ADJUSTED', handleSprintHoursAdjusted);
+      newSocket.off('PROJECT_STATE_CHANGED', handleProjectStateChanged);
+      newSocket.off('CLOSURE_REVIEW_UPDATED', handleClosureReviewUpdated);
       newSocket.close();
     };
   }, [enabled, queryClient]);
