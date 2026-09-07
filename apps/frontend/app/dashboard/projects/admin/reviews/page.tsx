@@ -1,17 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequest, XCircle, CheckCheck, MessageSquareWarning } from 'lucide-react';
+import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequest, CheckCheck, MessageSquareWarning } from 'lucide-react';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
-import uvgSwal, { swalCustomClass } from '@/lib/swal';
-import {
-  approveProjectClosure,
-  getAdminReviewInbox,
-  rejectProjectClosure,
-  resolverRevision,
-} from '@/lib/services/projects';
+import uvgSwal from '@/lib/swal';
+import { getAdminReviewInbox, resolverRevision } from '@/lib/services/projects';
 
 export default function AdminReviewsInboxPage() {
   const queryClient = useQueryClient();
@@ -53,31 +49,10 @@ export default function AdminReviewsInboxPage() {
     await refresh();
   }
 
-  async function resolveClosure(idProyecto: number, action: 'APPROVE' | 'REJECT') {
-    const { isConfirmed } = await uvgSwal.fire({
-      icon: action === 'APPROVE' ? 'question' : 'warning',
-      title: action === 'APPROVE' ? '¿Aprobar cierre?' : '¿Rechazar cierre?',
-      text: action === 'APPROVE'
-        ? 'El proyecto será marcado como cerrado.'
-        : 'La solicitud de cierre será rechazada.',
-      showCancelButton: true,
-      confirmButtonText: action === 'APPROVE' ? 'Sí, aprobar' : 'Sí, rechazar',
-      cancelButtonText: 'Cancelar',
-      ...(action === 'REJECT' && {
-        customClass: {
-          ...swalCustomClass,
-          confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md mx-4',
-        },
-      }),
-    });
-    if (!isConfirmed) return;
-    if (action === 'APPROVE') {
-      await approveProjectClosure(idProyecto);
-    } else {
-      await rejectProjectClosure(idProyecto);
-    }
-    await refresh();
-  }
+  // S7 (V5 §31.2): esta bandeja es de revisiones de PUBLICACIÓN. Los cierres
+  // se resuelven únicamente en la revisión administrativa del cierre
+  // (`/dashboard/admin/proyectos/[id]/cierre`); aquí solo se enlazan.
+  const CIERRES_HREF = '/dashboard/admin/proyectos?grupo=cierres';
 
   const totalPendientes =
     (inbox?.revisionesPendientes.length ?? 0) + (inbox?.cierresPendientes.length ?? 0) + (inbox?.correccionesEnviadas.length ?? 0);
@@ -266,9 +241,14 @@ export default function AdminReviewsInboxPage() {
 
             {/* Solicitudes de cierre */}
             <section>
-              <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
-                Solicitudes de cierre
-              </h2>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-headline text-lg font-black tracking-tight text-on-surface">
+                  Solicitudes de cierre
+                </h2>
+                <Link href={CIERRES_HREF} className="text-xs font-bold text-primary underline-offset-4 hover:underline">
+                  Ver en Solicitudes de cierre
+                </Link>
+              </div>
               {inbox.cierresPendientes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
                   <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" />
@@ -285,20 +265,19 @@ export default function AdminReviewsInboxPage() {
                         {c.tituloProyecto}
                       </p>
                       <div className="flex flex-wrap gap-2 sm:shrink-0">
-                        <button
-                          onClick={() => void resolveClosure(c.idProyecto, 'APPROVE')}
+                        <Link
+                          href={`/dashboard/admin/proyectos/${c.idProyecto}/cierre`}
                           className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-on-primary transition-colors hover:bg-primary/90"
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
-                          Aprobar cierre
-                        </button>
-                        <button
-                          onClick={() => void resolveClosure(c.idProyecto, 'REJECT')}
-                          className="flex items-center gap-1.5 rounded-xl bg-error px-3 py-2 text-xs font-bold text-on-error transition-colors hover:bg-error/90"
+                          Revisar cierre
+                        </Link>
+                        <Link
+                          href={CIERRES_HREF}
+                          className="flex items-center gap-1.5 rounded-xl border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high"
                         >
-                          <XCircle className="h-3.5 w-3.5" />
-                          Rechazar
-                        </button>
+                          Ver en Solicitudes de cierre
+                        </Link>
                       </div>
                     </div>
                   ))}
