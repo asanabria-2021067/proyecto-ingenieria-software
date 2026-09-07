@@ -1,4 +1,4 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, UnprocessableEntityException, Optional } from '@nestjs/common';
 import { Worker } from 'node:worker_threads';
 
 /**
@@ -55,9 +55,21 @@ export class ClosurePdfValidationService {
   /** Máximo observado de parseos simultáneos; solo para verificación. */
   maxSimultaneos = 0;
 
+  /**
+   * Los dos presupuestos son parámetros de AJUSTE, no dependencias: existen
+   * para que las pruebas puedan estrechar el tiempo o el paralelismo sin tocar
+   * las constantes de producción.
+   *
+   * `@Optional()` es imprescindible. Sin él, TypeScript emite `Number` como
+   * tipo de ambos parámetros y el contenedor intenta resolver un proveedor
+   * llamado `Number`, que no existe: la aplicación compila, las pruebas pasan
+   * —porque construyen el servicio a mano— y el arranque real falla con
+   * `UnknownDependenciesException`. Marcados como opcionales, Nest inyecta
+   * `undefined` y entran en juego los valores por defecto.
+   */
   constructor(
-    private readonly timeoutMs: number = PDF_PARSE_TIMEOUT_MS,
-    private readonly maxConcurrency: number = PDF_PARSE_MAX_CONCURRENCY,
+    @Optional() private readonly timeoutMs: number = PDF_PARSE_TIMEOUT_MS,
+    @Optional() private readonly maxConcurrency: number = PDF_PARSE_MAX_CONCURRENCY,
   ) {}
 
   /** Semáforo de dos plazas: el tercer parseo ESPERA, nunca se salta. */
