@@ -131,6 +131,12 @@ export interface RegistroTiempoTareaDTO {
   fecha: string;
   nota: string | null;
   creadoEn: string;
+  /**
+   * Marca de revocación. El autor nunca recibe sus registros revocados —
+   * retirarlos los saca de su lista—, así que solo llega con valor a quien
+   * lee el histórico de la tarea: líder y administración.
+   */
+  revocadoEn: string | null;
   usuario: UsuarioAsignadoResumen;
 }
 
