@@ -102,6 +102,47 @@ describe('ProjectsService', () => {
     await expect(service.findOne(999)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  /**
+   * El detalle y el catálogo no filtran por lo mismo. Un proyecto en solicitud
+   * de cierre sale del catálogo (ya no admite postulaciones) pero su espacio de
+   * trabajo debe seguir abriéndose: cuando compartían lista, pedir el cierre
+   * devolvía 404 y el proyecto «desaparecía» hasta para su líder.
+   */
+  it('findOne consulta el detalle de un proyecto en solicitud de cierre, no solo publicado/en progreso', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 57, estadoProyecto: 'EN_SOLICITUD_CIERRE' });
+    const service = makeService(prisma);
+
+    await service.findOne(57);
+
+    const where = prisma.proyecto.findFirst.mock.calls[0][0].where as {
+      estadoProyecto: { in: string[] };
+    };
+    expect(where.estadoProyecto.in).toContain('EN_SOLICITUD_CIERRE');
+    expect(where.estadoProyecto.in).toContain('PUBLICADO');
+    expect(where.estadoProyecto.in).toContain('EN_PROGRESO');
+    // CERRADO se lee como histórico por su propia ruta, no por aquí.
+    expect(where.estadoProyecto.in).not.toContain('CERRADO');
+  });
+
+  it('el catálogo público sigue sin ofrecer los proyectos en solicitud de cierre', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([]);
+    const service = makeService(prisma, {
+      isAdmin: vi.fn(),
+      notifyAdminsFromTemplate: vi.fn(),
+      notifyFromTemplate: vi.fn(),
+    });
+
+    await service.findAll({});
+
+    const where = prisma.proyecto.findMany.mock.calls[0][0].where as { AND: Array<Record<string, unknown>> };
+    const estados = where.AND.find((c) => 'estadoProyecto' in c) as
+      | { estadoProyecto: { in: string[] } }
+      | undefined;
+    expect(estados?.estadoProyecto.in).toEqual(['PUBLICADO', 'EN_PROGRESO']);
+  });
+
   it('findOneOwner falla si no es dueño', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 1, creadoPor: 99 });
