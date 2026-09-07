@@ -27,10 +27,10 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
 
-function mockLeader() {
+function mockLeader(overrides: Record<string, unknown> = {}) {
   (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
   (useProjectDetail as any).mockReturnValue({
-    data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', creador: { idUsuario: 1 } },
+    data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', creador: { idUsuario: 1 }, ...overrides },
   });
   (useProjectMembers as any).mockReturnValue({ members: [] });
 }
@@ -93,6 +93,33 @@ describe('ProjectSidebar', () => {
       'href',
       '/dashboard/projects/42/tareas',
     );
+  });
+
+  /**
+   * El formulario de edición rechaza `EN_SOLICITUD_CIERRE` y redirige nada más
+   * abrirse. Mientras la sidebar siguió ofreciendo el destino, el líder salía
+   * disparado a un listado ajeno al pulsar «Volver»: la entrada prometía una
+   * edición que ese estado no admite.
+   */
+  it.each(['EN_SOLICITUD_CIERRE', 'CERRADO'])(
+    'en «%s» no ofrece editar información ni roles',
+    (estadoProyecto) => {
+      mockLeader({ estadoProyecto });
+      renderSidebar();
+
+      expect(screen.queryByRole('link', { name: /editar información/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /editar roles/i })).not.toBeInTheDocument();
+      // Lo que sí es de solo lectura sigue disponible.
+      expect(screen.getByRole('link', { name: /revisiones pasadas/i })).toBeInTheDocument();
+    },
+  );
+
+  it('con el proyecto en progreso la edición sigue ofreciéndose', () => {
+    mockLeader({ estadoProyecto: 'EN_PROGRESO' });
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /editar información/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /editar roles/i })).toBeInTheDocument();
   });
 
   it('el liderazgo tiene su propio destino, separado de «Miembros» (S7 VIEW-06)', () => {
