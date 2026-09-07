@@ -34,9 +34,27 @@ type Db = Prisma.TransactionClient | PrismaService;
 const FEATURED_CACHE_KEY = 'projects:featured';
 const FEATURED_CACHE_TTL = 300_000;
 
+/** Estados que aparecen en el catálogo público y en destacados. */
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
   EstadoProyecto.PUBLICADO,
   EstadoProyecto.EN_PROGRESO,
+];
+
+/**
+ * Estados cuyo DETALLE sigue siendo consultable. Es una lista distinta de
+ * `ESTADOS_VISIBLES` a propósito: un proyecto en solicitud de cierre ya no se
+ * ofrece en el catálogo —no admite postulaciones— pero su espacio de trabajo
+ * debe seguir abriéndose, empezando por el del propio líder, que necesita ver
+ * el estado de su solicitud.
+ *
+ * Antes compartían lista y el detalle respondía 404 en cuanto se solicitaba el
+ * cierre: el proyecto «desaparecía» para todo el mundo.
+ *
+ * `CERRADO` NO entra: se lee como histórico completo por su propia ruta.
+ */
+const ESTADOS_CON_DETALLE: EstadoProyecto[] = [
+  ...ESTADOS_VISIBLES,
+  EstadoProyecto.EN_SOLICITUD_CIERRE,
 ];
 
 const ESTADOS_EDITABLES: EstadoProyecto[] = [
@@ -380,7 +398,7 @@ export class ProjectsService {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: {
         idProyecto: id,
-        estadoProyecto: { in: ESTADOS_VISIBLES },
+        estadoProyecto: { in: ESTADOS_CON_DETALLE },
         eliminadoEn: null,
       },
       select: proyectoDetalleSelect,
