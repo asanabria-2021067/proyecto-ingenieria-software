@@ -63,16 +63,20 @@ export default function ProyectosPage() {
     queryFn: () => apiFetch('/organizaciones'),
   });
 
-  const filtrados = proyectos.filter((p) => {
-    const coincideBusqueda =
-      !busqueda ||
-      p.tituloProyecto.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (p.descripcionProyecto ?? '').toLowerCase().includes(busqueda.toLowerCase());
+  const filtrados = proyectos
+    .filter((p) => {
+      const coincideBusqueda =
+        !busqueda ||
+        p.tituloProyecto.toLowerCase().includes(busqueda.toLowerCase()) ||
+        (p.descripcionProyecto ?? '').toLowerCase().includes(busqueda.toLowerCase());
 
-    const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
+      const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
 
-    return coincideBusqueda && coincideTipo;
-  });
+      return coincideBusqueda && coincideTipo;
+    })
+    // S7 (VIEW-09): los cerrados no aceptan postulaciones; van al final y solo se consultan.
+    .sort((a, b) => Number(a.estadoProyecto === 'CERRADO') - Number(b.estadoProyecto === 'CERRADO'));
+  const cerrados = filtrados.filter((p) => p.estadoProyecto === 'CERRADO').length;
   const hasActiveFilters = Boolean(busqueda || tipoFiltro || organizacionFiltro);
 
   const limpiarFiltros = () => {
@@ -230,6 +234,12 @@ export default function ProyectosPage() {
               </EmptyContent>
             )}
           </Empty>
+        )}
+
+        {!isLoading && !isError && filtrados.length > 0 && cerrados > 0 && (
+          <p className="mb-3 text-[13px] text-tertiary" role="note">
+            {cerrados === 1 ? '1 proyecto cerrado' : `${cerrados} proyectos cerrados`}: ya no aceptan postulaciones y se muestran solo para consulta.
+          </p>
         )}
 
         {!isLoading && !isError && filtrados.length > 0 && (
