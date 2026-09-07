@@ -159,6 +159,15 @@ export type OrigenReporteTramo = 'GRANULAR' | 'LEGACY' | 'POR_CONCILIAR';
  * viajan como string decimal de dos posiciones — se formatean, nunca se
  * convierten a `Number` para mostrarlos.
  */
+/**
+ * Una justificación de exceso. Hasta S7 viajaba como texto plano; hoy arrastra
+ * su marca de revocación. La unión con `string` no es adorno: un navegador con
+ * el bundle anterior en caché convive con un backend ya actualizado, y esta
+ * lista se renderiza directamente — un objeto donde se esperaba texto tumba
+ * toda la página, no solo este apartado. Se lee con `normalizarJustificacion`.
+ */
+export type JustificacionExcesoDTO = string | { texto: string; revocadoEn: string | null };
+
 export interface TramoHorasResumenDTO {
   idAsignacion: number;
   usuario: UsuarioAsignadoResumen;
@@ -175,7 +184,7 @@ export interface TramoHorasResumenDTO {
    * marca de revocación: al autor solo le llegan las vigentes; el líder recibe
    * también las de registros retirados y debe poder distinguirlas.
    */
-  justificaciones: Array<{ texto: string; revocadoEn: string | null }>;
+  justificaciones: JustificacionExcesoDTO[];
 }
 
 /**
