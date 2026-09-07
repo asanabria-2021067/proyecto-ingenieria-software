@@ -26,6 +26,7 @@ vi.mock('../hooks/use-leadership', () => ({
   useLeadershipContext: () => ({ data: undefined, isPending: false, isError: true }),
   useLeadershipHistory: () => ({ data: undefined, isPending: false, isError: true }),
   useLeadershipAppeals: () => ({ data: undefined, isPending: false, isError: true }),
+  useLeadershipAppealMutations: () => ({ cancel: { mutate: vi.fn(), isPending: false }, create: { mutate: vi.fn(), isPending: false }, invalidate: vi.fn() }),
 }));
 
 import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';

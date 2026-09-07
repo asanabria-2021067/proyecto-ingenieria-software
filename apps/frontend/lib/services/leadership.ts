@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   ApelacionItemDto,
+  CreateLeadershipAppealInput,
   LeadershipCandidatesDto,
   LeadershipContextDto,
   LeadershipHistoryItemDto,
@@ -42,4 +43,24 @@ export function getLeadershipAppeals(
   return apiFetch<PaginaLiderazgo<ApelacionItemDto>>(
     `/proyectos/${idProyecto}/liderazgo/apelaciones?${params.toString()}`,
   );
+}
+
+// ─── Apelación del líder (VIEW-17, F009) ─────────────────────────────────────
+
+/** E097 — el líder actual solicita que se transfiera su liderazgo. Los TRES campos son obligatorios. */
+export function createLeadershipAppeal(
+  idProyecto: number,
+  input: CreateLeadershipAppealInput,
+): Promise<ApelacionItemDto> {
+  return apiFetch<ApelacionItemDto>(`/proyectos/${idProyecto}/liderazgo/apelaciones`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+/** E098 — el autor retira su propia apelación mientras siga liderando. */
+export function cancelLeadershipAppeal(idProyecto: number, idApelacion: number): Promise<ApelacionItemDto> {
+  return apiFetch<ApelacionItemDto>(`/proyectos/${idProyecto}/liderazgo/apelaciones/${idApelacion}/cancelar`, {
+    method: 'POST',
+  });
 }
