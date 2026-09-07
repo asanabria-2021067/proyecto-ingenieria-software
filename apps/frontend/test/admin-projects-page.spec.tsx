@@ -101,7 +101,7 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cierres', page: 2, limit: 20 }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Solicitudes de cierre' })).toBeInTheDocument();
     expect(await screen.findByText('25 proyectos')).toBeInTheDocument();
-    expect(ADMIN_PROJECT_GROUPS).toEqual(['activos', 'revision', 'cierres', 'cerrados']);
+    expect(ADMIN_PROJECT_GROUPS).toEqual(['activos', 'cierres', 'cerrados']);
   });
 
   it('no repite la navegación entre grupos: esa selección es de la sidebar administrativa', async () => {
@@ -113,7 +113,7 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
     // Ningún enlace de la página apunta a otro grupo de la bandeja.
-    for (const otro of ['activos', 'revision', 'cierres'] as const) {
+    for (const otro of ['activos', 'cierres'] as const) {
       expect(
         screen.queryByRole('link', { name: ADMIN_PROJECT_GROUP_LABEL[otro] }),
       ).not.toBeInTheDocument();
@@ -156,7 +156,8 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
 
   it('accionHref enruta por la acción sugerida sin habilitar escrituras', () => {
     expect(accionHref(item({ accion: 'REVISAR_CIERRE' }))).toBe('/dashboard/admin/proyectos/37/cierre');
-    expect(accionHref(item({ accion: 'REVISAR_PUBLICACION' }))).toBe('/dashboard/projects/admin/reviews');
+    // «Abrir» nunca saca al administrador del proyecto elegido hacia otra bandeja.
+    expect(accionHref(item({ accion: 'REVISAR_PUBLICACION' }))).toBe('/dashboard/admin/proyectos/37');
     expect(accionHref(item({ accion: 'CONSULTAR_HISTORICO' }))).toBe('/dashboard/admin/proyectos/37');
   });
 
@@ -172,11 +173,19 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
   });
 
   it('un grupo vacío muestra su Empty específico', async () => {
-    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=revision'));
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados'));
     (getAdminProjects as any).mockResolvedValue(pagina([]));
     renderPage();
 
-    expect(await screen.findByText('No hay proyectos en revisión.')).toBeInTheDocument();
+    expect(await screen.findByText('No hay proyectos cerrados.')).toBeInTheDocument();
+  });
+
+  it('«revision» ya no es un grupo de la bandeja: la URL retirada cae en activos', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=revision'));
+    renderPage();
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/dashboard/admin/proyectos?grupo=activos'));
+    expect(getAdminProjects).not.toHaveBeenCalledWith(expect.objectContaining({ grupo: 'revision' }));
   });
 });
 

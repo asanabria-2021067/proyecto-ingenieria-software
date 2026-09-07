@@ -67,9 +67,6 @@ function formatearFecha(iso: string | null | undefined): string {
 /** Grupo de la bandeja al que pertenece un estado (para el breadcrumb/retorno). */
 export function grupoDeEstado(estadoProyecto: string): AdminProjectGroup {
   switch (estadoProyecto) {
-    case 'EN_REVISION':
-    case 'OBSERVADO':
-      return 'revision';
     case 'EN_SOLICITUD_CIERRE':
       return 'cierres';
     case 'CERRADO':
