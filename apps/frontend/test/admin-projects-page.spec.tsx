@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -45,7 +45,12 @@ import AdminProjectsClient, { accionHref } from '../app/dashboard/admin/proyecto
 import { useRealtimeNotifications } from '../lib/hooks/useRealtimeNotifications';
 import { getAdminProjects } from '../lib/services/admin-projects';
 import { adminProjectsPrefix, adminProjectsQueryKey } from '../lib/query-keys/admin-projects';
-import { ADMIN_PROJECT_GROUPS, type AdminProjectListItem, type AdminProjectsPage } from '../lib/types/admin-projects';
+import {
+  ADMIN_PROJECT_GROUP_LABEL,
+  ADMIN_PROJECT_GROUPS,
+  type AdminProjectListItem,
+  type AdminProjectsPage,
+} from '../lib/types/admin-projects';
 
 function item(overrides: Partial<AdminProjectListItem> = {}): AdminProjectListItem {
   return {
@@ -88,20 +93,31 @@ afterEach(() => {
 });
 
 describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
-  it('cada pestaña pide su grupo exacto y el grupo vive en la URL', async () => {
+  it('el grupo vive en la URL y encabeza la página, con su total', async () => {
     searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cierres&page=2'));
     (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'REVISAR_CIERRE', estadoProyecto: 'EN_SOLICITUD_CIERRE' })], { total: 25, page: 2 }));
     renderPage();
 
     await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cierres', page: 2, limit: 20 }));
-    const tabs = screen.getByRole('tablist');
-    expect(within(tabs).getByRole('tab', { name: /Solicitudes de cierre/ })).toHaveAttribute('aria-selected', 'true');
-    expect(within(tabs).getByRole('tab', { name: /Solicitudes de cierre/ })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cierres');
-    expect(within(tabs).getAllByRole('tab')).toHaveLength(4);
-    expect(within(tabs).getByRole('tab', { name: /^Activos/ })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=activos');
-    expect(within(tabs).getByRole('tab', { name: /^En revisión/ })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=revision');
-    expect(within(tabs).getByRole('tab', { name: /^Cerrados/ })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cerrados');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Solicitudes de cierre' })).toBeInTheDocument();
+    expect(await screen.findByText('25 proyectos')).toBeInTheDocument();
     expect(ADMIN_PROJECT_GROUPS).toEqual(['activos', 'revision', 'cierres', 'cerrados']);
+  });
+
+  it('no repite la navegación entre grupos: esa selección es de la sidebar administrativa', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados'));
+    (getAdminProjects as any).mockResolvedValue(pagina([item({ estadoProyecto: 'CERRADO', accion: 'CONSULTAR_HISTORICO' })]));
+    renderPage();
+
+    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 20 }));
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    // Ningún enlace de la página apunta a otro grupo de la bandeja.
+    for (const otro of ['activos', 'revision', 'cierres'] as const) {
+      expect(
+        screen.queryByRole('link', { name: ADMIN_PROJECT_GROUP_LABEL[otro] }),
+      ).not.toBeInTheDocument();
+    }
   });
 
   it('un grupo inválido en la URL redirige a ?grupo=activos', async () => {

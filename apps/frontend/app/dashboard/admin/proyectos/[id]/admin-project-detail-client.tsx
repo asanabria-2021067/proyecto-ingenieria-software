@@ -9,7 +9,6 @@ import { useLeadershipHistory } from '@/hooks/use-leadership';
 import { isHistoricalDetail } from '@/lib/services/admin-projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle, tipoBadgeLabel, tipoBadgeStyle } from '@/components/projects/available-project-card';
-import { ADMIN_PROJECT_GROUP_LABEL, adminProjectsGroupHref } from '@/components/admin-projects/admin-projects-tabs';
 import { ClosureStatusBanner } from '@/components/projects/closure-status-banner';
 import { LeadershipCard } from '@/components/leadership/leadership-card';
 import { LeadershipChangeDialog } from '@/components/leadership/leadership-change-dialog';
@@ -29,7 +28,13 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import type { HistoricalProjectView } from '@/lib/services/historical';
-import { isAdminProjectGroup, type AdminProjectDetail, type AdminProjectGroup } from '@/lib/types/admin-projects';
+import {
+  ADMIN_PROJECT_GROUP_LABEL,
+  adminProjectsGroupHref,
+  isAdminProjectGroup,
+  type AdminProjectDetail,
+  type AdminProjectGroup,
+} from '@/lib/types/admin-projects';
 
 const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
 
