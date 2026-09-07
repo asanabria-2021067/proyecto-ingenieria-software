@@ -29,7 +29,19 @@ export function flattenNavEntries(entries: NavEntry[]): NavLeaf[] {
   return entries.flatMap((entry) => (entry.type === 'group' ? entry.items : [entry]));
 }
 
-function isLeafActive(pathname: string, leaf: NavLeaf): boolean {
+/**
+ * S7: un destino puede llevar query (`/dashboard/admin/proyectos?grupo=activos`).
+ * `usePathname` nunca incluye la query, así que esos destinos se comparan por
+ * ruta exacta + parámetros presentes en `search` (los del `href` deben
+ * coincidir todos). Los destinos sin query conservan el criterio anterior.
+ */
+function isLeafActive(pathname: string, leaf: NavLeaf, search?: string | null): boolean {
+  const [hrefPath, hrefQuery] = leaf.href.split('?');
+  if (hrefQuery) {
+    if (pathname !== hrefPath) return false;
+    const actual = new URLSearchParams(search ?? '');
+    return [...new URLSearchParams(hrefQuery).entries()].every(([k, v]) => actual.get(k) === v);
+  }
   return leaf.exact ? pathname === leaf.href : pathname.startsWith(leaf.href);
 }
 
@@ -41,12 +53,14 @@ interface SidebarNavProps {
   entries: NavEntry[];
   /** `admin`: usa los tokens `--admin-*` del sidebar oscuro de AdminLayout. */
   theme?: 'default' | 'admin';
+  /** Query string actual (`useSearchParams().toString()`), solo necesaria si algún `href` lleva `?`. */
+  search?: string | null;
 }
 
 /** Sidebar de escritorio: items simples + grupos expandibles con subopciones,
  *  auto-expandidos cuando la ruta activa cae dentro del grupo. Reutilizado por
  *  DashboardLayout y AdminLayout. */
-export function SidebarNav({ entries, theme = 'default' }: SidebarNavProps) {
+export function SidebarNav({ entries, theme = 'default', search = null }: SidebarNavProps) {
   const pathname = usePathname();
   const isAdmin = theme === 'admin';
   const [expandedOverrides, setExpandedOverrides] = useState<Record<string, boolean>>({});
@@ -55,7 +69,7 @@ export function SidebarNav({ entries, theme = 'default' }: SidebarNavProps) {
     <nav className="flex-1 px-3 py-4 space-y-1">
       {entries.map((entry) => {
         if (entry.type !== 'group') {
-          const active = isLeafActive(pathname, entry);
+          const active = isLeafActive(pathname, entry, search);
           const Icon = entry.icon;
           return (
             <Link
@@ -87,7 +101,7 @@ export function SidebarNav({ entries, theme = 'default' }: SidebarNavProps) {
         }
 
         const GroupIcon = entry.icon;
-        const groupActiveByRoute = entry.items.some((item) => isLeafActive(pathname, item));
+        const groupActiveByRoute = entry.items.some((item) => isLeafActive(pathname, item, search));
         const expanded = expandedOverrides[entry.label] ?? groupActiveByRoute;
         const groupId = `nav-group-${slug(entry.label)}`;
 
@@ -125,7 +139,7 @@ export function SidebarNav({ entries, theme = 'default' }: SidebarNavProps) {
             {expanded && (
               <div id={groupId} className="ml-4 space-y-1 border-l border-outline-variant/50 pl-3">
                 {entry.items.map((item) => {
-                  const active = isLeafActive(pathname, item);
+                  const active = isLeafActive(pathname, item, search);
                   const ItemIcon = item.icon;
                   return (
                     <Link

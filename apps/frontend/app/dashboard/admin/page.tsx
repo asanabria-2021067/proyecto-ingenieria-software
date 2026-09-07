@@ -365,23 +365,29 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               valueStyle={{ color: '#1A1C1E' }}
               subtextoStyle={{ color: '#6B6B6B' }}
             />
-            <ActionCard
-              label="Cierre Pendiente"
-              value={stats.cierrePendiente}
-              subtexto="Solicitudes de cierre por aprobar"
-              badgeLabel="Acción requerida"
-              badgeClasses=""
-              icon={Clock}
-              cardBg="dark:bg-amber-900/10 dark:border-amber-900/30"
-              iconBg="dark:bg-amber-900/40"
-              iconColor="dark:text-amber-300"
-              cardStyle={{ backgroundColor: '#FCF8F4', borderColor: '#E6D6C3' }}
-              iconStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
-              badgeStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
-              labelStyle={{ color: '#6B6B6B' }}
-              valueStyle={{ color: '#1A1C1E' }}
-              subtextoStyle={{ color: '#6B6B6B' }}
-            />
+            <Link
+              href="/dashboard/admin/proyectos?grupo=cierres"
+              aria-label="Ver solicitudes de cierre pendientes"
+              className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              <ActionCard
+                label="Cierre Pendiente"
+                value={stats.cierrePendiente}
+                subtexto="Solicitudes de cierre por aprobar"
+                badgeLabel="Acción requerida"
+                badgeClasses=""
+                icon={Clock}
+                cardBg="dark:bg-amber-900/10 dark:border-amber-900/30"
+                iconBg="dark:bg-amber-900/40"
+                iconColor="dark:text-amber-300"
+                cardStyle={{ backgroundColor: '#FCF8F4', borderColor: '#E6D6C3' }}
+                iconStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
+                badgeStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
+                labelStyle={{ color: '#6B6B6B' }}
+                valueStyle={{ color: '#1A1C1E' }}
+                subtextoStyle={{ color: '#6B6B6B' }}
+              />
+            </Link>
             <ActionCard
               label="Bloqueados"
               value={stats.usuariosBloqueados}
