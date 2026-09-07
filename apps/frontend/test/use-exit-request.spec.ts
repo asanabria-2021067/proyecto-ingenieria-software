@@ -29,6 +29,7 @@ import {
   exitPreparationSummaryQueryKey,
   projectPendingExitRequestsQueryKey,
 } from '../lib/query-keys/exit-requests';
+import { leadershipCandidatesQueryKey, leadershipContextQueryKey } from '../lib/query-keys/leadership';
 import { projectSprintsQueryKey } from '../lib/query-keys/sprints';
 import { projectTasksQueryKey } from '../lib/query-keys/tasks';
 import {
@@ -549,7 +550,7 @@ describe('useApproveExitRequest', () => {
     expect(approveExitRequest).toHaveBeenCalledWith(7, 1);
   });
 
-  it('en éxito invalida exactamente members/team/member-detail del usuario resuelto (cross-domain) más pending-exit-requests (F14.1)', async () => {
+  it('en éxito invalida exactamente members/team/member-detail del usuario resuelto (cross-domain), pending-exit-requests (F14.1) y el contexto/candidatos de liderazgo (S7 F020)', async () => {
     (approveExitRequest as any).mockResolvedValue(solicitud({ estadoSolicitud: 'APROBADA', idUsuario: 9 }));
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -558,11 +559,15 @@ describe('useApproveExitRequest', () => {
     result.current.mutate(1);
 
     await waitFor(() => expect(approveExitRequest).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(6));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectMembersQueryKey(7) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectTeamSummaryQueryKey(7) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectMemberDetailQueryKey(7, 9) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectPendingExitRequestsQueryKey(7) });
+    // S7 (F020): quien sale deja de tener participación activa y de ser candidato;
+    // el backend no emite LEADERSHIP_CHANGED al aprobar, así que el refresco es de esta mutation.
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: leadershipContextQueryKey(7) });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: leadershipCandidatesQueryKey(7) });
   });
 
   it('no invalida exit-preparation-summary (PENDIENTE_LIDER nunca calificó para ese read-model)', async () => {
@@ -573,7 +578,8 @@ describe('useApproveExitRequest', () => {
 
     result.current.mutate(1);
 
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(4));
+    // 6 = members + team + member-detail + pending-exit-requests + leadership-context + leadership-candidates (S7 F020)
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(6));
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: exitPreparationSummaryQueryKey(7) });
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-tasks', 7] });
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-sprints', 7] });

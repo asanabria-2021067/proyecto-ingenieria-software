@@ -6,6 +6,7 @@ import {
   exitPreparationSummaryQueryKey,
   projectPendingExitRequestsQueryKey,
 } from '@/lib/query-keys/exit-requests';
+import { leadershipCandidatesQueryKey, leadershipContextQueryKey } from '@/lib/query-keys/leadership';
 import {
   projectMemberDetailQueryKey,
   projectMembersQueryKey,
@@ -212,6 +213,12 @@ export function useCancelExitPreparation(idProyecto: number) {
  * `pending-exit-requests` (el reader leader-facing de F14) también queda
  * obsoleto — se invalida en `onSettled` (éxito Y error) para reconciliar
  * incluso si otro líder ya la resolvió primero.
+ *
+ * S7 (F020): retirar participaciones cambia el contexto de liderazgo
+ * (`tieneParticipacionActiva`, `participacionesActivas`) y la lista de
+ * candidatos elegibles (quien sale deja de serlo). El backend NO emite
+ * `LEADERSHIP_CHANGED` al aprobar una salida (solo cambia de líder), así que
+ * no existe otro refresco determinista: se invalidan aquí ambas keys.
  */
 export function useApproveExitRequest(idProyecto: number) {
   const queryClient = useQueryClient();
@@ -224,6 +231,8 @@ export function useApproveExitRequest(idProyecto: number) {
       queryClient.invalidateQueries({
         queryKey: projectMemberDetailQueryKey(idProyecto, data.idUsuario),
       });
+      queryClient.invalidateQueries({ queryKey: leadershipContextQueryKey(idProyecto) });
+      queryClient.invalidateQueries({ queryKey: leadershipCandidatesQueryKey(idProyecto) });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: projectPendingExitRequestsQueryKey(idProyecto) });
