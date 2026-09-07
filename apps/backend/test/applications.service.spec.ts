@@ -69,13 +69,18 @@ function makePrisma() {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({ idParticipacion: 1 }),
       update: vi.fn().mockResolvedValue({ idParticipacion: 1 }),
-      // C043: el cupo se cuenta dentro de la transacción.
-      count: vi.fn(),
+      // C043: el cupo se cuenta dentro de la transacción — tanto al postular
+      // como al aceptar (`activarParticipacionPorPostulacion`).
+      count: vi.fn().mockResolvedValue(0),
+    },
+    // El alta por aceptación relee el rol bajo el lock para conocer su cupo.
+    rolProyecto: {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ cupos: 10, nombreRol: 'Backend' }),
     },
   };
   return {
     usuario: { findUnique: vi.fn() },
-    rolProyecto: { findUnique: vi.fn() },
+    rolProyecto: { findUnique: vi.fn(), ...tx.rolProyecto },
     participacionProyecto: { ...tx.participacionProyecto },
     postulacion: {
       findMany: vi.fn(),
@@ -209,6 +214,56 @@ describe('ApplicationsService', () => {
       ...overrides,
     });
   }
+
+  it('updateEstado (ACEPTADA) rechaza el alta cuando el rol ya no tiene cupo activo libre', async () => {
+    const prisma = makePrisma();
+    mockPostulacionPendiente(prisma);
+    // Rol de un solo cupo, ya ocupado: aceptar aquí dejaría 2 participaciones
+    // ACTIVO sobre `cupos: 1`. `create` no lo cubre — solo cuenta cupo cuando
+    // el proyecto está EN_PROGRESO, y un rol PUBLICADO puede acumular
+    // postulaciones pendientes que después se aceptan una por una.
+    prisma._tx.rolProyecto.findUniqueOrThrow.mockResolvedValue({ cupos: 1, nombreRol: 'Diseño' });
+    prisma._tx.participacionProyecto.count.mockResolvedValue(1);
+    const notifications = { notifyUsers: vi.fn(), persistUsersTx: vi.fn(), publishEffects: vi.fn() };
+    const service = makeService(prisma, notifications);
+
+    await expect(
+      service.updateEstado(
+        1,
+        { estadoPostulacion: 'ACEPTADA', comentarioResolucion: '' } as UpdateEstadoPostulacionDto,
+        9,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
+    expect(prisma._tx.participacionProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('updateEstado (ACEPTADA) no vuelve a consumir cupo cuando la participación ya estaba ACTIVO', async () => {
+    const prisma = makePrisma();
+    mockPostulacionPendiente(prisma);
+    prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
+    prisma._tx.participacionProyecto.findFirst.mockResolvedValue({
+      idParticipacion: 7,
+      estadoParticipacion: 'ACTIVO',
+    });
+    // Rol lleno: la idempotencia manda, porque esa plaza ya es de esta persona.
+    prisma._tx.rolProyecto.findUniqueOrThrow.mockResolvedValue({ cupos: 1, nombreRol: 'Diseño' });
+    prisma._tx.participacionProyecto.count.mockResolvedValue(1);
+    const notifications = { notifyUsers: vi.fn(), persistUsersTx: vi.fn(), publishEffects: vi.fn() };
+    const service = makeService(prisma, notifications);
+
+    const result = await service.updateEstado(
+      1,
+      { estadoPostulacion: 'ACEPTADA', comentarioResolucion: '' } as UpdateEstadoPostulacionDto,
+      9,
+    );
+
+    expect(result.estadoPostulacion).toBe('ACEPTADA');
+    expect(prisma._tx.rolProyecto.findUniqueOrThrow).not.toHaveBeenCalled();
+    expect(prisma._tx.participacionProyecto.create).not.toHaveBeenCalled();
+    expect(prisma._tx.participacionProyecto.update).not.toHaveBeenCalled();
+  });
 
   it('updateEstado (ACEPTADA) valida resolutor, notifica y crea la participación cuando no existe ninguna previa', async () => {
     const prisma = makePrisma();
