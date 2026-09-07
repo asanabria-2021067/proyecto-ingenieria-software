@@ -497,6 +497,9 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
             <tbody className="divide-y divide-outline-variant/30">
               {registros.map((registro) => {
                 const propio = idUsuarioActual != null && registro.idUsuario === idUsuarioActual;
+                // Un registro revocado solo llega a quien lee el histórico
+                // (líder/administración): se muestra como traza, no se opera.
+                const revocado = registro.revocadoEn != null;
                 return (
                   <tr key={registro.idRegistroTiempo} className="align-middle">
                     <td className="px-3 py-2">
@@ -516,7 +519,14 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
                       {formatearFecha(registro.fecha)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs font-bold text-on-surface">
-                      {formatearHorasNumero(registro.horas)} h
+                      <span className={revocado ? 'text-tertiary line-through' : undefined}>
+                        {formatearHorasNumero(registro.horas)} h
+                      </span>
+                      {revocado && (
+                        <Badge variant="outline" className="ml-2 text-[10px] font-semibold text-tertiary">
+                          Revocado
+                        </Badge>
+                      )}
                     </td>
                     <td className="max-w-[320px] px-3 py-2 text-xs text-on-surface-variant">
                       {registro.nota ? (
@@ -526,7 +536,7 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      {propio ? (
+                      {propio && !revocado ? (
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <Badge className="border-transparent bg-primary/10 text-[10px] font-semibold text-primary">
                             Propio

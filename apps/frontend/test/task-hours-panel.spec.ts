@@ -23,6 +23,7 @@ function registro(overrides: Partial<RegistroTiempoTareaDTO> = {}): RegistroTiem
     fecha: '2026-08-20',
     nota: null,
     creadoEn: '2026-08-20T12:00:00.000Z',
+    revocadoEn: null,
     usuario: { idUsuario: 5, nombre: 'Ana', apellido: 'Lopez', fotoUrl: null },
     ...overrides,
   };
