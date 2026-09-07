@@ -22,6 +22,36 @@ export class TipoEventoBitacora {
   static readonly TASK_HOURS_LOGGED = 'TASK_HOURS_LOGGED' as const;
   static readonly SPRINT_STARTED = 'SPRINT_STARTED' as const;
 
+  // ---- Sprint 7 (06 v2 §43): los siete anteriores conservan su literal. ----
+  static readonly TIME_RECORD_EDITED = 'TIME_RECORD_EDITED' as const;
+  static readonly TIME_RECORD_REVOKED = 'TIME_RECORD_REVOKED' as const;
+  static readonly ASSIGNMENT_CLOSED = 'ASSIGNMENT_CLOSED' as const;
+  static readonly TASK_HOURS_ADJUSTED = 'TASK_HOURS_ADJUSTED' as const;
+  static readonly TASK_HOURS_ADJUSTMENT_REVERTED = 'TASK_HOURS_ADJUSTMENT_REVERTED' as const;
+  static readonly SPRINT_FINALIZED = 'SPRINT_FINALIZED' as const;
+  static readonly SPRINT_CLOSED = 'SPRINT_CLOSED' as const;
+  static readonly SPRINT_HOURS_CONSOLIDATED = 'SPRINT_HOURS_CONSOLIDATED' as const;
+  static readonly EXIT_REQUEST_APPROVED = 'EXIT_REQUEST_APPROVED' as const;
+  static readonly EXIT_REQUEST_REJECTED = 'EXIT_REQUEST_REJECTED' as const;
+  static readonly LEADERSHIP_APPEAL_CREATED = 'LEADERSHIP_APPEAL_CREATED' as const;
+  static readonly LEADERSHIP_APPEAL_CANCELLED = 'LEADERSHIP_APPEAL_CANCELLED' as const;
+  static readonly LEADERSHIP_APPEAL_ACCEPTED = 'LEADERSHIP_APPEAL_ACCEPTED' as const;
+  static readonly LEADERSHIP_APPEAL_DENIED = 'LEADERSHIP_APPEAL_DENIED' as const;
+  static readonly LEADERSHIP_CHANGED = 'LEADERSHIP_CHANGED' as const;
+  static readonly PROJECT_CLOSE_REQUESTED = 'PROJECT_CLOSE_REQUESTED' as const;
+  static readonly POSTULATIONS_AUTO_REJECTED = 'POSTULATIONS_AUTO_REJECTED' as const;
+  static readonly CLOSURE_DRAFT_CREATED = 'CLOSURE_DRAFT_CREATED' as const;
+  static readonly CLOSURE_AUTOREPORT_GENERATED = 'CLOSURE_AUTOREPORT_GENERATED' as const;
+  static readonly CLOSURE_DOCUMENT_ADDED = 'CLOSURE_DOCUMENT_ADDED' as const;
+  static readonly CLOSURE_DOCUMENT_REMOVED = 'CLOSURE_DOCUMENT_REMOVED' as const;
+  static readonly PROJECT_CLOSE_DOCUMENTS_SUBMITTED = 'PROJECT_CLOSE_DOCUMENTS_SUBMITTED' as const;
+  static readonly PROJECT_CLOSE_REVIEW_APPROVED = 'PROJECT_CLOSE_REVIEW_APPROVED' as const;
+  static readonly PROJECT_HOURS_CREDITED = 'PROJECT_HOURS_CREDITED' as const;
+  static readonly PROJECT_CLOSE_REVIEW_DOC_CORRECTION = 'PROJECT_CLOSE_REVIEW_DOC_CORRECTION' as const;
+  static readonly PROJECT_CLOSE_RETURNED_TO_EXECUTION = 'PROJECT_CLOSE_RETURNED_TO_EXECUTION' as const;
+  static readonly CLOSURE_STORAGE_SWEPT = 'CLOSURE_STORAGE_SWEPT' as const;
+  static readonly LEGACY_HOURS_RECONCILED = 'LEGACY_HOURS_RECONCILED' as const;
+
   static readonly VALORES = [
     'TASK_CREATED',
     'TASK_UPDATED',
@@ -30,13 +60,53 @@ export class TipoEventoBitacora {
     'TASK_REASSIGNED',
     'TASK_HOURS_LOGGED',
     'SPRINT_STARTED',
+    'TIME_RECORD_EDITED',
+    'TIME_RECORD_REVOKED',
+    'ASSIGNMENT_CLOSED',
+    'TASK_HOURS_ADJUSTED',
+    'TASK_HOURS_ADJUSTMENT_REVERTED',
+    'SPRINT_FINALIZED',
+    'SPRINT_CLOSED',
+    'SPRINT_HOURS_CONSOLIDATED',
+    'EXIT_REQUEST_APPROVED',
+    'EXIT_REQUEST_REJECTED',
+    'LEADERSHIP_APPEAL_CREATED',
+    'LEADERSHIP_APPEAL_CANCELLED',
+    'LEADERSHIP_APPEAL_ACCEPTED',
+    'LEADERSHIP_APPEAL_DENIED',
+    'LEADERSHIP_CHANGED',
+    'PROJECT_CLOSE_REQUESTED',
+    'POSTULATIONS_AUTO_REJECTED',
+    'CLOSURE_DRAFT_CREATED',
+    'CLOSURE_AUTOREPORT_GENERATED',
+    'CLOSURE_DOCUMENT_ADDED',
+    'CLOSURE_DOCUMENT_REMOVED',
+    'PROJECT_CLOSE_DOCUMENTS_SUBMITTED',
+    'PROJECT_CLOSE_REVIEW_APPROVED',
+    'PROJECT_HOURS_CREDITED',
+    'PROJECT_CLOSE_REVIEW_DOC_CORRECTION',
+    'PROJECT_CLOSE_RETURNED_TO_EXECUTION',
+    'CLOSURE_STORAGE_SWEPT',
+    'LEGACY_HOURS_RECONCILED',
   ] as const;
 }
 
 /** Tipo derivado del catálogo — usar este nombre (no `TipoEventoBitacora`) en anotaciones de tipo. */
 export type TipoEventoBitacoraValor = (typeof TipoEventoBitacora.VALORES)[number];
 
-export type TipoEntidadBitacora = 'TAREA' | 'SPRINT';
+/**
+ * Entidad a la que apunta el evento. S7 amplió el catálogo más allá de
+ * tarea/Sprint; `string` deja pasar cualquier entidad futura sin mentir sobre
+ * lo que el backend puede devolver.
+ */
+export type TipoEntidadBitacora =
+  | 'TAREA'
+  | 'SPRINT'
+  | 'PROYECTO'
+  | 'DOCUMENTO_CIERRE'
+  | 'REVISION_CIERRE'
+  | 'APELACION_LIDERAZGO'
+  | (string & {});
 
 /** Mismo subconjunto público de Usuario que `SprintHistoryUsuarioDto` — nunca el objeto completo. */
 export interface BitacoraActorDto {
