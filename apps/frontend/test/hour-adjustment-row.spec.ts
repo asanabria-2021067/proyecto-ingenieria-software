@@ -22,7 +22,7 @@ function tramo(overrides: Partial<SprintClosingTramoDto> = {}): SprintClosingTra
     tituloTarea: 'Coordinación de jornada universitaria',
     tareaEliminada: false,
     idParticipacion: 51,
-    abierto: true,
+    abierto: false,
     origen: 'GRANULAR',
     reportadas: '7.00',
     ajuste: null,
@@ -131,13 +131,35 @@ describe('HourAdjustmentRow (VIEW-03 / F002)', () => {
     expect((revertir.parentElement as HTMLElement).getAttribute('tabindex')).toBe('0');
   });
 
-  it('un tramo abierto:false se renderiza read-only (sin input ni acciones habilitadas)', () => {
-    renderRow({ tramo: tramo({ abierto: false, propuestas: '7.00' }) });
+  it('un tramo ABIERTO (el integrante no lo ha cerrado) es read-only: el backend solo ajusta tramos cerrados', () => {
+    renderRow({ tramo: tramo({ abierto: true, propuestas: '7.00' }) });
 
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
-    expect(screen.getByText('Consolidado')).toBeInTheDocument();
+    expect(screen.getByText('Abierto · pendiente de cierre')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Guardar ajuste/ })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /^Revertir/ })).not.toBeInTheDocument();
+  });
+
+  it('un tramo cerrado y ya acreditado (reconocidoEn) es read-only', () => {
+    renderRow({ tramo: tramo({ abierto: false, reconocidoEn: '2026-09-01T12:00:00.000Z' }) });
+
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(screen.getByText('Acreditado')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Guardar ajuste/ })).toBeDisabled();
+  });
+
+  it('un tramo cerrado sin participación resuelta es read-only', () => {
+    renderRow({ tramo: tramo({ abierto: false, idParticipacion: null }) });
+
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Guardar ajuste/ })).toBeDisabled();
+  });
+
+  it('un tramo cerrado, con participación y sin acreditar es el ÚNICO editable', () => {
+    renderRow({ tramo: tramo({ abierto: false, idParticipacion: 51, reconocidoEn: null }) });
+
+    expect(screen.getByRole('spinbutton', { name: 'Horas propuestas' })).toBeEnabled();
+    expect(screen.getByText('Tramo cerrado')).toBeInTheDocument();
   });
 
   it('«Ver historial» carga la cadena bajo demanda y la muestra', async () => {
