@@ -206,6 +206,9 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
   const { data: currentUser } = useCurrentUser();
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
+  // S7: en `EN_SOLICITUD_CIERRE` y `CERRADO` el proyecto no admite Sprints nuevos.
+  const estadoProyecto = proyecto.estadoProyecto;
+  const proyectoEnCierre = estadoProyecto === 'EN_SOLICITUD_CIERRE' || estadoProyecto === 'CERRADO';
 
   const { data: avance, isSuccess: puedeVerAvance } = useProjectAvance(idProyecto);
   // Sprint de trabajo disponible (F2): la lista viene ordenada por
@@ -541,6 +544,26 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 onFiltroHitoChange={setFiltroHito}
                 mostrarToolbar={false}
               />
+            ) : proyectoEnCierre ? (
+              /* S7: en cierre no se abre trabajo nuevo. Ofrecer «Iniciar
+                 Sprint» aquí prometía una acción que el backend rechaza. */
+              <Empty tone="muted" role="status">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Kanban aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    {estadoProyecto === 'CERRADO'
+                      ? 'Este proyecto está cerrado'
+                      : 'Este proyecto está en proceso de cierre'}
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {estadoProyecto === 'CERRADO'
+                      ? 'Un proyecto cerrado ya no admite Sprints nuevos; su historial queda disponible para consulta.'
+                      : 'Mientras su cierre esté en revisión no pueden iniciarse Sprints nuevos. Si la administración lo devuelve a ejecución, podrás volver a hacerlo.'}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <Empty>
                 <EmptyHeader>
