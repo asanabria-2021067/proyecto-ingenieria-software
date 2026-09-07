@@ -87,7 +87,12 @@ export class HistoricalProjectReadService {
       this.prisma.proyecto.count({ where }),
       this.prisma.proyecto.findMany({
         where,
-        orderBy: { idProyecto: 'asc' },
+        // La bandeja se lee como una pila: lo último que se movió va primero.
+        // Con `idProyecto: 'asc'` una solicitud recién enviada caía al final,
+        // detrás de proyectos que llevaban semanas parados. `fechaActualizacion`
+        // se sella en cada cambio de estado, así que un cierre recién pedido
+        // encabeza su grupo; el id desempata y cubre a los que nunca se tocaron.
+        orderBy: [{ fechaActualizacion: { sort: 'desc', nulls: 'last' } }, { idProyecto: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
         select: {
