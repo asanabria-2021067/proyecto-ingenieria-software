@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { closeReadinessPrefix } from '@/lib/query-keys/closure';
-import { adminAppealsPrefix, adminProjectDetailQueryKey } from '@/lib/query-keys/admin-projects';
+import { adminAppealsPrefix, adminAppealsQueryKey, adminProjectDetailQueryKey } from '@/lib/query-keys/admin-projects';
 import { projectDetailQueryKey } from '@/lib/query-keys/project';
 import {
   leadershipAppealsPrefix,
@@ -15,6 +15,8 @@ import {
 import {
   cancelLeadershipAppeal,
   createLeadershipAppeal,
+  denyAppeal,
+  getAdminAppeals,
   getLeadershipAppeals,
   getLeadershipCandidates,
   getLeadershipContext,
@@ -24,6 +26,7 @@ import {
 import type {
   ApelacionItemDto,
   CreateLeadershipAppealInput,
+  DenyAppealInput,
   LeadershipCandidatesDto,
   LeadershipContextDto,
   LeadershipHistoryItemDto,
@@ -142,4 +145,33 @@ export function useTransferLeadership(
   };
 
   return { transfer, refreshContext };
+}
+
+/** VIEW-18 (F015) — bandeja administrativa de apelaciones. `estado` = filtro o `'TODAS'`. */
+export function useAdminAppeals(estado: string | undefined, page = 1, enabled = true) {
+  return useQuery<PaginaLiderazgo<ApelacionItemDto>>({
+    queryKey: adminAppealsQueryKey(estado ?? 'TODAS', page),
+    queryFn: () => getAdminAppeals({ estado, page }),
+    enabled,
+    retry: false,
+  });
+}
+
+/**
+ * VIEW-18 (F015) — denegar una apelación. Invalida la bandeja (prefijo), el
+ * contexto y las apelaciones del proyecto, el historial y el detalle admin.
+ */
+export function useDenyAppeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idProyecto, idApelacion, input }: { idProyecto: number; idApelacion: number; input: DenyAppealInput }) =>
+      denyAppeal(idProyecto, idApelacion, input),
+    onSuccess: (_data, { idProyecto }) => {
+      queryClient.invalidateQueries({ queryKey: adminAppealsPrefix });
+      queryClient.invalidateQueries({ queryKey: leadershipContextQueryKey(idProyecto) });
+      queryClient.invalidateQueries({ queryKey: leadershipHistoryPrefix(idProyecto) });
+      queryClient.invalidateQueries({ queryKey: leadershipAppealsPrefix(idProyecto) });
+      queryClient.invalidateQueries({ queryKey: adminProjectDetailQueryKey(idProyecto) });
+    },
+  });
 }
