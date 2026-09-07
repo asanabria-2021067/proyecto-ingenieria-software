@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CLOSURE_DOCUMENT_MAX_BYTES } from '@/components/projects/api-error';
 import { projectPendingPostulationsQueryKey } from '@/lib/query-keys/applications';
@@ -26,6 +27,7 @@ import {
   uploadClosureDocument,
 } from '@/lib/services/closure';
 import type {
+  ClosureUploadEnCurso,
   CloseReadinessSummary,
   ClosureDeliveryInput,
   ClosureDraft,
@@ -52,6 +54,14 @@ export function validateClosurePdf(file: File): string | null {
   }
   if (file.size === 0) return 'El archivo está vacío.';
   return null;
+}
+
+/**
+ * Una carga abortada por el usuario no es un fallo que deba anunciarse: el
+ * `fetch` cancelado lanza `AbortError` igual que si hubiera reventado.
+ */
+export function esUploadCancelado(err: unknown): boolean {
+  return (err as { name?: string } | null)?.name === 'AbortError';
 }
 
 /**
@@ -137,13 +147,43 @@ export function useClosureMutations(idProyecto: number) {
 
   // reserva → multipart {ticket, file} → backend. Máximo 2 reservas vivas por
   // actor y revisión (RESERVA_NO_DISPONIBLE).
+  /**
+   * Cargas vivas. `fetch` no informa del progreso de subida, así que no se
+   * inventa un porcentaje: se expone QUÉ se está subiendo para que la vista lo
+   * muestre, y un `AbortController` por carga para poder cancelarla.
+   */
+  const [uploads, setUploads] = useState<ClosureUploadEnCurso[]>([]);
+  const abortsRef = useRef(new Map<string, AbortController>());
+
   const upload = useMutation({
     mutationFn: async ({ revisionId, file }: { revisionId: number; file: File }) => {
-      const grant = await reserveClosureDocument(idProyecto, { revisionId, nombreArchivo: file.name });
-      return uploadClosureDocument(grant, file);
+      const id = `${Date.now()}-${file.name}`;
+      const controller = new AbortController();
+      abortsRef.current.set(id, controller);
+      setUploads((prev) => [...prev, { id, nombreArchivo: file.name, tamanoBytes: file.size }]);
+      try {
+        const grant = await reserveClosureDocument(idProyecto, { revisionId, nombreArchivo: file.name }, controller.signal);
+        return await uploadClosureDocument(grant, file, controller.signal);
+      } finally {
+        abortsRef.current.delete(id);
+        setUploads((prev) => prev.filter((u) => u.id !== id));
+      }
     },
     onSuccess: invalidateDocs,
   });
+
+  /**
+   * Cancela una carga en curso. Aborta la petición; la fila desaparece por el
+   * `finally` del propio `mutationFn`, no por una limpieza aparte.
+   *
+   * La reserva que el backend ya hubiera creado NO se libera aquí: solo se
+   * vincula al terminar la carga, así que no hay nada que desvincular y el
+   * servidor la caduca solo (§25, 10 min). Por eso tras varias cancelaciones
+   * seguidas puede aparecer el aviso de reservas abiertas.
+   */
+  const cancelUpload = (id: string) => {
+    abortsRef.current.get(id)?.abort();
+  };
 
   const detach = useMutation({
     mutationFn: ({ documentId, revisionId }: { documentId: number; revisionId: number }) =>
@@ -163,5 +203,5 @@ export function useClosureMutations(idProyecto: number) {
     queryClient.invalidateQueries({ queryKey: closureRevisionPrefix(idProyecto) });
   };
 
-  return { generate, upload, detach, submit, refreshAll };
+  return { generate, upload, uploads, cancelUpload, detach, submit, refreshAll };
 }
