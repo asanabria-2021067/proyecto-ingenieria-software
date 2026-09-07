@@ -40,6 +40,28 @@ const CLOSURE_EVIDENCE_WRITE: ProjectWriteMetadata = {
   family: 'CIERRE_EVIDENCIAS',
 };
 
+/**
+ * Límites del multipart de E107: exactamente dos partes, `ticket` y `file`.
+ *
+ * OJO con `parts`: busboy corta en cuanto el contador ALCANZA el límite, así
+ * que deja pasar `parts - 1` partes reales. Con `parts: 2` el cuerpo legítimo
+ * de dos partes se rechazaba con «Too many parts» y NINGUNA evidencia podía
+ * subirse. `files + fields + 1` admite las dos del contrato y sigue
+ * rechazando una tercera; hay un test que lo fija contra multer real.
+ */
+export const CLOSURE_UPLOAD_LIMITS = {
+  files: 1,
+  fields: 1,
+  parts: 3,
+  fieldNameSize: 64,
+  fieldSize: CLOSURE_TICKET_MAX_BYTES,
+  // El límite del ARCHIVO es el del contrato, sin descuentos. El margen de
+  // framing (MULTIPART_OVERHEAD_BYTES) es holgura del request completo y
+  // nunca se resta de este número.
+  fileSize: MAX_DOCUMENT_SIZE,
+  headerPairs: 32,
+};
+
 @Controller('proyectos/:projectId/cierre/documentos')
 @UseGuards(JwtAuthGuard)
 export class ClosureDocumentsController {
@@ -119,23 +141,7 @@ export class ClosureDocumentsController {
   @Post()
   @UseGuards(ProjectWriteGuard)
   @ProjectWrite(CLOSURE_EVIDENCE_WRITE)
-  @UseInterceptors(
-    FileInterceptor('file', {
-      limits: {
-        // Exactamente dos partes: el ticket y el archivo.
-        files: 1,
-        fields: 1,
-        parts: 2,
-        fieldNameSize: 64,
-        fieldSize: CLOSURE_TICKET_MAX_BYTES,
-        // El límite del ARCHIVO es el del contrato, sin descuentos. El margen
-        // de framing (MULTIPART_OVERHEAD_BYTES) es holgura del request
-        // completo y nunca se resta de este número.
-        fileSize: MAX_DOCUMENT_SIZE,
-        headerPairs: 32,
-      },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file', { limits: CLOSURE_UPLOAD_LIMITS }))
   upload(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
