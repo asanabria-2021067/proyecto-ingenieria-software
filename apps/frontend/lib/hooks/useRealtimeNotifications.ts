@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { projectSprintsQueryKey, sprintClosingSummaryQueryKey } from '@/lib/query-keys/sprints';
+import { currentExitRequestQueryKey, exitPreparationSummaryQueryKey } from '@/lib/query-keys/exit-requests';
 import {
   closeReadinessPrefix,
   closureDraftQueryKey,
@@ -162,6 +163,9 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: adminProjectDetailQueryKey(payload.projectId) });
       // VIEW-08: al cerrarse un proyecto del usuario sus horas pasan de abiertas a acreditadas.
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      // VIEW-10: la preparación de salida se bloquea cuando el proyecto entra en solicitud de cierre.
+      queryClient.invalidateQueries({ queryKey: exitPreparationSummaryQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: currentExitRequestQueryKey(payload.projectId) });
     };
 
     const handleClosureReviewUpdated = (payload: ClosureReviewUpdatedPayload) => {
