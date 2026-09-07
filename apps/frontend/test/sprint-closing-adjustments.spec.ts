@@ -70,6 +70,9 @@ function tramo(overrides: Partial<SprintClosingTramoDto> = {}): SprintClosingTra
     abierto: false,
     origen: 'GRANULAR',
     reportadas: '7.00',
+    estimacionTarea: null,
+    exceso: '0.00',
+    justificacionExceso: null,
     ajuste: null,
     justificacionAjuste: null,
     propuestas: '7.00',
@@ -163,9 +166,10 @@ describe('SprintClosingPage — ajustes por asignación (F002)', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     fireEvent.click(await screen.findByRole('button', { name: /Desglose de Carlos Pineda/ }));
-    const inputs = await screen.findAllByLabelText('Horas propuestas');
-    fireEvent.change(inputs[0], { target: { value: '5' } });
-    fireEvent.change(screen.getAllByLabelText(/Justificación/)[0], { target: { value: 'Se descontaron 2 horas' } });
+    // El panel del líder solo aparece tras pedir «Ajustar».
+    fireEvent.click((await screen.findAllByRole('button', { name: /^Ajustar/ }))[0]);
+    fireEvent.change(screen.getAllByLabelText('Horas aceptadas')[0], { target: { value: '5' } });
+    fireEvent.change(screen.getAllByLabelText(/Justificación del líder/)[0], { target: { value: 'Se descontaron 2 horas' } });
     fireEvent.click(screen.getAllByRole('button', { name: /Guardar ajuste/ })[0]);
 
     await waitFor(() =>
@@ -249,8 +253,10 @@ describe('SprintClosingPage — ajustes por asignación (F002)', () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: /Desglose de Carlos Pineda/ }));
-    await screen.findAllByText('Horas propuestas');
+    await screen.findAllByText('Horas reportadas');
+    // Ni siquiera se ofrece abrir el panel: el Sprint cerrado no admite ajustes.
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Ajustar/ })[0]).toBeDisabled();
     expect(screen.getByText('Cerrado')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /confirmar cierre del sprint/i })).toBeDisabled();
   });
