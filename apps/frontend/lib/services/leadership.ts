@@ -6,6 +6,7 @@ import type {
   LeadershipContextDto,
   LeadershipHistoryItemDto,
   PaginaLiderazgo,
+  TransferLeadershipInput,
 } from '@/lib/types/leadership';
 
 // ─── Parte PARTICIPANTE (VIEW-06 / VIEW-07 / VIEW-17) ─────────────────────────
@@ -62,5 +63,19 @@ export function createLeadershipAppeal(
 export function cancelLeadershipAppeal(idProyecto: number, idApelacion: number): Promise<ApelacionItemDto> {
   return apiFetch<ApelacionItemDto>(`/proyectos/${idProyecto}/liderazgo/apelaciones/${idApelacion}/cancelar`, {
     method: 'POST',
+  });
+}
+
+// ─── Parte ADMINISTRADOR (VIEW-19, F014) ─────────────────────────────────────
+
+/**
+ * E102 — cambio administrativo directo. `expectedLeaderId` es el testigo de
+ * concurrencia (CAS): si el líder ya cambió, el backend responde 409 y la UI
+ * debe refrescar el contexto; nunca reintentar automáticamente.
+ */
+export function transferLeadership(idProyecto: number, input: TransferLeadershipInput): Promise<unknown> {
+  return apiFetch<unknown>(`/admin/proyectos/${idProyecto}/liderazgo/cambiar`, {
+    method: 'POST',
+    body: JSON.stringify(input),
   });
 }

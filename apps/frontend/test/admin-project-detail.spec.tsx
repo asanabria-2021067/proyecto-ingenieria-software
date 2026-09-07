@@ -131,15 +131,16 @@ describe('VIEW-16 — detalle administrativo (F013)', () => {
     expect(getAdminProjectDetail).toHaveBeenCalledWith(37);
   });
 
-  it('permisos en false → cero controles de escritura y ningún botón inerte', async () => {
+  it('permisos en false → cero controles de escritura sobre tareas/Sprint/roles; la única acción es el botón general de liderazgo (F014)', async () => {
     renderPage();
     await screen.findByRole('heading', { level: 1 });
 
     for (const tab of ['miembros', 'sprints', 'liderazgo']) {
       fireEvent.mouseDown(screen.getByRole('tab', { name: new RegExp(tab, 'i') }));
     }
-    expect(screen.queryByRole('button', { name: /cambiar liderazgo|editar|eliminar|finalizar|cerrar sprint|iniciar|aprobar|rechazar/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/cambiar liderazgo/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /editar|eliminar|finalizar|cerrar sprint|iniciar|aprobar|rechazar|agregar/i })).not.toBeInTheDocument();
+    // Un solo botón general, nunca uno por integrante.
+    expect(screen.getAllByRole('button', { name: /cambiar liderazgo/i })).toHaveLength(1);
   });
 
   it('los cuatro tabs se montan y el breadcrumb vuelve a la bandeja con su grupo', async () => {
@@ -177,6 +178,8 @@ describe('VIEW-16 — detalle administrativo (F013)', () => {
     expect(await screen.findByText('Completada')).toBeInTheDocument();
     expect(screen.getByText('28')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Cerrados' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cerrados');
+    // En CERRADO no se ofrece la transferencia de liderazgo.
+    expect(screen.queryByRole('button', { name: /cambiar liderazgo/i })).not.toBeInTheDocument();
   });
 
   it('EN_SOLICITUD_CIERRE ofrece el enlace a la revisión administrativa del cierre', async () => {

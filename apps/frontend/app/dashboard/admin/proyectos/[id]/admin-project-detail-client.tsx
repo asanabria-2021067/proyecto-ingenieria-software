@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { AlertCircle, ClipboardCheck, Crown, FileText, Layers, Users } from 'lucide-react';
+import { AlertCircle, ClipboardCheck, Crown, FileText, Layers, UserCog, Users } from 'lucide-react';
 import { useAdminProjectDetail } from '@/hooks/use-admin-projects';
 import { useLeadershipHistory } from '@/hooks/use-leadership';
 import { isHistoricalDetail } from '@/lib/services/admin-projects';
@@ -11,6 +12,7 @@ import { estadoBadgeLabel, estadoBadgeStyle, tipoBadgeLabel, tipoBadgeStyle } fr
 import { ADMIN_PROJECT_GROUP_LABEL, adminProjectsGroupHref } from '@/components/admin-projects/admin-projects-tabs';
 import { ClosureStatusBanner } from '@/components/projects/closure-status-banner';
 import { LeadershipCard } from '@/components/leadership/leadership-card';
+import { LeadershipChangeDialog } from '@/components/leadership/leadership-change-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -147,8 +149,11 @@ function DetailSkeleton() {
 
 export interface AdminProjectDetailClientProps {
   id: number;
-  /** F014: acción general «Cambiar liderazgo» (única escritura, con autoridad en el endpoint admin). */
-  headerAction?: (vista: { idProyecto: number; estado: string; lider: VistaAdmin['lider'] }) => React.ReactNode;
+}
+
+/** Solo se transfiere el liderazgo con el proyecto operativo (06 v2 §18). */
+export function puedeTransferirLiderazgo(estadoProyecto: string): boolean {
+  return estadoProyecto === 'PUBLICADO' || estadoProyecto === 'EN_PROGRESO';
 }
 
 /**
@@ -157,11 +162,14 @@ export interface AdminProjectDetailClientProps {
  * filtro es del backend) y en `CERRADO` se muestra el histórico completo.
  * No hay botones inertes: la única acción (cambiar liderazgo) la añade F014.
  */
-export default function AdminProjectDetailClient({ id, headerAction }: AdminProjectDetailClientProps) {
+export default function AdminProjectDetailClient({ id }: AdminProjectDetailClientProps) {
   const searchParams = useSearchParams();
   const grupoParam = searchParams.get('grupo');
   const { data, isPending, isError, error, refetch } = useAdminProjectDetail(id);
   const historial = useLeadershipHistory(id, 1, Boolean(data));
+  // F014 (VIEW-19): UN solo botón general «Cambiar liderazgo» (nunca uno por
+  // integrante); su autoridad es el endpoint admin, no esta pantalla.
+  const [cambioAbierto, setCambioAbierto] = useState(false);
 
   if (isPending) return <DetailSkeleton />;
 
@@ -248,8 +256,17 @@ export default function AdminProjectDetailClient({ id, headerAction }: AdminProj
               {vista.descripcion || 'Sin descripción disponible.'}
             </p>
           </div>
-          {headerAction && (
-            <div className="shrink-0">{headerAction({ idProyecto: vista.idProyecto, estado: vista.estado, lider: vista.lider })}</div>
+          {puedeTransferirLiderazgo(vista.estado) && (
+            <div className="shrink-0">
+              <Button
+                type="button"
+                onClick={() => setCambioAbierto(true)}
+                className="h-10 w-full gap-1.5 rounded-lg text-sm font-bold sm:w-auto"
+              >
+                <UserCog className="size-4" aria-hidden="true" />
+                Cambiar liderazgo
+              </Button>
+            </div>
           )}
         </div>
         <dl className="mt-5 grid grid-cols-1 gap-4 border-t border-outline-variant/40 pt-4 text-sm sm:grid-cols-3">
@@ -301,6 +318,15 @@ export default function AdminProjectDetailClient({ id, headerAction }: AdminProj
             </Link>
           </Button>
         </div>
+      )}
+
+      {puedeTransferirLiderazgo(vista.estado) && (
+        <LeadershipChangeDialog
+          projectId={vista.idProyecto}
+          open={cambioAbierto}
+          onOpenChange={setCambioAbierto}
+          liderDesde={historial.data?.items.at(-1)?.registradoEn ?? null}
+        />
       )}
 
       <Tabs defaultValue="resumen">
