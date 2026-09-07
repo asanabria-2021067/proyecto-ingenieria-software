@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { NotificationsService } from '../notifications/notifications.service';
 import { canonicalDigest } from './closure-report-model';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
@@ -105,10 +106,12 @@ export class ProjectClosureService {
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${projectId} no encontrado`);
     }
-    // La preparación es información del LÍDER: ni el equipo ni un externo la
-    // consultan, porque enumera exactamente qué falta para cerrar.
+    // La preparación es información del LÍDER —enumera qué falta para cerrar,
+    // y ni el equipo ni un externo la consultan— y de la ADMINISTRACIÓN, que
+    // la necesita para resolver la solicitud: la fase `APPROVE` existe
+    // precisamente para su revisión, y el administrador nunca es el líder.
     if (proyecto.creadoPor !== actorId) {
-      throw new ForbiddenException('Solo el líder del proyecto puede consultar su preparación');
+      await this.policy.assertAdminTx(this.prisma as unknown as Prisma.TransactionClient, actorId);
     }
     return this.readinessService.evaluate(undefined, projectId, { phase });
   }
