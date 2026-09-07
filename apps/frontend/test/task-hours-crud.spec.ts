@@ -220,6 +220,10 @@ describe('TaskHoursSection (VIEW-04 / F001)', () => {
     expect(within(restantes).getByText('—')).toBeInTheDocument();
     expect(within(restantes).queryByText(/0 h/)).not.toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Estimación' })).getByText('—')).toBeInTheDocument();
+    // Sin umbral tampoco hay exceso: «—», nunca «0 h».
+    const sobre = screen.getByRole('group', { name: 'Horas sobreestimadas' });
+    expect(within(sobre).getByText('—')).toBeInTheDocument();
+    expect(within(sobre).queryByText(/0 h/)).not.toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Reportadas' })).getByText('3.5 h')).toBeInTheDocument();
 
     // Sin estimación nunca se pide justificación.
@@ -321,5 +325,47 @@ describe('TaskHoursSection (VIEW-04 / F001)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Revocar registro/ }));
     await waitFor(() => expect(swalFire).toHaveBeenCalled());
     expect(revokeTimeRecord).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * El resumen dedicaba un KPI a las horas «Legacy» —un detalle de origen que
+ * solo decide algo al cerrar el Sprint— mientras que lo reportado por encima
+ * de la estimación, que es lo que el líder revisa, no se mostraba pese a
+ * venir ya calculado por el backend (`sobreEstimacion`).
+ */
+describe('TaskHoursSection — horas sobreestimadas en el resumen', () => {
+  it('muestra el exceso que reporta el backend, sin recalcularlo', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(
+      resumen({ estimacion: 2, horasReportadasTarea: '4.00', restantes: '0.00', sobreEstimacion: '2.00' }),
+    );
+    renderSection();
+
+    await esperarCarga();
+    const sobre = screen.getByRole('group', { name: 'Horas sobreestimadas' });
+    expect(within(sobre).getByText('2 h')).toBeInTheDocument();
+  });
+
+  it('dentro de la estimación el exceso es cero, no «—»', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(
+      resumen({ estimacion: 10, horasReportadasTarea: '4.00', restantes: '6.00', sobreEstimacion: '0.00' }),
+    );
+    renderSection();
+
+    await esperarCarga();
+    const sobre = screen.getByRole('group', { name: 'Horas sobreestimadas' });
+    expect(within(sobre).getByText('0 h')).toBeInTheDocument();
+  });
+
+  it('ya no ocupa un KPI con las horas legacy', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen({ horasLegacyNoGranulares: '5.00' }));
+    renderSection();
+
+    await esperarCarga();
+    expect(screen.queryByRole('group', { name: 'Legacy' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('group')).toHaveLength(4);
   });
 });
