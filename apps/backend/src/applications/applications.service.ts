@@ -307,15 +307,39 @@ export class ApplicationsService {
       orderBy: { idParticipacion: 'desc' },
     });
 
+    if (existente?.estadoParticipacion === 'ACTIVO') {
+      // Ya activo (carrera/reintento) — no duplicar ni tocar fechaIngreso, y
+      // no vuelve a consumir cupo: la comprobación de abajo solo aplica a las
+      // altas que sí ocupan una plaza nueva.
+      return existente;
+    }
+
+    /**
+     * El cupo del rol se verifica AQUÍ, no solo al postular: `create` solo lo
+     * evalúa cuando el proyecto está EN_PROGRESO, así que un rol PUBLICADO
+     * podía acumular postulaciones y aceptarse todas, dejando más
+     * participaciones ACTIVO que `cupos`. Es el mismo criterio que ya aplica
+     * `RolesService.selfAssign` (la otra vía de alta), y corre dentro del lock
+     * del proyecto, así que dos aceptaciones concurrentes no pueden pasar
+     * ambas.
+     */
+    const rol = await tx.rolProyecto.findUniqueOrThrow({
+      where: { idRolProyecto },
+      select: { cupos: true, nombreRol: true },
+    });
+    const activos = await tx.participacionProyecto.count({
+      where: { idRolProyecto, estadoParticipacion: 'ACTIVO' },
+    });
+    if (activos >= rol.cupos) {
+      throw new ConflictException(
+        `El rol "${rol.nombreRol}" ya alcanzó su límite de ${rol.cupos} cupo(s) activo(s)`,
+      );
+    }
+
     if (!existente) {
       return tx.participacionProyecto.create({
         data: { idUsuario, idRolProyecto, idPostulacion, estadoParticipacion: 'ACTIVO' },
       });
-    }
-
-    if (existente.estadoParticipacion === 'ACTIVO') {
-      // Ya activo (carrera/reintento) — no duplicar ni tocar fechaIngreso.
-      return existente;
     }
 
     return tx.participacionProyecto.update({
