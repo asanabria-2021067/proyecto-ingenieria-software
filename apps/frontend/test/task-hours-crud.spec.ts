@@ -1,0 +1,325 @@
+import '@testing-library/jest-dom/vitest';
+import { createElement, type ReactNode } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+
+vi.mock('../lib/services/task-hours', () => ({
+  getHorasTarea: vi.fn(),
+  getTaskHoursSummary: vi.fn(),
+  registrarHorasTarea: vi.fn(),
+  updateTimeRecord: vi.fn(),
+  revokeTimeRecord: vi.fn(),
+}));
+
+// Radix Tooltip mide su contenido con ResizeObserver, ausente en jsdom.
+if (typeof (globalThis as any).ResizeObserver === 'undefined') {
+  (globalThis as any).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
+const swalFire = vi.hoisted(() => vi.fn());
+vi.mock('../lib/swal', () => ({
+  default: { fire: swalFire },
+  swalCustomClass: {},
+}));
+
+import { TaskHoursSection } from '../components/hours/task-hours-section';
+import { crossesEstimate } from '../hooks/use-task-hours';
+import {
+  getHorasTarea,
+  getTaskHoursSummary,
+  registrarHorasTarea,
+  revokeTimeRecord,
+  updateTimeRecord,
+} from '../lib/services/task-hours';
+import {
+  projectTasksQueryKey,
+  taskHoursQueryKey,
+  taskHoursSummaryQueryKey,
+} from '../lib/query-keys/tasks';
+import type { RegistroTiempoTareaDTO, TaskHoursSummaryDTO } from '../lib/types/tasks';
+
+const USUARIO = { idUsuario: 5, nombre: 'Ana', apellido: 'Lopez', fotoUrl: null };
+
+function registro(overrides: Partial<RegistroTiempoTareaDTO> = {}): RegistroTiempoTareaDTO {
+  return {
+    idRegistroTiempo: 1,
+    idAsignacion: 30,
+    idUsuario: 5,
+    horas: 4,
+    fecha: '2026-08-20',
+    nota: null,
+    creadoEn: '2026-08-20T12:00:00.000Z',
+    usuario: USUARIO,
+    ...overrides,
+  };
+}
+
+function resumen(overrides: Partial<TaskHoursSummaryDTO> = {}): TaskHoursSummaryDTO {
+  return {
+    taskId: 55,
+    sprintId: 9,
+    estimacion: 10,
+    horasReportadasTarea: '9.00',
+    horasLegacyNoGranulares: '0.00',
+    restantes: '1.00',
+    sobreEstimacion: null,
+    puedeCrear: true,
+    puedeEditar: true,
+    puedeRevocar: true,
+    tramos: [],
+    ...overrides,
+  };
+}
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
+  return { queryClient, wrapper };
+}
+
+function renderSection(props: Record<string, unknown> = {}) {
+  const { wrapper, queryClient } = createWrapper();
+  const utils = render(
+    createElement(TaskHoursSection, {
+      idProyecto: 7,
+      idTarea: 55,
+      idUsuarioActual: 5,
+      enabled: true,
+      ...props,
+    }),
+    { wrapper },
+  );
+  return { ...utils, queryClient };
+}
+
+async function esperarCarga() {
+  await waitFor(() => expect(screen.getByLabelText('Horas')).toBeInTheDocument());
+}
+
+describe('crossesEstimate (06 v2 §10)', () => {
+  it('solo cruza cuando antes ≤ estimación y después > estimación', () => {
+    expect(crossesEstimate('9.00', 2, 10)).toBe(true);
+    expect(crossesEstimate('10.00', 0.01, 10)).toBe(true);
+    expect(crossesEstimate('13.00', 2, 10)).toBe(false); // ya estaba por encima
+    expect(crossesEstimate('13.00', -1, 10)).toBe(false); // reducir nunca cruza
+    expect(crossesEstimate('9.00', 1, 10)).toBe(false); // llega justo al umbral
+    expect(crossesEstimate('9.00', 5, null)).toBe(false); // sin estimación no hay umbral
+  });
+});
+
+describe('TaskHoursSection (VIEW-04 / F001)', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('registra horas e invalida task-hours, task-hours-summary y project-tasks', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen({ horasReportadasTarea: '2.00', restantes: '8.00' }));
+    (registrarHorasTarea as any).mockResolvedValue(registro());
+    const { queryClient } = renderSection();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await esperarCarga();
+    fireEvent.change(screen.getByLabelText('Horas'), { target: { value: '2.5' } });
+    fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-08-20' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() =>
+      expect(registrarHorasTarea).toHaveBeenCalledWith(7, 55, { horas: 2.5, fecha: '2026-08-20' }),
+    );
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskHoursQueryKey(7, 55) });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskHoursSummaryQueryKey(7, 55) });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectTasksQueryKey(7) });
+    });
+  });
+
+  it('exige justificación cuando la operación cruza la estimación y la envía como justificacionExceso', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen({ estimacion: 10, horasReportadasTarea: '9.00' }));
+    (registrarHorasTarea as any).mockResolvedValue(registro());
+    renderSection();
+
+    await esperarCarga();
+    expect(screen.queryByLabelText(/Justificación del exceso/)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Horas'), { target: { value: '2' } });
+    const justificacion = await screen.findByLabelText(/Justificación del exceso/);
+    expect(justificacion).toBeRequired();
+    expect(screen.getByRole('button', { name: 'Registrar' })).toBeDisabled();
+
+    fireEvent.change(justificacion, { target: { value: 'Cambios de última hora' } });
+    expect(screen.getByRole('button', { name: 'Registrar' })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() =>
+      expect(registrarHorasTarea).toHaveBeenCalledWith(
+        7,
+        55,
+        expect.objectContaining({ horas: 2, justificacionExceso: 'Cambios de última hora' }),
+      ),
+    );
+  });
+
+  it('NO exige justificación al reducir horas aunque el total siga por encima de la estimación', async () => {
+    (getHorasTarea as any).mockResolvedValue([registro({ horas: 4, nota: 'Ajustes' })]);
+    (getTaskHoursSummary as any).mockResolvedValue(
+      resumen({ estimacion: 10, horasReportadasTarea: '13.00', restantes: '-3.00', sobreEstimacion: '3.00' }),
+    );
+    (updateTimeRecord as any).mockResolvedValue(registro({ horas: 3 }));
+    renderSection();
+
+    await esperarCarga();
+    fireEvent.click(await screen.findByRole('button', { name: /^Editar registro/ }));
+    fireEvent.change(screen.getByLabelText('Horas'), { target: { value: '3' } });
+
+    expect(screen.queryByLabelText(/Justificación del exceso/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(updateTimeRecord).toHaveBeenCalledWith(7, 55, 1, { horas: 3, fecha: '2026-08-20' }));
+    const enviado = (updateTimeRecord as any).mock.calls[0][3];
+    expect(enviado).not.toHaveProperty('justificacionExceso');
+    expect(enviado).not.toHaveProperty('nota');
+  });
+
+  it('al editar, retirar la nota envía nota:null y una nota nueva viaja recortada', async () => {
+    (getHorasTarea as any).mockResolvedValue([registro({ horas: 4, nota: 'Ajustes' })]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen({ horasReportadasTarea: '4.00', restantes: '6.00' }));
+    (updateTimeRecord as any).mockResolvedValue(registro());
+    renderSection();
+
+    await esperarCarga();
+    fireEvent.click(await screen.findByRole('button', { name: /^Editar registro/ }));
+    fireEvent.change(screen.getByLabelText('Nota'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(updateTimeRecord).toHaveBeenCalledWith(7, 55, 1, expect.objectContaining({ nota: null })),
+    );
+  });
+
+  it('estimacion: null → Restantes muestra «—» y nunca «0 h»', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(
+      resumen({ estimacion: null, restantes: null, sobreEstimacion: null, horasReportadasTarea: '3.50' }),
+    );
+    renderSection();
+
+    await esperarCarga();
+    const restantes = screen.getByRole('group', { name: 'Restantes' });
+    expect(within(restantes).getByText('—')).toBeInTheDocument();
+    expect(within(restantes).queryByText(/0 h/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Estimación' })).getByText('—')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Reportadas' })).getByText('3.5 h')).toBeInTheDocument();
+
+    // Sin estimación nunca se pide justificación.
+    fireEvent.change(screen.getByLabelText('Horas'), { target: { value: '50' } });
+    expect(screen.queryByLabelText(/Justificación del exceso/)).not.toBeInTheDocument();
+  });
+
+  it('puedeEditar:false deshabilita Editar con tooltip explicativo', async () => {
+    (getHorasTarea as any).mockResolvedValue([registro()]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen({ puedeEditar: false }));
+    renderSection();
+
+    await esperarCarga();
+    const editar = await screen.findByRole('button', { name: 'Editar' });
+    expect(editar).toBeDisabled();
+    const wrapper = editar.parentElement as HTMLElement;
+    expect(wrapper.tagName).toBe('SPAN');
+    expect(wrapper).toHaveAttribute('tabindex', '0');
+
+    fireEvent.focus(wrapper);
+    await waitFor(() => expect(screen.getAllByText(/no está disponible/).length).toBeGreaterThan(0));
+  });
+
+  it('puedeCrear:false deshabilita el formulario y el botón con tooltip', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen({ puedeCrear: false }));
+    renderSection();
+
+    await esperarCarga();
+    expect(screen.getByLabelText('Horas')).toBeDisabled();
+    const registrar = screen.getByRole('button', { name: 'Registrar' });
+    expect(registrar).toBeDisabled();
+    expect((registrar.parentElement as HTMLElement).getAttribute('tabindex')).toBe('0');
+  });
+
+  it('las filas de otros usuarios no muestran «Propio» ni acciones', async () => {
+    (getHorasTarea as any).mockResolvedValue([
+      registro({ idRegistroTiempo: 1, idUsuario: 5 }),
+      registro({
+        idRegistroTiempo: 2,
+        idUsuario: 8,
+        usuario: { idUsuario: 8, nombre: 'Beatriz', apellido: 'Solano', fotoUrl: null },
+      }),
+    ]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen());
+    renderSection();
+
+    await esperarCarga();
+    await screen.findByText('Beatriz Solano');
+    expect(screen.getAllByText('Propio')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Editar registro/ })).toHaveLength(1);
+  });
+
+  it('revocar dos veces (409 REGISTRO_YA_REVOCADO) no muestra error destructivo e invalida', async () => {
+    (getHorasTarea as any).mockResolvedValue([registro()]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen());
+    swalFire.mockResolvedValue({ isConfirmed: true });
+    (revokeTimeRecord as any).mockRejectedValue(
+      Object.assign(new Error('El registro de tiempo ya estaba revocado'), {
+        statusCode: 409,
+        code: 'REGISTRO_YA_REVOCADO',
+      }),
+    );
+    const { queryClient } = renderSection();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await esperarCarga();
+    fireEvent.click(await screen.findByRole('button', { name: /^Revocar registro/ }));
+
+    await waitFor(() => expect(revokeTimeRecord).toHaveBeenCalledWith(7, 55, 1));
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskHoursSummaryQueryKey(7, 55) }),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('un 409 distinto al revocar sí muestra el mensaje', async () => {
+    (getHorasTarea as any).mockResolvedValue([registro()]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen());
+    swalFire.mockResolvedValue({ isConfirmed: true });
+    (revokeTimeRecord as any).mockRejectedValue(
+      Object.assign(new Error('El Sprint ya no admite cambios'), { statusCode: 409 }),
+    );
+    renderSection();
+
+    await esperarCarga();
+    fireEvent.click(await screen.findByRole('button', { name: /^Revocar registro/ }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('El Sprint ya no admite cambios'));
+  });
+
+  it('cancelar la confirmación no llama al DELETE', async () => {
+    (getHorasTarea as any).mockResolvedValue([registro()]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen());
+    swalFire.mockResolvedValue({ isConfirmed: false });
+    renderSection();
+
+    await esperarCarga();
+    fireEvent.click(await screen.findByRole('button', { name: /^Revocar registro/ }));
+    await waitFor(() => expect(swalFire).toHaveBeenCalled());
+    expect(revokeTimeRecord).not.toHaveBeenCalled();
+  });
+});
