@@ -154,6 +154,8 @@ export function useRealtimeNotifications(enabled: boolean) {
       // cuando el proyecto pasa a CERRADO; el modo read-only aparece sin recargar.
       queryClient.invalidateQueries({ queryKey: ['proyecto', String(payload.projectId)] });
       queryClient.invalidateQueries({ queryKey: historicalProjectQueryKey(payload.projectId) });
+      // VIEW-12: el conteo «Cierre pendiente» del panel administrativo (key ya existente).
+      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
     };
 
     const handleClosureReviewUpdated = (payload: ClosureReviewUpdatedPayload) => {
@@ -161,6 +163,7 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: closeReadinessPrefix(payload.projectId) });
       queryClient.invalidateQueries({ queryKey: closureRevisionsPrefix(payload.projectId) });
       queryClient.invalidateQueries({ queryKey: closureRevisionPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
     };
 
     // S7 (F008): un cambio de liderazgo invalida TODO lo que deriva del líder,
