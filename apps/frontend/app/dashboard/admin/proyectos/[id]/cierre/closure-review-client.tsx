@@ -25,7 +25,6 @@ import { isHistoricalDetail } from '@/lib/services/admin-projects';
 import { COMENTARIO_VEREDICTO_MAX } from '@/lib/services/closure-review';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle, tipoBadgeLabel } from '@/components/projects/available-project-card';
-import { adminProjectsGroupHref } from '@/components/admin-projects/admin-projects-tabs';
 import { ClosureReadinessPanel } from '@/components/closure/closure-readiness-panel';
 import { ClosureDocumentsManager } from '@/components/closure/closure-documents-manager';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -55,6 +54,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import uvgSwal from '@/lib/swal';
+import { adminProjectsGroupHref } from '@/lib/types/admin-projects';
 import type { ClosureRevision } from '@/lib/types/closure';
 
 const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';

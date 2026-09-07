@@ -15,6 +15,23 @@ export function isAdminProjectGroup(value: string | null | undefined): value is 
   return (ADMIN_PROJECT_GROUPS as readonly string[]).includes(value ?? '');
 }
 
+/** Etiqueta visible de cada grupo (encabezado, breadcrumb y sidebar administrativa). */
+export const ADMIN_PROJECT_GROUP_LABEL: Record<AdminProjectGroup, string> = {
+  activos: 'Activos',
+  revision: 'En revisión',
+  cierres: 'Solicitudes de cierre',
+  cerrados: 'Cerrados',
+};
+
+/**
+ * URL canónica de un grupo. El grupo vive en `?grupo=` para que la bandeja sea
+ * compartible y sobreviva a la recarga; la navegación entre grupos es de la
+ * sidebar administrativa, no de la propia página.
+ */
+export function adminProjectsGroupHref(grupo: AdminProjectGroup): string {
+  return `/dashboard/admin/proyectos?grupo=${grupo}`;
+}
+
 /** Acción SUGERIDA de navegación por grupo; nunca habilita por sí sola una escritura. */
 export type AdminProjectAction = 'MONITOREAR' | 'REVISAR_PUBLICACION' | 'REVISAR_CIERRE' | 'CONSULTAR_HISTORICO' | string;
 

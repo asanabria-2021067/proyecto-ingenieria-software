@@ -7,11 +7,6 @@ import { AlertCircle, ChevronLeft, ChevronRight, FolderKanban } from 'lucide-rea
 import { useAdminProjects } from '@/hooks/use-admin-projects';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
-import {
-  ADMIN_PROJECT_GROUP_LABEL,
-  AdminProjectsTabs,
-  adminProjectsGroupHref,
-} from '@/components/admin-projects/admin-projects-tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,8 +23,10 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
+  ADMIN_PROJECT_GROUP_LABEL,
   ADMIN_PROJECTS_DEFAULT_LIMIT,
   ADMIN_PROJECTS_MAX_LIMIT,
+  adminProjectsGroupHref,
   isAdminProjectGroup,
   type AdminProjectGroup,
   type AdminProjectListItem,
@@ -119,18 +116,27 @@ export default function AdminProjectsClient() {
         </BreadcrumbList>
       </Breadcrumb>
 
+      {/* El grupo activo se elige en la sidebar administrativa: la página no
+          repite esa navegación, solo declara en qué grupo está parada. */}
       <section className="mb-6">
         <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">Administración</span>
-        <h1 className="font-headline text-3xl font-black tracking-tighter text-on-surface md:text-4xl">Proyectos</h1>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h1 className="font-headline text-3xl font-black tracking-tighter text-on-surface md:text-4xl">
+            {ADMIN_PROJECT_GROUP_LABEL[grupo]}
+          </h1>
+          {data && (
+            <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-sm font-semibold text-on-surface-variant">
+              {data.total} {data.total === 1 ? 'proyecto' : 'proyectos'}
+            </span>
+          )}
+        </div>
         <p className="mt-2 max-w-2xl text-sm text-tertiary">
           Bandeja administrativa por grupo. El administrador consulta y decide sobre cierres; nunca opera dentro del
           Sprint de un equipo.
         </p>
       </section>
 
-      <AdminProjectsTabs active={grupo} counts={data ? { [grupo]: data.total } : undefined} />
-
-      <div className="mt-4 rounded-xl border border-outline-variant bg-surface-container-lowest" aria-busy={isPlaceholderData}>
+      <div className="rounded-xl border border-outline-variant bg-surface-container-lowest" aria-busy={isPlaceholderData}>
         {isError ? (
           <Empty tone="danger" role="alert" className="border-0 shadow-none">
             <EmptyMedia variant="icon">
