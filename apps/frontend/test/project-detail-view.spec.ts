@@ -23,10 +23,10 @@ vi.mock('../lib/swal', () => ({
   default: { fire: vi.fn().mockResolvedValue({ isConfirmed: true }) },
   swalCustomClass: {},
 }));
-vi.mock('../lib/services/projects', () => ({
-  approveProjectClosure: vi.fn().mockResolvedValue(undefined),
-  rejectProjectClosure: vi.fn().mockResolvedValue(undefined),
-  requestProjectClosure: vi.fn().mockResolvedValue(undefined),
+vi.mock('../lib/services/projects', () => ({}));
+vi.mock('../lib/services/closure', () => ({
+  getCloseReadiness: vi.fn(),
+  getClosureRevisions: vi.fn(),
 }));
 
 const replaceMock = vi.fn();
@@ -41,9 +41,9 @@ import { useProjectDetail } from '../hooks/use-project-detail';
 import { useProjectMembers } from '../hooks/use-project-members';
 import { useProjectSprints } from '../hooks/use-project-sprints';
 import { useCurrentUser } from '../hooks/use-current-user';
-import uvgSwal from '../lib/swal';
-import { approveProjectClosure, rejectProjectClosure, requestProjectClosure } from '../lib/services/projects';
-import type { EstadoSprint, SprintDto } from '../lib/types/sprints';
+import { getCloseReadiness, getClosureRevisions } from '../lib/services/closure';
+import type { CloseReadinessSummary } from '../lib/types/closure';
+import type { SprintDto } from '../lib/types/sprints';
 
 const proyectoFixture: ProyectoDetalleDTO = {
   idProyecto: 42,
@@ -70,18 +70,6 @@ const proyectoFixture: ProyectoDetalleDTO = {
 
 function mockMembers(members: Array<{ idUsuario: number; idRolProyecto: number }> = []) {
   (useProjectMembers as any).mockReturnValue({ members });
-}
-
-function sprintFixture(estado: EstadoSprint, numero = 1): SprintDto {
-  return {
-    idSprint: numero,
-    idProyecto: 42,
-    numero,
-    estado,
-    fechaInicio: '2026-01-01T00:00:00.000Z',
-    fechaFinalizacionIniciada: null,
-    fechaCierre: null,
-  };
 }
 
 function mockSprints(sprints: SprintDto[] = []) {
@@ -174,19 +162,25 @@ describe('ProjectDetailClient — vista administrativa (Sección 19/21)', () => 
     expect(screen.getByText('Detalles del proyecto')).toBeInTheDocument();
   });
 
-  it('muestra el aviso de solicitud de cierre pendiente', () => {
+  it('muestra el banner de solicitud de cierre en revisión (sin veredictos en esta vista)', async () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
     (useProjectDetail as any).mockReturnValue({
       data: { ...proyectoFixture, estadoProyecto: 'EN_SOLICITUD_CIERRE' },
       isLoading: false,
       error: null,
     });
+    (getClosureRevisions as any).mockResolvedValue({
+      page: 1, limit: 20, total: 1,
+      items: [{ idRevisionCierre: 5, numeroRevision: 1, estadoRevision: 'ENVIADA', comentarioRevisor: null, documentosEnviados: [], informeOficial: null, puedeEditar: false, puedeEnviar: false, puedeResolver: false }],
+    });
     renderPage();
 
-    expect(screen.getByText('Solicitud de cierre pendiente')).toBeInTheDocument();
+    expect(await screen.findByText(/Solicitud de cierre en revisión/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /aprobar cierre/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rechazar/i })).not.toBeInTheDocument();
   });
 
-  it('un administrador (no líder) puede aprobar el cierre', async () => {
+  it('un administrador (no líder) tampoco ve veredictos aquí: viven en la revisión administrativa del cierre', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999, roles: ['administrador'] } });
     (useProjectDetail as any).mockReturnValue({
       data: { ...proyectoFixture, estadoProyecto: 'EN_SOLICITUD_CIERRE' },
@@ -195,40 +189,33 @@ describe('ProjectDetailClient — vista administrativa (Sección 19/21)', () => 
     });
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: /aprobar cierre/i }));
-
-    expect(uvgSwal.fire).toHaveBeenCalledWith(expect.objectContaining({ title: '¿Aprobar cierre?' }));
-    await waitFor(() => expect(approveProjectClosure).toHaveBeenCalledWith(42));
-    expect(rejectProjectClosure).not.toHaveBeenCalled();
-  });
-
-  it('un administrador (no líder) puede rechazar el cierre', async () => {
-    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999, roles: ['administrador'] } });
-    (useProjectDetail as any).mockReturnValue({
-      data: { ...proyectoFixture, estadoProyecto: 'EN_SOLICITUD_CIERRE' },
-      isLoading: false,
-      error: null,
-    });
-    renderPage();
-
-    fireEvent.click(screen.getByRole('button', { name: /rechazar/i }));
-
-    expect(uvgSwal.fire).toHaveBeenCalledWith(expect.objectContaining({ title: '¿Rechazar cierre?' }));
-    await waitFor(() => expect(rejectProjectClosure).toHaveBeenCalledWith(42));
-    expect(approveProjectClosure).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /aprobar cierre/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rechazar/i })).not.toBeInTheDocument();
   });
 });
 
-// ─── F16 — bloqueo de "Solicitar cierre del proyecto" por Sprint operable ──
+// ─── S7 — «Preparar cierre del proyecto» gobernado por el readiness ────────
 
-const SPRINT_BLOCK_MSG = 'Debes cerrar el Sprint actual antes de solicitar el cierre del proyecto';
+function readiness(overrides: Partial<CloseReadinessSummary> = {}): CloseReadinessSummary {
+  return {
+    projectId: 42,
+    revisionId: null,
+    phase: 'REQUEST',
+    canSubmit: true,
+    blockers: [],
+    warnings: [],
+    executionFingerprint: null,
+    ...overrides,
+  };
+}
 
-describe('ProjectDetailClient — F16: cierre bloqueado por Sprint operable (A11)', () => {
+describe('ProjectDetailClient — S7: preparar cierre según CloseReadinessSummary', () => {
   beforeEach(() => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } }); // idUsuario 1 = líder (creador.idUsuario)
     searchParamsMock.mockReturnValue(new URLSearchParams());
     mockMembers([]);
+    mockSprints([]);
   });
 
   afterEach(() => {
@@ -236,108 +223,42 @@ describe('ProjectDetailClient — F16: cierre bloqueado por Sprint operable (A11
     vi.clearAllMocks();
   });
 
-  it('Sprint ACTIVO: el botón está visible, disabled, explica el motivo y no dispara requestProjectClosure', () => {
-    mockSprints([sprintFixture('ACTIVO')]);
+  it('con canSubmit:true la acción es un enlace habilitado a /cierre', async () => {
+    (getCloseReadiness as any).mockResolvedValue(readiness());
     renderPage();
 
-    const boton = screen.getByRole('button', { name: /solicitar cierre del proyecto/i });
-    expect(boton).toBeInTheDocument();
-    expect(boton).toBeDisabled();
-    // Accesible sin mouse: aria-label del envoltorio enfocable (mismo patrón
-    // que role-admin-card.tsx), no solo el tooltip visual al hover.
-    expect(screen.getByLabelText(SPRINT_BLOCK_MSG)).toBeInTheDocument();
-
-    fireEvent.click(boton);
-    expect(requestProjectClosure).not.toHaveBeenCalled();
+    const link = await screen.findByRole('link', { name: /preparar cierre del proyecto/i });
+    expect(link).toHaveAttribute('href', '/dashboard/projects/42/cierre');
   });
 
-  it('Sprint EN_FINALIZACION: bloquea exactamente igual que ACTIVO', () => {
-    mockSprints([sprintFixture('EN_FINALIZACION')]);
-    renderPage();
-
-    const boton = screen.getByRole('button', { name: /solicitar cierre del proyecto/i });
-    expect(boton).toBeDisabled();
-    expect(screen.getByLabelText(SPRINT_BLOCK_MSG)).toBeInTheDocument();
-
-    fireEvent.click(boton);
-    expect(requestProjectClosure).not.toHaveBeenCalled();
-  });
-
-  it('Sprint CERRADO: no bloquea por esta razón — el botón queda habilitado y el flujo de solicitud sigue disponible', async () => {
-    mockSprints([sprintFixture('CERRADO')]);
-    renderPage();
-
-    expect(screen.queryByLabelText(SPRINT_BLOCK_MSG)).not.toBeInTheDocument();
-    const boton = screen.getByRole('button', { name: /solicitar cierre del proyecto/i });
-    expect(boton).not.toBeDisabled();
-
-    fireEvent.click(boton);
-    expect(uvgSwal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({ title: '¿Solicitar cierre del proyecto?' }),
+  it('con canSubmit:false la acción está deshabilitada y explica cuántas comprobaciones faltan', async () => {
+    (getCloseReadiness as any).mockResolvedValue(
+      readiness({ canSubmit: false, blockers: [{ code: 'SPRINTS_NO_CERRADOS', message: 'Sprint abierto', ids: [1], cantidad: 1 }] }),
     );
-    await waitFor(() => expect(requestProjectClosure).toHaveBeenCalledWith(42));
-  });
-
-  it('sin Sprint: no bloquea por esta razón — el botón queda habilitado', () => {
-    mockSprints([]);
     renderPage();
 
-    expect(screen.queryByLabelText(SPRINT_BLOCK_MSG)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /solicitar cierre del proyecto/i })).not.toBeDisabled();
+    expect(await screen.findByLabelText(/Faltan 1 de 16 comprobación/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /preparar cierre del proyecto/i })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: /preparar cierre del proyecto/i })).not.toBeInTheDocument();
   });
 
-  it('un Sprint CERRADO conviviendo con otro Sprint (numeración distinta) no reintroduce el bloqueo', () => {
-    // Aísla que la condición depende del `estado` real de cada Sprint, no de
-    // "existe al menos un Sprint" ni de cuál es el más reciente.
-    mockSprints([sprintFixture('CERRADO', 1), sprintFixture('CERRADO', 2)]);
-    renderPage();
-
-    expect(screen.queryByLabelText(SPRINT_BLOCK_MSG)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /solicitar cierre del proyecto/i })).not.toBeDisabled();
-  });
-
-  it('no-líder no ve el control (el control YA EXISTE solo para quien puede solicitarlo)', () => {
+  it('no-líder no ve el control', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
     mockMembers([{ idUsuario: 999, idRolProyecto: 3 }]);
-    mockSprints([sprintFixture('ACTIVO')]);
     renderPage();
 
-    expect(screen.queryByRole('button', { name: /solicitar cierre del proyecto/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/preparar cierre del proyecto/i)).not.toBeInTheDocument();
+    expect(getCloseReadiness).not.toHaveBeenCalled();
   });
 
-  it('fuera de EN_PROGRESO (p.ej. PUBLICADO) el control no se muestra, preservando la precondición existente de A11', () => {
+  it('fuera de EN_PROGRESO (p.ej. PUBLICADO) el control no se muestra', () => {
     (useProjectDetail as any).mockReturnValue({
       data: { ...proyectoFixture, estadoProyecto: 'PUBLICADO' },
       isLoading: false,
       error: null,
     });
-    mockSprints([]);
     renderPage();
 
-    expect(screen.queryByRole('button', { name: /solicitar cierre del proyecto/i })).not.toBeInTheDocument();
-  });
-
-  it('mientras la solicitud está en curso (pending), el botón permanece disabled sin volver a llamar requestProjectClosure', async () => {
-    mockSprints([]);
-    let resolveRequest!: () => void;
-    (requestProjectClosure as any).mockReturnValue(
-      new Promise<void>((resolve) => {
-        resolveRequest = resolve;
-      }),
-    );
-    renderPage();
-
-    const boton = screen.getByRole('button', { name: /solicitar cierre del proyecto/i });
-    fireEvent.click(boton);
-
-    await waitFor(() => expect(requestProjectClosure).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(boton).toBeDisabled());
-
-    // Un segundo click mientras está pending no debe disparar una segunda llamada.
-    fireEvent.click(boton);
-    expect(requestProjectClosure).toHaveBeenCalledTimes(1);
-
-    resolveRequest();
-    await waitFor(() => expect(boton).not.toBeDisabled());
+    expect(screen.queryByText(/preparar cierre del proyecto/i)).not.toBeInTheDocument();
   });
 });
