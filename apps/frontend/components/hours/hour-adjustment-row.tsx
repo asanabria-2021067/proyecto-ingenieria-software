@@ -79,7 +79,13 @@ export function HourAdjustmentRow({
     setErrorLocal(null);
   }, [tramo.propuestas, tramo.justificacionAjuste]);
 
-  const editable = tramo.abierto && !disabled;
+  // Contrato backend (task-hour-adjustments.service.ts): solo se ajusta un tramo
+  // ya CERRADO (desasignadaEn ≠ null → `abierto:false`), con participación
+  // resuelta y todavía no consumido por un cierre (`reconocidoEn` null).
+  // Un tramo abierto lo cierra su integrante; el líder no lo ajusta.
+  const consumido = tramo.reconocidoEn != null;
+  const ajustable = !tramo.abierto && tramo.idParticipacion != null && !consumido;
+  const editable = ajustable && !disabled;
   const propuestasNum = Number(propuestas);
   const propuestasValidas = propuestas.trim().length > 0 && Number.isFinite(propuestasNum) && propuestasNum >= 0;
   const delta = propuestasValidas ? toDeltaHoras(propuestasNum, tramo.reportadas) : '0.00';
@@ -128,9 +134,13 @@ export function HourAdjustmentRow({
   };
 
   const mensajeError = error ?? errorLocal;
-  const motivoNoEditable = !tramo.abierto
-    ? 'Este tramo ya fue consolidado; no admite ajustes.'
-    : 'El Sprint no admite ajustes en este momento.';
+  const motivoNoEditable = tramo.abierto
+    ? 'Este tramo sigue abierto: el integrante debe cerrarlo antes de que puedas ajustar sus horas.'
+    : consumido
+      ? 'Este tramo ya fue acreditado en un cierre; no admite ajustes.'
+      : tramo.idParticipacion == null
+        ? 'Este tramo no tiene participación histórica resuelta; no admite ajustes.'
+        : 'El Sprint no admite ajustes en este momento.';
 
   return (
     <div
@@ -156,9 +166,17 @@ export function HourAdjustmentRow({
               {ORIGEN_LABEL[tramo.origen] ?? tramo.origen}
             </Badge>
           )}
-          {!tramo.abierto && (
+          {tramo.abierto ? (
+            <Badge variant="outline" className="border-amber-500/50 text-[10px] text-amber-800 dark:text-amber-200">
+              Abierto · pendiente de cierre
+            </Badge>
+          ) : consumido ? (
             <Badge variant="outline" className="text-[10px] text-tertiary">
-              Consolidado
+              Acreditado
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px] text-tertiary">
+              Tramo cerrado
             </Badge>
           )}
         </div>

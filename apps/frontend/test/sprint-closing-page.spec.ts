@@ -102,7 +102,7 @@ function participante(overrides: Partial<any> = {}) {
           tituloTarea: 'Integración',
           tareaEliminada: false,
           idParticipacion: 51,
-          abierto: true,
+          abierto: false,
           origen: 'GRANULAR',
           reportadas: '11.00',
           ajuste: null,
