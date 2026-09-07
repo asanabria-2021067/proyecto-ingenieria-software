@@ -10,6 +10,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import {
   useCloseReadiness,
   useClosureDraft,
+  esUploadCancelado,
   useClosureMutations,
   useClosureRevision,
 } from '@/hooks/use-closure';
@@ -83,7 +84,7 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
   const draft = draftQuery.data ?? null;
   const readinessQuery = useCloseReadiness(idProyecto, phase, estadoOperable && draft != null);
   const revisionQuery = useClosureRevision(idProyecto, draft?.numeroRevision, draft != null);
-  const { generate, upload, detach, submit, refreshAll } = useClosureMutations(idProyecto);
+  const { generate, upload, uploads, cancelUpload, detach, submit, refreshAll } = useClosureMutations(idProyecto);
 
   const [docsError, setDocsError] = useState<string | null>(null);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
@@ -136,7 +137,13 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
     setDocsError(null);
     upload.mutate(
       { revisionId: draft.idRevisionCierre, file },
-      { onError: (err) => manejarErrorDocs(err, 'subir', file) },
+      {
+        onError: (err) => {
+          // Cancelar es una decisión del usuario, no un fallo que reportar.
+          if (esUploadCancelado(err)) return;
+          manejarErrorDocs(err, 'subir', file);
+        },
+      },
     );
   };
 
@@ -357,6 +364,8 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
               generating={generate.isPending}
               onUpload={onUpload}
               uploading={upload.isPending}
+              uploads={uploads}
+              onCancelUpload={cancelUpload}
               onDetach={onDetach}
               detachingId={detachingId}
               error={docsError}

@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ClosureDocumentViewer, formatearTamano } from '@/components/closure/closure-document-viewer';
 import { validateClosurePdf } from '@/hooks/use-closure';
-import type { ClosureRevision, ClosureRevisionDocument } from '@/lib/types/closure';
+import type { ClosureRevision, ClosureRevisionDocument, ClosureUploadEnCurso } from '@/lib/types/closure';
 
 export const MAX_EVIDENCIAS = 10;
 
@@ -26,6 +26,9 @@ export interface ClosureDocumentsManagerProps {
   generating?: boolean;
   onUpload?: (file: File) => void;
   uploading?: boolean;
+  /** Evidencias subiéndose ahora mismo; aún no son documentos de la entrega. */
+  uploads?: ClosureUploadEnCurso[];
+  onCancelUpload?: (id: string) => void;
   onDetach?: (documentId: number) => void;
   detachingId?: number | null;
   /** Error de la última operación de documentos (413/422/409…), ya traducido. */
@@ -65,6 +68,8 @@ export function ClosureDocumentsManager({
   generating = false,
   onUpload,
   uploading = false,
+  uploads = [],
+  onCancelUpload,
   onDetach,
   detachingId = null,
   error,
@@ -83,7 +88,7 @@ export function ClosureDocumentsManager({
   const informe = documentos.find((d) => d.tipoDocumento === 'INFORME_AUTOMATICO') ?? null;
   const evidencias = documentos.filter((d) => d.tipoDocumento === 'EVIDENCIA_LIDER');
   const puedeMutar = !readOnly && revision != null && (revision.puedeEditar ?? true);
-  const cupoLleno = evidencias.length >= MAX_EVIDENCIAS;
+  const cupoLleno = evidencias.length + uploads.length >= MAX_EVIDENCIAS;
 
   const elegirArchivo = (file: File | undefined) => {
     if (!file) return;
@@ -217,8 +222,46 @@ export function ClosureDocumentsManager({
           )}
         </div>
 
-        {evidencias.length > 0 && (
+        {(uploads.length > 0 || evidencias.length > 0) && (
           <ul className="mt-3 divide-y divide-outline-variant/30 border-t border-outline-variant/30" aria-label="Evidencias adjuntas">
+            {!readOnly &&
+              uploads.map((u) => (
+              <li key={u.id} className="flex flex-wrap items-center gap-2 py-2 text-sm" aria-label={`Evidencia en curso: ${u.nombreArchivo}`}>
+                <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-on-surface" title={u.nombreArchivo}>
+                    {u.nombreArchivo}
+                  </span>
+                  {/* Barra indeterminada: `fetch` no expone el progreso de
+                      subida, así que se muestra actividad, nunca un porcentaje
+                      inventado. */}
+                  <span
+                    role="progressbar"
+                    aria-label={`Subiendo ${u.nombreArchivo}`}
+                    className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-surface-container-high"
+                  >
+                    <span className="block h-full w-1/3 animate-pulse rounded-full bg-primary" />
+                  </span>
+                </span>
+                {formatearTamano(u.tamanoBytes) && (
+                  <Badge variant="outline" className="text-[10px] text-tertiary">
+                    {formatearTamano(u.tamanoBytes)}
+                  </Badge>
+                )}
+                <span className="text-xs text-tertiary">Subiendo…</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onCancelUpload?.(u.id)}
+                  aria-label={`Cancelar la subida de ${u.nombreArchivo}`}
+                  className="h-8 gap-1 text-xs font-semibold text-error hover:bg-error/10 hover:text-error"
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                  Cancelar
+                  </Button>
+                </li>
+              ))}
             {evidencias.map((doc) => (
               <li key={doc.idDocumentoCierre} className="flex flex-wrap items-center gap-2 py-2 text-sm">
                 <FileText className="size-4 shrink-0 text-tertiary" aria-hidden="true" />

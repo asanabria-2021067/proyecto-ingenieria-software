@@ -107,6 +107,18 @@ export interface CloseReadinessSummary {
 
 // ─── Documentos y carga ──────────────────────────────────────────────────────
 
+/**
+ * Una evidencia que el líder está subiendo AHORA. No es un documento todavía:
+ * el backend solo la vincula a la entrega cuando la carga termina, así que
+ * vive únicamente en el cliente hasta entonces.
+ */
+export interface ClosureUploadEnCurso {
+  /** Identidad local de la carga; el documento aún no tiene id del servidor. */
+  id: string;
+  nombreArchivo: string;
+  tamanoBytes: number;
+}
+
 /** Permiso de CARGA (`POST …/cierre/documentos/firma`). `uploadUrl` es una ruta del backend. TTL 600 s. */
 export interface UploadGrant {
   documentId: number;
