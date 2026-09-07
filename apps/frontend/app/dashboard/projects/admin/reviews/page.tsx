@@ -8,6 +8,7 @@ import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal from '@/lib/swal';
 import { getAdminReviewInbox, resolverRevision } from '@/lib/services/projects';
+import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 
 export default function AdminReviewsInboxPage() {
   const queryClient = useQueryClient();
@@ -45,8 +46,19 @@ export default function AdminReviewsInboxPage() {
       cancelButtonText: 'Cancelar',
     });
     if (!isConfirmed) return;
-    await resolverRevision(idProyecto, { resultado: 'APROBADA' });
-    await refresh();
+    try {
+      await resolverRevision(idProyecto, { resultado: 'APROBADA' });
+      await refresh();
+    } catch (err) {
+      // 409: otro administrador ya resolvió o el proyecto cambió de estado →
+      // invalidar y recargar la bandeja; nunca reintentar a ciegas.
+      await refresh();
+      void uvgSwal.fire({
+        icon: getApiErrorStatus(err) === 409 ? 'info' : 'error',
+        title: getApiErrorStatus(err) === 409 ? 'La revisión ya fue resuelta' : 'No se pudo aprobar',
+        text: getApiErrorMessage(err, 'admin'),
+      });
+    }
   }
 
   // S7 (V5 §31.2): esta bandeja es de revisiones de PUBLICACIÓN. Los cierres
@@ -70,7 +82,7 @@ export default function AdminReviewsInboxPage() {
               Revisiones
             </h1>
             <p className="mt-2 max-w-2xl text-base text-tertiary">
-              Bandeja de proyectos pendientes de revisión y solicitudes de cierre.
+              Bandeja de revisiones de publicación. Los cierres de proyecto se resuelven en Solicitudes de cierre.
             </p>
           </div>
           <button
@@ -111,7 +123,11 @@ export default function AdminReviewsInboxPage() {
                   <p className="text-xs text-tertiary">Proyectos pendientes de revisión</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
+              <Link
+                href={CIERRES_HREF}
+                aria-label="Cierre pendiente: ver en Solicitudes de cierre"
+                className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5 transition-colors hover:border-primary/40 hover:bg-surface-container"
+              >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
                   <GitPullRequest className="h-6 w-6 text-amber-600" />
                 </div>
@@ -120,9 +136,9 @@ export default function AdminReviewsInboxPage() {
                   <p className="text-3xl font-black tracking-tighter text-on-surface">
                     {inbox.cierresPendientes.length}
                   </p>
-                  <p className="text-xs text-tertiary">Solicitudes de cierre por aprobar</p>
+                  <p className="text-xs text-tertiary">Se resuelven en Solicitudes de cierre</p>
                 </div>
-              </div>
+              </Link>
               <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
                   <MessageSquareWarning className="h-6 w-6 text-orange-600" />
@@ -253,6 +269,7 @@ export default function AdminReviewsInboxPage() {
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
                   <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" />
                   <p className="text-sm font-medium text-tertiary">No hay cierres pendientes</p>
+                  <p className="mt-1 text-xs text-tertiary">Los veredictos de cierre no se emiten desde esta bandeja.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
