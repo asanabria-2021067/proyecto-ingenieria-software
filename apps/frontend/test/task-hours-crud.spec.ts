@@ -413,3 +413,62 @@ describe('TaskHoursSection — registros revocados', () => {
     expect(screen.getByRole('button', { name: /^Revocar registro/ })).toBeInTheDocument();
   });
 });
+
+/**
+ * Una justificación de exceso pertenece a un registro concreto. La lista las
+ * filtraba solo por autor, así que al revocar el registro su justificación
+ * seguía en pantalla: el estudiante veía argumentada una hora que ya había
+ * retirado, y el líder no podía distinguir si justificaba horas que aún cuentan.
+ */
+describe('TaskHoursSection — justificaciones de exceso revocadas', () => {
+  function tramo(justificaciones: Array<{ texto: string; revocadoEn: string | null }>) {
+    return {
+      idAsignacion: 3,
+      usuario: { idUsuario: 1, nombre: 'V', apellido: 'H', fotoUrl: null },
+      idParticipacion: 7,
+      rolHistorico: null,
+      abierto: true,
+      origen: 'GRANULAR' as const,
+      reportadas: '3.00',
+      ajuste: null,
+      propuestas: '3.00',
+      reconocidoEn: null,
+      justificaciones,
+    };
+  }
+
+  it('la justificación de un registro retirado se marca y se tacha', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(
+      resumen({ tramos: [tramo([{ texto: 'Hubo retrabajo', revocadoEn: '2026-09-07T18:00:00.000Z' }])] }),
+    );
+    renderSection();
+
+    await esperarCarga();
+    const texto = screen.getByText('Hubo retrabajo');
+    expect(texto).toHaveClass('line-through');
+    expect(within(texto.closest('li') as HTMLElement).getByText('Revocado')).toBeInTheDocument();
+  });
+
+  it('una justificación vigente se lee sin marca alguna', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(
+      resumen({ tramos: [tramo([{ texto: 'Se cayó el proveedor', revocadoEn: null }])] }),
+    );
+    renderSection();
+
+    await esperarCarga();
+    const texto = screen.getByText('Se cayó el proveedor');
+    expect(texto).not.toHaveClass('line-through');
+    expect(within(texto.closest('li') as HTMLElement).queryByText('Revocado')).not.toBeInTheDocument();
+  });
+
+  it('sin justificaciones no se dibuja el apartado', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen({ tramos: [tramo([])] }));
+    renderSection();
+
+    await esperarCarga();
+    expect(screen.queryByText('Justificaciones de exceso')).not.toBeInTheDocument();
+  });
+});

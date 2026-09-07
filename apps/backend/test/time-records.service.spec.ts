@@ -312,3 +312,76 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
     });
   });
 });
+
+
+/**
+ * Una justificación de exceso pertenece a un registro concreto. Se filtraban
+ * solo por autor, nunca por revocación: quien retiraba su registro seguía
+ * viendo argumentadas unas horas que ya no existían, y el líder no podía
+ * distinguir cuáles respaldaban horas vigentes.
+ */
+describe('TimeRecordsService — justificaciones de exceso y revocación', () => {
+  const REVOCADO_EN = new Date('2026-09-07T18:00:00.000Z');
+
+  /** Un tramo con dos registros del mismo autor: uno vigente y otro retirado. */
+  function tramoConAmbos() {
+    return {
+      idAsignacion: 3,
+      idParticipacion: 7,
+      desasignadaEn: null,
+      origenReporte: 'GRANULAR',
+      horasReales: new Prisma.Decimal(3),
+      reconocidoEn: null,
+      idUsuario: ASSIGNEE_ID,
+      usuario: { idUsuario: ASSIGNEE_ID, nombre: 'V', apellido: 'H', fotoUrl: null },
+      participacion: null,
+      registrosTiempo: [
+        { idUsuario: ASSIGNEE_ID, horas: new Prisma.Decimal(3), revocadoEn: null, justificacionExceso: 'Vigente' },
+        { idUsuario: ASSIGNEE_ID, horas: new Prisma.Decimal(1), revocadoEn: REVOCADO_EN, justificacionExceso: 'Retirada' },
+      ],
+      ajustes: [],
+    };
+  }
+
+  function setupResumen(perfil: string) {
+    const base = setup();
+    const prisma = base.prisma as unknown as Record<string, unknown>;
+    prisma.asignacionTarea = { findMany: vi.fn().mockResolvedValue([tramoConAmbos()]) };
+    prisma.sprint = {
+      findFirst: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }),
+      findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }),
+    };
+    (base.readPolicy.assertRead as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      profile: perfil, sprintEstados: null, ownOnly: false, isAdmin: false,
+      project: { estadoProyecto: 'EN_PROGRESO' },
+    });
+    return base;
+  }
+
+  it('el autor no recibe la justificación del registro que revocó', async () => {
+    const { service } = setupResumen('PARTICIPANTE_ACTIVO');
+
+    const resumen = await service.getTaskHoursSummary(PROJECT_ID, TASK_ID, ASSIGNEE_ID);
+
+    expect(resumen.tramos[0].justificaciones).toEqual([{ texto: 'Vigente', revocadoEn: null }]);
+  });
+
+  it('el líder conserva ambas y puede distinguir la retirada', async () => {
+    const { service } = setupResumen('LIDER');
+
+    const resumen = await service.getTaskHoursSummary(PROJECT_ID, TASK_ID, LEADER_ID);
+
+    expect(resumen.tramos[0].justificaciones).toEqual([
+      { texto: 'Vigente', revocadoEn: null },
+      { texto: 'Retirada', revocadoEn: REVOCADO_EN.toISOString() },
+    ]);
+  });
+
+  it('las horas reportadas nunca cuentan lo revocado, lo lea quien lo lea', async () => {
+    const { service: comoLider } = setupResumen('LIDER');
+    expect((await comoLider.getTaskHoursSummary(PROJECT_ID, TASK_ID, LEADER_ID)).horasReportadasTarea).toBe('3.00');
+
+    const { service: comoAutor } = setupResumen('PARTICIPANTE_ACTIVO');
+    expect((await comoAutor.getTaskHoursSummary(PROJECT_ID, TASK_ID, ASSIGNEE_ID)).horasReportadasTarea).toBe('3.00');
+  });
+});

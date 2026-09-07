@@ -568,17 +568,31 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
           </h3>
           <ul className="space-y-1">
             {resumen.tramos.flatMap((tramo) =>
-              tramo.justificaciones.map((justificacion, index) => (
-                <li
-                  key={`${tramo.idAsignacion}-${index}`}
-                  className="rounded-md bg-amber-400/10 px-3 py-2 text-xs text-on-surface-variant"
-                >
-                  <span className="font-semibold text-on-surface">
-                    {tramo.usuario.nombre} {tramo.usuario.apellido}:
-                  </span>{' '}
-                  {justificacion}
-                </li>
-              )),
+              tramo.justificaciones.map((justificacion, index) => {
+                // Justifica horas que ya no cuentan: se conserva como traza,
+                // pero no debe leerse igual que una vigente.
+                const revocada = justificacion.revocadoEn != null;
+                return (
+                  <li
+                    key={`${tramo.idAsignacion}-${index}`}
+                    className={`rounded-md px-3 py-2 text-xs ${
+                      revocada
+                        ? 'bg-surface-container-low text-tertiary'
+                        : 'bg-amber-400/10 text-on-surface-variant'
+                    }`}
+                  >
+                    <span className={`font-semibold ${revocada ? 'text-tertiary' : 'text-on-surface'}`}>
+                      {tramo.usuario.nombre} {tramo.usuario.apellido}:
+                    </span>{' '}
+                    <span className={revocada ? 'line-through' : undefined}>{justificacion.texto}</span>
+                    {revocada && (
+                      <Badge variant="outline" className="ml-2 text-[10px] font-semibold text-tertiary">
+                        Revocado
+                      </Badge>
+                    )}
+                  </li>
+                );
+              }),
             )}
           </ul>
         </div>
