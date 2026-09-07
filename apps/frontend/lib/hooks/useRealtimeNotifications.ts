@@ -9,6 +9,7 @@ import {
   closureRevisionsPrefix,
 } from '@/lib/query-keys/closure';
 import { projectDetailQueryKey } from '@/lib/query-keys/project';
+import { historicalProjectQueryKey } from '@/lib/query-keys/historical';
 import { projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
 
 export interface Notification {
@@ -133,6 +134,10 @@ export function useRealtimeNotifications(enabled: boolean) {
     const handleProjectStateChanged = (payload: ProjectStateChangedPayload) => {
       queryClient.invalidateQueries({ queryKey: projectDetailQueryKey(payload.projectId) });
       queryClient.invalidateQueries({ queryKey: closeReadinessPrefix(payload.projectId) });
+      // VIEW-02: el GET público (`['proyecto', id]`) y el histórico cambian
+      // cuando el proyecto pasa a CERRADO; el modo read-only aparece sin recargar.
+      queryClient.invalidateQueries({ queryKey: ['proyecto', String(payload.projectId)] });
+      queryClient.invalidateQueries({ queryKey: historicalProjectQueryKey(payload.projectId) });
     };
 
     const handleClosureReviewUpdated = (payload: ClosureReviewUpdatedPayload) => {
