@@ -105,6 +105,9 @@ function participante(overrides: Partial<any> = {}) {
           abierto: false,
           origen: 'GRANULAR',
           reportadas: '11.00',
+          estimacionTarea: null,
+          exceso: '0.00',
+          justificacionExceso: null,
           ajuste: null,
           justificacionAjuste: null,
           propuestas: '11.00',
@@ -205,7 +208,7 @@ describe('SprintClosingPage — render dinámico', () => {
     expect(screen.getAllByText('11 h').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('al expandir un integrante se ve rol → tarea → tramo con «Horas propuestas» editable', async () => {
+  it('al expandir un integrante se ve rol → tarea → tramo, en lectura y con «Ajustar»', async () => {
     mockSummary();
     mockClose();
 
@@ -213,7 +216,12 @@ describe('SprintClosingPage — render dinámico', () => {
     fireEvent.click(screen.getByRole('button', { name: /Desglose de Andrea Pérez/ }));
 
     expect(await screen.findByText('Tarea: Integración')).toBeInTheDocument();
-    expect(screen.getByRole('spinbutton', { name: 'Horas propuestas' })).toHaveValue(11);
+    // El registro del estudiante se lee; el líder ajusta aparte y bajo petición.
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Ajustar/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Ajustar/ }));
+    expect(screen.getByRole('spinbutton', { name: 'Horas aceptadas' })).toHaveValue(11);
     expect(screen.getByRole('button', { name: /Guardar ajuste/ })).toBeInTheDocument();
   });
 
