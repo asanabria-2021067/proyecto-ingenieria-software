@@ -67,7 +67,7 @@ function tramo(overrides: Partial<SprintClosingTramoDto> = {}): SprintClosingTra
     tituloTarea: 'Coordinación de jornada',
     tareaEliminada: false,
     idParticipacion: 51,
-    abierto: true,
+    abierto: false,
     origen: 'GRANULAR',
     reportadas: '7.00',
     ajuste: null,
