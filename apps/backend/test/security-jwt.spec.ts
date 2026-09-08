@@ -50,7 +50,7 @@ function runAuthenticate(strategy: JwtStrategy, token: string): Promise<AuthResu
 
 function signValidAccessToken(overrides: Record<string, unknown> = {}) {
   const jwtService = new JwtService({ secret: SECRET });
-  return jwtService.sign({ sub: 1, correo: 'a@uvg.edu.gt', ...overrides }, { expiresIn: '45m' });
+  return jwtService.sign({ sub: 1, correo: 'a@uvg.edu.gt', tipo: 'access', ...overrides }, { expiresIn: '45m' });
 }
 
 function base64url(obj: unknown) {
