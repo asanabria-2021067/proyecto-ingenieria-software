@@ -21,6 +21,7 @@ import {
   Layers,
   LogOut,
   MapPin,
+  MessageCircle,
   ShieldAlert,
   Users,
 } from 'lucide-react';
@@ -48,6 +49,7 @@ import ProjectDetailClient from '@/app/dashboard/projects/[id]/project-detail-cl
 import { ExitRequestSection } from '@/components/projects/detail/exit-request-section';
 import { LeaveProjectModal } from '@/components/projects/leave-project-modal';
 import { useProjectMembers } from '@/hooks/use-project-members';
+import { useChatPanel } from '@/components/projects/chat-panel-context';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useCurrentExitRequest } from '@/hooks/use-exit-request';
 import { useProjectRoles } from '@/hooks/use-project-roles';
@@ -129,6 +131,7 @@ export default function ProyectoDetallePage() {
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
   const esParticipante =
     !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
+  const { requestChatWith } = useChatPanel();
   const resolviendoPertenencia = isLoadingCurrentUser || (!!currentUser && isLoadingMembers);
 
   // Roles + isMine/canLeave: solo se piden para un participante activo (el
@@ -332,7 +335,7 @@ export default function ProyectoDetallePage() {
                     >
                       {getIniciales(proyecto.creador.nombre, proyecto.creador.apellido)}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-semibold text-on-surface">
                         {proyecto.creador.nombre} {proyecto.creador.apellido}
                       </p>
@@ -341,6 +344,16 @@ export default function ProyectoDetallePage() {
                         <p className="truncate text-[12px] text-on-surface-variant">{proyecto.creador.correo}</p>
                       )}
                     </div>
+                    {esParticipante && (
+                      <button
+                        type="button"
+                        onClick={() => requestChatWith(proyecto.creador.idUsuario)}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high"
+                      >
+                        <MessageCircle className="size-3.5" aria-hidden="true" />
+                        Chat
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <p className="text-[13px] text-on-surface-variant">Responsable no disponible</p>
