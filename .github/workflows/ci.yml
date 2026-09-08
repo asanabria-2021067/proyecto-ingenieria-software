@@ -171,12 +171,6 @@ jobs:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
       DIRECT_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
       JWT_SECRET: e2e-ci-secret
-      # La suite reutiliza pocas cuentas sembradas (carlos/maria/jose) a
-      # través de varios specs; en serie, sus logins superan el límite de
-      # producción (5/min) dentro del mismo minuto y el login termina en
-      # ThrottlerException. No afecta produccion (deploy.yml no define esta
-      # variable, asi que el backend real sigue en 5).
-      AUTH_LOGIN_THROTTLE_LIMIT: '50'
       REDIS_HOST: localhost
       REDIS_PORT: 6379
       FRONTEND_URL: http://localhost:3000
