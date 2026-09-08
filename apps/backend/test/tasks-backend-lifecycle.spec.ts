@@ -508,6 +508,116 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
   });
 
   // -------------------------------------------------------------------
+  // HU-141: gestión colaborativa por rol (edición/asignación/desasignación)
+  // -------------------------------------------------------------------
+  describe('HU-141 — gestión colaborativa por rol', () => {
+    async function crearTareaConRolDesarrollo(env: LifecycleEnv) {
+      const dto = await parseCreate(baseCreatePayload({ idRolProyecto: R.desarrolloA }));
+      return env.tasksService.create(P.A, U.liderA, dto);
+    }
+
+    it('editar: un participante activo del mismo rol que la tarea (no líder) puede editarla', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+      const dto = await parseUpdate({ tituloTarea: 'Editado por compañero de rol' });
+
+      const editada = await env.tasksService.update(P.A, creada.idTarea, U.a2, dto);
+
+      expect(editada.tituloTarea).toBe('Editado por compañero de rol');
+    });
+
+    it('asignar: un participante activo del mismo rol que la tarea (no líder) puede asignarla', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+      const dto = await parseAssign({ idUsuario: U.a1 });
+
+      const resultado = await env.tasksService.assign(P.A, creada.idTarea, U.a2, dto);
+
+      expect(resultado.asignacionActiva?.idUsuario).toBe(U.a1);
+    });
+
+    it('desasignar: un participante activo del mismo rol que la tarea (no líder) puede desasignarla', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+      await env.tasksService.assign(P.A, creada.idTarea, U.liderA, await parseAssign({ idUsuario: U.a1 }));
+
+      await expect(env.tasksService.unassign(P.A, creada.idTarea, U.a2)).resolves.toBeUndefined();
+    });
+
+    it('editar: un participante activo de OTRO rol del mismo proyecto (cross-role) → 403', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+      const dto = await parseUpdate({ tituloTarea: 'intento cross-role' });
+
+      await expectStatus(env.tasksService.update(P.A, creada.idTarea, U.a3Diseno, dto), ForbiddenException, 403);
+    });
+
+    it('asignar: un participante activo de OTRO rol del mismo proyecto (cross-role) → 403', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+
+      await expectStatus(
+        env.tasksService.assign(P.A, creada.idTarea, U.a3Diseno, await parseAssign({ idUsuario: U.a1 })),
+        ForbiddenException,
+        403,
+      );
+    });
+
+    it('editar: un participante activo con el mismo NOMBRE de rol pero en OTRO proyecto (cross-project) → 403', async () => {
+      // participanteB participa activamente en roles.desarrolloB, cuyo
+      // nombreRol es "Desarrollo" — igual que roles.desarrolloA — pero con
+      // id y proyecto distintos. Si la comparación usara el nombre en vez
+      // del id (o no acotara por proyecto), esto pasaría incorrectamente.
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+      const dto = await parseUpdate({ tituloTarea: 'intento cross-project' });
+
+      await expectStatus(env.tasksService.update(P.A, creada.idTarea, U.participanteB, dto), ForbiddenException, 403);
+    });
+
+    it('editar: un miembro RETIRADO del mismo rol de la tarea → 403', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+      const dto = await parseUpdate({ tituloTarea: 'intento de retirado' });
+
+      await expectStatus(env.tasksService.update(P.A, creada.idTarea, U.inactivoA, dto), ForbiddenException, 403);
+    });
+
+    it('editar: una tarea SIN rol sigue siendo exclusiva del líder pese a la colaboración por rol', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await env.tasksService.create(P.A, U.liderA, await parseCreate(baseCreatePayload()));
+      const dto = await parseUpdate({ tituloTarea: 'intento sin rol' });
+
+      await expectStatus(env.tasksService.update(P.A, creada.idTarea, U.a1, dto), ForbiddenException, 403);
+    });
+
+    it('el líder conserva autoridad total: edita, asigna y desasigna una tarea con rol sin tener participación en ese rol', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+
+      const editada = await env.tasksService.update(
+        P.A,
+        creada.idTarea,
+        U.liderA,
+        await parseUpdate({ tituloTarea: 'editado por el líder' }),
+      );
+      expect(editada.tituloTarea).toBe('editado por el líder');
+
+      const asignada = await env.tasksService.assign(P.A, creada.idTarea, U.liderA, await parseAssign({ idUsuario: U.a1 }));
+      expect(asignada.asignacionActiva?.idUsuario).toBe(U.a1);
+
+      await expect(env.tasksService.unassign(P.A, creada.idTarea, U.liderA)).resolves.toBeUndefined();
+    });
+
+    it('eliminar sigue siendo exclusivo del líder: un participante activo del mismo rol no puede eliminar', async () => {
+      const env = setupLifecycleEnv();
+      const creada = await crearTareaConRolDesarrollo(env);
+
+      await expectStatus(env.tasksService.remove(P.A, creada.idTarea, U.a2), ForbiddenException, 403);
+    });
+  });
+
+  // -------------------------------------------------------------------
   // Matriz 404
   // -------------------------------------------------------------------
   describe('Matriz de recursos no encontrados 404', () => {

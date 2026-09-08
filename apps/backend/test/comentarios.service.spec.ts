@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import { ComentariosService } from '../src/comentarios/comentarios.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 function makePrisma() {
   return {
@@ -20,9 +25,13 @@ function makeService(
   prisma: ReturnType<typeof makePrisma>,
   notifications: Partial<NotificationsService> = {},
 ) {
+  // C036: el canal A corre sobre el protocolo; el doble entrega el mismo mock como `tx`.
   return new ComentariosService(
     prisma as unknown as PrismaService,
     notifications as unknown as NotificationsService,
+    makeProjectTransactionDouble({ tx: prisma }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 }
 
@@ -63,7 +72,7 @@ describe('ComentariosService', () => {
 
     expect(prisma.tarea.findFirst).toHaveBeenCalledWith({
       where: { idTarea: 7, idProyecto: 1, eliminadoEn: null, proyecto: { eliminadoEn: null } },
-      select: { idTarea: true, idProyecto: true, creadaPor: true },
+      select: { idTarea: true, idProyecto: true, creadaPor: true, idSprint: true },
     });
   });
 

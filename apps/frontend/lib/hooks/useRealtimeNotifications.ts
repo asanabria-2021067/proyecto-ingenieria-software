@@ -1,7 +1,25 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { projectSprintsQueryKey } from '@/lib/query-keys/sprints';
+import { projectSprintsQueryKey, sprintClosingSummaryQueryKey } from '@/lib/query-keys/sprints';
+import { currentExitRequestQueryKey, exitPreparationSummaryQueryKey } from '@/lib/query-keys/exit-requests';
+import {
+  closeReadinessPrefix,
+  closureDraftQueryKey,
+  closureRevisionPrefix,
+  closureRevisionsPrefix,
+} from '@/lib/query-keys/closure';
+import { projectDetailQueryKey } from '@/lib/query-keys/project';
+import { historicalProjectQueryKey } from '@/lib/query-keys/historical';
+import {
+  leadershipAppealsPrefix,
+  leadershipCandidatesQueryKey,
+  leadershipContextQueryKey,
+  leadershipHistoryPrefix,
+} from '@/lib/query-keys/leadership';
+import { projectMembersQueryKey, projectTeamSummaryQueryKey } from '@/lib/query-keys/members';
+import { adminAppealsPrefix, adminProjectDetailQueryKey, adminProjectsPrefix } from '@/lib/query-keys/admin-projects';
+import { projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
 
 export interface Notification {
   tipoNotificacion: string;
@@ -14,6 +32,41 @@ export interface Notification {
 interface SprintRealtimePayload {
   projectId: number;
   sprintId: number;
+}
+
+/** Payload real de HU-142/T-171 — ver notifications.gateway.ts (backend): `{ projectId, taskId, idAsignacion }`. */
+interface TaskHoursLoggedPayload {
+  projectId: number;
+  taskId: number;
+  idAsignacion: number;
+}
+
+/** S7 — payload real de `SPRINT_HOURS_ADJUSTED` (notifications.service.ts): `{ projectId, sprintId, idAsignacion }`. */
+interface SprintHoursAdjustedPayload {
+  projectId: number;
+  sprintId: number;
+  idAsignacion: number;
+}
+
+/** S7 — payload real de `PROJECT_STATE_CHANGED`: `{ projectId, estadoProyecto }`. Solo se usa `projectId`. */
+interface ProjectStateChangedPayload {
+  projectId: number;
+  estadoProyecto: string;
+}
+
+/** S7 — payload real de `LEADERSHIP_CHANGED`: solo IDs. NUNCA se derivan permisos de él. */
+interface LeadershipChangedPayload {
+  projectId: number;
+  historialId: number;
+  liderAnteriorId: number;
+  liderNuevoId: number;
+  origen: string;
+}
+
+/** S7 — payload real de `CLOSURE_REVIEW_UPDATED`: `{ projectId, revisionId }`. */
+interface ClosureReviewUpdatedPayload {
+  projectId: number;
+  revisionId: number;
 }
 
 export function useRealtimeNotifications(enabled: boolean) {
@@ -73,12 +126,85 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(payload.projectId) });
     };
 
+    // HU-142 (T-171): mismo criterio que los handlers de Sprint — invalida
+    // las queries reales (`project-tasks` y `task-hours`) en vez de guardar
+    // un estado aparte, para que el total de horas registradas se mantenga
+    // correcto en cualquier pestaña abierta cuando otra persona registra
+    // horas sobre la misma tarea.
+    const handleTaskHoursLogged = (payload: TaskHoursLoggedPayload) => {
+      queryClient.invalidateQueries({ queryKey: projectTasksQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: taskHoursQueryKey(payload.projectId, payload.taskId) });
+    };
+
+    // S7 (F002): punto de extensión de realtime. Cada evento nuevo SOLO
+    // invalida las queries que le corresponden con los ids del payload; el
+    // backend decide el nuevo estado al reconsultar. Nunca se deriva estado
+    // de dominio ni permisos del payload.
+    const handleSprintHoursAdjusted = (payload: SprintHoursAdjustedPayload) => {
+      queryClient.invalidateQueries({
+        queryKey: sprintClosingSummaryQueryKey(payload.projectId, payload.sprintId),
+      });
+    };
+
+    // S7 (F005): el estado del proyecto NUNCA se deriva del payload
+    // (`estadoProyecto` viaja solo como diagnóstico); se invalida el detalle
+    // y el readiness para que el servidor vuelva a decidir.
+    const handleProjectStateChanged = (payload: ProjectStateChangedPayload) => {
+      queryClient.invalidateQueries({ queryKey: projectDetailQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: closeReadinessPrefix(payload.projectId) });
+      // VIEW-02: el GET público (`['proyecto', id]`) y el histórico cambian
+      // cuando el proyecto pasa a CERRADO; el modo read-only aparece sin recargar.
+      queryClient.invalidateQueries({ queryKey: ['proyecto', String(payload.projectId)] });
+      queryClient.invalidateQueries({ queryKey: historicalProjectQueryKey(payload.projectId) });
+      // VIEW-12: el conteo «Cierre pendiente» del panel administrativo (key ya existente).
+      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+      // VIEW-15/16: la bandeja administrativa mueve el proyecto de grupo y el detalle cambia de estado.
+      queryClient.invalidateQueries({ queryKey: adminProjectsPrefix });
+      queryClient.invalidateQueries({ queryKey: adminProjectDetailQueryKey(payload.projectId) });
+      // VIEW-08: al cerrarse un proyecto del usuario sus horas pasan de abiertas a acreditadas.
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      // VIEW-10: la preparación de salida se bloquea cuando el proyecto entra en solicitud de cierre.
+      queryClient.invalidateQueries({ queryKey: exitPreparationSummaryQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: currentExitRequestQueryKey(payload.projectId) });
+    };
+
+    const handleClosureReviewUpdated = (payload: ClosureReviewUpdatedPayload) => {
+      queryClient.invalidateQueries({ queryKey: closureDraftQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: closeReadinessPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: closureRevisionsPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: closureRevisionPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+      queryClient.invalidateQueries({ queryKey: adminProjectsPrefix });
+    };
+
+    // S7 (F008): un cambio de liderazgo invalida TODO lo que deriva del líder,
+    // incluido el detalle del proyecto (`['project', id]`): la sidebar deriva
+    // `isLeader` de `Proyecto.creadoPor` y sin esta invalidación un ex-líder
+    // seguiría viendo destinos de líder hasta recargar. El servidor decide.
+    const handleLeadershipChanged = (payload: LeadershipChangedPayload) => {
+      queryClient.invalidateQueries({ queryKey: leadershipContextQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: leadershipCandidatesQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: leadershipHistoryPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: leadershipAppealsPrefix(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: projectDetailQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: ['proyecto', String(payload.projectId)] });
+      queryClient.invalidateQueries({ queryKey: projectTeamSummaryQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: projectMembersQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: adminProjectDetailQueryKey(payload.projectId) });
+      queryClient.invalidateQueries({ queryKey: adminAppealsPrefix });
+    };
+
     newSocket.on('connect', handleConnect);
     newSocket.on('disconnect', handleDisconnect);
     newSocket.on('connected', handleConnected);
     newSocket.on('notification', handleNotification);
     newSocket.on('SPRINT_FINALIZATION_STARTED', handleSprintFinalizationStarted);
     newSocket.on('SPRINT_CLOSED', handleSprintClosed);
+    newSocket.on('TASK_HOURS_LOGGED', handleTaskHoursLogged);
+    newSocket.on('SPRINT_HOURS_ADJUSTED', handleSprintHoursAdjusted);
+    newSocket.on('PROJECT_STATE_CHANGED', handleProjectStateChanged);
+    newSocket.on('CLOSURE_REVIEW_UPDATED', handleClosureReviewUpdated);
+    newSocket.on('LEADERSHIP_CHANGED', handleLeadershipChanged);
 
     const timeoutId = window.setTimeout(() => setSocket(newSocket), 0);
 
@@ -90,6 +216,11 @@ export function useRealtimeNotifications(enabled: boolean) {
       newSocket.off('notification', handleNotification);
       newSocket.off('SPRINT_FINALIZATION_STARTED', handleSprintFinalizationStarted);
       newSocket.off('SPRINT_CLOSED', handleSprintClosed);
+      newSocket.off('TASK_HOURS_LOGGED', handleTaskHoursLogged);
+      newSocket.off('SPRINT_HOURS_ADJUSTED', handleSprintHoursAdjusted);
+      newSocket.off('PROJECT_STATE_CHANGED', handleProjectStateChanged);
+      newSocket.off('CLOSURE_REVIEW_UPDATED', handleClosureReviewUpdated);
+      newSocket.off('LEADERSHIP_CHANGED', handleLeadershipChanged);
       newSocket.close();
     };
   }, [enabled, queryClient]);

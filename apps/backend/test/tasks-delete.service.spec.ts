@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -6,6 +7,8 @@ import type { TasksRelationsService } from '../src/tasks/tasks-relations.service
 import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -21,6 +24,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   const prisma = {
     tx,
     $transaction: vi.fn(),
@@ -68,7 +74,7 @@ function makeService(opts: {
   // previo cuando la tarea no tiene rol; por defecto, sin asignación.
   const contextLiteral = { getActiveAssignment: vi.fn().mockResolvedValue(null) };
   const context = contextLiteral as typeof contextLiteral & TasksContextService;
-  const service = new TasksService(prisma, auth, relations, notifications, context);
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -317,7 +323,7 @@ describe('TasksService.remove', () => {
         }),
       };
       const context = contextLiteral as typeof contextLiteral & TasksContextService;
-      const service = new TasksService(prisma, auth, relations, notifications, context);
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 
       await service.remove(5, 42, 1);
       orden.push('fin_transaccion');

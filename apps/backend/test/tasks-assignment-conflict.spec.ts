@@ -1,5 +1,6 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
@@ -7,6 +8,8 @@ import type { TasksRelationsService } from '../src/tasks/tasks-relations.service
 import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { TasksService } from '../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * Tarea 26: el índice parcial `asignacion_tarea_activa_unique` (a lo sumo
@@ -82,6 +85,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   const prisma = {
     tx,
     $transaction: vi.fn(),
@@ -159,7 +165,7 @@ function makeService(opts: {
   const relations = opts.relations ?? makeRelations();
   const notifications = opts.notifications ?? makeNotifications();
   const context = opts.context ?? makeContext();
-  const service = new TasksService(prisma, auth, relations, notifications, context);
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -224,12 +230,15 @@ describe('TasksService.assign — colisión concurrente de asignación activa (T
       await expect(service.assign(5, 42, 1, DTO)).rejects.toBe(original);
     });
 
-    it('rechaza un error de conexión/inicialización: propaga el error original', async () => {
+    it('rechaza un error de conexión/inicialización: el protocolo lo traduce a 503, nunca a 409', async () => {
       const { tx, service } = makeService();
       const original = makeConnectionError();
       tx.asignacionTarea.create.mockRejectedValue(original);
 
-      await expect(service.assign(5, 42, 1, DTO)).rejects.toBe(original);
+      // C040 (06 v2 §16): la indisponibilidad de la base la traduce el runner
+      // por proyecto a 503; lo que este caso fija es que NO se confunde con la
+      // colisión reconocida de asignación activa (409).
+      await expect(service.assign(5, 42, 1, DTO)).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
     it('rechaza un Error genérico: propaga el error original exacto', async () => {
@@ -356,7 +365,7 @@ describe('TasksService.assign — colisión concurrente de asignación activa (T
       const relations = makeRelations();
       const notifications = makeNotifications();
       const context = makeContext({ getActiveAssignment: vi.fn().mockResolvedValue(null) });
-      const service = new TasksService(prisma, auth, relations, notifications, context);
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 
       // Ambas "solicitudes" observan que no hay asignación activa y ambas
       // alcanzan tx.asignacionTarea.create. El orden de invocación (no de

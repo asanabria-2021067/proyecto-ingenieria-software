@@ -99,6 +99,7 @@ function renderDialog(overrides: Record<string, unknown> = {}) {
     members: [miembro({ idUsuario: 5, idRolProyecto: 1 }), miembro({ idUsuario: 9, idRolProyecto: 2, nombre: 'Beto', apellido: 'Ruiz' })],
     labels: [etiqueta()],
     isLeader: true,
+    puedeGestionarTarea: true,
     crearTarea: mutationStub(),
     editarTarea: mutationStub(),
     asignarTarea: mutationStub(),
@@ -253,6 +254,37 @@ describe('TaskFormDialog — creación', () => {
     expect(await screen.findByRole('option', { name: /Ana Lopez/i })).toBeInTheDocument();
     // El líder sin participación no está en `members`, por lo que no es candidato.
     expect(screen.queryByRole('option', { name: /Lía Der/i })).not.toBeInTheDocument();
+  });
+
+  it('un integrante de otro rol se lista deshabilitado con su motivo, no desaparece', async () => {
+    // Dos roles del proyecto pueden llamarse casi igual. Ocultar en silencio a
+    // quien está en el otro hacía imposible distinguir "no está en el proyecto"
+    // de "está, pero en otro rol": el excluido se muestra, sin ser opción.
+    renderDialog({
+      mode: 'create',
+      task: null,
+      roles: [
+        { idRolProyecto: 1, nombreRol: 'Desarrollador UI/UX' },
+        { idRolProyecto: 2, nombreRol: 'Desarrollador UI/UX (o Diseñador de Interfaces)' },
+      ],
+      members: [
+        miembro({ idUsuario: 5, idRolProyecto: 1, nombre: 'Ana', apellido: 'Lopez' }),
+        miembro({ idUsuario: 9, idRolProyecto: 2, nombre: 'Beatriz', apellido: 'Solano' }),
+      ],
+    });
+
+    const selectRol = screen.getByRole('combobox', { name: 'Seleccionar rol del proyecto' });
+    fireEvent.keyDown(selectRol, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Desarrollador UI/UX' }));
+
+    const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
+    fireEvent.keyDown(selectAsignado, { key: 'Enter' });
+
+    expect(await screen.findByRole('option', { name: /Ana Lopez/i })).toBeInTheDocument();
+    // Beatriz sigue visible, pero fuera de las opciones seleccionables.
+    expect(screen.queryByRole('option', { name: /Beatriz Solano/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Beatriz Solano')).toBeInTheDocument();
+    expect(screen.getByText('Sin este rol (no asignables)')).toBeInTheDocument();
   });
 
   it('incluye etiquetas seleccionadas', async () => {
@@ -605,5 +637,15 @@ describe('TaskFormDialog — desasignar desde el pie', () => {
     await waitFor(() =>
       expect(desasignarTarea.mutateAsync).toHaveBeenCalledWith({ taskId: 1 }),
     );
+  });
+
+  it('aparece para un colaborador del mismo rol sin ser líder (puedeGestionarTarea sin isLeader)', () => {
+    renderDialog({ mode: 'edit', task: asignada(), isLeader: false, puedeGestionarTarea: true });
+    expect(screen.getByRole('button', { name: 'Desasignar tarea' })).toBeInTheDocument();
+  });
+
+  it('no aparece cuando ni es líder ni comparte el rol de la tarea (puedeGestionarTarea: false)', () => {
+    renderDialog({ mode: 'edit', task: asignada(), isLeader: false, puedeGestionarTarea: false });
+    expect(screen.queryByRole('button', { name: 'Desasignar tarea' })).not.toBeInTheDocument();
   });
 });

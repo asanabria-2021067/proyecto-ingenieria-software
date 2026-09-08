@@ -107,7 +107,13 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "focus:bg-primary focus:text-on-primary [&_svg:not([class*='text-'])]:text-tertiary relative flex w-full cursor-default items-center gap-2 rounded-lg py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+        // La opción resaltada se pinta de verde oscuro. `focus:text-on-primary`
+        // solo alcanza al texto suelto del item: un hijo con su propio color
+        // (`text-on-surface` en un nombre, `text-tertiary` en un subtítulo)
+        // gana por especificidad y se queda oscuro sobre verde oscuro. El
+        // `focus:[&_*]` lo lleva a TODOS los descendientes mientras dura el
+        // resaltado, y solo entonces.
+        "focus:bg-primary focus:text-on-primary focus:[&_*]:text-on-primary [&_svg:not([class*='text-'])]:text-tertiary relative flex w-full cursor-default items-center gap-2 rounded-lg py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         className,
       )}
       {...props}

@@ -1,3 +1,4 @@
+import { TimeRecordsService } from '../time-records/time-records.service';
 import {
   BadRequestException,
   ConflictException,
@@ -19,12 +20,21 @@ import { TasksAuthorizationService } from './tasks-authorization.service';
 import { TasksContextService } from './tasks-context.service';
 import { TasksRelationsService, RelatedResourcesInput } from './tasks-relations.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
 import { CloseAssignmentDto } from './dto/close-assignment.dto';
 import { calcularProgresoHito } from '../common/hito-progreso';
+import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -253,27 +263,80 @@ export class TasksService {
     private tasksRelations: TasksRelationsService,
     private notifications: NotificationsService,
     private tasksContext: TasksContextService,
+    // C040 (06 v2 §16/§32/§40): runner por proyecto y política de escritura;
+    // cada escritura corre en un único `run` (lock del proyecto primero, sin
+    // transacción anidada) y los asserts de HU-D4 se ejecutan con `tx` tras
+    // el lock.
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    // C041 (06 v2 §34): política de lectura histórica para `findAll`/`findOne`.
+    private readonly readPolicy: ProjectReadPolicyService,
+    private readonly timeRecords: TimeRecordsService,
+    // T-164: opcional únicamente porque las suites de test existentes
+    // construyen TasksService directamente (sin contenedor de Nest) con
+    // argumentos posicionales — en producción, TasksModule siempre lo provee
+    // vía BitacoraModule. Cada llamada usa `?.` por el mismo motivo.
+    private bitacoraEventos?: BitacoraEventosService,
   ) {}
 
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
+
+  /**
+   * C041 (06 v2 §34/§41 E044): el tablero conserva su autorización actual
+   * (líder o participante activo) y añade el ámbito por actor de la política
+   * de lectura; la conjunción nunca amplía lo que ya se veía. El filtro
+   * operativo `eliminadoEn: null` se conserva: la proyección histórica de
+   * aportes eliminados es otra lectura, no esta.
+   */
   async findAll(projectId: number, userId: number): Promise<TareaPublica[]> {
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'tareas',
+    });
     await this.tasksAuthorization.assertCanListProjectTasks(projectId, userId);
 
     const rows = await this.prisma.tarea.findMany({
-      where: { idProyecto: projectId, eliminadoEn: null },
+      where: {
+        idProyecto: projectId,
+        eliminadoEn: null,
+        ...this.tasksContext.taskScopeWhere(userId, this.readPolicy.scopeForActor(decision)),
+      },
       select: TASK_SELECT,
     });
 
     return rows.map(mapTarea).sort(compareTareas);
   }
 
+  /**
+   * C041 (06 v2 §34/§41 E045): igual que el tablero, con el Sprint de la
+   * tarea como entidad de la decisión: un actor limitado a Sprints cerrados
+   * no puede abrir el detalle de una tarea de un Sprint vigente.
+   */
   async findOne(projectId: number, taskId: number, userId: number): Promise<TareaPublica> {
-    await this.tasksAuthorization.assertCanReadTask(projectId, taskId, userId);
+    const tarea = await this.tasksAuthorization.assertCanReadTask(projectId, taskId, userId);
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'tareas',
+      entitySprintId: tarea?.idSprint ?? null,
+    });
 
     // Se repiten los filtros de proyecto y soft delete aunque
     // assertCanReadTask ya validó la tarea, para cubrir el caso de que
     // cambie entre la autorización y esta lectura final.
     const row = await this.prisma.tarea.findFirst({
-      where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
+      where: {
+        idTarea: taskId,
+        idProyecto: projectId,
+        eliminadoEn: null,
+        ...this.tasksContext.taskScopeWhere(userId, this.readPolicy.scopeForActor(decision)),
+      },
       select: TASK_SELECT,
     });
 
@@ -297,7 +360,8 @@ export class TasksService {
    * resuelve con éxito, nunca dentro de ella (sección 13 de la tarea).
    */
   async create(projectId: number, userId: number, dto: CreateTaskDto): Promise<TareaPublica> {
-    const row = await this.prisma.$transaction(async (tx) => {
+    const row = await this.projectTx.run(projectId, userId, 'tasks.create', async (ctx) => {
+      const { tx } = ctx;
       await this.tasksAuthorization.assertCanCreateTask(projectId, userId, tx);
 
       // El proyecto solo admite tareas nuevas mientras tenga un Sprint
@@ -315,7 +379,17 @@ export class TasksService {
         );
       }
 
-      const recursos = await this.tasksRelations.validateCreateTaskRelations(projectId, dto, tx);
+      // C040: política de escritura tras el lock (P/E, Sprint ambiente ACTIVO);
+      // crear no tiene una entidad previa que exigir.
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId);
+
+      // C086: la asignación inicial al crear una tarea pasa por la misma
+      // decisión de elegibilidad que una asignación posterior.
+      const recursos = await this.tasksRelations.validateCreateTaskRelations(
+        projectId,
+        { ...dto, actorId: userId },
+        tx,
+      );
 
       const tarea = await tx.tarea.create({
         data: {
@@ -395,6 +469,25 @@ export class TasksService {
         await this.syncHitoEstado(tx, filaFinal.idHito);
       }
 
+      // T-164: registrado con el MISMO tx que la creación — si cualquier
+      // paso posterior de esta transacción falla, el evento revierte junto
+      // con la tarea (sin eventos huérfanos).
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_CREATED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintActivo.idSprint,
+        tipoEntidad: 'TAREA',
+        idEntidad: filaFinal.idTarea,
+        valorNuevo: {
+          tituloTarea: filaFinal.tituloTarea,
+          estadoTarea: filaFinal.estadoTarea,
+          prioridad: filaFinal.prioridad,
+          idUsuarioAsignado: dto.idUsuarioAsignado ?? null,
+        },
+      });
+
       return filaFinal;
     });
 
@@ -449,8 +542,17 @@ export class TasksService {
       throw new BadRequestException('Debe enviar al menos un campo para actualizar la tarea');
     }
 
-    const row = await this.prisma.$transaction(async (tx) => {
-      await this.tasksAuthorization.assertCanEditTask(projectId, taskId, userId, tx);
+    const row = await this.projectTx.run(projectId, userId, 'tasks.update', async (ctx) => {
+      const { tx } = ctx;
+      const tareaAntes = await this.tasksAuthorization.assertCanEditTask(projectId, taskId, userId, tx);
+      // C040: HU-D4 ya se evaluó con `tx` tras el lock; la entidad (Sprint de
+      // la tarea) debe estar ACTIVO. `idsEtiquetas` se valida más abajo con el
+      // mismo `tx` y el mismo alcance de proyecto. `idSprint` es NOT NULL en
+      // `Tarea`: el acceso opcional solo tolera un doble de prueba incompleto,
+      // mismo criterio defensivo que `resolveTaskNotificationAudience`.
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId, {
+        sprintId: tareaAntes?.idSprint ?? null,
+      });
 
       const relacionesInput: RelatedResourcesInput = {};
       if (Object.prototype.hasOwnProperty.call(dto, 'idHito')) {
@@ -534,6 +636,35 @@ export class TasksService {
         );
       }
 
+      // T-164: diff limitado a las claves realmente enviadas en `data` (no
+      // toda la fila) — mismo criterio hasOwnProperty que el resto del
+      // método para distinguir "omitido" de "enviado explícitamente". Todo
+      // el bloque queda protegido por este `if` (en vez de encadenar `?.`)
+      // para no depender de que `tareaAntes` tenga cada campo cuando no hay
+      // bitácora conectada (mismo criterio que create/updateEstado/assign,
+      // donde el corto-circuito de `?.` ya evita tocar sus variables).
+      if (this.bitacoraEventos) {
+        const camposModificados = Object.keys(data) as (keyof typeof data)[];
+        const valorAnterior: Record<string, Prisma.InputJsonValue | null> = {};
+        const valorNuevo: Record<string, Prisma.InputJsonValue | null> = {};
+        for (const campo of camposModificados) {
+          valorAnterior[campo] = this.serializarValorBitacora((tareaAntes as Record<string, unknown>)[campo]);
+          valorNuevo[campo] = this.serializarValorBitacora(data[campo]);
+        }
+
+        await this.bitacoraEventos.registrarEvento({
+          tx,
+          tipoEvento: TipoEventoBitacora.TASK_UPDATED,
+          idActor: userId,
+          idProyecto: projectId,
+          idSprint: tareaAntes.idSprint,
+          tipoEntidad: 'TAREA',
+          idEntidad: taskId,
+          valorAnterior,
+          valorNuevo,
+        });
+      }
+
       return filaFinal;
     });
 
@@ -581,8 +712,17 @@ export class TasksService {
     userId: number,
     dto: UpdateTaskEstadoDto,
   ): Promise<TareaPublica> {
-    const row = await this.prisma.$transaction(async (tx) => {
-      await this.tasksAuthorization.assertCanChangeTaskState(projectId, taskId, userId, tx);
+    const row = await this.projectTx.run(projectId, userId, 'tasks.updateEstado', async (ctx) => {
+      const { tx } = ctx;
+      const tareaAntes = await this.tasksAuthorization.assertCanChangeTaskState(
+        projectId,
+        taskId,
+        userId,
+        tx,
+      );
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId, {
+        sprintId: tareaAntes?.idSprint ?? null,
+      });
 
       await tx.tarea.update({
         where: { idTarea: taskId },
@@ -607,6 +747,18 @@ export class TasksService {
       if (filaFinal.idHito !== null) {
         await this.syncHitoEstado(tx, filaFinal.idHito);
       }
+
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_STATUS_CHANGED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: tareaAntes.idSprint,
+        tipoEntidad: 'TAREA',
+        idEntidad: taskId,
+        valorAnterior: { estadoTarea: tareaAntes.estadoTarea },
+        valorNuevo: { estadoTarea: filaFinal.estadoTarea },
+      });
 
       return filaFinal;
     });
@@ -658,16 +810,50 @@ export class TasksService {
    * `eliminadoEn: null`).
    */
   async remove(projectId: number, taskId: number, userId: number): Promise<void> {
-    const snapshot = await this.prisma.$transaction(async (tx) => {
+    const snapshot = await this.projectTx.run(projectId, userId, 'tasks.remove', async (ctx) => {
+      const { tx } = ctx;
       const tarea = await this.tasksAuthorization.assertCanDeleteTask(projectId, taskId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId, {
+        sprintId: tarea?.idSprint ?? null,
+      });
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
 
       const eliminadoEn = new Date();
+
+      // C082 (§15): eliminar la tarea NO borra las horas trabajadas en ella.
+      // Se materializa la caché con el writer único ANTES de cerrar el tramo,
+      // de modo que el reporte quede fijado y siga entrando en la
+      // consolidación del Sprint. Nunca hay borrado físico del tramo.
+      let horasMaterializadas: string | null = null;
+      if (asignacionActiva) {
+        horasMaterializadas = (
+          await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion)
+        ).toFixed(2);
+      }
 
       await tx.asignacionTarea.updateMany({
         where: { idTarea: taskId, desasignadaEn: null },
         data: { desasignadaEn: eliminadoEn },
       });
+
+      if (asignacionActiva) {
+        await this.bitacoraEventos?.registrarEvento({
+          tx,
+          tipoEvento: TipoEventoBitacora.ASSIGNMENT_CLOSED,
+          idActor: userId,
+          idProyecto: projectId,
+          idSprint: tarea.idSprint,
+          tipoEntidad: 'TAREA',
+          idEntidad: taskId,
+          valorAnterior: { desasignadaEn: null },
+          valorNuevo: {
+            idAsignacion: asignacionActiva.idAsignacion,
+            horasReales: horasMaterializadas,
+            desasignadaEn: eliminadoEn.toISOString(),
+            motivo: 'TAREA_ELIMINADA',
+          },
+        });
+      }
 
       await tx.tarea.update({
         where: { idTarea: taskId },
@@ -737,13 +923,17 @@ export class TasksService {
     actorUserId: number,
     dto: AssignTaskDto,
   ): Promise<TareaPublica> {
-    const resultado = await this.prisma.$transaction(async (tx) => {
+    const resultado = await this.projectTx.run(projectId, actorUserId, 'tasks.assign', async (ctx) => {
+      const { tx } = ctx;
       const tarea = await this.tasksAuthorization.assertCanAssignTask(
         projectId,
         taskId,
         actorUserId,
         tx,
       );
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
+        sprintId: tarea?.idSprint ?? null,
+      });
 
       const rolEfectivo = tarea.idRolProyecto ?? null;
       // X1.1: idParticipacion exacto ya resuelto por esta misma validación
@@ -756,10 +946,12 @@ export class TasksService {
         dto.idUsuario,
         rolEfectivo,
         tx,
+        { nuevaAsignacion: true, actorId: actorUserId },
       );
 
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
       let escribio = false;
+      let esReasignacion = false;
 
       if (!asignacionActiva) {
         await this.createActiveAssignment(tx, {
@@ -771,6 +963,7 @@ export class TasksService {
         });
         escribio = true;
       } else if (asignacionActiva.idUsuario !== dto.idUsuario) {
+        await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion);
         const desasignadaEn = new Date();
 
         await tx.asignacionTarea.updateMany({
@@ -790,6 +983,7 @@ export class TasksService {
           desasignadaEn: null,
         });
         escribio = true;
+        esReasignacion = true;
       }
       // Si asignacionActiva.idUsuario === dto.idUsuario: idempotente, sin escrituras.
 
@@ -802,6 +996,26 @@ export class TasksService {
         throw new Error(
           `No se pudo leer la tarea con id ${taskId} recién asignada dentro de la transacción`,
         );
+      }
+
+      // T-164: solo cuando esta llamada realmente escribió (idempotente no
+      // genera evento, mismo criterio que la notificación de assign()).
+      // TASK_REASSIGNED cuando había un asignado activo distinto,
+      // TASK_ASSIGNED cuando la tarea no tenía ninguno.
+      if (escribio) {
+        await this.bitacoraEventos?.registrarEvento({
+          tx,
+          tipoEvento: esReasignacion
+            ? TipoEventoBitacora.TASK_REASSIGNED
+            : TipoEventoBitacora.TASK_ASSIGNED,
+          idActor: actorUserId,
+          idProyecto: projectId,
+          idSprint: tarea.idSprint,
+          tipoEntidad: 'TAREA',
+          idEntidad: taskId,
+          valorAnterior: { idUsuario: asignacionActiva?.idUsuario ?? null },
+          valorNuevo: { idUsuario: dto.idUsuario },
+        });
       }
 
       return { fila: filaFinal, escribio };
@@ -913,19 +1127,24 @@ export class TasksService {
    * la fila (`cerrada: true`).
    */
   async unassign(projectId: number, taskId: number, actorUserId: number): Promise<void> {
-    const resultado = await this.prisma.$transaction(async (tx) => {
+    const resultado = await this.projectTx.run(projectId, actorUserId, 'tasks.unassign', async (ctx) => {
+      const { tx } = ctx;
       const tarea = await this.tasksAuthorization.assertCanUnassignTask(
         projectId,
         taskId,
         actorUserId,
         tx,
       );
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
+        sprintId: tarea?.idSprint ?? null,
+      });
 
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
       if (!asignacionActiva) {
         return { cerrada: false as const };
       }
 
+      await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion);
       const desasignadaEn = new Date();
       const closed = await tx.asignacionTarea.updateMany({
         where: {
@@ -970,8 +1189,9 @@ export class TasksService {
   ): Promise<TareaPublica> {
     this.assertValidAssignmentClosureInput(dto);
 
-    const row = await this.prisma.$transaction(async (tx) => {
-      await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
+    const row = await this.projectTx.run(projectId, actorUserId, 'tasks.closeAssignment', async (ctx) => {
+      const { tx } = ctx;
+      const tareaBase = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
 
       const asignacion = await tx.asignacionTarea.findFirst({
         where: { idAsignacion: assignmentId, idTarea: taskId },
@@ -993,7 +1213,11 @@ export class TasksService {
       }
 
       await this.tasksContext.assertActiveProjectParticipant(projectId, actorUserId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
+        sprintId: tareaBase?.idSprint ?? null,
+      });
 
+      const horasReales = await this.timeRecords.recalculateAssignment(tx, assignmentId);
       const desasignadaEn = new Date();
       const closed = await tx.asignacionTarea.updateMany({
         where: {
@@ -1003,7 +1227,6 @@ export class TasksService {
           desasignadaEn: null,
         },
         data: {
-          horasReales: dto.horasReales,
           desasignadaEn,
         },
       });
@@ -1012,7 +1235,7 @@ export class TasksService {
         throw new ConflictException('La asignación ya fue cerrada');
       }
 
-      await tx.registroAvanceAsignacion.create({
+      const avance = await tx.registroAvanceAsignacion.create({
         data: {
           idAsignacion: assignmentId,
           idAutor: actorUserId,
@@ -1043,6 +1266,24 @@ export class TasksService {
       if (dto.marcarComoHecha === true && filaFinal.idHito !== null) {
         await this.syncHitoEstado(tx, filaFinal.idHito);
       }
+
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.ASSIGNMENT_CLOSED,
+        idActor: actorUserId,
+        idProyecto: projectId,
+        idSprint: tareaBase.idSprint,
+        tipoEntidad: 'TAREA',
+        idEntidad: taskId,
+        valorAnterior: { horasReales: null },
+        valorNuevo: {
+          idAsignacion: assignmentId,
+          horasReales: horasReales.toString(),
+          desasignadaEn: desasignadaEn.toISOString(),
+          tareaHecha: filaFinal.estadoTarea === EstadoTarea.HECHO,
+          idRegistroAvance: avance.idRegistroAvance,
+        },
+      });
 
       return filaFinal;
     });
@@ -1075,10 +1316,6 @@ export class TasksService {
   }
 
   private assertValidAssignmentClosureInput(dto: CloseAssignmentDto): void {
-    if (!Number.isFinite(dto.horasReales) || dto.horasReales < 0) {
-      throw new BadRequestException('horasReales debe ser un número válido mayor o igual a 0');
-    }
-
     if (
       typeof dto.contenidoAvance !== 'string' ||
       dto.contenidoAvance.trim().length < MIN_PROGRESS_CONTENT_LENGTH
@@ -1087,6 +1324,24 @@ export class TasksService {
         `contenidoAvance debe tener al menos ${MIN_PROGRESS_CONTENT_LENGTH} caracteres significativos`,
       );
     }
+  }
+
+  /**
+   * T-164: normaliza un valor de campo de Tarea para `detalleJson` (columna
+   * Json de bitacora_auditoria) — Date no es serializable tal cual por
+   * Prisma.InputJsonValue, así que se convierte a fecha-calendario
+   * (YYYY-MM-DD), mismo formato que toDateOnly ya usa para exponer
+   * fechaLimite al resto de la API. `undefined` se normaliza a `null`
+   * (nunca se omite la clave del diff).
+   */
+  private serializarValorBitacora(value: unknown): Prisma.InputJsonValue | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return toDateOnly(value);
+    }
+    return value as Prisma.InputJsonValue;
   }
 
   /**

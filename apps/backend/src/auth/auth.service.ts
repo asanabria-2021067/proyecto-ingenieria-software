@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
@@ -23,11 +23,19 @@ interface ResetTokenPayload {
 
 @Injectable()
 export class AuthService {
+  private readonly refreshSecret: string;
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private notificationsService: NotificationsService,
-  ) {}
+  ) {
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (!refreshSecret) {
+      throw new Error("JWT_REFRESH_SECRET no está definida");
+    }
+    this.refreshSecret = refreshSecret;
+  }
 
   private hashToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
@@ -35,9 +43,17 @@ export class AuthService {
 
   /** Firma el par de tokens y persiste el hash del refresh token para poder revocarlo (logout, rotación). */
   private async issueTokens(usuario: { idUsuario: number; correo: string }) {
-    const payload = { sub: usuario.idUsuario, correo: usuario.correo };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: ACCESS_TOKEN_TTL });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: REFRESH_TOKEN_TTL });
+    const accessToken = this.jwtService.sign(
+      { sub: usuario.idUsuario, correo: usuario.correo, tipo: "access" },
+      { secret: process.env.JWT_SECRET || "dev-secret-change-me", expiresIn: ACCESS_TOKEN_TTL },
+    );
+    const refreshToken = this.jwtService.sign(
+      // jti: dos refresh tokens del mismo usuario firmados dentro del mismo
+      // segundo (iat idéntico) producirían el mismo JWT y por lo tanto el
+      // mismo tokenHash, chocando con la unicidad de la columna.
+      { sub: usuario.idUsuario, correo: usuario.correo, tipo: "refresh", jti: randomUUID() },
+      { secret: this.refreshSecret, expiresIn: REFRESH_TOKEN_TTL },
+    );
 
     await this.prisma.tokenRefresco.create({
       data: {
@@ -188,10 +204,14 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
-    let payload: { sub: number; correo: string };
+    let payload: { sub: number; correo: string; tipo?: string };
     try {
-      payload = this.jwtService.verify(refreshToken);
+      payload = this.jwtService.verify(refreshToken, { secret: this.refreshSecret });
     } catch {
+      throw new UnauthorizedException("Token de refresco inválido o expirado");
+    }
+
+    if (payload.tipo !== "refresh") {
       throw new UnauthorizedException("Token de refresco inválido o expirado");
     }
 

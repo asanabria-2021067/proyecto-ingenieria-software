@@ -23,9 +23,14 @@ function isValidProjectId(idProyecto: number): boolean {
 export { projectMembersQueryKey };
 
 /**
- * `findTeam` ya filtra por `estadoParticipacion: 'ACTIVO'` en el backend:
- * este hook nunca vuelve a filtrar por estado ni consulta participaciones
- * históricas.
+ * `GET /proyectos/:id/equipo` (`TeamService.findTeam`) devuelve el equipo
+ * COMPLETO: cada `ParticipacionProyecto` del proyecto, incluidas las
+ * históricas (`RETIRADO`/`COMPLETADO`), anotadas con `elegible`. Este hook es
+ * la fuente de la cascada rol → usuarios del formulario de tarea, y el backend
+ * rechaza con 400 cualquier asignación a quien no tenga participación ACTIVO
+ * en el rol efectivo (`TasksRelationsService.assertUserParticipationForEffectiveRole`),
+ * así que las participaciones no activas se descartan aquí: ofrecer a un
+ * retirado como candidato solo produce un error al guardar.
  */
 export function useProjectMembers(idProyecto: number) {
   const enabled = isValidProjectId(idProyecto);
@@ -36,14 +41,16 @@ export function useProjectMembers(idProyecto: number) {
     enabled,
   });
 
-  const members: MiembroProyecto[] = (query.data ?? []).map((p) => ({
-    idUsuario: p.usuario.idUsuario,
-    nombre: p.usuario.nombre,
-    apellido: p.usuario.apellido,
-    correo: p.usuario.correo,
-    fotoUrl: p.usuario.fotoUrl,
-    idRolProyecto: p.rolProyecto.idRolProyecto,
-  }));
+  const members: MiembroProyecto[] = (query.data ?? [])
+    .filter((p) => p.estadoParticipacion === 'ACTIVO')
+    .map((p) => ({
+      idUsuario: p.usuario.idUsuario,
+      nombre: p.usuario.nombre,
+      apellido: p.usuario.apellido,
+      correo: p.usuario.correo,
+      fotoUrl: p.usuario.fotoUrl,
+      idRolProyecto: p.rolProyecto.idRolProyecto,
+    }));
 
   return {
     members,

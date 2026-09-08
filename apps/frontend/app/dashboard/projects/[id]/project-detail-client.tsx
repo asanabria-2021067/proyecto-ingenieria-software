@@ -3,24 +3,23 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { type RolesSheetIntent } from '@/components/projects/project-roles-sheet';
 import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
-import { ProjectClosureSection } from '@/components/projects/detail/project-closure-section';
 import { ExitRequestSection } from '@/components/projects/detail/exit-request-section';
+import { ClosureStatusBanner } from '@/components/projects/closure-status-banner';
+import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-banner';
 import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
 import { ProjectRoleManagementSection } from '@/components/projects/detail/project-role-management-section';
 import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectRoles } from '@/hooks/use-project-roles';
-import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useCurrentExitRequest } from '@/hooks/use-exit-request';
-import { approveProjectClosure, rejectProjectClosure, requestProjectClosure } from '@/lib/services/projects';
-import uvgSwal, { swalCustomClass } from '@/lib/swal';
+import { useCloseReadiness, useClosureRevisions } from '@/hooks/use-closure';
+import { countPassedChecks, TOTAL_CLOSURE_CHECKS } from '@/components/closure/closure-readiness-panel';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 
 interface Props {
@@ -59,97 +58,45 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   // '@/hooks/use-current-user' devolviendo solo `useCurrentUser`, así que no
   // podemos depender de otro export de ese módulo aquí.
   const isAdmin = (currentUser?.roles ?? []).some((r) => r.toLowerCase() === 'administrador');
-  const queryClient = useQueryClient();
   // Liderazgo determinado exclusivamente por Proyecto.creadoPor.
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
 
   // F9 — único punto de entrada en la UI hacia /salida/preparacion.
   const { request: solicitudSalidaAbierta } = useCurrentExitRequest(idProyecto);
 
-  const enSolicitudCierre = proyecto.estadoProyecto === 'EN_SOLICITUD_CIERRE';
-  const [resolviendoCierre, setResolviendoCierre] = useState(false);
+  // S7 (VIEW-01): el cierre ya no es una mutation directa. Es un ENLACE a la
+  // preparación del cierre (VIEW-13) cuya habilitación decide el backend con
+  // `CloseReadinessSummary.canSubmit` (16 blockers). Si el readiness falla,
+  // el workspace se renderiza igual y la acción queda deshabilitada.
+  const estadoProyecto = proyecto.estadoProyecto;
+  const proyectoCerrado = estadoProyecto === 'CERRADO';
+  const enSolicitudCierre = estadoProyecto === 'EN_SOLICITUD_CIERRE';
+  const mostrarPrepararCierre = isLeader && estadoProyecto === 'EN_PROGRESO';
+  const readinessQuery = useCloseReadiness(idProyecto, 'REQUEST', mostrarPrepararCierre);
+  const revisionesQuery = useClosureRevisions(idProyecto, 1, isLeader && enSolicitudCierre);
+  const ultimaRevision = revisionesQuery.data?.items[0] ?? null;
 
-  // F16 — único disparador de "Solicitar cierre del proyecto" (A11:
-  // ProjectsService.requestClose). Solo el líder, y solo cuando el proyecto
-  // está EN_PROGRESO: es la única precondición de estado que A11 exige antes
-  // de evaluar el Sprint operable, así que fuera de EN_PROGRESO el control ni
-  // se muestra (mismo criterio que `enSolicitudCierre &&` para el aviso de
-  // aprobación pendiente).
-  const mostrarSolicitarCierre = isLeader && proyecto.estadoProyecto === 'EN_PROGRESO';
-  const { sprints } = useProjectSprints(idProyecto);
-  // A11 (`assertNoOperableSprint`): solo ACTIVO/EN_FINALIZACION bloquean;
-  // CERRADO y la ausencia de Sprint nunca bloquean por esta razón. El índice
-  // parcial `sprint_operable_unique` garantiza que a lo sumo un Sprint del
-  // proyecto está en uno de estos dos estados a la vez.
-  const cierreBloqueadoPorSprint = sprints.some(
-    (s) => s.estado === 'ACTIVO' || s.estado === 'EN_FINALIZACION',
-  );
-  const [solicitandoCierre, setSolicitandoCierre] = useState(false);
-
-  const solicitarCierre = async () => {
-    const { isConfirmed } = await uvgSwal.fire({
-      icon: 'question',
-      title: '¿Solicitar cierre del proyecto?',
-      text: 'Un administrador deberá aprobar la solicitud para finalizar el proyecto.',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, solicitar',
-      cancelButtonText: 'Cancelar',
-    });
-    if (!isConfirmed) return;
-    setSolicitandoCierre(true);
-    try {
-      await requestProjectClosure(idProyecto);
-      await queryClient.invalidateQueries({ queryKey: ['project', idProyecto] });
-      await uvgSwal.fire({
-        icon: 'success',
-        title: 'Solicitud enviada',
-        text: 'Un administrador revisará tu solicitud de cierre.',
-        timer: 2000,
-        showConfirmButton: false,
-      });
-    } catch (err: unknown) {
-      await uvgSwal.fire({
-        icon: 'error',
-        title: 'No se pudo solicitar el cierre',
-        text: err instanceof Error ? err.message : 'Ocurrió un error al solicitar el cierre del proyecto.',
-      });
-    } finally {
-      setSolicitandoCierre(false);
-    }
-  };
-
-  const resolverCierre = async (accion: 'APROBAR' | 'RECHAZAR') => {
-    const { isConfirmed } = await uvgSwal.fire({
-      icon: accion === 'APROBAR' ? 'question' : 'warning',
-      title: accion === 'APROBAR' ? '¿Aprobar cierre?' : '¿Rechazar cierre?',
-      text:
-        accion === 'APROBAR'
-          ? 'El proyecto será marcado como cerrado.'
-          : 'El proyecto volverá al estado En progreso.',
-      showCancelButton: true,
-      confirmButtonText: accion === 'APROBAR' ? 'Sí, aprobar' : 'Sí, rechazar',
-      cancelButtonText: 'Cancelar',
-      ...(accion === 'RECHAZAR' && {
-        customClass: {
-          ...swalCustomClass,
-          confirmButton:
-            'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md mx-4',
-        },
-      }),
-    });
-    if (!isConfirmed) return;
-    setResolviendoCierre(true);
-    try {
-      if (accion === 'APROBAR') {
-        await approveProjectClosure(idProyecto);
-      } else {
-        await rejectProjectClosure(idProyecto);
-      }
-      await queryClient.invalidateQueries({ queryKey: ['project', idProyecto] });
-    } finally {
-      setResolviendoCierre(false);
-    }
-  };
+  const closureAction = mostrarPrepararCierre
+    ? (() => {
+        const href = `/dashboard/projects/${idProyecto}/cierre`;
+        if (readinessQuery.isPending) {
+          return { href, enabled: false, reason: 'Comprobando los requisitos del cierre…' };
+        }
+        if (readinessQuery.isError || !readinessQuery.data) {
+          return { href, enabled: false, reason: 'No se pudo comprobar el estado del cierre. Actualiza la página e inténtalo de nuevo.' };
+        }
+        const readiness = readinessQuery.data;
+        if (readiness.canSubmit) {
+          return { href, enabled: true, reason: null };
+        }
+        const faltan = TOTAL_CLOSURE_CHECKS - countPassedChecks(readiness.blockers);
+        return {
+          href,
+          enabled: false,
+          reason: `Faltan ${faltan} de ${TOTAL_CLOSURE_CHECKS} ${faltan === 1 ? 'comprobación' : 'comprobaciones'} para preparar el cierre.`,
+        };
+      })()
+    : undefined;
 
   // Compatibilidad de navegación (Sección 20): URLs antiguas ?tab= → workspace.
   const router = useRouter();
@@ -170,6 +117,8 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const esParticipante =
     currentUser != null && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeVerKanban = isLeader || esParticipante;
+  // S7: en CERRADO no hay ninguna escritura (roles, fechas, postulaciones).
+  const puedeEscribir = isLeader && !proyectoCerrado;
 
   // Roles enriquecidos (stats + isMine/canLeave): el líder los ve siempre;
   // un participante activo también los necesita para "Mi rol"/"Salir de este
@@ -183,7 +132,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     eliminarRol,
     asignarmeRol,
     salirDeRol,
-  } = useProjectRoles(idProyecto, { enabled: isLeader || esParticipante });
+  } = useProjectRoles(idProyecto, { enabled: (isLeader || esParticipante) && !proyectoCerrado });
 
   const [rolesSheetAbierto, setRolesSheetAbierto] = useState(false);
   const [rolesSheetIntent, setRolesSheetIntent] = useState<RolesSheetIntent>({ kind: 'list' });
@@ -206,11 +155,11 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   // con ?openRoles=1 y este efecto lo traduce a abrir el sheet.
   const openRolesParam = searchParams.get('openRoles');
   useEffect(() => {
-    if (openRolesParam !== '1' || !isLeader) return;
+    if (openRolesParam !== '1' || !puedeEscribir) return;
     abrirGestionRoles();
     router.replace(`/dashboard/projects/${idProyecto}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openRolesParam, isLeader, idProyecto]);
+  }, [openRolesParam, puedeEscribir, idProyecto]);
 
   // Resumen del equipo (Sección 24), todo derivado de datos reales.
   const participantesConfirmados = new Set(members.map((m) => m.idUsuario)).size;
@@ -235,21 +184,22 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
         isLeader={isLeader}
         isAdmin={isAdmin}
         puedeVerKanban={puedeVerKanban}
-        mostrarSolicitarCierre={mostrarSolicitarCierre}
-        solicitandoCierre={solicitandoCierre}
-        cierreBloqueadoPorSprint={cierreBloqueadoPorSprint}
-        onSolicitarCierre={() => void solicitarCierre()}
+        closureAction={closureAction}
+        readOnly={proyectoCerrado}
       >
+        {proyectoCerrado && (
+          <ReadOnlyProjectBanner fechaCierre={proyecto.fechaActualizacion} className="mb-5" />
+        )}
         {enSolicitudCierre && (
-          <ProjectClosureSection
-            proyecto={proyecto}
+          <ClosureStatusBanner
+            idProyecto={idProyecto}
+            estadoProyecto={estadoProyecto}
+            revision={ultimaRevision}
             isLeader={isLeader}
-            isAdmin={isAdmin}
-            resolviendoCierre={resolviendoCierre}
-            resolverCierre={resolverCierre}
+            className="mb-5"
           />
         )}
-        {solicitudSalidaAbierta && (
+        {solicitudSalidaAbierta && !proyectoCerrado && (
           <ExitRequestSection idProyecto={idProyecto} solicitud={solicitudSalidaAbierta} />
         )}
       </ProjectSummarySection>
@@ -265,7 +215,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           <ProjectObjectivesSection objetivos={objetivos} />
 
           <ProjectRoleManagementSection
-            isLeader={isLeader}
+            isLeader={puedeEscribir}
             proyecto={proyecto}
             rolesAdmin={rolesAdmin}
             asignarmeRol={asignarmeRol}
@@ -283,7 +233,7 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
         <ProjectDetailsSection
           proyecto={proyecto}
-          isLeader={isLeader}
+          isLeader={puedeEscribir}
           misRoles={misRoles}
           participantesConfirmados={participantesConfirmados}
           rolesDisponiblesCount={rolesDisponiblesCount}

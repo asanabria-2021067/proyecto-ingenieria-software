@@ -13,13 +13,17 @@ import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { ProjectsService } from '../../src/projects/projects.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsService } from '../../src/sprints/sprints.service';
 
 /**
  * X3 (Escenario B) — regresión cross-flow: Decisión #2 (congelada, A11) —
- * `ProjectsService.requestClose` debe rechazarse mientras el proyecto tenga
+ * La invariante A11 debe rechazar el inicio del cierre mientras el proyecto tenga
  * un Sprint operable (ACTIVO o EN_FINALIZACION) y solo permitirse una vez
  * ese Sprint queda CERRADO. Verificado contra PostgreSQL real, atravesando
  * el método productivo real (`requestClose`) y las transiciones reales de
@@ -72,11 +76,19 @@ describeIntegration(
       const prismaService = prisma as unknown as PrismaService;
       const notifications = makeFakeNotifications();
 
-      projectsService = new ProjectsService(prismaService, notifications, makeFakeCacheManager());
+      const resolver = new ProjectIdResolverService(prismaService);
+      projectsService = new ProjectsService(
+        prismaService,
+        notifications,
+        makeFakeCacheManager(),
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(resolver),
+        new ProjectReadPolicyService(prismaService),
+      );
 
       const sprintsContext = new SprintsContextService(prismaService);
       const sprintsAuthorization = new SprintsAuthorizationService(sprintsContext);
-      sprintsService = new SprintsService(prismaService, sprintsContext, sprintsAuthorization, notifications);
+      sprintsService = new SprintsService(prismaService, sprintsContext, sprintsAuthorization, notifications, new ProjectTransactionService(prismaService), new ProjectPolicyService(new ProjectIdResolverService(prismaService)), new ProjectReadPolicyService(prismaService));
     });
 
     afterAll(async () => {
@@ -91,11 +103,11 @@ describeIntegration(
       await cleanupIntegrationFixtures(prisma, scope);
     });
 
-    it('ACTIVO rechaza requestClose; EN_FINALIZACION rechaza requestClose; CERRADO permite requestClose', async () => {
+    it('ACTIVO bloquea el inicio del cierre; EN_FINALIZACION lo bloquea; CERRADO lo permite', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       await markProjectInProgress(prisma, project.idProyecto);
 
@@ -105,7 +117,7 @@ describeIntegration(
       // --- Sprint ACTIVO: requestClose real, RECHAZADO ---
       let rejectionActivo: unknown;
       try {
-        await projectsService.requestClose(project.idProyecto, leader.idUsuario);
+        await projectsService.assertNoOperableSprint(project.idProyecto);
       } catch (error) {
         rejectionActivo = error;
       }
@@ -126,7 +138,7 @@ describeIntegration(
 
       let rejectionFinalizacion: unknown;
       try {
-        await projectsService.requestClose(project.idProyecto, leader.idUsuario);
+        await projectsService.assertNoOperableSprint(project.idProyecto);
       } catch (error) {
         rejectionFinalizacion = error;
       }
@@ -141,18 +153,22 @@ describeIntegration(
       });
       expect(proyectoTrasFinalizacion.estadoProyecto).toBe('EN_PROGRESO');
 
-      // --- Sprint CERRADO (A9 real): requestClose real, PERMITIDO ---
+      // --- Sprint CERRADO (A9 real): la invariante deja de bloquear ---
       const cerrado = await sprintsService.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
       expect(cerrado.estado).toBe('CERRADO');
 
-      const solicitudPermitida = await projectsService.requestClose(project.idProyecto, leader.idUsuario);
-      expect(solicitudPermitida.estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
+      await expect(
+        projectsService.assertNoOperableSprint(project.idProyecto),
+      ).resolves.toBeUndefined();
 
+      // C128: la invariante ya no ejecuta la transición —el cierre legacy se
+      // retiró—, así que el proyecto permanece EN_PROGRESO hasta que la nueva
+      // solicitud de cierre exista y sea el único camino.
       const proyectoFinal = await prisma.proyecto.findUniqueOrThrow({
         where: { idProyecto: project.idProyecto },
         select: { estadoProyecto: true },
       });
-      expect(proyectoFinal.estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
+      expect(proyectoFinal.estadoProyecto).toBe('EN_PROGRESO');
     });
 
     /**
@@ -192,11 +208,11 @@ describeIntegration(
      * exactamente igual que cualquier otro Sprint ACTIVO — sin ningún
      * bypass por ser `numero === 1` u origen de backfill.
      */
-    it('proyecto legado con Sprint 1 sintético/backfillado (numero=1, ACTIVO, fechaCierre=NULL, con tarea legacy asociada): requestClose sigue RECHAZADO — sin bypass por ser Sprint 1', async () => {
+    it('proyecto legado con Sprint 1 sintético/backfillado (numero=1, ACTIVO, fechaCierre=NULL, con tarea legacy asociada): el inicio del cierre sigue RECHAZADO — sin bypass por ser Sprint 1', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       await markProjectInProgress(prisma, project.idProyecto);
 
@@ -225,7 +241,7 @@ describeIntegration(
 
       let rejection: unknown;
       try {
-        await projectsService.requestClose(project.idProyecto, leader.idUsuario);
+        await projectsService.assertNoOperableSprint(project.idProyecto);
       } catch (error) {
         rejection = error;
       }

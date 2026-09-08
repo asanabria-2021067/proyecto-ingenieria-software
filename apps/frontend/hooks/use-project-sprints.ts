@@ -3,19 +3,28 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   projectSprintsQueryKey,
+  sprintAnalyticsQueryKey,
   sprintClosingSummaryQueryKey,
   sprintDetailQueryKey,
+  sprintsAnalyticsQueryKey,
 } from '@/lib/query-keys/sprints';
 import {
-  adjustSprintHours,
   closeSprint,
   finalizeSprint,
   getProjectSprints,
+  getSprintAnalytics,
   getSprintClosingSummary,
   getSprintDetail,
+  getSprintsAnalytics,
   startSprint,
 } from '@/lib/services/sprints';
-import type { AdjustSprintHoursInput, SprintClosingSummaryDto, SprintDetailDto, SprintDto } from '@/lib/types/sprints';
+import type {
+  SprintAnalyticsDto,
+  SprintClosingSummaryDto,
+  SprintComparativeAnalyticsDto,
+  SprintDetailDto,
+  SprintDto,
+} from '@/lib/types/sprints';
 
 function isValidProjectId(idProyecto: number): boolean {
   return Number.isInteger(idProyecto) && idProyecto > 0;
@@ -143,30 +152,48 @@ export function useSprintClosingSummary(idProyecto: number, idSprint: number) {
 }
 
 /**
- * Ajusta horas reconocidas de una participación (A7) —
- * `PATCH /proyectos/:id/sprints/:sprintId/horas/:idParticipacion`. Opera
- * sobre una `ParticipacionProyecto` concreta, nunca sobre una persona
- * agregada (F5 puede necesitar invocarla varias veces, una por cada
- * participación realmente modificada de un participante multirol).
- *
- * `SprintDetail` (F4) nunca lee `HorasParticipacion` — sus asignaciones solo
- * exponen `horasReales` de `AsignacionTarea`, una tabla distinta que A7
- * jamás toca — así que no hay causa contractual para invalidarlo aquí; solo
- * `SprintClosingSummary` queda obsoleto tras un ajuste exitoso.
+ * Analítica individual de un Sprint (T-172) — `GET /proyectos/:id/sprints/:sprintId/analytics`.
+ * Read-only, mismo patrón que `useSprintDetail`/`useSprintClosingSummary`:
+ * sin invalidación propia porque no muta nada.
  */
-export function useAdjustSprintHours(idProyecto: number, idSprint: number) {
-  const queryClient = useQueryClient();
+export function useSprintAnalytics(idProyecto: number, idSprint: number) {
+  const enabled = isValidId(idProyecto) && isValidId(idSprint);
 
-  return useMutation({
-    mutationFn: ({
-      idParticipacion,
-      ...input
-    }: { idParticipacion: number } & AdjustSprintHoursInput) =>
-      adjustSprintHours(idProyecto, idSprint, idParticipacion, input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: sprintClosingSummaryQueryKey(idProyecto, idSprint),
-      });
-    },
+  const query = useQuery<SprintAnalyticsDto>({
+    queryKey: sprintAnalyticsQueryKey(idProyecto, idSprint),
+    queryFn: () => getSprintAnalytics(idProyecto, idSprint),
+    enabled,
   });
+
+  return {
+    analytics: query.data,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Analítica comparativa entre Sprints del proyecto (T-173) — `GET /proyectos/:id/sprints/analytics`.
+ * Read-only, mismo patrón que `useSprintAnalytics`.
+ */
+export function useSprintsAnalytics(idProyecto: number) {
+  const enabled = isValidProjectId(idProyecto);
+
+  const query = useQuery<SprintComparativeAnalyticsDto>({
+    queryKey: sprintsAnalyticsQueryKey(idProyecto),
+    queryFn: () => getSprintsAnalytics(idProyecto),
+    enabled,
+  });
+
+  return {
+    sprints: query.data?.sprints ?? [],
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
 }

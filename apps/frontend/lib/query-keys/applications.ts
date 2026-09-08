@@ -19,3 +19,15 @@
  */
 export const projectPendingPostulationsQueryKey = (idProyecto: number) =>
   ['proyecto-postulaciones-pendientes', idProyecto] as const;
+
+/**
+ * S7 (F008) — TODAS las postulaciones del proyecto sin filtrar por estado
+ * (`GET /proyectos/:id/postulaciones`, `projects.controller.ts:213`). Es
+ * EXACTAMENTE el mismo array que `app/dashboard/proyectos/[id]/postulaciones/page.tsx`
+ * usaba como literal (`['postulaciones-proyecto', id]`, con el `id` de la
+ * ruta): se extrae aquí para no repetirlo, conservando la caché viva. No se
+ * fusiona con `projectPendingPostulationsQueryKey`: son dos read-models de
+ * dos endpoints con semántica distinta.
+ */
+export const projectAllPostulationsQueryKey = (idProyecto: number | string) =>
+  ['postulaciones-proyecto', idProyecto] as const;

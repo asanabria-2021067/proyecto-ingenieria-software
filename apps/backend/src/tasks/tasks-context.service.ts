@@ -4,6 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type TxClient = Prisma.TransactionClient;
 
+/**
+ * C040 (06 v2 §40): consultas de contexto compartidas. Cuando el llamador
+ * está dentro del runner por proyecto pasa su `tx`, y entonces cada lectura
+ * ocurre bajo el lock, en la misma vista que la escritura; sin `tx` (lecturas
+ * puras) usa el cliente base. Este servicio nunca abre una transacción.
+ */
 @Injectable()
 export class TasksContextService {
   constructor(private prisma: PrismaService) {}
@@ -92,6 +98,52 @@ export class TasksContextService {
     if (!participacion) {
       throw new ForbiddenException('No tienes una participación activa en este proyecto');
     }
+  }
+
+  /**
+   * Participación ACTIVO de userId en roleId dentro de projectId — usada por
+   * TasksAuthorizationService (HU-141) para la vía "mismo rol activo" de
+   * assertCanEditTask/assertCanAssignTask/assertCanUnassignTask. Mismo
+   * criterio de filtrado que assertActiveProjectParticipant: nunca compara
+   * por nombreRol, solo por idRolProyecto, y siempre acotado a este proyecto
+   * vía rolProyecto.idProyecto (un idRolProyecto de otro proyecto no puede
+   * colar aquí aunque coincidiera el número).
+   */
+  async getActiveParticipationInRole(
+    projectId: number,
+    userId: number,
+    roleId: number,
+    tx?: TxClient,
+  ) {
+    const db = tx ?? this.prisma;
+    return db.participacionProyecto.findFirst({
+      where: {
+        idUsuario: userId,
+        idRolProyecto: roleId,
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { idProyecto: projectId },
+      },
+      select: { idParticipacion: true },
+    });
+  }
+
+  /**
+   * C041 (06 v2 §34): filtro adicional de `Tarea` derivado de la decisión de
+   * lectura ya resuelta por `ProjectReadPolicyService`. Se aplica en la
+   * consulta, nunca sobre el DTO: el ámbito de Sprint restringe las tareas a
+   * los estados que la matriz permite al actor, y `ownOnly` (participante
+   * histórico o exlíder) las acota a aquellas en las que el actor tuvo una
+   * asignación. Un actor sin restricciones produce `{}` y la consulta queda
+   * exactamente como antes.
+   */
+  taskScopeWhere(
+    userId: number,
+    scope: { sprintWhere: Prisma.SprintWhereInput; ownOnly: boolean },
+  ): Prisma.TareaWhereInput {
+    return {
+      ...(Object.keys(scope.sprintWhere).length > 0 ? { sprint: scope.sprintWhere } : {}),
+      ...(scope.ownOnly ? { asignaciones: { some: { idUsuario: userId } } } : {}),
+    };
   }
 
   /**
