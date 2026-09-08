@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
+import { login } from './support/auth';
 
 const PROYECTO_ID = 1;
-const PASSWORD = 'Test1234!';
 // Proyecto 1 tiene tres participantes activos reales (carlos, maria, jose) —
 // cada test usa un par distinto para no compartir conversación con los otros
 // specs de chat que corren en paralelo (misma conversación = mensajes de un
@@ -26,13 +26,6 @@ async function desactivarTour(page: Page) {
   });
 }
 
-async function login(page: Page, correo: string) {
-  await page.goto('/login');
-  await page.getByPlaceholder('usuario@uvg.edu.gt').fill(correo);
-  await page.getByPlaceholder('Minimo 8 caracteres').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Iniciar Sesion' }).click();
-  await page.waitForURL('**/dashboard');
-}
 
 async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
   const existente = page.locator('aside').getByRole('button', { name: new RegExp(nombreOtro) });
