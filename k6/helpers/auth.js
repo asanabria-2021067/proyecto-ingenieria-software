@@ -1,15 +1,28 @@
 // K1 — helper reutilizable de autenticación para los escenarios de carga
 // (K2/K3). Encapsula el contrato REAL de login del backend (inspeccionado
-// en apps/backend/src/auth/{auth.controller.ts,auth.service.ts,dto/login.dto.ts}),
-// para que un escenario nunca tenga que conocer la ruta exacta, la forma
-// del body ni el nombre del campo de token:
+// en apps/backend/src/auth/{auth.controller.ts,cookie.util.ts,jwt.strategy.ts,
+// auth.service.ts,dto/login.dto.ts} — post fix de seguridad S-05/HU-137,
+// sesión por cookies httpOnly), para que un escenario nunca tenga que
+// conocer la ruta exacta, la forma del body ni de dónde sale el token:
 //
 //   ruta:              POST {config.baseUrl}/auth/login
 //   body:              { correo, contrasena }  (DTO real: LoginDto)
 //   status de éxito:   201 (Nest usa 201 por defecto en @Post() sin @HttpCode)
-//   respuesta:         { accessToken, refreshToken }
-//   header de sesión:  Authorization: Bearer <accessToken>  (passport-jwt,
-//                      ExtractJwt.fromAuthHeaderAsBearerToken() en jwt.strategy.ts)
+//   respuesta (body):  { mensaje: '...' } — YA NO incluye accessToken/
+//                      refreshToken en el JSON (ver auth.controller.ts).
+//   tokens reales:     entregados exclusivamente como cookies httpOnly
+//                      `access_token` / `refresh_token` (setAuthCookies en
+//                      cookie.util.ts) — nunca en el body.
+//   header de sesión:  Authorization: Bearer <accessToken> sigue aceptado
+//                      para requests HTTP normales: JwtStrategy
+//                      (jwt.strategy.ts) prueba primero la cookie
+//                      access_token y, si no está, cae a
+//                      ExtractJwt.fromAuthHeaderAsBearerToken() — por eso
+//                      este helper sigue devolviendo el token "pelado" (ya
+//                      no viene del body sino de la cookie de la respuesta
+//                      de login) para que authHeaders() arme ese header sin
+//                      que cada escenario tenga que manejar cookies por su
+//                      cuenta.
 //
 // Usa exclusivamente APIs oficiales de k6 (k6/http, k6/check) — nunca
 // axios/fetch de Node/fs/path/process.env, que k6 no soporta en su runtime.
@@ -22,11 +35,13 @@ const LOGIN_PATH = '/auth/login';
 const LOGIN_SUCCESS_STATUS = 201;
 
 /**
- * Autentica contra el backend real y devuelve { accessToken, refreshToken }.
- * Nunca devuelve `undefined` silenciosamente: si el status o la forma de la
- * respuesta no coinciden con el contrato real, lanza un error explícito
- * (sanitizado: nunca incluye la contraseña ni el body completo) para que el
- * escenario falle de inmediato en vez de arrastrar un token vacío.
+ * Autentica contra el backend real y devuelve { accessToken, refreshToken },
+ * extraídos de las cookies httpOnly `access_token`/`refresh_token` que el
+ * backend entrega en la respuesta de login (nunca del body JSON — el body
+ * solo trae { mensaje }). Nunca devuelve `undefined` silenciosamente: si el
+ * status o las cookies no coinciden con el contrato real, lanza un error
+ * explícito (sanitizado: nunca incluye la contraseña ni el body completo)
+ * para que el escenario falle de inmediato en vez de arrastrar un token vacío.
  *
  * K2.1: acepta opcionalmente credenciales explícitas `{ email, password }`
  * para autenticar una SEGUNDA identidad distinta de K6_USER_EMAIL/
@@ -60,18 +75,23 @@ export function login(credentials) {
     throw new Error(`login() falló contra ${url}: status ${res.status} (se esperaba ${LOGIN_SUCCESS_STATUS})`);
   }
 
-  let payload;
-  try {
-    payload = res.json();
-  } catch (error) {
-    throw new Error(`login() falló contra ${url}: la respuesta no es JSON válido`);
+  // Los tokens ya NO viajan en el body: llegan como cookies httpOnly
+  // `access_token`/`refresh_token` (setAuthCookies en cookie.util.ts). k6
+  // expone las cookies de la respuesta en `res.cookies`, un objeto
+  // `{ nombre: [{ value, ... }] }` — cada nombre puede tener más de una
+  // entrada si el header Set-Cookie se repitiera, pero el backend siempre
+  // manda cada cookie una sola vez por login.
+  const accessTokenCookie = res.cookies && res.cookies.access_token && res.cookies.access_token[0];
+  const refreshTokenCookie = res.cookies && res.cookies.refresh_token && res.cookies.refresh_token[0];
+
+  if (!accessTokenCookie || !accessTokenCookie.value) {
+    throw new Error(`login() falló contra ${url}: la respuesta no incluye la cookie access_token`);
   }
 
-  if (!payload || typeof payload.accessToken !== 'string' || payload.accessToken.length === 0) {
-    throw new Error(`login() falló contra ${url}: la respuesta no incluye accessToken`);
-  }
-
-  return { accessToken: payload.accessToken, refreshToken: payload.refreshToken };
+  return {
+    accessToken: accessTokenCookie.value,
+    refreshToken: refreshTokenCookie ? refreshTokenCookie.value : undefined,
+  };
 }
 
 /**
