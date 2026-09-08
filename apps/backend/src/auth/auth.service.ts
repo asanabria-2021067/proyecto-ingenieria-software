@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
@@ -48,7 +48,10 @@ export class AuthService {
       { secret: process.env.JWT_SECRET || "dev-secret-change-me", expiresIn: ACCESS_TOKEN_TTL },
     );
     const refreshToken = this.jwtService.sign(
-      { sub: usuario.idUsuario, correo: usuario.correo, tipo: "refresh" },
+      // jti: dos refresh tokens del mismo usuario firmados dentro del mismo
+      // segundo (iat idéntico) producirían el mismo JWT y por lo tanto el
+      // mismo tokenHash, chocando con la unicidad de la columna.
+      { sub: usuario.idUsuario, correo: usuario.correo, tipo: "refresh", jti: randomUUID() },
       { secret: this.refreshSecret, expiresIn: REFRESH_TOKEN_TTL },
     );
 
