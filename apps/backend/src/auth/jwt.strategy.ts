@@ -29,7 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    if (payload.tipo) {
+    if (payload.tipo !== 'access') {
       throw new UnauthorizedException('Token no válido para autenticación');
     }
 
