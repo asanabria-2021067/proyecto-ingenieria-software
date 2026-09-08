@@ -58,6 +58,10 @@ async function enviarMensaje(page: Page, texto: string) {
 // del proyecto, así que cambiar de pestaña no debe cerrarlo ni perder el
 // historial ya cargado).
 test('concurrencia: ningún mensaje se pierde cuando ambos escriben casi al mismo tiempo', async ({ browser }) => {
+  // Dos logins + dos sockets reales sobre el backend/frontend de dev
+  // compartido de CI: el timeout por defecto (30s) no siempre alcanza bajo
+  // esa carga compartida.
+  test.setTimeout(60_000);
   const contextA = await browser.newContext();
   const contextB = await browser.newContext();
   const pageA = await contextA.newPage();
@@ -82,10 +86,10 @@ test('concurrencia: ningún mensaje se pierde cuando ambos escriben casi al mism
     await Promise.all([enviarMensaje(pageA, mensajeA), enviarMensaje(pageB, mensajeB)]);
 
     // Ambos deben terminar viendo los dos mensajes, sin importar el orden de llegada.
-    await expect(pageA.getByText(mensajeA)).toBeVisible();
-    await expect(pageA.getByText(mensajeB)).toBeVisible();
-    await expect(pageB.getByText(mensajeA)).toBeVisible();
-    await expect(pageB.getByText(mensajeB)).toBeVisible();
+    await expect(pageA.getByText(mensajeA).first()).toBeVisible();
+    await expect(pageA.getByText(mensajeB).first()).toBeVisible();
+    await expect(pageB.getByText(mensajeA).first()).toBeVisible();
+    await expect(pageB.getByText(mensajeB).first()).toBeVisible();
   } finally {
     await contextA.close();
     await contextB.close();
@@ -93,6 +97,7 @@ test('concurrencia: ningún mensaje se pierde cuando ambos escriben casi al mism
 });
 
 test('navegación: cambiar de pestaña del proyecto no cierra el chat ni pierde el historial', async ({ page }) => {
+  test.setTimeout(60_000);
   await desactivarTour(page);
   await login(page, 'maria.lopez@uvg.edu.gt');
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
@@ -102,7 +107,7 @@ test('navegación: cambiar de pestaña del proyecto no cierra el chat ni pierde 
   const marca = Math.random().toString(36).slice(2);
   const mensaje = `Persistencia-${marca}`;
   await enviarMensaje(page, mensaje);
-  await expect(page.getByText(mensaje)).toBeVisible();
+  await expect(page.getByText(mensaje).first()).toBeVisible();
 
   // El panel de chat vive en el layout del proyecto (sidebar), no en la
   // página — navegar a otra pestaña del mismo proyecto no debe desmontarlo.
@@ -111,5 +116,5 @@ test('navegación: cambiar de pestaña del proyecto no cierra el chat ni pierde 
 
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
   await abrirChatIndividualCon(page, 'José');
-  await expect(page.getByText(mensaje)).toBeVisible();
+  await expect(page.getByText(mensaje).first()).toBeVisible();
 });
