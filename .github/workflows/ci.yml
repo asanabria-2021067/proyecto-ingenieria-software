@@ -70,6 +70,12 @@ jobs:
       - name: Aplicar migraciones Prisma
         run: npx prisma migrate deploy
 
+      # test/s7-bootstrap.spec.ts audita dist/ (el artefacto real desplegado,
+      # ver ese archivo) y falla si no existe: sin este build, ese spec
+      # rompe cada corrida de este job aunque el resto del codigo este bien.
+      - name: Compilar (nest build)
+        run: npm run build
+
       - name: Lint
         run: npm run lint
         continue-on-error: true
