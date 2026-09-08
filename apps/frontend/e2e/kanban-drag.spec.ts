@@ -83,7 +83,10 @@ test('el líder arrastra una tarea a otra columna y el tablero refleja el cambio
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(CORREO_LIDER);
   await page.getByPlaceholder('Minimo 8 caracteres').fill(CONTRASENA_LIDER);
   await page.getByRole('button', { name: 'Iniciar Sesion' }).click();
-  await page.waitForURL('**/dashboard');
+  // El runner de CI comparte un único backend/frontend de dev con el resto
+  // de la suite; el login puede tardar más que el timeout por defecto de
+  // Playwright bajo esa carga compartida.
+  await page.waitForURL('**/dashboard', { timeout: 45_000 });
 
   await page.goto(`/dashboard/projects/${PROYECTO_ID}/kanban`);
 
