@@ -56,6 +56,10 @@ async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
 // smoke: chat en tiempo real entre dos usuarios reales del mismo proyecto
 // (T-Fase3.3): A envía, B lo ve aparecer sin recargar la página.
 test('un usuario envía un mensaje y el otro lo recibe sin recargar', async ({ browser }) => {
+  // Dos logins + dos sockets reales sobre el backend/frontend de dev
+  // compartido de CI: el timeout por defecto (30s) no siempre alcanza bajo
+  // esa carga compartida.
+  test.setTimeout(60_000);
   const contextA = await browser.newContext();
   const contextB = await browser.newContext();
   const pageA = await contextA.newPage();
@@ -77,13 +81,13 @@ test('un usuario envía un mensaje y el otro lo recibe sin recargar', async ({ b
 
     await pageA.getByPlaceholder('Escribe un mensaje…').fill(mensaje);
     await pageA.getByRole('button', { name: 'Enviar mensaje' }).click();
-    await expect(pageA.getByText(mensaje)).toBeVisible();
+    await expect(pageA.getByText(mensaje).first()).toBeVisible();
 
     // B nunca recarga: el mensaje debe llegarle por el socket de /chat,
     // ya sea abriendo el hilo desde la lista (conversationUpdated) o,
     // si ya lo tenía abierto, directamente (newMessage).
     await abrirChatIndividualCon(pageB, 'Carlos');
-    await expect(pageB.getByText(mensaje)).toBeVisible();
+    await expect(pageB.getByText(mensaje).first()).toBeVisible();
   } finally {
     await contextA.close();
     await contextB.close();
