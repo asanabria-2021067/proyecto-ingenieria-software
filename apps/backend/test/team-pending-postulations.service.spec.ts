@@ -4,6 +4,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { ApplicationsService } from '../src/applications/applications.service';
 import type { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { TeamService } from '../src/team/team.service';
+import { makeProjectReadPolicyDouble } from './helpers/project-policy.double';
 
 function makePrisma() {
   return {
@@ -25,6 +26,7 @@ function makeService(
     prisma as unknown as PrismaService,
     applications as unknown as ApplicationsService,
     { getPendingLeaderReviews: vi.fn() } as unknown as ExitRequestsService,
+    makeProjectReadPolicyDouble(),
   );
 }
 
@@ -131,7 +133,8 @@ describe('TeamService.getPendingPostulations', () => {
     await service.getPendingPostulations(1, 10);
 
     expect(applications.findAll).toHaveBeenCalledTimes(1);
-    expect(applications.findAll).toHaveBeenCalledWith();
+    // C047: el dominio de postulaciones recibe el actor, nunca un listado global.
+    expect(applications.findAll).toHaveBeenCalledWith(10);
     expect(prisma.postulacion.findMany).not.toHaveBeenCalled();
   });
 

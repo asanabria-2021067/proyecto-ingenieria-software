@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Etiqueta, Hito, Prisma, RolProyecto } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksContextService } from './tasks-context.service';
+import { ProjectEligibilityService } from '../eligibility/project-eligibility.service';
 
 type TxClient = Prisma.TransactionClient;
 
@@ -28,18 +29,44 @@ export interface RelatedResourcesResult {
   idParticipacionAsignado?: number;
 }
 
+/**
+ * C086: distingue crear una asignación NUEVA de revalidar una existente. Solo
+ * la primera pasa por la elegibilidad del destino.
+ */
+export interface AssignmentResolutionOptions {
+  nuevaAsignacion?: boolean;
+  actorId?: number;
+}
+
 export interface CreateTaskRelationsInput {
   idHito?: number;
   idRolProyecto?: number;
   idsEtiquetas?: number[];
   idUsuarioAsignado?: number;
+  /**
+   * C086 (§17): quién ejecuta la operación. Solo importa para la excepción de
+   * §18.1 — el saliente que entrega su propio trabajo no queda excluido de
+   * recibirlo de vuelta durante la preparación.
+   */
+  actorId?: number;
 }
 
+/**
+ * C040 (06 v2 §32/§40): la validación de relaciones (hito, rol y el conjunto
+ * completo de `idsEtiquetas`) corre con el `tx` del runner por proyecto, así
+ * que la mutación indirecta de etiquetas desde `create`/`update` queda
+ * acotada al mismo proyecto y al mismo lock que la escritura de la tarea.
+ * Este servicio nunca abre una transacción propia.
+ */
 @Injectable()
 export class TasksRelationsService {
   constructor(
     private prisma: PrismaService,
     private tasksContext: TasksContextService,
+    // C086: opcional por el mismo motivo posicional que en el resto del
+    // dominio — las suites existentes construyen este servicio con dos
+    // argumentos; en producción TasksModule siempre lo provee.
+    private readonly eligibility?: ProjectEligibilityService,
   ) {}
 
   /**
@@ -110,6 +137,7 @@ export class TasksRelationsService {
     userId: number,
     roleId: number | null,
     tx?: TxClient,
+    options: AssignmentResolutionOptions = {},
   ): Promise<number> {
     await this.assertUserExists(userId, tx);
 
@@ -117,7 +145,7 @@ export class TasksRelationsService {
       await this.tasksContext.getRoleInProjectOrThrow(projectId, roleId, tx);
     }
 
-    return this.assertUserParticipationForEffectiveRole(projectId, userId, roleId, tx);
+    return this.assertUserParticipationForEffectiveRole(projectId, userId, roleId, tx, options);
   }
 
   private async assertUserExists(userId: number, tx?: TxClient): Promise<void> {
@@ -150,8 +178,34 @@ export class TasksRelationsService {
     userId: number,
     roleId: number | null,
     tx?: TxClient,
+    options: AssignmentResolutionOptions = {},
   ): Promise<number> {
     const db = tx ?? this.prisma;
+
+    /**
+     * C086 (06 v2 §17/§23 §18.1): este es el ÚNICO punto donde se resuelve la
+     * FK de participación de una asignación, así que también es el único donde
+     * tiene sentido decidir si el destino puede recibir trabajo. La regla se
+     * aplica a QUIEN RECIBE, nunca a quien asigna: un integrante con salida en
+     * preparación debe poder seguir entregando y reasignando lo suyo, y solo
+     * queda excluido de recibir cosas nuevas.
+     *
+     * Se evalúa SOLO al crear una asignación nueva. Revalidar la coherencia de
+     * una asignación que ya existe (cambio de rol de la tarea) no es asignar
+     * trabajo nuevo: expulsar ahí a quien tiene una salida en curso le quitaría
+     * el trabajo que §13 le permite terminar.
+     *
+     * El assert exige `tx` porque solo vale bajo el lock; los callers de
+     * producción que asignan corren dentro de `run`, así que siempre lo tienen.
+     */
+    if (options.nuevaAsignacion && tx && this.eligibility) {
+      await this.eligibility.assertAssignmentDestination(tx, {
+        projectId,
+        taskRoleId: roleId,
+        userId,
+        handoverActorId: options.actorId ?? null,
+      });
+    }
 
     if (roleId !== null) {
       const participacionConRol = await db.participacionProyecto.findFirst({
@@ -218,6 +272,7 @@ export class TasksRelationsService {
         input.idUsuarioAsignado,
         rolEfectivo,
         tx,
+        { nuevaAsignacion: true, actorId: input.actorId },
       );
     }
 

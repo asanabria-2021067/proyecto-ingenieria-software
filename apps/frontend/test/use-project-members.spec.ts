@@ -69,6 +69,40 @@ describe('useProjectMembers', () => {
     });
   });
 
+  it('descarta las participaciones no activas que `findTeam` devuelve anotadas', async () => {
+    // `GET /proyectos/:id/equipo` devuelve el equipo COMPLETO, incluidos los
+    // históricos. Ofrecerlos como candidatos de asignación solo produce el 400
+    // de `assertUserParticipationForEffectiveRole` al guardar.
+    (apiFetch as any).mockResolvedValue([
+      {
+        idParticipacion: 1,
+        estadoParticipacion: 'ACTIVO',
+        fechaIngreso: '2026-01-01T00:00:00.000Z',
+        usuario: { idUsuario: 5, nombre: 'Ana', apellido: 'Lopez', correo: 'ana@uvg.edu.gt', fotoUrl: null },
+        rolProyecto: { idRolProyecto: 2, nombreRol: 'Backend', descripcionRolProyecto: null },
+      },
+      {
+        idParticipacion: 2,
+        estadoParticipacion: 'RETIRADO',
+        fechaIngreso: '2026-01-01T00:00:00.000Z',
+        usuario: { idUsuario: 6, nombre: 'Beto', apellido: 'Ruiz', correo: 'beto@uvg.edu.gt', fotoUrl: null },
+        rolProyecto: { idRolProyecto: 2, nombreRol: 'Backend', descripcionRolProyecto: null },
+      },
+      {
+        idParticipacion: 3,
+        estadoParticipacion: 'COMPLETADO',
+        fechaIngreso: '2026-01-01T00:00:00.000Z',
+        usuario: { idUsuario: 7, nombre: 'Cris', apellido: 'Paz', correo: 'cris@uvg.edu.gt', fotoUrl: null },
+        rolProyecto: { idRolProyecto: 2, nombreRol: 'Backend', descripcionRolProyecto: null },
+      },
+    ]);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useProjectMembers(7), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.members.map((m) => m.idUsuario)).toEqual([5]);
+  });
+
   it('expone members por defecto [] antes de resolver', () => {
     (apiFetch as any).mockReturnValue(new Promise(() => {}));
     const { wrapper } = createWrapper();

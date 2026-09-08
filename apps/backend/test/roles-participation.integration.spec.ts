@@ -1,9 +1,13 @@
+import { makeTimeRecordsService } from './helpers/time-records.fixture';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { RolesService } from '../src/roles/roles.service';
+import { ProjectIdResolverService } from '../src/common/project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../src/common/project-policy/project-policy.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
 
 /**
  * Pruebas de INTEGRACIÓN reales contra PostgreSQL (Secciones 2/3): validan el
@@ -32,6 +36,7 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
   let anaId: number;
   let betoId: number;
   let projectId: number;
+  let sprintId: number;
   let rolFrontId: number;
   let rolDocsId: number;
   const tareas: Record<string, number> = {};
@@ -39,7 +44,14 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
 
   beforeAll(async () => {
     prisma = new PrismaClient({ datasources: { db: { url: DB_URL } } });
-    service = new RolesService(prisma as unknown as PrismaService, fakeNotifications);
+    // C034: el servicio corre sobre el protocolo real (runner + policy).
+    const prismaService = prisma as unknown as PrismaService;
+    service = new RolesService(
+      prismaService,
+      fakeNotifications,
+      new ProjectTransactionService(prismaService),
+      new ProjectPolicyService(new ProjectIdResolverService(prismaService)), makeTimeRecordsService(prismaService),
+    );
     await prisma.$connect();
   });
 
@@ -76,6 +88,12 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
       },
     });
     projectId = proyecto.idProyecto;
+    // FND-03/FND-08: `Tarea.idSprint` es NOT NULL, así que toda tarea exige un
+    // Sprint del mismo proyecto. El fixture es anterior a esa restricción.
+    const sprint = await prisma.sprint.create({
+      data: { idProyecto: projectId, numero: 1, estado: 'ACTIVO' },
+    });
+    sprintId = sprint.idSprint;
 
     const rolFront = await prisma.rolProyecto.create({
       data: { idProyecto: projectId, nombreRol: 'Frontend', cupos: 3 },
@@ -105,6 +123,7 @@ suite('RolesService.leaveRole — integración PostgreSQL real', () => {
       const t = await prisma.tarea.create({
         data: {
           idProyecto: projectId,
+          idSprint: sprintId,
           idRolProyecto: idRol,
           tituloTarea: clave,
           estadoTarea: estado,

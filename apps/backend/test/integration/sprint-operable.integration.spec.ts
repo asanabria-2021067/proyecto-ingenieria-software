@@ -9,6 +9,10 @@ import { SprintsContextService } from '../../src/sprints/sprints-context.service
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real A2: concurrencia de SprintsService.startSprint contra el
@@ -39,7 +43,7 @@ describeIntegration(
       // finalizeSprint (A4) lo hace — así que un doble vacío es suficiente
       // aquí; nunca se invoca en este archivo.
       const notifications = {} as unknown as NotificationsService;
-      service = new SprintsService(prisma as unknown as PrismaService, context, authorization, notifications);
+      service = new SprintsService(prisma as unknown as PrismaService, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)), new ProjectReadPolicyService(prisma as unknown as PrismaService));
       await prisma.$connect();
     });
 
@@ -59,7 +63,7 @@ describeIntegration(
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       // Precondición: proyecto válido, líder válido, sin ningún Sprint
@@ -105,7 +109,7 @@ describeIntegration(
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const primero = await service.startSprint(project.idProyecto, leader.idUsuario);
