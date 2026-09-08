@@ -7,6 +7,14 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  // En CI todos los specs comparten un único backend/frontend de dev (ver
+  // webServer abajo): con más de un worker, tests pesados (dos contextos de
+  // navegador, sockets, drag real) compiten por el mismo servidor y unos a
+  // otros se hacen perder su propia ventana de tiempo (visto en CI real:
+  // login colgado más allá de 30s solo bajo esa contención). Serializar en
+  // CI cambia velocidad por estabilidad; en local, con --workers no seteado,
+  // sigue paralelo.
+  workers: process.env.CI ? 1 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: [['html', { open: 'never' }]],
   use: {
