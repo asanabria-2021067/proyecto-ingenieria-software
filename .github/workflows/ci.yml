@@ -140,7 +140,7 @@ jobs:
       - name: Pruebas unitarias (Vitest, sin cobertura, en lotes)
         if: github.event_name == 'pull_request'
         run: |
-          ls test/*.spec.ts test/*.spec.tsx 2>/dev/null | xargs -n 20 npx vitest run
+          ls test/*.spec.ts test/*.spec.tsx 2>/dev/null | xargs -n 10 npx vitest run
 
   e2e:
     name: E2E - suite de humo (Playwright)
