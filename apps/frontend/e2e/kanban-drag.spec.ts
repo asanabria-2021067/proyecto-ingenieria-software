@@ -64,6 +64,21 @@ async function arrastrarTarea(page: Page, handleName: string, destino: Estado) {
 
 // smoke: tablero Kanban con drag & drop real (T-125, flujo 2)
 test('el líder arrastra una tarea a otra columna y el tablero refleja el cambio', async ({ page }) => {
+  // OnboardingTour (react-joyride) se activa por localStorage
+  // (`onboarding_seen_{idUsuario}`, ver components/dashboard/OnboardingTour.tsx),
+  // nunca por estado del backend: en un contexto de navegador nuevo (como
+  // este test) aparece para carlos.mendoza (perfil completo) y su overlay
+  // intercepta tanto el mousedown del drag como cualquier click. Se
+  // neutraliza en la raíz en vez de perseguir el botón "Saltar tour", que
+  // corre la carrera contra su retardo interno de 800ms bajo carga.
+  await page.addInitScript(() => {
+    const originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key: string) {
+      if (typeof key === 'string' && key.startsWith('onboarding_seen_')) return 'true';
+      return originalGetItem.call(this, key);
+    };
+  });
+
   await page.goto('/login');
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(CORREO_LIDER);
   await page.getByPlaceholder('Minimo 8 caracteres').fill(CONTRASENA_LIDER);
