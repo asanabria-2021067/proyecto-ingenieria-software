@@ -25,6 +25,7 @@ import {
   useMessages,
   useSendMessage,
 } from '@/hooks/use-chat';
+import { useChatPanel } from '@/components/projects/chat-panel-context';
 import type { ChatConversacion } from '@/lib/types/chat';
 import type { MiembroProyecto } from '@/hooks/use-project-members';
 
@@ -50,15 +51,41 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
   const [activeId, setActiveId] = useState<number | null>(null);
   const [nuevoChatAbierto, setNuevoChatAbierto] = useState(false);
   const markRead = useMarkConversationRead(idProyecto);
+  const crearDesdeOtraVista = useCreateConversation(idProyecto);
+  const { pendingChatUserId, clearPendingChat } = useChatPanel();
 
   const { isConnected } = useChatSocket(idProyecto, activeId);
-
-  if (!habilitado) return null;
 
   const abrirConversacion = (idConversacion: number) => {
     setActiveId(idConversacion);
     markRead.mutate(idConversacion);
   };
+
+  // Entrada a un chat 1:1 desde fuera del sidebar (p. ej. el botón "Chat" en
+  // la ficha del responsable del proyecto) — createConversation es idempotente
+  // para INDIVIDUAL, así que reintentar aquí solo abre la conversación ya
+  // existente, nunca duplica una.
+  useEffect(() => {
+    if (pendingChatUserId == null) return;
+    let cancelado = false;
+    crearDesdeOtraVista.mutate(
+      { tipo: 'INDIVIDUAL', idsParticipantes: [pendingChatUserId] },
+      {
+        onSuccess: (conversacion) => {
+          if (!cancelado) abrirConversacion(conversacion.idConversacion);
+        },
+        onSettled: () => {
+          if (!cancelado) clearPendingChat();
+        },
+      },
+    );
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingChatUserId]);
+
+  if (!habilitado) return null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col border-t border-outline-variant">
