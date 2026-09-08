@@ -25,6 +25,9 @@ env:
   # de integracion si se conectan realmente via INTEGRATION_DATABASE_URL.
   DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
   DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+  # AuthService falla al arrancar sin esto (ver auth.service.ts) - no tiene
+  # valor por defecto a proposito, asi que CI debe proveerlo explicitamente.
+  JWT_REFRESH_SECRET: ci-refresh-secret
 
 jobs:
   backend:

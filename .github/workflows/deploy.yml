@@ -147,6 +147,7 @@ jobs:
             DB_NAME=uvg_collab
             DB_PORT=5432
             JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
             NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
             NEXT_PUBLIC_API_PREFIX=/api
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
