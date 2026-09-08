@@ -8,11 +8,17 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { setAuthCookies, clearAuthCookies } from './cookie.util';
 
+// Configurable solo para la suite E2E, que reutiliza unas pocas cuentas
+// sembradas a través de varios specs y en serie puede superar fácilmente
+// el límite de producción dentro del mismo minuto. Sin la variable, el
+// límite de producción queda exactamente igual que antes.
+const LOGIN_THROTTLE_LIMIT = Number(process.env.AUTH_LOGIN_THROTTLE_LIMIT) || 5;
+
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  @Throttle({ short: { limit: 5, ttl: 60000 } })
+  @Throttle({ short: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60000 } })
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken } = await this.authService.login(loginDto);
