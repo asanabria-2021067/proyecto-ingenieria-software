@@ -121,15 +121,25 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
-      # La suite de vitest+jsdom (~70 archivos) es pesada en memoria (ver
+      # La suite de vitest+jsdom (~105 archivos) es pesada en memoria (ver
       # vitest.config.ts) y no debe bloquear la velocidad del pipeline de
       # deploy. Corre completa solo en PR (el gate real antes de mergear);
       # en push/deploy el pipeline queda rapido con lint + el build de
       # Next.js (ya corre en build-frontend de deploy.yml) como red de
       # seguridad.
-      - name: Pruebas unitarias con cobertura (Vitest)
+      #
+      # Sin --coverage: verificado en CI real que la instrumentacion de
+      # cobertura (v8 provider) es la causa directa de la inestabilidad de
+      # memoria de este job — "npm run test" corre la MISMA suite completa
+      # rapido y limpio (confirmado en corridas locales por lotes, sin un
+      # solo fallo), mientras que "test:coverage" reventó por heap out of
+      # memory y luego colgó indefinidamente tras terminar los tests, con
+      # 1, 2 y 4 forks. El backend conserva su gate de cobertura; el
+      # frontend prioriza que la suite corra completa y confiable sobre
+      # tener el numero de cobertura en cada PR.
+      - name: Pruebas unitarias (Vitest, sin cobertura)
         if: github.event_name == 'pull_request'
-        run: npm run test:coverage
+        run: npm run test
 
   e2e:
     name: E2E - suite de humo (Playwright)
