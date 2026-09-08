@@ -353,9 +353,11 @@ describeIntegration('S7 lectura histórica de proyectos', () => {
       new ProjectReadPolicyService(prisma),
     );
     expect((await projects.findOne(publicado.idProyecto)).idProyecto).toBe(publicado.idProyecto);
-    // Cerrar un proyecto no lo publica: el endpoint público no se amplía.
+    // Solo CERRADO sale del detalle público (se lee como histórico por su
+    // propia ruta, ver ESTADOS_CON_DETALLE) — EN_SOLICITUD_CIERRE se
+    // mantiene visible, la solicitud de cierre no lo hace desaparecer.
     await expectStatus(404, () => projects.findOne(f.project.idProyecto));
-    await expectStatus(404, () => projects.findOne(enCierre.idProyecto));
+    expect((await projects.findOne(enCierre.idProyecto)).idProyecto).toBe(enCierre.idProyecto);
 
     // El externo no lee ninguna superficie privada del proyecto cerrado.
     await expectStatus(403, () =>
