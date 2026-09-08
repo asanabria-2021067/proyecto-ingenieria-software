@@ -201,10 +201,14 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
-    let payload: { sub: number; correo: string };
+    let payload: { sub: number; correo: string; tipo?: string };
     try {
-      payload = this.jwtService.verify(refreshToken);
+      payload = this.jwtService.verify(refreshToken, { secret: this.refreshSecret });
     } catch {
+      throw new UnauthorizedException("Token de refresco inválido o expirado");
+    }
+
+    if (payload.tipo !== "refresh") {
       throw new UnauthorizedException("Token de refresco inválido o expirado");
     }
 
