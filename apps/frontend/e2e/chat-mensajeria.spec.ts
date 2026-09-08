@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { login } from './support/auth';
 
 // Ambos participan realmente en el Proyecto 1 del seed (carlos.mendoza es su
 // líder y tiene además una participación de rol; maria.lopez tiene la
@@ -7,7 +8,6 @@ import { test, expect, type Page } from '@playwright/test';
 const PROYECTO_ID = 1;
 const CORREO_A = 'carlos.mendoza@uvg.edu.gt';
 const CORREO_B = 'maria.lopez@uvg.edu.gt';
-const PASSWORD = 'Test1234!';
 
 // OnboardingTour (react-joyride) se activa por localStorage
 // (`onboarding_seen_{idUsuario}`, ver OnboardingTour.tsx), nunca por estado
@@ -26,14 +26,6 @@ async function desactivarTour(page: Page) {
       return originalGetItem.call(this, key);
     };
   });
-}
-
-async function login(page: Page, correo: string) {
-  await page.goto('/login');
-  await page.getByPlaceholder('usuario@uvg.edu.gt').fill(correo);
-  await page.getByPlaceholder('Minimo 8 caracteres').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Iniciar Sesion' }).click();
-  await page.waitForURL('**/dashboard');
 }
 
 /** Abre (o crea, si no existe todavía) la conversación individual con `nombreOtro`. */
