@@ -40,6 +40,8 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+k6/results/*
+!k6/results/.gitkeep
 
 # ── TypeScript ────────────────────────────────────────────
 *.tsbuildinfo
