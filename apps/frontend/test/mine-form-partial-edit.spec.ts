@@ -28,8 +28,10 @@ vi.mock('../lib/services/projects', () => ({
 }));
 
 const pushMock = vi.fn();
+const replaceMock = vi.fn();
+const routerMock = { push: pushMock, replace: replaceMock };
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: pushMock, replace: vi.fn() }),
+  useRouter: () => routerMock,
   useSearchParams: () => new URLSearchParams('id=28'),
 }));
 
