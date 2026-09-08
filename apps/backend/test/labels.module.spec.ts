@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MODULE_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+// AppModule registra ConfigModule.forRoot al importarse y el validador único
+// exige FRONTEND_URL; este spec solo inspecciona metadata, así que fija un
+// valor sintético antes de que se evalúe el import (vi.hoisted).
+vi.hoisted(() => {
+  process.env.FRONTEND_URL ??= 'http://localhost:3000';
+});
 import { AppModule } from '../src/app.module';
 import { LabelsModule } from '../src/labels/labels.module';
 import { LabelsController } from '../src/labels/labels.controller';
@@ -52,13 +58,16 @@ describe('LabelsModule (Tarea 32: estructura, wiring, persistencia y asociación
     expect(typeof instance.normalizeName).toBe('function');
   });
 
-  it('LabelsService depende únicamente de PrismaService en su constructor (persistencia de la Tarea 31, sin NotificationsService ni otros módulos)', () => {
+  it('LabelsService depende de PrismaService y del protocolo de proyecto en su constructor (persistencia de la Tarea 31, sin NotificationsService ni otros módulos)', () => {
     // `design:paramtypes` no se emite bajo el transform de este test runner
     // (esbuild, sin emitDecoratorMetadata) aunque sí en el build real de
     // Nest; se verifica la firma real del constructor por código fuente,
     // igual que otros specs de este repo inspeccionan decoradores
     // (ver test/tasks-comentarios.controller.spec.ts).
-    expect(SERVICE_SOURCE).toMatch(/constructor\(private prisma: PrismaService\)/);
+    // C035: el servicio corre sobre ProjectTransactionService + ProjectPolicyService.
+    expect(SERVICE_SOURCE).toMatch(
+      /constructor\(\s*private prisma: PrismaService,\s*private readonly projectTx: ProjectTransactionService,\s*private readonly policy: ProjectPolicyService,\s*\)/,
+    );
     expect(SERVICE_SOURCE).not.toMatch(/^import .*NotificationsService/m);
     expect(SERVICE_SOURCE).not.toMatch(/^import .*from '\.\.\/tasks\//m);
     expect(SERVICE_SOURCE).not.toMatch(/^import .*from '\.\.\/comentarios\//m);

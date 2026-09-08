@@ -1,3 +1,5 @@
+import { TimeRecordsService } from '../time-records/time-records.service';
+import { ProjectEligibilityService } from '../eligibility/project-eligibility.service';
 import {
   Injectable,
   Logger,
@@ -6,9 +8,15 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { CreateRoleDto, RoleRequisitoDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 
@@ -20,6 +28,12 @@ type TxClient = Prisma.TransactionClient;
  * la creación del proyecto, la autoasignación del líder a un rol y el retiro
  * limitado de un rol. La tarea sigue asignándose a un usuario; nada aquí
  * convierte el rol en el asignado de una tarea.
+ *
+ * C034 (06 v2 §16/§32): cada escritura corre en `ProjectTransactionService.run`
+ * (lock del proyecto primero, hijos después); `leaveRole` usa el modo
+ * `Serializable` acotado del runner, que reejecuta todos los asserts y el
+ * UPDATE del padre en cada intento. Las notificaciones `ROL_*` existentes se
+ * conservan como best-effort después del commit.
  */
 @Injectable()
 export class RolesService {
@@ -28,9 +42,22 @@ export class RolesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    private readonly timeRecords: TimeRecordsService,
+    // C086: opcional por el mismo motivo posicional que en el resto del
+    // dominio; en producción RolesModule siempre lo provee.
+    private readonly eligibility?: ProjectEligibilityService,
   ) {}
 
   // ───────────────────────── helpers ─────────────────────────
+
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
 
   private async loadProjectOrThrow(projectId: number, tx?: TxClient) {
     const db = tx ?? this.prisma;
@@ -182,108 +209,120 @@ export class RolesService {
 
   // ───────────────────────── CRUD ─────────────────────────
 
-  /** Crear un rol (Sección 8). Solo el líder. */
+  /** Crear un rol (Sección 8). Solo el líder. C034: bajo el lock del proyecto. */
   async createRole(projectId: number, dto: CreateRoleDto, userId: number) {
-    const proyecto = await this.loadProjectOrThrow(projectId);
-    this.assertLeader(proyecto, userId);
+    return this.projectTx.run(projectId, userId, 'roles.createRole', async (ctx) => {
+      const { tx } = ctx;
+      const proyecto = await this.loadProjectOrThrow(projectId, tx);
+      this.assertLeader(proyecto, userId);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ROL_CRUD', userId);
 
-    if (dto.idCarreraRequerida != null) {
-      await this.assertCarreraExists(dto.idCarreraRequerida);
-    }
-    if (dto.requisitos?.length) {
-      await this.assertHabilidadesExist(dto.requisitos);
-    }
+      if (dto.idCarreraRequerida != null) {
+        await this.assertCarreraExists(dto.idCarreraRequerida, tx);
+      }
+      if (dto.requisitos?.length) {
+        await this.assertHabilidadesExist(dto.requisitos, tx);
+      }
 
-    const rol = await this.prisma.rolProyecto.create({
-      data: {
-        idProyecto: projectId,
-        nombreRol: dto.nombreRol,
-        descripcionRolProyecto: dto.descripcionRolProyecto ?? null,
-        idCarreraRequerida: dto.idCarreraRequerida ?? null,
-        cupos: dto.cupos,
-        horasSemanalesEstimadas: dto.horasSemanalesEstimadas ?? null,
-        ...(dto.requisitos?.length && {
-          requisitos: {
-            create: dto.requisitos.map((req) => ({
-              idHabilidad: req.idHabilidad,
-              nivelMinimo: req.nivelMinimo,
-              obligatorio: req.obligatorio,
-            })),
-          },
-        }),
-      },
-      select: this.roleWithStatsSelect(),
+      const rol = await tx.rolProyecto.create({
+        data: {
+          idProyecto: projectId,
+          nombreRol: dto.nombreRol,
+          descripcionRolProyecto: dto.descripcionRolProyecto ?? null,
+          idCarreraRequerida: dto.idCarreraRequerida ?? null,
+          cupos: dto.cupos,
+          horasSemanalesEstimadas: dto.horasSemanalesEstimadas ?? null,
+          ...(dto.requisitos?.length && {
+            requisitos: {
+              create: dto.requisitos.map((req) => ({
+                idHabilidad: req.idHabilidad,
+                nivelMinimo: req.nivelMinimo,
+                obligatorio: req.obligatorio,
+              })),
+            },
+          }),
+        },
+        select: this.roleWithStatsSelect(),
+      });
+
+      return this.shapeRole(rol);
     });
-
-    return this.shapeRole(rol);
   }
 
   /**
    * Editar un rol (Sección 8). Solo el líder. Conserva el mismo idRolProyecto,
    * no mueve el rol de proyecto, no desasigna usuarios ni tareas. Reducir cupos
-   * por debajo de los participantes activos ⇒ 400. Todo en una transacción
-   * cuando toca varias tablas (rol + requisitos).
+   * por debajo de los participantes activos ⇒ 400. C034: asserts, conteo y
+   * escritura (rol + requisitos) corren bajo el lock del proyecto, todo o nada.
    */
   async updateRole(projectId: number, roleId: number, dto: UpdateRoleDto, userId: number) {
-    const proyecto = await this.loadProjectOrThrow(projectId);
-    this.assertLeader(proyecto, userId);
-    const rolActual = await this.loadRoleInProjectOrThrow(projectId, roleId);
+    const { proyecto, rolActual, rol } = await this.projectTx.run(
+      projectId,
+      userId,
+      'roles.updateRole',
+      async (ctx) => {
+        const { tx } = ctx;
+        const proyecto = await this.loadProjectOrThrow(projectId, tx);
+        this.assertLeader(proyecto, userId);
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ROL_CRUD', userId);
+        const rolActual = await this.loadRoleInProjectOrThrow(projectId, roleId, tx);
 
-    if (dto.idCarreraRequerida != null) {
-      await this.assertCarreraExists(dto.idCarreraRequerida);
-    }
-    if (dto.requisitos !== undefined && dto.requisitos.length > 0) {
-      await this.assertHabilidadesExist(dto.requisitos);
-    }
-
-    if (dto.cupos !== undefined) {
-      const activos = await this.prisma.participacionProyecto.count({
-        where: { idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
-      });
-      if (dto.cupos < activos) {
-        throw new BadRequestException(
-          `No puedes reducir los cupos a ${dto.cupos}: el rol tiene ${activos} participante(s) activo(s)`,
-        );
-      }
-    }
-
-    const data: Prisma.RolProyectoUpdateInput = {};
-    if (dto.nombreRol !== undefined) data.nombreRol = dto.nombreRol;
-    if (dto.descripcionRolProyecto !== undefined)
-      data.descripcionRolProyecto = dto.descripcionRolProyecto;
-    if (dto.cupos !== undefined) data.cupos = dto.cupos;
-    if (dto.horasSemanalesEstimadas !== undefined)
-      data.horasSemanalesEstimadas = dto.horasSemanalesEstimadas;
-    if (dto.idCarreraRequerida !== undefined) {
-      data.carreraRequerida =
-        dto.idCarreraRequerida === null
-          ? { disconnect: true }
-          : { connect: { idCarrera: dto.idCarreraRequerida } };
-    }
-
-    const rol = await this.prisma.$transaction(async (tx) => {
-      if (Object.keys(data).length > 0) {
-        await tx.rolProyecto.update({ where: { idRolProyecto: roleId }, data });
-      }
-      if (dto.requisitos !== undefined) {
-        // Reemplazo del conjunto de habilidades (no expulsa participantes).
-        await tx.requisitoHabilidadRol.deleteMany({ where: { idRolProyecto: roleId } });
-        if (dto.requisitos.length > 0) {
-          await tx.requisitoHabilidadRol.createMany({
-            data: dto.requisitos.map((req) => ({
-              idRolProyecto: roleId,
-              idHabilidad: req.idHabilidad,
-              nivelMinimo: req.nivelMinimo,
-              obligatorio: req.obligatorio,
-            })),
-          });
+        if (dto.idCarreraRequerida != null) {
+          await this.assertCarreraExists(dto.idCarreraRequerida, tx);
         }
-      }
-      return tx.rolProyecto.findUniqueOrThrow({
-        where: { idRolProyecto: roleId },
-        select: this.roleWithStatsSelect(),
-      });
-    });
+        if (dto.requisitos !== undefined && dto.requisitos.length > 0) {
+          await this.assertHabilidadesExist(dto.requisitos, tx);
+        }
+
+        if (dto.cupos !== undefined) {
+          const activos = await tx.participacionProyecto.count({
+            where: { idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
+          });
+          if (dto.cupos < activos) {
+            throw new BadRequestException(
+              `No puedes reducir los cupos a ${dto.cupos}: el rol tiene ${activos} participante(s) activo(s)`,
+            );
+          }
+        }
+
+        const data: Prisma.RolProyectoUpdateInput = {};
+        if (dto.nombreRol !== undefined) data.nombreRol = dto.nombreRol;
+        if (dto.descripcionRolProyecto !== undefined)
+          data.descripcionRolProyecto = dto.descripcionRolProyecto;
+        if (dto.cupos !== undefined) data.cupos = dto.cupos;
+        if (dto.horasSemanalesEstimadas !== undefined)
+          data.horasSemanalesEstimadas = dto.horasSemanalesEstimadas;
+        if (dto.idCarreraRequerida !== undefined) {
+          data.carreraRequerida =
+            dto.idCarreraRequerida === null
+              ? { disconnect: true }
+              : { connect: { idCarrera: dto.idCarreraRequerida } };
+        }
+
+        if (Object.keys(data).length > 0) {
+          await tx.rolProyecto.update({ where: { idRolProyecto: roleId }, data });
+        }
+        if (dto.requisitos !== undefined) {
+          // Reemplazo del conjunto de habilidades (no expulsa participantes).
+          await tx.requisitoHabilidadRol.deleteMany({ where: { idRolProyecto: roleId } });
+          if (dto.requisitos.length > 0) {
+            await tx.requisitoHabilidadRol.createMany({
+              data: dto.requisitos.map((req) => ({
+                idRolProyecto: roleId,
+                idHabilidad: req.idHabilidad,
+                nivelMinimo: req.nivelMinimo,
+                obligatorio: req.obligatorio,
+              })),
+            });
+          }
+        }
+        const rol = await tx.rolProyecto.findUniqueOrThrow({
+          where: { idRolProyecto: roleId },
+          select: this.roleWithStatsSelect(),
+        });
+        return { proyecto, rolActual, rol };
+      },
+    );
 
     // Notificación post-commit a participantes activos si cambió algo relevante.
     if (this.relevantChange(rolActual, dto)) {
@@ -303,32 +342,37 @@ export class RolesService {
   /**
    * Eliminación segura de rol (Sección 9). Sin soft delete. Se rechaza (400)
    * si el rol tiene historial externo: participaciones de cualquier estado,
-   * tareas (activas o con soft delete) o postulaciones. Los requisitos de
-   * habilidad son configuración intrínseca del rol —no historial externo—, por
-   * lo que un rol que solo tiene requisitos SÍ puede eliminarse: sus requisitos
-   * se borran junto con el rol dentro de una misma transacción (todo o nada).
-   * No emite notificación general.
+   * tareas (activas o con soft delete) o postulaciones de cualquier estado.
+   * Los requisitos de habilidad son configuración intrínseca del rol —no
+   * historial externo—, por lo que un rol que solo tiene requisitos SÍ puede
+   * eliminarse: sus requisitos se borran junto con el rol dentro de la misma
+   * transacción (todo o nada). No emite notificación general. C034 (06 v2
+   * §32): los tres conteos y el borrado corren dentro del lock del proyecto.
    */
   async deleteRole(projectId: number, roleId: number, userId: number) {
-    const proyecto = await this.loadProjectOrThrow(projectId);
-    this.assertLeader(proyecto, userId);
-    await this.loadRoleInProjectOrThrow(projectId, roleId);
+    await this.projectTx.run(projectId, userId, 'roles.deleteRole', async (ctx) => {
+      const { tx } = ctx;
+      const proyecto = await this.loadProjectOrThrow(projectId, tx);
+      this.assertLeader(proyecto, userId);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ROL_CRUD', userId);
+      await this.loadRoleInProjectOrThrow(projectId, roleId, tx);
 
-    const [participaciones, tareas, postulaciones] = await Promise.all([
-      this.prisma.participacionProyecto.count({ where: { idRolProyecto: roleId } }),
-      this.prisma.tarea.count({ where: { idRolProyecto: roleId } }),
-      this.prisma.postulacion.count({ where: { idRolProyecto: roleId } }),
-    ]);
+      // Historial externo contado bajo el lock, sin filtrar por estado ni por
+      // soft delete: cualquier referencia al rol impide eliminarlo.
+      const participaciones = await tx.participacionProyecto.count({
+        where: { idRolProyecto: roleId },
+      });
+      const tareas = await tx.tarea.count({ where: { idRolProyecto: roleId } });
+      const postulaciones = await tx.postulacion.count({ where: { idRolProyecto: roleId } });
 
-    if (participaciones > 0 || tareas > 0 || postulaciones > 0) {
-      throw new BadRequestException(
-        'El rol ya tiene historial asociado (participaciones, tareas o postulaciones) y no puede eliminarse',
-      );
-    }
+      if (participaciones > 0 || tareas > 0 || postulaciones > 0) {
+        throw new BadRequestException(
+          'El rol ya tiene historial asociado (participaciones, tareas o postulaciones) y no puede eliminarse',
+        );
+      }
 
-    // Requisitos (configuración intrínseca) + rol en una sola transacción: si
-    // algo falla, no queda información parcialmente eliminada.
-    await this.prisma.$transaction(async (tx) => {
+      // Requisitos (configuración intrínseca) + rol en la misma transacción: si
+      // algo falla, no queda información parcialmente eliminada.
       await tx.requisitoHabilidadRol.deleteMany({ where: { idRolProyecto: roleId } });
       await tx.rolProyecto.delete({ where: { idRolProyecto: roleId } });
     });
@@ -343,51 +387,69 @@ export class RolesService {
    * ParticipacionProyecto ACTIVO (no una Postulación). Idempotente: si ya
    * participa activamente, devuelve el estado actual sin crear otra fila ni
    * consumir cupo. Consume cupo cuando crea. Una carrera concurrente que
-   * viole el índice parcial se traduce a 409.
+   * viole el índice parcial se traduce a 409. C034: idempotencia, cupo y alta
+   * corren bajo el lock del proyecto.
    */
   async selfAssign(projectId: number, roleId: number, userId: number) {
-    const proyecto = await this.loadProjectOrThrow(projectId);
-    this.assertLeader(proyecto, userId);
-    const rol = await this.loadRoleInProjectOrThrow(projectId, roleId);
+    const resultado = await this.projectTx.run(projectId, userId, 'roles.selfAssign', async (ctx) => {
+      const { tx } = ctx;
+      const proyecto = await this.loadProjectOrThrow(projectId, tx);
+      this.assertLeader(proyecto, userId);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ROL_ALTA_PARTICIPACION', userId);
+      const rol = await this.loadRoleInProjectOrThrow(projectId, roleId, tx);
 
-    // Idempotencia.
-    const existente = await this.prisma.participacionProyecto.findFirst({
-      where: { idUsuario: userId, idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
-      select: { idParticipacion: true },
+      // Idempotencia.
+      const existente = await tx.participacionProyecto.findFirst({
+        where: { idUsuario: userId, idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
+        select: { idParticipacion: true },
+      });
+      if (existente) {
+        return { idParticipacion: existente.idParticipacion, yaParticipaba: true as const, proyecto, rol };
+      }
+
+      // C086 (§17/§23 §18.1): la elegibilidad decide en un solo sitio, para que
+      // nadie active una vía de nueva participación eludiendo una salida
+      // abierta. Conserva las reglas vigentes de cupo e idempotencia.
+      if (this.eligibility) {
+        await this.eligibility.assertCanSelfAssignRole(tx, { projectId, roleId, userId });
+      } else {
+        const activos = await tx.participacionProyecto.count({
+          where: { idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
+        });
+        if (activos >= rol.cupos) {
+          throw new ConflictException('El rol ya alcanzó su límite de cupos activos');
+        }
+      }
+
+      let participacion: { idParticipacion: number };
+      try {
+        participacion = await tx.participacionProyecto.create({
+          data: { idUsuario: userId, idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
+          select: { idParticipacion: true },
+        });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ConflictException('Ya existe una participación activa en este rol');
+        }
+        throw error;
+      }
+
+      return { idParticipacion: participacion.idParticipacion, yaParticipaba: false as const, proyecto, rol };
     });
-    if (existente) {
+
+    if (resultado.yaParticipaba) {
       return {
-        idParticipacion: existente.idParticipacion,
+        idParticipacion: resultado.idParticipacion,
         idRolProyecto: roleId,
         estadoParticipacion: 'ACTIVO' as const,
         yaParticipaba: true,
       };
     }
 
-    // Cupo disponible.
-    const activos = await this.prisma.participacionProyecto.count({
-      where: { idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
-    });
-    if (activos >= rol.cupos) {
-      throw new BadRequestException('El rol ya alcanzó su límite de cupos activos');
-    }
-
-    let participacion;
-    try {
-      participacion = await this.prisma.participacionProyecto.create({
-        data: { idUsuario: userId, idRolProyecto: roleId, estadoParticipacion: 'ACTIVO' },
-        select: { idParticipacion: true },
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Ya existe una participación activa en este rol');
-      }
-      throw error;
-    }
-
     // Notificación post-commit. El actor (líder) siempre se excluye
     // (notifyRoleMembers excluye al actor), por lo que solo se informa a otros
     // miembros activos del rol; puede resultar en cero destinatarios.
+    const { proyecto, rol } = resultado;
     await this.safeNotify(() =>
       this.notifications.notifyRoleMembers(projectId, roleId, userId, {
         tipoNotificacion: 'ROL_ASIGNADO_LIDER',
@@ -398,7 +460,7 @@ export class RolesService {
     );
 
     return {
-      idParticipacion: participacion.idParticipacion,
+      idParticipacion: resultado.idParticipacion,
       idRolProyecto: roleId,
       estadoParticipacion: 'ACTIVO' as const,
       yaParticipaba: false,
@@ -408,71 +470,95 @@ export class RolesService {
   /**
    * Retiro limitado de un rol (Secciones 10-16). Salir de un rol conservando
    * al menos otro rol activo en el mismo proyecto. No abandona el último rol
-   * (400). Atómico y seguro ante concurrencia (SERIALIZABLE + reintento): dos
-   * salidas concurrentes de roles distintos nunca dejan al usuario en cero.
+   * (400). Atómico y seguro ante concurrencia: C034 lo expresa como el modo
+   * `Serializable` acotado del runner (06 v2 §16: máximo 3 intentos ante
+   * conflicto de serialización), que reejecuta todos los asserts y el UPDATE
+   * del padre en cada intento; dos salidas concurrentes de roles distintos
+   * nunca dejan al usuario en cero.
    */
   async leaveRole(projectId: number, roleId: number, userId: number) {
-    const proyecto = await this.loadProjectOrThrow(projectId);
-    await this.loadRoleInProjectOrThrow(projectId, roleId);
-
     const timestampRetiro = new Date();
 
-    const resultado = await this.runSerializable(async (tx) => {
-      // Participación ACTIVO del usuario en el rol que abandona.
-      const participacion = await tx.participacionProyecto.findFirst({
-        where: {
-          idUsuario: userId,
-          idRolProyecto: roleId,
-          estadoParticipacion: 'ACTIVO',
-          rolProyecto: { idProyecto: projectId },
-        },
-        select: { idParticipacion: true },
-      });
-      if (!participacion) {
-        throw new BadRequestException('No participas activamente en este rol');
-      }
+    const resultado = await this.projectTx.run(
+      projectId,
+      userId,
+      'roles.leaveRole',
+      async (ctx) => {
+        const { tx } = ctx;
+        const proyecto = await this.loadProjectOrThrow(projectId, tx);
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ROL_RETIRO', userId);
+        await this.loadRoleInProjectOrThrow(projectId, roleId, tx);
 
-      // Debe quedar al menos otro rol activo en el mismo proyecto.
-      const otrosRolesActivos = await tx.participacionProyecto.count({
-        where: {
-          idUsuario: userId,
-          estadoParticipacion: 'ACTIVO',
-          idRolProyecto: { not: roleId },
-          rolProyecto: { idProyecto: projectId },
-        },
-      });
-      if (otrosRolesActivos === 0) {
-        throw new BadRequestException('No puedes abandonar tu último rol desde esta opción.');
-      }
-
-      // Asignaciones activas del usuario en tareas del rol abandonado (mismo
-      // proyecto, no eliminadas). Solo esas se cierran, con un único timestamp.
-      const asignaciones = await tx.asignacionTarea.findMany({
-        where: {
-          idUsuario: userId,
-          desasignadaEn: null,
-          tarea: { idProyecto: projectId, idRolProyecto: roleId, eliminadoEn: null },
-        },
-        select: { idAsignacion: true },
-      });
-      const idsAsignacion = asignaciones.map((a) => a.idAsignacion);
-      if (idsAsignacion.length > 0) {
-        await tx.asignacionTarea.updateMany({
-          where: { idAsignacion: { in: idsAsignacion } },
-          data: { desasignadaEn: timestampRetiro },
+        // Participación ACTIVO del usuario en el rol que abandona.
+        const participacion = await tx.participacionProyecto.findFirst({
+          where: {
+            idUsuario: userId,
+            idRolProyecto: roleId,
+            estadoParticipacion: 'ACTIVO',
+            rolProyecto: { idProyecto: projectId },
+          },
+          select: { idParticipacion: true },
         });
-      }
+        if (!participacion) {
+          throw new BadRequestException('No participas activamente en este rol');
+        }
 
-      await tx.participacionProyecto.update({
-        where: { idParticipacion: participacion.idParticipacion },
-        data: { estadoParticipacion: 'RETIRADO', fechaSalida: timestampRetiro },
-      });
+        // Debe quedar al menos otro rol activo en el mismo proyecto.
+        const otrosRolesActivos = await tx.participacionProyecto.count({
+          where: {
+            idUsuario: userId,
+            estadoParticipacion: 'ACTIVO',
+            idRolProyecto: { not: roleId },
+            rolProyecto: { idProyecto: projectId },
+          },
+        });
+        if (otrosRolesActivos === 0) {
+          throw new BadRequestException('No puedes abandonar tu último rol desde esta opción.');
+        }
 
-      return {
-        idParticipacion: participacion.idParticipacion,
-        tareasDesasignadas: idsAsignacion.length,
-      };
-    });
+        // Asignaciones activas del usuario en tareas del rol abandonado (mismo
+        // proyecto, no eliminadas). Solo esas se cierran, con un único timestamp.
+        // C056 (06 v2 §32): además, el tramo debe pertenecer a un Sprint ACTIVO
+        // —la exigencia de entidad de `ROL_RETIRO`—, de modo que retirarse de un
+        // rol nunca reescribe un tramo que quedó en un Sprint ya cerrado.
+        const asignaciones = await tx.asignacionTarea.findMany({
+          where: {
+            idUsuario: userId,
+            desasignadaEn: null,
+            tarea: {
+              idProyecto: projectId,
+              idRolProyecto: roleId,
+              eliminadoEn: null,
+              sprint: { estado: EstadoSprint.ACTIVO },
+            },
+          },
+          select: { idAsignacion: true },
+        });
+        const idsAsignacion = asignaciones.map((a) => a.idAsignacion);
+        if (idsAsignacion.length > 0) {
+          for (const idAsignacion of idsAsignacion) {
+            await this.timeRecords.recalculateAssignment(tx, idAsignacion);
+          }
+          await tx.asignacionTarea.updateMany({
+            where: { idAsignacion: { in: idsAsignacion } },
+            data: { desasignadaEn: timestampRetiro },
+          });
+        }
+
+        await tx.participacionProyecto.update({
+          where: { idParticipacion: participacion.idParticipacion },
+          data: { estadoParticipacion: 'RETIRADO', fechaSalida: timestampRetiro },
+        });
+
+        return {
+          creadoPor: proyecto.creadoPor,
+          tituloProyecto: proyecto.tituloProyecto,
+          idParticipacion: participacion.idParticipacion,
+          tareasDesasignadas: idsAsignacion.length,
+        };
+      },
+      { isolation: 'Serializable' },
+    );
 
     // Notificaciones post-commit (Sección 18A): líder + miembros activos del
     // rol afectado, excluyendo al actor, deduplicados. Una sola notificación
@@ -495,7 +581,7 @@ export class RolesService {
         select: { idUsuario: true },
       });
       const destinatarios = [
-        ...new Set([proyecto.creadoPor, ...miembros.map((m) => m.idUsuario)]),
+        ...new Set([resultado.creadoPor, ...miembros.map((m) => m.idUsuario)]),
       ].filter((id) => id !== userId);
       if (destinatarios.length === 0) return;
 
@@ -506,13 +592,13 @@ export class RolesService {
         tituloNotificacion: 'Un integrante dejó un rol',
         mensajeNotificacion:
           resultado.tareasDesasignadas > 0
-            ? `${userName} dejó el rol "${roleName}" en "${proyecto.tituloProyecto}". ${resultado.tareasDesasignadas} ${resultado.tareasDesasignadas === 1 ? 'tarea quedó' : 'tareas quedaron'} sin asignar.`
-            : `${userName} dejó el rol "${roleName}" en "${proyecto.tituloProyecto}".`,
+            ? `${userName} dejó el rol "${roleName}" en "${resultado.tituloProyecto}". ${resultado.tareasDesasignadas} ${resultado.tareasDesasignadas === 1 ? 'tarea quedó' : 'tareas quedaron'} sin asignar.`
+            : `${userName} dejó el rol "${roleName}" en "${resultado.tituloProyecto}".`,
         datosJson: {
           projectId,
           roleId,
           roleName,
-          projectTitle: proyecto.tituloProyecto,
+          projectTitle: resultado.tituloProyecto,
           taskCount: resultado.tareasDesasignadas,
         },
       });
@@ -526,30 +612,6 @@ export class RolesService {
   }
 
   // ───────────────────────── internos ─────────────────────────
-
-  /**
-   * Ejecuta una transacción SERIALIZABLE con reintento acotado ante conflictos
-   * de serialización (P2034: write conflict / deadlock). Evita el reintento
-   * cuando la falla es una regla de negocio (BadRequest/NotFound/Forbidden).
-   */
-  private async runSerializable<T>(fn: (tx: TxClient) => Promise<T>): Promise<T> {
-    const maxIntentos = 3;
-    let ultimoError: unknown;
-    for (let intento = 1; intento <= maxIntentos; intento++) {
-      try {
-        return await this.prisma.$transaction(fn, {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        });
-      } catch (error) {
-        const esConflicto =
-          error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
-        if (!esConflicto || intento === maxIntentos) throw error;
-        ultimoError = error;
-        this.logger.warn(`Reintentando transacción SERIALIZABLE (intento ${intento})`);
-      }
-    }
-    throw ultimoError;
-  }
 
   /**
    * Notificación best-effort posterior al commit (Sección 18): si falla, se

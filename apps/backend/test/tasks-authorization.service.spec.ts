@@ -9,6 +9,7 @@ function makeContext() {
     getProjectOrThrow: vi.fn(),
     getTaskInProjectOrThrow: vi.fn(),
     getActiveAssignment: vi.fn(),
+    getActiveParticipationInRole: vi.fn(),
     assertProjectLeader: vi.fn(),
     assertActiveProjectParticipant: vi.fn(),
   };
@@ -22,7 +23,9 @@ const EXTERNO_ID = 4;
 const CREADOR_ID = 777;
 
 const PROYECTO = { idProyecto: 1, creadoPor: LIDER_ID };
-const TAREA = { idTarea: 10, idProyecto: 1, creadaPor: CREADOR_ID, eliminadoEn: null };
+const TAREA = { idTarea: 10, idProyecto: 1, creadaPor: CREADOR_ID, eliminadoEn: null, idRolProyecto: null };
+const ROL_TAREA = 55;
+const TAREA_CON_ROL = { idTarea: 10, idProyecto: 1, creadaPor: CREADOR_ID, eliminadoEn: null, idRolProyecto: ROL_TAREA };
 
 const NOT_FOUND = () => new NotFoundException('Tarea con id 10 no encontrada en el proyecto 1');
 const FORBIDDEN_LEADER = () => new ForbiddenException('No eres el líder de este proyecto');
@@ -85,7 +88,7 @@ describe('TasksAuthorizationService', () => {
     it('permite al líder y devuelve la tarea validada', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
-      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
       const service = new TasksAuthorizationService(ctx);
 
       const result = await service.assertCanEditTask(1, 10, LIDER_ID);
@@ -93,22 +96,23 @@ describe('TasksAuthorizationService', () => {
       expect(result).toBe(TAREA);
     });
 
-    it('rechaza a un participante activo que no es líder', async () => {
+    it('rechaza a un participante activo que no es líder (tarea sin rol: sin vía de colaboración por rol)', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
-      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
       const service = new TasksAuthorizationService(ctx);
 
       await expect(service.assertCanEditTask(1, 10, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
       );
       expect(ctx.assertActiveProjectParticipant).not.toHaveBeenCalled();
+      expect(ctx.getActiveParticipationInRole).not.toHaveBeenCalled();
     });
 
     it('rechaza al asignado activo que no es líder', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
-      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
       const service = new TasksAuthorizationService(ctx);
 
       await expect(service.assertCanEditTask(1, 10, ASIGNADO_ID)).rejects.toBeInstanceOf(
@@ -120,7 +124,7 @@ describe('TasksAuthorizationService', () => {
     it('rechaza al creador de la tarea si no es líder', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
-      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
       const service = new TasksAuthorizationService(ctx);
 
       await expect(service.assertCanEditTask(1, 10, CREADOR_ID)).rejects.toBeInstanceOf(
@@ -136,7 +140,7 @@ describe('TasksAuthorizationService', () => {
       await expect(service.assertCanEditTask(1, 999, LIDER_ID)).rejects.toBeInstanceOf(
         NotFoundException,
       );
-      expect(ctx.assertProjectLeader).not.toHaveBeenCalled();
+      expect(ctx.getProjectOrThrow).not.toHaveBeenCalled();
     });
 
     it('propaga NotFoundException si la tarea pertenece a otro proyecto', async () => {
@@ -167,7 +171,7 @@ describe('TasksAuthorizationService', () => {
     it('permite al líder y devuelve la tarea validada', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
-      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
       const service = new TasksAuthorizationService(ctx);
 
       const result = await service[method](1, 10, LIDER_ID);
@@ -175,10 +179,10 @@ describe('TasksAuthorizationService', () => {
       expect(result).toBe(TAREA);
     });
 
-    it('rechaza al asignado activo que no es líder', async () => {
+    it('rechaza al asignado activo que no es líder (tarea sin rol)', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
-      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
       const service = new TasksAuthorizationService(ctx);
 
       await expect(service[method](1, 10, ASIGNADO_ID)).rejects.toBeInstanceOf(
@@ -187,15 +191,94 @@ describe('TasksAuthorizationService', () => {
       expect(ctx.getActiveAssignment).not.toHaveBeenCalled();
     });
 
-    it('rechaza a un participante que no es líder', async () => {
+    it('rechaza a un participante que no es líder (tarea sin rol)', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
-      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
       const service = new TasksAuthorizationService(ctx);
 
       await expect(service[method](1, 10, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    it('permite a un participante activo en el mismo rol que la tarea (no líder)', async () => {
+      const ctx = makeContext();
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA_CON_ROL);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
+      ctx.getActiveParticipationInRole.mockResolvedValue({ idParticipacion: 1 });
+      const service = new TasksAuthorizationService(ctx);
+
+      const result = await service[method](1, 10, PARTICIPANTE_ID);
+
+      expect(result).toBe(TAREA_CON_ROL);
+      expect(ctx.getActiveParticipationInRole).toHaveBeenCalledWith(1, PARTICIPANTE_ID, ROL_TAREA, undefined);
+    });
+
+    it('rechaza a un participante activo en un rol DISTINTO del de la tarea (cross-role)', async () => {
+      const ctx = makeContext();
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA_CON_ROL);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
+      ctx.getActiveParticipationInRole.mockResolvedValue(null);
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service[method](1, 10, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('rechaza a un usuario cuya participación en el rol de la tarea ya no está ACTIVO (retirado)', async () => {
+      // getActiveParticipationInRole ya filtra por estadoParticipacion:
+      // 'ACTIVO' en la propia consulta — una fila RETIRADO/COMPLETADO se
+      // traduce en null aquí, igual que en assertActiveProjectParticipant.
+      const ctx = makeContext();
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA_CON_ROL);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
+      ctx.getActiveParticipationInRole.mockResolvedValue(null);
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service[method](1, 10, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('tarea sin rol: un participante activo es rechazado sin consultar participación por rol', async () => {
+      const ctx = makeContext();
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service[method](1, 10, PARTICIPANTE_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(ctx.getActiveParticipationInRole).not.toHaveBeenCalled();
+    });
+
+    it('el líder conserva autoridad total sobre una tarea con rol, sin consultar participación por rol', async () => {
+      const ctx = makeContext();
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA_CON_ROL);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
+      const service = new TasksAuthorizationService(ctx);
+
+      const result = await service[method](1, 10, LIDER_ID);
+
+      expect(result).toBe(TAREA_CON_ROL);
+      expect(ctx.getActiveParticipationInRole).not.toHaveBeenCalled();
+    });
+
+    it('traslada el mismo tx a getTaskInProjectOrThrow, getProjectOrThrow y getActiveParticipationInRole', async () => {
+      const ctx = makeContext();
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA_CON_ROL);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
+      ctx.getActiveParticipationInRole.mockResolvedValue({ idParticipacion: 1 });
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new TasksAuthorizationService(ctx);
+
+      await service[method](1, 10, PARTICIPANTE_ID, tx);
+
+      expect(ctx.getTaskInProjectOrThrow).toHaveBeenCalledWith(1, 10, tx);
+      expect(ctx.getProjectOrThrow).toHaveBeenCalledWith(1, tx);
+      expect(ctx.getActiveParticipationInRole).toHaveBeenCalledWith(1, PARTICIPANTE_ID, ROL_TAREA, tx);
     });
   });
 
@@ -622,7 +705,7 @@ describe('TasksAuthorizationService', () => {
     it('el objeto de tarea conserva creadaPor sin que intervenga en la decisión', async () => {
       const ctx = makeContext();
       ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
-      ctx.assertProjectLeader.mockResolvedValue(undefined);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
       const service = new TasksAuthorizationService(ctx);
 
       const result = await service.assertCanEditTask(1, 10, LIDER_ID);

@@ -20,6 +20,14 @@ vi.mock('../hooks/use-exit-request', () => ({
 }));
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
+// S7 (F008): la card de liderazgo tiene cobertura propia (leadership-card.spec.ts);
+// aquí se stubea para que esta página siga probándose sin QueryClientProvider.
+vi.mock('../hooks/use-leadership', () => ({
+  useLeadershipContext: () => ({ data: undefined, isPending: false, isError: true }),
+  useLeadershipHistory: () => ({ data: undefined, isPending: false, isError: true }),
+  useLeadershipAppeals: () => ({ data: undefined, isPending: false, isError: true }),
+  useLeadershipAppealMutations: () => ({ cancel: { mutate: vi.fn(), isPending: false }, create: { mutate: vi.fn(), isPending: false }, invalidate: vi.fn() }),
+}));
 
 import MiembrosProyectoPage from '../app/dashboard/proyectos/[id]/miembros/page';
 import { useProjectTeam } from '../hooks/use-project-team';

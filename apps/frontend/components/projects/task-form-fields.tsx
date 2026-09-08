@@ -50,22 +50,51 @@ export interface TaskFormFieldsProps {
 }
 
 /**
- * Candidatos para el usuario asignado (Sección 7/23). Con rol, los candidatos
- * son los participantes activos de ese rol exacto; sin rol, los participantes
- * activos de cualquier rol del proyecto. `members` viene de `findTeam` con una
- * fila POR participación, así que un usuario con varios roles aparecería varias
- * veces en el caso "Sin rol": se deduplica por `idUsuario` para que figure una
- * sola vez en el selector.
+ * Un integrante puede ocupar VARIOS roles del proyecto a la vez (el índice
+ * único de `ParticipacionProyecto` es por usuario+rol, no por usuario+proyecto),
+ * y `members` llega con una fila POR participación. Se agrupa por `idUsuario`
+ * conservando todos sus roles, para que la persona figure una sola vez en el
+ * selector y se pueda explicar por qué queda fuera de un rol concreto.
  */
-function candidatosParaRol(rol: string, members: MiembroProyecto[]): MiembroProyecto[] {
-  const filtrados =
-    rol === SIN_ROL ? members : members.filter((m) => m.idRolProyecto === Number(rol));
-  const vistos = new Set<number>();
-  return filtrados.filter((m) => {
-    if (vistos.has(m.idUsuario)) return false;
-    vistos.add(m.idUsuario);
-    return true;
-  });
+interface CandidatoAgrupado extends MiembroProyecto {
+  idsRoles: number[];
+}
+
+function agruparPorUsuario(members: MiembroProyecto[]): CandidatoAgrupado[] {
+  const porUsuario = new Map<number, CandidatoAgrupado>();
+  for (const m of members) {
+    const previo = porUsuario.get(m.idUsuario);
+    if (previo) {
+      if (!previo.idsRoles.includes(m.idRolProyecto)) previo.idsRoles.push(m.idRolProyecto);
+    } else {
+      porUsuario.set(m.idUsuario, { ...m, idsRoles: [m.idRolProyecto] });
+    }
+  }
+  return [...porUsuario.values()];
+}
+
+/**
+ * Candidatos para el usuario asignado (Sección 7/23). Con rol, los elegibles
+ * son los participantes activos de ese rol EXACTO — mismo criterio que aplica
+ * el backend en `TasksRelationsService.assertUserParticipationForEffectiveRole`;
+ * sin rol, cualquier participante activo del proyecto.
+ *
+ * Los que no cumplen no se ocultan: se devuelven aparte para listarlos
+ * deshabilitados con el motivo. Dos roles del proyecto pueden tener nombres casi
+ * idénticos, y desaparecer en silencio hacía imposible distinguir "esta persona
+ * no está en el proyecto" de "está, pero en otro rol".
+ */
+function particionarCandidatos(
+  rol: string,
+  members: MiembroProyecto[],
+): { elegibles: CandidatoAgrupado[]; excluidos: CandidatoAgrupado[] } {
+  const todos = agruparPorUsuario(members);
+  if (rol === SIN_ROL) return { elegibles: todos, excluidos: [] };
+  const idRol = Number(rol);
+  return {
+    elegibles: todos.filter((m) => m.idsRoles.includes(idRol)),
+    excluidos: todos.filter((m) => !m.idsRoles.includes(idRol)),
+  };
 }
 
 function iniciales(nombre: string, apellido: string): string {
@@ -118,7 +147,11 @@ export function TaskFormFields({ roles, milestones, members, labels, onManageLab
   const rolSeleccionado = watch('idRolProyecto');
   const [cascadaMensaje, setCascadaMensaje] = useState<string | null>(null);
 
-  const candidatos = candidatosParaRol(rolSeleccionado, members);
+  const { elegibles: candidatos, excluidos } = particionarCandidatos(rolSeleccionado, members);
+  const nombreRolSeleccionado =
+    rolSeleccionado === SIN_ROL
+      ? null
+      : (roles.find((r) => String(r.idRolProyecto) === rolSeleccionado)?.nombreRol ?? null);
 
   // Cambio de rol síncrono dentro del propio handler (no en un efecto): si
   // el asignado actual deja de pertenecer al rol nuevo, se limpia de
@@ -131,7 +164,7 @@ export function TaskFormFields({ roles, milestones, members, labels, onManageLab
       setCascadaMensaje(null);
       return;
     }
-    const siguenValido = candidatosParaRol(nuevoRol, members).some(
+    const siguenValido = particionarCandidatos(nuevoRol, members).elegibles.some(
       (m) => String(m.idUsuario) === asignadoActual,
     );
     if (!siguenValido) {
@@ -345,15 +378,48 @@ export function TaskFormFields({ roles, milestones, members, labels, onManageLab
                         </span>
                       </SelectItem>
                     ))}
+                    {/* Los integrantes que no ocupan el rol de la tarea se listan
+                        deshabilitados en vez de ocultarse: el líder ve que la
+                        persona SÍ está en el proyecto y que lo que falta es el
+                        rol, no la membresía (dos roles del proyecto pueden
+                        llamarse casi igual). Seleccionarlos sigue siendo
+                        imposible — el backend rechaza esa asignación. */}
+                    {excluidos.length > 0 && (
+                      <div className="mt-1 border-t border-outline-variant/40 pt-1">
+                        <p className="px-2 py-1 text-[11px] font-semibold text-on-surface-variant">
+                          Sin este rol (no asignables)
+                        </p>
+                        {excluidos.map((miembro) => (
+                          <div
+                            key={`excluido-${miembro.idUsuario}`}
+                            aria-disabled="true"
+                            title={`${miembro.nombre} ${miembro.apellido} · ${miembro.correo} — no participa en el rol seleccionado`}
+                            className="flex min-w-0 cursor-not-allowed items-center gap-2 rounded-sm px-2 py-1.5 text-sm opacity-50"
+                          >
+                            <Avatar className="size-5 shrink-0">
+                              <AvatarFallback className="bg-on-surface/10 text-[9px] font-bold text-on-surface-variant">
+                                {iniciales(miembro.nombre, miembro.apellido)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="min-w-0 truncate">
+                              {miembro.nombre} {miembro.apellido}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
                 {candidatos.length === 0 ? (
                   <FormDescription className="text-xs">
-                    No hay participantes disponibles para este rol.
+                    Ningún integrante activo ocupa
+                    {nombreRolSeleccionado ? ` el rol «${nombreRolSeleccionado}»` : ' este rol'}. Cambia el
+                    rol de la tarea o dale ese rol a la persona en «Editar Roles».
                   </FormDescription>
                 ) : (
                   <FormDescription className="text-xs">
-                    Los usuarios disponibles dependen del rol seleccionado.
+                    Solo se pueden asignar integrantes activos
+                    {nombreRolSeleccionado ? ` con el rol «${nombreRolSeleccionado}»` : ' del proyecto'}.
                   </FormDescription>
                 )}
                 {cascadaMensaje && (

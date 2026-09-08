@@ -4,6 +4,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { ApplicationsService } from '../src/applications/applications.service';
 import type { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { TeamService } from '../src/team/team.service';
+import { makeProjectReadPolicyDouble } from './helpers/project-policy.double';
 
 function makePrisma() {
   return {
@@ -21,6 +22,7 @@ function makeService(prisma: ReturnType<typeof makePrisma>) {
     prisma as unknown as PrismaService,
     { findAll: vi.fn() } as unknown as ApplicationsService,
     { getPendingLeaderReviews: vi.fn() } as unknown as ExitRequestsService,
+    makeProjectReadPolicyDouble(),
   );
 }
 
@@ -58,7 +60,7 @@ function participacion(
 }
 
 describe('TeamService.findTeam', () => {
-  it('devuelve las participaciones ACTIVO del proyecto con el contrato histórico de GET /proyectos/:id/equipo', async () => {
+  it('devuelve las participaciones del proyecto (activas e históricas) con el contrato de GET /proyectos/:id/equipo y su anotación de elegibilidad', async () => {
     const prisma = makePrisma();
     const equipo = [
       {
@@ -76,18 +78,19 @@ describe('TeamService.findTeam', () => {
     prisma.participacionProyecto.findMany.mockResolvedValue(equipo);
     const service = makeService(prisma);
 
-    const result = await service.findTeam(1);
+    const result = await service.findTeam(1, 7);
 
-    expect(result).toBe(equipo);
+    // C047: misma fila, anotada con su elegibilidad para recibir trabajo.
+    expect(result).toEqual([{ ...equipo[0], elegible: true, motivoNoElegible: null }]);
     expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith({
       where: {
         rolProyecto: { idProyecto: 1 },
-        estadoParticipacion: 'ACTIVO',
       },
       select: {
         idParticipacion: true,
         estadoParticipacion: true,
         fechaIngreso: true,
+        fechaSalida: true,
         usuario: {
           select: {
             idUsuario: true,
@@ -116,7 +119,7 @@ describe('TeamService.findTeam', () => {
     prisma.participacionProyecto.findMany.mockResolvedValue([]);
     const service = makeService(prisma);
 
-    const result = await service.findTeam(1);
+    const result = await service.findTeam(1, 7);
 
     expect(result).toEqual([]);
     expect(prisma.proyecto.findFirst).not.toHaveBeenCalled();

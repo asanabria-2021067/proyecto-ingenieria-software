@@ -25,6 +25,7 @@ import {
   useMessages,
   useSendMessage,
 } from '@/hooks/use-chat';
+import { useChatPanel } from '@/components/projects/chat-panel-context';
 import type { ChatConversacion } from '@/lib/types/chat';
 import type { MiembroProyecto } from '@/hooks/use-project-members';
 
@@ -50,20 +51,54 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
   const [activeId, setActiveId] = useState<number | null>(null);
   const [nuevoChatAbierto, setNuevoChatAbierto] = useState(false);
   const markRead = useMarkConversationRead(idProyecto);
+  const crearDesdeOtraVista = useCreateConversation(idProyecto);
+  const { pendingChatUserId, clearPendingChat } = useChatPanel();
 
-  useChatSocket(idProyecto, activeId);
-
-  if (!habilitado) return null;
+  const { isConnected } = useChatSocket(idProyecto, activeId);
 
   const abrirConversacion = (idConversacion: number) => {
     setActiveId(idConversacion);
     markRead.mutate(idConversacion);
   };
 
+  // Entrada a un chat 1:1 desde fuera del sidebar (p. ej. el botón "Chat" en
+  // la ficha del responsable del proyecto) — createConversation es idempotente
+  // para INDIVIDUAL, así que reintentar aquí solo abre la conversación ya
+  // existente, nunca duplica una.
+  useEffect(() => {
+    if (pendingChatUserId == null) return;
+    let cancelado = false;
+    crearDesdeOtraVista.mutate(
+      { tipo: 'INDIVIDUAL', idsParticipantes: [pendingChatUserId] },
+      {
+        onSuccess: (conversacion) => {
+          if (!cancelado) abrirConversacion(conversacion.idConversacion);
+        },
+        onSettled: () => {
+          if (!cancelado) clearPendingChat();
+        },
+      },
+    );
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingChatUserId]);
+
+  if (!habilitado) return null;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col border-t border-outline-variant">
       <div className="flex items-center justify-between px-4 py-2.5">
-        <span className="text-xs font-bold uppercase tracking-wide text-tertiary">Chats</span>
+        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-tertiary">
+          Chats
+          <span
+            role="status"
+            title={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
+            aria-label={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
+            className={`size-1.5 shrink-0 rounded-full ${isConnected ? 'bg-green-500' : 'animate-pulse bg-amber-500'}`}
+          />
+        </span>
         <button
           type="button"
           onClick={() => setNuevoChatAbierto(true)}

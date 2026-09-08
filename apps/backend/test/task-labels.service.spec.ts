@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { LabelsService } from '../src/labels/labels.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
+import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
 
 /**
  * Tarea 32: LabelsService.attachToTask/detachFromTask ejecutan TODA la
@@ -35,6 +36,18 @@ function makePrisma() {
   return prisma;
 }
 
+/**
+ * C035: LabelsService corre sobre el protocolo transaccional. El doble del
+ * runner entrega `prisma.__tx` como `tx` (la misma vista que daba el mock de
+ * `$transaction`) y la policy es no-op.
+ */
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  projectTx = makeProjectTransactionDouble({ tx: prisma.__tx }),
+) {
+  return new LabelsService(prisma as unknown as PrismaService, projectTx, makeProjectPolicyDouble());
+}
+
 const PROJECT_ID = 5;
 const TASK_ID = 42;
 const LABEL_ID = 7;
@@ -58,7 +71,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('el líder asocia: crea la fila vía upsert con la clave compuesta exacta', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
 
@@ -72,11 +85,12 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('toda la operación corre en una sola transacción; ninguna consulta usa el delegate raíz de PrismaService', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const projectTx = makeProjectTransactionDouble({ tx: prisma.__tx });
+    const service = makeService(prisma, projectTx);
 
     await service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
 
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(projectTx.run).toHaveBeenCalledTimes(1);
     expect(prisma.proyecto.findFirst).not.toHaveBeenCalled();
     expect(prisma.tarea.findFirst).not.toHaveBeenCalled();
     expect(prisma.etiqueta.findFirst).not.toHaveBeenCalled();
@@ -86,7 +100,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('devuelve void', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     const resultado = await service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
 
@@ -96,7 +110,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('participante activo no líder recibe 403, sin llegar a validar tarea/etiqueta ni escribir', async () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, PARTICIPANT_ID),
@@ -109,7 +123,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('el asignado activo de la tarea (sin ser líder) recibe 403', async () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, ASSIGNEE_ID),
@@ -119,7 +133,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('el creador de la tarea (sin ser líder del proyecto) recibe 403', async () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, TASK_CREATOR_ID),
@@ -129,7 +143,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('un usuario externo recibe 403', async () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, EXTERNO_ID),
@@ -139,7 +153,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('proyecto inexistente/eliminado produce 404, sin escritura', async () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID),
@@ -151,7 +165,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.__tx.tarea.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, 999999, LABEL_ID, LEADER_ID),
@@ -163,7 +177,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.__tx.tarea.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID),
@@ -175,7 +189,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
         eliminadoEn: null,
         proyecto: { eliminadoEn: null },
       },
-      select: { idTarea: true },
+      select: { idTarea: true, idSprint: true },
     });
   });
 
@@ -183,7 +197,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.__tx.tarea.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID),
@@ -195,7 +209,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.__tx.tarea.findFirst.mockResolvedValue({ idTarea: TASK_ID });
     prisma.__tx.etiqueta.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, 999999, LEADER_ID),
@@ -208,7 +222,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.__tx.tarea.findFirst.mockResolvedValue({ idTarea: TASK_ID });
     prisma.__tx.etiqueta.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID),
@@ -237,7 +251,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
     prisma.__tx.tareaEtiqueta.upsert.mockImplementation(async () => {
       orden.push('asociacion');
     });
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
 
@@ -247,7 +261,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
   it('no modifica la tarea ni la etiqueta: nunca llama a tarea.update/updateMany/delete/deleteMany ni etiqueta.update/updateMany/delete/deleteMany', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
 
@@ -274,7 +288,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
     stubHappyPath(prisma);
     const errorFk = new Error('foreign key violation simulada');
     prisma.__tx.tareaEtiqueta.upsert.mockRejectedValue(errorFk);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID)).rejects.toBe(errorFk);
   });
@@ -284,7 +298,7 @@ describe('LabelsService.attachToTask (PUT, Tarea 32)', () => {
     stubHappyPath(prisma);
     const errorFallo = new Error('fallo al escribir TareaEtiqueta');
     prisma.__tx.tareaEtiqueta.upsert.mockRejectedValue(errorFallo);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID)).rejects.toBe(errorFallo);
   });
@@ -294,7 +308,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
   it('el líder retira: usa deleteMany filtrado por idTarea + idEtiqueta (nunca delete sobre la PK compuesta)', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
 
@@ -308,7 +322,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
     prisma.__tx.tareaEtiqueta.deleteMany.mockResolvedValue({ count: 0 });
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID),
@@ -318,7 +332,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
   it('participante activo no líder recibe 403, sin escritura', async () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, PARTICIPANT_ID),
@@ -329,7 +343,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
   it('proyecto inexistente/eliminado produce 404', async () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID),
@@ -340,7 +354,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
     const prisma = makePrisma();
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.__tx.tarea.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID),
@@ -353,7 +367,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
     prisma.__tx.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.__tx.tarea.findFirst.mockResolvedValue({ idTarea: TASK_ID });
     prisma.__tx.etiqueta.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID),
@@ -364,7 +378,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
   it('el filtro nunca usa solo idEtiqueta o solo idTarea (no afecta otras asociaciones)', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
 
@@ -375,7 +389,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
   it('no modifica la tarea ni la etiqueta', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
 
@@ -388,7 +402,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
     stubHappyPath(prisma);
     const errorFallo = new Error('fallo al eliminar TareaEtiqueta');
     prisma.__tx.tareaEtiqueta.deleteMany.mockRejectedValue(errorFallo);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID)).rejects.toBe(errorFallo);
   });
@@ -398,7 +412,7 @@ describe('LabelsService.detachFromTask (DELETE, Tarea 32)', () => {
     stubHappyPath(prisma);
     const error = new Error('fallo de conexión simulado');
     prisma.__tx.tareaEtiqueta.deleteMany.mockRejectedValue(error);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID)).rejects.toBe(error);
   });
@@ -408,7 +422,7 @@ describe('Idempotencia y concurrencia simuladas (Tarea 32)', () => {
   it('PUT repetido: la segunda llamada también resuelve sin error (upsert nunca lanza P2002 por PK compuesta ya existente)', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await service.attachToTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
     await expect(
@@ -420,7 +434,7 @@ describe('Idempotencia y concurrencia simuladas (Tarea 32)', () => {
   it('dos PUT concurrentes resuelven ambos con éxito (simulados con Promise.all sobre el mismo upsert idempotente)', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       Promise.all([
@@ -436,7 +450,7 @@ describe('Idempotencia y concurrencia simuladas (Tarea 32)', () => {
     prisma.__tx.tareaEtiqueta.deleteMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await service.detachFromTask(PROJECT_ID, TASK_ID, LABEL_ID, LEADER_ID);
     await expect(
@@ -447,7 +461,7 @@ describe('Idempotencia y concurrencia simuladas (Tarea 32)', () => {
   it('dos DELETE concurrentes resuelven ambos con éxito, sin P2025', async () => {
     const prisma = makePrisma();
     stubHappyPath(prisma);
-    const service = new LabelsService(prisma as unknown as PrismaService);
+    const service = makeService(prisma);
 
     await expect(
       Promise.all([

@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
 import type { NotificationsService } from '../src/notifications/notifications.service';
@@ -7,6 +8,8 @@ import type { TasksAuthorizationService } from '../src/tasks/tasks-authorization
 import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { TasksRelationsService } from '../src/tasks/tasks-relations.service';
 import { TasksService } from '../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * Tarea 34: integra las mutaciones de gestión de tareas (crear, editar,
@@ -42,6 +45,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   return {
     tx,
     usuario: { findUnique: vi.fn().mockResolvedValue({ nombre: 'Actor', apellido: 'Prueba' }) },
@@ -71,7 +77,9 @@ function makeService(
     relations as TasksRelationsService,
     notifications as NotificationsService,
     context as TasksContextService,
-  );
+    new ProjectTransactionService(prisma as unknown as PrismaService),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 }
 
 function tareaRow(overrides: Record<string, unknown> = {}) {
@@ -229,7 +237,11 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
   function makeUpdateSetup(rowOverrides: Record<string, unknown> = {}) {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanEditTask: vi.fn().mockResolvedValue(undefined) };
+    // T-164: assertCanEditTask ahora también sirve como "tareaAntes" para el
+    // diff de la bitácora (idSprint incluido, ausente de TASK_SELECT) —
+    // antes su resuelto se descartaba, así que este mock puede devolver
+    // cualquier fila con los campos que update() vaya a leer.
+    const auth = { assertCanEditTask: vi.fn().mockResolvedValue({ idSprint: 1, ...tareaRow(rowOverrides) }) };
     const relations = {
       validateRelatedResources: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     };
@@ -284,7 +296,7 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
   it('error de update: ninguna notificación', async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanEditTask: vi.fn().mockResolvedValue(undefined) };
+    const auth = { assertCanEditTask: vi.fn().mockResolvedValue({ idSprint: 1, ...tareaRow() }) };
     const relations = {
       validateRelatedResources: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     };

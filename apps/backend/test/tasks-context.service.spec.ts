@@ -283,6 +283,76 @@ describe('TasksContextService', () => {
     });
   });
 
+  describe('getActiveParticipationInRole', () => {
+    it('devuelve la participación cuando el usuario está ACTIVO en ese rol exacto y proyecto', async () => {
+      const prisma = makeClient();
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 7 });
+      const service = new TasksContextService(prisma as unknown as PrismaService);
+
+      const result = await service.getActiveParticipationInRole(1, 5, 10);
+
+      expect(result).toEqual({ idParticipacion: 7 });
+      expect(prisma.participacionProyecto.findFirst).toHaveBeenCalledWith({
+        where: {
+          idUsuario: 5,
+          idRolProyecto: 10,
+          estadoParticipacion: 'ACTIVO',
+          rolProyecto: { idProyecto: 1 },
+        },
+        select: { idParticipacion: true },
+      });
+    });
+
+    it('devuelve null cuando el usuario no tiene ninguna participación en ese rol', async () => {
+      const prisma = makeClient();
+      prisma.participacionProyecto.findFirst.mockResolvedValue(null);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
+
+      const result = await service.getActiveParticipationInRole(1, 5, 10);
+
+      expect(result).toBeNull();
+    });
+
+    it('nunca compara por nombre de rol: el filtro va siempre por idRolProyecto + idProyecto', async () => {
+      // El filtro rolProyecto: { idProyecto } garantiza que un idRolProyecto
+      // de OTRO proyecto no pueda coincidir, aunque existiera con ese mismo
+      // número — nunca se compara por nombreRol.
+      const prisma = makeClient();
+      prisma.participacionProyecto.findFirst.mockResolvedValue(null);
+      const service = new TasksContextService(prisma as unknown as PrismaService);
+
+      await service.getActiveParticipationInRole(1, 5, 10);
+
+      expect(prisma.participacionProyecto.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            idRolProyecto: 10,
+            estadoParticipacion: 'ACTIVO',
+            rolProyecto: { idProyecto: 1 },
+          }),
+        }),
+      );
+    });
+
+    it('usa el cliente transaccional proporcionado en vez del PrismaService principal', async () => {
+      const prisma = makeClient();
+      const tx = makeClient();
+      tx.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 9 });
+      const service = new TasksContextService(prisma as unknown as PrismaService);
+
+      const result = await service.getActiveParticipationInRole(
+        1,
+        5,
+        10,
+        tx as unknown as Prisma.TransactionClient,
+      );
+
+      expect(result).toEqual({ idParticipacion: 9 });
+      expect(tx.participacionProyecto.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.participacionProyecto.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getMilestoneInProjectOrThrow', () => {
     it('devuelve el hito cuando pertenece al mismo proyecto', async () => {
       const prisma = makeClient();

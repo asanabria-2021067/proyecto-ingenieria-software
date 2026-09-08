@@ -95,23 +95,10 @@ export async function resubmitProject(
   return apiFetch(`/proyectos/${id}/reenviar`, { method: 'POST' });
 }
 
-export async function requestProjectClosure(
-  id: number,
-): Promise<{ idProyecto: number; estadoProyecto: string }> {
-  return apiFetch(`/proyectos/${id}/solicitar-cierre`, { method: 'POST' });
-}
-
-export async function approveProjectClosure(
-  id: number,
-): Promise<{ idProyecto: number; estadoProyecto: string }> {
-  return apiFetch(`/proyectos/${id}/aprobar-cierre`, { method: 'POST' });
-}
-
-export async function rejectProjectClosure(
-  id: number,
-): Promise<{ idProyecto: number; estadoProyecto: string }> {
-  return apiFetch(`/proyectos/${id}/rechazar-cierre`, { method: 'POST' });
-}
+// S7: `requestProjectClosure` / `approveProjectClosure` / `rejectProjectClosure`
+// fueron RETIRADAS. Sus rutas cambiaron de contrato (C128): el cierre vive
+// en `lib/services/closure.ts` (líder: preparar/enviar) y
+// `lib/services/closure-review.ts` (administrador: veredictos).
 
 export async function getProjectRevisions(
   idProyecto: number,

@@ -41,6 +41,7 @@ services:
       - DIRECT_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}?schema=public
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-me}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?debes definir JWT_REFRESH_SECRET, no tiene valor por defecto}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:

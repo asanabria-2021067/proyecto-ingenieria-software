@@ -5,8 +5,11 @@ import { describeIntegration, createIntegrationPrismaClient } from './setup/data
 import {
   createIntegrationUser,
   createIntegrationProject,
+  createIntegrationParticipation,
+  createIntegrationProjectRole,
   createIntegrationSprint,
   createIntegrationTask,
+  createIntegrationTaskAssignment,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { SprintsService } from '../../src/sprints/sprints.service';
@@ -14,6 +17,12 @@ import { SprintsContextService } from '../../src/sprints/sprints-context.service
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
+import { BitacoraEventosService } from '../../src/bitacora/bitacora-eventos.service';
+import { HoursRecognitionService } from '../../src/sprints/hours-recognition.service';
 
 /**
  * Integración real A4: SprintsService.finalizeSprint contra PostgreSQL real
@@ -40,15 +49,22 @@ describeIntegration(
     let scope: IntegrationCleanupScope;
 
     function makeService(notifications = makeNotificationsSpy()) {
-      const context = new SprintsContextService(prisma as unknown as PrismaService);
+      const prismaService = prisma as unknown as PrismaService;
+      const context = new SprintsContextService(prismaService);
       const authorization = new SprintsAuthorizationService(context);
+      const runner = new ProjectTransactionService(prismaService);
       return {
         service: new SprintsService(
-          prisma as unknown as PrismaService,
+          prismaService,
           context,
           authorization,
           notifications as unknown as NotificationsService,
-        ),
+          runner,
+          new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+          new ProjectReadPolicyService(prismaService),
+          new BitacoraEventosService(),
+          undefined,
+          new HoursRecognitionService(prismaService)),
         notifications,
       };
     }
@@ -73,7 +89,7 @@ describeIntegration(
     it('tarea pendiente: finalizeSprint rechaza con ConflictException y el Sprint permanece ACTIVO sin fechaFinalizacionIniciada', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
       scope.sprintIds = [sprint.idSprint];
@@ -101,7 +117,7 @@ describeIntegration(
     it('todas las tareas HECHO: finalizeSprint transiciona a EN_FINALIZACION y persiste fechaFinalizacionIniciada', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
       scope.sprintIds = [sprint.idSprint];
@@ -109,6 +125,20 @@ describeIntegration(
         estadoTarea: 'HECHO',
       });
       scope.taskIds = [task.idTarea];
+      // C075 (§12): un HECHO exige TRAZA (F1) y un tramo con horas exige
+      // participación resuelta (F3). El tramo se crea ya cerrado para no
+      // violar F2 y anclado a una participación real.
+      const role = await createIntegrationProjectRole(prisma, project.idProyecto);
+      scope.roleIds = [role.idRolProyecto];
+      const participation = await createIntegrationParticipation(prisma, leader.idUsuario, role.idRolProyecto, {
+        estadoParticipacion: 'ACTIVO',
+      });
+      scope.participationIds = [participation.idParticipacion];
+      const trace = await createIntegrationTaskAssignment(prisma, task.idTarea, leader.idUsuario, leader.idUsuario, {
+        idParticipacion: participation.idParticipacion,
+        desasignadaEn: new Date('2026-09-02T12:00:00.000Z'),
+      });
+      scope.assignmentIds = [trace.idAsignacion];
 
       const { service } = makeService();
 
@@ -123,7 +153,7 @@ describeIntegration(
     it('concurrencia real: exactamente una de dos finalizaciones simultáneas gana, con exactamente una notificación', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
       scope.sprintIds = [sprint.idSprint];
@@ -131,6 +161,20 @@ describeIntegration(
         estadoTarea: 'HECHO',
       });
       scope.taskIds = [task.idTarea];
+      // C075 (§12): un HECHO exige TRAZA (F1) y un tramo con horas exige
+      // participación resuelta (F3). El tramo se crea ya cerrado para no
+      // violar F2 y anclado a una participación real.
+      const role = await createIntegrationProjectRole(prisma, project.idProyecto);
+      scope.roleIds = [role.idRolProyecto];
+      const participation = await createIntegrationParticipation(prisma, leader.idUsuario, role.idRolProyecto, {
+        estadoParticipacion: 'ACTIVO',
+      });
+      scope.participationIds = [participation.idParticipacion];
+      const trace = await createIntegrationTaskAssignment(prisma, task.idTarea, leader.idUsuario, leader.idUsuario, {
+        idParticipacion: participation.idParticipacion,
+        desasignadaEn: new Date('2026-09-02T12:00:00.000Z'),
+      });
+      scope.assignmentIds = [trace.idAsignacion];
 
       let notificationCalls = 0;
       const { service } = makeService({

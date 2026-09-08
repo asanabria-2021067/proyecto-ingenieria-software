@@ -17,3 +17,15 @@ export const projectAvanceQueryKey = (idProyecto: number) => ['project-avance', 
 
 export const taskCommentsQueryKey = (idProyecto: number, idTarea: number) =>
   ['task-comments', idProyecto, idTarea] as const;
+
+/** HU-142 (T-171) — mismo criterio de forma que taskCommentsQueryKey. */
+export const taskHoursQueryKey = (idProyecto: number, idTarea: number) =>
+  ['task-hours', idProyecto, idTarea] as const;
+
+/**
+ * S7 — resumen autoritativo de horas de la tarea
+ * (`GET /proyectos/:pid/tareas/:tid/horas/resumen`). Namespace propio: es
+ * otro read-model que la lista de registros.
+ */
+export const taskHoursSummaryQueryKey = (idProyecto: number, idTarea: number) =>
+  ['task-hours-summary', idProyecto, idTarea] as const;

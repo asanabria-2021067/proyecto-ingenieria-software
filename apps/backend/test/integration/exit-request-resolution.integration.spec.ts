@@ -19,6 +19,10 @@ import { ExitRequestsContextService } from '../../src/exit-requests/exit-request
 import { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
 import { HoursRecognitionService } from '../../src/sprints/hours-recognition.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 function makeExitRequestsService(prisma: PrismaClient) {
   const prismaService = prisma as unknown as PrismaService;
@@ -28,9 +32,11 @@ function makeExitRequestsService(prisma: PrismaClient) {
     { notifyFromTemplate: vi.fn() } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService),
     new HoursRecognitionService(prismaService),
-    new SprintsContextService(prismaService),
-  );
+    new SprintsContextService(prismaService));
 }
 
 describeIntegration('B9 resolución de solicitud de salida (PostgreSQL real)', () => {
@@ -68,8 +74,8 @@ describeIntegration('B9 resolución de solicitud de salida (PostgreSQL real)', (
     const member = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, member.idUsuario];
 
-    const projectP1 = await createIntegrationProject(prisma, leader.idUsuario);
-    const projectP2 = await createIntegrationProject(prisma, leader.idUsuario);
+    const projectP1 = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+    const projectP2 = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [projectP1.idProyecto, projectP2.idProyecto];
     const sprintP1 = await createIntegrationSprint(prisma, projectP1.idProyecto);
     scope.sprintIds = [sprintP1.idSprint];
@@ -181,7 +187,7 @@ describeIntegration('B9 resolución de solicitud de salida (PostgreSQL real)', (
     const member = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, member.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const role = await createIntegrationProjectRole(prisma, project.idProyecto);

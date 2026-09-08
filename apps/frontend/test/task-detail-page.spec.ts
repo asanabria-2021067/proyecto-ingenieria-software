@@ -29,6 +29,13 @@ vi.mock('../components/projects/task-comments-panel', () => ({
   TaskCommentsPanel: () => createElement('div', { 'data-testid': 'panel-comentarios' }, 'Comentarios'),
 }));
 
+// HU-142: mismo criterio que TaskCommentsPanel — su consulta/mutación ya
+// tienen cobertura dedicada en task-hours-panel.spec.ts, así que aquí se
+// stubea para verificar únicamente que se monta junto al resto del detalle.
+vi.mock('../components/projects/task-hours-panel', () => ({
+  TaskHoursPanel: () => createElement('div', { 'data-testid': 'panel-horas' }, 'Horas'),
+}));
+
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
 const searchParamsState = vi.hoisted(() => ({ current: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
@@ -322,5 +329,89 @@ describe('TaskDetailPage — acciones y permisos', () => {
     // Aun así ve la información y los comentarios.
     expect(screen.getByRole('heading', { level: 1, name: 'Implementar login' })).toBeInTheDocument();
     expect(screen.getByTestId('panel-comentarios')).toBeInTheDocument();
+  });
+});
+
+// HU-141 — gestión colaborativa por rol: un participante activo en el MISMO
+// rol que la tarea puede editar/asignar/desasignar sin ser líder, pero
+// "Eliminar tarea" sigue siendo exclusivo del líder. Estas pruebas ejercitan
+// la derivación real de `mismoRolActivo` dentro de TaskDetailClient (no solo
+// el prop que consume TaskFormDialog, ya cubierto en task-form-dialog.spec.ts).
+describe('TaskDetailPage — HU-141 gestión colaborativa por rol', () => {
+  it('un colaborador activo en el MISMO rol que la tarea ve Editar/Más pero no ve Eliminar tarea', async () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
+    (useProjectMembers as any).mockReturnValue({
+      members: [{ idUsuario: 2, nombre: 'Beto', apellido: 'Ruiz', correo: 'beto@uvg.edu.gt', fotoUrl: null, idRolProyecto: 3 }],
+    });
+    mockTasks({ tasks: [tarea({ rolProyecto: { idRolProyecto: 3, nombreRol: 'Backend' } })] });
+    renderDetail();
+
+    expect(screen.getByRole('button', { name: 'Editar tarea Implementar login' })).toBeInTheDocument();
+    const mas = screen.getByRole('button', { name: 'Más acciones de la tarea' });
+    expect(mas).toBeInTheDocument();
+
+    mas.focus();
+    fireEvent.keyDown(mas, { key: 'Enter' });
+    expect(await screen.findByRole('menuitem', { name: 'Asignar tarea Implementar login' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Eliminar tarea/ })).not.toBeInTheDocument();
+  });
+
+  // Regresión (final-review Issue #1): el diálogo de edición ahora se abre
+  // para `puedeGestionarTarea` (líder o mismo-rol), pero el drawer
+  // <ProjectLabelsDrawer> que "Gestionar etiquetas" debería abrir sigue
+  // gateado solo a `isLeader`. Si `onManageLabels` se pasara sin condicionar,
+  // un colaborador de mismo rol vería el botón sin que hiciera nada al
+  // hacer clic (no drawer). Se verifica que el botón ni siquiera se renderiza.
+  it('un colaborador activo en el MISMO rol NO ve "Gestionar etiquetas" al abrir el formulario de edición', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
+    (useProjectMembers as any).mockReturnValue({
+      members: [{ idUsuario: 2, nombre: 'Beto', apellido: 'Ruiz', correo: 'beto@uvg.edu.gt', fotoUrl: null, idRolProyecto: 3 }],
+    });
+    mockTasks({ tasks: [tarea({ rolProyecto: { idRolProyecto: 3, nombreRol: 'Backend' } })] });
+    renderDetail();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Implementar login' }));
+    expect(screen.getByText('Actualiza la información de la tarea. Los cambios se reflejarán en el tablero.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Gestionar etiquetas del proyecto' })).not.toBeInTheDocument();
+  });
+
+  it('un colaborador con un rol DIFERENTE al de la tarea no ve Editar ni Más', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
+    (useProjectMembers as any).mockReturnValue({
+      members: [{ idUsuario: 2, nombre: 'Beto', apellido: 'Ruiz', correo: 'beto@uvg.edu.gt', fotoUrl: null, idRolProyecto: 99 }],
+    });
+    mockTasks({ tasks: [tarea({ rolProyecto: { idRolProyecto: 3, nombreRol: 'Backend' } })] });
+    renderDetail();
+
+    expect(screen.queryByRole('button', { name: /^Editar tarea/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Más acciones de la tarea' })).not.toBeInTheDocument();
+  });
+
+  it('un usuario sin ninguna participación activa no ve Editar ni Más aunque la tarea tenga rol', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
+    (useProjectMembers as any).mockReturnValue({ members: [] });
+    mockTasks({ tasks: [tarea({ rolProyecto: { idRolProyecto: 3, nombreRol: 'Backend' } })] });
+    renderDetail();
+
+    expect(screen.queryByRole('button', { name: /^Editar tarea/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Más acciones de la tarea' })).not.toBeInTheDocument();
+  });
+
+  // Regresión: `members` puede traer varias filas ACTIVO para el mismo usuario
+  // (una por rol). Un `.find()` ingenuo se quedaría con la primera y negaría
+  // acceso legítimo si el rol de la tarea coincide con una fila posterior.
+  it('regresión: coincide con la SEGUNDA fila del usuario (dos roles activos distintos), no con la primera', async () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
+    (useProjectMembers as any).mockReturnValue({
+      members: [
+        { idUsuario: 2, nombre: 'Beto', apellido: 'Ruiz', correo: 'beto@uvg.edu.gt', fotoUrl: null, idRolProyecto: 99 },
+        { idUsuario: 2, nombre: 'Beto', apellido: 'Ruiz', correo: 'beto@uvg.edu.gt', fotoUrl: null, idRolProyecto: 3 },
+      ],
+    });
+    mockTasks({ tasks: [tarea({ rolProyecto: { idRolProyecto: 3, nombreRol: 'Backend' } })] });
+    renderDetail();
+
+    expect(screen.getByRole('button', { name: 'Editar tarea Implementar login' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Más acciones de la tarea' })).toBeInTheDocument();
   });
 });

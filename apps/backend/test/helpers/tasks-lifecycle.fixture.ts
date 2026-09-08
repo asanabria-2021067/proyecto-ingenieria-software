@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './time-records.fixture';
 import { vi } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Prisma } from '@prisma/client';
@@ -8,7 +9,13 @@ import { TasksService } from '../../src/tasks/tasks.service';
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectsService } from '../../src/projects/projects.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './project-policy.double';
 import { ComentariosService } from '../../src/comentarios/comentarios.service';
 
 /**
@@ -499,6 +506,28 @@ export function makeFakeDb(state: FixtureState) {
       });
     },
 
+    /**
+     * C040: el runner real (`ProjectTransactionService`) ejecuta estas dos
+     * sentencias antes del callback. `$queryRaw` reproduce la forma del
+     * `UPDATE … RETURNING` del lock a partir del estado en memoria.
+     */
+    async $executeRawUnsafe(): Promise<number> {
+      return 0;
+    },
+    async $queryRaw(_strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> {
+      const idProyecto = values[0];
+      const row = state.proyectos.find((p) => p.idProyecto === idProyecto);
+      if (!row) return [];
+      return [
+        {
+          idProyecto: row.idProyecto,
+          creadoPor: row.creadoPor,
+          estadoProyecto: row.estadoProyecto,
+          eliminadoEn: row.eliminadoEn,
+        },
+      ];
+    },
+
     proyecto: {
       findFirst: vi.fn(async (args: FindArgs) => {
         maybeFail('proyecto.findFirst');
@@ -829,12 +858,17 @@ export function setupLifecycleEnv(): LifecycleEnv {
       },
     ),
   };
+  // C040: runner REAL sobre el `$transaction` del fake (conserva su rollback
+  // en memoria); la policy es un doble no-op.
   const tasksService = new TasksService(
     db as unknown as PrismaService,
     tasksAuthorization,
     tasksRelations,
     notifications as unknown as NotificationsService,
     tasksContext,
+    new ProjectTransactionService(db as unknown as PrismaService),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(), makeTimeRecordsDouble(),
   );
 
   const projectsNotifications = {
@@ -846,11 +880,17 @@ export function setupLifecycleEnv(): LifecycleEnv {
     db as unknown as PrismaService,
     projectsNotifications as unknown as NotificationsService,
     {} as unknown as Cache,
+    makeProjectTransactionDouble({ tx: db }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 
   const comentariosService = new ComentariosService(
     db as unknown as PrismaService,
     notifications as unknown as NotificationsService,
+    makeProjectTransactionDouble({ tx: db }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 
   return {

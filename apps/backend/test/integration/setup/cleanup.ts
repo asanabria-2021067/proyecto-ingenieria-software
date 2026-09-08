@@ -40,6 +40,7 @@ export async function cleanupIntegrationFixtures(
 
   if (assignmentIds.length > 0) {
     operations.push(
+      prisma.registroTiempoTarea.deleteMany({ where: { idAsignacion: { in: assignmentIds } } }),
       prisma.asignacionTarea.deleteMany({ where: { idAsignacion: { in: assignmentIds } } }),
     );
   }

@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, Clock, CheckCircle, XCircle, User } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
+import { projectAllPostulationsQueryKey } from '@/lib/query-keys/applications';
 import { EstadoPostulacion, PostulacionRecibida } from '@/types';
 
 const ESTADO_CONFIG: Record<
@@ -52,7 +53,7 @@ export default function PostulacionesProyectoPage() {
     isLoading,
     isError,
   } = useQuery<PostulacionRecibida[]>({
-    queryKey: ['postulaciones-proyecto', id],
+    queryKey: projectAllPostulationsQueryKey(id),
     queryFn: () => apiFetch(`/proyectos/${id}/postulaciones`),
   });
 
@@ -71,7 +72,7 @@ export default function PostulacionesProyectoPage() {
         body: JSON.stringify({ estadoPostulacion, comentarioResolucion: comentarioResolucion || undefined }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['postulaciones-proyecto', id] });
+      queryClient.invalidateQueries({ queryKey: projectAllPostulationsQueryKey(id) });
       cerrarModal();
     },
   });

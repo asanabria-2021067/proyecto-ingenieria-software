@@ -11,6 +11,10 @@ vi.mock('bcryptjs', () => ({
   hash: vi.fn(),
 }));
 
+// AuthService exige esta variable al construirse (ver auth.service.ts) - sin
+// ella, ninguno de los tests de este archivo podría instanciar el servicio.
+process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+
 describe('AuthService', () => {
   it('login retorna token cuando credenciales son validas', async () => {
     const prisma = {
@@ -95,5 +99,94 @@ describe('AuthService', () => {
         semestre: 1,
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  describe('refreshToken', () => {
+    function makeService(opts: {
+      verifyReturn?: Record<string, unknown>;
+      verifyThrows?: boolean;
+      registro?: Record<string, unknown> | null;
+    }) {
+      const jwtService = {
+        verify: opts.verifyThrows
+          ? vi.fn().mockImplementation(() => {
+              throw new Error('expirado o invalido');
+            })
+          : vi.fn().mockReturnValue(opts.verifyReturn),
+        sign: vi.fn().mockReturnValue('token-nuevo'),
+      };
+      const prisma = {
+        tokenRefresco: {
+          findUnique: vi.fn().mockResolvedValue(opts.registro ?? null),
+          update: vi.fn().mockResolvedValue({}),
+          create: vi.fn().mockResolvedValue({}),
+        },
+      };
+      const service = new AuthService(
+        prisma as unknown as PrismaService,
+        jwtService as unknown as JwtService,
+        { notifyAdminsFromTemplate: vi.fn() } as unknown as NotificationsService,
+      );
+      return { service, jwtService, prisma };
+    }
+
+    it('verifica el refresh con JWT_REFRESH_SECRET, nunca con el secreto de access', async () => {
+      const { service, jwtService } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh' },
+        registro: { idTokenRefresco: 1, revocadoEn: null, expiraEn: new Date(Date.now() + 60_000) },
+      });
+
+      await service.refreshToken('token-viejo');
+
+      expect(jwtService.verify).toHaveBeenCalledWith('token-viejo', { secret: 'test-refresh-secret' });
+    });
+
+    it('rota el token: revoca el usado y emite un par nuevo', async () => {
+      const { service, prisma } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh' },
+        registro: { idTokenRefresco: 42, revocadoEn: null, expiraEn: new Date(Date.now() + 60_000) },
+      });
+
+      const result = await service.refreshToken('token-viejo');
+
+      expect(prisma.tokenRefresco.update).toHaveBeenCalledWith({
+        where: { idTokenRefresco: 42 },
+        data: { revocadoEn: expect.any(Date) },
+      });
+      expect(result).toEqual({ accessToken: 'token-nuevo', refreshToken: 'token-nuevo' });
+    });
+
+    it('rechaza un refresh ya revocado', async () => {
+      const { service } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh' },
+        registro: { idTokenRefresco: 1, revocadoEn: new Date(), expiraEn: new Date(Date.now() + 60_000) },
+      });
+
+      await expect(service.refreshToken('token-usado')).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rechaza un refresh expirado (expiraEn en el pasado)', async () => {
+      const { service } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh' },
+        registro: { idTokenRefresco: 1, revocadoEn: null, expiraEn: new Date(Date.now() - 1000) },
+      });
+
+      await expect(service.refreshToken('token-viejo')).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rechaza un token cuya firma no verifica (invalido o expirado a nivel JWT)', async () => {
+      const { service } = makeService({ verifyThrows: true });
+
+      await expect(service.refreshToken('token-basura')).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('un access token no es aceptado como refresh token (tipo distinto de "refresh")', async () => {
+      const { service, prisma } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'access' },
+      });
+
+      await expect(service.refreshToken('access-token-real')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.tokenRefresco.findUnique).not.toHaveBeenCalled();
+    });
   });
 });

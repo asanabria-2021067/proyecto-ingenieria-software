@@ -11,6 +11,16 @@ export class SprintsContextService {
   constructor(private prisma: PrismaService) {}
 
   /**
+   * C046 (06 v2 §34): filtro de `Sprint` derivado de la decisión de lectura ya
+   * resuelta por `ProjectReadPolicyService`. Se aplica en la consulta: un
+   * actor sin restricción produce `{}` y la lista queda igual que antes; un
+   * administrador o un participante histórico solo ve los Sprints cerrados.
+   */
+  sprintScopeWhere(scope: { sprintWhere: Prisma.SprintWhereInput }): Prisma.SprintWhereInput {
+    return scope.sprintWhere;
+  }
+
+  /**
    * Reproduce exactamente TasksContextService.getProjectOrThrow: liderazgo =
    * Proyecto.creadoPor === userId, sin tabla ni rol distinto de "líder".
    */

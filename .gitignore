@@ -40,6 +40,8 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+k6/results/*
+!k6/results/.gitkeep
 
 # ── TypeScript ────────────────────────────────────────────
 *.tsbuildinfo
@@ -50,3 +52,4 @@ blob-report/
 *.pid.lock
 
 pnpm-lock.yaml
+apps/frontend/e2e/support/.auth-cache/
