@@ -9,6 +9,24 @@ import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
 import { extractCookie, getFrontendUrl } from '../common/utils/cookie';
 
+/**
+ * Sprint 7 (06 v2 §45): nombres de los cuatro eventos realtime de dominio
+ * nuevos. Se exportan para que los emisores futuros referencien un nombre
+ * catalogado; ningún método del gateway los emite todavía. Los tres eventos
+ * conservados (SPRINT_FINALIZATION_STARTED, SPRINT_CLOSED, TASK_HOURS_LOGGED)
+ * y el evento genérico `notification` no cambian.
+ */
+export const SPRINT_HOURS_ADJUSTED = 'SPRINT_HOURS_ADJUSTED' as const;
+export const LEADERSHIP_CHANGED = 'LEADERSHIP_CHANGED' as const;
+export const PROJECT_STATE_CHANGED = 'PROJECT_STATE_CHANGED' as const;
+export const CLOSURE_REVIEW_UPDATED = 'CLOSURE_REVIEW_UPDATED' as const;
+export const S7_REALTIME_EVENTS = [
+  SPRINT_HOURS_ADJUSTED,
+  LEADERSHIP_CHANGED,
+  PROJECT_STATE_CHANGED,
+  CLOSURE_REVIEW_UPDATED,
+] as const;
+
 @WebSocketGateway({
   cors: {
     origin: getFrontendUrl(),
@@ -111,6 +129,17 @@ export class NotificationsGateway
   ) {
     for (const userId of userIds) {
       this.server.to(`user:${userId}`).emit('TASK_HOURS_LOGGED', payload);
+    }
+  }
+
+  /**
+   * Sprint 7 (06 v2 §45): emisor genérico por nombre de evento catalogado,
+   * pensado para los efectos post-commit del runner de proyecto. Mismo
+   * mecanismo de rooms `user:{idUsuario}`; ningún emisor lo usa todavía.
+   */
+  async emitToUsers(event: string, userIds: number[], payload: unknown): Promise<void> {
+    for (const userId of userIds) {
+      this.server.to(`user:${userId}`).emit(event, payload);
     }
   }
 }

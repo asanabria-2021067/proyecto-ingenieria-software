@@ -7,7 +7,9 @@ import {
   Kanban,
   ListChecks,
   Users,
+  Crown,
   Rocket,
+  ClipboardCheck,
   Pencil,
   History,
   Settings2,
@@ -45,6 +47,17 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
     !!currentUser &&
     members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeChatear = isLeader || esParticipante;
+  // S7 (VIEW-01/VIEW-02): ni en CERRADO ni en EN_SOLICITUD_CIERRE existe
+  // escritura sobre la información del proyecto, tampoco en la sidebar: se
+  // ocultan «Editar Información» y «Editar Roles».
+  //
+  // Mientras solo se comprobaba CERRADO, un proyecto en solicitud de cierre
+  // seguía ofreciendo «Editar Información»; el formulario rechaza ese estado y
+  // redirige nada más abrirse, perdiendo el `returnTo`, así que «Volver»
+  // dejaba al líder en un listado ajeno en vez de en su proyecto.
+  const estadoProyecto = proyecto?.estadoProyecto;
+  const admiteEditarInformacion = estadoProyecto !== 'CERRADO' && estadoProyecto !== 'EN_SOLICITUD_CIERRE';
+  const cierreDisponible = estadoProyecto === 'EN_PROGRESO' || estadoProyecto === 'EN_SOLICITUD_CIERRE';
 
   const navItems: NavItem[] = [
     {
@@ -57,23 +70,25 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
   ];
 
   if (isLeader) {
-    navItems.push(
-      {
+    if (admiteEditarInformacion) {
+      navItems.push({
         href: `/dashboard/projects/mine/form?id=${idProyecto}`,
         label: 'Editar Información',
         icon: Pencil,
-      },
-      {
-        href: `/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`,
-        label: 'Revisiones Pasadas',
-        icon: History,
-      },
-      {
+      });
+    }
+    navItems.push({
+      href: `/dashboard/projects/mine/${idProyecto}?returnTo=/dashboard/projects/${idProyecto}`,
+      label: 'Revisiones Pasadas',
+      icon: History,
+    });
+    if (admiteEditarInformacion) {
+      navItems.push({
         href: `/dashboard/projects/${idProyecto}?openRoles=1`,
         label: 'Editar Roles',
         icon: Settings2,
-      },
-    );
+      });
+    }
   }
 
   if (puedeChatear) {
@@ -98,6 +113,12 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         label: 'Miembros',
         icon: Users,
       },
+      // S7 (VIEW-06): el liderazgo salió de «Miembros» a su propia vista.
+      {
+        href: `/dashboard/proyectos/${idProyecto}/liderazgo`,
+        label: 'Liderazgo',
+        icon: Crown,
+      },
       {
         href: `/dashboard/proyectos/${idProyecto}/sprints`,
         label: 'Sprints',
@@ -109,6 +130,16 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         icon: ScrollText,
       },
     );
+  }
+
+  // S7 (VIEW-13): entrada a la preparación del cierre, solo para el líder y
+  // solo mientras el proyecto puede prepararse o corregirse.
+  if (isLeader && cierreDisponible) {
+    navItems.push({
+      href: `/dashboard/projects/${idProyecto}/cierre`,
+      label: 'Cierre',
+      icon: ClipboardCheck,
+    });
   }
 
   // HU-143: a diferencia de Sprints/Bitácora (arriba, exclusivos del líder),

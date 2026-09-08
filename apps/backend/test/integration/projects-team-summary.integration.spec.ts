@@ -15,6 +15,7 @@ import { TeamService } from '../../src/team/team.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { ApplicationsService } from '../../src/applications/applications.service';
 import type { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real T-106 (Tarea 4) contra PostgreSQL: getTeamSummary
@@ -41,6 +42,7 @@ describeIntegration('TeamService.getTeamSummary — integración PostgreSQL real
       prisma as unknown as PrismaService,
       { findAll: async () => [] } as unknown as ApplicationsService,
       { getPendingLeaderReviews: async () => [] } as unknown as ExitRequestsService,
+      new ProjectReadPolicyService(prisma as unknown as PrismaService),
     );
     await prisma.$connect();
   });

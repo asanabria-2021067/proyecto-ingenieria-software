@@ -5,6 +5,11 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { TimeRecordsService } from '../src/time-records/time-records.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 const PROJECT_ID = 10;
 const TASK_ID = 20;
@@ -39,6 +44,11 @@ function makeTx(overrides: Record<string, unknown> = {}) {
 
 function setup(txOverrides: Record<string, unknown> = {}) {
   const tx = makeTx(txOverrides);
+  Object.assign(tx.asignacionTarea, {
+    findUniqueOrThrow: vi.fn().mockResolvedValue({
+      origenReporte: 'GRANULAR', horasReales: null, reconocidoEn: null, desasignadaEn: null,
+    }),
+  });
   const prisma = {
     $transaction: vi.fn((callback: (tx: unknown) => unknown) => callback(tx)),
     registroTiempoTarea: {
@@ -62,13 +72,17 @@ function setup(txOverrides: Record<string, unknown> = {}) {
     notifyTaskHoursLogged: vi.fn().mockResolvedValue(undefined),
   };
 
+  const readPolicy = makeProjectReadPolicyDouble();
   const service = new TimeRecordsService(
     prisma as unknown as PrismaService,
     tasksContext as unknown as TasksContextService,
     notifications as unknown as NotificationsService,
+    makeProjectTransactionDouble({ tx }),
+    makeProjectPolicyDouble(),
+    readPolicy,
   );
 
-  return { prisma, tasksContext, notifications, tx, service };
+  return { prisma, tasksContext, notifications, tx, service, readPolicy };
 }
 
 describe('TimeRecordsService (HU-142 / T-170)', () => {
@@ -93,6 +107,9 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
             horas: VALID_DTO.horas,
             fecha: new Date('2026-08-20T00:00:00.000Z'),
             nota: VALID_DTO.nota,
+            // C065 (§10): el alta persiste siempre la justificación enviada
+            // (aquí ninguna); la exigencia de texto la decide el umbral.
+            justificacionExceso: null,
           },
         }),
       );
@@ -131,11 +148,11 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
       await service.create(PROJECT_ID, TASK_ID, ASSIGNEE_ID, { horas: 1, fecha: '2026-08-20' });
 
       expect(tx.registroTiempoTarea.aggregate).toHaveBeenCalledWith({
-        where: { idAsignacion: ASSIGNMENT_ID },
+        where: { idAsignacion: ASSIGNMENT_ID, revocadoEn: null },
         _sum: { horas: true },
       });
       const llamada = tx.asignacionTarea.updateMany.mock.calls[0][0];
-      expect(llamada.where).toEqual({ idAsignacion: ASSIGNMENT_ID, desasignadaEn: null });
+      expect(llamada.where).toEqual({ idAsignacion: ASSIGNMENT_ID, origenReporte: 'GRANULAR', reconocidoEn: null });
       expect(Number(llamada.data.horasReales)).toBe(6);
     });
 
@@ -211,15 +228,64 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
     });
 
     it('un integrante que no es líder solo recibe sus propios registros', async () => {
-      const { prisma, service } = setup();
+      const { prisma, service, readPolicy } = setup();
+      // C067: la visibilidad la decide el PERFIL devuelto por la política de
+      // lectura, no una comparación local con `creadoPor`.
+      (readPolicy.assertRead as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        profile: 'PARTICIPANTE_ACTIVO', sprintEstados: null, ownOnly: false, isAdmin: false,
+      });
 
       await service.findAllForTask(PROJECT_ID, TASK_ID, ASSIGNEE_ID);
 
       expect(prisma.registroTiempoTarea.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { asignacion: { idTarea: TASK_ID }, idUsuario: ASSIGNEE_ID },
+          where: { asignacion: { idTarea: TASK_ID }, idUsuario: ASSIGNEE_ID, revocadoEn: null },
         }),
       );
+    });
+
+    /**
+     * Revocar es un borrado lógico: la fila queda con `revocadoEn`. La lista no
+     * lo filtraba para nadie, así que quien retiraba su registro lo seguía
+     * viendo en pantalla —parecía que «Revocar» no hacía nada— aunque los
+     * totales sí lo hubieran descontado.
+     */
+    it('quien solo reporta sus horas deja de ver el registro que revoca', async () => {
+      const { prisma, service, readPolicy } = setup();
+      (readPolicy.assertRead as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        profile: 'PARTICIPANTE_ACTIVO', sprintEstados: null, ownOnly: false, isAdmin: false,
+      });
+
+      await service.findAllForTask(PROJECT_ID, TASK_ID, ASSIGNEE_ID);
+
+      const { where } = prisma.registroTiempoTarea.findMany.mock.calls[0][0];
+      expect(where.revocadoEn).toBeNull();
+    });
+
+    it('el líder conserva el histórico: también los registros revocados', async () => {
+      const { prisma, service } = setup();
+
+      await service.findAllForTask(PROJECT_ID, TASK_ID, LEADER_ID);
+
+      const { where } = prisma.registroTiempoTarea.findMany.mock.calls[0][0];
+      expect(where).not.toHaveProperty('revocadoEn');
+    });
+
+    it('expone la marca de revocación para que el líder distinga lo retirado', async () => {
+      const { prisma, service } = setup();
+      const revocadoEn = new Date('2026-09-07T18:00:00.000Z');
+      prisma.registroTiempoTarea.findMany.mockResolvedValue([
+        {
+          idRegistroTiempo: 9, idAsignacion: 3, idUsuario: ASSIGNEE_ID,
+          horas: { toNumber: () => 1 }, fecha: new Date('2026-09-07T00:00:00.000Z'),
+          nota: null, creadoEn: new Date('2026-09-07T10:00:00.000Z'), revocadoEn,
+          usuario: { idUsuario: ASSIGNEE_ID, nombre: 'V', apellido: 'H', fotoUrl: null },
+        },
+      ] as never);
+
+      const filas = await service.findAllForTask(PROJECT_ID, TASK_ID, LEADER_ID);
+
+      expect(filas[0].revocadoEn).toBe(revocadoEn.toISOString());
     });
 
     it('mapea cada fila a horas number y fecha YYYY-MM-DD (misma regresión que create)', async () => {
@@ -244,5 +310,78 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
       expect(typeof result[0]!.horas).toBe('number');
       expect(result[0]!.fecha).toBe('2026-08-19');
     });
+  });
+});
+
+
+/**
+ * Una justificación de exceso pertenece a un registro concreto. Se filtraban
+ * solo por autor, nunca por revocación: quien retiraba su registro seguía
+ * viendo argumentadas unas horas que ya no existían, y el líder no podía
+ * distinguir cuáles respaldaban horas vigentes.
+ */
+describe('TimeRecordsService — justificaciones de exceso y revocación', () => {
+  const REVOCADO_EN = new Date('2026-09-07T18:00:00.000Z');
+
+  /** Un tramo con dos registros del mismo autor: uno vigente y otro retirado. */
+  function tramoConAmbos() {
+    return {
+      idAsignacion: 3,
+      idParticipacion: 7,
+      desasignadaEn: null,
+      origenReporte: 'GRANULAR',
+      horasReales: new Prisma.Decimal(3),
+      reconocidoEn: null,
+      idUsuario: ASSIGNEE_ID,
+      usuario: { idUsuario: ASSIGNEE_ID, nombre: 'V', apellido: 'H', fotoUrl: null },
+      participacion: null,
+      registrosTiempo: [
+        { idUsuario: ASSIGNEE_ID, horas: new Prisma.Decimal(3), revocadoEn: null, justificacionExceso: 'Vigente' },
+        { idUsuario: ASSIGNEE_ID, horas: new Prisma.Decimal(1), revocadoEn: REVOCADO_EN, justificacionExceso: 'Retirada' },
+      ],
+      ajustes: [],
+    };
+  }
+
+  function setupResumen(perfil: string) {
+    const base = setup();
+    const prisma = base.prisma as unknown as Record<string, unknown>;
+    prisma.asignacionTarea = { findMany: vi.fn().mockResolvedValue([tramoConAmbos()]) };
+    prisma.sprint = {
+      findFirst: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }),
+      findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }),
+    };
+    (base.readPolicy.assertRead as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      profile: perfil, sprintEstados: null, ownOnly: false, isAdmin: false,
+      project: { estadoProyecto: 'EN_PROGRESO' },
+    });
+    return base;
+  }
+
+  it('el autor no recibe la justificación del registro que revocó', async () => {
+    const { service } = setupResumen('PARTICIPANTE_ACTIVO');
+
+    const resumen = await service.getTaskHoursSummary(PROJECT_ID, TASK_ID, ASSIGNEE_ID);
+
+    expect(resumen.tramos[0].justificaciones).toEqual([{ texto: 'Vigente', revocadoEn: null }]);
+  });
+
+  it('el líder conserva ambas y puede distinguir la retirada', async () => {
+    const { service } = setupResumen('LIDER');
+
+    const resumen = await service.getTaskHoursSummary(PROJECT_ID, TASK_ID, LEADER_ID);
+
+    expect(resumen.tramos[0].justificaciones).toEqual([
+      { texto: 'Vigente', revocadoEn: null },
+      { texto: 'Retirada', revocadoEn: REVOCADO_EN.toISOString() },
+    ]);
+  });
+
+  it('las horas reportadas nunca cuentan lo revocado, lo lea quien lo lea', async () => {
+    const { service: comoLider } = setupResumen('LIDER');
+    expect((await comoLider.getTaskHoursSummary(PROJECT_ID, TASK_ID, LEADER_ID)).horasReportadasTarea).toBe('3.00');
+
+    const { service: comoAutor } = setupResumen('PARTICIPANTE_ACTIVO');
+    expect((await comoAutor.getTaskHoursSummary(PROJECT_ID, TASK_ID, ASSIGNEE_ID)).horasReportadasTarea).toBe('3.00');
   });
 });

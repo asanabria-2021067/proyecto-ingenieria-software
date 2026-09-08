@@ -25,6 +25,11 @@ export class BitacoraContextService {
   }
 
   /**
+   * C048: la audiencia del lector la decide ahora `ProjectReadPolicyService`
+   * con scope `bitacora` (líder actual o administrador). Este helper se
+   * conserva como comprobación de liderazgo del módulo —no autoriza lecturas
+   * por sí solo— y sigue sin habilitar ninguna escritura.
+   *
    * T-164: la bitácora es exclusiva del líder — a diferencia de tareas/tasks
    * (líder o participante activo).
    *

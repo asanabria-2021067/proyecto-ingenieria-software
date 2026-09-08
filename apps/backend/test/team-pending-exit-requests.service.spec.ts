@@ -3,6 +3,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { ApplicationsService } from '../src/applications/applications.service';
 import type { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { TeamService } from '../src/team/team.service';
+import { makeProjectReadPolicyDouble } from './helpers/project-policy.double';
 
 function makePrisma() {
   return {
@@ -29,6 +30,7 @@ function makeService(
     prisma as unknown as PrismaService,
     applications as unknown as ApplicationsService,
     exitRequests as unknown as ExitRequestsService,
+    makeProjectReadPolicyDouble(),
   );
 }
 

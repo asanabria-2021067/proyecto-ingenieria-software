@@ -8,6 +8,8 @@ import { ExitRequestsContextService } from '../src/exit-requests/exit-requests.c
 import { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
 import { HoursRecognitionService } from '../src/sprints/hours-recognition.service';
 import { SprintsContextService } from '../src/sprints/sprints-context.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * Tarea 5: el índice parcial `solicitud_salida_proyecto_pendiente_unique` (a
@@ -74,6 +76,9 @@ function makePrisma() {
   // prisma como tx deja las aserciones sobre solicitudSalidaProyecto.updateMany /
   // participacionProyecto.updateMany apuntando a los mismos spies de arriba.
   prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb(prisma));
+  // C044: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del lock
+  // del proyecto sobre el cliente transaccional antes del callback.
+  withProjectLock(prisma);
   return prisma;
 }
 
@@ -90,6 +95,9 @@ function makeService(
   const hoursRecognition = {
     recognizeParticipationHours: vi.fn().mockResolvedValue({
       horasReconocidas: 0,
+      // C077: reporte y propuesta viajan separados en el resultado.
+      horasReportadas: new Prisma.Decimal(0),
+      horasPropuestas: new Prisma.Decimal(0),
       idsAsignacionesReconocidas: [],
       horasParticipacion: null,
     }),
@@ -105,9 +113,11 @@ function makeService(
     } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
+    new ProjectTransactionService(prisma as unknown as PrismaService),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
     hoursRecognition,
-    new SprintsContextService(prisma as unknown as PrismaService),
-  );
+    new SprintsContextService(prisma as unknown as PrismaService));
 }
 
 const LIDER_ID = 1;
@@ -993,6 +1003,8 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     prisma.asignacionTarea.count.mockResolvedValue(0);
     const recognizeParticipationHours = vi.fn().mockResolvedValue({
       horasReconocidas: 5,
+      horasReportadas: new Prisma.Decimal(5),
+      horasPropuestas: new Prisma.Decimal(5),
       idsAsignacionesReconocidas: [901, 902],
       horasParticipacion: { idRegistroHoras: 300 },
     });
@@ -1021,10 +1033,12 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
       orderBy: { idParticipacion: 'asc' },
     });
     expect(recognizeParticipationHours).toHaveBeenCalledTimes(1);
+    // C083: el lote comparte un único instante de consumo.
     expect(recognizeParticipationHours).toHaveBeenCalledWith(prisma, {
       projectId: PROYECTO_ID,
       sprintId: SPRINT_ID,
       participationId: 77,
+      reconocidoEn: expect.any(Date),
     });
     expect(prisma.participacionProyecto.updateMany).toHaveBeenCalledWith({
       where: { idUsuario: MIEMBRO_ID, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: PROYECTO_ID } },
@@ -1045,6 +1059,8 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idParticipacion: 77 }, { idParticipacion: 88 }]);
     const recognizeParticipationHours = vi.fn().mockResolvedValue({
       horasReconocidas: 0,
+      horasReportadas: new Prisma.Decimal(0),
+      horasPropuestas: new Prisma.Decimal(0),
       idsAsignacionesReconocidas: [],
       horasParticipacion: null,
     });
@@ -1057,12 +1073,18 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
       projectId: PROYECTO_ID,
       sprintId: SPRINT_ID,
       participationId: 77,
+      reconocidoEn: expect.any(Date),
     });
     expect(recognizeParticipationHours).toHaveBeenNthCalledWith(2, prisma, {
       projectId: PROYECTO_ID,
       sprintId: SPRINT_ID,
       participationId: 88,
+      reconocidoEn: expect.any(Date),
     });
+    // C083: las dos participaciones comparten el MISMO instante de consumo.
+    const [, primera] = recognizeParticipationHours.mock.calls[0];
+    const [, segunda] = recognizeParticipationHours.mock.calls[1];
+    expect(primera.reconocidoEn.getTime()).toBe(segunda.reconocidoEn.getTime());
     const [{ where }] = prisma.participacionProyecto.updateMany.mock.calls[0];
     expect(where).toEqual({
       idUsuario: MIEMBRO_ID,
@@ -1271,6 +1293,8 @@ describe('ExitRequestsService.approveSolicitudSalida', () => {
     prisma.asignacionTarea.count.mockResolvedValue(0);
     const recognizeParticipationHours = vi.fn().mockResolvedValue({
       horasReconocidas: 2,
+      horasReportadas: new Prisma.Decimal(2),
+      horasPropuestas: new Prisma.Decimal(2),
       idsAsignacionesReconocidas: [700],
       horasParticipacion: { idRegistroHoras: 44 },
     });

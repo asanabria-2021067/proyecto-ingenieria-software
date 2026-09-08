@@ -1,12 +1,30 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { EstadoSolicitudSalida, Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { EstadoSolicitudSalida, EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { HoursRecognitionService } from '../sprints/hours-recognition.service';
 import { SprintsContextService } from '../sprints/sprints-context.service';
 import { ExitRequestsAuthorizationService } from './exit-requests.authorization.service';
 import { ExitRequestsContextService } from './exit-requests.context.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 
+/**
+ * C044 (06 v2 §13/§32): las cinco escrituras de salida corren en el runner
+ * por proyecto con la familia `SALIDA` (P/E, ambiente `NOT_FINALIZING`), y
+ * cada assert de autorización y de contexto recibe el `tx` del lock. La
+ * aprobación relee bajo el lock los valores definitivos (liderazgo, estado de
+ * la solicitud y tareas pendientes) antes de resolver. Solicitar y continuar
+ * no reconocen horas; el reconocimiento sigue viviendo únicamente en la rama
+ * de aprobación, tal como está hoy.
+ */
 @Injectable()
 export class ExitRequestsService {
   constructor(
@@ -14,45 +32,85 @@ export class ExitRequestsService {
     private readonly notifications: NotificationsService,
     private readonly authorization: ExitRequestsAuthorizationService,
     private readonly context: ExitRequestsContextService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
     private readonly hoursRecognition?: HoursRecognitionService,
     private readonly sprintsContext?: SprintsContextService,
+    // C083: la aprobación deja hecho funcional en bitácora dentro de la misma
+    // transacción de dominio. Opcional por el mismo motivo posicional que en
+    // Tasks/Sprints; en producción el módulo siempre lo provee.
+    private readonly bitacoraEventos?: BitacoraEventosService,
   ) {}
 
-  async createSolicitudSalida(idProyecto: number, idUsuario: number, motivo: string) {
-    await this.authorization.assertCanCreateSolicitudSalida(idProyecto, idUsuario);
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
 
+  /**
+   * C085 (06 v2 §13/§32): mientras un Sprint está EN_FINALIZACION el proyecto
+   * está consolidando, y ninguna de las cinco rutas de salida puede tocarlo:
+   * crear, continuar, cancelar, aprobar y rechazar devuelven 409 sin escribir.
+   *
+   * La metadata de ruta ya declara `NOT_FINALIZING`, pero el service repite el
+   * rechazo por su cuenta: el guard protege la ruta HTTP, no al servicio, y
+   * cualquier caller interno debe encontrarse con la misma pared.
+   */
+  private async assertSprintNotFinalizingTx(tx: Prisma.TransactionClient, idProyecto: number): Promise<void> {
+    const operable = await this.sprintsContext?.getCurrentSprint(idProyecto, tx);
+    if (operable?.estado === EstadoSprint.EN_FINALIZACION) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_EN_FINALIZACION',
+        message: 'El Sprint actual está en finalización y el proyecto está temporalmente bloqueado',
+        idSprint: operable.idSprint,
+      });
+    }
+  }
+
+  async createSolicitudSalida(idProyecto: number, idUsuario: number, motivo: string) {
     const motivoLimpio = motivo.trim();
     if (motivoLimpio.length === 0) {
       throw new BadRequestException('motivo no puede estar vacío');
     }
 
-    const solicitudAbierta = await this.prisma.solicitudSalidaProyecto.findFirst({
-      where: {
-        idProyecto,
-        idUsuario,
-        estadoSolicitud: { in: ['PREPARACION', 'PENDIENTE_LIDER'] },
-      },
-      select: { idSolicitud: true },
-    });
-    if (solicitudAbierta) {
-      throw new ConflictException('Ya existe una solicitud de salida pendiente para este proyecto');
-    }
+    return this.projectTx.run(idProyecto, idUsuario, 'exit-requests.create', async (ctx) => {
+      const { tx } = ctx;
+      await this.authorization.assertCanCreateSolicitudSalida(idProyecto, idUsuario, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', idUsuario);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
 
-    try {
-      return await this.prisma.solicitudSalidaProyecto.create({
-        data: {
+      const solicitudAbierta = await tx.solicitudSalidaProyecto.findFirst({
+        where: {
           idProyecto,
           idUsuario,
-          motivo: motivoLimpio,
-          estadoSolicitud: EstadoSolicitudSalida.PREPARACION,
+          estadoSolicitud: { in: ['PREPARACION', 'PENDIENTE_LIDER'] },
         },
+        select: { idSolicitud: true },
       });
-    } catch (error) {
-      if (this.isPendingExitRequestCollision(error)) {
+      if (solicitudAbierta) {
         throw new ConflictException('Ya existe una solicitud de salida pendiente para este proyecto');
       }
-      throw error;
-    }
+
+      try {
+        return await tx.solicitudSalidaProyecto.create({
+          data: {
+            idProyecto,
+            idUsuario,
+            motivo: motivoLimpio,
+            estadoSolicitud: EstadoSolicitudSalida.PREPARACION,
+          },
+        });
+      } catch (error) {
+        if (this.isPendingExitRequestCollision(error)) {
+          throw new ConflictException('Ya existe una solicitud de salida pendiente para este proyecto');
+        }
+        throw error;
+      }
+    });
   }
 
   /**
@@ -66,6 +124,13 @@ export class ExitRequestsService {
    */
   async getSolicitudSalidaAbierta(idProyecto: number, actorUserId: number) {
     await this.context.getProjectOrThrow(idProyecto);
+    // C044 (§34): lectura autorizada por la política; el filtro por actor se
+    // conserva, así que nunca devuelve la solicitud de otra persona.
+    await this.readPolicy.assertRead(undefined, {
+      projectId: idProyecto,
+      actorId: actorUserId,
+      scope: 'equipo',
+    });
 
     const solicitud = await this.prisma.solicitudSalidaProyecto.findFirst({
       where: {
@@ -122,6 +187,11 @@ export class ExitRequestsService {
 
   async getExitPreparationSummary(idProyecto: number, actorUserId: number) {
     await this.context.getProjectOrThrow(idProyecto);
+    await this.readPolicy.assertRead(undefined, {
+      projectId: idProyecto,
+      actorId: actorUserId,
+      scope: 'equipo',
+    });
 
     const solicitud = await this.prisma.solicitudSalidaProyecto.findFirst({
       where: {
@@ -191,7 +261,14 @@ export class ExitRequestsService {
   }
 
   async continueExitPreparation(idProyecto: number, actorUserId: number) {
-    const resultado = await this.prisma.$transaction(async (tx) => {
+    const resultado = await this.projectTx.run(
+      idProyecto,
+      actorUserId,
+      'exit-requests.continuePreparation',
+      async (ctx) => {
+      const { tx } = ctx;
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', actorUserId);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
       const solicitud = await tx.solicitudSalidaProyecto.findFirst({
         where: {
           idProyecto,
@@ -249,13 +326,21 @@ export class ExitRequestsService {
         solicitadaEn: solicitud.solicitadaEn,
         estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER,
       };
-    });
+      },
+    );
 
     return resultado;
   }
 
   async cancelExitPreparation(idProyecto: number, actorUserId: number) {
-    const resultado = await this.prisma.$transaction(async (tx) => {
+    const resultado = await this.projectTx.run(
+      idProyecto,
+      actorUserId,
+      'exit-requests.cancelPreparation',
+      async (ctx) => {
+      const { tx } = ctx;
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', actorUserId);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
       const solicitud = await tx.solicitudSalidaProyecto.findFirst({
         where: {
           idProyecto,
@@ -300,30 +385,47 @@ export class ExitRequestsService {
         solicitadaEn: solicitud.solicitadaEn,
         estadoSolicitud: EstadoSolicitudSalida.CANCELADA,
       };
-    });
+      },
+    );
 
     return resultado;
   }
 
   async approveSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
-    const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId);
-    const solicitud = await this.context.getPendingSolicitudSalidaOrThrow(idProyecto, idSolicitud);
-
-    const tareasPendientes = await this.prisma.asignacionTarea.count({
-      where: {
-        idUsuario: solicitud.idUsuario,
-        desasignadaEn: null,
-        tarea: { idProyecto, eliminadoEn: null, estadoTarea: { not: 'HECHO' } },
-      },
-    });
-    if (tareasPendientes > 0) {
-      throw new BadRequestException(
-        `No se puede aprobar la salida: el integrante tiene ${tareasPendientes} tarea(s) pendiente(s) que deben reasignarse antes de aprobar la salida`,
-      );
-    }
+    // Pre-chequeo fuera del lock: rechaza de inmediato lo que ya se sabe
+    // inválido (no eres líder; la solicitud no está PENDIENTE_LIDER). La
+    // autoridad, sin embargo, es la transacción: dentro del lock se releen
+    // liderazgo y tareas pendientes, y el CAS decide el ganador de una
+    // resolución concurrente.
+    await this.authorization.assertProjectLeader(idProyecto, liderId);
+    await this.context.getPendingSolicitudSalidaOrThrow(idProyecto, idSolicitud);
 
     const ahora = new Date();
-    return this.prisma.$transaction(async (tx) => {
+    return this.projectTx.run(idProyecto, liderId, 'exit-requests.approve', async (ctx) => {
+      const { tx } = ctx;
+      const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', liderId);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
+      const solicitud = await tx.solicitudSalidaProyecto.findFirst({
+        where: { idSolicitud, idProyecto },
+      });
+      if (!solicitud) {
+        throw new NotFoundException(`Solicitud con id ${idSolicitud} no encontrada`);
+      }
+
+      const tareasPendientes = await tx.asignacionTarea.count({
+        where: {
+          idUsuario: solicitud.idUsuario,
+          desasignadaEn: null,
+          tarea: { idProyecto, eliminadoEn: null, estadoTarea: { not: 'HECHO' } },
+        },
+      });
+      if (tareasPendientes > 0) {
+        throw new BadRequestException(
+          `No se puede aprobar la salida: el integrante tiene ${tareasPendientes} tarea(s) pendiente(s) que deben reasignarse antes de aprobar la salida`,
+        );
+      }
+
       const actualizada = {
         ...solicitud,
         estadoSolicitud: EstadoSolicitudSalida.APROBADA,
@@ -346,10 +448,10 @@ export class ExitRequestsService {
       }
 
       const sprint = await this.sprintsContext.getCurrentSprint(idProyecto, tx);
-      if (!sprint) {
-        throw new ConflictException('No hay un Sprint activo en este proyecto');
-      }
 
+      // §13: TODAS las participaciones activas del saliente en este proyecto,
+      // en orden ascendente, releídas bajo el lock. Salir del proyecto es
+      // salir de todos sus roles, no solo del que motivó la solicitud.
       const participacionesActivas = await tx.participacionProyecto.findMany({
         where: {
           idUsuario: solicitud.idUsuario,
@@ -360,13 +462,40 @@ export class ExitRequestsService {
         orderBy: { idParticipacion: 'asc' },
       });
 
-      for (const participacion of participacionesActivas) {
-        await this.hoursRecognition.recognizeParticipationHours(tx, {
-          projectId: idProyecto,
-          sprintId: sprint.idSprint,
-          participationId: participacion.idParticipacion,
-        });
+      /**
+       * §13: tres ramas según el Sprint operable, y solo una reconoce horas.
+       *
+       *   ACTIVO           → reconocer SOLO los tramos elegibles de quien sale,
+       *                      del Sprint actual, dejándolos PENDIENTE; después
+       *                      retirar. Flow A omitirá después esos tramos.
+       *   EN_FINALIZACION  → 409 sin escribir: una consolidación en curso no
+       *                      admite que alguien se lleve tramos por debajo.
+       *   Ninguno operable → retirar SIN reconocimiento nuevo. No se inventa
+       *                      un Sprint ni una fila con idSprint NULL; lo que
+       *                      quede pendiente pertenece a la conciliación §14.
+       */
+      const reconocidas: Array<{ idParticipacion: number; horasReportadas: string; horasPropuestas: string }> = [];
+      if (sprint?.estado === EstadoSprint.ACTIVO) {
+        const consolidadoEn = new Date();
+        for (const participacion of participacionesActivas) {
+          const resultado = await this.hoursRecognition.recognizeParticipationHours(tx, {
+            projectId: idProyecto,
+            sprintId: sprint.idSprint,
+            participationId: participacion.idParticipacion,
+            reconocidoEn: consolidadoEn,
+          });
+          if (resultado.horasParticipacion !== null) {
+            reconocidas.push({
+              idParticipacion: participacion.idParticipacion,
+              horasReportadas: resultado.horasReportadas.toFixed(2),
+              horasPropuestas: resultado.horasPropuestas.toFixed(2),
+            });
+          }
+        }
       }
+      // Sin Sprint operable NO se reconoce nada: no se fabrica un Sprint, no
+      // se crea una fila con idSprint NULL y lo que quede pendiente queda para
+      // la conciliación de §14. Salir entre Sprints no inventa historia.
 
       await tx.participacionProyecto.updateMany({
         where: {
@@ -376,6 +505,27 @@ export class ExitRequestsService {
         },
         data: { estadoParticipacion: 'RETIRADO', fechaSalida: ahora },
       });
+
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.EXIT_REQUEST_APPROVED,
+        idActor: liderId,
+        idProyecto,
+        idSprint: sprint?.idSprint ?? null,
+        tipoEntidad: 'PROYECTO',
+        idEntidad: idProyecto,
+        valorAnterior: { estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER },
+        valorNuevo: {
+          idSolicitud,
+          idUsuario: solicitud.idUsuario,
+          estadoSolicitud: EstadoSolicitudSalida.APROBADA,
+          fechaSalida: ahora.toISOString(),
+          participacionesRetiradas: participacionesActivas.map((fila) => fila.idParticipacion),
+          // Reconocidas, NO acreditadas: quedan PENDIENTE hasta el cierre.
+          reconocidas,
+        },
+      });
+
       await this.notifications.notifyFromTemplate(
         [solicitud.idUsuario],
         'PARTICIPACION_ACTUALIZADA',
@@ -387,10 +537,21 @@ export class ExitRequestsService {
   }
 
   async rejectSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {
-    const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId);
-    const solicitud = await this.context.getPendingSolicitudSalidaOrThrow(idProyecto, idSolicitud);
+    // Mismo criterio que la aprobación: pre-chequeo fuera, CAS bajo el lock.
+    await this.authorization.assertProjectLeader(idProyecto, liderId);
+    await this.context.getPendingSolicitudSalidaOrThrow(idProyecto, idSolicitud);
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.projectTx.run(idProyecto, liderId, 'exit-requests.reject', async (ctx) => {
+      const { tx } = ctx;
+      const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', liderId);
+      await this.assertSprintNotFinalizingTx(tx, idProyecto);
+      const solicitud = await tx.solicitudSalidaProyecto.findFirst({
+        where: { idSolicitud, idProyecto },
+      });
+      if (!solicitud) {
+        throw new NotFoundException(`Solicitud con id ${idSolicitud} no encontrada`);
+      }
       const ahora = new Date();
       const actualizada = {
         ...solicitud,
@@ -409,6 +570,27 @@ export class ExitRequestsService {
       if (resolved.count !== 1) {
         throw new ConflictException('La solicitud ya no está en estado PENDIENTE_LIDER');
       }
+
+      // Rechazar CONSERVA las participaciones y no toca horas: ni resta, ni
+      // duplica, ni reconoce. Tampoco recrea las asignaciones que el saliente
+      // hubiera entregado durante la preparación — eso sería inventar trabajo.
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.EXIT_REQUEST_REJECTED,
+        idActor: liderId,
+        idProyecto,
+        idSprint: null,
+        tipoEntidad: 'PROYECTO',
+        idEntidad: idProyecto,
+        valorAnterior: { estadoSolicitud: EstadoSolicitudSalida.PENDIENTE_LIDER },
+        valorNuevo: {
+          idSolicitud: solicitud.idSolicitud,
+          idUsuario: solicitud.idUsuario,
+          estadoSolicitud: EstadoSolicitudSalida.RECHAZADA,
+          resueltaEn: ahora.toISOString(),
+        },
+      });
+
       await this.notifications.notifyFromTemplate(
         [solicitud.idUsuario],
         'PARTICIPACION_ACTUALIZADA',

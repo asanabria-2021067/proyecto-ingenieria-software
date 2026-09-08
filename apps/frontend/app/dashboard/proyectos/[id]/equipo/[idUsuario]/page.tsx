@@ -8,8 +8,11 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  History,
   ListChecks,
+  Lock,
   ShieldAlert,
+  ShieldCheck,
   UserRound,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
@@ -29,6 +32,10 @@ import type {
 } from '@/lib/dto/member-detail.dto';
 import { ESTADO_PARTICIPACION_STYLE } from '@/components/projects/member-status.utils';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
+import { useLeadershipCandidates } from '@/hooks/use-leadership';
+import { useHistoricalProject } from '@/hooks/use-historical-project';
+import { motivoInelegibilidadLabel, type LeadershipCandidateDto } from '@/lib/types/leadership';
+import type { HistoricalHorasUsuario } from '@/lib/services/historical';
 import type { EstadoSprint } from '@/lib/types/sprints';
 
 /**
@@ -68,6 +75,19 @@ function formatearHoras(horas: number): string {
   return horas.toLocaleString('es-GT', { maximumFractionDigits: 2 });
 }
 
+/** Los importes S7 llegan como string decimal: se formatean, nunca se convierten a `Number` para mostrarlos. */
+function formatearDecimal(value: string): string {
+  const [entera, decimal = ''] = value.split('.');
+  const dec = decimal.replace(/0+$/, '');
+  return dec.length > 0 ? `${entera}.${dec}` : entera;
+}
+
+/** Suma de importes numéricos del contrato B14 en centésimas enteras (sin coma flotante). */
+function sumarEnCentesimas(valores: number[]): string {
+  const total = valores.reduce((acc, v) => acc + Math.round(v * 100), 0);
+  return `${Math.floor(total / 100)}.${String(total % 100).padStart(2, '0')}`;
+}
+
 /** B14 no garantiza orden descendente (ordena `sprints` ascendente por `numero`); esto es puramente presentacional, nunca reagrupa tareas/horas. */
 function ordenarSprintsDescendente(
   sprints: HistorialSprintIntegranteDTO[],
@@ -104,6 +124,18 @@ export default function DetalleIntegranteProyectoPage() {
     error,
   } = useProjectMemberDetail(idProyecto, idUsuarioNum);
 
+  // S7 (VIEW-07): NO existe endpoint de «horas de proyecto por usuario». Las
+  // horas se derivan del detalle de equipo; la elegibilidad objetiva (solo
+  // para el líder) de `GET liderazgo/candidatos`; y en proyecto CERRADO las
+  // horas acreditadas definitivas del histórico.
+  const estadoProyecto = proyecto?.estadoProyecto;
+  const proyectoCerrado = estadoProyecto === 'CERRADO';
+  const candidatosQuery = useLeadershipCandidates(idProyecto, isLeader && !proyectoCerrado);
+  const historicoQuery = useHistoricalProject(idProyecto, isLeader && proyectoCerrado);
+  const candidato = candidatosQuery.data?.candidatos.find((c) => c.idUsuario === idUsuarioNum) ?? null;
+  const horasHistoricas =
+    historicoQuery.data?.totales.porUsuario.find((u) => u.idUsuario === idUsuarioNum) ?? null;
+
   const volverHref = `/dashboard/proyectos/${id}/equipo`;
 
   return (
@@ -139,7 +171,14 @@ export default function DetalleIntegranteProyectoPage() {
           )}
 
           {!cargandoDetalle && detalle && (
-            <DetalleIntegranteContent idProyecto={idProyecto} detalle={detalle} />
+            <DetalleIntegranteContent
+              idProyecto={idProyecto}
+              detalle={detalle}
+              candidato={candidato}
+              horasHistoricas={horasHistoricas}
+              proyectoCerrado={proyectoCerrado}
+              mostrarElegibilidad={isLeader && !proyectoCerrado}
+            />
           )}
         </>
       )}
@@ -149,13 +188,30 @@ export default function DetalleIntegranteProyectoPage() {
 
 function DetalleIntegranteContent({
   detalle,
+  candidato,
+  horasHistoricas,
+  proyectoCerrado,
+  mostrarElegibilidad,
 }: {
   idProyecto: number;
   detalle: NonNullable<ReturnType<typeof useProjectMemberDetail>['data']>;
+  candidato: LeadershipCandidateDto | null;
+  horasHistoricas: HistoricalHorasUsuario | null;
+  proyectoCerrado: boolean;
+  mostrarElegibilidad: boolean;
 }) {
   const { usuario, participaciones, tareas, sprints } = detalle;
   const totalHorasReales = sumaHorasReales(tareas);
   const sprintsOrdenados = ordenarSprintsDescendente(sprints);
+
+  // Niveles de horas (V5 §4): registradas · legacy · propuestas · acreditadas.
+  // Preferencia por los string decimales del backend; el fallback numérico
+  // (B14) se suma en centésimas enteras.
+  const registradas = horasHistoricas?.reportadasGranulares ?? candidato?.horasReportadas ?? null;
+  const legacy = horasHistoricas?.legacy ?? candidato?.horasLegacy ?? null;
+  const propuestas = horasHistoricas?.propuestasPendientes ?? sumarEnCentesimas(sprints.map((s) => s.horasCalculadas));
+  const acreditadas = horasHistoricas?.acreditadas ?? sumarEnCentesimas(sprints.map((s) => s.horasAprobadas));
+  const tareasDistintas = horasHistoricas?.tareasDistintas ?? candidato?.tareasDistintas ?? tareas.length;
 
   return (
     <div className="space-y-6">
@@ -199,7 +255,17 @@ function DetalleIntegranteContent({
         </div>
       </div>
 
-      {/* Total de horas — justifica reconocimiento */}
+      {proyectoCerrado && (
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant"
+        >
+          <Lock className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
+          Proyecto cerrado: las horas acreditadas son definitivas y no existen acciones sobre el integrante.
+        </p>
+      )}
+
+      {/* Total de horas — justifica reconocimiento (contrato B14, se conserva) */}
       <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 flex items-center gap-3">
         <div className="flex items-center justify-center size-11 rounded-xl bg-primary/10 shrink-0">
           <Clock className="w-5 h-5 text-primary" aria-hidden="true" />
@@ -217,6 +283,60 @@ function DetalleIntegranteContent({
           <p className="text-2xl font-headline font-extrabold text-on-surface">{tareas.length}</p>
         </div>
       </div>
+
+      {/* Horas por nivel (S7 V5 §4) — nunca se suman entre niveles */}
+      <section aria-labelledby="horas-niveles-title" className="space-y-2">
+        <h2 id="horas-niveles-title" className="sr-only">
+          Horas del integrante por nivel
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <HorasKpi icon={Clock} label="Horas registradas" value={registradas != null ? `${formatearDecimal(registradas)} h` : '—'} />
+          <HorasKpi icon={History} label="Horas legacy" value={legacy != null ? `${formatearDecimal(legacy)} h` : '—'} />
+          <HorasKpi icon={Calendar} label="Horas propuestas" value={`${formatearDecimal(propuestas)} h`} />
+          <HorasKpi icon={CheckCircle2} label="Horas acreditadas" value={`${formatearDecimal(acreditadas)} h`} destacado />
+        </div>
+        <p className="text-xs text-tertiary">
+          Registradas y legacy provienen del servidor por integrante; propuestas y acreditadas se consolidan por Sprint. Los
+          niveles no se suman entre sí.
+        </p>
+      </section>
+
+      {mostrarElegibilidad && candidato && (
+        <section
+          aria-labelledby="elegibilidad-title"
+          className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="elegibilidad-title" className="flex items-center gap-2 text-base font-bold text-on-surface">
+              <ShieldCheck className="size-5 text-primary" aria-hidden="true" />
+              Elegibilidad para liderazgo
+            </h2>
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                candidato.esElegible ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'
+              }`}
+            >
+              {candidato.esElegible ? 'Elegible' : 'No elegible'}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-tertiary">
+            Criterios objetivos del servidor; no existe ranking ni recomendación automática. Tareas distintas:{' '}
+            <span className="font-semibold text-on-surface">{tareasDistintas}</span>.
+          </p>
+          {candidato.motivos.length > 0 ? (
+            <ul className="mt-3 space-y-1 text-sm text-on-surface-variant" aria-label="Motivos de inelegibilidad">
+              {candidato.motivos.map((motivo) => (
+                <li key={motivo} className="flex items-start gap-2">
+                  <ShieldAlert className="mt-0.5 size-4 shrink-0 text-error" aria-hidden="true" />
+                  {motivoInelegibilidadLabel(motivo)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-on-surface-variant">Cumple los criterios objetivos para recibir el liderazgo.</p>
+          )}
+        </section>
+      )}
 
       {/* Historial por Sprint — F15, agrupación entregada por B14, nunca reconstruida aquí */}
       <div className="space-y-4">
@@ -246,6 +366,34 @@ function DetalleIntegranteContent({
         {sprintsOrdenados.map((sprint) => (
           <MemberSprintHistoryCard key={sprint.idSprint} sprint={sprint} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function HorasKpi({
+  icon: Icon,
+  label,
+  value,
+  destacado = false,
+}: {
+  icon: typeof Clock;
+  label: string;
+  value: string;
+  destacado?: boolean;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
+    >
+      <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${destacado ? 'bg-primary/15' : 'bg-primary/10'}`}>
+        <Icon className="size-5 text-primary" aria-hidden="true" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-bold uppercase tracking-wide text-tertiary">{label}</p>
+        <p className="font-headline text-2xl font-extrabold text-on-surface">{value}</p>
       </div>
     </div>
   );

@@ -5,6 +5,8 @@ import type { SprintsAuthorizationService } from '../src/sprints/sprints-authori
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import type { BitacoraEventosService } from '../src/bitacora/bitacora-eventos.service';
 import { SprintsService } from '../src/sprints/sprints.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -16,6 +18,8 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C045: el runner real bloquea el proyecto antes del callback.
+  withProjectLock(tx);
   const prisma = {
     tx,
     $transaction: vi.fn(async (cb: (t: ReturnType<typeof makeTx>) => unknown) => cb(tx)),
@@ -40,7 +44,7 @@ describe('SprintsService.startSprint — instrumentación de bitácora (T-164)',
     } as unknown as SprintsContextService;
     const authorization = { assertCanStartSprint: vi.fn().mockResolvedValue(undefined) } as unknown as SprintsAuthorizationService;
     const notifications = {} as unknown as NotificationsService;
-    const service = new SprintsService(prisma, context, authorization, notifications, bitacora);
+    const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), bitacora);
 
     await service.startSprint(5, 9);
 
@@ -67,7 +71,7 @@ describe('SprintsService.startSprint — instrumentación de bitácora (T-164)',
     } as unknown as SprintsContextService;
     const authorization = { assertCanStartSprint: vi.fn().mockResolvedValue(undefined) } as unknown as SprintsAuthorizationService;
     const notifications = {} as unknown as NotificationsService;
-    const service = new SprintsService(prisma, context, authorization, notifications);
+    const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
     await expect(service.startSprint(5, 9)).resolves.toEqual(
       expect.objectContaining({ idSprint: 10 }),

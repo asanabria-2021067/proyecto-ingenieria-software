@@ -33,10 +33,11 @@ describe('TeamController.findTeam (GET /proyectos/:id/equipo)', () => {
     service.findTeam.mockResolvedValue(equipo);
     const controller = makeController(service);
 
-    const result = await controller.findTeam(42);
+    const result = await controller.findTeam(42, { userId: 7 });
 
     expect(service.findTeam).toHaveBeenCalledTimes(1);
-    expect(service.findTeam).toHaveBeenCalledWith(42);
+    // C047: el lector recibe al actor para resolver su política de lectura.
+    expect(service.findTeam).toHaveBeenCalledWith(42, 7);
     expect(result).toBe(equipo);
   });
 

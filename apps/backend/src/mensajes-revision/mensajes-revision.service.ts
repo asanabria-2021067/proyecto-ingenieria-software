@@ -4,20 +4,44 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EstadoProyecto, TipoNotificacion } from '@prisma/client';
+import { EstadoProyecto, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { CreateMensajeRevisionDto } from './dto/create-mensaje-revision.dto';
 
+type Db = Prisma.TransactionClient | PrismaService;
+
+/**
+ * C038 (06 v2 §32/§34): el contenido del canal B (mensaje de revisión) se
+ * escribe dentro de `ProjectTransactionService.run` con la familia
+ * `MENSAJE_REVISION` (R/O/P/E; S/C bloqueado); el lector pasa por la política
+ * de lectura histórica antes de la autorización existente; el acuse personal
+ * (`markAsRead`) es una escritura por usuario, repetible, sin lock de proyecto
+ * ni cambio de dominio o Sprint. La notificación `MENSAJE_REVISION` se
+ * conserva y se emite después del commit. El comentario propio del cierre es
+ * otro canal y no se toca aquí.
+ */
 @Injectable()
 export class MensajesRevisionService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
   ) {}
 
   async findByProyecto(idProyecto: number, userId: number) {
     const proyecto = await this.getProjectAccessContext(idProyecto);
+    // C038 (§34): política de lectura histórica antes de la autorización del canal.
+    await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'resumen' });
     await this.assertChannelBAccess(proyecto, userId, false);
 
     return this.prisma.mensajeRevisionProyecto.findMany({
@@ -30,28 +54,39 @@ export class MensajesRevisionService {
   }
 
   async create(idProyecto: number, userId: number, dto: CreateMensajeRevisionDto) {
-    const proyecto = await this.getProjectAccessContext(idProyecto);
-    await this.assertChannelBAccess(proyecto, userId, true);
+    const { proyecto, mensaje } = await this.projectTx.run(
+      idProyecto,
+      userId,
+      'mensajes-revision.create',
+      async (ctx) => {
+        const { tx } = ctx;
+        const proyecto = await this.getProjectAccessContext(idProyecto, tx);
+        await this.assertChannelBAccess(proyecto, userId, true);
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'MENSAJE_REVISION', userId);
 
-    if (dto.idRevision) {
-      const revision = await this.prisma.revisionProyecto.findFirst({
-        where: { idRevisionProyecto: dto.idRevision, idProyecto },
-        select: { idRevisionProyecto: true },
-      });
-      if (!revision) {
-        throw new BadRequestException('La revisión indicada no pertenece al proyecto');
-      }
-    }
+        if (dto.idRevision) {
+          const revision = await tx.revisionProyecto.findFirst({
+            where: { idRevisionProyecto: dto.idRevision, idProyecto },
+            select: { idRevisionProyecto: true },
+          });
+          if (!revision) {
+            throw new BadRequestException('La revisión indicada no pertenece al proyecto');
+          }
+        }
 
-    const mensaje = await this.prisma.mensajeRevisionProyecto.create({
-      data: {
-        idProyecto,
-        idRemitente: userId,
-        idRevision: dto.idRevision,
-        contenido: dto.contenido.trim(),
+        const mensaje = await tx.mensajeRevisionProyecto.create({
+          data: {
+            idProyecto,
+            idRemitente: userId,
+            idRevision: dto.idRevision,
+            contenido: dto.contenido.trim(),
+          },
+        });
+        return { proyecto, mensaje };
       },
-    });
+    );
 
+    // Notificación existente, emitida después del commit del `run`.
     const admins = await this.prisma.usuarioRolAcceso.findMany({
       where: { rolAcceso: { nombrePerfil: 'administrador' } },
       distinct: ['idUsuario'],
@@ -71,6 +106,11 @@ export class MensajesRevisionService {
     return mensaje;
   }
 
+  /**
+   * Acuse personal (06 v2 §32 «Acuse personal de mensaje»): escritura por
+   * usuario, repetible, que no cambia dominio ni Sprint; por eso NO adquiere
+   * el lock de proyecto ni bloquea a otros actores (C038).
+   */
   async markAsRead(idProyecto: number, userId: number) {
     const proyecto = await this.getProjectAccessContext(idProyecto);
     await this.assertChannelBAccess(proyecto, userId, false);
@@ -87,8 +127,15 @@ export class MensajesRevisionService {
     return { ok: true };
   }
 
-  private async getProjectAccessContext(idProyecto: number) {
-    const proyecto = await this.prisma.proyecto.findUnique({
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
+
+  private async getProjectAccessContext(idProyecto: number, db: Db = this.prisma) {
+    const proyecto = await db.proyecto.findUnique({
       where: { idProyecto },
       select: {
         idProyecto: true,

@@ -1,12 +1,17 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
-import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
-import { SprintClosingSummaryDto, SprintClosingSummaryParticipantDto } from './dto/sprint-closing-summary.dto';
+import {
+  SprintClosingBlockerDto,
+  SprintClosingMemberTotalsDto,
+  SprintClosingSummaryDto,
+  SprintClosingSummaryParticipantDto,
+  SprintClosingTramoDto,
+} from './dto/sprint-closing-summary.dto';
 import {
   SprintDetailDto,
   SprintDetailHitoDto,
@@ -19,6 +24,35 @@ import {
 } from './dto/sprint-analytics.dto';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { ProjectHoursSummaryService } from './project-hours-summary.service';
+import { HoursRecognitionService } from './hours-recognition.service';
+
+/**
+ * C045 (06 v2 §32/§41 E060–E062): iniciar, finalizar y cerrar un Sprint
+ * corren en el runner por proyecto. La policy restringe el inicio a un
+ * proyecto P/E sin Sprint operable, y finalizar/cerrar al Sprint exacto en
+ * `ACTIVO`/`EN_FINALIZACION`; el cuerpo de consolidación de `closeSprint` se
+ * conserva tal cual hasta su propio commit.
+ */
+/** Participante que aparece por su agregado pero no tiene tramos en el Sprint. */
+const SIN_TRAMOS: SprintClosingMemberTotalsDto = {
+  tareasDistintas: 0,
+  estimacionAsociada: null,
+  reportadas: '0.00',
+  legacy: '0.00',
+  exceso: '0.00',
+  propuestas: '0.00',
+  filasPendientes: 0,
+  filasConsumidas: 0,
+  tramos: [],
+};
 
 @Injectable()
 export class SprintsService {
@@ -27,11 +61,160 @@ export class SprintsService {
     private readonly sprintsContext: SprintsContextService,
     private readonly sprintsAuthorization: SprintsAuthorizationService,
     private readonly notificationsService: NotificationsService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    // C046 (06 v2 §34): alcance por actor de los lectores de Sprint.
+    private readonly readPolicy: ProjectReadPolicyService,
     // T-164: opcional por el mismo motivo que TasksService.bitacoraEventos —
     // las suites existentes construyen SprintsService directamente con 4
     // argumentos posicionales; en producción SprintsModule siempre lo provee.
     private readonly bitacoraEventos?: BitacoraEventosService,
+    // C079 (§40): el detalle por integrante lo compone el proveedor de
+    // agregación de horas; Sprints solo decide quién puede leerlo.
+    private readonly projectHours?: ProjectHoursSummaryService,
+    // C080 (§12): el reconocimiento por participación vive en su propio
+    // servicio; `closeSprint` solo lo ORQUESTA y es el único que cambia el
+    // estado del Sprint.
+    private readonly recognition?: HoursRecognitionService,
   ) {}
+
+  /**
+   * C075 (06 v2 §12): las cuatro revalidaciones de finalización, siempre bajo
+   * el lock y siempre sobre el conjunto HISTÓRICO. El detalle importa:
+   *
+   *   F1 — las tareas operativas están HECHO y con traza: un HECHO sin
+   *        ninguna asignación histórica no es trabajo realizado, es una
+   *        casilla marcada.
+   *   F2 — NINGUNA asignación del Sprint sigue abierta, **incluidas las de
+   *        tareas eliminadas**: borrar la tarea no cierra el tramo, y un
+   *        tramo abierto al consolidar dejaría horas fuera del corte.
+   *   F3 — toda asignación con horas tiene participación resuelta y origen
+   *        determinado: sin eso no se sabe a quién ni bajo qué rol acreditar.
+   *   F4 — las cachés granulares coinciden con el SUM efectivo.
+   *
+   * La normalización de tramos cerrados sin registros corre entre F2 y F3:
+   * después de saber que nada sigue abierto y antes de contrastar atribución
+   * y cuadre, para que ambos vean el estado definitivo y no uno donde una
+   * caché NULL se escapa del contraste.
+   *
+   * Devuelve los conteos satisfechos para que la bitácora deje constancia de
+   * QUÉ se revalidó, no solo de que se revalidó.
+   */
+  private async assertFinalizationPredicatesTx(
+    tx: Prisma.TransactionClient,
+    projectId: number,
+    sprintId: number,
+  ): Promise<{ f1: number; f2: number; f3: number; f4: number }> {
+    const tareas = await tx.tarea.findMany({
+      where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
+      select: { idTarea: true, estadoTarea: true, _count: { select: { asignaciones: true } } },
+    });
+    const pendientes = tareas.filter((tarea) => tarea.estadoTarea !== EstadoTarea.HECHO);
+    if (pendientes.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F1_TAREAS_PENDIENTES',
+        message: 'No se puede finalizar el Sprint mientras existan tareas pendientes',
+        idsTarea: pendientes.map((tarea) => tarea.idTarea),
+      });
+    }
+    const sinTraza = tareas.filter((tarea) => tarea._count.asignaciones === 0);
+    if (sinTraza.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F1_HECHO_SIN_TRAZA',
+        message: 'Hay tareas marcadas como HECHO sin ninguna asignación histórica',
+        idsTarea: sinTraza.map((tarea) => tarea.idTarea),
+      });
+    }
+
+    // F2: SIN filtro de `eliminadoEn` — ese es exactamente el caso que se
+    // escapaba y el que este predicado existe para atrapar.
+    const abiertas = await tx.asignacionTarea.findMany({
+      where: { desasignadaEn: null, tarea: { idProyecto: projectId, idSprint: sprintId } },
+      select: { idAsignacion: true, idTarea: true },
+    });
+    if (abiertas.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F2_ASIGNACIONES_ABIERTAS',
+        message: 'No se puede finalizar el Sprint mientras existan asignaciones abiertas',
+        idsAsignacion: abiertas.map((fila) => fila.idAsignacion),
+        idsTarea: [...new Set(abiertas.map((fila) => fila.idTarea))],
+      });
+    }
+
+    // La normalización precede a F3 y F4: materializa a 0 los tramos cerrados
+    // granulares sin registros para que ambos predicados evalúen el estado
+    // definitivo, y no uno en el que una caché NULL se escapa del contraste.
+    // C155 (§39/§48): la normalización previa vive en el servicio de
+    // reconocimiento, que Sprints YA compone. Sprints sigue sin calcular ni
+    // escribir `horasReales` por su cuenta: delega con su propio `tx`.
+    await this.recognition?.normalizeClosedGranularTx(tx, { projectId, sprintId });
+
+    const conHoras = await tx.asignacionTarea.findMany({
+      where: { horasReales: { not: null }, tarea: { idProyecto: projectId, idSprint: sprintId } },
+      select: { idAsignacion: true, idParticipacion: true, origenReporte: true },
+    });
+    // §22: los dos motivos de F3 son diagnósticos DISTINTOS y se informan por
+    // separado, siempre citando los tramos exactos: un impedimento que no dice
+    // cuál fila lo causa obliga al líder a adivinar dónde está el problema.
+    const sinParticipacion = conHoras.filter((fila) => fila.idParticipacion === null);
+    if (sinParticipacion.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'TRAMOS_SIN_PARTICIPACION',
+        message: 'Hay tramos con horas sin participación resuelta',
+        idsAsignacion: sinParticipacion.map((fila) => fila.idAsignacion),
+      });
+    }
+    const sinConciliar = conHoras.filter((fila) => fila.origenReporte === 'POR_CONCILIAR');
+    if (sinConciliar.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'ORIGEN_SIN_CONCILIAR',
+        message: 'Hay tramos con horas cuyo origen todavía no está conciliado',
+        idsAsignacion: sinConciliar.map((fila) => fila.idAsignacion),
+      });
+    }
+
+    const granulares = await tx.asignacionTarea.findMany({
+      where: {
+        origenReporte: 'GRANULAR',
+        reconocidoEn: null,
+        tarea: { idProyecto: projectId, idSprint: sprintId },
+      },
+      select: {
+        idAsignacion: true,
+        horasReales: true,
+        registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+      },
+    });
+    const descuadradas = granulares.filter((tramo) => {
+      const suma = tramo.registrosTiempo.reduce(
+        (acc, fila) => acc.plus(fila.horas),
+        new Prisma.Decimal(0),
+      );
+      return tramo.horasReales === null || !tramo.horasReales.equals(suma);
+    });
+    if (descuadradas.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SPRINT_F4_CACHE_DESCUADRADA',
+        message: 'Hay cachés granulares que no coinciden con la suma efectiva de registros',
+        idsAsignacion: descuadradas.map((tramo) => tramo.idAsignacion),
+      });
+    }
+
+    return { f1: tareas.length, f2: abiertas.length, f3: conHoras.length, f4: granulares.length };
+  }
+
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
 
   /**
    * Inicia el Sprint manualmente: exclusivo del líder (contrato A1), y solo
@@ -57,8 +240,12 @@ export class SprintsService {
    * persistida.
    */
   async startSprint(projectId: number, userId: number) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.projectTx.run(projectId, userId, 'sprints.startSprint', async (ctx) => {
+      const { tx } = ctx;
       await this.sprintsAuthorization.assertCanStartSprint(projectId, userId, tx);
+      // C045: además del liderazgo, el proyecto debe estar en P/E y no tener
+      // ningún Sprint operable; iniciar en B/R/O/C deja de aceptarse.
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SPRINT_START', userId);
 
       const sprintOperable = await this.sprintsContext.getCurrentSprint(projectId, tx);
       if (sprintOperable) {
@@ -138,37 +325,29 @@ export class SprintsService {
    * duplicada).
    */
   async finalizeSprint(projectId: number, sprintId: number, userId: number) {
-    const sprintFinalizado = await this.prisma.$transaction(async (tx) => {
+    const sprintFinalizado = await this.projectTx.run(
+      projectId,
+      userId,
+      'sprints.finalizeSprint',
+      async (ctx) => {
+      const { tx } = ctx;
       const sprint = await this.sprintsAuthorization.assertCanFinalizeSprint(
         projectId,
         sprintId,
         userId,
         tx,
       );
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SPRINT_FINALIZE', userId, {
+        sprintId,
+      });
 
       if (sprint.estado !== EstadoSprint.ACTIVO) {
         throw new ConflictException('El Sprint ya no está en estado ACTIVO');
       }
 
-      // Tarea.eliminadoEn: null — mismo filtro de soft delete que el resto
-      // del dominio tasks/ ya aplica (TasksContextService.getTaskInProjectOrThrow,
-      // TasksService.findAll/findOne): una tarea eliminada no cuenta como
-      // pendiente. Un Sprint sin ninguna tarea (0 relevantes) cumple
-      // trivialmente "0 tareas no-HECHO" — A4 no introduce una regla de
-      // "mínimo una tarea" que Foundation/A1-A3 nunca definieron.
-      const tareasPendientes = await tx.tarea.count({
-        where: {
-          idProyecto: projectId,
-          idSprint: sprintId,
-          eliminadoEn: null,
-          estadoTarea: { not: EstadoTarea.HECHO },
-        },
-      });
-      if (tareasPendientes > 0) {
-        throw new ConflictException(
-          'No se puede finalizar el Sprint mientras existan tareas pendientes',
-        );
-      }
+      // C075 (§12): las cuatro revalidaciones completas, no solo el conteo de
+      // tareas pendientes. Cualquiera que falle aborta con cero escrituras.
+      const predicados = await this.assertFinalizationPredicatesTx(tx, projectId, sprintId);
 
       const actualizado = await tx.sprint.updateMany({
         where: {
@@ -195,8 +374,28 @@ export class SprintsService {
         );
       }
 
+      // El actor queda en la bitácora: `Sprint` no tiene columna de
+      // «finalizado por» y este commit no introduce migraciones. La fila
+      // guarda la FECHA; el evento guarda QUIÉN y QUÉ se revalidó.
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.SPRINT_FINALIZED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintId,
+        tipoEntidad: 'SPRINT',
+        idEntidad: sprintId,
+        valorAnterior: { estado: EstadoSprint.ACTIVO },
+        valorNuevo: {
+          estado: EstadoSprint.EN_FINALIZACION,
+          fechaFinalizacionIniciada: filaFinal.fechaFinalizacionIniciada?.toISOString() ?? null,
+          predicados,
+        },
+      });
+
       return filaFinal;
-    });
+      },
+    );
 
     await this.notificationsService.notifyProjectActiveParticipants(projectId, userId, {
       tipoNotificacion: TipoNotificacion.CAMBIO_ESTADO_PROYECTO,
@@ -214,83 +413,12 @@ export class SprintsService {
   }
 
   /**
-   * A7: ajusta/aprueba el registro de reconocimiento de horas ya existente
-   * (HorasParticipacion) para una participación dentro de un Sprint —
-   * `horasCalculadas` (persistido por A5/proceso de cálculo previo) es la
-   * única fuente de comparación; A7 nunca la recalcula ni toca
-   * AsignacionTarea.horasReales.
-   *
-   * Aislamiento cross-project: la búsqueda exige simultáneamente
-   * idParticipacion + idSprint (ya validado contra projectId por
-   * `assertCanAdjustRecognizedHours` vía `getSprintInProjectOrThrow`) +
-   * participacion.rolProyecto.idProyecto === projectId, para no confiar
-   * únicamente en participacionId como identificador.
-   *
-   * La comparación usa Prisma.Decimal.equals (no floating point) porque
-   * horasCalculadas/horasAprobadas son columnas Decimal(6,2).
-   *
-   * `horasCalculadas === null` (A7.1) nunca se trata como 0: A7 ajusta un
-   * cálculo ya persistido, no lo inventa. Sin una base de cálculo real
-   * todavía no hay nada que aprobar, así que se rechaza con
-   * BadRequestException en vez de asumir silenciosamente un 0 que
-   * permitiría "aprobar" horas sobre un reconocimiento inexistente.
-   */
-  async adjustRecognizedHours(
-    projectId: number,
-    sprintId: number,
-    participationId: number,
-    userId: number,
-    dto: AdjustRecognizedHoursDto,
-  ) {
-    return this.prisma.$transaction(async (tx) => {
-      await this.sprintsAuthorization.assertCanAdjustRecognizedHours(projectId, sprintId, userId, tx);
-
-      const registro = await tx.horasParticipacion.findFirst({
-        where: {
-          idParticipacion: participationId,
-          idSprint: sprintId,
-          participacion: { rolProyecto: { idProyecto: projectId } },
-        },
-      });
-      if (!registro) {
-        throw new NotFoundException(
-          `No existe un registro de horas para la participación ${participationId} en el Sprint ${sprintId} del proyecto ${projectId}`,
-        );
-      }
-
-      if (registro.horasCalculadas === null) {
-        throw new BadRequestException(
-          'No hay horas calculadas disponibles para ajustar en este registro',
-        );
-      }
-
-      const horasCalculadas = registro.horasCalculadas;
-      const horasAprobadas = new Prisma.Decimal(dto.horasAprobadas);
-      const requiereJustificacion = !horasAprobadas.equals(horasCalculadas);
-
-      if (requiereJustificacion && !dto.justificacionAjuste?.trim()) {
-        throw new BadRequestException(
-          'justificacionAjuste es obligatoria cuando horasAprobadas difiere de horasCalculadas',
-        );
-      }
-
-      return tx.horasParticipacion.update({
-        where: { idRegistroHoras: registro.idRegistroHoras },
-        data: {
-          horasAprobadas: dto.horasAprobadas,
-          justificacionAjuste: dto.justificacionAjuste?.trim() ?? null,
-        },
-      });
-    });
-  }
-
-  /**
    * A8: read-model de revisión/finalización de horas del Sprint
    * (SprintClosingSummary), person-centric — cada participante aparece una
    * única vez sin importar cuántos roles tenga en el proyecto (mismo
    * invariante que ProjectsService.getTeamSummary /
    * TeamSummaryMemberDto). Puramente de lectura: nunca recalcula horas
-   * (A5), nunca invoca `adjustRecognizedHours` (A7), nunca toca
+   * (A5), nunca escribe el agregado de horas, nunca toca
    * `AsignacionTarea.horasReales` ni marca tramos como reconocidos.
    *
    * Presupuesto de ≤2 queries por invocación, independiente del número de
@@ -328,6 +456,14 @@ export class SprintsService {
     sprintId: number,
     userId: number,
   ): Promise<SprintClosingSummaryDto> {
+    // C046 (§41 E066): resumen de cierre — solo el líder actual mientras el
+    // Sprint no esté cerrado.
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
     await this.sprintsAuthorization.assertCanViewClosingSummary(projectId, sprintId, userId);
 
     const participantes = await this.prisma.$queryRaw<SprintClosingSummaryParticipantDto[]>(Prisma.sql`
@@ -420,7 +556,191 @@ export class SprintsService {
       ORDER BY u.apellido, u.nombre, u.id_usuario
     `);
 
-    return { idProyecto: projectId, idSprint: sprintId, participantes };
+    // C079 (§46): el desglose por tramos y ajustes se compone APARTE de la
+    // consulta de HU-D1, que no cambia. Así el contrato anterior se conserva
+    // intacto y lo nuevo se añade encima en vez de reescribirlo.
+    const { totalesPorUsuario, blockers, estadoSprint } = await this.buildClosingBreakdown(
+      projectId,
+      sprintId,
+    );
+
+    return {
+      idProyecto: projectId,
+      idSprint: sprintId,
+      estadoSprint,
+      participantes: participantes.map((participante) => ({
+        ...participante,
+        totales: totalesPorUsuario.get(participante.idUsuario) ?? SIN_TRAMOS,
+      })),
+      blockers,
+    };
+  }
+
+  /**
+   * C079 (06 v2 §22/§46): composición del desglose de cierre. Es LECTURA pura
+   * — no recalcula ni escribe nada — y mantiene separadas las cuatro capas que
+   * §16 no considera intercambiables: reportado, legacy, ajustado y propuesto.
+   *
+   * Los blockers se devuelven con sus identificadores porque un impedimento
+   * sin decir CUÁL fila lo causa obliga al líder a adivinar.
+   */
+  private async buildClosingBreakdown(projectId: number, sprintId: number) {
+    const [sprint, tramos] = await Promise.all([
+      this.prisma.sprint.findUnique({ where: { idSprint: sprintId }, select: { estado: true } }),
+      this.prisma.asignacionTarea.findMany({
+        // Sin filtro de `eliminadoEn` (§15/§22): el conjunto histórico incluye
+        // los tramos de tareas eliminadas, que también deben consolidarse.
+        where: { tarea: { idProyecto: projectId, idSprint: sprintId } },
+        orderBy: { idAsignacion: 'asc' },
+        select: {
+          idAsignacion: true,
+          idTarea: true,
+          idUsuario: true,
+          idParticipacion: true,
+          desasignadaEn: true,
+          origenReporte: true,
+          horasReales: true,
+          reconocidoEn: true,
+          tarea: { select: { tituloTarea: true, eliminadoEn: true, tiempoEstimadoHoras: true } },
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, justificacionExceso: true } },
+          ajustes: { where: { anuladoEn: null }, select: { horasBase: true, deltaHoras: true, justificacion: true } },
+        },
+      }),
+    ]);
+
+    const cero = new Prisma.Decimal(0);
+    const totalesPorUsuario = new Map<number, SprintClosingMemberTotalsDto>();
+    const acumulado = new Map<number, {
+      reportadas: Prisma.Decimal; legacy: Prisma.Decimal; propuestas: Prisma.Decimal;
+      tareas: Map<number, number | null>; pendientes: number; consumidas: number;
+      tramos: SprintClosingTramoDto[];
+    }>();
+    const sinParticipacion: number[] = [];
+    const sinConsolidar: number[] = [];
+    const basesDesactualizadas: number[] = [];
+
+    for (const tramo of tramos) {
+      const cache = tramo.horasReales ?? cero;
+      const granulares = tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), cero);
+      // Sobreestimación DEL TRAMO: lo reportado por encima de la estimación de
+      // su tarea. Sin estimación no hay exceso que medir (no es cero: es que la
+      // pregunta no aplica), y por eso `estimacionTarea` viaja tal cual.
+      const estimacionTarea = tramo.tarea.tiempoEstimadoHoras;
+      const excesoTramo =
+        estimacionTarea === null ? cero : Prisma.Decimal.max(granulares.minus(estimacionTarea), 0);
+      // El estudiante justifica su propio exceso al registrar las horas; un
+      // tramo puede tener varios registros, así que se conservan todas.
+      const justificacionesExceso = tramo.registrosTiempo
+        .map((fila) => fila.justificacionExceso?.trim())
+        .filter((texto): texto is string => !!texto);
+      const legacyTramo = tramo.origenReporte === 'LEGACY' ? cache : cero;
+      const vigente = tramo.ajustes[0] ?? null;
+      if (vigente && !vigente.horasBase.equals(cache)) {
+        basesDesactualizadas.push(tramo.idAsignacion);
+      }
+      if (tramo.idParticipacion === null) {
+        sinParticipacion.push(tramo.idAsignacion);
+      }
+      if (tramo.reconocidoEn === null && tramo.desasignadaEn !== null && tramo.horasReales !== null) {
+        sinConsolidar.push(tramo.idAsignacion);
+      }
+
+      const fila = acumulado.get(tramo.idUsuario) ?? {
+        reportadas: cero, legacy: cero, propuestas: cero,
+        tareas: new Map<number, number | null>(), pendientes: 0, consumidas: 0,
+        tramos: [] as SprintClosingTramoDto[],
+      };
+      fila.reportadas = fila.reportadas.plus(granulares);
+      fila.legacy = fila.legacy.plus(legacyTramo);
+      fila.propuestas = fila.propuestas.plus(cache).plus(vigente?.deltaHoras ?? cero);
+      fila.tareas.set(tramo.idTarea, tramo.tarea.tiempoEstimadoHoras);
+      if (tramo.reconocidoEn === null) fila.pendientes += 1; else fila.consumidas += 1;
+      fila.tramos.push({
+        idAsignacion: tramo.idAsignacion,
+        idTarea: tramo.idTarea,
+        tituloTarea: tramo.tarea.tituloTarea,
+        tareaEliminada: tramo.tarea.eliminadoEn !== null,
+        idParticipacion: tramo.idParticipacion,
+        abierto: tramo.desasignadaEn === null,
+        origen: tramo.origenReporte,
+        reportadas: granulares.toFixed(2),
+        estimacionTarea,
+        exceso: excesoTramo.toFixed(2),
+        justificacionExceso: justificacionesExceso.length > 0 ? justificacionesExceso.join(' · ') : null,
+        ajuste: vigente ? vigente.deltaHoras.toFixed(2) : null,
+        justificacionAjuste: vigente?.justificacion ?? null,
+        propuestas: cache.plus(vigente?.deltaHoras ?? cero).toFixed(2),
+        reconocidoEn: tramo.reconocidoEn,
+      });
+      acumulado.set(tramo.idUsuario, fila);
+    }
+
+    for (const [idUsuario, fila] of acumulado) {
+      const estimaciones = [...fila.tareas.values()].filter((valor): valor is number => valor !== null);
+      const estimacionAsociada = estimaciones.length > 0 ? estimaciones.reduce((a, b) => a + b, 0) : null;
+      const reportadasTotales = fila.reportadas.plus(fila.legacy);
+      totalesPorUsuario.set(idUsuario, {
+        tareasDistintas: fila.tareas.size,
+        estimacionAsociada,
+        reportadas: fila.reportadas.toFixed(2),
+        legacy: fila.legacy.toFixed(2),
+        exceso:
+          estimacionAsociada === null
+            ? '0.00'
+            : Prisma.Decimal.max(reportadasTotales.minus(estimacionAsociada), 0).toFixed(2),
+        propuestas: fila.propuestas.toFixed(2),
+        filasPendientes: fila.pendientes,
+        filasConsumidas: fila.consumidas,
+        tramos: fila.tramos,
+      });
+    }
+
+    const blockers: SprintClosingBlockerDto[] = [];
+    if (sinParticipacion.length > 0) {
+      blockers.push({
+        code: 'TRAMOS_SIN_PARTICIPACION',
+        message: 'Hay tramos sin participación resuelta; no puede saberse a quién acreditarlos',
+        ids: sinParticipacion,
+        cantidad: sinParticipacion.length,
+      });
+    }
+    if (basesDesactualizadas.length > 0) {
+      blockers.push({
+        code: 'AJUSTE_DESACTUALIZADO',
+        message: 'Hay ajustes vigentes calculados sobre un reporte distinto del actual',
+        ids: basesDesactualizadas,
+        cantidad: basesDesactualizadas.length,
+      });
+    }
+    if (sinConsolidar.length > 0) {
+      blockers.push({
+        code: 'HORAS_SIN_CONSOLIDAR',
+        message: 'Hay tramos cerrados con horas todavía no consolidadas',
+        ids: sinConsolidar,
+        cantidad: sinConsolidar.length,
+      });
+    }
+
+    return { totalesPorUsuario, blockers, estadoSprint: sprint?.estado };
+  }
+
+  /**
+   * C079 (§41 E069): detalle por integrante dentro del Sprint. La decisión de
+   * lectura es la misma del resumen; el desglose lo compone el proveedor de
+   * agregación, que no escribe nada.
+   */
+  async getSprintMemberDetail(projectId: number, sprintId: number, userId: number, actorId: number) {
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
+    await this.sprintsAuthorization.assertCanViewClosingSummary(projectId, sprintId, actorId);
+    if (!this.projectHours) {
+      throw new NotFoundException('El detalle por integrante no está disponible');
+    }
+    return this.projectHours.sprintMemberDetail(undefined, { sprintId, userId });
   }
 
   /**
@@ -473,16 +793,66 @@ export class SprintsService {
    * bloqueo, no un mensaje de bandeja.
    */
   async closeSprint(projectId: number, sprintId: number, userId: number) {
-    const sprintCerrado = await this.prisma.$transaction(async (tx) => {
+    const sprintCerrado = await this.projectTx.run(
+      projectId,
+      userId,
+      'sprints.closeSprint',
+      async (ctx) => {
+      const { tx } = ctx;
       const sprint = await this.sprintsAuthorization.assertCanCloseSprint(
         projectId,
         sprintId,
         userId,
         tx,
       );
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SPRINT_CLOSE', userId, {
+        sprintId,
+      });
 
       if (sprint.estado !== EstadoSprint.EN_FINALIZACION) {
         throw new ConflictException('El Sprint no está en estado EN_FINALIZACION');
+      }
+
+      // C080 (§12): CERRAR es CONSOLIDAR, no acreditar. Se reconocen TODAS las
+      // participaciones elegibles primero y solo después se hace la única
+      // transición de estado, de modo que ningún Sprint pueda quedar cerrado
+      // con horas a medio consolidar: o entra todo, o no entra nada.
+      await this.assertFinalizationPredicatesTx(tx, projectId, sprintId);
+
+      const participaciones =
+        (await this.recognition?.listEligibleParticipationsTx(tx, { projectId, sprintId })) ?? [];
+      // Un único instante para TODO el lote: la consolidación de un Sprint es
+      // un solo hecho, y verlo con marcas distintas por participación sugeriría
+      // que ocurrió a trozos.
+      const consolidadoEn = new Date();
+      const consolidadas: Array<{
+        idParticipacion: number;
+        idUsuario: number;
+        horasReportadas: string;
+        horasPropuestas: string;
+        idsAsignaciones: number[];
+      }> = [];
+      for (const idParticipacion of participaciones) {
+        const resultado = await this.recognition!.recognizeParticipationHours(tx, {
+          projectId,
+          sprintId,
+          participationId: idParticipacion,
+          reconocidoEn: consolidadoEn,
+        });
+        if (resultado.horasParticipacion === null) {
+          continue;
+        }
+        const duenio = await tx.participacionProyecto.findUniqueOrThrow({
+          where: { idParticipacion },
+          select: { idUsuario: true },
+        });
+        consolidadas.push({
+          idParticipacion,
+          idUsuario: duenio.idUsuario,
+          horasReportadas: resultado.horasReportadas.toFixed(2),
+          horasPropuestas: resultado.horasPropuestas.toFixed(2),
+          idsAsignaciones: resultado.idsAsignacionesReconocidas,
+        });
       }
 
       const actualizado = await tx.sprint.updateMany({
@@ -511,9 +881,64 @@ export class SprintsService {
         );
       }
 
-      return filaFinal;
-    });
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.SPRINT_HOURS_CONSOLIDATED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintId,
+        tipoEntidad: 'SPRINT',
+        idEntidad: sprintId,
+        valorNuevo: { consolidadas },
+      });
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.SPRINT_CLOSED,
+        idActor: userId,
+        idProyecto: projectId,
+        idSprint: sprintId,
+        tipoEntidad: 'SPRINT',
+        idEntidad: sprintId,
+        valorAnterior: { estado: EstadoSprint.EN_FINALIZACION },
+        valorNuevo: {
+          estado: EstadoSprint.CERRADO,
+          fechaCierre: filaFinal.fechaCierre?.toISOString() ?? null,
+          cerradoPor: userId,
+        },
+      });
 
+      // §44: se avisa a TODO usuario con tramos consumidos, incluido aquel
+      // cuya propuesta final es 0.00 — saber que su Sprint se consolidó en
+      // cero también es información suya.
+      // Sin nadie a quien avisar, ni siquiera se consulta el título.
+      const proyecto = consolidadas.length > 0
+        ? await tx.proyecto.findUniqueOrThrow({
+            where: { idProyecto: projectId },
+            select: { tituloProyecto: true },
+          })
+        : null;
+      for (const fila of consolidadas) {
+        await this.notificationsService.persistTemplateTx(
+          tx,
+          [fila.idUsuario],
+          'HORAS_CONSOLIDADAS',
+          {
+            projectTitle: proyecto!.tituloProyecto,
+            projectId,
+            sprintId,
+            numeroSprint: filaFinal.numero,
+            horasReportadas: fila.horasReportadas,
+            horasPropuestas: fila.horasPropuestas,
+          },
+          ctx.effects,
+        );
+      }
+
+      return filaFinal;
+      },
+    );
+
+    // Realtime SIEMPRE post-commit: nunca un socket dentro de la transacción.
     await this.notificationsService.notifySprintClosed(projectId, userId, {
       projectId,
       sprintId,
@@ -580,12 +1005,23 @@ export class SprintsService {
     return new Map(filas.map((fila) => [fila.idSprint, fila]));
   }
 
+  /**
+   * C046 (§34/§41 E064): la autorización actual se conserva y se le añade el
+   * ámbito por actor; un administrador o un participante histórico solo ve
+   * los Sprints cerrados del proyecto vivo.
+   */
   async listSprints(projectId: number, userId: number): Promise<SprintListItemDto[]> {
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+    });
     await this.sprintsAuthorization.assertCanListSprintHistory(projectId, userId);
+    const alcance = this.sprintsContext.sprintScopeWhere(this.readPolicy.scopeForActor(decision));
 
     const [sprints, agregadosPorSprint] = await Promise.all([
       this.prisma.sprint.findMany({
-        where: { idProyecto: projectId },
+        where: { idProyecto: projectId, ...alcance },
         orderBy: { numero: 'desc' },
         select: {
           idSprint: true,
@@ -648,6 +1084,15 @@ export class SprintsService {
    * `Hito.estadoHito`.
    */
   async getSprintDetail(projectId: number, sprintId: number, userId: number): Promise<SprintDetailDto> {
+    // C046 (§34/§41 E065): el detalle de un Sprint ACTIVO o EN_FINALIZACION
+    // solo es visible para el líder actual; el resto de perfiles queda
+    // limitado a los Sprints cerrados.
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
     await this.sprintsAuthorization.assertCanViewSprintHistory(projectId, sprintId, userId);
 
     const sprint = await this.prisma.sprint.findFirst({
@@ -795,6 +1240,12 @@ export class SprintsService {
     sprintId: number,
     userId: number,
   ): Promise<SprintAnalyticsDto> {
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
     await this.sprintsAuthorization.assertCanViewSprintAnalytics(projectId, sprintId, userId);
 
     const sprint = await this.prisma.sprint.findFirst({
@@ -913,7 +1364,20 @@ export class SprintsService {
     projectId: number,
     userId: number,
   ): Promise<SprintComparativeAnalyticsDto> {
+    // C046 (§41 E068): la comparativa también respeta el ámbito por actor.
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+    });
     await this.sprintsAuthorization.assertCanListSprintAnalytics(projectId, userId);
+    // La comparativa es SQL agregado: el ámbito se aplica como fragmento
+    // parametrizado, nunca interpolando estados en el texto de la consulta.
+    const estadosVisibles = decision.sprintEstados;
+    const filtroEstados =
+      estadosVisibles === null
+        ? Prisma.empty
+        : Prisma.sql` AND s.estado::text IN (${Prisma.join([...estadosVisibles])})`;
 
     const filas = await this.prisma.$queryRaw<
       Omit<SprintComparativeAnalyticsItemDto, 'porcentajeCumplimiento'>[]
@@ -952,7 +1416,7 @@ export class SprintsService {
       FROM sprint s
       LEFT JOIN tareas_agregadas ta ON ta."idSprint" = s.id_sprint
       LEFT JOIN hitos_agregados ha ON ha."idSprint" = s.id_sprint
-      WHERE s.id_proyecto = ${projectId}
+      WHERE s.id_proyecto = ${projectId}${filtroEstados}
       ORDER BY s.numero ASC
     `);
 

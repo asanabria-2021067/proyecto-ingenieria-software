@@ -17,6 +17,15 @@ export interface CalculateRecognizableHoursInput {
 }
 
 /**
+ * C080: el orquestador de cierre pasa UN instante para todo el lote, de modo
+ * que la consolidación completa de un Sprint quede sellada con la misma marca
+ * temporal. Omitido, cada llamada usa el suyo (Flow B, reconocimiento suelto).
+ */
+export interface RecognizeParticipationHoursInput extends CalculateRecognizableHoursInput {
+  reconocidoEn?: Date;
+}
+
+/**
  * Resultado de `recognizeParticipationHours` (SYNC GATE 1). `horasReconocidas`
  * es el DELTA reconocido en ESTA llamada (0 si no había nada elegible — un
  * no-op real, no una reescritura a 0 de un total ya persistido).
@@ -27,6 +36,10 @@ export interface CalculateRecognizableHoursInput {
  */
 export interface RecognizeParticipationHoursResult {
   horasReconocidas: number;
+  /** C077 (§12.2): suma de cachés — lo que el integrante reportó. */
+  horasReportadas: Prisma.Decimal;
+  /** C077 (§12.2): suma de (caché + ajuste vigente válido) — lo que se propone. */
+  horasPropuestas: Prisma.Decimal;
   idsAsignacionesReconocidas: number[];
   horasParticipacion: Prisma.HorasParticipacionGetPayload<Record<string, never>> | null;
 }
@@ -34,6 +47,59 @@ export interface RecognizeParticipationHoursResult {
 @Injectable()
 export class HoursRecognitionService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * C155 (06 v2 §12/§14/§39/§48): normalización EXCEPCIONAL previa a Flow A.
+   *
+   * Un tramo cerrado, granular, no consumido, sin caché y sin ningún registro
+   * efectivo describe trabajo que terminó sin horas. Consolidar con la caché en
+   * NULL dejaría ese hecho sin materializar, así que se fija a 0 antes de
+   * revalidar F1–F4.
+   *
+   * Vive AQUÍ y no en `TimeRecordsService` porque §39/§48 congelan el grafo:
+   * `Sprints` depende de `Policy + Bitacora + Notifications`, nunca de
+   * `TimeRecords`. Delegar en el writer ordinario obligaba a la arista
+   * `SprintsModule → TimeRecordsModule`, que ese grafo prohíbe.
+   *
+   * Esto NO convierte a este servicio en un segundo writer general de
+   * `horasReales`: la excepción está acotada a los cinco predicados de abajo y
+   * su único resultado posible es `NULL → 0`. El writer ORDINARIO sigue siendo
+   * `TimeRecordsService.recalculateAssignment`, y ninguna otra escritura de esa
+   * columna se autoriza desde aquí.
+   *
+   * Recibe el `tx` del caller: nunca abre transacción propia ni anida otra.
+   */
+  async normalizeClosedGranularTx(
+    tx: TxClient,
+    scope: { projectId: number; sprintId: number },
+  ): Promise<void> {
+    const assignments = await tx.asignacionTarea.findMany({
+      where: {
+        tarea: { idProyecto: scope.projectId, idSprint: scope.sprintId },
+        desasignadaEn: { not: null },
+        reconocidoEn: null,
+        origenReporte: 'GRANULAR',
+        horasReales: null,
+        registrosTiempo: { none: { revocadoEn: null } },
+      },
+      select: { idAsignacion: true },
+    });
+    for (const assignment of assignments) {
+      // Mismo compare-and-set que usaba el writer ordinario: el tramo sigue
+      // siendo granular y sin consumir en el instante de escribir.
+      const updated = await tx.asignacionTarea.updateMany({
+        where: {
+          idAsignacion: assignment.idAsignacion,
+          origenReporte: 'GRANULAR',
+          reconocidoEn: null,
+        },
+        data: { horasReales: new Prisma.Decimal(0) },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException('El tramo cambió durante el recálculo');
+      }
+    }
+  }
 
   /**
    * Where compartido por `calculateRecognizableHours` (aggregate, cálculo
@@ -109,6 +175,44 @@ export class HoursRecognitionService {
   }
 
   /**
+   * C076 (06 v2 §12): las participaciones reconocibles se derivan de los
+   * TRAMOS, no de la lista de participantes ACTIVO. La diferencia no es
+   * cosmética: quien se retiró o completó su participación dejando trabajo sin
+   * consumir tiene derecho a que se le reconozca, y un miembro activo que no
+   * trabajó en este Sprint no debe generar ningún agregado.
+   *
+   * Se excluyen los tramos ya consumidos (`reconocidoEn` no nulo, típicamente
+   * por una salida anticipada de Flow B) y los de origen sin conciliar, cuya
+   * procedencia todavía no está determinada.
+   *
+   * El orden ascendente es deliberado: fija un orden de bloqueo determinista
+   * para el lote y hace la enumeración reproducible entre ejecuciones.
+   */
+  async listEligibleParticipationsTx(
+    tx: TxClient,
+    input: { projectId: number; sprintId: number },
+  ): Promise<number[]> {
+    const tramos = await tx.asignacionTarea.findMany({
+      where: {
+        idParticipacion: { not: null },
+        desasignadaEn: { not: null },
+        horasReales: { not: null },
+        reconocidoEn: null,
+        origenReporte: { not: 'POR_CONCILIAR' },
+        // Sin filtro de `eliminadoEn`: borrar la tarea no borra las horas ya
+        // trabajadas en ella.
+        tarea: { idProyecto: input.projectId, idSprint: input.sprintId },
+      },
+      distinct: ['idParticipacion'],
+      orderBy: { idParticipacion: 'asc' },
+      select: { idParticipacion: true },
+    });
+    return tramos
+      .map((tramo) => tramo.idParticipacion)
+      .filter((id): id is number => id !== null);
+  }
+
+  /**
    * SYNC GATE 1: operación productiva transaction-aware que B10 (Flow B)
    * puede invocar dentro de SU PROPIA transacción externa (resolución de
    * solicitud de salida), junto con el retiro de participaciones, sin abrir
@@ -136,13 +240,12 @@ export class HoursRecognitionService {
    *      a lo sumo una fila por (participación, Sprint) cuando idSprint no
    *      es null. Como esa unicidad es un índice PARCIAL (no un `@@unique`
    *      de Prisma, que no admite condición), no existe `upsert()` nativo
-   *      contra ella: se hace `findFirst` + `create`/`update` explícito, y
-   *      si dos transacciones concurrentes intentan crear la misma fila por
-   *      primera vez, la que pierde la carrera recibe P2002 (reconocido
-   *      específicamente, mismo criterio estrecho que
-   *      `SprintsService.isOperableSprintCollision`) y reintenta como
-   *      `update` con `increment`, en vez de propagar el error crudo.
-   *      `horasCalculadas` se INCREMENTA (nunca se sobrescribe): un
+   *      contra ella: se hace `findFirst` + `create`/`update` explícito.
+   *      C078: bajo el lock del proyecto no hay carrera normal de primera
+   *      creación, así que un P2002 aquí es inesperado y NO se captura —
+   *      aborta la transacción entera en vez de intentar recuperarse dentro
+   *      de una tx PostgreSQL ya fallida.
+   *      Ambas columnas se INCREMENTAN (nunca se sobrescriben): un
    *      reconocimiento repetido que no encuentra tramos nuevos nunca toca
    *      esta fila (ver más abajo), así que el total ya persistido de un
    *      reconocimiento previo nunca se pierde ni se recalcula desde cero.
@@ -150,8 +253,8 @@ export class HoursRecognitionService {
    * Idempotencia de la operación completa: si no hay tramos elegibles
    * (`elegibles.length === 0` — ya sea porque nunca hubo, o porque una
    * llamada previa ya los reconoció todos), el método retorna
-   * inmediatamente `{ horasReconocidas: 0, idsAsignacionesReconocidas: [],
-   * horasParticipacion: null }` SIN tocar `HorasParticipacion` ni
+   * inmediatamente un resultado en cero (reporte y propuesta incluidos)
+   * SIN tocar `HorasParticipacion` ni
    * `AsignacionTarea` — un verdadero no-op, nunca una fila sintética con 0
    * horas ni una sobrescritura del total ya correcto.
    *
@@ -168,32 +271,65 @@ export class HoursRecognitionService {
    */
   async recognizeParticipationHours(
     tx: TxClient,
-    input: CalculateRecognizableHoursInput,
+    input: RecognizeParticipationHoursInput,
   ): Promise<RecognizeParticipationHoursResult> {
     const { participationId, sprintId } = input;
 
+    // §12.1: tramos cerrados, con caché, no consumidos, con FK y origen
+    // resueltos. La tarea puede estar eliminada: las horas trabajadas no
+    // desaparecen porque después se borrara la tarea.
     const elegibles = await tx.asignacionTarea.findMany({
-      where: this.buildEligibleAssignmentsWhere(input),
-      select: { idAsignacion: true, horasReales: true },
+      where: {
+        ...this.buildEligibleAssignmentsWhere(input),
+        origenReporte: { not: 'POR_CONCILIAR' },
+      },
+      select: {
+        idAsignacion: true,
+        horasReales: true,
+        ajustes: { where: { anuladoEn: null }, select: { horasBase: true, deltaHoras: true } },
+      },
     });
 
     if (elegibles.length === 0) {
-      return { horasReconocidas: 0, idsAsignacionesReconocidas: [], horasParticipacion: null };
+      // No-op REAL: ni fila cero ficticia ni reescritura de un total correcto.
+      return {
+        horasReconocidas: 0,
+        horasReportadas: new Prisma.Decimal(0),
+        horasPropuestas: new Prisma.Decimal(0),
+        idsAsignacionesReconocidas: [],
+        horasParticipacion: null,
+      };
     }
 
     const idsAsignaciones = elegibles.map((a) => a.idAsignacion);
-    const totalDecimal = elegibles.reduce(
-      (acumulado, a) => acumulado.plus(a.horasReales ?? new Prisma.Decimal(0)),
-      new Prisma.Decimal(0),
-    );
-    const horasReconocidas = totalDecimal.toNumber();
+    let horasReportadas = new Prisma.Decimal(0);
+    let horasPropuestas = new Prisma.Decimal(0);
+    for (const tramo of elegibles) {
+      const cache = tramo.horasReales ?? new Prisma.Decimal(0);
+      horasReportadas = horasReportadas.plus(cache);
+      const vigente = tramo.ajustes[0];
+      if (vigente && !vigente.horasBase.equals(cache)) {
+        // §11: la base del ajuste es la evidencia del reporte que el líder vio.
+        // Si el reporte cambió después, aplicar el delta sobre otro importe
+        // sería una aproximación inventada. Se rechaza y el líder relee.
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'AJUSTE_DESACTUALIZADO',
+          message: 'Un ajuste vigente se calculó sobre un reporte distinto del actual',
+          idAsignacion: tramo.idAsignacion,
+        });
+      }
+      horasPropuestas = horasPropuestas.plus(cache).plus(vigente?.deltaHoras ?? 0);
+    }
+    const horasReconocidas = horasReportadas.toNumber();
 
+    // §12.3: CAS sobre TODOS los ids con una FECHA COMÚN. El conteo exacto es
+    // la garantía: si alguien consumió uno de estos tramos entretanto, se
+    // aborta en vez de persistir un total parcial.
+    const reconocidoEn = input.reconocidoEn ?? new Date();
     const marcado = await tx.asignacionTarea.updateMany({
-      where: {
-        idAsignacion: { in: idsAsignaciones },
-        reconocidoEn: null,
-      },
-      data: { reconocidoEn: new Date() },
+      where: { idAsignacion: { in: idsAsignaciones }, reconocidoEn: null },
+      data: { reconocidoEn },
     });
 
     if (marcado.count !== idsAsignaciones.length) {
@@ -210,72 +346,61 @@ export class HoursRecognitionService {
 
     let horasParticipacion;
     if (existente) {
-      horasParticipacion = await tx.horasParticipacion.update({
-        where: { idRegistroHoras: existente.idRegistroHoras },
-        data: { horasCalculadas: { increment: totalDecimal } },
-      });
-    } else {
-      try {
-        horasParticipacion = await tx.horasParticipacion.create({
-          data: {
-            idParticipacion: participationId,
-            idSprint: sprintId,
-            periodoInicio: hoy,
-            periodoFin: hoy,
-            horasReportadas: totalDecimal,
-            horasCalculadas: totalDecimal,
-          },
-        });
-      } catch (error) {
-        if (!this.isHorasParticipacionSprintCollision(error)) {
-          throw error;
-        }
-        // Otra transacción creó la fila (idParticipacion, idSprint)
-        // concurrentemente entre nuestro findFirst y este create — se
-        // convierte en un increment sobre la fila ganadora, en vez de
-        // propagar el P2002 crudo.
-        const ganadora = await tx.horasParticipacion.findFirstOrThrow({
-          where: { idParticipacion: participationId, idSprint: sprintId },
-        });
-        horasParticipacion = await tx.horasParticipacion.update({
-          where: { idRegistroHoras: ganadora.idRegistroHoras },
-          data: { horasCalculadas: { increment: totalDecimal } },
+      if (existente.estadoHoras !== 'PENDIENTE') {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'AGREGADO_NO_PENDIENTE',
+          message: 'El agregado de horas de esta participación ya no está pendiente',
+          idRegistroHoras: existente.idRegistroHoras,
         });
       }
+      if (existente.horasCalculadas === null) {
+        // Fila legacy sin procedencia: no se sabe qué compone su total, así
+        // que incrementarla mezclaría un cálculo nuevo con un origen opaco.
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'AGREGADO_LEGACY_SIN_PROCEDENCIA',
+          message: 'El agregado existente no tiene procedencia calculada y no puede incrementarse',
+          idRegistroHoras: existente.idRegistroHoras,
+        });
+      }
+      // §8: en reconocimientos sucesivos se incrementan AMBAS columnas.
+      horasParticipacion = await tx.horasParticipacion.update({
+        where: { idRegistroHoras: existente.idRegistroHoras },
+        data: {
+          horasReportadas: { increment: horasReportadas },
+          horasCalculadas: { increment: horasPropuestas },
+        },
+      });
+    } else {
+      // C078 (§12/§16): bajo el lock del proyecto no existe carrera normal de
+      // primera creación, así que un P2002 aquí es inesperado y debe abortar
+      // TODA la transacción. No se captura: PostgreSQL ya marcó la tx como
+      // fallida, y cualquier consulta posterior dentro de ella solo produce un
+      // error opaco de «transacción abortada» que oculta la causa real. El
+      // índice único parcial sigue protegiendo la cardinalidad; la
+      // idempotencia la da el CAS de `reconocidoEn`, no este catch.
+      horasParticipacion = await tx.horasParticipacion.create({
+        data: {
+          idParticipacion: participationId,
+          // Nunca una fila con idSprint NULL (§8).
+          idSprint: sprintId,
+          periodoInicio: hoy,
+          periodoFin: hoy,
+          horasReportadas,
+          horasCalculadas: horasPropuestas,
+          // horasAprobadas/fechaAprobacion/aprobadoPor NO se tocan:
+          // reconocer no es acreditar. Solo approveClosure acredita (§31).
+        },
+      });
     }
 
     return {
       horasReconocidas,
+      horasReportadas,
+      horasPropuestas,
       idsAsignacionesReconocidas: idsAsignaciones,
       horasParticipacion,
     };
-  }
-
-  /**
-   * Reconoce específicamente la violación del índice único parcial
-   * `horas_participacion_sprint_unique` (idParticipacion, idSprint) — mismo
-   * criterio estrecho que `SprintsService.isOperableSprintCollision`: no
-   * basta `code === 'P2002'`, se exige además modelo HorasParticipacion y
-   * ambas columnas del target. Cualquier otro P2002 (u otro código) se
-   * relanza sin cambios.
-   */
-  private isHorasParticipacionSprintCollision(error: unknown): boolean {
-    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
-      return false;
-    }
-    if (error.code !== 'P2002') {
-      return false;
-    }
-
-    const modelName = error.meta?.modelName;
-    const target = error.meta?.target;
-
-    return (
-      modelName === 'HorasParticipacion' &&
-      Array.isArray(target) &&
-      target.length === 2 &&
-      target.includes('id_participacion') &&
-      target.includes('id_sprint')
-    );
   }
 }

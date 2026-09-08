@@ -12,6 +12,7 @@ import {
   Flag,
   History,
   ListChecks,
+  Lock,
   MessageCircle,
   Users,
 } from 'lucide-react';
@@ -346,6 +347,9 @@ function SprintDetailContent({
   const estiloEstado = ESTADO_SPRINT_STYLE[detail.estado];
   const hitosPorId = new Map(detail.hitos.map((hito) => [hito.idHito, hito.tituloHito]));
   const participantes = agruparParticipantes(detail.tareas);
+  // S7 (VIEW-11): un Sprint CERRADO es histórico para todos los roles. Las
+  // horas acreditadas viven en el resumen de cierre (read-only en ese estado).
+  const cerrado = detail.estado === 'CERRADO';
 
   return (
     <div className="space-y-6">
@@ -361,20 +365,42 @@ function SprintDetailContent({
               {estiloEstado.label}
             </span>
           </div>
-          <Button
-            asChild
-            variant="outline"
-            className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-          >
-            <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/analytics`}>
-              <BarChart3 className="size-3.5" aria-hidden="true" />
-              Ver analítica
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {cerrado && (
+              <Button
+                asChild
+                variant="outline"
+                className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
+              >
+                <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/finalizar`}>
+                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                  Horas acreditadas
+                </Link>
+              </Button>
+            )}
+            <Button
+              asChild
+              variant="outline"
+              className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
+            >
+              <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/analytics`}>
+                <BarChart3 className="size-3.5" aria-hidden="true" />
+                Ver analítica
+              </Link>
+            </Button>
+          </div>
         </div>
         <p className="mt-2 text-sm text-tertiary">
-          Resumen histórico del trabajo, las contribuciones y los hitos de este Sprint.
+          {cerrado
+            ? 'Resumen histórico del sprint y sus contribuciones registradas.'
+            : 'Resumen histórico del trabajo, las contribuciones y los hitos de este Sprint.'}
         </p>
+        {cerrado && (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-tertiary">
+            <Lock className="size-3.5" aria-hidden="true" />
+            Sprint cerrado: vista de solo lectura. Las horas acreditadas se consultan en el resumen de cierre.
+          </p>
+        )}
 
         {/* METADATA HISTÓRICA — solo campos que el DTO realmente entrega */}
         <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-outline-variant/30 pt-4 text-sm">

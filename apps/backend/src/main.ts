@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 import { getFrontendUrl } from './common/utils/cookie';
@@ -7,6 +8,7 @@ const cookieParser = require('cookie-parser');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
   app.setGlobalPrefix('api');
 
   // Security headers
@@ -33,7 +35,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = process.env.PORT ?? 3001;
+  const port = configService.get<number>('app.port', 3001);
   await app.listen(port);
   Logger.log(`Backend running on port ${port}`, 'Bootstrap');
 }

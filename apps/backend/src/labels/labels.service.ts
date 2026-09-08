@@ -4,8 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { CreateLabelDto } from './dto/create-label.dto';
 import { UpdateLabelDto } from './dto/update-label.dto';
 
@@ -23,9 +29,26 @@ const LABEL_SELECT = {
   color: true,
 } as const;
 
+/**
+ * C035 (06 v2 §32): eliminar o renombrar una etiqueta que conserva un vínculo
+ * con una tarea de un Sprint cerrado responde 409 sin aplicar ningún cambio;
+ * la historia cerrada no se reescribe.
+ */
+export const LABEL_CLOSED_LINK_MESSAGE =
+  'La etiqueta está vinculada a tareas de un Sprint cerrado y no puede eliminarse ni renombrarse';
+
+/**
+ * C035 (06 v2 §16/§32): cada escritura corre en `ProjectTransactionService.run`
+ * (lock del proyecto primero, hijos después) y declara su familia de política.
+ * La comprobación de vínculos históricos se hace dentro del lock.
+ */
 @Injectable()
 export class LabelsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+  ) {}
 
   /**
    * Fuente única del cálculo de `Etiqueta.nombreNormalizado` (Tarea 30).
@@ -54,79 +77,97 @@ export class LabelsService {
 
   /**
    * POST: exclusivo del líder. Orden: proyecto válido → liderazgo →
-   * normalización → creación. El nombre visible ya llega recortado por
-   * CreateLabelDto; no se vuelve a transformar aquí.
+   * política → normalización → creación, todo bajo el lock del proyecto. El
+   * nombre visible ya llega recortado por CreateLabelDto; no se vuelve a
+   * transformar aquí.
    */
   async create(projectId: number, userId: number, dto: CreateLabelDto) {
-    await this.assertProjectLeader(projectId, userId);
-    const nombreNormalizado = this.normalizeName(dto.nombreEtiqueta);
+    return this.projectTx.run(projectId, userId, 'labels.create', async (ctx) => {
+      const { tx } = ctx;
+      await this.assertProjectLeader(projectId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_CRUD', userId);
+      const nombreNormalizado = this.normalizeName(dto.nombreEtiqueta);
 
-    try {
-      return await this.prisma.etiqueta.create({
-        data: {
-          idProyecto: projectId,
-          nombreEtiqueta: dto.nombreEtiqueta,
-          nombreNormalizado,
-          color: dto.color,
-        },
-        select: LABEL_SELECT,
-      });
-    } catch (error) {
-      throw this.translateUniqueCollisionOrRethrow(error);
-    }
+      try {
+        return await tx.etiqueta.create({
+          data: {
+            idProyecto: projectId,
+            nombreEtiqueta: dto.nombreEtiqueta,
+            nombreNormalizado,
+            color: dto.color,
+          },
+          select: LABEL_SELECT,
+        });
+      } catch (error) {
+        throw this.translateUniqueCollisionOrRethrow(error);
+      }
+    });
   }
 
   /**
    * PATCH: exclusivo del líder. Orden: proyecto válido → liderazgo →
-   * etiqueta perteneciente al proyecto (consulta única con idEtiqueta +
-   * idProyecto, para que una etiqueta de otro proyecto sea indistinguible
-   * de una inexistente) → operación. Un DTO vacío ({}) no escribe: devuelve
-   * la etiqueta actual con el contrato público, sin lanzar 400.
+   * política → etiqueta perteneciente al proyecto (consulta única con
+   * idEtiqueta + idProyecto, para que una etiqueta de otro proyecto sea
+   * indistinguible de una inexistente) → operación. Un DTO vacío ({}) no
+   * escribe: devuelve la etiqueta actual con el contrato público, sin lanzar
+   * 400. C035: renombrar una etiqueta con vínculos en Sprint cerrado → 409
+   * sin cambios; el color no altera la identidad histórica.
    */
   async update(projectId: number, labelId: number, userId: number, dto: UpdateLabelDto) {
-    await this.assertProjectLeader(projectId, userId);
-    const actual = await this.getLabelInProjectOrThrow(projectId, labelId);
+    return this.projectTx.run(projectId, userId, 'labels.update', async (ctx) => {
+      const { tx } = ctx;
+      await this.assertProjectLeader(projectId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_CRUD', userId);
+      const actual = await this.getLabelInProjectOrThrow(projectId, labelId, tx);
 
-    if (dto.nombreEtiqueta === undefined && dto.color === undefined) {
-      return actual;
-    }
+      if (dto.nombreEtiqueta === undefined && dto.color === undefined) {
+        return actual;
+      }
 
-    const data: Prisma.EtiquetaUpdateInput = {};
-    if (dto.nombreEtiqueta !== undefined) {
-      data.nombreEtiqueta = dto.nombreEtiqueta;
-      data.nombreNormalizado = this.normalizeName(dto.nombreEtiqueta);
-    }
-    if (dto.color !== undefined) {
-      data.color = dto.color;
-    }
+      const data: Prisma.EtiquetaUpdateInput = {};
+      if (dto.nombreEtiqueta !== undefined) {
+        if (dto.nombreEtiqueta !== actual.nombreEtiqueta) {
+          await this.assertNoClosedLinks(tx, labelId);
+        }
+        data.nombreEtiqueta = dto.nombreEtiqueta;
+        data.nombreNormalizado = this.normalizeName(dto.nombreEtiqueta);
+      }
+      if (dto.color !== undefined) {
+        data.color = dto.color;
+      }
 
-    try {
-      return await this.prisma.etiqueta.update({
-        where: { idEtiqueta: labelId },
-        data,
-        select: LABEL_SELECT,
-      });
-    } catch (error) {
-      throw this.translateUniqueCollisionOrRethrow(error);
-    }
+      try {
+        return await tx.etiqueta.update({
+          where: { idEtiqueta: labelId },
+          data,
+          select: LABEL_SELECT,
+        });
+      } catch (error) {
+        throw this.translateUniqueCollisionOrRethrow(error);
+      }
+    });
   }
 
   /**
    * DELETE: exclusivo del líder. Orden: proyecto válido → liderazgo →
-   * etiqueta perteneciente al proyecto → transacción. Las filas
-   * TareaEtiqueta se borran explícitamente antes de la etiqueta (misma
-   * `tx`, con rollback total ante cualquier fallo) para dejar la intención
-   * explícita, aunque la FK `tarea_etiqueta_id_etiqueta_fkey` ya declara
-   * `ON DELETE CASCADE` (verificado en la migración
-   * 20260720044028_migrate_tasks_labels_assignments). Nunca toca `Tarea`.
-   * No es idempotente: una segunda eliminación no encuentra la etiqueta en
-   * `getLabelInProjectOrThrow` y responde 404.
+   * política → etiqueta perteneciente al proyecto → vínculos históricos →
+   * borrado, todo bajo el lock del proyecto. Las filas TareaEtiqueta se
+   * borran explícitamente antes de la etiqueta (misma `tx`, con rollback
+   * total ante cualquier fallo) para dejar la intención explícita, aunque la
+   * FK `tarea_etiqueta_id_etiqueta_fkey` ya declara `ON DELETE CASCADE`
+   * (verificado en la migración 20260720044028_migrate_tasks_labels_assignments).
+   * Nunca toca `Tarea`. No es idempotente: una segunda eliminación no
+   * encuentra la etiqueta en `getLabelInProjectOrThrow` y responde 404. C035:
+   * un vínculo con una tarea de Sprint cerrado → 409 sin cambios.
    */
   async remove(projectId: number, labelId: number, userId: number): Promise<void> {
-    await this.assertProjectLeader(projectId, userId);
-    await this.getLabelInProjectOrThrow(projectId, labelId);
+    await this.projectTx.run(projectId, userId, 'labels.remove', async (ctx) => {
+      const { tx } = ctx;
+      await this.assertProjectLeader(projectId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_CRUD', userId);
+      await this.getLabelInProjectOrThrow(projectId, labelId, tx);
+      await this.assertNoClosedLinks(tx, labelId);
 
-    await this.prisma.$transaction(async (tx) => {
       await tx.tareaEtiqueta.deleteMany({ where: { idEtiqueta: labelId } });
       await tx.etiqueta.delete({ where: { idEtiqueta: labelId } });
     });
@@ -134,14 +175,15 @@ export class LabelsService {
 
   /**
    * PUT /proyectos/:projectId/tareas/:taskId/etiquetas/:labelId. Exclusivo
-   * del líder. Toda la operación (validaciones incluidas) corre dentro de
-   * una única transacción interactiva, con el mismo `tx` en cada paso, para
-   * que proyecto/liderazgo/tarea/etiqueta se lean con la misma vista que la
+   * del líder. Toda la operación (validaciones incluidas) corre dentro del
+   * `run` del proyecto, con el mismo `tx` en cada paso, para que
+   * proyecto/liderazgo/tarea/etiqueta se lean con la misma vista que la
    * escritura final. Orden: proyecto válido → liderazgo → tarea activa en
-   * el proyecto → etiqueta en el proyecto → asociación. `upsert` sobre la
-   * clave compuesta real (`idTarea_idEtiqueta`) es la única protección
-   * necesaria contra duplicados, incluso con dos solicitudes concurrentes:
-   * nunca se usa `findFirst` seguido de `create`.
+   * el proyecto → política (P/E, Sprint ACTIVO, tarea en Sprint ACTIVO) →
+   * etiqueta en el proyecto → asociación. `upsert` sobre la clave compuesta
+   * real (`idTarea_idEtiqueta`) es la única protección necesaria contra
+   * duplicados, incluso con dos solicitudes concurrentes: nunca se usa
+   * `findFirst` seguido de `create`.
    */
   async attachToTask(
     projectId: number,
@@ -149,9 +191,13 @@ export class LabelsService {
     labelId: number,
     actorUserId: number,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    await this.projectTx.run(projectId, actorUserId, 'labels.attachToTask', async (ctx) => {
+      const { tx } = ctx;
       await this.assertProjectLeader(projectId, actorUserId, tx);
-      await this.getTaskInProjectOrThrow(projectId, taskId, tx);
+      const tarea = await this.getTaskInProjectOrThrow(projectId, taskId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_TAREA', actorUserId, {
+        sprintId: tarea.idSprint,
+      });
       await this.getLabelInProjectOrThrow(projectId, labelId, tx);
 
       await tx.tareaEtiqueta.upsert({
@@ -164,7 +210,7 @@ export class LabelsService {
 
   /**
    * DELETE /proyectos/:projectId/tareas/:taskId/etiquetas/:labelId.
-   * Exclusivo del líder; mismo orden de validación y misma transacción que
+   * Exclusivo del líder; mismo orden de validación y mismo `run` que
    * `attachToTask`. `deleteMany` filtrado por ambas claves (idTarea +
    * idEtiqueta) es idempotente por construcción: una asociación ausente
    * produce `count: 0` sin lanzar, nunca `P2025` (a diferencia de `delete`
@@ -177,15 +223,40 @@ export class LabelsService {
     labelId: number,
     actorUserId: number,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    await this.projectTx.run(projectId, actorUserId, 'labels.detachFromTask', async (ctx) => {
+      const { tx } = ctx;
       await this.assertProjectLeader(projectId, actorUserId, tx);
-      await this.getTaskInProjectOrThrow(projectId, taskId, tx);
+      const tarea = await this.getTaskInProjectOrThrow(projectId, taskId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_TAREA', actorUserId, {
+        sprintId: tarea.idSprint,
+      });
       await this.getLabelInProjectOrThrow(projectId, labelId, tx);
 
       await tx.tareaEtiqueta.deleteMany({
         where: { idTarea: taskId, idEtiqueta: labelId },
       });
     });
+  }
+
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
+
+  /**
+   * C035 (06 v2 §32): cuenta, dentro del lock, los vínculos de la etiqueta
+   * con tareas de un Sprint cerrado (incluidas tareas con soft delete: siguen
+   * siendo historia). Cualquier vínculo cerrado bloquea con 409 sin cambios.
+   */
+  private async assertNoClosedLinks(tx: TxClient, labelId: number): Promise<void> {
+    const vinculosCerrados = await tx.tareaEtiqueta.count({
+      where: { idEtiqueta: labelId, tarea: { sprint: { estado: EstadoSprint.CERRADO } } },
+    });
+    if (vinculosCerrados > 0) {
+      throw new ConflictException(LABEL_CLOSED_LINK_MESSAGE);
+    }
   }
 
   /**
@@ -298,7 +369,8 @@ export class LabelsService {
    * (más `proyecto.eliminadoEn: null` como defensa adicional), reproduciendo
    * el mismo contrato que `TasksContextService.getTaskInProjectOrThrow` sin
    * importar TasksModule. `tx` es obligatorio: este helper solo se invoca
-   * dentro de la transacción interactiva de attachToTask/detachFromTask.
+   * dentro del `run` de attachToTask/detachFromTask. C035: devuelve también
+   * `idSprint` para la exigencia de entidad (tarea en Sprint ACTIVO).
    */
   private async getTaskInProjectOrThrow(projectId: number, taskId: number, tx: TxClient) {
     const tarea = await tx.tarea.findFirst({
@@ -308,7 +380,7 @@ export class LabelsService {
         eliminadoEn: null,
         proyecto: { eliminadoEn: null },
       },
-      select: { idTarea: true },
+      select: { idTarea: true, idSprint: true },
     });
     if (!tarea) {
       throw new NotFoundException(

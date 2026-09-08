@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { ProjectWriteGuard } from '../common/guards/project-write.guard';
+import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
 import { SprintsModule } from '../sprints/sprints.module';
 import { ProgressRecordsController } from './progress-records.controller';
 import { ProgressRecordsService } from './progress-records.service';
 import { TasksContextService } from '../tasks/tasks-context.service';
 
 @Module({
-  imports: [SprintsModule],
+  imports: [ProjectPolicyModule, SprintsModule],
   controllers: [ProgressRecordsController],
-  providers: [ProgressRecordsService, TasksContextService, ProjectWriteGuard],
+  providers: [ProgressRecordsService, TasksContextService],
 })
 export class ProgressRecordsModule {}

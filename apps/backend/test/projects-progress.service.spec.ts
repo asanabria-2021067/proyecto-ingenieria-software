@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cache } from 'cache-manager';
 import { ProjectsService } from '../src/projects/projects.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 
@@ -73,6 +78,9 @@ function makeService(prisma: unknown) {
     prisma as unknown as PrismaService,
     {} as unknown as NotificationsService,
     {} as unknown as Cache,
+    makeProjectTransactionDouble({ tx: {} }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 }
 

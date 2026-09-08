@@ -52,7 +52,7 @@ import {
   paginateTasks,
   searchTasks,
   sortTasks,
-  type CampoOrden,
+  type CriterioOrdenTarea,
   type DireccionOrden,
 } from '@/lib/tasks/filters';
 import type { EstadoTarea, Prioridad, TareaPublicaDTO } from '@/lib/types/tasks';
@@ -64,7 +64,7 @@ interface Props {
 const TAMANO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
 
-const OPCIONES_ORDEN: { value: string; label: string; campo: CampoOrden; direccion: DireccionOrden }[] = [
+const OPCIONES_ORDEN: { value: string; label: string; campo: CriterioOrdenTarea; direccion: DireccionOrden }[] = [
   { value: 'fechaLimite:asc', label: 'Fecha límite: más próxima primero', campo: 'fechaLimite', direccion: 'asc' },
   { value: 'fechaLimite:desc', label: 'Fecha límite: más lejana primero', campo: 'fechaLimite', direccion: 'desc' },
   { value: 'prioridad:asc', label: 'Prioridad: alta primero', campo: 'prioridad', direccion: 'asc' },
@@ -138,11 +138,11 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
     const porTexto = searchTasks(tasks, busqueda);
     const porEstado = filterTasksByStatus(
       porTexto,
-      estadoFiltro === FILTRO_TODOS ? undefined : estadoFiltro,
+      estadoFiltro === FILTRO_TODOS ? undefined : (estadoFiltro as EstadoTarea),
     );
     const porPrioridad = filterTasksByPriority(
       porEstado,
-      prioridadFiltro === FILTRO_TODOS ? undefined : prioridadFiltro,
+      prioridadFiltro === FILTRO_TODOS ? undefined : (prioridadFiltro as Prioridad),
     );
     return sortTasks(porPrioridad, ordenActivo.campo, ordenActivo.direccion);
   }, [tasks, busqueda, estadoFiltro, prioridadFiltro, ordenActivo]);
@@ -431,21 +431,21 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={paginado.page <= 1}
+                disabled={paginado.pagina <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 aria-label="Página anterior"
               >
                 Anterior
               </Button>
               <span className="text-xs font-medium text-tertiary" aria-live="polite">
-                Página {paginado.page} de {paginado.totalPages}
+                Página {paginado.pagina} de {paginado.totalPaginas}
               </span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={paginado.page >= paginado.totalPages}
-                onClick={() => setPage((p) => Math.min(paginado.totalPages, p + 1))}
+                disabled={paginado.pagina >= paginado.totalPaginas}
+                onClick={() => setPage((p) => Math.min(paginado.totalPaginas, p + 1))}
                 aria-label="Página siguiente"
               >
                 Siguiente

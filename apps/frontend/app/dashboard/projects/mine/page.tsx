@@ -80,6 +80,8 @@ export default function MyProjectsPage() {
   const participoFiltrados = proyectosParticipo.filter((p) => !idsPropios.has(p.idProyecto));
 
   async function handleDelete(proyecto: MiProyectoListItemDTO) {
+    // S7 (VIEW-09): un proyecto CERRADO es solo consulta; nunca se elimina.
+    if (proyecto.estadoProyecto === 'CERRADO') return;
     const result = await uvgSwal.fire({
       icon: 'warning',
       title: 'Eliminar proyecto',
@@ -126,6 +128,7 @@ export default function MyProjectsPage() {
     })
     .sort((a, b) => (ESTADO_ORDEN[a.estadoProyecto] ?? 99) - (ESTADO_ORDEN[b.estadoProyecto] ?? 99));
   const hasActiveFilters = Boolean(busqueda || tipoFiltro || estadoFiltro);
+  const cerrados = filtrados.filter((p) => p.estadoProyecto === 'CERRADO').length;
 
   const limpiarFiltros = () => {
     setBusqueda('');
@@ -283,6 +286,12 @@ export default function MyProjectsPage() {
           </Empty>
         )}
 
+        {!isLoading && !isError && filtrados.length > 0 && cerrados > 0 && (
+          <p className="mb-3 text-[13px] text-tertiary" role="note">
+            {cerrados === 1 ? '1 proyecto cerrado' : `${cerrados} proyectos cerrados`}: solo consulta, con sus horas ya acreditadas.
+          </p>
+        )}
+
         {!isLoading && !isError && filtrados.length > 0 && (
           <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
             {filtrados.map((proyecto) => (
@@ -290,7 +299,7 @@ export default function MyProjectsPage() {
                 key={proyecto.idProyecto}
                 context="mine"
                 proyecto={proyecto}
-                onDelete={() => handleDelete(proyecto)}
+                onDelete={proyecto.estadoProyecto === 'CERRADO' ? undefined : () => handleDelete(proyecto)}
               />
             ))}
           </div>

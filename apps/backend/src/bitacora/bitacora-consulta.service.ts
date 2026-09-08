@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BitacoraContextService } from './bitacora-context.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { TipoEntidadBitacora, TipoEventoBitacora, TipoEventoBitacoraValor } from './tipos-evento-bitacora';
 import { BitacoraPaginadaDto, EventoBitacoraDto, FiltrosBitacoraInput } from './dto/bitacora-evento.dto';
 
@@ -38,14 +39,26 @@ export class BitacoraConsultaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bitacoraContext: BitacoraContextService,
+    private readonly readPolicy: ProjectReadPolicyService,
   ) {}
 
+  /**
+   * C048 (06 v2 §34/§43/§41 E091): la audiencia la decide la política de
+   * lectura con scope `bitacora` —líder actual y administrador, nunca un
+   * participante— en un solo lugar, en vez de repetir la regla aquí. Los
+   * filtros de la consulta y el contrato de HU-D3 se conservan intactos, y el
+   * módulo no gana ningún writer por esta lectura.
+   */
   async listEventos(
     projectId: number,
     userId: number,
     filtros: FiltrosBitacoraInput,
   ): Promise<BitacoraPaginadaDto> {
-    await this.bitacoraContext.assertProjectLeader(projectId, userId);
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'bitacora',
+    });
 
     const { idSprint, idActor, tipoEvento, page, limit } = filtros;
 

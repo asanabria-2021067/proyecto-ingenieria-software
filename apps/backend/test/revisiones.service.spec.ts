@@ -4,20 +4,24 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { RevisionesService } from '../src/revisiones/revisiones.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
+/**
+ * C039: reclamar/resolver corren dentro del `run` del protocolo; el doble del
+ * runner entrega este mismo mock como `tx`, por lo que todas las escrituras
+ * de la transición se observan en los delegates raíz.
+ */
 function makePrisma() {
-  const defaultTx = {
-    revisionProyecto: { update: vi.fn() },
-    proyecto: { update: vi.fn(), findUnique: vi.fn() },
-    notificacion: { create: vi.fn() },
-  };
-
   return {
     revisionProyecto: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    revisionCierreProyecto: { findMany: vi.fn().mockResolvedValue([{ idRevisionCierre: 2 }]) },
     proyecto: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     usuario: { findUnique: vi.fn() },
     notificacion: { create: vi.fn() },
-    $transaction: vi.fn(async (cb: (tx: typeof defaultTx) => unknown) => cb(defaultTx)),
   };
 }
 
@@ -28,6 +32,9 @@ function makeService(
   return new RevisionesService(
     prisma as unknown as PrismaService,
     notifications as unknown as NotificationsService,
+    makeProjectTransactionDouble({ tx: prisma }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 }
 
@@ -85,15 +92,8 @@ describe('RevisionesService', () => {
   it('resolver actualiza revision y proyecto', async () => {
     const prisma = makePrisma();
     prisma.revisionProyecto.findFirst.mockResolvedValue({ idRevisionProyecto: 4, idRevisor: 7 });
-    const tx = {
-      revisionProyecto: { update: vi.fn().mockResolvedValue({ idRevisionProyecto: 4, estadoRevision: 'APROBADA' }) },
-      proyecto: {
-        update: vi.fn(),
-        findUnique: vi.fn().mockResolvedValue({ creadoPor: 2, tituloProyecto: 'Proyecto' }),
-      },
-      notificacion: { create: vi.fn() },
-    };
-    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as typeof prisma.$transaction;
+    prisma.revisionProyecto.update.mockResolvedValue({ idRevisionProyecto: 4, estadoRevision: 'APROBADA' });
+    prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: 2, tituloProyecto: 'Proyecto' });
     const notifications = {
       isAdmin: vi.fn().mockResolvedValue(true),
       notifyFromTemplate: vi.fn(),
@@ -103,12 +103,13 @@ describe('RevisionesService', () => {
     const result = await service.resolver(1, 7, { resultado: 'APROBADA', comentario: '' });
 
     expect(result.estadoProyecto).toBe(EstadoProyecto.PUBLICADO);
-    expect(tx.proyecto.update).toHaveBeenCalled();
+    // C039: la transición escribe sobre el `tx` del run (aquí, el mismo mock).
+    expect(prisma.proyecto.update).toHaveBeenCalled();
     expect(notifications.notifyFromTemplate).toHaveBeenCalledWith(
       [2],
       'PROYECTO_APROBADO',
       expect.objectContaining({ projectId: 1, revisionId: 4 }),
-      tx,
+      prisma,
     );
   });
 

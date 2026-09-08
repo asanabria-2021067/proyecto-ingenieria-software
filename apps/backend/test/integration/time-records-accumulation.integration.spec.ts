@@ -1,5 +1,6 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
@@ -19,6 +20,10 @@ import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
 import { TimeRecordsService } from '../../src/time-records/time-records.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 function decimalToNumber(value: unknown): number {
   return Number(value);
@@ -32,13 +37,22 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     {} as unknown as TasksRelationsService,
     {} as unknown as NotificationsService,
     new TasksContextService(prismaService),
-  );
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
 }
 
 function makeTimeRecordsService(prisma: PrismaClient): TimeRecordsService {
   const prismaService = prisma as unknown as PrismaService;
   const notifications = { notifyTaskHoursLogged: async () => undefined } as unknown as NotificationsService;
-  return new TimeRecordsService(prismaService, new TasksContextService(prismaService), notifications);
+  return new TimeRecordsService(
+    prismaService,
+    new TasksContextService(prismaService),
+    notifications,
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService),
+  );
 }
 
 function longContent(label: string): string {
@@ -89,7 +103,7 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const assignee = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, assignee.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, assignee.idUsuario);
@@ -143,7 +157,7 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const otro = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, assignee.idUsuario, otro.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, assignee.idUsuario);
@@ -186,7 +200,7 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const assignee = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, assignee.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, assignee.idUsuario);
@@ -216,7 +230,6 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     });
 
     await tasks.closeAssignment(project.idProyecto, task.idTarea, assignment.idAsignacion, assignee.idUsuario, {
-      horasReales: 99,
       contenidoAvance: longContent('cierre manual ignora el acumulado granular'),
       marcarComoHecha: false,
     });
@@ -251,7 +264,7 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const userA = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, userA.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const { role, participation } = await createActiveParticipant(prisma, project.idProyecto, userA.idUsuario);
@@ -270,7 +283,6 @@ describeIntegration('HU-142 (T-170) acumulación e inmutabilidad de RegistroTiem
     const tramo1 = await createIntegrationTaskAssignment(prisma, task.idTarea, userA.idUsuario, leader.idUsuario);
     await timeRecords.create(project.idProyecto, task.idTarea, userA.idUsuario, { horas: 3, fecha: '2026-08-10' });
     await tasks.closeAssignment(project.idProyecto, task.idTarea, tramo1.idAsignacion, userA.idUsuario, {
-      horasReales: 3,
       contenidoAvance: longContent('tramo 1 cerrado'),
       marcarComoHecha: false,
     });

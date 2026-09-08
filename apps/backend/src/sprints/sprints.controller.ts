@@ -1,27 +1,52 @@
 import {
-  Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ProjectWriteGuard } from '../common/guards/project-write.guard';
+import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { SprintsService } from './sprints.service';
-import { AdjustRecognizedHoursDto } from './dto/adjust-recognized-hours.dto';
+
+/**
+ * C045 (06 v2 §32/§41 E060–E062): ciclo de vida del Sprint. El proyecto se
+ * resuelve desde `params.projectId` y las tres operaciones exigen P/E; el
+ * ambiente distingue cada una: iniciar solo sin Sprint operable, finalizar
+ * con un Sprint ACTIVO y cerrar con uno EN_FINALIZACION.
+ */
+const SPRINT_START: ProjectWriteMetadata = {
+  source: { kind: 'param', name: 'projectId' },
+  states: ['P', 'E'],
+  sprint: 'NONE_OPERABLE',
+  family: 'SPRINT_START',
+};
+const SPRINT_FINALIZE: ProjectWriteMetadata = {
+  ...SPRINT_START,
+  sprint: 'ACTIVO',
+  family: 'SPRINT_FINALIZE',
+};
+const SPRINT_CLOSE: ProjectWriteMetadata = {
+  ...SPRINT_START,
+  sprint: 'EN_FINALIZACION',
+  family: 'SPRINT_CLOSE',
+};
 
 @Controller('proyectos/:projectId/sprints')
 @UseGuards(JwtAuthGuard)
 export class SprintsController {
   constructor(private readonly sprintsService: SprintsService) {}
 
+  /** E060: iniciar Sprint (líder, sin Sprint operable). */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(SPRINT_START)
   start(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
@@ -29,8 +54,11 @@ export class SprintsController {
     return this.sprintsService.startSprint(projectId, user.userId);
   }
 
+  /** E061: finalizar el Sprint ACTIVO. */
   @Post(':sprintId/finalizar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(SPRINT_FINALIZE)
   finalize(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('sprintId', ParseIntPipe) sprintId: number,
@@ -39,8 +67,11 @@ export class SprintsController {
     return this.sprintsService.finalizeSprint(projectId, sprintId, user.userId);
   }
 
+  /** E062: cerrar el Sprint EN_FINALIZACION. */
   @Post(':sprintId/cerrar')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(SPRINT_CLOSE)
   close(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('sprintId', ParseIntPipe) sprintId: number,
@@ -49,24 +80,7 @@ export class SprintsController {
     return this.sprintsService.closeSprint(projectId, sprintId, user.userId);
   }
 
-  @Patch(':sprintId/horas/:participacionId')
-  @HttpCode(HttpStatus.OK)
-  adjustHours(
-    @Param('projectId', ParseIntPipe) projectId: number,
-    @Param('sprintId', ParseIntPipe) sprintId: number,
-    @Param('participacionId', ParseIntPipe) participacionId: number,
-    @Body() dto: AdjustRecognizedHoursDto,
-    @CurrentUser() user: { userId: number },
-  ) {
-    return this.sprintsService.adjustRecognizedHours(
-      projectId,
-      sprintId,
-      participacionId,
-      user.userId,
-      dto,
-    );
-  }
-
+  /** E066: resumen de cierre (líder actual mientras el Sprint no esté cerrado). */
   @Get(':sprintId/resumen-cierre')
   @HttpCode(HttpStatus.OK)
   getClosingSummary(
@@ -77,6 +91,18 @@ export class SprintsController {
     return this.sprintsService.getSprintClosingSummary(projectId, sprintId, user.userId);
   }
 
+  /** E069: detalle de cierre de un integrante concreto dentro del Sprint. */
+  @Get(':sprintId/resumen-cierre/miembros/:userId')
+  @HttpCode(HttpStatus.OK)
+  getClosingMemberDetail(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Param('userId', ParseIntPipe) userId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.getSprintMemberDetail(projectId, sprintId, userId, user.userId);
+  }
+
   /**
    * T-173: registrada ANTES de `detail(':sprintId')` a propósito — Nest/Express
    * matchea rutas en orden de registro, y `analytics` (segmento literal)
@@ -85,6 +111,7 @@ export class SprintsController {
    * con `sprintId='analytics'`, que `ParseIntPipe` rechazaría con 400 en vez
    * de resolver la analítica comparativa.
    */
+  /** E068: analítica comparativa; el ámbito por actor se aplica en la consulta. */
   @Get('analytics')
   @HttpCode(HttpStatus.OK)
   getComparativeAnalytics(
@@ -94,6 +121,7 @@ export class SprintsController {
     return this.sprintsService.getSprintsAnalytics(projectId, user.userId);
   }
 
+  /** E064: lista de Sprints con el alcance por actor (§34). */
   @Get()
   @HttpCode(HttpStatus.OK)
   list(
@@ -103,6 +131,7 @@ export class SprintsController {
     return this.sprintsService.listSprints(projectId, user.userId);
   }
 
+  /** E065: detalle de un Sprint; ACTIVO/EN_FINALIZACION solo para el líder. */
   @Get(':sprintId')
   @HttpCode(HttpStatus.OK)
   detail(
@@ -114,6 +143,7 @@ export class SprintsController {
   }
 
   /** T-172: `:sprintId/analytics` nunca colisiona con `:sprintId` (arriba) — distinto número de segmentos, el orden entre ambas es irrelevante. */
+  /** E067: analítica de un Sprint con el mismo alcance por actor. */
   @Get(':sprintId/analytics')
   @HttpCode(HttpStatus.OK)
   getAnalytics(

@@ -15,6 +15,10 @@ import { SprintsContextService } from '../../src/sprints/sprints-context.service
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real A9: SprintsService.closeSprint (EN_FINALIZACION ->
@@ -95,7 +99,9 @@ describeIntegration(
         context,
         authorization,
         makeNotificationsSpy() as unknown as NotificationsService,
-      );
+        new ProjectTransactionService(prismaParaTransaccion as unknown as PrismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
+        new ProjectReadPolicyService(prisma as unknown as PrismaService));
     }
 
     beforeAll(async () => {
@@ -127,7 +133,7 @@ describeIntegration(
     it('A. cierre exitoso: EN_FINALIZACION -> CERRADO, persiste fechaCierre y cerradoPor = líder', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
       scope.sprintIds = [sprint.idSprint];
@@ -147,7 +153,7 @@ describeIntegration(
     it('B. rollback real: la excepción inyectada DESPUÉS del UPDATE real revierte el Sprint a EN_FINALIZACION en PostgreSQL', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
       scope.sprintIds = [sprint.idSprint];
@@ -195,7 +201,7 @@ describeIntegration(
     it('C. CERRADO es terminal: un segundo cierre y un intento de finalizeSprint posterior fallan, el estado sigue CERRADO', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
       scope.sprintIds = [sprint.idSprint];
@@ -219,7 +225,7 @@ describeIntegration(
     it('D. preservación de horas A7: horasCalculadas/horasAprobadas/justificacionAjuste sobreviven exactamente iguales al cierre', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
       scope.sprintIds = [sprint.idSprint];
@@ -252,7 +258,7 @@ describeIntegration(
     it('E. A9.1: SPRINT_CLOSED se emite exactamente una vez tras un cierre real, con el payload correcto', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
       scope.sprintIds = [sprint.idSprint];
@@ -274,7 +280,9 @@ describeIntegration(
         context,
         authorization,
         notifications as unknown as NotificationsService,
-      );
+        new ProjectTransactionService(prisma as unknown as PrismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
+        new ProjectReadPolicyService(prisma as unknown as PrismaService));
 
       await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
 
@@ -289,7 +297,7 @@ describeIntegration(
     it('F. A9.1: si la transacción hace rollback real, SPRINT_CLOSED nunca se emite', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
       const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
       scope.sprintIds = [sprint.idSprint];
@@ -311,7 +319,9 @@ describeIntegration(
         context,
         authorization,
         notifications as unknown as NotificationsService,
-      );
+        new ProjectTransactionService(rollbackPrisma),
+        new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
+        new ProjectReadPolicyService(prisma as unknown as PrismaService));
 
       await expect(
         service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario),

@@ -1,32 +1,73 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException, ConflictException, type ExecutionContext } from '@nestjs/common';
-import type { SprintsContextService } from '../src/sprints/sprints-context.service';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  type ExecutionContext,
+} from '@nestjs/common';
+import type { Reflector } from '@nestjs/core';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import { ProjectIdResolverService } from '../src/common/project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../src/common/project-policy/project-policy.service';
 import {
   ProjectWriteGuard,
   NO_ACTIVE_SPRINT_MESSAGE,
   FINALIZING_SPRINT_MESSAGE,
 } from '../src/common/guards/project-write.guard';
+import type { ProjectWriteMetadata } from '../src/common/guards/project-write.metadata';
 
-function makeSprintsContext() {
-  return { getCurrentSprint: vi.fn() } as unknown as SprintsContextService & {
-    getCurrentSprint: ReturnType<typeof vi.fn>;
+/**
+ * Sprint 7 (C027): el guard pasa a ser guiado por metadata explícita
+ * (`@ProjectWrite`) resuelta por el resolutor enumerado; sin metadata aplica
+ * el default restrictivo (P/E + Sprint ambiente ACTIVO). Estos casos
+ * conservan exactamente los rechazos observables anteriores (sin Sprint
+ * operable, EN_FINALIZACION, projectId inválido) sobre el nuevo contrato.
+ */
+interface SprintRow {
+  idSprint: number;
+  idProyecto: number;
+  estado: string;
+}
+
+function makeGuard(options: {
+  sprint: SprintRow | null;
+  project?: { idProyecto: number; estadoProyecto: string; creadoPor: number; eliminadoEn: Date | null } | null;
+  metadata?: ProjectWriteMetadata;
+}) {
+  const prisma = {
+    proyecto: {
+      // El doble devuelve la fila del proyecto consultado (mismo id que el resuelto), como la base real.
+      findUnique: vi.fn().mockImplementation(async (args: { where: { idProyecto: number } }) =>
+        options.project === undefined
+          ? { idProyecto: args.where.idProyecto, estadoProyecto: 'EN_PROGRESO', creadoPor: 1, eliminadoEn: null }
+          : options.project,
+      ),
+    },
+    sprint: { findFirst: vi.fn().mockResolvedValue(options.sprint) },
   };
+  const prismaService = prisma as unknown as PrismaService;
+  const resolver = new ProjectIdResolverService(prismaService);
+  const policy = new ProjectPolicyService(resolver);
+  const reflector = {
+    getAllAndOverride: vi.fn().mockReturnValue(options.metadata),
+  } as unknown as Reflector;
+  return { guard: new ProjectWriteGuard(reflector, resolver, policy, prismaService), prisma };
 }
 
 function makeContext(params: Record<string, unknown>): ExecutionContext {
   return {
     switchToHttp: () => ({
-      getRequest: () => ({ params }),
+      getRequest: () => ({ params, body: {} }),
     }),
+    getHandler: () => function handler() {},
+    getClass: () => class Controller {},
   } as unknown as ExecutionContext;
 }
 
 describe('ProjectWriteGuard', () => {
   describe('sin Sprint operable', () => {
     it('lanza ConflictException con el mensaje congelado de "sin Sprint activo"', async () => {
-      const sprintsContext = makeSprintsContext();
-      sprintsContext.getCurrentSprint.mockResolvedValue(null);
-      const guard = new ProjectWriteGuard(sprintsContext);
+      const { guard } = makeGuard({ sprint: null });
       const context = makeContext({ projectId: '1' });
 
       await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ConflictException);
@@ -36,13 +77,7 @@ describe('ProjectWriteGuard', () => {
 
   describe('Sprint ACTIVO', () => {
     it('devuelve true y permite continuar', async () => {
-      const sprintsContext = makeSprintsContext();
-      sprintsContext.getCurrentSprint.mockResolvedValue({
-        idSprint: 1,
-        idProyecto: 1,
-        estado: 'ACTIVO',
-      });
-      const guard = new ProjectWriteGuard(sprintsContext);
+      const { guard } = makeGuard({ sprint: { idSprint: 1, idProyecto: 1, estado: 'ACTIVO' } });
       const context = makeContext({ projectId: '1' });
 
       await expect(guard.canActivate(context)).resolves.toBe(true);
@@ -51,13 +86,7 @@ describe('ProjectWriteGuard', () => {
 
   describe('Sprint EN_FINALIZACION', () => {
     it('lanza ConflictException con el mensaje congelado de finalización', async () => {
-      const sprintsContext = makeSprintsContext();
-      sprintsContext.getCurrentSprint.mockResolvedValue({
-        idSprint: 1,
-        idProyecto: 1,
-        estado: 'EN_FINALIZACION',
-      });
-      const guard = new ProjectWriteGuard(sprintsContext);
+      const { guard } = makeGuard({ sprint: { idSprint: 1, idProyecto: 1, estado: 'EN_FINALIZACION' } });
       const context = makeContext({ projectId: '1' });
 
       await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ConflictException);
@@ -71,58 +100,65 @@ describe('ProjectWriteGuard', () => {
     });
   });
 
-  describe('resolución de projectId', () => {
-    it('lee el parámetro projectId de la request y lo convierte a number antes de llamar a getCurrentSprint', async () => {
-      const sprintsContext = makeSprintsContext();
-      sprintsContext.getCurrentSprint.mockResolvedValue({ idSprint: 1, estado: 'ACTIVO' });
-      const guard = new ProjectWriteGuard(sprintsContext);
+  describe('resolución de projectId (default: params.projectId)', () => {
+    it('lee el parámetro projectId de la request y consulta el Sprint operable con el número resuelto', async () => {
+      const { guard, prisma } = makeGuard({ sprint: { idSprint: 1, idProyecto: 42, estado: 'ACTIVO' } });
       const context = makeContext({ projectId: '42' });
 
       await guard.canActivate(context);
 
-      expect(sprintsContext.getCurrentSprint).toHaveBeenCalledWith(42);
-      expect(sprintsContext.getCurrentSprint).toHaveBeenCalledTimes(1);
+      expect(prisma.sprint.findFirst).toHaveBeenCalledTimes(1);
+      const consulta = prisma.sprint.findFirst.mock.calls[0][0] as { where: { idProyecto: unknown } };
+      expect(consulta.where.idProyecto).toBe(42);
+      expect(prisma.proyecto.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { idProyecto: 42 } }),
+      );
     });
 
     it('pasa exactamente el projectId numérico resuelto, no el string crudo', async () => {
-      const sprintsContext = makeSprintsContext();
-      sprintsContext.getCurrentSprint.mockResolvedValue({ idSprint: 1, estado: 'ACTIVO' });
-      const guard = new ProjectWriteGuard(sprintsContext);
+      const { guard, prisma } = makeGuard({ sprint: { idSprint: 1, idProyecto: 7, estado: 'ACTIVO' } });
       const context = makeContext({ projectId: '7' });
 
       await guard.canActivate(context);
 
-      const calledWith = sprintsContext.getCurrentSprint.mock.calls[0][0];
-      expect(calledWith).toBe(7);
-      expect(typeof calledWith).toBe('number');
+      const consulta = prisma.sprint.findFirst.mock.calls[0][0] as { where: { idProyecto: unknown } };
+      expect(consulta.where.idProyecto).toBe(7);
+      expect(typeof consulta.where.idProyecto).toBe('number');
     });
   });
 
   describe('parámetro inválido', () => {
     it('lanza BadRequestException si projectId falta en los params, sin consultar Sprint', async () => {
-      const sprintsContext = makeSprintsContext();
-      const guard = new ProjectWriteGuard(sprintsContext);
+      const { guard, prisma } = makeGuard({ sprint: null });
       const context = makeContext({});
 
       await expect(guard.canActivate(context)).rejects.toBeInstanceOf(BadRequestException);
-      expect(sprintsContext.getCurrentSprint).not.toHaveBeenCalled();
+      expect(prisma.sprint.findFirst).not.toHaveBeenCalled();
     });
 
     it('lanza BadRequestException si projectId no es un entero válido ("abc"), sin consultar Sprint', async () => {
-      const sprintsContext = makeSprintsContext();
-      const guard = new ProjectWriteGuard(sprintsContext);
+      const { guard, prisma } = makeGuard({ sprint: null });
       const context = makeContext({ projectId: 'abc' });
 
       await expect(guard.canActivate(context)).rejects.toBeInstanceOf(BadRequestException);
-      expect(sprintsContext.getCurrentSprint).not.toHaveBeenCalled();
+      expect(prisma.sprint.findFirst).not.toHaveBeenCalled();
     });
 
     it('lanza BadRequestException si projectId es un número no entero ("1.5")', async () => {
-      const sprintsContext = makeSprintsContext();
-      const guard = new ProjectWriteGuard(sprintsContext);
+      const { guard } = makeGuard({ sprint: null });
       const context = makeContext({ projectId: '1.5' });
 
       await expect(guard.canActivate(context)).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('proyecto inexistente o eliminado', () => {
+    it('lanza NotFoundException sin consultar Sprint', async () => {
+      const { guard, prisma } = makeGuard({ sprint: null, project: null });
+      const context = makeContext({ projectId: '9' });
+
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.sprint.findFirst).not.toHaveBeenCalled();
     });
   });
 });
