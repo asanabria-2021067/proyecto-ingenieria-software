@@ -4,6 +4,12 @@ import { SprintsContextService } from './sprints-context.service';
 
 type TxClient = Prisma.TransactionClient;
 
+/**
+ * C045 (06 v2 §32/§40): las reglas de autoridad del Sprint no cambian; en las
+ * tres operaciones del ciclo de vida se evalúan con el `tx` del runner por
+ * proyecto, ya con el lock adquirido, junto a la policy de la familia
+ * correspondiente. Este servicio nunca abre una transacción propia.
+ */
 @Injectable()
 export class SprintsAuthorizationService {
   constructor(private readonly sprintsContext: SprintsContextService) {}
@@ -29,16 +35,6 @@ export class SprintsAuthorizationService {
 
   /** Cerrar Sprint: exclusivo del líder. */
   async assertCanCloseSprint(projectId: number, sprintId: number, userId: number, tx?: TxClient) {
-    return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
-  }
-
-  /** Ajustar horas reconocidas (A7): exclusivo del líder, parte de la gestión del Sprint. */
-  async assertCanAdjustRecognizedHours(
-    projectId: number,
-    sprintId: number,
-    userId: number,
-    tx?: TxClient,
-  ) {
     return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
   }
 
@@ -88,6 +84,36 @@ export class SprintsAuthorizationService {
     tx?: TxClient,
   ) {
     return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
+  }
+
+  /**
+   * Ver analítica de un Sprint (T-172, HU-143): "líder o integrante del
+   * proyecto" — a diferencia de `assertCanViewSprintHistory` (F4, exclusivo
+   * del líder), HU-143 pide explícitamente que cualquier integrante activo
+   * también pueda ver la analítica. Mismo criterio de acceso que
+   * `assertCanListSprintHistory` (F3, la lista de Sprints con sus
+   * agregados), aplicado aquí a un Sprint concreto: primero se resuelve el
+   * Sprint dentro del proyecto (404 si no existe o es de otro proyecto),
+   * luego se exige participación activa.
+   */
+  async assertCanViewSprintAnalytics(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+    tx?: TxClient,
+  ) {
+    const sprint = await this.sprintsContext.getSprintInProjectOrThrow(projectId, sprintId, tx);
+    await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
+    return sprint;
+  }
+
+  /**
+   * Ver analítica comparativa entre Sprints del proyecto (T-173, HU-143):
+   * mismo criterio que `assertCanListSprintHistory`/`assertCanViewSprintAnalytics`
+   * — líder o integrante con participación activa.
+   */
+  async assertCanListSprintAnalytics(projectId: number, userId: number, tx?: TxClient): Promise<void> {
+    await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
   }
 
   /**

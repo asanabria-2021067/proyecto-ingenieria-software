@@ -15,6 +15,10 @@ import { SprintsContextService } from '../../src/sprints/sprints-context.service
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * Integración real A10: SprintsService.listSprints / getSprintDetail contra
@@ -59,7 +63,7 @@ describeIntegration(
       const context = new SprintsContextService(prisma as unknown as PrismaService);
       const authorization = new SprintsAuthorizationService(context);
       const notifications = {} as unknown as NotificationsService;
-      service = new SprintsService(prisma as unknown as PrismaService, context, authorization, notifications);
+      service = new SprintsService(prisma as unknown as PrismaService, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)), new ProjectReadPolicyService(prisma as unknown as PrismaService));
       await prisma.$connect();
     });
 
@@ -100,8 +104,8 @@ describeIntegration(
       const member = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, member.idUsuario];
 
-      const projectA = await createIntegrationProject(prisma, leader.idUsuario);
-      const projectB = await createIntegrationProject(prisma, leader.idUsuario);
+      const projectA = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      const projectB = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [projectA.idProyecto, projectB.idProyecto];
 
       const hitoA = await createHito(prisma, projectA.idProyecto, 'MILESTONE-A', 1);

@@ -5,6 +5,11 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import type { UpdateProjectDto } from '../src/projects/dto/update-project.dto';
 import { ProjectsService } from '../src/projects/projects.service';
+import {
+  makeProjectPolicyDouble,
+  makeProjectReadPolicyDouble,
+  makeProjectTransactionDouble,
+} from './helpers/project-policy.double';
 
 const OWNER = 7;
 const PID = 28;
@@ -25,6 +30,9 @@ function makeService(prisma: ReturnType<typeof makePrisma>) {
     prisma as unknown as PrismaService,
     {} as unknown as NotificationsService,
     {} as unknown as Cache,
+    makeProjectTransactionDouble({ tx: prisma }),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble(),
   );
 }
 

@@ -63,7 +63,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user, isLoading, isError } = useCurrentUser();
-  const { latestNotification } = useRealtimeNotifications(!!user);
+  const { latestNotification, isConnected: notificationsConnected } = useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
 
   useEffect(() => {
@@ -155,6 +155,16 @@ export default function DashboardLayout({
             </span>
           </div>
           <div className="flex items-center gap-3">
+            {!!user && (
+              <span
+                role="status"
+                title={notificationsConnected ? 'Notificaciones en vivo conectadas' : 'Reconectando notificaciones en vivo…'}
+                aria-label={notificationsConnected ? 'Notificaciones en vivo conectadas' : 'Reconectando notificaciones en vivo'}
+                className={`size-2 shrink-0 rounded-full ${
+                  notificationsConnected ? 'bg-green-500' : 'animate-pulse bg-amber-500'
+                }`}
+              />
+            )}
             <NotificationsBell onlyIcon />
             <FontScaleToggle />
             <div id="dashboard-theme-toggle">

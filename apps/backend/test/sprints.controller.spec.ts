@@ -8,11 +8,12 @@ function makeService() {
   return {
     startSprint: vi.fn(),
     finalizeSprint: vi.fn(),
-    adjustRecognizedHours: vi.fn(),
     getSprintClosingSummary: vi.fn(),
     closeSprint: vi.fn(),
     listSprints: vi.fn(),
     getSprintDetail: vi.fn(),
+    getSprintAnalytics: vi.fn(),
+    getSprintsAnalytics: vi.fn(),
   };
 }
 
@@ -75,9 +76,9 @@ describe('SprintsController.finalize (POST /proyectos/:projectId/sprints/:sprint
     );
   });
 
-  it('NO tiene ProjectWriteGuard aplicado (A4 gestiona su propia seguridad de estado en la transacción)', () => {
+  it('declara ProjectWriteGuard (C045: §41 E061 exige JWT+PWG con ambiente ACTIVO)', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, SprintsController.prototype.finalize) ?? [];
-    expect(guards).not.toContain(ProjectWriteGuard);
+    expect(guards).toContain(ProjectWriteGuard);
   });
 
   it('delega en SprintsService.finalizeSprint con projectId, sprintId y userId (CurrentUser)', () => {
@@ -154,51 +155,15 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
   });
 });
 
-describe('SprintsController.adjustHours (PATCH /proyectos/:projectId/sprints/:sprintId/horas/:participacionId)', () => {
-  it('está registrado como PATCH en :sprintId/horas/:participacionId', () => {
-    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.adjustHours)).toBe(
-      ':sprintId/horas/:participacionId',
-    );
-    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.adjustHours)).toBe(4); // PATCH
-  });
-
-  it('responde con 200 OK', () => {
-    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.adjustHours)).toBe(
-      200,
-    );
-  });
-
-  it('delega en SprintsService.adjustRecognizedHours con projectId, sprintId, participacionId, userId y el body', () => {
-    const service = makeService();
-    const controller = makeController(service);
-    const dto = { horasAprobadas: 8, justificacionAjuste: 'ajuste válido' };
-
-    controller.adjustHours(5, 12, 30, dto, { userId: 9 });
-
-    expect(service.adjustRecognizedHours).toHaveBeenCalledTimes(1);
-    expect(service.adjustRecognizedHours).toHaveBeenCalledWith(5, 12, 30, 9, dto);
-  });
-
-  it('retorna exactamente lo que resuelve SprintsService.adjustRecognizedHours, sin transformarlo', async () => {
-    const service = makeService();
-    const registroActualizado = { idRegistroHoras: 100, horasAprobadas: 8 };
-    service.adjustRecognizedHours.mockResolvedValue(registroActualizado);
-    const controller = makeController(service);
-
-    const result = await controller.adjustHours(5, 12, 30, { horasAprobadas: 8 }, { userId: 9 });
-
-    expect(result).toBe(registroActualizado);
-  });
-
-  it('propaga los errores de autorización/negocio que lance SprintsService.adjustRecognizedHours', async () => {
-    const service = makeService();
-    const error = new Error('justificación requerida');
-    service.adjustRecognizedHours.mockRejectedValue(error);
-    const controller = makeController(service);
-
-    await expect(
-      controller.adjustHours(5, 12, 30, { horasAprobadas: 8 }, { userId: 9 }),
-    ).rejects.toBe(error);
+/**
+ * C074: `adjustHours` fue RETIRADO. El total reconocido dejó de ser editable a
+ * mano por el líder; la vía soportada para corregir una propuesta es el ajuste
+ * append-only por tramo (AjusteHoraTarea). La prueba se conserva invertida
+ * para que reintroducir el handler falle de inmediato.
+ */
+describe('SprintsController — el ajuste manual de horas reconocidas está retirado', () => {
+  it('no expone ningún handler adjustHours', () => {
+    expect((SprintsController.prototype as Record<string, unknown>).adjustHours).toBeUndefined();
   });
 });
 
@@ -328,5 +293,103 @@ describe('SprintsController.detail (GET /proyectos/:projectId/sprints/:sprintId)
     const controller = makeController(service);
 
     await expect(controller.detail(5, 12, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.getAnalytics (GET /proyectos/:projectId/sprints/:sprintId/analytics) — T-172', () => {
+  it('está registrado como GET en :sprintId/analytics', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.getAnalytics)).toBe(
+      ':sprintId/analytics',
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.getAnalytics)).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.getAnalytics)).toBe(200);
+  });
+
+  it('delega en SprintsService.getSprintAnalytics con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.getAnalytics(5, 12, { userId: 9 });
+
+    expect(service.getSprintAnalytics).toHaveBeenCalledTimes(1);
+    expect(service.getSprintAnalytics).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.getSprintAnalytics, sin transformarlo', async () => {
+    const service = makeService();
+    const analytics = { idSprint: 12, idProyecto: 5, tareasTotales: 3 };
+    service.getSprintAnalytics.mockResolvedValue(analytics);
+    const controller = makeController(service);
+
+    const result = await controller.getAnalytics(5, 12, { userId: 9 });
+
+    expect(result).toBe(analytics);
+  });
+
+  it('propaga los errores de autorización/negocio (p. ej. aislamiento cross-project) que lance SprintsService.getSprintAnalytics', async () => {
+    const service = makeService();
+    const error = new Error('no encontrado');
+    service.getSprintAnalytics.mockRejectedValue(error);
+    const controller = makeController(service);
+
+    await expect(controller.getAnalytics(5, 12, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.getComparativeAnalytics (GET /proyectos/:projectId/sprints/analytics) — T-173', () => {
+  it('está registrado como GET en analytics (segmento literal, no confundible con :sprintId)', () => {
+    expect(
+      Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.getComparativeAnalytics),
+    ).toBe('analytics');
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.getComparativeAnalytics),
+    ).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.getComparativeAnalytics),
+    ).toBe(200);
+  });
+
+  it('delega en SprintsService.getSprintsAnalytics con projectId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.getComparativeAnalytics(5, { userId: 9 });
+
+    expect(service.getSprintsAnalytics).toHaveBeenCalledTimes(1);
+    expect(service.getSprintsAnalytics).toHaveBeenCalledWith(5, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.getSprintsAnalytics, sin transformarlo', async () => {
+    const service = makeService();
+    const comparativa = { idProyecto: 5, sprints: [] };
+    service.getSprintsAnalytics.mockResolvedValue(comparativa);
+    const controller = makeController(service);
+
+    const result = await controller.getComparativeAnalytics(5, { userId: 9 });
+
+    expect(result).toBe(comparativa);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.getSprintsAnalytics', async () => {
+    const service = makeService();
+    const error = new Error('no autorizado');
+    service.getSprintsAnalytics.mockRejectedValue(error);
+    const controller = makeController(service);
+
+    await expect(controller.getComparativeAnalytics(5, { userId: 9 })).rejects.toBe(error);
+  });
+
+  it('está registrada en el controller ANTES que detail(:sprintId) — evita que Express matchee "analytics" como sprintId', () => {
+    const prototype = SprintsController.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
+    const rutasGet = Object.getOwnPropertyNames(prototype).filter(
+      (nombreMetodo) => Reflect.getMetadata(METHOD_METADATA, prototype[nombreMetodo]) === 0,
+    );
+    expect(rutasGet.indexOf('getComparativeAnalytics')).toBeLessThan(rutasGet.indexOf('detail'));
   });
 });

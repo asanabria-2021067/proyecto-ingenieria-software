@@ -77,8 +77,16 @@ function makeRootPrismaSpy() {
   };
 }
 
-function tramo(idAsignacion: number, horasReales: number) {
-  return { idAsignacion, horasReales: new Prisma.Decimal(horasReales) };
+/**
+ * C077: el tramo llega con su cadena de ajustes vigentes, porque la propuesta
+ * es caché + ajuste vigente válido. Sin ajustes, propuesta = reporte.
+ */
+function tramo(
+  idAsignacion: number,
+  horasReales: number,
+  ajustes: Array<{ horasBase: Prisma.Decimal; deltaHoras: Prisma.Decimal }> = [],
+) {
+  return { idAsignacion, horasReales: new Prisma.Decimal(horasReales), ajustes };
 }
 
 function makeTx() {
@@ -272,6 +280,8 @@ describe('HoursRecognitionService', () => {
 
       expect(resultado).toEqual({
         horasReconocidas: 0,
+        horasReportadas: new Prisma.Decimal(0),
+        horasPropuestas: new Prisma.Decimal(0),
         idsAsignacionesReconocidas: [],
         horasParticipacion: null,
       });
@@ -316,6 +326,9 @@ describe('HoursRecognitionService', () => {
         idRegistroHoras: 501,
         idParticipacion: PARTICIPATION_ID,
         idSprint: SPRINT_ID,
+        // C077 (§12.3): solo se incrementa un agregado PENDIENTE y con
+        // procedencia calculada; cualquier otro estado es 409.
+        estadoHoras: 'PENDIENTE',
         horasCalculadas: new Prisma.Decimal(10),
       };
       tx.horasParticipacion.findFirst.mockResolvedValue(filaExistente);
@@ -325,9 +338,13 @@ describe('HoursRecognitionService', () => {
       const resultado = await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
 
       expect(resultado.horasReconocidas).toBe(4);
+      // §8: en reconocimientos sucesivos se incrementan AMBAS columnas.
       expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
         where: { idRegistroHoras: 501 },
-        data: { horasCalculadas: { increment: expect.any(Prisma.Decimal) } },
+        data: {
+          horasReportadas: { increment: expect.any(Prisma.Decimal) },
+          horasCalculadas: { increment: expect.any(Prisma.Decimal) },
+        },
       });
       const incremento = tx.horasParticipacion.update.mock.calls[0][0].data.horasCalculadas.increment;
       expect(incremento.toNumber()).toBe(4);
@@ -366,25 +383,29 @@ describe('HoursRecognitionService', () => {
       expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
     });
 
-    it('caso 6: colisión P2002 al crear (otra tx ganó la carrera de creación) — reintenta como increment sobre la fila ganadora', async () => {
+    /**
+     * C078 (§12/§16): el catch de P2002 fue RETIRADO. Bajo el lock del
+     * proyecto no hay carrera normal de primera creación, y consultar dentro
+     * de una transacción PostgreSQL ya abortada solo produce un error opaco.
+     * Un P2002 inesperado ahora revierte todo, que es lo correcto.
+     */
+    it('caso 6: un P2002 inesperado al crear propaga y aborta la transacción, sin consultar dentro de ella', async () => {
       const { prisma } = makeRootPrismaSpy();
       const tx = makeTx();
       tx.asignacionTarea.findMany.mockResolvedValue([tramo(9, 6)]);
       tx.asignacionTarea.updateMany.mockResolvedValue({ count: 1 });
       tx.horasParticipacion.findFirst.mockResolvedValue(null);
-      tx.horasParticipacion.create.mockRejectedValue(makeHorasParticipacionCollisionError());
-      const filaGanadora = { idRegistroHoras: 777, horasCalculadas: new Prisma.Decimal(2) };
-      tx.horasParticipacion.findFirstOrThrow.mockResolvedValue(filaGanadora);
-      tx.horasParticipacion.update.mockResolvedValue({ ...filaGanadora, horasCalculadas: new Prisma.Decimal(8) });
+      const colision = makeHorasParticipacionCollisionError();
+      tx.horasParticipacion.create.mockRejectedValue(colision);
       const service = new HoursRecognitionService(prisma);
 
-      const resultado = await service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT);
+      await expect(
+        service.recognizeParticipationHours(tx as unknown as Prisma.TransactionClient, INPUT),
+      ).rejects.toBe(colision);
 
-      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
-        where: { idRegistroHoras: 777 },
-        data: { horasCalculadas: { increment: expect.any(Prisma.Decimal) } },
-      });
-      expect(resultado.horasParticipacion).toEqual({ ...filaGanadora, horasCalculadas: new Prisma.Decimal(8) });
+      // Ninguna consulta posterior dentro de la tx ya fallida.
+      expect(tx.horasParticipacion.findFirstOrThrow).not.toHaveBeenCalled();
+      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
     });
 
     it('caso 7: transaction client supplied — todas las operaciones usan tx, ninguna usa this.prisma raíz', async () => {
@@ -434,9 +455,15 @@ describe('HoursRecognitionService', () => {
           desasignadaEn: { not: null },
           horasReales: { not: null },
           reconocidoEn: null,
+          // C077 (§12.1): un origen sin conciliar no es un reporte utilizable.
+          origenReporte: { not: 'POR_CONCILIAR' },
           tarea: { idProyecto: 7, idSprint: 8 },
         },
-        select: { idAsignacion: true, horasReales: true },
+        select: {
+          idAsignacion: true,
+          horasReales: true,
+          ajustes: { where: { anuladoEn: null }, select: { horasBase: true, deltaHoras: true } },
+        },
       });
     });
   });

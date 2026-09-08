@@ -27,12 +27,20 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
 
-function mockLeader() {
+function mockLeader(overrides: Record<string, unknown> = {}) {
   (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+  (useProjectDetail as any).mockReturnValue({
+    data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', creador: { idUsuario: 1 }, ...overrides },
+  });
+  (useProjectMembers as any).mockReturnValue({ members: [] });
+}
+
+function mockParticipante() {
+  (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 2 } });
   (useProjectDetail as any).mockReturnValue({
     data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', creador: { idUsuario: 1 } },
   });
-  (useProjectMembers as any).mockReturnValue({ members: [] });
+  (useProjectMembers as any).mockReturnValue({ members: [{ idUsuario: 2 }] });
 }
 
 function renderSidebar() {
@@ -81,6 +89,55 @@ describe('ProjectSidebar', () => {
       'href',
       '/dashboard/projects/42/kanban',
     );
+    expect(screen.getByRole('link', { name: /lista de tareas/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/42/tareas',
+    );
+  });
+
+  /**
+   * El formulario de edición rechaza `EN_SOLICITUD_CIERRE` y redirige nada más
+   * abrirse. Mientras la sidebar siguió ofreciendo el destino, el líder salía
+   * disparado a un listado ajeno al pulsar «Volver»: la entrada prometía una
+   * edición que ese estado no admite.
+   */
+  it.each(['EN_SOLICITUD_CIERRE', 'CERRADO'])(
+    'en «%s» no ofrece editar información ni roles',
+    (estadoProyecto) => {
+      mockLeader({ estadoProyecto });
+      renderSidebar();
+
+      expect(screen.queryByRole('link', { name: /editar información/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /editar roles/i })).not.toBeInTheDocument();
+      // Lo que sí es de solo lectura sigue disponible.
+      expect(screen.getByRole('link', { name: /revisiones pasadas/i })).toBeInTheDocument();
+    },
+  );
+
+  it('con el proyecto en progreso la edición sigue ofreciéndose', () => {
+    mockLeader({ estadoProyecto: 'EN_PROGRESO' });
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /editar información/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /editar roles/i })).toBeInTheDocument();
+  });
+
+  it('el liderazgo tiene su propio destino, separado de «Miembros» (S7 VIEW-06)', () => {
+    mockLeader();
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /liderazgo/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/liderazgo',
+    );
+  });
+
+  it('un integrante (no líder) no ve el destino de liderazgo, igual que no ve «Miembros»', () => {
+    mockParticipante();
+    renderSidebar();
+
+    expect(screen.queryByRole('link', { name: /liderazgo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /miembros/i })).not.toBeInTheDocument();
   });
 
   it('al entrar al Tablero (ruta anidada bajo Resumen) solo un NavItem queda activo', () => {
@@ -101,5 +158,17 @@ describe('ProjectSidebar', () => {
     const activos = screen.getAllByRole('link').filter((link) => link.className.includes('text-primary'));
     expect(activos).toHaveLength(1);
     expect(activos[0]).toHaveAccessibleName(/tablero/i);
+  });
+
+  it('un integrante (no líder) también ve "Lista de tareas", igual que "Tablero"', () => {
+    mockParticipante();
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /tablero/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /lista de tareas/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/42/tareas',
+    );
+    expect(screen.queryByRole('link', { name: /editar información/i })).not.toBeInTheDocument();
   });
 });

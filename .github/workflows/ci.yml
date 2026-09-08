@@ -25,6 +25,9 @@ env:
   # de integracion si se conectan realmente via INTEGRATION_DATABASE_URL.
   DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
   DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+  # AuthService falla al arrancar sin esto (ver auth.service.ts) - no tiene
+  # valor por defecto a proposito, asi que CI debe proveerlo explicitamente.
+  JWT_REFRESH_SECRET: ci-refresh-secret
 
 jobs:
   backend:
@@ -66,6 +69,12 @@ jobs:
 
       - name: Aplicar migraciones Prisma
         run: npx prisma migrate deploy
+
+      # test/s7-bootstrap.spec.ts audita dist/ (el artefacto real desplegado,
+      # ver ese archivo) y falla si no existe: sin este build, ese spec
+      # rompe cada corrida de este job aunque el resto del codigo este bien.
+      - name: Compilar (nest build)
+        run: npm run build
 
       - name: Lint
         run: npm run lint
@@ -112,15 +121,26 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
-      # La suite de vitest+jsdom (~70 archivos) es pesada en memoria (ver
+      # La suite de vitest+jsdom (~105 archivos) es pesada en memoria (ver
       # vitest.config.ts) y no debe bloquear la velocidad del pipeline de
       # deploy. Corre completa solo en PR (el gate real antes de mergear);
       # en push/deploy el pipeline queda rapido con lint + el build de
       # Next.js (ya corre en build-frontend de deploy.yml) como red de
       # seguridad.
-      - name: Pruebas unitarias con cobertura (Vitest)
+      #
+      # Sin --coverage y en lotes de proceso separado: verificado en CI real
+      # que ninguna combinación de forks/techo de heap/cobertura evita que
+      # jsdom acumule memoria dentro de un mismo proceso hasta reventar
+      # (probado con 1, 2 y 4 forks, con y sin --coverage, siempre el mismo
+      # "heap out of memory" cerca de los ~6GB). Cada lote de 20 archivos
+      # corre como una invocación de vitest totalmente nueva: el proceso
+      # termina y libera toda su memoria antes de que arranque el próximo,
+      # así que ninguna acumulación puede cruzar de un lote a otro. Cada
+      # lote individual ya se verificó limpio y rápido en corridas locales.
+      - name: Pruebas unitarias (Vitest, sin cobertura, en lotes)
         if: github.event_name == 'pull_request'
-        run: npm run test:coverage
+        run: |
+          ls test/*.spec.ts test/*.spec.tsx 2>/dev/null | xargs -n 10 npx vitest run
 
   e2e:
     name: E2E - suite de humo (Playwright)
