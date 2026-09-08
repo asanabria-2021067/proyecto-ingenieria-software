@@ -146,6 +146,55 @@ enum EstadoHoras {
   RECHAZADA
 }
 
+/// S7 M1 (06 v2 §8/§14): procedencia del importe de un tramo de asignación.
+/// GRANULAR = SUM de RegistroTiempoTarea efectivos; LEGACY = importe manual
+/// histórico sin registros; POR_CONCILIAR = mezcla o discrepancia pendiente de
+/// conciliación explícita (bloquea consumo/cierre hasta resolverse).
+enum OrigenReporteTramo {
+  GRANULAR
+  LEGACY
+  POR_CONCILIAR
+}
+
+/// S7 M4 (06 v2 §19): ciclo de vida de una apelación de liderazgo.
+enum EstadoApelacionLiderazgo {
+  PENDIENTE
+  ACEPTADA
+  DENEGADA
+  CANCELADA
+}
+
+/// S7 M4 (06 v2 §18/§20): procedencia de un cambio de líder registrado en el historial.
+enum OrigenCambioLiderazgo {
+  SOLICITUD_LIDER
+  CAMBIO_ADMINISTRATIVO
+}
+
+/// S7 M5 (06 v2 §24): ciclo de vida de una revisión de cierre de proyecto.
+enum EstadoRevisionCierre {
+  BORRADOR
+  ENVIADA
+  APROBADA
+  CORRECCION_DOCUMENTAL
+  DEVUELTA_A_EJECUCION
+}
+
+/// S7 M5 (06 v2 §25): tipo de documento de cierre.
+enum TipoDocumentoCierre {
+  INFORME_AUTOMATICO
+  EVIDENCIA_LIDER
+  INFORME_OFICIAL_FINAL
+}
+
+/// S7 M5 (06 v2 §25): estado técnico de un documento/reserva de cierre.
+enum EstadoDocumentoCierre {
+  RESERVADO
+  EN_CARGA
+  DISPONIBLE
+  PURGA_PENDIENTE
+  PURGADO
+}
+
 enum TipoCertificado {
   HORAS_BECA
   EXTENSION
@@ -183,6 +232,15 @@ enum TipoNotificacion {
   SOLICITUD_AMISTAD
   AMISTAD_ACEPTADA
   NUEVO_SEGUIDOR
+  // S7 M6 (06 v2 §44): ocho valores nuevos, añadidos al final sin reordenar los treinta existentes.
+  APELACION_LIDERAZGO_RECIBIDA
+  APELACION_LIDERAZGO_RESUELTA
+  LIDERAZGO_ACTUALIZADO
+  POSTULACION_RECHAZADA_POR_CIERRE
+  CIERRE_CORRECCION_DOCUMENTAL
+  CIERRE_DEVUELTO_A_EJECUCION
+  HORAS_CONSOLIDADAS
+  HORAS_ACREDITADAS
 }
 
 enum EstadoAmistad {
@@ -259,6 +317,18 @@ model Usuario {
   sprintsCerrados                  Sprint[]
   registrosAvanceEscritos          RegistroAvanceAsignacion[]
   registrosTiempoRegistrados       RegistroTiempoTarea[]
+  registrosTiempoRevocados         RegistroTiempoTarea[]      @relation("RegistroTiempoRevocador")
+  ajustesAutor                     AjusteHoraTarea[]          @relation("AjusteHoraAutor")
+  ajustesAnulados                  AjusteHoraTarea[]          @relation("AjusteHoraAnulador")
+  apelacionesSolicitadas           ApelacionLiderazgo[]       @relation("ApelacionSolicitante")
+  apelacionesComoCandidato         ApelacionLiderazgo[]       @relation("ApelacionCandidato")
+  apelacionesResueltas             ApelacionLiderazgo[]       @relation("ApelacionResolutor")
+  liderazgosAnteriores             HistorialLiderazgo[]       @relation("HistorialLiderAnterior")
+  liderazgosNuevos                 HistorialLiderazgo[]       @relation("HistorialLiderNuevo")
+  cambiosLiderazgoAdministrados    HistorialLiderazgo[]       @relation("HistorialAdmin")
+  cierresSolicitados               RevisionCierreProyecto[]   @relation("RevisionCierreSolicitante")
+  cierresRevisados                 RevisionCierreProyecto[]   @relation("RevisionCierreRevisor")
+  documentosCierreCreados          DocumentoCierre[]          @relation("DocumentoCierreAutor")
   amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
   amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
   siguiendo                        Seguimiento[]              @relation("Siguiendo")
@@ -518,6 +588,10 @@ model Proyecto {
   sprints           Sprint[]
   conversaciones    Conversacion[]
 
+  apelacionesLiderazgo ApelacionLiderazgo[]
+  historialLiderazgo   HistorialLiderazgo[]
+  revisionesCierre     RevisionCierreProyecto[]
+  documentosCierre     DocumentoCierre[]
   @@map("proyecto")
 }
 
@@ -765,19 +839,23 @@ model AsignacionTarea {
   desasignadaEn   DateTime? @map("desasignada_en")
   asignadoPor     Int       @map("asignado_por")
   /// Horas realmente trabajadas por idUsuario durante ESTE tramo concreto de asignación (nunca el total de la tarea): una tarea reasignada tiene una fila de AsignacionTarea por tramo, y cada una lleva sus propias horas. Reportado manualmente por el líder al editar la tarea. Fuente granular que HU-126 (HorasParticipacion.horasCalculadas) consumirá después; no confundir con esa capa de agregación/aprobación, que este PR no implementa.
-  horasReales     Decimal?  @map("horas_reales") @db.Decimal(6, 2)
+  horasReales     Decimal?  @map("horas_reales") @db.Decimal(12, 2)
   /// FND-09 (A5.1): marca el momento en que este tramo (horasReales) fue consumido por un proceso de reconocimiento de horas (Flow A: cálculo por Sprint / Flow B: reconocimiento anticipado por salida). NULL = todavía reconocible; NOT NULL = ya reconocido, no debe volver a sumarse. Sin default: todos los tramos existentes y los tramos nuevos nacen NULL — no hay trazabilidad histórica suficiente para inferir reconocimiento retroactivo, y ningún reconocimiento granular está implementado todavía (ver HorasParticipacion, que no referencia AsignacionTarea individuales).
   reconocidoEn    DateTime? @map("reconocido_en")
+  /// S7 M1: procedencia del importe de este tramo (ver OrigenReporteTramo). Por defecto GRANULAR, que describe el comportamiento vigente; la clasificación real de tramos históricos es tarea de la herramienta de conciliación D1.
+  origenReporte   OrigenReporteTramo @default(GRANULAR) @map("origen_reporte")
 
   tarea           Tarea                      @relation(fields: [idTarea], references: [idTarea])
   usuario         Usuario                    @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
   asignador       Usuario                    @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
-  participacion   ParticipacionProyecto?     @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: SetNull)
+  participacion   ParticipacionProyecto?     @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: Restrict, onUpdate: Cascade)
   registrosAvance RegistroAvanceAsignacion[]
   registrosTiempo RegistroTiempoTarea[]
+  ajustes         AjusteHoraTarea[]
 
   @@index([idUsuario, desasignadaEn])
   @@index([idParticipacion])
+  @@index([origenReporte, reconocidoEn])
   @@map("asignacion_tarea")
 }
 
@@ -809,20 +887,218 @@ model RegistroAvanceAsignacion {
 /// mientras el tramo sigue activo (desasignadaEn IS NULL) — regla de la capa
 /// de servicio (TimeRecordsService), no constraint de schema.
 model RegistroTiempoTarea {
-  idRegistroTiempo Int      @id @default(autoincrement()) @map("id_registro_tiempo")
-  idAsignacion     Int      @map("id_asignacion")
-  idUsuario        Int      @map("id_usuario")
-  horas            Decimal  @db.Decimal(6, 2)
-  fecha            DateTime @db.Date
-  nota             String?  @db.Text
-  creadoEn         DateTime @default(now()) @map("creado_en")
+  idRegistroTiempo    Int       @id @default(autoincrement()) @map("id_registro_tiempo")
+  idAsignacion        Int       @map("id_asignacion")
+  idUsuario           Int       @map("id_usuario")
+  horas               Decimal   @db.Decimal(6, 2)
+  fecha               DateTime  @db.Date
+  nota                String?   @db.Text
+  creadoEn            DateTime  @default(now()) @map("creado_en")
+  /// S7 M2 (06 v2 §9/§10): justificación exigida solo al registro que cruza la estimación de la tarea; se conserva aunque deje de ser necesaria.
+  justificacionExceso String?   @map("justificacion_exceso") @db.Text
+  /// S7 M2: última edición del autor sobre un registro todavía no consumido.
+  editadoEn           DateTime? @map("editado_en")
+  /// S7 M2: revocación lógica (nunca DELETE físico): el importe deja de contar en el SUM efectivo pero se conserva como evidencia junto con fecha, nota y justificación.
+  revocadoEn          DateTime? @map("revocado_en")
+  revocadoPor         Int?      @map("revocado_por")
 
-  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion])
-  usuario    Usuario         @relation(fields: [idUsuario], references: [idUsuario])
+  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion], onDelete: Restrict, onUpdate: Cascade)
+  usuario    Usuario         @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  revocador  Usuario?        @relation("RegistroTiempoRevocador", fields: [revocadoPor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([idAsignacion])
   @@index([idUsuario])
+  @@index([idAsignacion, revocadoEn])
   @@map("registro_tiempo_tarea")
+}
+
+/// S7 M3 (06 v2 §11/§35): ajuste del líder sobre un tramo cerrado, append-only
+/// respecto de importe/base/justificación/autor. Para corregir se anula el
+/// vigente y se crea un sucesor enlazado por idAjusteAnterior; el anterior
+/// nunca se borra. horasBase es la evidencia del reporte visto al ajustar,
+/// no la fuente del reporte. A lo sumo un ajuste vigente por tramo
+/// (índice parcial s7_ajuste_vigente, SQL manual).
+model AjusteHoraTarea {
+  idAjusteHora     Int       @id @default(autoincrement()) @map("id_ajuste_hora")
+  idAsignacion     Int       @map("id_asignacion")
+  deltaHoras       Decimal   @map("delta_horas") @db.Decimal(12, 2)
+  horasBase        Decimal   @map("horas_base") @db.Decimal(12, 2)
+  justificacion    String?   @db.Text
+  idAutor          Int       @map("id_autor")
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  anuladoEn        DateTime? @map("anulado_en")
+  anuladoPor       Int?      @map("anulado_por")
+  idAjusteAnterior Int?      @unique @map("id_ajuste_anterior")
+
+  asignacion      AsignacionTarea  @relation(fields: [idAsignacion], references: [idAsignacion], onDelete: Restrict, onUpdate: Cascade)
+  autor           Usuario          @relation("AjusteHoraAutor", fields: [idAutor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  anulador        Usuario?         @relation("AjusteHoraAnulador", fields: [anuladoPor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  ajusteAnterior  AjusteHoraTarea? @relation("CadenaAjusteHora", fields: [idAjusteAnterior], references: [idAjusteHora], onDelete: Restrict, onUpdate: Cascade)
+  ajusteSiguiente AjusteHoraTarea? @relation("CadenaAjusteHora")
+
+  @@index([idAsignacion, anuladoEn])
+  @@index([idAutor])
+  @@map("ajuste_hora_tarea")
+}
+
+/// S7 M4 (06 v2 §19/§35): solicitud del líder actual para transferir el
+/// liderazgo a un candidato elegible. Una pendiente por proyecto y líder
+/// (índice parcial s7_apelacion_pendiente, SQL manual). Inmutable en texto
+/// tras crearse; se retiene después de resolverse. No persiste idHistorial:
+/// el historial navega hacia la apelación por su propia FK única.
+model ApelacionLiderazgo {
+  idApelacion          Int                      @id @default(autoincrement()) @map("id_apelacion")
+  idProyecto           Int                      @map("id_proyecto")
+  idLiderSolicitante   Int                      @map("id_lider_solicitante")
+  asunto               String                   @db.VarChar(200)
+  mensaje              String                   @db.Text
+  idCandidatoPropuesto Int                      @map("id_candidato_propuesto")
+  estadoApelacion      EstadoApelacionLiderazgo @default(PENDIENTE) @map("estado_apelacion")
+  creadaEn             DateTime                 @default(now()) @map("creada_en")
+  resueltaEn           DateTime?                @map("resuelta_en")
+  idAdminResolutor     Int?                     @map("id_admin_resolutor")
+  mensajeResolucion    String?                  @map("mensaje_resolucion") @db.Text
+
+  proyecto           Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict, onUpdate: Cascade)
+  liderSolicitante   Usuario             @relation("ApelacionSolicitante", fields: [idLiderSolicitante], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  candidatoPropuesto Usuario             @relation("ApelacionCandidato", fields: [idCandidatoPropuesto], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  adminResolutor     Usuario?            @relation("ApelacionResolutor", fields: [idAdminResolutor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  historial          HistorialLiderazgo? @relation("ApelacionHistorial")
+
+  @@index([idProyecto, estadoApelacion])
+  @@index([estadoApelacion, creadaEn])
+  @@index([idLiderSolicitante])
+  @@map("apelacion_liderazgo")
+}
+
+/// S7 M4 (06 v2 §20/§35): hecho append-only de cambio de líder (anterior,
+/// nuevo, admin, motivo, origen). idApelacion es una FK única real hacia la
+/// apelación aceptada; el candidato sugerido se lee a través de ella y no se
+/// duplica aquí. Sin fila fundacional ficticia, sin UPDATE ni DELETE.
+model HistorialLiderazgo {
+  idHistorialLiderazgo Int                   @id @default(autoincrement()) @map("id_historial_liderazgo")
+  idProyecto           Int                   @map("id_proyecto")
+  idLiderAnterior      Int                   @map("id_lider_anterior")
+  idLiderNuevo         Int                   @map("id_lider_nuevo")
+  idAdminResponsable   Int                   @map("id_admin_responsable")
+  motivo               String                @db.Text
+  origen               OrigenCambioLiderazgo
+  idApelacion          Int?                  @unique @map("id_apelacion")
+  registradoEn         DateTime              @default(now()) @map("registrado_en")
+
+  proyecto         Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict, onUpdate: Cascade)
+  liderAnterior    Usuario             @relation("HistorialLiderAnterior", fields: [idLiderAnterior], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  liderNuevo       Usuario             @relation("HistorialLiderNuevo", fields: [idLiderNuevo], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  adminResponsable Usuario             @relation("HistorialAdmin", fields: [idAdminResponsable], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  apelacion        ApelacionLiderazgo? @relation("ApelacionHistorial", fields: [idApelacion], references: [idApelacion], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([idProyecto, registradoEn])
+  @@index([idLiderNuevo])
+  @@map("historial_liderazgo")
+}
+
+/// S7 M5 (06 v2 §24/§35): revisión de cierre propia del proyecto, numerada
+/// por proyecto. A lo sumo una BORRADOR y una ENVIADA por proyecto (índices
+/// parciales s7_revision_borrador / s7_revision_enviada, SQL manual). ENVIADA
+/// congela solicitante, fecha, fingerprintEntrega y documentos; el admin
+/// resuelve una sola vez. idDocumentoOficial es la relación separada del
+/// informe oficial: nunca pasa por el puente de entrega.
+model RevisionCierreProyecto {
+  idRevisionCierre    Int                  @id @default(autoincrement()) @map("id_revision_cierre")
+  idProyecto          Int                  @map("id_proyecto")
+  numeroRevision      Int                  @map("numero_revision")
+  estadoRevision      EstadoRevisionCierre @default(BORRADOR) @map("estado_revision")
+  idSolicitante       Int?                 @map("id_solicitante")
+  enviadaEn           DateTime?            @map("enviada_en")
+  fingerprintEntrega  String?              @map("fingerprint_entrega") @db.Char(64)
+  idRevisor           Int?                 @map("id_revisor")
+  comentarioRevisor   String?              @map("comentario_revisor") @db.Text
+  resueltaEn          DateTime?            @map("resuelta_en")
+  idDocumentoOficial  Int?                 @unique @map("id_documento_oficial")
+  creadaEn            DateTime             @default(now()) @map("creada_en")
+
+  proyecto             Proyecto                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict, onUpdate: Cascade)
+  solicitante          Usuario?                  @relation("RevisionCierreSolicitante", fields: [idSolicitante], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  revisor              Usuario?                  @relation("RevisionCierreRevisor", fields: [idRevisor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  informeOficial       DocumentoCierre?          @relation("InformeOficial", fields: [idDocumentoOficial], references: [idDocumentoCierre], onDelete: Restrict, onUpdate: Cascade)
+  documentos           DocumentoRevisionCierre[]
+  documentosOriginados DocumentoCierre[]         @relation("DocumentoOrigen")
+
+  @@unique([idProyecto, numeroRevision])
+  @@index([idProyecto, estadoRevision])
+  @@index([estadoRevision, enviadaEn])
+  @@map("revision_cierre_proyecto")
+}
+
+/// S7 M5 (06 v2 §25–§27/§35): documento de cierre y, a la vez, reserva
+/// técnica de carga (RESERVADO → EN_CARGA → DISPONIBLE → PURGA_PENDIENTE →
+/// PURGADO; nunca se borra la fila). Identidad remota Cloudinary
+/// (proveedor/externalId/resourceType/deliveryType, assetId/versionRemota
+/// tras confirmar), metadata criptográfica AES-256-GCM en cryptoMetadata
+/// (sin claves en claro) y huellas del informe. Límite único por archivo:
+/// 10485760 bytes (CK29, SQL manual).
+model DocumentoCierre {
+  idDocumentoCierre     Int                   @id @default(autoincrement()) @map("id_documento_cierre")
+  idProyecto            Int                   @map("id_proyecto")
+  idRevisionOrigen      Int                   @map("id_revision_origen")
+  tipoDocumento         TipoDocumentoCierre   @map("tipo_documento")
+  proveedor             String                @default("cloudinary") @db.VarChar(32)
+  externalId            String                @map("external_id") @db.VarChar(255)
+  resourceType          String                @default("raw") @map("resource_type") @db.VarChar(16)
+  deliveryType          String                @map("delivery_type") @db.VarChar(16)
+  assetId               String?               @map("asset_id") @db.VarChar(255)
+  versionRemota         String?               @map("version_remota") @db.VarChar(64)
+  nombreArchivo         String                @map("nombre_archivo") @db.VarChar(255)
+  mimeType              String                @default("application/pdf") @map("mime_type") @db.VarChar(127)
+  tamanoBytes           BigInt?               @map("tamano_bytes")
+  tamanoCifradoBytes    BigInt?               @map("tamano_cifrado_bytes")
+  checksumSha256        String?               @map("checksum_sha256") @db.Char(64)
+  checksumCifradoSha256 String?               @map("checksum_cifrado_sha256") @db.Char(64)
+  cryptoMetadata        Json?                 @map("crypto_metadata")
+  generatorVersion      String?               @map("generator_version") @db.VarChar(64)
+  fingerprintEjecucion  String?               @map("fingerprint_ejecucion") @db.Char(64)
+  fingerprintModelo     String?               @map("fingerprint_modelo") @db.Char(64)
+  contextoReporte       Json?                 @map("contexto_reporte")
+  idAutor               Int                   @map("id_autor")
+  creadoEn              DateTime              @default(now()) @map("creado_en")
+  estadoDocumento       EstadoDocumentoCierre @default(RESERVADO) @map("estado_documento")
+  reservaExpiraEn       DateTime              @map("reserva_expira_en")
+  cargaIniciadaEn       DateTime?             @map("carga_iniciada_en")
+  cargaLimiteEn         DateTime?             @map("carga_limite_en")
+  disponibleEn          DateTime?             @map("disponible_en")
+  purgaSolicitadaEn     DateTime?             @map("purga_solicitada_en")
+  purgadoEn             DateTime?             @map("purgado_en")
+
+  proyecto       Proyecto                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict, onUpdate: Cascade)
+  revisionOrigen RevisionCierreProyecto    @relation("DocumentoOrigen", fields: [idRevisionOrigen], references: [idRevisionCierre], onDelete: Restrict, onUpdate: Cascade)
+  autor          Usuario                   @relation("DocumentoCierreAutor", fields: [idAutor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  revisiones     DocumentoRevisionCierre[]
+  oficialDe      RevisionCierreProyecto?   @relation("InformeOficial")
+
+  @@unique([proveedor, externalId])
+  @@index([idProyecto, tipoDocumento])
+  @@index([estadoDocumento, creadoEn])
+  @@index([idRevisionOrigen, tipoDocumento])
+  @@map("documento_cierre")
+}
+
+/// S7 M5 (06 v2 §25/§35): puente de entrega revisión ↔ documento. Orden 0 =
+/// informe automático; 1…10 = evidencias del líder (CK30, SQL manual). El
+/// informe oficial NO se vincula por esta tabla.
+model DocumentoRevisionCierre {
+  idDocumentoRevision Int      @id @default(autoincrement()) @map("id_documento_revision")
+  idRevisionCierre    Int      @map("id_revision_cierre")
+  idDocumentoCierre   Int      @map("id_documento_cierre")
+  orden               Int
+  vinculadoEn         DateTime @default(now()) @map("vinculado_en")
+
+  revision  RevisionCierreProyecto @relation(fields: [idRevisionCierre], references: [idRevisionCierre], onDelete: Restrict, onUpdate: Cascade)
+  documento DocumentoCierre        @relation(fields: [idDocumentoCierre], references: [idDocumentoCierre], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([idRevisionCierre, idDocumentoCierre])
+  @@unique([idRevisionCierre, orden])
+  @@index([idDocumentoCierre])
+  @@map("documento_revision_cierre")
 }
 
 model Etiqueta {
@@ -895,9 +1171,9 @@ model HorasParticipacion {
   idParticipacion     Int         @map("id_participacion")
   periodoInicio       DateTime    @map("periodo_inicio") @db.Date
   periodoFin          DateTime    @map("periodo_fin") @db.Date
-  horasReportadas     Decimal     @map("horas_reportadas") @db.Decimal(6, 2)
-  horasCalculadas     Decimal?    @map("horas_calculadas") @db.Decimal(6, 2)
-  horasAprobadas      Decimal?    @map("horas_aprobadas") @db.Decimal(6, 2)
+  horasReportadas     Decimal     @map("horas_reportadas") @db.Decimal(12, 2)
+  horasCalculadas     Decimal?    @map("horas_calculadas") @db.Decimal(12, 2)
+  horasAprobadas      Decimal?    @map("horas_aprobadas") @db.Decimal(12, 2)
   justificacionAjuste String?     @map("justificacion_ajuste") @db.Text
   estadoHoras         EstadoHoras @default(PENDIENTE) @map("estado_horas")
   aprobadoPor         Int?        @map("aprobado_por")
@@ -905,8 +1181,8 @@ model HorasParticipacion {
   idSprint            Int?        @map("id_sprint")
 
   participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion])
-  aprobador     Usuario?              @relation(fields: [aprobadoPor], references: [idUsuario])
-  sprint        Sprint?               @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
+  aprobador     Usuario?              @relation(fields: [aprobadoPor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
+  sprint        Sprint?               @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([idSprint])
   @@map("horas_participacion")

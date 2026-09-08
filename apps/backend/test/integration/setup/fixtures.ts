@@ -1,6 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
-import { TipoProyecto, type EstadoParticipacion, type EstadoSprint, type EstadoTarea } from '@prisma/client';
+import {
+  Prisma,
+  TipoProyecto,
+  type EstadoParticipacion,
+  type EstadoProyecto,
+  type EstadoSprint,
+  type EstadoTarea,
+  type OrigenReporteTramo,
+} from '@prisma/client';
 
 /**
  * Fixtures genéricas de infraestructura para el harness de integración
@@ -35,6 +43,8 @@ interface IntegrationProjectOverrides {
   tituloProyecto?: string;
   descripcionProyecto?: string;
   tipoProyecto?: TipoProyecto;
+  /** S7: estado inicial explícito (por defecto el del schema, BORRADOR); las rutas de escritura operativas exigen P/E. */
+  estadoProyecto?: EstadoProyecto;
 }
 
 export async function createIntegrationProject(
@@ -49,6 +59,7 @@ export async function createIntegrationProject(
         overrides.descripcionProyecto ?? 'Proyecto de integración generado por fixtures de test.',
       tipoProyecto: overrides.tipoProyecto ?? TipoProyecto.ACADEMICO_HORAS_BECA,
       creadoPor,
+      ...(overrides.estadoProyecto !== undefined ? { estadoProyecto: overrides.estadoProyecto } : {}),
     },
   });
 }
@@ -152,13 +163,37 @@ export async function createIntegrationTask(
   });
 }
 
+interface IntegrationTaskAssignmentOverrides {
+  idParticipacion?: number;
+  desasignadaEn?: Date | null;
+  horasReales?: Prisma.Decimal | string | number | null;
+  origenReporte?: OrigenReporteTramo;
+  reconocidoEn?: Date | null;
+}
+
+/**
+ * Los overrides existen porque las suites de tiempo del Sprint 7 necesitan
+ * tramos cerrados, consumidos o de origen distinto de GRANULAR como punto de
+ * partida: son estados que el producto alcanza por sus propias rutas, y
+ * fabricarlos a mano en cada suite duplicaría el mismo `update` posterior.
+ */
 export async function createIntegrationTaskAssignment(
   prisma: PrismaClient,
   idTarea: number,
   idUsuario: number,
   asignadoPor: number,
+  overrides: IntegrationTaskAssignmentOverrides = {},
 ) {
   return prisma.asignacionTarea.create({
-    data: { idTarea, idUsuario, asignadoPor },
+    data: {
+      idTarea,
+      idUsuario,
+      asignadoPor,
+      ...(overrides.idParticipacion !== undefined ? { idParticipacion: overrides.idParticipacion } : {}),
+      ...(overrides.desasignadaEn !== undefined ? { desasignadaEn: overrides.desasignadaEn } : {}),
+      ...(overrides.horasReales !== undefined ? { horasReales: overrides.horasReales } : {}),
+      ...(overrides.origenReporte !== undefined ? { origenReporte: overrides.origenReporte } : {}),
+      ...(overrides.reconocidoEn !== undefined ? { reconocidoEn: overrides.reconocidoEn } : {}),
+    },
   });
 }

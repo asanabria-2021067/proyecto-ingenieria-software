@@ -60,7 +60,12 @@ function NewProjectFormContent() {
   useEffect(() => {
     if (!proyectoExistente) return;
     if (!ALLOWED_EDIT_STATES.includes(proyectoExistente.estadoProyecto)) {
-      router.replace(`/dashboard/projects/mine/${editId}`);
+      // Se llega aquí por URL directa (marcador o historial): el estado ya no
+      // admite edición. Se conserva el `returnTo` hacia el propio proyecto
+      // para que «Volver» devuelva al líder a su workspace y no a un listado.
+      router.replace(
+        `/dashboard/projects/mine/${editId}?returnTo=${encodeURIComponent(`/dashboard/projects/${editId}`)}`,
+      );
       return;
     }
     const p = proyectoExistente;

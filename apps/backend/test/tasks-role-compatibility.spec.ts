@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, HttpException, NotFoundException } from '@nestjs/common';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -7,6 +8,8 @@ import { TasksService } from '../src/tasks/tasks.service';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
 import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * A diferencia de tasks-update.service.spec.ts (que mockea
@@ -239,6 +242,9 @@ function makeFakeDb(state: Fixture) {
 
   db.$transaction.mockImplementation(async (callback: (db: unknown) => unknown) => callback(db));
 
+  // C040: el runner real bloquea el proyecto antes del callback.
+  withProjectLock(db);
+
   return db;
 }
 
@@ -248,7 +254,7 @@ function makeService(state: Fixture) {
   const tasksAuthorization = new TasksAuthorizationService(tasksContext);
   const tasksRelations = new TasksRelationsService(db as unknown as PrismaService, tasksContext);
   const notifications = {} as unknown as NotificationsService;
-  const service = new TasksService(db as unknown as PrismaService, tasksAuthorization, tasksRelations, notifications, tasksContext);
+  const service = new TasksService(db as unknown as PrismaService, tasksAuthorization, tasksRelations, notifications, tasksContext, new ProjectTransactionService(db as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return { db, service };
 }
 

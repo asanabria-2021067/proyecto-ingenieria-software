@@ -9,7 +9,6 @@ import {
   sprintsAnalyticsQueryKey,
 } from '@/lib/query-keys/sprints';
 import {
-  adjustSprintHours,
   closeSprint,
   finalizeSprint,
   getProjectSprints,
@@ -20,7 +19,6 @@ import {
   startSprint,
 } from '@/lib/services/sprints';
 import type {
-  AdjustSprintHoursInput,
   SprintAnalyticsDto,
   SprintClosingSummaryDto,
   SprintComparativeAnalyticsDto,
@@ -151,35 +149,6 @@ export function useSprintClosingSummary(idProyecto: number, idSprint: number) {
     error: query.error,
     refetch: query.refetch,
   };
-}
-
-/**
- * Ajusta horas reconocidas de una participación (A7) —
- * `PATCH /proyectos/:id/sprints/:sprintId/horas/:idParticipacion`. Opera
- * sobre una `ParticipacionProyecto` concreta, nunca sobre una persona
- * agregada (F5 puede necesitar invocarla varias veces, una por cada
- * participación realmente modificada de un participante multirol).
- *
- * `SprintDetail` (F4) nunca lee `HorasParticipacion` — sus asignaciones solo
- * exponen `horasReales` de `AsignacionTarea`, una tabla distinta que A7
- * jamás toca — así que no hay causa contractual para invalidarlo aquí; solo
- * `SprintClosingSummary` queda obsoleto tras un ajuste exitoso.
- */
-export function useAdjustSprintHours(idProyecto: number, idSprint: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({
-      idParticipacion,
-      ...input
-    }: { idParticipacion: number } & AdjustSprintHoursInput) =>
-      adjustSprintHours(idProyecto, idSprint, idParticipacion, input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: sprintClosingSummaryQueryKey(idProyecto, idSprint),
-      });
-    },
-  });
 }
 
 /**

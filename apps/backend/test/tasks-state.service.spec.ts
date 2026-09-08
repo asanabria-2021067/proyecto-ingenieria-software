@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EstadoTarea } from '@prisma/client';
@@ -8,6 +9,8 @@ import type { TasksContextService } from '../src/tasks/tasks-context.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import type { UpdateTaskEstadoDto } from '../src/tasks/dto/update-task-estado.dto';
 import { TasksService } from '../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function estadoDto(estadoTarea: string): UpdateTaskEstadoDto {
   return { estadoTarea: estadoTarea as EstadoTarea };
@@ -26,6 +29,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   const prisma = {
     tx,
     $transaction: vi.fn(),
@@ -84,7 +90,7 @@ function makeService(opts: {
   const notifications = opts.notifications ?? makeNotifications();
   const contextLiteral = { getActiveAssignment: vi.fn() };
   const context = contextLiteral as typeof contextLiteral & TasksContextService;
-  const service = new TasksService(prisma, auth, relations, notifications, context);
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -434,7 +440,7 @@ describe('TasksService.updateEstado', () => {
       const relations = {} as unknown as TasksRelationsService;
       const notifications = makeNotifications();
       const context = {} as unknown as TasksContextService;
-      const service = new TasksService(prisma, auth, relations, notifications, context);
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 
       await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
       orden.push('fin_transaccion');
@@ -538,7 +544,7 @@ describe('TasksService.updateEstado', () => {
       const notifications = makeNotifications();
       const relations = {} as unknown as TasksRelationsService;
       const context = {} as unknown as TasksContextService;
-      const service = new TasksService(prisma, auth, relations, notifications, context);
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 
       await service.updateEstado(5, 42, 1, estadoDto('HECHO'));
 
@@ -563,7 +569,7 @@ describe('TasksService.updateEstado', () => {
         { idHito: 7, estadoTarea: 'EN_PROGRESO' },
       ]);
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService);
+      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 
       await service.updateEstado(5, 42, 1, estadoDto('EN_PROGRESO'));
 
@@ -579,7 +585,7 @@ describe('TasksService.updateEstado', () => {
       tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: 7, estadoTarea: 'POR_HACER' }));
       tx.tarea.findMany.mockResolvedValue([{ idHito: 7, estadoTarea: 'POR_HACER' }]);
       const prisma = makePrisma(tx);
-      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService);
+      const service = new TasksService(prisma, makeAuthorization(), {} as unknown as TasksRelationsService, makeNotifications(), {} as unknown as TasksContextService, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 
       await service.updateEstado(5, 42, 1, estadoDto('POR_HACER'));
 

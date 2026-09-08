@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, TipoExperiencia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectHoursSummaryService } from '../sprints/project-hours-summary.service';
 import {
   UpdateProfileDto,
   CreateExperienciaDto,
@@ -9,7 +10,16 @@ import { GetMisTareasQueryDto } from './dto/get-mis-tareas-query.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    /**
+     * C125 (06 v2 §40/§46): las horas del dashboard se delegan al proveedor
+     * de horas en vez de recalcularse aquí. Opcional por el mismo motivo
+     * posicional que en el resto del dominio; en producción UsersModule
+     * siempre lo provee.
+     */
+    private readonly projectHours?: ProjectHoursSummaryService,
+  ) {}
 
   async getMe(userId: number) {
     const user = await this.prisma.usuario.findUnique({
@@ -412,6 +422,11 @@ export class UsersService {
         }),
       ]);
 
+    // §46: registradas en proyectos ABIERTOS incluye las participaciones ya
+    // retiradas —lo que alguien trabajó no se borra al retirarse— y las
+    // acreditadas cuentan SOLO los agregados que un administrador aprobó.
+    const abiertas = await this.projectHours?.forUserOpenProjects(userId);
+
     return {
       horasBeca: Number(horasBecaResult._sum.horasAprobadas ?? 0),
       horasBecaRequeridas: perfil?.horasBecaRequeridas ?? null,
@@ -420,6 +435,8 @@ export class UsersService {
       horasTotal: Number(horasData._sum.horasAprobadas ?? 0),
       proyectosActivos,
       postulacionesRecientes,
+      horasRegistradasEnProyectosAbiertos: abiertas?.reportadasGranulares ?? '0.00',
+      horasAcreditadas: abiertas?.acreditadas ?? '0.00',
     };
   }
 

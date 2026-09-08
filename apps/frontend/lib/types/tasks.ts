@@ -131,6 +131,12 @@ export interface RegistroTiempoTareaDTO {
   fecha: string;
   nota: string | null;
   creadoEn: string;
+  /**
+   * Marca de revocación. El autor nunca recibe sus registros revocados —
+   * retirarlos los saca de su lista—, así que solo llega con valor a quien
+   * lee el histórico de la tarea: líder y administración.
+   */
+  revocadoEn: string | null;
   usuario: UsuarioAsignadoResumen;
 }
 
@@ -139,4 +145,78 @@ export interface CreateTimeRecordInput {
   horas: number;
   fecha: string;
   nota?: string;
+  /** S7: obligatoria solo cuando ESTA operación cruza la estimación (antes ≤ estimación ∧ después > estimación). */
+  justificacionExceso?: string;
+}
+
+// ─── Sprint 7 — horas granulares (06 v2 §46, C067) ───────────────────────────
+
+/** Origen del tramo de horas: granular (registros), legacy (histórico sin registros) o por conciliar. */
+export type OrigenReporteTramo = 'GRANULAR' | 'LEGACY' | 'POR_CONCILIAR';
+
+/**
+ * Tramo de horas dentro del resumen autoritativo de la tarea. Los importes
+ * viajan como string decimal de dos posiciones — se formatean, nunca se
+ * convierten a `Number` para mostrarlos.
+ */
+/**
+ * Una justificación de exceso. Hasta S7 viajaba como texto plano; hoy arrastra
+ * su marca de revocación. La unión con `string` no es adorno: un navegador con
+ * el bundle anterior en caché convive con un backend ya actualizado, y esta
+ * lista se renderiza directamente — un objeto donde se esperaba texto tumba
+ * toda la página, no solo este apartado. Se lee con `normalizarJustificacion`.
+ */
+export type JustificacionExcesoDTO = string | { texto: string; revocadoEn: string | null };
+
+export interface TramoHorasResumenDTO {
+  idAsignacion: number;
+  usuario: UsuarioAsignadoResumen;
+  idParticipacion: number | null;
+  rolHistorico: { idRolProyecto: number; nombreRol: string } | null;
+  abierto: boolean;
+  origen: OrigenReporteTramo;
+  reportadas: string;
+  ajuste: string | null;
+  propuestas: string;
+  reconocidoEn: string | null;
+  /**
+   * Justificaciones de exceso visibles para este lector. Cada una arrastra su
+   * marca de revocación: al autor solo le llegan las vigentes; el líder recibe
+   * también las de registros retirados y debe poder distinguirlas.
+   */
+  justificaciones: JustificacionExcesoDTO[];
+}
+
+/**
+ * `GET /proyectos/:projectId/tareas/:taskId/horas/resumen` — única fuente
+ * correcta de estimación, reportadas, restantes, exceso y de los flags
+ * `puedeCrear/puedeEditar/puedeRevocar`, que gobiernan la UI.
+ *
+ * `restantes` y `sobreEstimacion` son `null` (no `0`) cuando
+ * `estimacion === null`: «no hay umbral» no es «el umbral es cero».
+ */
+export interface TaskHoursSummaryDTO {
+  taskId: number;
+  sprintId: number;
+  estimacion: number | null;
+  horasReportadasTarea: string;
+  horasLegacyNoGranulares: string;
+  restantes: string | null;
+  sobreEstimacion: string | null;
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeRevocar: boolean;
+  tramos: TramoHorasResumenDTO[];
+}
+
+/**
+ * Body de `PATCH /proyectos/:projectId/tareas/:taskId/horas/:recordId` —
+ * equivalente a `UpdateTimeRecordDto`. `nota: null` RETIRA la nota;
+ * `undefined` la conserva; la cadena vacía se rechaza.
+ */
+export interface UpdateTimeRecordInput {
+  horas?: number;
+  fecha?: string;
+  nota?: string | null;
+  justificacionExceso?: string;
 }
