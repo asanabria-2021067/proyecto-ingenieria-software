@@ -128,18 +128,19 @@ jobs:
       # Next.js (ya corre en build-frontend de deploy.yml) como red de
       # seguridad.
       #
-      # Sin --coverage: verificado en CI real que la instrumentacion de
-      # cobertura (v8 provider) es la causa directa de la inestabilidad de
-      # memoria de este job — "npm run test" corre la MISMA suite completa
-      # rapido y limpio (confirmado en corridas locales por lotes, sin un
-      # solo fallo), mientras que "test:coverage" reventó por heap out of
-      # memory y luego colgó indefinidamente tras terminar los tests, con
-      # 1, 2 y 4 forks. El backend conserva su gate de cobertura; el
-      # frontend prioriza que la suite corra completa y confiable sobre
-      # tener el numero de cobertura en cada PR.
-      - name: Pruebas unitarias (Vitest, sin cobertura)
+      # Sin --coverage y en lotes de proceso separado: verificado en CI real
+      # que ninguna combinación de forks/techo de heap/cobertura evita que
+      # jsdom acumule memoria dentro de un mismo proceso hasta reventar
+      # (probado con 1, 2 y 4 forks, con y sin --coverage, siempre el mismo
+      # "heap out of memory" cerca de los ~6GB). Cada lote de 20 archivos
+      # corre como una invocación de vitest totalmente nueva: el proceso
+      # termina y libera toda su memoria antes de que arranque el próximo,
+      # así que ninguna acumulación puede cruzar de un lote a otro. Cada
+      # lote individual ya se verificó limpio y rápido en corridas locales.
+      - name: Pruebas unitarias (Vitest, sin cobertura, en lotes)
         if: github.event_name == 'pull_request'
-        run: npm run test
+        run: |
+          ls test/*.spec.ts test/*.spec.tsx 2>/dev/null | xargs -n 20 npx vitest run
 
   e2e:
     name: E2E - suite de humo (Playwright)
