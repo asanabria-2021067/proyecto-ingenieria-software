@@ -11,7 +11,7 @@ describe('Infra', () => {
       usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }) },
     };
     const strategy = new JwtStrategy(prisma as unknown as PrismaService);
-    await expect(strategy.validate({ sub: 7, correo: 'a@uvg.edu' })).resolves.toEqual({
+    await expect(strategy.validate({ sub: 7, correo: 'a@uvg.edu', tipo: 'access' })).resolves.toEqual({
       userId: 7,
       correo: 'a@uvg.edu',
     });
