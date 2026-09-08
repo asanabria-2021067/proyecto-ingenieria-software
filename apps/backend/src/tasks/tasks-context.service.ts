@@ -4,6 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type TxClient = Prisma.TransactionClient;
 
+/**
+ * C040 (06 v2 §40): consultas de contexto compartidas. Cuando el llamador
+ * está dentro del runner por proyecto pasa su `tx`, y entonces cada lectura
+ * ocurre bajo el lock, en la misma vista que la escritura; sin `tx` (lecturas
+ * puras) usa el cliente base. Este servicio nunca abre una transacción.
+ */
 @Injectable()
 export class TasksContextService {
   constructor(private prisma: PrismaService) {}
@@ -119,6 +125,25 @@ export class TasksContextService {
       },
       select: { idParticipacion: true },
     });
+  }
+
+  /**
+   * C041 (06 v2 §34): filtro adicional de `Tarea` derivado de la decisión de
+   * lectura ya resuelta por `ProjectReadPolicyService`. Se aplica en la
+   * consulta, nunca sobre el DTO: el ámbito de Sprint restringe las tareas a
+   * los estados que la matriz permite al actor, y `ownOnly` (participante
+   * histórico o exlíder) las acota a aquellas en las que el actor tuvo una
+   * asignación. Un actor sin restricciones produce `{}` y la consulta queda
+   * exactamente como antes.
+   */
+  taskScopeWhere(
+    userId: number,
+    scope: { sprintWhere: Prisma.SprintWhereInput; ownOnly: boolean },
+  ): Prisma.TareaWhereInput {
+    return {
+      ...(Object.keys(scope.sprintWhere).length > 0 ? { sprint: scope.sprintWhere } : {}),
+      ...(scope.ownOnly ? { asignaciones: { some: { idUsuario: userId } } } : {}),
+    };
   }
 
   /**

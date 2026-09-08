@@ -1,6 +1,8 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
 import { Prioridad, type PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import {
@@ -12,6 +14,8 @@ import {
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { FINALIZING_SPRINT_MESSAGE, ProjectWriteGuard } from '../../src/common/guards/project-write.guard';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
@@ -28,6 +32,8 @@ import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksController } from '../../src/tasks/tasks.controller';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * X3 (Escenario A) — regresión cross-flow: ciclo de vida COMPLETO de un
@@ -41,7 +47,7 @@ import { TasksService } from '../../src/tasks/tasks.service';
  *      checkpoint atraviesa la metadata GUARDS_METADATA real del handler y
  *      ejecuta el guard real, nunca una llamada directa al service que se
  *      saltaría el guard
- *   -> revisión real de horas (A7 adjustRecognizedHours) + SprintClosingSummary
+ *   -> revisión real de horas (agregado ya acreditado) + SprintClosingSummary
  *      real (A8)
  *   -> closeSprint real -> CERRADO (A9), inmutable ante una segunda
  *      transición
@@ -65,9 +71,15 @@ function makeFakeNotifications(): NotificationsService {
   } as unknown as NotificationsService;
 }
 
-function fakeExecutionContext(params: Record<string, unknown>): ExecutionContext {
+function fakeExecutionContext(
+  params: Record<string, unknown>,
+  handler: object,
+  controllerClass: object,
+): ExecutionContext {
   return {
-    switchToHttp: () => ({ getRequest: () => ({ params }) }),
+    switchToHttp: () => ({ getRequest: () => ({ params, body: {} }) }),
+    getHandler: () => handler,
+    getClass: () => controllerClass,
   } as unknown as ExecutionContext;
 }
 
@@ -111,7 +123,8 @@ describeIntegration(
       const notifications = makeFakeNotifications();
 
       const sprintsContext = new SprintsContextService(prismaService);
-      guard = new ProjectWriteGuard(sprintsContext);
+      const resolver = new ProjectIdResolverService(prismaService);
+      guard = new ProjectWriteGuard(new Reflector(), resolver, new ProjectPolicyService(resolver), prismaService);
 
       const tasksContext = new TasksContextService(prismaService);
       const tasksAuthorization = new TasksAuthorizationService(tasksContext);
@@ -122,19 +135,34 @@ describeIntegration(
         tasksRelations,
         notifications,
         tasksContext,
-      );
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+        new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
       tasksController = new TasksController(tasksService);
 
-      const progressService = new ProgressRecordsService(prismaService, tasksContext);
+      const progressService = new ProgressRecordsService(
+        prismaService,
+        tasksContext,
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+      );
       progressController = new ProgressRecordsController(progressService);
 
       const exitContext = new ExitRequestsContextService(prismaService);
       const exitAuthorization = new ExitRequestsAuthorizationService(exitContext);
-      const exitService = new ExitRequestsService(prismaService, notifications, exitAuthorization, exitContext);
+      const exitService = new ExitRequestsService(
+        prismaService,
+        notifications,
+        exitAuthorization,
+        exitContext,
+        new ProjectTransactionService(prismaService),
+        new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+        new ProjectReadPolicyService(prismaService),
+      );
       exitController = new ExitRequestsController(exitService);
 
       const sprintsAuthorization = new SprintsAuthorizationService(sprintsContext);
-      sprintsService = new SprintsService(prismaService, sprintsContext, sprintsAuthorization, notifications);
+      sprintsService = new SprintsService(prismaService, sprintsContext, sprintsAuthorization, notifications, new ProjectTransactionService(prismaService), new ProjectPolicyService(new ProjectIdResolverService(prismaService)), new ProjectReadPolicyService(prismaService));
     });
 
     afterAll(async () => {
@@ -172,6 +200,7 @@ describeIntegration(
       // los `deleteMany` redundantes que ese helper repite después sobre
       // los mismos IDs ya borrados son no-ops seguros (count: 0).
       if (assignmentIds.length > 0) {
+        await prisma.registroTiempoTarea.deleteMany({ where: { idAsignacion: { in: assignmentIds } } });
         await prisma.asignacionTarea.deleteMany({ where: { idAsignacion: { in: assignmentIds } } });
       }
       const taskIds = scope.taskIds ?? [];
@@ -191,7 +220,10 @@ describeIntegration(
       action: () => Promise<T>,
     ): Promise<T> {
       expect(guardsOf(controller, handlerName)).toContain(ProjectWriteGuard);
-      await guard.canActivate(fakeExecutionContext({ projectId: String(projectId) }));
+      const prototype = Object.getPrototypeOf(controller) as Record<string, object>;
+      await guard.canActivate(
+        fakeExecutionContext({ projectId: String(projectId) }, prototype[handlerName], prototype.constructor),
+      );
       return action();
     }
 
@@ -203,7 +235,7 @@ describeIntegration(
       const collaborator = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, collaborator.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const role = await createIntegrationProjectRole(prisma, project.idProyecto, { nombreRol: 'X3 Rol' });
@@ -255,6 +287,9 @@ describeIntegration(
       expect(asignacion.idParticipacion).toBe(participation.idParticipacion);
 
       // --- C. Cierre real del tramo (A12: marcarComoHecha sincroniza el Hito) ---
+      await prisma.registroTiempoTarea.create({
+        data: { idAsignacion: asignacion.idAsignacion, idUsuario: collaborator.idUsuario, horas: HORAS_REALES, fecha: new Date('2026-09-06') },
+      });
       await runThroughRealGuard(tasksController, 'closeAssignment', project.idProyecto, () =>
         tasksController.closeAssignment(
           project.idProyecto,
@@ -262,7 +297,6 @@ describeIntegration(
           { assignmentId: String(asignacion.idAsignacion) },
           { userId: collaborator.idUsuario },
           {
-            horasReales: HORAS_REALES,
             contenidoAvance: longProgressContent('X3 cierre de tramo en ACTIVO'),
             marcarComoHecha: true,
           },
@@ -403,18 +437,15 @@ describeIntegration(
           periodoFin: new Date('2026-01-31'),
           horasReportadas: HORAS_REALES,
           horasCalculadas: HORAS_REALES,
+          // C074: el líder ya no edita el total reconocido. La acreditación es
+          // potestad exclusiva de approveClosure (06 v2 §31), así que el
+          // importe aprobado forma parte del estado de partida del fixture, no
+          // de una llamada del líder que ya no existe.
+          horasAprobadas: HORAS_REALES,
         },
       });
       scope.horasParticipacionIds = [horasCalculadas.idRegistroHoras];
-
-      const ajustada = await sprintsService.adjustRecognizedHours(
-        project.idProyecto,
-        sprint.idSprint,
-        participation.idParticipacion,
-        leader.idUsuario,
-        { horasAprobadas: HORAS_REALES },
-      );
-      expect(Number(ajustada.horasAprobadas)).toBe(HORAS_REALES);
+      expect(Number(horasCalculadas.horasAprobadas)).toBe(HORAS_REALES);
 
       const resumen = await sprintsService.getSprintClosingSummary(
         project.idProyecto,

@@ -1,3 +1,4 @@
+import { makeTimeRecordsDouble } from './helpers/time-records.fixture';
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TasksService } from '../src/tasks/tasks.service';
@@ -7,6 +8,8 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { TasksAuthorizationService } from '../src/tasks/tasks-authorization.service';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../src/tasks/tasks-relations.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 function makeTx() {
   return {
@@ -16,6 +19,9 @@ function makeTx() {
 }
 
 function makePrisma(tx = makeTx()) {
+  // C040: el runner real ejecuta `SET LOCAL lock_timeout` y el UPDATE del
+  // lock del proyecto sobre `tx` antes del callback.
+  withProjectLock(tx);
   const prisma = {
     tx,
     $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
@@ -90,7 +96,7 @@ function makeService(opts: {
   const relations = opts.relations ?? makeRelations();
   const notifications = opts.notifications ?? makeNotifications();
   const context = opts.context ?? makeContext();
-  const service = new TasksService(prisma, auth, relations, notifications, context);
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -224,7 +230,12 @@ describe('TasksService.assign', () => {
 
       await service.assign(5, 42, 1, DTO);
 
-      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, 6, tx);
+      // C086: asignar es crear una asignación NUEVA, así que pasa por la
+      // elegibilidad del destino con el actor que la ejecuta.
+      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, 6, tx, {
+        nuevaAsignacion: true,
+        actorId: 1,
+      });
     });
 
     it('tarea sin rol: rolEfectivo es null', async () => {
@@ -233,7 +244,10 @@ describe('TasksService.assign', () => {
 
       await service.assign(5, 42, 1, DTO);
 
-      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, null, tx);
+      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, null, tx, {
+        nuevaAsignacion: true,
+        actorId: 1,
+      });
     });
 
     it('candidato activo en el rol exacto: permitido (tarea con rol)', async () => {
@@ -617,7 +631,7 @@ describe('TasksService.assign', () => {
         return tareaRow();
       });
       const notifications = makeNotifications();
-      const service = new TasksService(prisma, auth, relations, notifications, context);
+      const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 
       await service.assign(5, 42, 1, DTO);
 
@@ -649,7 +663,10 @@ describe('TasksService.assign', () => {
       await service.assign(5, 42, 1, DTO);
 
       expect(auth.assertCanAssignTask).toHaveBeenCalledWith(5, 42, 1, tx);
-      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, null, tx);
+      expect(relations.assertUserAssignableToProject).toHaveBeenCalledWith(5, 7, null, tx, {
+        nuevaAsignacion: true,
+        actorId: 1,
+      });
       expect(context.getActiveAssignment).toHaveBeenCalledWith(42, tx);
     });
   });

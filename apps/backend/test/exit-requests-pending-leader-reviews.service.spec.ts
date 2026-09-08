@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { ExitRequestsAuthorizationService } from '../src/exit-requests/exit-requests.authorization.service';
 import { ExitRequestsContextService } from '../src/exit-requests/exit-requests.context.service';
 import { ExitRequestsService } from '../src/exit-requests/exit-requests.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble } from './helpers/project-policy.double';
 
 const LIDER_ID = 1;
 const OTRO_USUARIO_ID = 99;
@@ -28,7 +30,9 @@ function makeService(prisma: ReturnType<typeof makePrisma>) {
     >[1],
     new ExitRequestsAuthorizationService(context),
     context,
-  );
+    new ProjectTransactionService(prismaService),
+    makeProjectPolicyDouble(),
+    makeProjectReadPolicyDouble());
 }
 
 type PendingLeaderReviewsArgs = {

@@ -122,8 +122,8 @@ export interface SprintClosingSummaryRoleDto {
 /**
  * Una `ParticipacionProyecto` individual dentro del desglose de un
  * participante (A8.1) — la única forma del contrato que expone
- * `idParticipacion`, imprescindible para `adjustSprintHours` (A7), que
- * ajusta por participación, nunca por persona agregada.
+ * `idParticipacion`, que S7 usa para mapear cada tramo a su rol (el ajuste
+ * por participación, E063, fue retirado: hoy se ajusta por asignación).
  *
  * `horasCalculadas`/`horasAprobadas` son `number | null` porque reflejan la
  * columna backend tal cual: A5 puede no haber calculado nada todavía, y
@@ -159,18 +159,93 @@ export interface SprintClosingSummaryParticipantDto {
   horasCalculadas: number;
   horasAprobadas: number;
   participaciones: SprintClosingSummaryParticipationDto[];
+  /** S7 C079 (§46): desglose por tramos y ajustes. Aditivo; nunca editable. */
+  totales?: SprintClosingMemberTotalsDto;
+}
+
+/**
+ * S7 C079 (06 v2 §46): un TRAMO (`AsignacionTarea`) dentro del desglose de
+ * cierre. `reportadas` es lo que reportó el integrante y `propuestas` es
+ * reportadas + el ajuste vigente del líder. Los importes son string decimal
+ * de dos posiciones: se formatean, nunca se operan en punto flotante.
+ */
+export interface SprintClosingTramoDto {
+  idAsignacion: number;
+  idTarea: number;
+  tituloTarea: string;
+  tareaEliminada: boolean;
+  idParticipacion: number | null;
+  abierto: boolean;
+  origen: string;
+  reportadas: string;
+  /** Estimación de la tarea del tramo; `null` cuando nadie la estimó. */
+  estimacionTarea: number | null;
+  /** Reportado por encima de la estimación. `'0.00'` si no la supera o no hay. */
+  exceso: string;
+  /** Lo que argumentó el ESTUDIANTE al exceder su estimación, no el líder. */
+  justificacionExceso: string | null;
+  ajuste: string | null;
+  justificacionAjuste: string | null;
+  propuestas: string;
+  reconocidoEn: string | null;
+}
+
+/** S7 C079: totales por integrante derivados de sus tramos; nunca editables. */
+export interface SprintClosingMemberTotalsDto {
+  tareasDistintas: number;
+  estimacionAsociada: number | null;
+  reportadas: string;
+  legacy: string;
+  exceso: string;
+  propuestas: string;
+  filasPendientes: number;
+  filasConsumidas: number;
+  tramos: SprintClosingTramoDto[];
+}
+
+/** S7 C079 (§22/§46): impedimento visible del cierre del Sprint. */
+export interface SprintClosingBlockerDto {
+  code: string;
+  message: string;
+  ids: number[];
+  cantidad: number;
 }
 
 export interface SprintClosingSummaryDto {
   idProyecto: number;
   idSprint: number;
+  /** S7 C079: el estado del Sprint forma parte del resumen (`CERRADO` ⇒ read-only). */
+  estadoSprint?: string;
   participantes: SprintClosingSummaryParticipantDto[];
+  /** S7 C079: lo que impide consolidar. Vacío o ausente ⇒ se puede cerrar. */
+  blockers?: SprintClosingBlockerDto[];
 }
 
-/** Body de `PATCH /proyectos/:id/sprints/:sprintId/horas/:participacionId` (A7). */
-export interface AdjustSprintHoursInput {
-  horasAprobadas: number;
-  justificacionAjuste?: string;
+/**
+ * S7 — body de `POST /proyectos/:pid/sprints/:sid/asignaciones/:aid/ajuste-horas`
+ * (`UpsertHourAdjustmentDto`). `deltaHoras` es un DELTA CON SIGNO en string
+ * decimal (`/^[+-]?\d{1,10}(\.\d{1,2})?$/`), nunca un absoluto. La
+ * justificación es obligatoria si el delta no es cero.
+ */
+export interface UpsertHourAdjustmentInput {
+  deltaHoras: string;
+  justificacion?: string;
+}
+
+/** S7 — un eslabón de la cadena de ajustes de un tramo (`AjusteHoraPublico`). */
+export interface AjusteHoraDTO {
+  idAjusteHora: number;
+  idAsignacion: number;
+  deltaHoras: string;
+  horasBase: string;
+  propuesta: string;
+  justificacion: string | null;
+  idAutor: number;
+  creadoEn: string;
+  anuladoEn: string | null;
+  anuladoPor: number | null;
+  idAjusteAnterior: number | null;
+  vigente: boolean;
 }
 
 /**

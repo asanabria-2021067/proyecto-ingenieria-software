@@ -56,7 +56,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { TaskCommentsPanel } from '@/components/projects/task-comments-panel';
-import { TaskHoursPanel } from '@/components/projects/task-hours-panel';
+import { TaskHoursSection } from '@/components/hours/task-hours-section';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
 import { CloseAssignmentForm } from '@/components/projects/close-assignment-form';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
@@ -543,13 +543,17 @@ function TaskDetailView({
             </div>
           </section>
 
-          {/* Horas trabajadas (HU-142) */}
-          <section className={CARD}>
-            <SeccionTitulo icon={Clock}>Horas trabajadas</SeccionTitulo>
-            <TaskHoursPanel
+          {/* Horas de la tarea (HU-142 · S7 VIEW-04): el resumen del backend
+              gobierna crear/editar/revocar; aquí no se infiere permiso alguno. */}
+          <section className={CARD} aria-labelledby="horas-tarea-titulo">
+            <h2 id="horas-tarea-titulo" className="mb-1 flex items-center gap-2 text-sm font-bold text-on-surface">
+              <Clock className="size-4 text-tertiary" aria-hidden="true" />
+              Horas de la tarea
+            </h2>
+            <TaskHoursSection
               idProyecto={idProyecto}
               idTarea={tarea.idTarea}
-              puedeRegistrar={esAsignadoActivo}
+              idUsuarioActual={currentUser?.idUsuario ?? null}
               enabled
             />
           </section>

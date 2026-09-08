@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -11,6 +10,8 @@ import type { NotificationsService } from '../src/notifications/notifications.se
 import { SprintsService } from '../src/sprints/sprints.service';
 import { SprintsContextService } from '../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../src/sprints/sprints-authorization.service';
+import { ProjectTransactionService } from '../src/common/project-policy/project-transaction.service';
+import { makeProjectPolicyDouble, makeProjectReadPolicyDouble, withProjectLock } from './helpers/project-policy.double';
 
 /**
  * Reproduce la violación real del índice parcial `sprint_operable_unique`
@@ -57,8 +58,15 @@ function makeForeignKeyError() {
 function makeTx() {
   return {
     sprint: { findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
-    tarea: { count: vi.fn() },
-    horasParticipacion: { findFirst: vi.fn(), update: vi.fn() },
+    tarea: { count: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    // C075 (§12): finalizar revalida F1–F4 sobre el conjunto histórico, así
+    // que el doble expone las consultas de tramos que esas revalidaciones
+    // hacen. Por defecto todo vacío = los cuatro predicados se cumplen.
+    asignacionTarea: { findMany: vi.fn().mockResolvedValue([]) },
+    horasParticipacion: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
+    // C080: cerrar consolida y avisa; el título del proyecto solo se consulta
+    // cuando hay destinatarios.
+    proyecto: { findUniqueOrThrow: vi.fn().mockResolvedValue({ tituloProyecto: 'Proyecto' }) },
   };
 }
 
@@ -67,7 +75,11 @@ function makePrisma(tx = makeTx()) {
     tx,
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
-    sprint: { findFirst: vi.fn(), findMany: vi.fn() },
+    // C079: el resumen de cierre compone su desglose por tramos con dos
+    // consultas adicionales (estado del Sprint + tramos del Sprint), aparte
+    // de la agregación de HU-D1, que no cambia.
+    sprint: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn().mockResolvedValue({ estado: 'EN_FINALIZACION' }) },
+    asignacionTarea: { findMany: vi.fn().mockResolvedValue([]) },
     hito: { findMany: vi.fn() },
     // A12: getSprintDetail usa esto para calcular `porcentaje` por Hito
     // (TODAS las tareas vigentes del Hito en el proyecto). Por defecto []
@@ -76,11 +88,18 @@ function makePrisma(tx = makeTx()) {
     tarea: { findMany: vi.fn().mockResolvedValue([]) },
   };
   prisma.$transaction.mockImplementation(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx));
+  // C045: el runner real bloquea el proyecto antes del callback.
+  withProjectLock(tx);
   return prisma as typeof prisma & PrismaService;
 }
 
 function makeSprintsContext() {
-  const context = { getCurrentSprint: vi.fn() };
+  const context = {
+    getCurrentSprint: vi.fn(),
+    // C046: el ámbito de lectura se resuelve en el contexto (función pura
+    // sobre la decisión); un actor sin restricción produce `{}`.
+    sprintScopeWhere: vi.fn().mockReturnValue({}),
+  };
   return context as typeof context & SprintsContextService;
 }
 
@@ -89,7 +108,6 @@ function makeSprintsAuthorization() {
     assertCanStartSprint: vi.fn().mockResolvedValue(undefined),
     assertCanFinalizeSprint: vi.fn(),
     assertCanCloseSprint: vi.fn(),
-    assertCanAdjustRecognizedHours: vi.fn().mockResolvedValue(undefined),
     assertCanViewClosingSummary: vi.fn().mockResolvedValue(undefined),
     assertCanListSprintHistory: vi.fn().mockResolvedValue(undefined),
     assertCanViewSprintHistory: vi.fn().mockResolvedValue(undefined),
@@ -124,7 +142,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -144,7 +162,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -169,7 +187,7 @@ describe('SprintsService', () => {
         estado: 'ACTIVO',
       });
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -187,7 +205,7 @@ describe('SprintsService', () => {
         estado: 'EN_FINALIZACION',
       });
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -206,7 +224,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -222,7 +240,7 @@ describe('SprintsService', () => {
       authorization.assertCanStartSprint.mockRejectedValue(
         new ForbiddenException('No eres el líder de este proyecto'),
       );
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.startSprint(PROJECT_ID, NO_LIDER_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -239,7 +257,7 @@ describe('SprintsService', () => {
       authorization.assertCanStartSprint.mockRejectedValue(
         new NotFoundException('Proyecto con id 10 no encontrado'),
       );
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -259,7 +277,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -277,7 +295,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -292,7 +310,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
@@ -307,7 +325,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
@@ -322,7 +340,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
@@ -342,7 +360,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -363,7 +381,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       context.getCurrentSprint.mockResolvedValue(null);
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.startSprint(PROJECT_ID, LIDER_ID);
 
@@ -373,6 +391,11 @@ describe('SprintsService', () => {
   });
 
   describe('finalizeSprint', () => {
+    /** Tarea HECHO con traza: el estado por sí solo no satisface F1. */
+    function tareaHecha(idTarea: number, overrides: Record<string, unknown> = {}) {
+      return { idTarea, estadoTarea: 'HECHO', _count: { asignaciones: 1 }, ...overrides };
+    }
+
     function sprintActivo(overrides: Record<string, unknown> = {}) {
       return {
         idSprint: SPRINT_ID,
@@ -389,14 +412,14 @@ describe('SprintsService', () => {
       const sprint = sprintActivo();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 1 });
       const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
       tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -418,11 +441,11 @@ describe('SprintsService', () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.count.mockResolvedValue(1); // una tarea EN_PROGRESO cuenta como no-HECHO
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { estadoTarea: 'EN_PROGRESO' })]);
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -436,23 +459,22 @@ describe('SprintsService', () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.count.mockResolvedValue(1);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { estadoTarea: 'POR_HACER' })]);
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
       );
-      expect(tx.tarea.count).toHaveBeenCalledWith({
-        where: {
-          idProyecto: PROJECT_ID,
-          idSprint: SPRINT_ID,
-          eliminadoEn: null,
-          estadoTarea: { not: 'HECHO' },
-        },
-      });
+      // F1 sigue mirando solo el conjunto vigente: una tarea eliminada no
+      // cuenta como pendiente (a diferencia de F2, que sí la incluye).
+      expect(tx.tarea.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { idProyecto: PROJECT_ID, idSprint: SPRINT_ID, eliminadoEn: null },
+        }),
+      );
     });
 
     it('caso 4: Sprint EN_FINALIZACION rechaza sin notificar', async () => {
@@ -464,12 +486,12 @@ describe('SprintsService', () => {
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
       );
-      expect(tx.tarea.count).not.toHaveBeenCalled();
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
       expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
     });
 
@@ -480,7 +502,7 @@ describe('SprintsService', () => {
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -497,7 +519,7 @@ describe('SprintsService', () => {
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.finalizeSprint(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
@@ -515,12 +537,12 @@ describe('SprintsService', () => {
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID),
       ).rejects.toBeInstanceOf(NotFoundException);
-      expect(tx.tarea.count).not.toHaveBeenCalled();
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
       expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
     });
 
@@ -529,14 +551,14 @@ describe('SprintsService', () => {
       const sprint = sprintActivo();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 1 });
       const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
       tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -548,12 +570,13 @@ describe('SprintsService', () => {
       const sprint = sprintActivo();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 1 });
       const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
       tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
 
       const orden: string[] = [];
+      withProjectLock(tx);
       const prisma = {
         $transaction: vi.fn(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => {
           const resultado = await callback(tx);
@@ -569,7 +592,7 @@ describe('SprintsService', () => {
       notifications.notifySprintFinalizationStarted.mockImplementation(async () => {
         orden.push('notificacion-realtime');
       });
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -584,11 +607,12 @@ describe('SprintsService', () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 1 });
       // Simula un fallo dentro de la transacción DESPUÉS del updateMany (p.
       // ej. la relectura final falla) — el callback de $transaction
       // propaga el rechazo tal como Prisma haría en un rollback real.
+      withProjectLock(tx);
       const prisma = {
         $transaction: vi.fn(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => {
           tx.sprint.findFirst.mockResolvedValue(null);
@@ -597,7 +621,7 @@ describe('SprintsService', () => {
       } as unknown as PrismaService;
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toThrow();
       expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
@@ -608,12 +632,12 @@ describe('SprintsService', () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.count.mockResolvedValue(0);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1)]);
       tx.sprint.updateMany.mockResolvedValue({ count: 0 }); // otra transacción ya ganó la carrera
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -623,314 +647,16 @@ describe('SprintsService', () => {
     });
   });
 
-  describe('adjustRecognizedHours', () => {
-    const PARTICIPATION_ID = 30;
-
-    function registroHoras(overrides: Record<string, unknown> = {}) {
-      return {
-        idRegistroHoras: 100,
-        idParticipacion: PARTICIPATION_ID,
-        idSprint: SPRINT_ID,
-        horasCalculadas: new Prisma.Decimal(10),
-        horasAprobadas: null,
-        justificacionAjuste: null,
-        ...overrides,
-      };
-    }
-
-    // AsignacionTarea nunca se toca desde A7: makeTx() no expone
-    // `asignacionTarea` en absoluto, así que cualquier intento de
-    // leerla/escribirla desde adjustRecognizedHours haría fallar la prueba
-    // con un TypeError, demostrando la invariante de horasReales inmutable
-    // (Sección 10 / criterio 13) sin necesitar una fila real de fixture.
-
-    it('caso 1: aumento con justificación válida — acepta, persiste horasAprobadas y justificacionAjuste', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras());
-      const actualizado = registroHoras({ horasAprobadas: new Prisma.Decimal(15), justificacionAjuste: 'Horas extra validadas con evidencia' });
-      tx.horasParticipacion.update.mockResolvedValue(actualizado);
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      const dto = { horasAprobadas: 15, justificacionAjuste: 'Horas extra validadas con evidencia' };
-      const result = await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto);
-
-      expect(result).toBe(actualizado);
-      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
-        where: { idRegistroHoras: 100 },
-        data: { horasAprobadas: 15, justificacionAjuste: 'Horas extra validadas con evidencia' },
-      });
-    });
-
-    it('caso 2: disminución con justificación válida — acepta, persiste horasAprobadas y justificacionAjuste', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras());
-      const actualizado = registroHoras({ horasAprobadas: new Prisma.Decimal(6), justificacionAjuste: 'Se descuentan horas no verificables' });
-      tx.horasParticipacion.update.mockResolvedValue(actualizado);
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      const dto = { horasAprobadas: 6, justificacionAjuste: 'Se descuentan horas no verificables' };
-      const result = await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto);
-
-      expect(result).toBe(actualizado);
-      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
-        where: { idRegistroHoras: 100 },
-        data: { horasAprobadas: 6, justificacionAjuste: 'Se descuentan horas no verificables' },
-      });
-    });
-
-    it('caso 3: diferencia sin justificación (campo ausente) — lanza BadRequestException sin persistir', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras());
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      const dto = { horasAprobadas: 12 };
-      await expect(
-        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-    });
-
-    it('caso 3b: justificación whitespace-only no satisface la regla — lanza BadRequestException sin persistir', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras());
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      const dto = { horasAprobadas: 12, justificacionAjuste: '   ' };
-      await expect(
-        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-    });
-
-    it('caso 4: igualdad (horasAprobadas == horasCalculadas) sin justificación — acepta y persiste horasAprobadas', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: new Prisma.Decimal(10) }));
-      const actualizado = registroHoras({ horasAprobadas: new Prisma.Decimal(10) });
-      tx.horasParticipacion.update.mockResolvedValue(actualizado);
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      const dto = { horasAprobadas: 10 };
-      const result = await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, dto);
-
-      expect(result).toBe(actualizado);
-      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
-        where: { idRegistroHoras: 100 },
-        data: { horasAprobadas: 10, justificacionAjuste: null },
-      });
-    });
-
-    it('caso 5: localiza el registro acotando por idParticipacion + idSprint + proyecto (aislamiento cross-project)', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: new Prisma.Decimal(10) }));
-      tx.horasParticipacion.update.mockResolvedValue(registroHoras({ horasAprobadas: new Prisma.Decimal(10) }));
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 10 });
-
-      expect(tx.horasParticipacion.findFirst).toHaveBeenCalledWith({
-        where: {
-          idParticipacion: PARTICIPATION_ID,
-          idSprint: SPRINT_ID,
-          participacion: { rolProyecto: { idProyecto: PROJECT_ID } },
-        },
-      });
-      expect(authorization.assertCanAdjustRecognizedHours).toHaveBeenCalledWith(
-        PROJECT_ID,
-        SPRINT_ID,
-        LIDER_ID,
-        tx,
-      );
-    });
-
-    it('caso 6: registro de horas inexistente para la participación/Sprint — lanza NotFoundException sin persistir', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(null);
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      await expect(
-        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 5 }),
-      ).rejects.toBeInstanceOf(NotFoundException);
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-    });
-
-    it('caso 6b (A7.1 multirol): ajustar la participación #51 nunca toca el registro de horas de la participación #87 del mismo usuario', async () => {
-      const tx = makeTx();
-      const registro51 = registroHoras({
-        idRegistroHoras: 501,
-        idParticipacion: 51,
-        horasCalculadas: new Prisma.Decimal(10),
-        horasAprobadas: null,
-      });
-      const registro87 = registroHoras({
-        idRegistroHoras: 870,
-        idParticipacion: 87,
-        horasCalculadas: new Prisma.Decimal(8),
-        horasAprobadas: new Prisma.Decimal(8),
-      });
-      tx.horasParticipacion.findFirst.mockImplementation(
-        async ({ where }: { where: { idParticipacion: number } }) => {
-          if (where.idParticipacion === 51) return registro51;
-          if (where.idParticipacion === 87) return registro87;
-          return null;
-        },
-      );
-      tx.horasParticipacion.update.mockImplementation(
-        async ({ where, data }: { where: { idRegistroHoras: number }; data: Record<string, unknown> }) => {
-          if (where.idRegistroHoras === 501) return { ...registro51, ...data };
-          if (where.idRegistroHoras === 870) return { ...registro87, ...data };
-          throw new Error(`update dirigido a un idRegistroHoras inesperado: ${where.idRegistroHoras}`);
-        },
-      );
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      const resultado51 = await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, 51, LIDER_ID, {
-        horasAprobadas: 12,
-        justificacionAjuste: 'Se reconocen dos horas adicionales',
-      });
-
-      expect(resultado51.horasAprobadas).toBe(12);
-      expect(tx.horasParticipacion.update).toHaveBeenCalledTimes(1);
-      expect(tx.horasParticipacion.update).toHaveBeenCalledWith({
-        where: { idRegistroHoras: 501 },
-        data: { horasAprobadas: 12, justificacionAjuste: 'Se reconocen dos horas adicionales' },
-      });
-      // #87 nunca fue leída ni escrita por este ajuste: solo se consultó una
-      // vez (para #51), y ningún update apuntó a su idRegistroHoras (870).
-      expect(tx.horasParticipacion.findFirst).toHaveBeenCalledTimes(1);
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalledWith(
-        expect.objectContaining({ where: { idRegistroHoras: 870 } }),
-      );
-    });
-
-    it('caso 7: usuario no líder — propaga la excepción de autorización sin buscar ni persistir el registro', async () => {
-      const tx = makeTx();
-      const authorization = makeSprintsAuthorization();
-      authorization.assertCanAdjustRecognizedHours.mockRejectedValue(
-        new ForbiddenException('No eres el líder de este proyecto'),
-      );
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      await expect(
-        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 5 }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(tx.horasParticipacion.findFirst).not.toHaveBeenCalled();
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-    });
-
-    it('caso 8: horasCalculadas null se rechaza (A7.1) — NUNCA se trata como 0, sin importar si se envía justificación', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: null }));
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      // Con el fallback antiguo (?? new Prisma.Decimal(0)) esta llamada con
-      // justificación habría sido ACEPTADA (3 != 0, justificación presente).
-      // A7.1 debe rechazarla igual: sin horasCalculadas persistido no hay
-      // base de cálculo sobre la cual ajustar, independientemente de que se
-      // envíe justificación.
-      await expect(
-        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, {
-          horasAprobadas: 3,
-          justificacionAjuste: 'justificación válida no vacía',
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-    });
-
-    it('caso 8b: horasCalculadas null con horasAprobadas = 0 también se rechaza (no hay fallback implícito a 0)', async () => {
-      const tx = makeTx();
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: null }));
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      // Con el fallback antiguo, horasAprobadas=0 habría igualado el 0
-      // implícito y se habría aceptado SIN justificación. A7.1 debe
-      // rechazar de todos modos: null nunca se interpreta como 0.
-      await expect(
-        service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 0 }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-    });
-
-    it('caso 9: horasReales de AsignacionTarea permanece exactamente igual antes/después del ajuste (invariante de la Sección 10)', async () => {
-      // Fixture explícito de dos tramos AsignacionTarea con horasReales
-      // conocidas, independiente del mock de HorasParticipacion — simula el
-      // estado real de la base de datos antes y después de la operación.
-      const asignacionesAntes = [
-        { idAsignacion: 501, horasReales: new Prisma.Decimal(3) },
-        { idAsignacion: 502, horasReales: new Prisma.Decimal(2) },
-      ];
-      // Copia profunda independiente para comparar "estado post-operación"
-      // sin compartir referencia con `asignacionesAntes`.
-      const asignacionTareaStore = asignacionesAntes.map((a) => ({ ...a, horasReales: new Prisma.Decimal(a.horasReales) }));
-
-      const txBase = makeTx();
-      // AsignacionTarea SÍ está disponible en este tx (a diferencia de otros
-      // casos de este describe), precisamente para poder leerla antes y
-      // después y comparar valores reales, no solo ausencia de llamadas.
-      const tx = {
-        ...txBase,
-        asignacionTarea: {
-          findMany: vi.fn(async () => asignacionTareaStore.map((a) => ({ ...a }))),
-        },
-      };
-      tx.horasParticipacion.findFirst.mockResolvedValue(registroHoras({ horasCalculadas: new Prisma.Decimal(10) }));
-      tx.horasParticipacion.update.mockResolvedValue(registroHoras({ horasAprobadas: new Prisma.Decimal(10) }));
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
-
-      const antes = await tx.asignacionTarea.findMany();
-
-      await service.adjustRecognizedHours(PROJECT_ID, SPRINT_ID, PARTICIPATION_ID, LIDER_ID, { horasAprobadas: 10 });
-
-      const despues = await tx.asignacionTarea.findMany();
-
-      expect(despues).toHaveLength(antes.length);
-      antes.forEach((asignacionAntes: { idAsignacion: number; horasReales: Prisma.Decimal }, index: number) => {
-        const asignacionDespues = despues[index];
-        expect(asignacionDespues.idAsignacion).toBe(asignacionAntes.idAsignacion);
-        expect(asignacionDespues.horasReales.equals(asignacionAntes.horasReales)).toBe(true);
-      });
-      // Aserción explícita adicional por valor concreto, sin depender solo
-      // del bucle: los dos tramos conservan exactamente 3 y 2.
-      expect(despues[0].horasReales.equals(new Prisma.Decimal(3))).toBe(true);
-      expect(despues[1].horasReales.equals(new Prisma.Decimal(2))).toBe(true);
-      // adjustRecognizedHours nunca invoca asignacionTarea: la única
-      // llamada registrada es la del propio test (antes/después), no del
-      // servicio.
-      expect(tx.asignacionTarea.findMany).toHaveBeenCalledTimes(2);
+  /**
+   * C074: `adjustRecognizedHours` fue RETIRADO junto con su ruta, su DTO y su
+   * rama de autorización. `HorasParticipacion` deja de tener un escritor
+   * manual: reconocer es de Flow A/B y acreditar es de approveClosure.
+   */
+  describe('el ajuste manual del total reconocido está retirado', () => {
+    it('SprintsService ya no expone adjustRecognizedHours', () => {
+      expect(
+        (SprintsService.prototype as unknown as Record<string, unknown>).adjustRecognizedHours,
+      ).toBeUndefined();
     });
   });
 
@@ -983,14 +709,21 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue(filas);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
-      expect(result).toEqual({
-        idProyecto: PROJECT_ID,
-        idSprint: SPRINT_ID,
-        participantes: filas,
+      // C079: el resumen se extiende de forma ADITIVA — las filas agregadas de
+      // HU-D1 siguen llegando sin transformar, con su desglose por tramos al
+      // lado y sin ningún total editable.
+      expect(result.idProyecto).toBe(PROJECT_ID);
+      expect(result.idSprint).toBe(SPRINT_ID);
+      expect(result.estadoSprint).toBe('EN_FINALIZACION');
+      expect(result.blockers).toEqual([]);
+      expect(result.participantes).toHaveLength(filas.length);
+      result.participantes.forEach((participante, indice) => {
+        expect(participante).toMatchObject(filas[indice]);
+        expect(participante.totales).toMatchObject({ tareasDistintas: 0, tramos: [] });
       });
       expect(authorization.assertCanViewClosingSummary).toHaveBeenCalledWith(
         PROJECT_ID,
@@ -1012,7 +745,7 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([filaMultirol]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1059,7 +792,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([filaMultirol]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1106,7 +839,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([filaMultirol]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1125,7 +858,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([participanteRaw()]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1154,7 +887,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([filaSinCalculo]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1169,11 +902,17 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
-      expect(result).toEqual({ idProyecto: PROJECT_ID, idSprint: SPRINT_ID, participantes: [] });
+      expect(result).toEqual({
+        idProyecto: PROJECT_ID,
+        idSprint: SPRINT_ID,
+        estadoSprint: 'EN_FINALIZACION',
+        participantes: [],
+        blockers: [],
+      });
     });
 
     it('Sprint ajeno al proyecto: propaga NotFoundException sin ejecutar la consulta agregada', async () => {
@@ -1184,7 +923,7 @@ describe('SprintsService', () => {
       authorization.assertCanViewClosingSummary.mockRejectedValue(
         new NotFoundException(`Sprint con id ${SPRINT_ID} no encontrado en el proyecto ${PROJECT_ID}`),
       );
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID),
@@ -1200,7 +939,7 @@ describe('SprintsService', () => {
       authorization.assertCanViewClosingSummary.mockRejectedValue(
         new ForbiddenException('No eres el líder de este proyecto'),
       );
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
@@ -1214,7 +953,7 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1232,7 +971,7 @@ describe('SprintsService', () => {
       expect(sqlArg.strings.join('')).not.toContain(String(SPRINT_ID));
     });
 
-    it('query count: exactamente 2 consultas de base de datos (contexto+autorización + agregación), sin crecer con N participantes', async () => {
+    it('query count: exactamente 4 consultas de base de datos (contexto+autorización + agregación + estado + tramos), sin crecer con N participantes', async () => {
       async function contarQueriesParaNParticipantes(n: number) {
         const sprintFilas = Array.from({ length: n }, (_, i) => participanteRaw({ idUsuario: 100 + i }));
         const sprintFindFirst = vi.fn().mockResolvedValue({
@@ -1241,8 +980,11 @@ describe('SprintsService', () => {
           proyecto: { creadoPor: LIDER_ID, eliminadoEn: null },
         });
         const queryRaw = vi.fn().mockResolvedValue(sprintFilas);
+        const sprintFindUnique = vi.fn().mockResolvedValue({ estado: 'EN_FINALIZACION' });
+        const tramosFindMany = vi.fn().mockResolvedValue([]);
         const prisma = {
-          sprint: { findFirst: sprintFindFirst },
+          sprint: { findFirst: sprintFindFirst, findUnique: sprintFindUnique },
+          asignacionTarea: { findMany: tramosFindMany },
           $queryRaw: queryRaw,
         } as unknown as PrismaService;
 
@@ -1251,13 +993,18 @@ describe('SprintsService', () => {
         // real autorización -> agregación efectúa.
         const context = new SprintsContextService(prisma);
         const authorization = new SprintsAuthorizationService(context);
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.getSprintClosingSummary(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
         expect(result.participantes).toHaveLength(n);
+        // C079: el presupuesto pasa de 2 a 4 consultas (autorización,
+        // agregación de HU-D1, estado del Sprint y tramos del Sprint). Lo que
+        // este caso fija sigue siendo lo importante: NO crece con N.
         expect(sprintFindFirst).toHaveBeenCalledTimes(1);
         expect(queryRaw).toHaveBeenCalledTimes(1);
+        expect(sprintFindUnique).toHaveBeenCalledTimes(1);
+        expect(tramosFindMany).toHaveBeenCalledTimes(1);
       }
 
       await contarQueriesParaNParticipantes(1);
@@ -1294,7 +1041,7 @@ describe('SprintsService', () => {
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications);
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1335,7 +1082,7 @@ describe('SprintsService', () => {
         notifications.notifySprintClosed.mockImplementation(async () => {
           llamadas.push('notifySprintClosed');
         });
-        const service = new SprintsService(prisma, context, authorization, notifications);
+        const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1349,7 +1096,7 @@ describe('SprintsService', () => {
         const prisma = makePrisma(tx);
         const context = makeSprintsContext();
         const notifications = makeNotifications();
-        const service = new SprintsService(prisma, context, authorization, notifications);
+        const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
           ConflictException,
@@ -1365,7 +1112,7 @@ describe('SprintsService', () => {
         const prisma = makePrisma(tx);
         const context = makeSprintsContext();
         const notifications = makeNotifications();
-        const service = new SprintsService(prisma, context, authorization, notifications);
+        const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
           ConflictException,
@@ -1382,7 +1129,7 @@ describe('SprintsService', () => {
         const prisma = makePrisma(tx);
         const context = makeSprintsContext();
         const notifications = makeNotifications();
-        const service = new SprintsService(prisma, context, authorization, notifications);
+        const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         await expect(
           service.closeSprint(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
@@ -1397,7 +1144,7 @@ describe('SprintsService', () => {
       authorization.assertCanCloseSprint.mockResolvedValue(sprintEnFinalizacion({ estado: 'ACTIVO' }));
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -1414,7 +1161,7 @@ describe('SprintsService', () => {
       );
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -1433,7 +1180,7 @@ describe('SprintsService', () => {
       tx.sprint.updateMany.mockResolvedValue({ count: 0 });
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -1456,7 +1203,7 @@ describe('SprintsService', () => {
       );
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.closeSprint(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
@@ -1472,7 +1219,7 @@ describe('SprintsService', () => {
       );
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID),
@@ -1480,7 +1227,7 @@ describe('SprintsService', () => {
       expect(tx.sprint.updateMany).not.toHaveBeenCalled();
     });
 
-    it('caso 7: preserva las horas de A7 — closeSprint nunca lee ni escribe HorasParticipacion/AsignacionTarea', async () => {
+    it('caso 7: consolidar nunca acredita — closeSprint jamás escribe las columnas de aprobación', async () => {
       const tx = makeTx();
       const sprint = sprintEnFinalizacion();
       const authorization = makeSprintsAuthorization();
@@ -1489,15 +1236,23 @@ describe('SprintsService', () => {
       tx.sprint.findFirst.mockResolvedValue({ ...sprint, estado: 'CERRADO' });
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
-      expect(tx.horasParticipacion.findFirst).not.toHaveBeenCalled();
-      expect(tx.horasParticipacion.update).not.toHaveBeenCalled();
-      // makeTx() tampoco expone asignacionTarea: si closeSprint intentara
-      // tocarla, la llamada fallaría con TypeError antes de llegar aquí.
-      expect((tx as unknown as Record<string, unknown>).asignacionTarea).toBeUndefined();
+      // C080: cerrar SÍ consolida — reconoce las participaciones elegibles
+      // antes de la transición. Lo que sigue siendo cierto, y es lo que este
+      // caso protege, es que NUNCA acredita: `horasAprobadas`,
+      // `fechaAprobacion` y `aprobadoPor` son exclusivas de approveClosure.
+      const escrituras = [
+        ...tx.horasParticipacion.update.mock.calls,
+        ...tx.horasParticipacion.create.mock.calls,
+      ];
+      for (const [argumento] of escrituras) {
+        expect(argumento.data).not.toHaveProperty('horasAprobadas');
+        expect(argumento.data).not.toHaveProperty('fechaAprobacion');
+        expect(argumento.data).not.toHaveProperty('aprobadoPor');
+      }
     });
 
     it('terminalidad: una segunda llamada a closeSprint sobre un Sprint ya CERRADO se rechaza (mismo caso 3, verificado explícitamente como "terminal")', async () => {
@@ -1508,7 +1263,7 @@ describe('SprintsService', () => {
       );
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
         ConflictException,
@@ -1523,7 +1278,7 @@ describe('SprintsService', () => {
       );
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID),
@@ -1560,7 +1315,7 @@ describe('SprintsService', () => {
       ]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1577,7 +1332,7 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1590,7 +1345,7 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1606,7 +1361,7 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1620,7 +1375,7 @@ describe('SprintsService', () => {
       authorization.assertCanListSprintHistory.mockRejectedValue(
         new ForbiddenException('No eres el líder de este proyecto'),
       );
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.listSprints(PROJECT_ID, NO_LIDER_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -1637,7 +1392,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([]); // ninguna fila agregada para idSprint 9
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1652,7 +1407,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([agregadoRaw({ idSprint: 1, tareas: 3, hitos: 2, horasEstimadas: 14 })]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1667,7 +1422,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([agregadoRaw({ idSprint: 1, tareas: 3, hitos: 0, horasEstimadas: 14 })]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1684,7 +1439,7 @@ describe('SprintsService', () => {
         ]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1700,7 +1455,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1717,7 +1472,7 @@ describe('SprintsService', () => {
         prisma.$queryRaw.mockResolvedValue([]);
         const context = makeSprintsContext();
         const authorization = makeSprintsAuthorization();
-        const service = new SprintsService(prisma, context, authorization, makeNotifications());
+        const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
         const result = await service.listSprints(PROJECT_ID, LIDER_ID);
 
@@ -1786,7 +1541,7 @@ describe('SprintsService', () => {
       prisma.tarea.findMany.mockResolvedValue([{ idHito: 200, estadoTarea: 'HECHO' }]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1838,7 +1593,7 @@ describe('SprintsService', () => {
       prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([tarea]));
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1878,7 +1633,7 @@ describe('SprintsService', () => {
       ]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1928,7 +1683,7 @@ describe('SprintsService', () => {
       ]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1959,7 +1714,7 @@ describe('SprintsService', () => {
       prisma.tarea.findMany.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -1976,7 +1731,7 @@ describe('SprintsService', () => {
       authorization.assertCanViewSprintHistory.mockRejectedValue(
         new NotFoundException(`Sprint con id ${SPRINT_ID} no encontrado en el proyecto ${PROJECT_ID}`),
       );
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID),
@@ -1989,7 +1744,7 @@ describe('SprintsService', () => {
       prisma.sprint.findFirst.mockResolvedValue(null);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID),
@@ -2001,7 +1756,7 @@ describe('SprintsService', () => {
       prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([]));
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.getSprintDetail(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -2035,7 +1790,7 @@ describe('SprintsService', () => {
       );
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -2059,7 +1814,7 @@ describe('SprintsService', () => {
       prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([]));
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -2088,7 +1843,7 @@ describe('SprintsService', () => {
       ]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -2104,7 +1859,7 @@ describe('SprintsService', () => {
       prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([]));
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -2119,7 +1874,7 @@ describe('SprintsService', () => {
       authorization.assertCanViewSprintAnalytics.mockRejectedValue(
         new NotFoundException(`Sprint con id ${SPRINT_ID} no encontrado en el proyecto ${PROJECT_ID}`),
       );
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID),
@@ -2132,7 +1887,7 @@ describe('SprintsService', () => {
       prisma.sprint.findFirst.mockResolvedValue(null);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(
         service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID),
@@ -2144,7 +1899,7 @@ describe('SprintsService', () => {
       prisma.sprint.findFirst.mockResolvedValue(sprintConTareas([]));
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.getSprintAnalytics(PROJECT_ID, SPRINT_ID, LIDER_ID);
 
@@ -2179,7 +1934,7 @@ describe('SprintsService', () => {
       ]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       const result = await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
 
@@ -2216,7 +1971,7 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
 
@@ -2231,7 +1986,7 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
 
@@ -2244,7 +1999,7 @@ describe('SprintsService', () => {
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanListSprintAnalytics.mockRejectedValue(new ForbiddenException('no autorizado'));
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await expect(service.getSprintsAnalytics(PROJECT_ID, NO_LIDER_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -2257,7 +2012,7 @@ describe('SprintsService', () => {
       prisma.$queryRaw.mockResolvedValue([]);
       const context = makeSprintsContext();
       const authorization = makeSprintsAuthorization();
-      const service = new SprintsService(prisma, context, authorization, makeNotifications());
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
       await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
 

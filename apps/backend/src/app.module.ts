@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import * as redisStore from 'cache-manager-redis-store';
+import { buildEnvOptions } from './config/env.options';
 import { AppController } from './app.controller';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
+import { ProjectPolicyModule } from './common/project-policy/project-policy.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -25,6 +28,10 @@ import { RolesModule } from './roles/roles.module';
 import { ProgressRecordsModule } from './progress-records/progress-records.module';
 import { TimeRecordsModule } from './time-records/time-records.module';
 import { SprintsModule } from './sprints/sprints.module';
+import { TaskHourAdjustmentsModule } from './task-hour-adjustments/task-hour-adjustments.module';
+import { StorageModule } from './storage/storage.module';
+import { ProjectClosureModule } from './project-closure/project-closure.module';
+import { LeadershipModule } from './leadership/leadership.module';
 import { ExitRequestsModule } from './exit-requests/exit-requests.module';
 import { TeamModule } from './team/team.module';
 import { SocialModule } from './social/social.module';
@@ -33,6 +40,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot(buildEnvOptions()),
     EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot([
       {
@@ -51,14 +59,18 @@ import { BitacoraModule } from './bitacora/bitacora.module';
         limit: 200,
       },
     ]),
-    CacheModule.register({
+    CacheModule.registerAsync({
       isGlobal: true,
-      store: redisStore,
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      ttl: 300,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        store: redisStore,
+        host: config.get<string>('app.redis.host'),
+        port: config.get<number>('app.redis.port'),
+        ttl: 300,
+      }),
     }),
     PrismaModule,
+    ProjectPolicyModule,
     AuthModule,
     UsersModule,
     ProjectsModule,
@@ -77,6 +89,10 @@ import { BitacoraModule } from './bitacora/bitacora.module';
     ProgressRecordsModule,
     TimeRecordsModule,
     SprintsModule,
+    TaskHourAdjustmentsModule,
+    StorageModule,
+    ProjectClosureModule,
+    LeadershipModule,
     ExitRequestsModule,
     TeamModule,
     SocialModule,

@@ -2,6 +2,15 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post,
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
+import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
+
+/** C028: salidas en P/E con ambiente NOT_FINALIZING (06 v2 §13/§32). */
+const EXIT_WRITE: ProjectWriteMetadata = {
+  source: { kind: 'param', name: 'projectId' },
+  states: ['P', 'E'],
+  sprint: 'NOT_FINALIZING',
+  family: 'SALIDA',
+};
 import { CreateSolicitudSalidaDto } from './dto/create-solicitud-salida.dto';
 import { ExitRequestsService } from './exit-requests.service';
 
@@ -13,6 +22,7 @@ export class ExitRequestsController {
   @Post('solicitudes-salida')
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(EXIT_WRITE)
   createExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() data: CreateSolicitudSalidaDto,
@@ -24,6 +34,7 @@ export class ExitRequestsController {
   @Post('solicitudes-salida/:idSolicitud/aprobar')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(EXIT_WRITE)
   approveExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
@@ -35,6 +46,7 @@ export class ExitRequestsController {
   @Post('solicitudes-salida/:idSolicitud/rechazar')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(EXIT_WRITE)
   rejectExitRequest(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
@@ -71,6 +83,7 @@ export class ExitRequestsController {
   @Post('salida/preparacion/continuar')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(EXIT_WRITE)
   continueExitPreparation(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
@@ -81,6 +94,7 @@ export class ExitRequestsController {
   @Post('salida/preparacion/cancelar')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(EXIT_WRITE)
   cancelExitPreparation(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },

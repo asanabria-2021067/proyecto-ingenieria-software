@@ -333,6 +333,9 @@ function filtrarPorGrupo(
   return miembros.filter((miembro) => miembro.grupo === grupo);
 }
 
+
+
+
 export default function MiembrosProyectoPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
@@ -475,6 +478,7 @@ export default function MiembrosProyectoPage() {
           isLoading={isLoading}
         />
       </div>
+
 
       {isError ? (
         <Empty tone="danger" role="alert">

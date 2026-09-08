@@ -4,6 +4,13 @@ import { TasksContextService } from './tasks-context.service';
 
 type TxClient = Prisma.TransactionClient;
 
+/**
+ * C040 (06 v2 §32/§40): las reglas de autoridad de HU-D4 no cambian. Lo que
+ * cambia es cuándo se evalúan: en toda ruta de escritura, `TasksService` las
+ * invoca con el `tx` del runner por proyecto, ya con el lock adquirido, de
+ * modo que la autoridad se decide sobre el mismo estado que se escribe. Este
+ * servicio nunca abre una transacción propia (no hay tx anidada).
+ */
 @Injectable()
 export class TasksAuthorizationService {
   constructor(private readonly tasksContext: TasksContextService) {}

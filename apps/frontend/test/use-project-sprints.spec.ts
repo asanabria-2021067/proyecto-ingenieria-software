@@ -10,13 +10,11 @@ vi.mock('../lib/services/sprints', () => ({
   closeSprint: vi.fn(),
   getSprintDetail: vi.fn(),
   getSprintClosingSummary: vi.fn(),
-  adjustSprintHours: vi.fn(),
   getSprintAnalytics: vi.fn(),
   getSprintsAnalytics: vi.fn(),
 }));
 
 import {
-  useAdjustSprintHours,
   useCloseSprint,
   useFinalizeSprint,
   useProjectSprints,
@@ -34,7 +32,6 @@ import {
   sprintsAnalyticsQueryKey,
 } from '../lib/query-keys/sprints';
 import {
-  adjustSprintHours,
   closeSprint,
   finalizeSprint,
   getProjectSprints,
@@ -437,76 +434,6 @@ describe('useSprintClosingSummary (F5)', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBe(boom);
-  });
-});
-
-describe('useAdjustSprintHours (F5)', () => {
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('invoca el service con projectId, sprintId, idParticipacion y el payload correctos', async () => {
-    (adjustSprintHours as any).mockResolvedValue({});
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAdjustSprintHours(7, 1), { wrapper });
-
-    result.current.mutate({ idParticipacion: 51, horasAprobadas: 12, justificacionAjuste: 'Ajuste válido' });
-
-    await waitFor(() => expect(adjustSprintHours).toHaveBeenCalledTimes(1));
-    expect(adjustSprintHours).toHaveBeenCalledWith(7, 1, 51, {
-      horasAprobadas: 12,
-      justificacionAjuste: 'Ajuste válido',
-    });
-  });
-
-  it('permite omitir justificacionAjuste (igualdad, sin ajuste)', async () => {
-    (adjustSprintHours as any).mockResolvedValue({});
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAdjustSprintHours(7, 1), { wrapper });
-
-    result.current.mutate({ idParticipacion: 51, horasAprobadas: 10 });
-
-    await waitFor(() => expect(adjustSprintHours).toHaveBeenCalledWith(7, 1, 51, { horasAprobadas: 10 }));
-  });
-
-  it('en éxito invalida exactamente sprint-closing-summary del proyecto/Sprint', async () => {
-    (adjustSprintHours as any).mockResolvedValue({});
-    const { wrapper, queryClient } = createWrapper();
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useAdjustSprintHours(7, 1), { wrapper });
-
-    result.current.mutate({ idParticipacion: 51, horasAprobadas: 10 });
-
-    await waitFor(() => expect(adjustSprintHours).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['sprint-closing-summary', 7, 1] }),
-    );
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('no invalida sprint-detail ni otras caches ajenas', async () => {
-    (adjustSprintHours as any).mockResolvedValue({});
-    const { wrapper, queryClient } = createWrapper();
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useAdjustSprintHours(7, 1), { wrapper });
-
-    result.current.mutate({ idParticipacion: 51, horasAprobadas: 10 });
-
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(1));
-    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['sprint-detail', 7, 1] });
-    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-sprints', 7] });
-  });
-
-  it('una mutation fallida no invalida como éxito', async () => {
-    (adjustSprintHours as any).mockRejectedValue(new Error('400'));
-    const { wrapper, queryClient } = createWrapper();
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useAdjustSprintHours(7, 1), { wrapper });
-
-    await expect(
-      result.current.mutateAsync({ idParticipacion: 51, horasAprobadas: 12 }),
-    ).rejects.toThrow('400');
-    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });
 

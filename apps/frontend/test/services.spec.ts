@@ -6,7 +6,6 @@ import { apiFetch } from '../lib/api/client';
 import { login, register } from '../lib/services/auth';
 import { getCarreras, getCualidades, getHabilidades, getIntereses } from '../lib/services/catalogs';
 import {
-  approveProjectClosure,
   createProject,
   getAdminReviewInbox,
   getContributorProjects,
@@ -15,8 +14,6 @@ import {
   getProjectById,
   getProjectRevisions,
   reclamarRevision,
-  rejectProjectClosure,
-  requestProjectClosure,
   resolverRevision,
   resubmitProject,
   searchProjects,
@@ -46,14 +43,11 @@ describe('frontend services wrappers', () => {
     await updateProject(1, { descripcionProyecto: 'y' } as any);
     await submitProjectForReview(1);
     await resubmitProject(1);
-    await requestProjectClosure(1);
-    await approveProjectClosure(1);
-    await rejectProjectClosure(1);
     await getProjectRevisions(1);
     await reclamarRevision(1);
     await resolverRevision(1, { resultado: 'APROBADA' } as any);
     await getAdminReviewInbox();
-    expect((apiFetch as any).mock.calls.length).toBe(16);
+    expect((apiFetch as any).mock.calls.length).toBe(13);
   });
 
   it('notifications/users/catalogs usan rutas esperadas', async () => {

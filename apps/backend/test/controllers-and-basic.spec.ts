@@ -4,7 +4,6 @@ import { ApplicationsController } from '../src/applications/applications.control
 import { AuthController } from '../src/auth/auth.controller';
 import { CatalogsController } from '../src/catalogs/catalogs.controller';
 import { ComentariosController } from '../src/comentarios/comentarios.controller';
-import { EvidenceController } from '../src/evidence/evidence.controller';
 import { MensajesRevisionController } from '../src/mensajes-revision/mensajes-revision.controller';
 import { NotificationsController } from '../src/notifications/notifications.controller';
 import { ProjectsController } from '../src/projects/projects.controller';
@@ -12,7 +11,6 @@ import { RevisionesController } from '../src/revisiones/revisiones.controller';
 import { UsersController } from '../src/users/users.controller';
 import { ValidationController } from '../src/validation/validation.controller';
 import { CatalogsService } from '../src/catalogs/catalogs.service';
-import { EvidenceService } from '../src/evidence/evidence.service';
 import { ValidationService } from '../src/validation/validation.service';
 import { TasksController } from '../src/tasks/tasks.controller';
 
@@ -84,9 +82,6 @@ describe('Controllers and basic services', () => {
     projects.changeEstado(1, { nuevoEstado: 'PUBLICADO' } as Parameters<ProjectsController['changeEstado']>[1], { userId: 1 });
     projects.submitForReview(1, { userId: 1 });
     projects.resubmit(1, { userId: 1 });
-    projects.requestClose(1, { userId: 1 });
-    projects.approveClosure(1, { userId: 1 });
-    projects.rejectClosure(1, { userId: 1 });
     projects.findPostulaciones(1, { userId: 1 });
 
     const applicationsSvc = { create: vi.fn(), findAll: vi.fn(), findMine: vi.fn(), findOne: vi.fn(), updateEstado: vi.fn() };
@@ -94,9 +89,10 @@ describe('Controllers and basic services', () => {
       applicationsSvc as unknown as ConstructorParameters<typeof ApplicationsController>[0],
     );
     applications.create({} as Parameters<ApplicationsController['create']>[0], { userId: 1 });
-    applications.findAll();
+    // C043: los lectores reciben el actor (nunca un listado global).
+    applications.findAll({ userId: 1 });
     applications.findMine({ userId: 1 });
-    applications.findOne(1);
+    applications.findOne(1, { userId: 1 });
     applications.updateEstado(
       1,
       {} as Parameters<ApplicationsController['updateEstado']>[1],
@@ -170,7 +166,7 @@ describe('Controllers and basic services', () => {
     mensajes.markAsRead(1, { userId: 1 });
   });
 
-  it('catalogs/tasks/validation/evidence servicios básicos', async () => {
+  it('catalogs/tasks/validation servicios básicos', async () => {
     const prisma = {
       carrera: { findMany: vi.fn().mockResolvedValue([{ idCarrera: 1, nombreCarrera: 'Ing' }]) },
       habilidad: { findMany: vi.fn().mockResolvedValue([{ idHabilidad: 1, nombreHabilidad: 'TS' }]) },
@@ -206,11 +202,5 @@ describe('Controllers and basic services', () => {
     expect(validation.findAll()).toEqual({ message: 'Not implemented yet' });
     expect(validation.create({})).toEqual({ message: 'Not implemented yet' });
 
-    const evidenceService = new EvidenceService(
-      {} as ConstructorParameters<typeof EvidenceService>[0],
-    );
-    const evidence = new EvidenceController(evidenceService);
-    expect(evidence.findAll()).toEqual({ message: 'Not implemented yet' });
-    expect(evidence.create({})).toEqual({ message: 'Not implemented yet' });
   });
 });

@@ -4,6 +4,12 @@ import { SprintsContextService } from './sprints-context.service';
 
 type TxClient = Prisma.TransactionClient;
 
+/**
+ * C045 (06 v2 §32/§40): las reglas de autoridad del Sprint no cambian; en las
+ * tres operaciones del ciclo de vida se evalúan con el `tx` del runner por
+ * proyecto, ya con el lock adquirido, junto a la policy de la familia
+ * correspondiente. Este servicio nunca abre una transacción propia.
+ */
 @Injectable()
 export class SprintsAuthorizationService {
   constructor(private readonly sprintsContext: SprintsContextService) {}
@@ -29,16 +35,6 @@ export class SprintsAuthorizationService {
 
   /** Cerrar Sprint: exclusivo del líder. */
   async assertCanCloseSprint(projectId: number, sprintId: number, userId: number, tx?: TxClient) {
-    return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
-  }
-
-  /** Ajustar horas reconocidas (A7): exclusivo del líder, parte de la gestión del Sprint. */
-  async assertCanAdjustRecognizedHours(
-    projectId: number,
-    sprintId: number,
-    userId: number,
-    tx?: TxClient,
-  ) {
     return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
   }
 

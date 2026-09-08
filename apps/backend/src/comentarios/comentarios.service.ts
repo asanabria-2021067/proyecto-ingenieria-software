@@ -4,18 +4,47 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EstadoProyecto, TipoNotificacion } from '@prisma/client';
+import { EstadoProyecto, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { CreateComentarioDto } from './dto/create-comentario.dto';
 import { UpdateComentarioDto } from './dto/update-comentario.dto';
 
+type Db = Prisma.TransactionClient | PrismaService;
+
+/**
+ * C036 (06 v2 §16/§32/§34): el canal A de proyecto/hito escribe dentro de
+ * `ProjectTransactionService.run` (lock del proyecto primero) con la familia
+ * `COMENTARIO_PROYECTO_HITO`, y sus dos lectores pasan por la política de
+ * lectura histórica antes de la autorización existente. Las notificaciones
+ * `COMENTARIO_PROYECTO`/`COMENTARIO_HITO` se conservan después del commit.
+ * C037: el canal de tarea (createForTask/updateForTask/removeForTask) también
+ * corre bajo `run` con la familia `COMENTARIO_TAREA` y exige que la tarea
+ * pertenezca a un Sprint ACTIVO; `COMENTARIO_TAREA` se notifica tras el commit.
+ */
 @Injectable()
 export class ComentariosService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
   ) {}
+
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
 
   /**
    * Tarea 28: los comentarios de tarea ya no se crean mediante esta ruta
@@ -39,10 +68,32 @@ export class ComentariosService {
     }
 
     const contexto = await this.resolveProjectContext(dto);
-    await this.assertChannelAWriteAllowed(contexto.idProyecto, userId);
-
     const tipo = dto.idProyecto ? TipoNotificacion.COMENTARIO_PROYECTO : TipoNotificacion.COMENTARIO_HITO;
-    return this.persistAndNotify(userId, contexto.idProyecto, dto, tipo);
+
+    // C036: autorización del canal y política dentro del lock; la notificación
+    // existente se emite después del commit.
+    const comentario = await this.projectTx.run(
+      contexto.idProyecto,
+      userId,
+      'comentarios.create',
+      async (ctx) => {
+        const { tx } = ctx;
+        await this.assertChannelAWriteAllowed(contexto.idProyecto, userId, tx);
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_PROYECTO_HITO', userId);
+        return tx.comentario.create({
+          data: {
+            idAutor: userId,
+            idProyecto: dto.idProyecto,
+            idTarea: dto.idTarea,
+            idHito: dto.idHito,
+            contenido: dto.contenido.trim(),
+          },
+        });
+      },
+    );
+
+    await this.notifyChannelA(userId, contexto.idProyecto, dto, tipo, comentario.idComentario);
+    return comentario;
   }
 
   /**
@@ -50,14 +101,18 @@ export class ComentariosService {
    * proyecto+tarea en base de datos (`getTareaEnProyectoOrThrow`, con
    * `proyecto.eliminadoEn: null` incluido) antes de reutilizar la misma
    * regla de autorización de escritura (`assertChannelAWriteAllowed`) que
-   * ya usan los comentarios de proyecto e hito.
+   * ya usan los comentarios de proyecto e hito. C037 (06 v2 §32): todo corre
+   * dentro del `run` del proyecto y, tras el lock, la tarea comentada debe
+   * pertenecer a un Sprint ACTIVO (entidad de `COMENTARIO_TAREA`): anotar
+   * una tarea nunca escribe en un Sprint cerrado. Se permite anotar una tarea
+   * legacy existente en prepublicación; crear tareas ahí sigue prohibido.
    *
    * Tarea 29: a diferencia de `create()` (proyecto/hito), NO delega en
-   * `persistAndNotify`/`notifyProjectActiveParticipants`. Los destinatarios
+   * `notifyChannelA`/`notifyProjectActiveParticipants`. Los destinatarios
    * de un comentario de tarea nunca son "todos los participantes activos
    * del proyecto": son, como mucho, un único usuario (el asignado activo o,
    * en su defecto, quien creó la tarea), resuelto en vivo por
-   * `getTaskCommentRecipientIds` en cada llamada.
+   * `getTaskCommentRecipientIds` en cada llamada, después del commit.
    */
   async createForTask(
     projectId: number,
@@ -65,16 +120,27 @@ export class ComentariosService {
     userId: number,
     contenido: string,
   ) {
-    const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId);
-    await this.assertChannelAWriteAllowed(projectId, userId);
-
-    const comentario = await this.prisma.comentario.create({
-      data: {
-        idAutor: userId,
-        idTarea: taskId,
-        contenido: contenido.trim(),
+    const { tarea, comentario } = await this.projectTx.run(
+      projectId,
+      userId,
+      'comentarios.createForTask',
+      async (ctx) => {
+        const { tx } = ctx;
+        const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId, tx);
+        await this.assertChannelAWriteAllowed(projectId, userId, tx);
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_TAREA', userId, {
+          sprintId: tarea.idSprint,
+        });
+        const comentario = await tx.comentario.create({
+          data: {
+            idAutor: userId,
+            idTarea: taskId,
+            contenido: contenido.trim(),
+          },
+        });
+        return { tarea, comentario };
       },
-    });
+    );
 
     const recipientIds = await this.getTaskCommentRecipientIds(taskId, tarea.creadaPor, userId);
     await this.notifications.notifyUsers(recipientIds, {
@@ -124,39 +190,27 @@ export class ComentariosService {
   }
 
   /**
-   * Lógica de persistencia y notificación compartida entre `create` (rutas
-   * de proyecto/hito) y `createForTask` (ruta anidada de tarea), para no
-   * duplicar el bloque de `comentario.create` + `notifyProjectActiveParticipants`.
+   * Notificación del canal A (proyecto/hito) a los participantes activos,
+   * conservada sin cambios y emitida después del commit del `run` (C036).
    */
-  private async persistAndNotify(
+  private async notifyChannelA(
     userId: number,
     idProyecto: number,
-    data: { idProyecto?: number; idTarea?: number; idHito?: number; contenido: string },
+    data: { idTarea?: number; idHito?: number },
     tipo: TipoNotificacion,
-  ) {
-    const comentario = await this.prisma.comentario.create({
-      data: {
-        idAutor: userId,
-        idProyecto: data.idProyecto,
-        idTarea: data.idTarea,
-        idHito: data.idHito,
-        contenido: data.contenido.trim(),
-      },
-    });
-
+    idComentario: number,
+  ): Promise<void> {
     await this.notifications.notifyProjectActiveParticipants(idProyecto, userId, {
       tipoNotificacion: tipo,
       tituloNotificacion: 'Nuevo comentario',
       mensajeNotificacion: 'Se agregó un comentario nuevo en el proyecto.',
       datosJson: {
         idProyecto,
-        idComentario: comentario.idComentario,
+        idComentario,
         idTarea: data.idTarea ?? null,
         idHito: data.idHito ?? null,
       },
     });
-
-    return comentario;
   }
 
   private readonly autorSelect = {
@@ -164,6 +218,8 @@ export class ComentariosService {
   } as const;
 
   async findByProyecto(idProyecto: number, userId: number) {
+    // C036 (§34): política de lectura histórica antes de la autorización existente.
+    await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'resumen' });
     await this.assertChannelAReadAllowed(idProyecto, userId);
     return this.prisma.comentario.findMany({
       where: { idProyecto, eliminadoEn: null },
@@ -180,7 +236,15 @@ export class ComentariosService {
    * junto con la ruta genérica `GET /comentarios/tarea/:idTarea`.
    */
   async findByTareaEnProyecto(projectId: number, taskId: number, userId: number) {
-    await this.getTareaEnProyectoOrThrow(projectId, taskId);
+    const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId);
+    // C037 (§34): política de lectura histórica (Sprint de la tarea como
+    // entidad) antes de la autorización existente.
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'tareas',
+      entitySprintId: tarea.idSprint,
+    });
     await this.assertChannelAReadAllowed(projectId, userId);
     return this.prisma.comentario.findMany({
       where: { idTarea: taskId, eliminadoEn: null },
@@ -195,6 +259,7 @@ export class ComentariosService {
       select: { idProyecto: true },
     });
     if (!hito) throw new NotFoundException('Hito no encontrado');
+    await this.readPolicy.assertRead(undefined, { projectId: hito.idProyecto, actorId: userId, scope: 'resumen' });
     await this.assertChannelAReadAllowed(hito.idProyecto, userId);
     return this.prisma.comentario.findMany({
       where: { idHito, eliminadoEn: null },
@@ -211,15 +276,16 @@ export class ComentariosService {
    * tarea globalmente), para que una tarea de otro proyecto sea
    * indistinguible de una inexistente.
    */
-  private async getTareaEnProyectoOrThrow(projectId: number, taskId: number) {
-    const tarea = await this.prisma.tarea.findFirst({
+  private async getTareaEnProyectoOrThrow(projectId: number, taskId: number, db: Db = this.prisma) {
+    const tarea = await db.tarea.findFirst({
       where: {
         idTarea: taskId,
         idProyecto: projectId,
         eliminadoEn: null,
         proyecto: { eliminadoEn: null },
       },
-      select: { idTarea: true, idProyecto: true, creadaPor: true },
+      // C037: `idSprint` alimenta la exigencia de entidad (Sprint ACTIVO).
+      select: { idTarea: true, idProyecto: true, creadaPor: true, idSprint: true },
     });
     if (!tarea) {
       throw new NotFoundException(`Tarea con id ${taskId} no encontrada en el proyecto ${projectId}`);
@@ -235,8 +301,8 @@ export class ComentariosService {
    * comentario cruzado nunca revela su existencia en otro contexto: se
    * comporta exactamente igual que un `commentId` inexistente.
    */
-  private async getComentarioEnTareaOrThrow(taskId: number, commentId: number) {
-    const comentario = await this.prisma.comentario.findFirst({
+  private async getComentarioEnTareaOrThrow(taskId: number, commentId: number, db: Db = this.prisma) {
+    const comentario = await db.comentario.findFirst({
       where: { idComentario: commentId, idTarea: taskId, eliminadoEn: null },
       select: { idComentario: true, idAutor: true },
     });
@@ -289,38 +355,54 @@ export class ComentariosService {
     }
   }
 
+  /**
+   * C036: PATCH genérico del canal A. La identidad (comentario → proyecto) se
+   * resuelve fuera del lock; existencia, no-tarea, autoría, autorización del
+   * canal y política se reejecutan dentro del `run` antes de escribir.
+   */
   async update(idComentario: number, userId: number, dto: UpdateComentarioDto) {
-    const comentario = await this.prisma.comentario.findUnique({
-      where: { idComentario },
-      select: {
-        idComentario: true,
-        idAutor: true,
-        eliminadoEn: true,
-        idProyecto: true,
-        idTarea: true,
-        hito: { select: { idProyecto: true } },
-      },
-    });
-    if (!comentario || comentario.eliminadoEn) {
-      throw new NotFoundException('Comentario no encontrado');
-    }
-    this.assertNotTaskComment(comentario);
-    if (comentario.idAutor !== userId) {
-      throw new ForbiddenException('Solo el autor puede editar este comentario');
-    }
+    const { idProyecto } = await this.loadChannelAComment(idComentario, userId, 'editar');
 
-    const idProyecto = comentario.idProyecto ?? comentario.hito?.idProyecto;
-    if (!idProyecto) throw new NotFoundException('Proyecto de comentario no encontrado');
-
-    await this.assertChannelAWriteAllowed(idProyecto, userId);
-    return this.prisma.comentario.update({
-      where: { idComentario },
-      data: { contenido: dto.contenido.trim(), editadoEn: new Date() },
+    return this.projectTx.run(idProyecto, userId, 'comentarios.update', async (ctx) => {
+      const { tx } = ctx;
+      await this.loadChannelAComment(idComentario, userId, 'editar', tx);
+      await this.assertChannelAWriteAllowed(idProyecto, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_PROYECTO_HITO', userId);
+      return tx.comentario.update({
+        where: { idComentario },
+        data: { contenido: dto.contenido.trim(), editadoEn: new Date() },
+      });
     });
   }
 
+  /** C036: DELETE genérico del canal A (soft delete), mismo orden que `update`. */
   async remove(idComentario: number, userId: number) {
-    const comentario = await this.prisma.comentario.findUnique({
+    const { idProyecto } = await this.loadChannelAComment(idComentario, userId, 'eliminar');
+
+    return this.projectTx.run(idProyecto, userId, 'comentarios.remove', async (ctx) => {
+      const { tx } = ctx;
+      await this.loadChannelAComment(idComentario, userId, 'eliminar', tx);
+      await this.assertChannelAWriteAllowed(idProyecto, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_PROYECTO_HITO', userId);
+      return tx.comentario.update({
+        where: { idComentario },
+        data: { eliminadoEn: new Date() },
+      });
+    });
+  }
+
+  /**
+   * Carga un comentario del canal genérico y aplica, en este orden, las reglas
+   * existentes: existe y no está eliminado → no es comentario de tarea
+   * (Tarea 28.B) → solo el autor → proyecto resoluble (propio o del hito).
+   */
+  private async loadChannelAComment(
+    idComentario: number,
+    userId: number,
+    accion: 'editar' | 'eliminar',
+    db: Db = this.prisma,
+  ) {
+    const comentario = await db.comentario.findUnique({
       where: { idComentario },
       select: {
         idComentario: true,
@@ -336,17 +418,13 @@ export class ComentariosService {
     }
     this.assertNotTaskComment(comentario);
     if (comentario.idAutor !== userId) {
-      throw new ForbiddenException('Solo el autor puede eliminar este comentario');
+      throw new ForbiddenException(`Solo el autor puede ${accion} este comentario`);
     }
 
     const idProyecto = comentario.idProyecto ?? comentario.hito?.idProyecto;
     if (!idProyecto) throw new NotFoundException('Proyecto de comentario no encontrado');
 
-    await this.assertChannelAWriteAllowed(idProyecto, userId);
-    return this.prisma.comentario.update({
-      where: { idComentario },
-      data: { eliminadoEn: new Date() },
-    });
+    return { comentario, idProyecto };
   }
 
   /**
@@ -355,7 +433,9 @@ export class ComentariosService {
    * autorización (misma política real: solo el autor, luego
    * `assertChannelAWriteAllowed`) → escritura. Un comentario de otra tarea,
    * de otro proyecto o de un hito/proyecto nunca llega a la comprobación de
-   * autoría: `getComentarioEnTareaOrThrow` ya lo trata como inexistente.
+   * autoría: `getComentarioEnTareaOrThrow` ya lo trata como inexistente. C037: todo
+   * bajo el `run` del proyecto; tras el lock, el Sprint de la tarea debe
+   * estar ACTIVO.
    */
   async updateForTask(
     projectId: number,
@@ -364,17 +444,23 @@ export class ComentariosService {
     userId: number,
     dto: UpdateComentarioDto,
   ) {
-    await this.getTareaEnProyectoOrThrow(projectId, taskId);
-    const comentario = await this.getComentarioEnTareaOrThrow(taskId, commentId);
+    return this.projectTx.run(projectId, userId, 'comentarios.updateForTask', async (ctx) => {
+      const { tx } = ctx;
+      const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId, tx);
+      const comentario = await this.getComentarioEnTareaOrThrow(taskId, commentId, tx);
 
-    if (comentario.idAutor !== userId) {
-      throw new ForbiddenException('Solo el autor puede editar este comentario');
-    }
+      if (comentario.idAutor !== userId) {
+        throw new ForbiddenException('Solo el autor puede editar este comentario');
+      }
 
-    await this.assertChannelAWriteAllowed(projectId, userId);
-    return this.prisma.comentario.update({
-      where: { idComentario: commentId },
-      data: { contenido: dto.contenido.trim(), editadoEn: new Date() },
+      await this.assertChannelAWriteAllowed(projectId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_TAREA', userId, {
+        sprintId: tarea.idSprint,
+      });
+      return tx.comentario.update({
+        where: { idComentario: commentId },
+        data: { contenido: dto.contenido.trim(), editadoEn: new Date() },
+      });
     });
   }
 
@@ -384,17 +470,23 @@ export class ComentariosService {
    * `updateForTask`.
    */
   async removeForTask(projectId: number, taskId: number, commentId: number, userId: number) {
-    await this.getTareaEnProyectoOrThrow(projectId, taskId);
-    const comentario = await this.getComentarioEnTareaOrThrow(taskId, commentId);
+    return this.projectTx.run(projectId, userId, 'comentarios.removeForTask', async (ctx) => {
+      const { tx } = ctx;
+      const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId, tx);
+      const comentario = await this.getComentarioEnTareaOrThrow(taskId, commentId, tx);
 
-    if (comentario.idAutor !== userId) {
-      throw new ForbiddenException('Solo el autor puede eliminar este comentario');
-    }
+      if (comentario.idAutor !== userId) {
+        throw new ForbiddenException('Solo el autor puede eliminar este comentario');
+      }
 
-    await this.assertChannelAWriteAllowed(projectId, userId);
-    return this.prisma.comentario.update({
-      where: { idComentario: commentId },
-      data: { eliminadoEn: new Date() },
+      await this.assertChannelAWriteAllowed(projectId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_TAREA', userId, {
+        sprintId: tarea.idSprint,
+      });
+      return tx.comentario.update({
+        where: { idComentario: commentId },
+        data: { eliminadoEn: new Date() },
+      });
     });
   }
 
@@ -418,8 +510,8 @@ export class ComentariosService {
     throw new BadRequestException('Entidad de comentario inválida');
   }
 
-  private async assertChannelAWriteAllowed(idProyecto: number, userId: number) {
-    const proyecto = await this.prisma.proyecto.findUnique({
+  private async assertChannelAWriteAllowed(idProyecto: number, userId: number, db: Db = this.prisma) {
+    const proyecto = await db.proyecto.findUnique({
       where: { idProyecto },
       select: { estadoProyecto: true, creadoPor: true },
     });
@@ -440,7 +532,7 @@ export class ComentariosService {
       proyecto.estadoProyecto === EstadoProyecto.PUBLICADO ||
       proyecto.estadoProyecto === EstadoProyecto.EN_PROGRESO
     ) {
-      const participa = await this.prisma.participacionProyecto.findFirst({
+      const participa = await db.participacionProyecto.findFirst({
         where: {
           idUsuario: userId,
           estadoParticipacion: 'ACTIVO',

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { FolderOpen, SearchX } from 'lucide-react';
+import { FolderOpen, Lock, SearchX } from 'lucide-react';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
+import { estadoBadgeLabel } from '@/components/projects/available-project-card';
 import {
   Empty,
   EmptyDescription,
@@ -107,11 +108,12 @@ export function ProjectsListClient({ initialData, initialTotalPages, searchQuery
                 {project.tituloProyecto}
               </h2>
               <span
-                className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                className={`inline-flex shrink-0 items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                   ESTADO_STYLES[project.estadoProyecto] ?? 'bg-gray-100 text-gray-600'
                 }`}
               >
-                {project.estadoProyecto}
+                {project.estadoProyecto === 'CERRADO' && <Lock className="h-3 w-3" aria-hidden="true" />}
+                {estadoBadgeLabel(project.estadoProyecto)}
               </span>
             </div>
             {project.descripcionProyecto && (
@@ -126,6 +128,11 @@ export function ProjectsListClient({ initialData, initialTotalPages, searchQuery
               <span className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600">
                 {project.modalidadProyecto}
               </span>
+              {project.estadoProyecto === 'CERRADO' && (
+                <span className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500">
+                  Solo consulta · histórico
+                </span>
+              )}
             </div>
           </Link>
         ))}

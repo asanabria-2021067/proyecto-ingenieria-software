@@ -4,6 +4,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { BitacoraContextService } from '../src/bitacora/bitacora-context.service';
 import { BitacoraConsultaService } from '../src/bitacora/bitacora-consulta.service';
 import { TipoEventoBitacora } from '../src/bitacora/tipos-evento-bitacora';
+import { makeProjectReadPolicyDouble } from './helpers/project-policy.double';
 
 function eventoRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -40,10 +41,16 @@ function makeContext(shouldThrow = false) {
 }
 
 describe('BitacoraConsultaService.listEventos', () => {
-  it('rechaza con ForbiddenException cuando el actor no es el líder, sin llegar a consultar bitacora_auditoria', async () => {
+  it('rechaza con ForbiddenException cuando la política de lectura no autoriza al actor, sin llegar a consultar bitacora_auditoria', async () => {
     const prisma = makePrisma();
-    const context = makeContext(true);
-    const service = new BitacoraConsultaService(prisma, context);
+    const context = makeContext();
+    // C048: la audiencia (líder actual o administrador) la decide §34; el
+    // resto de perfiles ni siquiera llega a la consulta.
+    const readPolicy = makeProjectReadPolicyDouble();
+    readPolicy.assertRead.mockRejectedValue(
+      new ForbiddenException('No tienes acceso a esta información del proyecto'),
+    );
+    const service = new BitacoraConsultaService(prisma, context, readPolicy);
 
     await expect(
       service.listEventos(5, 3, { page: 1, limit: 20 }),
@@ -54,7 +61,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('filtra por accion IN (eventos funcionales) y detalleJson.idProyecto — nunca por idProyecto directo (no existe la columna)', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
 
     await service.listEventos(5, 9, { page: 1, limit: 20 });
 
@@ -66,7 +73,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('aplica el filtro idSprint sobre detalleJson cuando se envía', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
 
     await service.listEventos(5, 9, { page: 1, limit: 20, idSprint: 3 });
 
@@ -77,7 +84,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('aplica el filtro idActor sobre la columna real idUsuario', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
 
     await service.listEventos(5, 9, { page: 1, limit: 20, idActor: 7 });
 
@@ -88,7 +95,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('filtra por un tipoEvento específico cuando se envía (en vez del IN completo)', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
 
     await service.listEventos(5, 9, { page: 1, limit: 20, tipoEvento: TipoEventoBitacora.SPRINT_STARTED });
 
@@ -99,7 +106,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('pagina con skip/take y devuelve total/totalPages', async () => {
     const prisma = makePrisma([eventoRow()], 45);
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
 
     const resultado = await service.listEventos(5, 9, { page: 2, limit: 20 });
 
@@ -114,7 +121,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('mapea la fila cruda de BitacoraAuditoria a EventoBitacoraDto, incluyendo el actor', async () => {
     const prisma = makePrisma([eventoRow()]);
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
 
     const resultado = await service.listEventos(5, 9, { page: 1, limit: 20 });
 

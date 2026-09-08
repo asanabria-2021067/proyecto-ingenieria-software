@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
@@ -22,6 +23,10 @@ import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.s
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * X2 — regresión cross-flow: ciclo de vida completo de una salida de
@@ -50,7 +55,9 @@ function makeTasksService(prisma: PrismaClient): TasksService {
       notifyUsers: vi.fn(),
     } as unknown as NotificationsService,
     tasksContext,
-  );
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
 }
 
 function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
@@ -61,9 +68,11 @@ function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
     { notifyFromTemplate: vi.fn() } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService),
     new HoursRecognitionService(prismaService),
-    new SprintsContextService(prismaService),
-  );
+    new SprintsContextService(prismaService));
 }
 
 function longProgressContent(label: string): string {
@@ -131,8 +140,8 @@ describeIntegration(
       const collaborator = await createIntegrationUser(prisma);
       scope.userIds = [leaderA.idUsuario, leaderB.idUsuario, collaborator.idUsuario];
 
-      const projectA = await createIntegrationProject(prisma, leaderA.idUsuario);
-      const projectB = await createIntegrationProject(prisma, leaderB.idUsuario);
+      const projectA = await createIntegrationProject(prisma, leaderA.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      const projectB = await createIntegrationProject(prisma, leaderB.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [projectA.idProyecto, projectB.idProyecto];
 
       const roleA1 = await createIntegrationProjectRole(prisma, projectA.idProyecto, {
@@ -241,13 +250,15 @@ describeIntegration(
       // F. B2: cierre real del tramo, con horas y evidencia de avance
       // válidas (nunca desasignadaEn escrito a mano vía Prisma).
       // ---------------------------------------------------------------
+      await prisma.registroTiempoTarea.create({
+        data: { idAsignacion: assignment.idAsignacion, idUsuario: collaborator.idUsuario, horas: HORAS_REALES, fecha: new Date('2026-09-06') },
+      });
       await tasksService.closeAssignment(
         projectA.idProyecto,
         taskA.idTarea,
         assignment.idAsignacion,
         collaborator.idUsuario,
         {
-          horasReales: HORAS_REALES,
           contenidoAvance: longProgressContent('X2 cierre real de tramo antes de PENDIENTE_LIDER'),
           marcarComoHecha: false,
         },

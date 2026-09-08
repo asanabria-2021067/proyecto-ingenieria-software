@@ -69,6 +69,8 @@ export interface NotificationTemplateData {
   SOLICITUD_CIERRE_PROYECTO: {
     projectTitle: string;
     projectId: number;
+    revisionId?: number;
+    numeroRevision?: number;
   };
   CIERRE_APROBADO: {
     projectTitle: string;
@@ -154,6 +156,66 @@ export interface NotificationTemplateData {
   NUEVO_SEGUIDOR: {
     userName: string;
   };
+
+  // ---- Sprint 7 (06 v2 §44): plantillas de los ocho valores añadidos por M6. Importes de horas como
+  // strings decimales de dos posiciones (§8); ningún emisor las usa todavía. ----
+  APELACION_LIDERAZGO_RECIBIDA: {
+    projectTitle: string;
+    projectId: number;
+    appealId: number;
+    asunto: string;
+    leaderName: string;
+  };
+  APELACION_LIDERAZGO_RESUELTA: {
+    projectTitle: string;
+    projectId: number;
+    appealId: number;
+    accepted: boolean;
+    newLeaderName?: string | null;
+    mensajeResolucion?: string | null;
+  };
+  LIDERAZGO_ACTUALIZADO: {
+    projectTitle: string;
+    projectId: number;
+    previousLeaderName: string;
+    newLeaderName: string;
+    /** Destinatario: líder saliente, líder nuevo o integrante activo del equipo. */
+    audiencia: 'SALIENTE' | 'NUEVO' | 'EQUIPO';
+    /** Solo para el saliente: efecto real Q1 según su participación activa al confirmar. */
+    salienteConservaMembresia?: boolean;
+  };
+  POSTULACION_RECHAZADA_POR_CIERRE: {
+    projectTitle: string;
+    projectId: number;
+    applicationId: number;
+    roleName: string;
+  };
+  CIERRE_CORRECCION_DOCUMENTAL: {
+    projectTitle: string;
+    projectId: number;
+    revisionId: number;
+    numeroRevision: number;
+    comentario: string;
+  };
+  CIERRE_DEVUELTO_A_EJECUCION: {
+    projectTitle: string;
+    projectId: number;
+    revisionId?: number;
+    comentario: string;
+  };
+  HORAS_CONSOLIDADAS: {
+    projectTitle: string;
+    projectId: number;
+    sprintId: number;
+    numeroSprint: number;
+    horasReportadas: string;
+    horasPropuestas: string;
+  };
+  HORAS_ACREDITADAS: {
+    projectTitle: string;
+    projectId: number;
+    horasAcreditadas: string;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -221,7 +283,7 @@ export const NOTIFICATION_TEMPLATES = {
   SOLICITUD_CIERRE_PROYECTO: {
     title: 'Solicitud de cierre de proyecto',
     message: (data: NotificationTemplateData['SOLICITUD_CIERRE_PROYECTO']) =>
-      `El líder solicitó cierre para "${data.projectTitle}".`,
+      `El líder solicitó cierre para "${data.projectTitle}"${data.numeroRevision === undefined ? '' : ` con la revisión ${data.numeroRevision}`}.`,
   },
   CIERRE_APROBADO: {
     title: 'Cierre de proyecto aprobado',
@@ -301,6 +363,61 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Nuevo seguidor',
     message: (data: NotificationTemplateData['NUEVO_SEGUIDOR']) =>
       `${data.userName} comenzó a seguirte.`,
+  },
+
+  // ---- Sprint 7 (06 v2 §44) ----
+  APELACION_LIDERAZGO_RECIBIDA: {
+    title: 'Nueva apelación de liderazgo',
+    message: (data: NotificationTemplateData['APELACION_LIDERAZGO_RECIBIDA']) =>
+      `${data.leaderName} solicitó transferir el liderazgo del proyecto "${data.projectTitle}": ${data.asunto}. Revisa la apelación para aceptarla o denegarla.`,
+  },
+  APELACION_LIDERAZGO_RESUELTA: {
+    title: (data: NotificationTemplateData['APELACION_LIDERAZGO_RESUELTA']) =>
+      data.accepted ? 'Tu apelación de liderazgo fue aceptada' : 'Tu apelación de liderazgo fue denegada',
+    message: (data: NotificationTemplateData['APELACION_LIDERAZGO_RESUELTA']) =>
+      data.accepted
+        ? `La transferencia del liderazgo de "${data.projectTitle}" fue aceptada. ${data.newLeaderName ?? 'El sucesor designado'} es el nuevo líder.`
+        : `Tu apelación para transferir el liderazgo de "${data.projectTitle}" fue denegada.${data.mensajeResolucion ? ` Motivo: ${data.mensajeResolucion}` : ''}`,
+  },
+  LIDERAZGO_ACTUALIZADO: {
+    title: 'Liderazgo del proyecto actualizado',
+    message: (data: NotificationTemplateData['LIDERAZGO_ACTUALIZADO']) => {
+      if (data.audiencia === 'NUEVO') {
+        return `Ahora eres el líder del proyecto "${data.projectTitle}". ${data.previousLeaderName} dejó el liderazgo.`;
+      }
+      if (data.audiencia === 'SALIENTE') {
+        return data.salienteConservaMembresia
+          ? `Dejaste el liderazgo de "${data.projectTitle}"; ${data.newLeaderName} es el nuevo líder. Conservas tus roles y continúas como integrante del proyecto.`
+          : `Dejaste el liderazgo de "${data.projectTitle}"; ${data.newLeaderName} es el nuevo líder. Al no tener una participación activa, ya no tienes acceso como integrante del proyecto. Tu historial como líder permanece registrado.`;
+      }
+      return `${data.newLeaderName} es el nuevo líder del proyecto "${data.projectTitle}" en reemplazo de ${data.previousLeaderName}.`;
+    },
+  },
+  POSTULACION_RECHAZADA_POR_CIERRE: {
+    title: (data: NotificationTemplateData['POSTULACION_RECHAZADA_POR_CIERRE']) =>
+      `Postulación al proyecto "${data.projectTitle}" rechazada`,
+    message: () =>
+      'Tu postulación fue rechazada automáticamente porque el proyecto inició su proceso de cierre',
+  },
+  CIERRE_CORRECCION_DOCUMENTAL: {
+    title: 'Corrección documental solicitada',
+    message: (data: NotificationTemplateData['CIERRE_CORRECCION_DOCUMENTAL']) =>
+      `El administrador solicitó una corrección documental del cierre de "${data.projectTitle}" y abrió el borrador ${data.numeroRevision}. Comentario: ${data.comentario}`,
+  },
+  CIERRE_DEVUELTO_A_EJECUCION: {
+    title: 'Cierre devuelto a ejecución',
+    message: (data: NotificationTemplateData['CIERRE_DEVUELTO_A_EJECUCION']) =>
+      `El administrador devolvió el proyecto "${data.projectTitle}" a ejecución. Comentario: ${data.comentario}`,
+  },
+  HORAS_CONSOLIDADAS: {
+    title: 'Horas consolidadas del Sprint',
+    message: (data: NotificationTemplateData['HORAS_CONSOLIDADAS']) =>
+      `En el Sprint ${data.numeroSprint} de "${data.projectTitle}" se consolidaron ${data.horasReportadas} horas reportadas y ${data.horasPropuestas} horas propuestas. Quedan pendientes hasta el cierre administrativo del proyecto.`,
+  },
+  HORAS_ACREDITADAS: {
+    title: 'Horas acreditadas',
+    message: (data: NotificationTemplateData['HORAS_ACREDITADAS']) =>
+      `Se acreditaron ${data.horasAcreditadas} horas por tu participación en el proyecto "${data.projectTitle}".`,
   },
 } as const;
 
