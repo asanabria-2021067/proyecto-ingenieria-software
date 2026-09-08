@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
+import { login } from './support/auth';
 
 // carlos.mendoza es el líder del Proyecto 1 (seed), así que tiene el handle
 // de arrastre en todas sus tareas sin importar a quién estén asignadas.
 const CORREO_LIDER = 'carlos.mendoza@uvg.edu.gt';
-const CONTRASENA_LIDER = 'Test1234!';
 const PROYECTO_ID = 1;
 // Tarea sin asignar en el seed: mover esta no afecta el trabajo de nadie más.
 const TITULO_TAREA = 'CRUD de sesiones de tutoría';
@@ -83,14 +83,7 @@ test('el líder arrastra una tarea a otra columna y el tablero refleja el cambio
     };
   });
 
-  await page.goto('/login');
-  await page.getByPlaceholder('usuario@uvg.edu.gt').fill(CORREO_LIDER);
-  await page.getByPlaceholder('Minimo 8 caracteres').fill(CONTRASENA_LIDER);
-  await page.getByRole('button', { name: 'Iniciar Sesion' }).click();
-  // El runner de CI comparte un único backend/frontend de dev con el resto
-  // de la suite; el login puede tardar más que el timeout por defecto de
-  // Playwright bajo esa carga compartida.
-  await page.waitForURL('**/dashboard', { timeout: 45_000 });
+  await login(page, CORREO_LIDER);
 
   await page.goto(`/dashboard/projects/${PROYECTO_ID}/kanban`);
 
