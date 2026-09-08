@@ -64,6 +64,10 @@ async function arrastrarTarea(page: Page, handleName: string, destino: Estado) {
 
 // smoke: tablero Kanban con drag & drop real (T-125, flujo 2)
 test('el líder arrastra una tarea a otra columna y el tablero refleja el cambio', async ({ page }) => {
+  // El timeout de test por defecto (30s) manda sobre el timeout de una
+  // acción individual — subir solo el de waitForURL no alcanza si el test
+  // completo sigue topando a los 30s.
+  test.setTimeout(60_000);
   // OnboardingTour (react-joyride) se activa por localStorage
   // (`onboarding_seen_{idUsuario}`, ver components/dashboard/OnboardingTour.tsx),
   // nunca por estado del backend: en un contexto de navegador nuevo (como
