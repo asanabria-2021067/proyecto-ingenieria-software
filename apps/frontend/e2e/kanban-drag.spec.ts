@@ -48,17 +48,26 @@ async function columnaActual(page: Page, handleName: string): Promise<Estado> {
 // recalcular la colisión con la columna destino en cada paso.
 async function arrastrarTarea(page: Page, handleName: string, destino: Estado) {
   const handle = page.getByRole('button', { name: handleName });
+  await handle.scrollIntoViewIfNeeded();
   const box = await handle.boundingBox();
   if (!box) throw new Error('No se pudo medir el handle de arrastre');
 
   const destinoBox = await page.locator(`[data-column-estado="${destino}"]`).boundingBox();
   if (!destinoBox) throw new Error('No se pudo medir la columna destino');
 
+  // Pausas cortas entre cada tramo: el PointerSensor de @dnd-kit procesa el
+  // gesto de forma asíncrona (pointerdown -> activation constraint ->
+  // pointermove -> recálculo de colisión) y un lote de eventos sin
+  // separación real a veces no le da tiempo a registrar el inicio del
+  // arrastre bajo CI, aunque localmente sí alcance.
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
+  await page.waitForTimeout(150);
   // movimiento corto primero: supera el umbral de activación antes del salto grande
-  await page.mouse.move(box.x + box.width / 2 + 15, box.y + box.height / 2, { steps: 5 });
-  await page.mouse.move(destinoBox.x + destinoBox.width / 2, destinoBox.y + 100, { steps: 15 });
+  await page.mouse.move(box.x + box.width / 2 + 15, box.y + box.height / 2, { steps: 10 });
+  await page.waitForTimeout(150);
+  await page.mouse.move(destinoBox.x + destinoBox.width / 2, destinoBox.y + 100, { steps: 25 });
+  await page.waitForTimeout(150);
   await page.mouse.up();
 }
 
@@ -95,7 +104,7 @@ test('el líder arrastra una tarea a otra columna y el tablero refleja el cambio
 
   await expect(
     page.locator(`[data-column-estado="${destino}"]`).getByRole('button', { name: handleName }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 10_000 });
   await expect(
     page.locator(`[data-column-estado="${origen}"]`).getByRole('button', { name: handleName }),
   ).toHaveCount(0);
