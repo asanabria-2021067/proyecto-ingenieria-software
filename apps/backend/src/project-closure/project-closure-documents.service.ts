@@ -1,0 +1,728 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  PayloadTooLargeException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { EstadoDocumentoCierre, Prisma, TipoDocumentoCierre } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
+import {
+  ClosureCryptoService,
+  sha256Hex,
+  type ClosureCryptoMetadata,
+} from '../storage/closure-crypto.service';
+import { ClosureTicketService } from '../storage/closure-ticket.service';
+import { ClosurePdfValidationService } from '../storage/closure-pdf-validation.service';
+import {
+  ASSET_NO_COINCIDE,
+  CLOSURE_REMOTE_TIMEOUT_MS,
+  CloudinaryClosureStorageAdapter,
+} from '../storage/cloudinary-closure-storage.adapter';
+import {
+  CLOUDINARY_CLOSURE_PORT,
+  type ClosureRemoteIdentity,
+  type ClosureStoragePort,
+} from '../storage/closure-storage.port';
+import { ReserveDocumentDto } from './dto/reserve-document.dto';
+import type { ReadGrant, UploadGrant } from './dto/upload-grant.dto';
+
+/**
+ * C113/C114/C117/C130 (06 v2 §25/§26/§27/§28): carga mediada de documentos de cierre.
+ *
+ * La secuencia es deliberada: una transacción BREVE reserva, el trabajo caro
+ * —hash, cifrado y transferencia— ocurre FUERA de cualquier lock, y una
+ * segunda transacción breve confirma. Mantener el proyecto bloqueado mientras
+ * viajan diez megabytes por la red dejaría el proyecto inoperante para todos
+ * durante la subida de una sola persona.
+ */
+
+/** §26/§28: límite absoluto y exacto de un documento de cierre. */
+export const MAX_DOCUMENT_SIZE = 10_485_760;
+/** §26: margen de framing multipart sobre el límite del archivo. */
+export const MULTIPART_OVERHEAD_BYTES = 65_536;
+/** §25: reservas de evidencia vivas por actor y revisión. */
+export const MAX_OPEN_EVIDENCE_RESERVATIONS = 2;
+
+export const DOCUMENTO_DEMASIADO_GRANDE = 'DOCUMENTO_DEMASIADO_GRANDE';
+export const RESERVA_NO_DISPONIBLE = 'RESERVA_NO_DISPONIBLE';
+
+export interface ClosureDocumentPublic {
+  idDocumentoCierre: number;
+  idProyecto: number;
+  idRevisionOrigen: number;
+  tipoDocumento: TipoDocumentoCierre;
+  estadoDocumento: EstadoDocumentoCierre;
+  nombreArchivo: string;
+  tamanoBytes: number | null;
+  checksumSha256: string | null;
+  externalId: string;
+  deliveryType: string;
+  assetId: string | null;
+  versionRemota: string | null;
+  disponibleEn: Date | null;
+}
+
+const DOCUMENTO_SELECT = {
+  idDocumentoCierre: true,
+  idProyecto: true,
+  idRevisionOrigen: true,
+  tipoDocumento: true,
+  estadoDocumento: true,
+  nombreArchivo: true,
+  tamanoBytes: true,
+  checksumSha256: true,
+  externalId: true,
+  deliveryType: true,
+  assetId: true,
+  versionRemota: true,
+  disponibleEn: true,
+  idAutor: true,
+  resourceType: true,
+  proveedor: true,
+  reservaExpiraEn: true,
+  cryptoMetadata: true,
+  tamanoCifradoBytes: true,
+  checksumCifradoSha256: true,
+} satisfies Prisma.DocumentoCierreSelect;
+
+type DocumentoRow = Prisma.DocumentoCierreGetPayload<{ select: typeof DOCUMENTO_SELECT }>;
+
+function mapDocumento(row: DocumentoRow): ClosureDocumentPublic {
+  return {
+    idDocumentoCierre: row.idDocumentoCierre,
+    idProyecto: row.idProyecto,
+    idRevisionOrigen: row.idRevisionOrigen,
+    tipoDocumento: row.tipoDocumento,
+    estadoDocumento: row.estadoDocumento,
+    nombreArchivo: row.nombreArchivo,
+    tamanoBytes: row.tamanoBytes === null ? null : Number(row.tamanoBytes),
+    checksumSha256: row.checksumSha256,
+    externalId: row.externalId,
+    deliveryType: row.deliveryType,
+    assetId: row.assetId,
+    versionRemota: row.versionRemota,
+    disponibleEn: row.disponibleEn,
+  };
+}
+
+@Injectable()
+export class ProjectClosureDocumentsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
+    private readonly tickets: ClosureTicketService,
+    private readonly crypto: ClosureCryptoService,
+    private readonly adapter: CloudinaryClosureStorageAdapter,
+    private readonly pdfValidation: ClosurePdfValidationService,
+    @Inject(CLOUDINARY_CLOSURE_PORT) private readonly storage: ClosureStoragePort,
+    private readonly bitacoraEventos: BitacoraEventosService,
+  ) {}
+
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
+
+  /** El borrador debe existir, pertenecer al proyecto y seguir en BORRADOR. */
+  async detach(projectId: number, actorId: number, revisionId: number, documentId: number): Promise<void> {
+    await this.projectTx.run(projectId, actorId, 'closure.detach', async (ctx) => {
+      const { tx } = ctx;
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'CIERRE_EVIDENCIAS', actorId);
+      await this.assertDraftTx(tx, projectId, revisionId);
+      const link = await tx.documentoRevisionCierre.findUnique({
+        where: { idRevisionCierre_idDocumentoCierre: { idRevisionCierre: revisionId, idDocumentoCierre: documentId } },
+        include: { documento: true },
+      });
+      if (!link) return;
+      if (link.documento.tipoDocumento !== 'EVIDENCIA_LIDER' || link.documento.idProyecto !== projectId) {
+        throw new ConflictException('Solo se pueden retirar evidencias del borrador');
+      }
+      await tx.documentoRevisionCierre.delete({ where: { idDocumentoRevision: link.idDocumentoRevision } });
+      await this.bitacoraEventos.registrarEvento({ tx, tipoEvento: TipoEventoBitacora.CLOSURE_DOCUMENT_REMOVED,
+        idActor: actorId, idProyecto: projectId, tipoEntidad: 'DOCUMENTO_CIERRE', idEntidad: documentId,
+        valorAnterior: { revisionId, orden: link.orden }, valorNuevo: null });
+    });
+  }
+
+  private async assertDraftTx(
+    tx: Prisma.TransactionClient,
+    projectId: number,
+    revisionId: number,
+  ): Promise<{ idRevisionCierre: number }> {
+    const revision = await tx.revisionCierreProyecto.findFirst({
+      where: { idRevisionCierre: revisionId, idProyecto: projectId },
+      select: { idRevisionCierre: true, estadoRevision: true },
+    });
+    if (!revision) {
+      throw new NotFoundException(
+        `Revisión de cierre con id ${revisionId} no encontrada en el proyecto ${projectId}`,
+      );
+    }
+    if (revision.estadoRevision !== 'BORRADOR') {
+      throw new ConflictException('La revisión de cierre ya no admite documentos');
+    }
+    return { idRevisionCierre: revision.idRevisionCierre };
+  }
+
+  /**
+   * E106: reserva la fila ANTES de cualquier I/O y devuelve el permiso de
+   * carga. Que exista fila antes de subir es lo que impide dejar objetos
+   * remotos huérfanos sin registro que los pueda limpiar.
+   */
+  async reserve(projectId: number, actorId: number, dto: ReserveDocumentDto): Promise<UploadGrant> {
+    // Gate de configuración antes de reservar, firmar o subir.
+    this.tickets.assertAvailable();
+    const identidad = this.adapter.buildIdentity(projectId);
+
+    const documento = await this.projectTx.run(
+      projectId,
+      actorId,
+      'closure-documents.reserve',
+      async (ctx) => {
+        const { tx } = ctx;
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'CIERRE_EVIDENCIAS', actorId);
+        await this.assertDraftTx(tx, projectId, dto.revisionId);
+
+        // §25: dos reservas vivas por actor y revisión. Sin cuota, un cliente
+        // que reintenta acumularía identidades remotas que nadie usará.
+        const abiertas = await tx.documentoCierre.count({
+          where: {
+            idRevisionOrigen: dto.revisionId,
+            idAutor: actorId,
+            tipoDocumento: TipoDocumentoCierre.EVIDENCIA_LIDER,
+            estadoDocumento: { in: [EstadoDocumentoCierre.RESERVADO, EstadoDocumentoCierre.EN_CARGA] },
+            reservaExpiraEn: { gt: new Date() },
+          },
+        });
+        if (abiertas >= MAX_OPEN_EVIDENCE_RESERVATIONS) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: RESERVA_NO_DISPONIBLE,
+            message: 'Ya tienes el máximo de reservas de evidencia abiertas en esta revisión',
+          });
+        }
+
+        return tx.documentoCierre.create({
+          data: {
+            idProyecto: projectId,
+            idRevisionOrigen: dto.revisionId,
+            tipoDocumento: TipoDocumentoCierre.EVIDENCIA_LIDER,
+            proveedor: identidad.proveedor,
+            externalId: identidad.publicId,
+            resourceType: identidad.resourceType,
+            deliveryType: identidad.deliveryType,
+            nombreArchivo: dto.nombreArchivo,
+            idAutor: actorId,
+            reservaExpiraEn: new Date(Date.now() + 600_000),
+          },
+          select: DOCUMENTO_SELECT,
+        });
+      },
+    );
+
+    const { ticket, expiraEn } = this.tickets.sign({
+      purpose: 'upload',
+      documentId: documento.idDocumentoCierre,
+      projectId,
+      revisionId: dto.revisionId,
+      actorId,
+    });
+
+    return {
+      documentId: documento.idDocumentoCierre,
+      uploadUrl: `/proyectos/${projectId}/cierre/documentos`,
+      ticket,
+      expiraEn,
+      maxBytes: MAX_DOCUMENT_SIZE,
+    };
+  }
+
+  /**
+   * E107: recibe `{ticket,file}`, valida, cifra y sube.
+   *
+   * Orden exacto de §26: verificar → limitar bytes → parsear → cifrar (todo
+   * sin lock) → tx breve `RESERVADO→EN_CARGA` → subir → tx breve
+   * `→DISPONIBLE` + vínculo. Mientras los bytes viajan no hay ninguna
+   * transacción abierta.
+   */
+  async uploadAndAttach(
+    projectId: number,
+    actorId: number,
+    ticket: string,
+    file: Buffer,
+  ): Promise<ClosureDocumentPublic> {
+    this.tickets.assertAvailable();
+    const payload = this.tickets.verify(ticket, { purpose: 'upload', projectId });
+    if (!Buffer.isBuffer(file) || file.length === 0) {
+      throw new BadRequestException('No se recibió el archivo del documento');
+    }
+    // §25: el límite es INCLUSIVO y se aplica sobre los bytes realmente
+    // recibidos. No se descuenta ningún margen criptográfico porque no
+    // existe: el ciphertext mide exactamente lo mismo que el PDF.
+    if (file.length > MAX_DOCUMENT_SIZE) {
+      throw new PayloadTooLargeException({
+        statusCode: 413,
+        code: DOCUMENTO_DEMASIADO_GRANDE,
+        message: 'El documento supera el tamaño máximo permitido',
+      });
+    }
+    // Un nombre o un Content-Type no prueban que esto sea un PDF: se parsea
+    // el documento completo en un worker acotado, sin reescribir el original.
+    await this.pdfValidation.assertValidPdf(file);
+
+    const documentoPrevio = await this.prisma.documentoCierre.findFirst({
+      where: { idDocumentoCierre: payload.documentId, idProyecto: projectId },
+      select: DOCUMENTO_SELECT,
+    });
+    if (!documentoPrevio) {
+      throw new NotFoundException(`Documento de cierre ${payload.documentId} no encontrado`);
+    }
+    // Reintento sobre un documento ya vinculado. Al MISMO actor se le
+    // devuelve el resultado existente sin volver a subir un solo byte; a
+    // cualquier otro se le responde conflicto: el ticket ya se consumió y su
+    // resultado pertenece a quien lo consumió.
+    if (documentoPrevio.estadoDocumento === EstadoDocumentoCierre.DISPONIBLE) {
+      if (documentoPrevio.idAutor !== actorId) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: RESERVA_NO_DISPONIBLE,
+          message: 'La reserva de este documento ya fue consumida por su autor',
+        });
+      }
+      return mapDocumento(documentoPrevio);
+    }
+    if (payload.actorId !== actorId) {
+      throw new ForbiddenException('El ticket pertenece a otro usuario');
+    }
+
+    // Cifrado y hashes FUERA de cualquier transacción.
+    const sellado = this.crypto.seal(file, {
+      projectId,
+      documentId: documentoPrevio.idDocumentoCierre,
+      publicId: documentoPrevio.externalId,
+      tipoDocumento: documentoPrevio.tipoDocumento,
+    });
+
+    // Tx breve 1: consumo del ticket por CAS.
+    await this.projectTx.run(projectId, actorId, 'closure-documents.begin-upload', async (ctx) => {
+      const { tx } = ctx;
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'CIERRE_EVIDENCIAS', actorId);
+      await this.assertDraftTx(tx, projectId, payload.revisionId);
+      const consumido = await tx.documentoCierre.updateMany({
+        where: {
+          idDocumentoCierre: payload.documentId,
+          estadoDocumento: EstadoDocumentoCierre.RESERVADO,
+        },
+        data: {
+          estadoDocumento: EstadoDocumentoCierre.EN_CARGA,
+          cargaIniciadaEn: new Date(),
+          cargaLimiteEn: new Date(Date.now() + 7_200_000),
+          tamanoBytes: BigInt(sellado.tamanoBytes),
+          checksumSha256: sellado.checksumSha256,
+          tamanoCifradoBytes: BigInt(sellado.tamanoCifradoBytes),
+          checksumCifradoSha256: sellado.checksumCifradoSha256,
+          cryptoMetadata: sellado.metadata as unknown as Prisma.InputJsonValue,
+        },
+      });
+      // El ticket es de un solo uso: la reserva ya consumida es un conflicto.
+      if (consumido.count !== 1) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: RESERVA_NO_DISPONIBLE,
+          message: 'La reserva de este documento ya fue consumida',
+        });
+      }
+    });
+
+    // I/O externo: sin transacción abierta y sin lock retenido.
+    const identidad: ClosureRemoteIdentity = {
+      proveedor: 'cloudinary',
+      cloudName: this.adapter.cloudNameForIdentity(),
+      publicId: documentoPrevio.externalId,
+      resourceType: 'raw',
+      deliveryType: documentoPrevio.deliveryType as ClosureRemoteIdentity['deliveryType'],
+    };
+    const firmados = this.adapter.signUploadParams(identidad);
+    const confirmada = await this.storage.uploadImmutable(identidad, sellado.ciphertext, firmados);
+    await this.verifyRemote(identidad, confirmada, {
+      checksumCifradoSha256: sellado.checksumCifradoSha256,
+      tamanoCifradoBytes: sellado.tamanoCifradoBytes,
+    });
+
+    // Tx breve 2: revalidar y vincular.
+    return this.projectTx.run(projectId, actorId, 'closure-documents.finish-upload', async (ctx) => {
+      const { tx } = ctx;
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'CIERRE_EVIDENCIAS', actorId);
+      const revision = await this.assertDraftTx(tx, projectId, payload.revisionId);
+
+      const disponible = await tx.documentoCierre.updateMany({
+        where: {
+          idDocumentoCierre: payload.documentId,
+          estadoDocumento: EstadoDocumentoCierre.EN_CARGA,
+        },
+        data: {
+          estadoDocumento: EstadoDocumentoCierre.DISPONIBLE,
+          disponibleEn: new Date(),
+          assetId: confirmada.assetId ?? null,
+          versionRemota: confirmada.version ?? null,
+        },
+      });
+      if (disponible.count !== 1) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: RESERVA_NO_DISPONIBLE,
+          message: 'La carga de este documento ya fue resuelta',
+        });
+      }
+
+      const siguienteOrden = await tx.documentoRevisionCierre.count({
+        where: { idRevisionCierre: revision.idRevisionCierre },
+      });
+      await tx.documentoRevisionCierre.create({
+        data: {
+          idRevisionCierre: revision.idRevisionCierre,
+          idDocumentoCierre: payload.documentId,
+          orden: siguienteOrden,
+        },
+      });
+
+      const fila = await tx.documentoCierre.findUniqueOrThrow({
+        where: { idDocumentoCierre: payload.documentId },
+        select: DOCUMENTO_SELECT,
+      });
+
+      await this.bitacoraEventos.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.CLOSURE_DOCUMENT_ADDED,
+        idActor: actorId,
+        idProyecto: projectId,
+        tipoEntidad: 'DOCUMENTO_CIERRE',
+        idEntidad: payload.documentId,
+        valorAnterior: null,
+        // Nunca claves ni ciphertext: solo identidad y medidas.
+        valorNuevo: {
+          idRevisionCierre: revision.idRevisionCierre,
+          orden: siguienteOrden,
+          externalId: fila.externalId,
+          tamanoBytes: Number(fila.tamanoBytes ?? 0),
+          checksumSha256: fila.checksumSha256,
+        },
+      });
+
+      return mapDocumento(fila);
+    });
+  }
+
+  /**
+   * Verificación remota completa (§27).
+   *
+   * Un HTTP 200 NO prueba que los bytes enviados se hayan almacenado: con
+   * `overwrite=false` el proveedor puede responder éxito devolviendo el asset
+   * anterior. Por eso se compara la identidad contra la reserva, se cruzan
+   * assetId y version con la API de recursos y, decisivamente, se DESCARGA el
+   * objeto para comparar su longitud y su SHA-256 con el ciphertext local.
+   *
+   * Ante cualquier discrepancia se responde 409 y se detiene: no se reintenta
+   * con `overwrite=true`, no se reutiliza el publicId y no se destruye el
+   * objeto para forzar la carga. Todo esto ocurre FUERA de transacción.
+   */
+  protected async verifyRemote(
+    reserva: ClosureRemoteIdentity,
+    confirmada: ClosureRemoteIdentity,
+    esperado: { checksumCifradoSha256: string; tamanoCifradoBytes: number },
+  ): Promise<void> {
+    const conflicto = (detalle: string): never => {
+      throw new ConflictException({
+        statusCode: 409,
+        code: ASSET_NO_COINCIDE,
+        message: `El objeto remoto no corresponde al documento reservado (${detalle})`,
+      });
+    };
+
+    if (
+      confirmada.publicId !== reserva.publicId ||
+      confirmada.resourceType !== reserva.resourceType ||
+      confirmada.deliveryType !== reserva.deliveryType
+    ) {
+      conflicto('identidad');
+    }
+
+    const descriptor = await this.storage.verifyAsset(confirmada);
+    if (
+      descriptor.publicId !== reserva.publicId ||
+      descriptor.resourceType !== reserva.resourceType ||
+      descriptor.deliveryType !== reserva.deliveryType ||
+      descriptor.bytes !== esperado.tamanoCifradoBytes
+    ) {
+      conflicto('metadatos');
+    }
+    // El cruce entre la respuesta de carga y la de recursos: si el proveedor
+    // conservó un asset anterior, aquí deja de coincidir.
+    if (
+      (confirmada.assetId ?? '') !== descriptor.assetId ||
+      (confirmada.version ?? '') !== descriptor.version
+    ) {
+      conflicto('identificador de asset');
+    }
+
+    // Prueba decisiva: los bytes reales que quedaron guardados. Un recurso
+    // preexistente con contenido distinto —aunque mida lo mismo— falla aquí.
+    const remoto = await this.storage.readCiphertext(confirmada, CLOSURE_REMOTE_TIMEOUT_MS);
+    if (
+      remoto.length !== esperado.tamanoCifradoBytes ||
+      sha256Hex(remoto) !== esperado.checksumCifradoSha256
+    ) {
+      conflicto('contenido');
+    }
+    // `etag` nunca se interpreta como el SHA-256 del PDF ni se persiste: su
+    // única función es cruzar las dos respuestas del proveedor.
+  }
+
+  /**
+   * C130 (§28): reserva la fila de un documento GENERADO por el servidor.
+   *
+   * A diferencia de una evidencia, aquí no hay ticket ni multipart: el
+   * documento lo produce el backend. La reserva ocurre dentro de la
+   * transacción de captura del caller para que exista fila antes de cualquier
+   * I/O, y CK26 exige que un informe traiga ya su versión de generador, sus
+   * dos huellas y su contexto.
+   *
+   * El índice parcial `s7_informe_en_generacion` impide dos informes del
+   * mismo tipo en curso para una revisión: una generación concurrente choca
+   * en la base, no en una comprobación optimista.
+   */
+  async reserveGeneratedTx(
+    tx: Prisma.TransactionClient,
+    input: {
+      projectId: number;
+      revisionId: number;
+      tipoDocumento: TipoDocumentoCierre;
+      nombreArchivo: string;
+      actorId: number;
+      generatorVersion: string;
+      fingerprintEjecucion: string;
+      fingerprintModelo: string;
+      contextoReporte: Prisma.InputJsonValue;
+    },
+  ): Promise<ClosureDocumentPublic> {
+    this.tickets.assertAvailable();
+    const identidad = this.adapter.buildIdentity(input.projectId);
+    try {
+      const fila = await tx.documentoCierre.create({
+        data: {
+          idProyecto: input.projectId,
+          idRevisionOrigen: input.revisionId,
+          tipoDocumento: input.tipoDocumento,
+          proveedor: identidad.proveedor,
+          externalId: identidad.publicId,
+          resourceType: identidad.resourceType,
+          deliveryType: identidad.deliveryType,
+          nombreArchivo: input.nombreArchivo,
+          idAutor: input.actorId,
+          reservaExpiraEn: new Date(Date.now() + 600_000),
+          generatorVersion: input.generatorVersion,
+          fingerprintEjecucion: input.fingerprintEjecucion,
+          fingerprintModelo: input.fingerprintModelo,
+          contextoReporte: input.contextoReporte,
+        },
+        select: DOCUMENTO_SELECT,
+      });
+      return mapDocumento(fila);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException({
+          statusCode: 409,
+          code: RESERVA_NO_DISPONIBLE,
+          message: 'Ya hay un informe de este tipo en generación para la revisión',
+        });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * C130 (§26/§28): cifra, sube y VERIFICA un documento generado.
+   *
+   * Ocurre íntegramente FUERA de transacción: cifrar diez megabytes y
+   * transferirlos por red no puede hacerse con el proyecto bloqueado. Devuelve
+   * lo que la transacción de finalización necesita para confirmar.
+   */
+  async uploadGenerated(
+    documentId: number,
+    projectId: number,
+    pdf: Buffer,
+  ): Promise<{
+    identidad: ClosureRemoteIdentity;
+    checksumSha256: string;
+    tamanoBytes: number;
+    checksumCifradoSha256: string;
+    tamanoCifradoBytes: number;
+    metadata: ClosureCryptoMetadata;
+  }> {
+    this.tickets.assertAvailable();
+    if (pdf.length > MAX_DOCUMENT_SIZE) {
+      throw new PayloadTooLargeException({
+        statusCode: 413,
+        code: DOCUMENTO_DEMASIADO_GRANDE,
+        message: 'El documento generado supera el tamaño máximo permitido',
+      });
+    }
+    const documento = await this.prisma.documentoCierre.findFirstOrThrow({
+      where: { idDocumentoCierre: documentId, idProyecto: projectId },
+      select: DOCUMENTO_SELECT,
+    });
+    const sellado = this.crypto.seal(pdf, {
+      projectId,
+      documentId,
+      publicId: documento.externalId,
+      tipoDocumento: documento.tipoDocumento,
+    });
+    const identidad: ClosureRemoteIdentity = {
+      proveedor: 'cloudinary',
+      cloudName: this.adapter.cloudNameForIdentity(),
+      publicId: documento.externalId,
+      resourceType: 'raw',
+      deliveryType: documento.deliveryType as ClosureRemoteIdentity['deliveryType'],
+    };
+    const firmados = this.adapter.signUploadParams(identidad);
+    const confirmada = await this.storage.uploadImmutable(identidad, sellado.ciphertext, firmados);
+    await this.verifyRemote(identidad, confirmada, {
+      checksumCifradoSha256: sellado.checksumCifradoSha256,
+      tamanoCifradoBytes: sellado.tamanoCifradoBytes,
+    });
+    return {
+      identidad: confirmada,
+      checksumSha256: sellado.checksumSha256,
+      tamanoBytes: sellado.tamanoBytes,
+      checksumCifradoSha256: sellado.checksumCifradoSha256,
+      tamanoCifradoBytes: sellado.tamanoCifradoBytes,
+      metadata: sellado.metadata,
+    };
+  }
+
+
+  /**
+   * E109 (§26): permiso de lectura. Devuelve una URL DEL BACKEND y un ticket
+   * de cinco minutos atado al usuario, al documento y a su checksum.
+   *
+   * Nunca se entrega una URL del proveedor: el PDF en claro solo existe
+   * dentro del backend autorizado, y una URL remota —firmada o no— sacaría el
+   * control de acceso de nuestras manos.
+   */
+  async getReadUrl(projectId: number, documentId: number, actorId: number): Promise<ReadGrant> {
+    this.tickets.assertAvailable();
+    await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'documentos' });
+    const documento = await this.loadAvailable(projectId, documentId);
+    const { ticket, expiraEn } = this.tickets.sign({
+      purpose: 'read',
+      documentId,
+      projectId,
+      revisionId: documento.idRevisionOrigen,
+      actorId,
+      checksum: documento.checksumSha256 ?? '',
+    });
+    return {
+      documentId,
+      url: `/proyectos/${projectId}/cierre/documentos/${documentId}/contenido?ticket=${encodeURIComponent(ticket)}`,
+      expiraEn,
+    };
+  }
+
+  /**
+   * E110 (§26): bytes del documento, descifrados y verificados.
+   *
+   * Exige las TRES cosas a la vez: la sesión autenticada del mismo usuario,
+   * un ticket vigente para ese documento y los permisos ACTUALES sobre el
+   * proyecto. El ticket solo no autoriza: si los permisos cambiaron desde que
+   * se emitió, la lectura se niega.
+   */
+  async readContent(
+    projectId: number,
+    documentId: number,
+    actorId: number,
+    ticket: string,
+  ): Promise<{ bytes: Buffer; nombreArchivo: string }> {
+    this.tickets.assertAvailable();
+    const payload = this.tickets.verify(ticket, { purpose: 'read', projectId, documentId });
+    if (payload.actorId !== actorId) {
+      throw new UnauthorizedException('El ticket no corresponde a la sesión autenticada');
+    }
+    // Permisos ACTUALES, no los que existían al emitir el ticket.
+    await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'documentos' });
+
+    const documento = await this.loadAvailable(projectId, documentId);
+    const identidad: ClosureRemoteIdentity = {
+      proveedor: 'cloudinary',
+      cloudName: this.adapter.cloudNameForIdentity(),
+      publicId: documento.externalId,
+      resourceType: 'raw',
+      deliveryType: documento.deliveryType as ClosureRemoteIdentity['deliveryType'],
+    };
+    const ciphertext = await this.storage.readCiphertext(identidad, CLOSURE_REMOTE_TIMEOUT_MS);
+    // Autenticar y verificar ANTES de emitir un solo byte.
+    const bytes = this.crypto.open(
+      ciphertext,
+      this.cryptoMetadataOf(documento),
+      {
+        projectId,
+        documentId,
+        publicId: documento.externalId,
+        tipoDocumento: documento.tipoDocumento,
+      },
+      {
+        checksumSha256: documento.checksumSha256 ?? '',
+        tamanoBytes: Number(documento.tamanoBytes ?? 0),
+      },
+    );
+    return { bytes, nombreArchivo: documento.nombreArchivo };
+  }
+
+  /** Solo un documento DISPONIBLE se lee; una reserva o una purga no. */
+  private async loadAvailable(projectId: number, documentId: number): Promise<DocumentoRow> {
+    const documento = await this.prisma.documentoCierre.findFirst({
+      where: { idDocumentoCierre: documentId, idProyecto: projectId },
+      select: DOCUMENTO_SELECT,
+    });
+    if (!documento) {
+      throw new NotFoundException(`Documento de cierre ${documentId} no encontrado`);
+    }
+    if (documento.estadoDocumento !== EstadoDocumentoCierre.DISPONIBLE) {
+      throw new ConflictException('El documento no está disponible para lectura');
+    }
+    return documento;
+  }
+
+  /** Metadata pública del documento; nunca metadata criptográfica. */
+  async findOne(projectId: number, documentId: number): Promise<ClosureDocumentPublic> {
+    const fila = await this.prisma.documentoCierre.findFirst({
+      where: { idDocumentoCierre: documentId, idProyecto: projectId },
+      select: DOCUMENTO_SELECT,
+    });
+    if (!fila) {
+      throw new NotFoundException(`Documento de cierre ${documentId} no encontrado`);
+    }
+    return mapDocumento(fila);
+  }
+
+  /** Metadata criptográfica tipada; solo la usan las rutas del backend. */
+  protected cryptoMetadataOf(row: { cryptoMetadata: unknown }): ClosureCryptoMetadata {
+    return row.cryptoMetadata as ClosureCryptoMetadata;
+  }
+}

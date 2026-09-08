@@ -1,3 +1,5 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
+import { createBarrier, useSecondClient, withDeadline } from './setup/concurrency';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { ConflictException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
@@ -18,6 +20,10 @@ import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.s
 import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 function makeTasksService(prisma: PrismaClient): TasksService {
   const prismaService = prisma as unknown as PrismaService;
@@ -27,7 +33,9 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     {} as unknown as TasksRelationsService,
     {} as unknown as NotificationsService,
     new TasksContextService(prismaService),
-  );
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
 }
 
 function longContent(label: string): string {
@@ -39,6 +47,7 @@ function decimalToNumber(value: unknown): number {
 }
 
 describeIntegration('B3 cierre concurrente de AsignacionTarea (PostgreSQL real)', () => {
+  const secondClient = useSecondClient();
   let prisma: PrismaClient;
   let scope: IntegrationCleanupScope;
 
@@ -70,7 +79,7 @@ describeIntegration('B3 cierre concurrente de AsignacionTarea (PostgreSQL real)'
     const assignee = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario, assignee.idUsuario];
 
-    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
     scope.projectIds = [project.idProyecto];
 
     const role = await createIntegrationProjectRole(prisma, project.idProyecto);
@@ -100,32 +109,31 @@ describeIntegration('B3 cierre concurrente de AsignacionTarea (PostgreSQL real)'
 
     const service = makeTasksService(prisma);
     const requestA = {
-      horasReales: 3,
       contenidoAvance: longContent('request A horas 3'),
       marcarComoHecha: false,
     };
     const requestB = {
-      horasReales: 7,
       contenidoAvance: longContent('request B horas 7'),
       marcarComoHecha: false,
     };
 
-    const results = await Promise.allSettled([
-      service.closeAssignment(
+    const barrier = createBarrier(2);
+    const results = await withDeadline(Promise.allSettled([
+      barrier.arrive().then(() => service.closeAssignment(
         project.idProyecto,
         task.idTarea,
         assignment.idAsignacion,
         assignee.idUsuario,
         requestA,
-      ),
-      service.closeAssignment(
+      )),
+      barrier.arrive().then(() => makeTasksService(secondClient()).closeAssignment(
         project.idProyecto,
         task.idTarea,
         assignment.idAsignacion,
         assignee.idUsuario,
         requestB,
-      ),
-    ]);
+      )),
+    ]), 10000, 'cierres concurrentes');
 
     const fulfilled = results.filter((result) => result.status === 'fulfilled');
     const rejected = results.filter((result) => result.status === 'rejected');
@@ -140,7 +148,8 @@ describeIntegration('B3 cierre concurrente de AsignacionTarea (PostgreSQL real)'
     expect(finalAssignment.desasignadaEn).not.toBeNull();
 
     const finalHours = decimalToNumber(finalAssignment.horasReales);
-    expect([requestA.horasReales, requestB.horasReales]).toContain(finalHours);
+    expect(finalAssignment.horasReales).not.toBeNull();
+    expect(finalHours).toBe(0);
 
     const progressRecords = await prisma.registroAvanceAsignacion.findMany({
       where: { idAsignacion: assignment.idAsignacion },
@@ -149,7 +158,7 @@ describeIntegration('B3 cierre concurrente de AsignacionTarea (PostgreSQL real)'
     expect(progressRecords).toHaveLength(1);
     expect(progressRecords[0].idAutor).toBe(assignee.idUsuario);
     expect(progressRecords[0].contenido).toBe(
-      finalHours === requestA.horasReales ? requestA.contenidoAvance : requestB.contenidoAvance,
+      results[0].status === 'fulfilled' ? requestA.contenidoAvance : requestB.contenidoAvance,
     );
   });
 });

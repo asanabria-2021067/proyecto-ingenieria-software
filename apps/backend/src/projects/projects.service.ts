@@ -20,13 +20,41 @@ import {
 import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService, type ReadDecision } from '../common/project-policy/project-read-policy.service';
+import {
+  ProjectTransactionService,
+  type ProjectLockRow,
+  type ProjectTransactionContext,
+} from '../common/project-policy/project-transaction.service';
+
+/** Cliente Prisma raíz o transaccional: los helpers de autorización se repiten con `tx` después del lock (06 v2 §16). */
+type Db = Prisma.TransactionClient | PrismaService;
 
 const FEATURED_CACHE_KEY = 'projects:featured';
 const FEATURED_CACHE_TTL = 300_000;
 
+/** Estados que aparecen en el catálogo público y en destacados. */
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
   EstadoProyecto.PUBLICADO,
   EstadoProyecto.EN_PROGRESO,
+];
+
+/**
+ * Estados cuyo DETALLE sigue siendo consultable. Es una lista distinta de
+ * `ESTADOS_VISIBLES` a propósito: un proyecto en solicitud de cierre ya no se
+ * ofrece en el catálogo —no admite postulaciones— pero su espacio de trabajo
+ * debe seguir abriéndose, empezando por el del propio líder, que necesita ver
+ * el estado de su solicitud.
+ *
+ * Antes compartían lista y el detalle respondía 404 en cuanto se solicitaba el
+ * cierre: el proyecto «desaparecía» para todo el mundo.
+ *
+ * `CERRADO` NO entra: se lee como histórico completo por su propia ruta.
+ */
+const ESTADOS_CON_DETALLE: EstadoProyecto[] = [
+  ...ESTADOS_VISIBLES,
+  EstadoProyecto.EN_SOLICITUD_CIERRE,
 ];
 
 const ESTADOS_EDITABLES: EstadoProyecto[] = [
@@ -258,7 +286,33 @@ export class ProjectsService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
   ) {}
+
+  /**
+   * C033 (06 v2 §34): el detalle aplica el scope de Sprint del lector en la
+   * consulta (p. ej. admin → solo tareas de Sprints CERRADO), no en el DTO.
+   */
+  private detalleSelectParaLector(decision: ReadDecision) {
+    const { sprintWhere } = this.readPolicy.scopeForActor(decision);
+    if (Object.keys(sprintWhere).length === 0) {
+      return proyectoDetalleSelect;
+    }
+    return {
+      ...proyectoDetalleSelect,
+      tareas: { ...proyectoDetalleSelect.tareas, where: { sprint: sprintWhere } },
+    };
+  }
+
+  /** Fila del proyecto tomada por el runner; solo es `null` en creación. */
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
 
   private _buildListConditions(filters: {
     q?: string;
@@ -344,7 +398,7 @@ export class ProjectsService {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: {
         idProyecto: id,
-        estadoProyecto: { in: ESTADOS_VISIBLES },
+        estadoProyecto: { in: ESTADOS_CON_DETALLE },
         eliminadoEn: null,
       },
       select: proyectoDetalleSelect,
@@ -356,13 +410,18 @@ export class ProjectsService {
   }
 
   async findOneAdmin(id: number, adminId: number) {
+    const decision = await this.readPolicy.assertRead(undefined, {
+      projectId: id,
+      actorId: adminId,
+      scope: 'resumen',
+    });
     const isAdmin = await this.notifications.isAdmin(adminId);
     if (!isAdmin) {
       throw new ForbiddenException('Se requieren permisos de administrador');
     }
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
-      select: proyectoDetalleSelect,
+      select: this.detalleSelectParaLector(decision),
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
@@ -371,6 +430,7 @@ export class ProjectsService {
   }
 
   async findOneOwner(id: number, userId: number) {
+    await this.readPolicy.assertRead(undefined, { projectId: id, actorId: userId, scope: 'resumen' });
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
       select: {
@@ -403,6 +463,7 @@ export class ProjectsService {
    * líder del proyecto o un participante activo — nadie más puede consultarlo.
    */
   async getAvance(id: number, userId: number) {
+    await this.readPolicy.assertRead(undefined, { projectId: id, actorId: userId, scope: 'resumen' });
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
       select: {
@@ -428,8 +489,8 @@ export class ProjectsService {
     return calcularAvanceProyecto(proyecto.tareas, proyecto.hitos);
   }
 
-  private async esParticipanteActivo(idProyecto: number, userId: number): Promise<boolean> {
-    const participacion = await this.prisma.participacionProyecto.findFirst({
+  private async esParticipanteActivo(idProyecto: number, userId: number, db: Db = this.prisma): Promise<boolean> {
+    const participacion = await db.participacionProyecto.findFirst({
       where: {
         idUsuario: userId,
         estadoParticipacion: 'ACTIVO',
@@ -561,7 +622,12 @@ export class ProjectsService {
     const estadoProyecto =
       accion === 'EN_REVISION' ? EstadoProyecto.EN_REVISION : EstadoProyecto.BORRADOR;
 
-    return this.prisma.$transaction(async (tx) => {
+    // C031 (06 v2 §16): la creación inserta primero su propia fila y considera adquirido el lock.
+    return this.projectTx.run(
+      null,
+      creadoPor,
+      'projects.createFull',
+      async ({ tx, effects }) => {
       const proyecto = await tx.proyecto.create({
         data: {
           ...rest,
@@ -601,18 +667,21 @@ export class ProjectsService {
       if (accion === 'EN_REVISION') {
         const snapshot = await this._buildProjectSnapshot(tx, proyecto.idProyecto);
         await this._crearRevisionPendiente(tx, proyecto.idProyecto, 1, snapshot);
-        await this.notifications.notifyAdminsFromTemplate(
+        await this.notifications.persistAdminsTx(
+          tx,
           'PROYECTO_EN_REVISION',
           {
             projectTitle: proyecto.tituloProyecto,
             projectId: proyecto.idProyecto,
             numeroEnvio: 1,
           },
-          tx,
+          effects,
         );
       }
       return proyecto;
-    });
+      },
+      { createsProject: true },
+    );
   }
 
   async create(data: CreateProjectDto, creadoPor: number) {
@@ -681,13 +750,16 @@ export class ProjectsService {
   }
 
   async update(id: number, data: UpdateProjectDto, userId: number) {
-    const proyecto = await this._requireOwner(id, userId);
+    return this.projectTx.run(id, userId, 'projects.update', async (ctx) => {
+    const { tx } = ctx;
+    const proyecto = await this._requireOwner(id, userId, tx);
+    await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PROYECTO_EDICION', userId);
 
     // Edición parcial (proyecto ya publicado / en progreso): solo el
     // subconjunto seguro de campos; conserva estado, roles, organizaciones,
     // participantes, tareas, hitos, comentarios, notificaciones y revisiones.
     if (ESTADOS_EDITABLE_PARCIAL.includes(proyecto.estadoProyecto)) {
-      return this._updateParcial(id, data);
+      return this._updateParcial(id, data, tx);
     }
 
     if (!ESTADOS_EDITABLES.includes(proyecto.estadoProyecto)) {
@@ -704,7 +776,6 @@ export class ProjectsService {
       ...camposGenerales
     } = data;
 
-    return this.prisma.$transaction(async (tx) => {
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: {
@@ -782,7 +853,7 @@ export class ProjectsService {
    * organizaciones, participantes, tareas, hitos, comentarios, notificaciones
    * ni revisiones.
    */
-  private async _updateParcial(id: number, data: UpdateProjectDto) {
+  private async _updateParcial(id: number, data: UpdateProjectDto, db: Db = this.prisma) {
     const bloqueados: string[] = [];
     if (data.tipoProyecto !== undefined) bloqueados.push('tipo de proyecto');
     if (data.modalidadProyecto !== undefined) bloqueados.push('modalidad');
@@ -807,62 +878,68 @@ export class ProjectsService {
       updateData.fechaFinEstimada = new Date(data.fechaFinEstimada);
     }
 
-    await this.prisma.proyecto.update({ where: { idProyecto: id }, data: updateData });
+    await db.proyecto.update({ where: { idProyecto: id }, data: updateData });
 
-    return this.prisma.proyecto.findUnique({
+    return db.proyecto.findUnique({
       where: { idProyecto: id },
       select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true, fechaActualizacion: true },
     });
   }
 
   async submitForReview(id: number, userId: number) {
-    const proyecto = await this._requireOwner(id, userId);
-    if (proyecto.estadoProyecto !== EstadoProyecto.BORRADOR) {
-      throw new BadRequestException(
-        'Solo se puede enviar a revisión un proyecto en estado BORRADOR',
-      );
-    }
-    const totalEnvios = await this.prisma.revisionProyecto.count({
-      where: { idProyecto: id },
-    });
-    return this.prisma.$transaction(async (tx) => {
+    return this.projectTx.run(id, userId, 'projects.submitForReview', async (ctx) => {
+      const { tx, effects } = ctx;
+      const proyecto = await this._requireOwner(id, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PUBLICACION_ENVIO', userId);
+      if (proyecto.estadoProyecto !== EstadoProyecto.BORRADOR) {
+        throw new BadRequestException(
+          'Solo se puede enviar a revisión un proyecto en estado BORRADOR',
+        );
+      }
+      const totalEnvios = await tx.revisionProyecto.count({
+        where: { idProyecto: id },
+      });
       const snapshot = await this._buildProjectSnapshot(tx, id);
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
       await this._crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
-      await this.notifications.notifyAdminsFromTemplate(
+      await this.notifications.persistAdminsTx(
+        tx,
         'PROYECTO_EN_REVISION',
         {
           projectTitle: proyecto.tituloProyecto,
           projectId: id,
           numeroEnvio: totalEnvios + 1,
         },
-        tx,
+        effects,
       );
       return { idProyecto: id, estadoProyecto: EstadoProyecto.EN_REVISION };
     });
   }
 
   async resubmit(id: number, userId: number) {
-    const proyecto = await this._requireOwner(id, userId);
-    if (proyecto.estadoProyecto !== EstadoProyecto.OBSERVADO) {
-      throw new BadRequestException(
-        'Solo se puede reenviar un proyecto en estado OBSERVADO',
-      );
-    }
-    const totalEnvios = await this.prisma.revisionProyecto.count({
-      where: { idProyecto: id },
-    });
-    return this.prisma.$transaction(async (tx) => {
+    return this.projectTx.run(id, userId, 'projects.resubmit', async (ctx) => {
+      const { tx, effects } = ctx;
+      const proyecto = await this._requireOwner(id, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PUBLICACION_ENVIO', userId);
+      if (proyecto.estadoProyecto !== EstadoProyecto.OBSERVADO) {
+        throw new BadRequestException(
+          'Solo se puede reenviar un proyecto en estado OBSERVADO',
+        );
+      }
+      const totalEnvios = await tx.revisionProyecto.count({
+        where: { idProyecto: id },
+      });
       const snapshot = await this._buildProjectSnapshot(tx, id);
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
       await this._crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
-      await this.notifications.notifyAdminsFromTemplate(
+      await this.notifications.persistAdminsTx(
+        tx,
         'PROYECTO_EN_REVISION',
         {
           projectTitle: proyecto.tituloProyecto,
@@ -870,127 +947,9 @@ export class ProjectsService {
           numeroEnvio: totalEnvios + 1,
           isResubmission: true,
         },
-        tx,
+        effects,
       );
       return { idProyecto: id, estadoProyecto: EstadoProyecto.EN_REVISION, numeroEnvio: totalEnvios + 1 };
-    });
-  }
-
-  async requestClose(id: number, userId: number) {
-    const proyecto = await this._requireOwner(id, userId);
-    if (proyecto.estadoProyecto !== EstadoProyecto.EN_PROGRESO) {
-      throw new BadRequestException(
-        'Solo se puede solicitar cierre para proyectos en estado EN_PROGRESO',
-      );
-    }
-    await this.assertNoOperableSprint(id);
-    return this.prisma.$transaction(async (tx) => {
-      const actualizado = await tx.proyecto.update({
-        where: { idProyecto: id },
-        data: {
-          estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE,
-          fechaActualizacion: new Date(),
-        },
-        select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
-      });
-      await this.notifications.notifyAdminsFromTemplate(
-        'SOLICITUD_CIERRE_PROYECTO',
-        {
-          projectTitle: actualizado.tituloProyecto,
-          projectId: id,
-        },
-        tx,
-      );
-      return actualizado;
-    });
-  }
-
-  async approveClosure(id: number, adminId: number) {
-    await this._requireAdmin(adminId);
-    const proyecto = await this.prisma.proyecto.findUnique({
-      where: { idProyecto: id },
-      select: { idProyecto: true, tituloProyecto: true, estadoProyecto: true, creadoPor: true },
-    });
-    if (!proyecto) throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
-    if (proyecto.estadoProyecto !== EstadoProyecto.EN_SOLICITUD_CIERRE) {
-      throw new BadRequestException(
-        'Solo se puede aprobar cierre de proyectos en estado EN_SOLICITUD_CIERRE',
-      );
-    }
-    return this.prisma.$transaction(async (tx) => {
-      const ahora = new Date();
-      await tx.proyecto.update({
-        where: { idProyecto: id },
-        data: {
-          estadoProyecto: EstadoProyecto.CANCELADO,
-          eliminadoEn: ahora,
-          fechaActualizacion: ahora,
-        },
-      });
-      await tx.participacionProyecto.updateMany({
-        where: { estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: id } },
-        data: { estadoParticipacion: 'RETIRADO', fechaSalida: ahora },
-      });
-      await tx.postulacion.updateMany({
-        where: { estadoPostulacion: 'PENDIENTE', rolProyecto: { idProyecto: id } },
-        data: {
-          estadoPostulacion: 'RECHAZADA',
-          comentarioResolucion: 'Cierre administrativo del proyecto aprobado',
-          resueltaPor: adminId,
-          fechaResolucion: ahora,
-        },
-      });
-      const participantes = await tx.participacionProyecto.findMany({
-        where: { estadoParticipacion: 'RETIRADO', rolProyecto: { idProyecto: id } },
-        distinct: ['idUsuario'],
-        select: { idUsuario: true },
-      });
-      const destinatarios = Array.from(
-        new Set([proyecto.creadoPor, ...participantes.map((p) => p.idUsuario)]),
-      );
-      await this.notifications.notifyFromTemplate(
-        destinatarios,
-        'CIERRE_APROBADO',
-        {
-          projectTitle: proyecto.tituloProyecto,
-          projectId: id,
-        },
-        tx,
-      );
-      return { idProyecto: id, estadoProyecto: EstadoProyecto.CANCELADO };
-    });
-  }
-
-  async rejectClosure(id: number, adminId: number) {
-    await this._requireAdmin(adminId);
-    const proyecto = await this.prisma.proyecto.findUnique({
-      where: { idProyecto: id },
-      select: { idProyecto: true, tituloProyecto: true, estadoProyecto: true, creadoPor: true },
-    });
-    if (!proyecto) throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
-    if (proyecto.estadoProyecto !== EstadoProyecto.EN_SOLICITUD_CIERRE) {
-      throw new BadRequestException(
-        'Solo se puede rechazar cierre de proyectos en estado EN_SOLICITUD_CIERRE',
-      );
-    }
-    return this.prisma.$transaction(async (tx) => {
-      await tx.proyecto.update({
-        where: { idProyecto: id },
-        data: {
-          estadoProyecto: EstadoProyecto.EN_PROGRESO,
-          fechaActualizacion: new Date(),
-        },
-      });
-      await this.notifications.notifyFromTemplate(
-        [proyecto.creadoPor],
-        'CIERRE_RECHAZADO',
-        {
-          projectTitle: proyecto.tituloProyecto,
-          projectId: id,
-        },
-        tx,
-      );
-      return { idProyecto: id, estadoProyecto: EstadoProyecto.EN_PROGRESO };
     });
   }
 
@@ -999,24 +958,21 @@ export class ProjectsService {
     userId: number,
     nuevoEstado: EstadoProyectoCreador,
   ) {
-    const proyecto = await this._requireOwner(id, userId);
+    return this.projectTx.run(id, userId, 'projects.changeEstado', async (ctx) => {
+    const { tx, effects } = ctx;
+    const proyecto = await this._requireOwner(id, userId, tx);
+    await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PROYECTO_EDICION', userId);
     const permitidos = TRANSICIONES_PERMITIDAS[proyecto.estadoProyecto] ?? [];
     if (!permitidos.includes(nuevoEstado as EstadoProyecto)) {
       throw new BadRequestException(
         `Transición no permitida: ${proyecto.estadoProyecto} -> ${nuevoEstado}`,
       );
     }
-    // A11 / Decisión Bloqueante #2: esta es la transición real que persiste
-    // EstadoProyecto.CERRADO (EN_PROGRESO -> CERRADO, vía
-    // TRANSICIONES_PERMITIDAS) — no `approveClosure`, que en el flujo
-    // administrativo actual persiste CANCELADO, no CERRADO. La invariante
-    // "Proyecto=CERRADO con Sprint operable" se protege aquí.
-    if (nuevoEstado === EstadoProyectoCreador.CERRADO) {
-      await this.assertNoOperableSprint(id);
-    }
+    // C032: el líder ya no puede llevar el proyecto a CERRADO desde esta ruta;
+    // el estado terminal pertenece exclusivamente a la revisión administrativa de cierre.
     const estadoAnterior = proyecto.estadoProyecto;
 
-    const actualizado = await this.prisma.proyecto.update({
+    const actualizado = await tx.proyecto.update({
       where: { idProyecto: id },
       data: {
         estadoProyecto: nuevoEstado as EstadoProyecto,
@@ -1035,18 +991,19 @@ export class ProjectsService {
       newStatus: actualizado.estadoProyecto,
     } as const;
 
-    await this.notifications.notifyFromTemplate(
+    await this.notifications.persistTemplateTx(
+      tx,
       [proyecto.creadoPor],
       'CAMBIO_ESTADO_PROYECTO',
       templateData,
+      effects,
     );
 
     if (
       nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
-      nuevoEstado === EstadoProyectoCreador.EN_PROGRESO ||
-      nuevoEstado === EstadoProyectoCreador.CERRADO
+      nuevoEstado === EstadoProyectoCreador.EN_PROGRESO
     ) {
-      const participaciones = await this.prisma.participacionProyecto.findMany({
+      const participaciones = await tx.participacionProyecto.findMany({
         where: {
           estadoParticipacion: 'ACTIVO',
           idUsuario: { notIn: [userId, proyecto.creadoPor] },
@@ -1057,22 +1014,26 @@ export class ProjectsService {
       });
       const destinatarios = participaciones.map((p) => p.idUsuario);
       if (destinatarios.length) {
-        await this.notifications.notifyFromTemplate(
+        await this.notifications.persistTemplateTx(
+          tx,
           destinatarios,
           'CAMBIO_ESTADO_PROYECTO',
           templateData,
+          effects,
         );
       }
     }
 
     if (nuevoEstado === EstadoProyectoCreador.PUBLICADO) {
-      await this.notifications.notifyFromTemplate(
+      await this.notifications.persistTemplateTx(
+        tx,
         [proyecto.creadoPor],
         'PROYECTO_PUBLICADO',
         {
           projectTitle: actualizado.tituloProyecto,
           projectId: actualizado.idProyecto,
         },
+        effects,
       );
     }
 
@@ -1080,15 +1041,17 @@ export class ProjectsService {
       nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
       estadoAnterior === EstadoProyecto.PUBLICADO
     ) {
-      await this._invalidateFeaturedCache();
+      // I/O de caché fuera del lock: efecto post-commit.
+      effects.add({ key: 'cache:projects:featured', publish: () => this._invalidateFeaturedCache() });
     }
 
     return actualizado;
+    });
   }
 
   /** Líder o participante con participación ACTIVO en algún rol del proyecto. */
-  private async _requireActiveMember(idProyecto: number, userId: number) {
-    const proyecto = await this.prisma.proyecto.findFirst({
+  private async _requireActiveMember(idProyecto: number, userId: number, db: Db = this.prisma) {
+    const proyecto = await db.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
       select: { idProyecto: true, creadoPor: true },
     });
@@ -1096,14 +1059,14 @@ export class ProjectsService {
       throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
     }
     const esLider = proyecto.creadoPor === userId;
-    if (!esLider && !(await this.esParticipanteActivo(idProyecto, userId))) {
+    if (!esLider && !(await this.esParticipanteActivo(idProyecto, userId, db))) {
       throw new ForbiddenException('No tienes una participación activa en este proyecto');
     }
     return proyecto;
   }
 
-  private async _requireOwner(idProyecto: number, userId: number) {
-    const proyecto = await this.prisma.proyecto.findFirst({
+  private async _requireOwner(idProyecto: number, userId: number, db: Db = this.prisma) {
+    const proyecto = await db.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
       select: { idProyecto: true, estadoProyecto: true, creadoPor: true, tituloProyecto: true },
     });
@@ -1127,8 +1090,14 @@ export class ProjectsService {
    * cierra, finaliza ni crea ningún Sprint; únicamente rechaza la
    * transición del Proyecto si corresponde.
    */
-  private async assertNoOperableSprint(idProyecto: number): Promise<void> {
-    const sprintOperable = await this.prisma.sprint.findFirst({
+  /**
+   * Invariante A11: un proyecto con Sprint operable no puede iniciar su
+   * cierre. Sobrevive al retiro del cierre legacy porque describe el
+   * proyecto, no aquel endpoint; el evaluador de preparación la vuelve a
+   * comprobar por su cuenta cuando decide si se puede solicitar.
+   */
+  async assertNoOperableSprint(idProyecto: number, db: Db = this.prisma): Promise<void> {
+    const sprintOperable = await db.sprint.findFirst({
       where: {
         idProyecto,
         estado: { in: [EstadoSprint.ACTIVO, EstadoSprint.EN_FINALIZACION] },
@@ -1150,6 +1119,7 @@ export class ProjectsService {
   }
 
   async findPostulacionesByProject(idProyecto: number, userId: number) {
+    await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'equipo' });
     await this._requireOwner(idProyecto, userId);
 
     return this.prisma.postulacion.findMany({
@@ -1185,9 +1155,11 @@ export class ProjectsService {
    * valor enviado por el cliente que podría colisionar con hitos existentes.
    */
   async createHito(idProyecto: number, userId: number, dto: CreateHitoDto) {
-    await this._requireActiveMember(idProyecto, userId);
+    const hito = await this.projectTx.run(idProyecto, userId, 'projects.createHito', async (ctx) => {
+      const { tx } = ctx;
+      await this._requireActiveMember(idProyecto, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'HITO_CREATE', userId);
 
-    const hito = await this.prisma.$transaction(async (tx) => {
       const ultimo = await tx.hito.findFirst({
         where: { idProyecto },
         orderBy: { orden: 'desc' },
@@ -1219,31 +1191,26 @@ export class ProjectsService {
   }
 
   async delete(id: number, userId: number) {
-    await this._requireOwner(id, userId);
+    return this.projectTx.run(id, userId, 'projects.delete', async (ctx) => {
+      const { tx } = ctx;
+      const proyecto = await this._requireOwner(id, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PROYECTO_EDICION', userId);
 
-    const proyecto = await this.prisma.proyecto.findUnique({
-      where: { idProyecto: id },
-      select: { estadoProyecto: true },
+      const estadosEliminables: EstadoProyecto[] = [
+        EstadoProyecto.BORRADOR,
+        EstadoProyecto.OBSERVADO,
+      ];
+      if (!estadosEliminables.includes(proyecto.estadoProyecto)) {
+        throw new BadRequestException('Solo se pueden eliminar proyectos en estado BORRADOR u OBSERVADO');
+      }
+
+      await tx.proyecto.update({
+        where: { idProyecto: id },
+        data: { eliminadoEn: new Date() },
+      });
+
+      return { mensaje: 'Proyecto eliminado correctamente' };
     });
-
-    if (!proyecto) {
-      throw new NotFoundException('Proyecto no encontrado');
-    }
-
-    const estadosEliminables: EstadoProyecto[] = [
-      EstadoProyecto.BORRADOR,
-      EstadoProyecto.OBSERVADO,
-    ];
-    if (!estadosEliminables.includes(proyecto.estadoProyecto)) {
-      throw new BadRequestException('Solo se pueden eliminar proyectos en estado BORRADOR u OBSERVADO');
-    }
-
-    await this.prisma.proyecto.update({
-      where: { idProyecto: id },
-      data: { eliminadoEn: new Date() },
-    });
-
-    return { mensaje: 'Proyecto eliminado correctamente' };
   }
 
   private async _buildProjectSnapshot(tx: Prisma.TransactionClient, idProyecto: number) {

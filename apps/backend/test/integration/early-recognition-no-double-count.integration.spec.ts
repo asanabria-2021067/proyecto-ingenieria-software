@@ -1,3 +1,4 @@
+import { makeTimeRecordsService } from '../helpers/time-records.fixture';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
@@ -16,13 +17,19 @@ import { ExitRequestsAuthorizationService } from '../../src/exit-requests/exit-r
 import { ExitRequestsContextService } from '../../src/exit-requests/exit-requests.context.service';
 import { ExitRequestsService } from '../../src/exit-requests/exit-requests.service';
 import { HoursRecognitionService } from '../../src/sprints/hours-recognition.service';
+import { ProjectHoursSummaryService } from '../../src/sprints/project-hours-summary.service';
+import { BitacoraEventosService } from '../../src/bitacora/bitacora-eventos.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import { SprintsService } from '../../src/sprints/sprints.service';
 import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.service';
-import { TasksContextService } from '../../src/tasks/tasks-context.service';
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { TasksService } from '../../src/tasks/tasks.service';
+import { TasksContextService } from '../../src/tasks/tasks-context.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 
 /**
  * X1 — regresión cross-flow: reconocimiento anticipado de horas (B10) al
@@ -49,7 +56,9 @@ function makeTasksService(prisma: PrismaClient): TasksService {
     new TasksRelationsService(prismaService, tasksContext),
     { notifyFromTemplate: vi.fn() } as unknown as NotificationsService,
     tasksContext,
-  );
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService), makeTimeRecordsService(prismaService));
 }
 
 function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
@@ -60,21 +69,39 @@ function makeExitRequestsService(prisma: PrismaClient): ExitRequestsService {
     { notifyFromTemplate: vi.fn() } as unknown as NotificationsService,
     new ExitRequestsAuthorizationService(context),
     context,
+    new ProjectTransactionService(prismaService),
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService),
     new HoursRecognitionService(prismaService),
     new SprintsContextService(prismaService),
-  );
+    // C083: la aprobación registra su hecho funcional en la misma transacción.
+    new BitacoraEventosService());
 }
 
 function makeSprintsService(prisma: PrismaClient): SprintsService {
   const prismaService = prisma as unknown as PrismaService;
   const context = new SprintsContextService(prismaService);
   const authorization = new SprintsAuthorizationService(context);
+  const realNotifications = new NotificationsService(prismaService, undefined as never);
   const notifications = {
     notifyProjectActiveParticipants: async () => undefined,
     notifySprintFinalizationStarted: async () => undefined,
     notifySprintClosed: async () => undefined,
+    persistTemplateTx: realNotifications.persistTemplateTx.bind(realNotifications),
+    persistUsersTx: realNotifications.persistUsersTx.bind(realNotifications),
   } as unknown as NotificationsService;
-  return new SprintsService(prismaService, context, authorization, notifications);
+  const runner = new ProjectTransactionService(prismaService);
+  return new SprintsService(
+    prismaService,
+    context,
+    authorization,
+    notifications,
+    runner,
+    new ProjectPolicyService(new ProjectIdResolverService(prismaService)),
+    new ProjectReadPolicyService(prismaService),
+    new BitacoraEventosService(),
+    new ProjectHoursSummaryService(prismaService),
+    new HoursRecognitionService(prismaService));
 }
 
 function longProgressContent(label: string): string {
@@ -127,6 +154,11 @@ describeIntegration(
           where: { idSolicitud: { in: solicitudIds } },
         });
       }
+      // C083: cerrar el Sprint persiste filas de notificación y de bitácora
+      // dentro de la transacción de dominio; ambas apuntan a Usuario con FK
+      // RESTRICT y deben irse antes que el cleanup genérico.
+      await prisma.notificacion.deleteMany({ where: { idUsuario: { in: scope.userIds ?? [] } } });
+      await prisma.bitacoraAuditoria.deleteMany({ where: { idUsuario: { in: scope.userIds ?? [] } } });
       await cleanupIntegrationFixtures(prisma, scope);
     });
 
@@ -139,7 +171,7 @@ describeIntegration(
       const member = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario, member.idUsuario];
 
-      const project = await createIntegrationProject(prisma, leader.idUsuario);
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
       const role = await createIntegrationProjectRole(prisma, project.idProyecto, {
@@ -189,8 +221,10 @@ describeIntegration(
       // Fase C — durante PREPARACION, el colaborador cierra su único tramo
       // (B2/B1) con horas inequívocas y marca la tarea como HECHO, para que
       // el Sprint pueda finalizar más adelante sin más blockers.
+      await prisma.registroTiempoTarea.create({
+        data: { idAsignacion: assignment.idAsignacion, idUsuario: member.idUsuario, horas: HORAS_REALES, fecha: new Date('2026-09-06') },
+      });
       await tasksService.closeAssignment(project.idProyecto, task.idTarea, assignment.idAsignacion, member.idUsuario, {
-        horasReales: HORAS_REALES,
         contenidoAvance: longProgressContent('X1 cierre de tramo en PREPARACION'),
         marcarComoHecha: true,
       });
@@ -315,5 +349,109 @@ describeIntegration(
       expect(Number(asignacionFinal.horasReales)).toBe(HORAS_REALES);
       expect(asignacionFinal.desasignadaEn).not.toBeNull();
     });
+
+    it('T09: los tramos consumidos por una salida aprobada no se vuelven a contar al cerrar el Sprint', async () => {
+      const leader = await createIntegrationUser(prisma);
+      const saliente = await createIntegrationUser(prisma);
+      const resto = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario, saliente.idUsuario, resto.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      scope.projectIds = [project.idProyecto];
+
+      // El saliente tiene DOS participaciones: salir del proyecto es salir de
+      // todos sus roles, y ambas deben consumirse y retirarse a la vez.
+      const rolA = await createIntegrationProjectRole(prisma, project.idProyecto, { nombreRol: 'T09 Rol A', cupos: 3 });
+      const rolB = await createIntegrationProjectRole(prisma, project.idProyecto, { nombreRol: 'T09 Rol B', cupos: 3 });
+      scope.roleIds = [rolA.idRolProyecto, rolB.idRolProyecto];
+      const pA = await createIntegrationParticipation(prisma, saliente.idUsuario, rolA.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+      const pB = await createIntegrationParticipation(prisma, saliente.idUsuario, rolB.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+      const pResto = await createIntegrationParticipation(prisma, resto.idUsuario, rolA.idRolProyecto, { estadoParticipacion: 'ACTIVO' });
+      scope.participationIds = [pA.idParticipacion, pB.idParticipacion, pResto.idParticipacion];
+
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
+      scope.sprintIds = [sprint.idSprint];
+
+      async function tramoCerrado(idUsuario: number, idParticipacion: number, horas: string) {
+        const tarea = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, { estadoTarea: 'HECHO' });
+        scope.taskIds = [...(scope.taskIds ?? []), tarea.idTarea];
+        const asignacion = await prisma.asignacionTarea.create({
+          data: {
+            idTarea: tarea.idTarea, idUsuario, asignadoPor: leader.idUsuario, idParticipacion,
+            desasignadaEn: new Date('2026-09-04T12:00:00.000Z'), horasReales: horas,
+          },
+        });
+        scope.assignmentIds = [...(scope.assignmentIds ?? []), asignacion.idAsignacion];
+        await prisma.registroTiempoTarea.create({
+          data: { idAsignacion: asignacion.idAsignacion, idUsuario, horas, fecha: new Date('2026-09-03') },
+        });
+        return asignacion;
+      }
+
+      const tramoA = await tramoCerrado(saliente.idUsuario, pA.idParticipacion, '3.00');
+      const tramoB = await tramoCerrado(saliente.idUsuario, pB.idParticipacion, '2.00');
+      const tramoResto = await tramoCerrado(resto.idUsuario, pResto.idParticipacion, '5.00');
+
+      const solicitud = await exitRequestsService.createSolicitudSalida(
+        project.idProyecto, saliente.idUsuario, 'T09: salida con dos participaciones y horas ya reportadas',
+      );
+      solicitudIds = [solicitud.idSolicitud];
+      await exitRequestsService.continueExitPreparation(project.idProyecto, saliente.idUsuario);
+
+      // --- Aprobación: reconoce y RETIRA, en esa transacción ---
+      const aprobada = await exitRequestsService.approveSolicitudSalida(
+        project.idProyecto, solicitud.idSolicitud, leader.idUsuario,
+      );
+      expect(aprobada.estadoSolicitud).toBe('APROBADA');
+
+      const agregadosSalida = await prisma.horasParticipacion.findMany({
+        where: { idParticipacion: { in: [pA.idParticipacion, pB.idParticipacion] } },
+      });
+      horasParticipacionIds = agregadosSalida.map((fila) => fila.idRegistroHoras);
+      expect(agregadosSalida).toHaveLength(2);
+      expect(agregadosSalida.every((fila) => fila.estadoHoras === 'PENDIENTE')).toBe(true);
+      // Reconocidas, nunca acreditadas.
+      expect(agregadosSalida.every((fila) => fila.horasAprobadas === null)).toBe(true);
+      expect(agregadosSalida.every((fila) => fila.idSprint === sprint.idSprint)).toBe(true);
+
+      const marcados = await prisma.asignacionTarea.findMany({
+        where: { idAsignacion: { in: [tramoA.idAsignacion, tramoB.idAsignacion] } },
+      });
+      expect(marcados.every((fila) => fila.reconocidoEn !== null)).toBe(true);
+      const consumidoEn = new Map(marcados.map((fila) => [fila.idAsignacion, fila.reconocidoEn!.toISOString()]));
+      // El tramo del resto del equipo NO se toca.
+      expect((await prisma.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion: tramoResto.idAsignacion } })).reconocidoEn).toBeNull();
+
+      // Ambas participaciones quedan RETIRADO con fecha de salida.
+      const retiradas = await prisma.participacionProyecto.findMany({
+        where: { idParticipacion: { in: [pA.idParticipacion, pB.idParticipacion] } },
+      });
+      expect(retiradas.every((fila) => fila.estadoParticipacion === 'RETIRADO')).toBe(true);
+      expect(retiradas.every((fila) => fila.fechaSalida !== null)).toBe(true);
+
+      const eventoAprobacion = await prisma.bitacoraAuditoria.findMany({
+        where: { idUsuario: leader.idUsuario, accion: 'EXIT_REQUEST_APPROVED' },
+      });
+      expect(eventoAprobacion).toHaveLength(1);
+
+      // --- Cierre del Sprint con el resto del equipo ---
+      await sprintsService.finalizeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
+      await sprintsService.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
+
+      // Los tramos ya consumidos conservan SU marca: no se re-marcan ni se resuman.
+      for (const [idAsignacion, marca] of consumidoEn) {
+        expect((await prisma.asignacionTarea.findUniqueOrThrow({ where: { idAsignacion } })).reconocidoEn?.toISOString()).toBe(marca);
+      }
+      const agregadosFinales = await prisma.horasParticipacion.findMany({ where: { idSprint: sprint.idSprint } });
+      horasParticipacionIds = agregadosFinales.map((fila) => fila.idRegistroHoras);
+      // Exactamente una fila por participación: cada tramo se consumió una vez.
+      expect(agregadosFinales).toHaveLength(3);
+      const porParticipacion = new Map(agregadosFinales.map((fila) => [fila.idParticipacion, fila]));
+      expect(porParticipacion.get(pA.idParticipacion)!.horasCalculadas?.toFixed(2)).toBe('3.00');
+      expect(porParticipacion.get(pB.idParticipacion)!.horasCalculadas?.toFixed(2)).toBe('2.00');
+      expect(porParticipacion.get(pResto.idParticipacion)!.horasCalculadas?.toFixed(2)).toBe('5.00');
+      expect(agregadosFinales.every((fila) => fila.idSprint !== null)).toBe(true);
+      expect(agregadosFinales.every((fila) => fila.horasAprobadas === null)).toBe(true);
+    });
+
   },
 );

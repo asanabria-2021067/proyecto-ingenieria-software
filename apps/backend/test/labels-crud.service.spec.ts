@@ -3,21 +3,32 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import { LabelsService } from '../src/labels/labels.service';
 import { CreateLabelDto } from '../src/labels/dto/create-label.dto';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { makeProjectPolicyDouble, makeProjectTransactionDouble } from './helpers/project-policy.double';
 
+/**
+ * C035: LabelsService escribe siempre sobre el `tx` del protocolo. El doble
+ * del runner entrega este mismo objeto como `tx`, por lo que los delegates
+ * raíz y `__tx` comparten instancias.
+ */
 function makePrisma() {
   const tx = {
-    tareaEtiqueta: { deleteMany: vi.fn() },
-    etiqueta: { delete: vi.fn() },
-  };
-  const prisma = {
     proyecto: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
-    etiqueta: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-    tareaEtiqueta: { deleteMany: vi.fn() },
-    $transaction: vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
+    etiqueta: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    tareaEtiqueta: { deleteMany: vi.fn(), count: vi.fn().mockResolvedValue(0) },
+  };
+  const prisma = {
+    ...tx,
     __tx: tx,
   };
   return prisma as typeof prisma & PrismaService;
+}
+
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  projectTx = makeProjectTransactionDouble({ tx: prisma }),
+) {
+  return new LabelsService(prisma, projectTx, makeProjectPolicyDouble());
 }
 
 const LEADER_ID = 1;
@@ -36,7 +47,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findMany.mockResolvedValue([]);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.findAllForProject(PROJECT_ID, LEADER_ID);
 
@@ -48,7 +59,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
     prisma.etiqueta.findMany.mockResolvedValue([]);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.findAllForProject(PROJECT_ID, PARTICIPANT_ID)).resolves.toEqual([]);
   });
@@ -57,7 +68,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.findAllForProject(PROJECT_ID, PARTICIPANT_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -68,7 +79,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.findAllForProject(PROJECT_ID, EXTERNO_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -79,7 +90,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.participacionProyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.findAllForProject(PROJECT_ID, OTHER_PARTICIPANT_ID),
@@ -97,7 +108,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
   it('proyecto inexistente produce 404', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.findAllForProject(999, LEADER_ID)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -107,7 +118,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
   it('proyecto eliminado produce 404 (findFirst con eliminadoEn: null no lo encuentra)', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.findAllForProject(PROJECT_ID, LEADER_ID)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -122,7 +133,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findMany.mockResolvedValue([]);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.findAllForProject(PROJECT_ID, LEADER_ID)).resolves.toEqual([]);
   });
@@ -131,7 +142,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findMany.mockResolvedValue([]);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.findAllForProject(PROJECT_ID, LEADER_ID);
 
@@ -148,7 +159,7 @@ describe('LabelsService — listado (GET, Tarea 31)', () => {
     prisma.etiqueta.findMany.mockResolvedValue([
       { idEtiqueta: 1, nombreEtiqueta: 'Backend', color: '#10B981' },
     ]);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     const resultado = await service.findAllForProject(PROJECT_ID, LEADER_ID);
 
@@ -166,7 +177,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'Backend', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     const resultado = await service.create(PROJECT_ID, LEADER_ID, dto());
 
@@ -176,7 +187,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
   it('un participante activo no líder recibe 403, sin llegar a crear', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.create(PROJECT_ID, PARTICIPANT_ID, dto())).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -187,7 +198,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
   it('un externo recibe 403', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.create(PROJECT_ID, EXTERNO_ID, dto())).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -197,7 +208,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
   it('proyecto inexistente/eliminado produce 404, sin llegar a crear', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.create(PROJECT_ID, LEADER_ID, dto())).rejects.toBeInstanceOf(
       NotFoundException,
@@ -209,7 +220,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'Diseño Frontend', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.create(PROJECT_ID, LEADER_ID, dto({ nombreEtiqueta: 'Diseño Frontend' }));
 
@@ -228,7 +239,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'ＦＲＯＮＴＥＮＤ', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.create(PROJECT_ID, LEADER_ID, dto({ nombreEtiqueta: 'ＦＲＯＮＴＥＮＤ' }));
 
@@ -240,7 +251,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'Backend', color: '#a1B2c3' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.create(PROJECT_ID, LEADER_ID, dto({ color: '#a1B2c3' }));
 
@@ -253,7 +264,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.create.mockResolvedValue({ idEtiqueta: 1, nombreEtiqueta: 'Backend', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     const resultado = await service.create(PROJECT_ID, LEADER_ID, dto());
 
@@ -266,7 +277,7 @@ describe('LabelsService — creación (POST, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     const errorGenerico = new Error('fallo de conexión');
     prisma.etiqueta.create.mockRejectedValue(errorGenerico);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.create(PROJECT_ID, LEADER_ID, dto())).rejects.toBe(errorGenerico);
   });
@@ -282,7 +293,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(etiquetaActual());
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Front', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front' });
 
@@ -298,7 +309,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(etiquetaActual());
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Backend', color: '#000000' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' });
 
@@ -314,7 +325,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(etiquetaActual());
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Front', color: '#000000' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front', color: '#000000' });
 
@@ -329,7 +340,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(etiquetaActual());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, {});
 
@@ -342,7 +353,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(etiquetaActual({ nombreEtiqueta: 'frontend' }));
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Frontend', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Frontend' });
 
@@ -361,7 +372,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
         meta: { modelName: 'Etiqueta', target: ['id_proyecto', 'nombre_normalizado'] },
       }),
     );
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Urgente' }),
@@ -372,7 +383,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, 999999, LEADER_ID, { color: '#000000' }),
@@ -383,7 +394,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' }),
@@ -397,7 +408,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
   it('actor no líder recibe 403 sin llegar a consultar la etiqueta', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, LABEL_ID, PARTICIPANT_ID, { color: '#000000' }),
@@ -408,7 +419,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
   it('proyecto inexistente/eliminado produce 404', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' }),
@@ -421,7 +432,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.etiqueta.findFirst.mockResolvedValue(etiquetaActual());
     const errorGenerico = new Error('fallo inesperado');
     prisma.etiqueta.update.mockRejectedValue(errorGenerico);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(
       service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { color: '#000000' }),
@@ -433,7 +444,7 @@ describe('LabelsService — edición (PATCH, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(etiquetaActual());
     prisma.etiqueta.update.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Front', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     const resultado = await service.update(PROJECT_ID, LABEL_ID, LEADER_ID, { nombreEtiqueta: 'Front' });
 
@@ -446,11 +457,12 @@ describe('LabelsService — eliminación (DELETE, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Backend', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const projectTx = makeProjectTransactionDouble({ tx: prisma });
+    const service = makeService(prisma, projectTx);
 
     await service.remove(PROJECT_ID, LABEL_ID, LEADER_ID);
 
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(projectTx.run).toHaveBeenCalledTimes(1);
     expect(prisma.__tx.tareaEtiqueta.deleteMany).toHaveBeenCalledWith({ where: { idEtiqueta: LABEL_ID } });
     expect(prisma.__tx.etiqueta.delete).toHaveBeenCalledWith({ where: { idEtiqueta: LABEL_ID } });
   });
@@ -459,7 +471,7 @@ describe('LabelsService — eliminación (DELETE, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Backend', color: '#10B981' });
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.remove(PROJECT_ID, LABEL_ID, LEADER_ID);
 
@@ -471,19 +483,20 @@ describe('LabelsService — eliminación (DELETE, Tarea 31)', () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.remove(PROJECT_ID, LABEL_ID, LEADER_ID)).rejects.toBeInstanceOf(
       NotFoundException,
     );
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.__tx.tareaEtiqueta.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.__tx.etiqueta.delete).not.toHaveBeenCalled();
   });
 
   it('etiqueta inexistente produce 404', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.remove(PROJECT_ID, 999999, LEADER_ID)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -496,7 +509,7 @@ describe('LabelsService — eliminación (DELETE, Tarea 31)', () => {
     prisma.etiqueta.findFirst
       .mockResolvedValueOnce({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Backend', color: '#10B981' })
       .mockResolvedValueOnce(null);
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await service.remove(PROJECT_ID, LABEL_ID, LEADER_ID);
     await expect(service.remove(PROJECT_ID, LABEL_ID, LEADER_ID)).rejects.toBeInstanceOf(
@@ -507,12 +520,12 @@ describe('LabelsService — eliminación (DELETE, Tarea 31)', () => {
   it('un participante activo no líder recibe 403, sin transacción', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
-    const service = new LabelsService(prisma);
+    const service = makeService(prisma);
 
     await expect(service.remove(PROJECT_ID, LABEL_ID, PARTICIPANT_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.__tx.etiqueta.delete).not.toHaveBeenCalled();
     expect(prisma.etiqueta.findFirst).not.toHaveBeenCalled();
   });
 
@@ -521,9 +534,8 @@ describe('LabelsService — eliminación (DELETE, Tarea 31)', () => {
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.etiqueta.findFirst.mockResolvedValue({ idEtiqueta: LABEL_ID, nombreEtiqueta: 'Backend', color: '#10B981' });
     const errorFallo = new Error('fallo al eliminar etiqueta');
-    const tx = { tareaEtiqueta: { deleteMany: vi.fn() }, etiqueta: { delete: vi.fn().mockRejectedValue(errorFallo) } };
-    prisma.$transaction = vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) as typeof prisma.$transaction;
-    const service = new LabelsService(prisma);
+    prisma.__tx.etiqueta.delete.mockRejectedValue(errorFallo);
+    const service = makeService(prisma);
 
     await expect(service.remove(PROJECT_ID, LABEL_ID, LEADER_ID)).rejects.toBe(errorFallo);
   });
