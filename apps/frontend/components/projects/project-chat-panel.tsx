@@ -51,7 +51,7 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
   const [nuevoChatAbierto, setNuevoChatAbierto] = useState(false);
   const markRead = useMarkConversationRead(idProyecto);
 
-  useChatSocket(idProyecto, activeId);
+  const { isConnected } = useChatSocket(idProyecto, activeId);
 
   if (!habilitado) return null;
 
@@ -63,7 +63,15 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
   return (
     <div className="flex min-h-0 flex-1 flex-col border-t border-outline-variant">
       <div className="flex items-center justify-between px-4 py-2.5">
-        <span className="text-xs font-bold uppercase tracking-wide text-tertiary">Chats</span>
+        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-tertiary">
+          Chats
+          <span
+            role="status"
+            title={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
+            aria-label={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
+            className={`size-1.5 shrink-0 rounded-full ${isConnected ? 'bg-green-500' : 'animate-pulse bg-amber-500'}`}
+          />
+        </span>
         <button
           type="button"
           onClick={() => setNuevoChatAbierto(true)}

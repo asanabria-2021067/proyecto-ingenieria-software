@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -80,6 +80,7 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
   const socketRef = useRef<Socket | null>(null);
   const activeConversationIdRef = useRef<number | null>(activeConversationId);
   activeConversationIdRef.current = activeConversationId;
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -122,19 +123,26 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
     // mensajes en vivo para el resto de la sesión aunque el socket siga
     // "conectado" a simple vista.
     const handleConnect = () => {
+      setIsConnected(true);
       if (activeConversationIdRef.current != null) {
         socket.emit('joinConversation', { idConversacion: activeConversationIdRef.current });
       }
     };
 
+    const handleDisconnect = () => {
+      setIsConnected(false);
+    };
+
     socket.on('newMessage', handleNewMessage);
     socket.on('conversationUpdated', handleConversationUpdated);
     socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
 
     return () => {
       socket.off('newMessage', handleNewMessage);
       socket.off('conversationUpdated', handleConversationUpdated);
       socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
       socket.close();
       socketRef.current = null;
     };
@@ -149,4 +157,6 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
       socket.emit('leaveConversation', { idConversacion: activeConversationId });
     };
   }, [activeConversationId]);
+
+  return { isConnected };
 }
