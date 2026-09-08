@@ -301,8 +301,8 @@ describeIntegration('S7 time lifecycle', () => {
       data: { horas: '8.00' },
     });
     await db.asignacionTarea.update({ where: { idAsignacion: f.closed.idAsignacion }, data: { horasReales: '8.00' } });
-    // Un registro revocado de A: es evidencia visible para su autor y para el
-    // líder, y no cuenta en ningún total.
+    // Un registro revocado de A: solo el líder conserva esa evidencia
+    // (revocarlo lo retira de la propia lista de A), y no cuenta en ningún total.
     const revocado = await db.registroTiempoTarea.create({
       data: {
         idAsignacion: f.closed.idAsignacion,
@@ -364,7 +364,7 @@ describeIntegration('S7 time lifecycle', () => {
     expect(tramoA.reportadas).toBe('8.00');
     expect(tramoA.abierto).toBe(false);
     expect(tramoA.origen).toBe('GRANULAR');
-    expect(tramoA.justificaciones).toEqual(['justificación histórica del cruce']);
+    expect(tramoA.justificaciones).toEqual([{ texto: 'justificación histórica del cruce', revocadoEn: null }]);
     const tramoLegacyProyectado = comoAutor.tramos.find((t) => t.idAsignacion === tramoLegacy.idAsignacion)!;
     // Un importe legacy no se hace pasar por SUM de registros granulares.
     expect(tramoLegacyProyectado.reportadas).toBe('0.00');
@@ -384,18 +384,18 @@ describeIntegration('S7 time lifecycle', () => {
 
     const comoLider = await service.getTaskHoursSummary(f.project.idProyecto, f.task.idTarea, f.leader.idUsuario);
     expect(comoLider.tramos.find((t) => t.idAsignacion === f.closed.idAsignacion)!.justificaciones).toEqual([
-      'justificación histórica del cruce',
+      { texto: 'justificación histórica del cruce', revocadoEn: null },
     ]);
     // El líder no reporta horas propias en esta tarea.
     expect(comoLider.puedeCrear).toBe(false);
     expect(comoLider.puedeEditar).toBe(false);
 
-    // Visibilidad de la lista: el autor ve sus propios revocados, el líder ve
-    // todos, B solo los suyos y el externo no ve nada.
+    // Visibilidad de la lista: revocar retira el registro de la lista de su
+    // propio autor (es lo que significa retirarlo, ver findAllForTask); el
+    // líder conserva el histórico completo, incluidos los revocados. B solo
+    // ve los suyos y el externo no ve nada.
     const listaAutor = await service.findAllForTask(f.project.idProyecto, f.task.idTarea, f.owner.idUsuario);
-    expect(listaAutor.map((r) => r.idRegistroTiempo).sort()).toEqual(
-      [f.ownerRecord.idRegistroTiempo, revocado.idRegistroTiempo].sort(),
-    );
+    expect(listaAutor.map((r) => r.idRegistroTiempo)).toEqual([f.ownerRecord.idRegistroTiempo]);
     const listaSucesor = await service.findAllForTask(f.project.idProyecto, f.task.idTarea, f.successor.idUsuario);
     expect(listaSucesor.map((r) => r.idRegistroTiempo)).toEqual([f.successorRecord.idRegistroTiempo]);
     const listaLider = await service.findAllForTask(f.project.idProyecto, f.task.idTarea, f.leader.idUsuario);
