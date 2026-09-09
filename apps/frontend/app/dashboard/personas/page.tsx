@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Check, Search, UserPlus, UserCheck, UserX, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getIniciales } from '@/components/projects/available-project-card';
 import {
@@ -23,7 +26,31 @@ import {
   useSeguirUsuario,
   useSolicitudesAmistadPendientes,
 } from '@/hooks/use-social';
+import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
 import type { UsuarioBusquedaDto } from '@/lib/types/social';
+
+const MAX_CHIPS_VISIBLES = 3;
+
+function ChipList({ items }: { items: string[] }) {
+  if (items.length === 0) return null;
+  const visibles = items.slice(0, MAX_CHIPS_VISIBLES);
+  const restantes = items.length - visibles.length;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {visibles.map((item) => (
+        <Badge key={item} variant="secondary" className="font-normal">
+          {item}
+        </Badge>
+      ))}
+      {restantes > 0 && (
+        <Badge variant="outline" className="font-normal">
+          +{restantes} más
+        </Badge>
+      )}
+    </div>
+  );
+}
 
 function UsuarioCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const crearSolicitud = useCrearSolicitudAmistad();
@@ -33,8 +60,8 @@ function UsuarioCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const dejarDeSeguir = useDejarDeSeguir();
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-4">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="flex items-start justify-between gap-3 rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-4">
+      <div className="flex items-start gap-3 min-w-0">
         <Avatar>
           {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt={`${usuario.nombre} ${usuario.apellido}`} />}
           <AvatarFallback>{getIniciales(usuario.nombre, usuario.apellido)}</AvatarFallback>
@@ -43,6 +70,11 @@ function UsuarioCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
           <p className="truncate text-sm font-semibold text-on-surface">
             {usuario.nombre} {usuario.apellido}
           </p>
+          {usuario.carrera && (
+            <p className="truncate text-xs text-on-surface-variant">{usuario.carrera}</p>
+          )}
+          <ChipList items={usuario.habilidades} />
+          <ChipList items={usuario.intereses} />
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -102,12 +134,68 @@ function UsuarioCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   );
 }
 
+function ChipToggleGroup({
+  opciones,
+  seleccionados,
+  onToggle,
+}: {
+  opciones: { id: number; nombre: string }[];
+  seleccionados: number[];
+  onToggle: (id: number) => void;
+}) {
+  if (opciones.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {opciones.map((opcion) => {
+        const isSelected = seleccionados.includes(opcion.id);
+        return (
+          <button
+            key={opcion.id}
+            type="button"
+            onClick={() => onToggle(opcion.id)}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+              isSelected
+                ? 'border-primary bg-primary text-on-primary'
+                : 'border-outline-variant/30 bg-surface-container-low text-on-surface hover:bg-surface-container-high'
+            }`}
+          >
+            {opcion.nombre}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PersonasPage() {
   const [q, setQ] = useState('');
-  const { resultados, isLoading, enabled } = useBuscarUsuarios(q);
+  const [carrera, setCarrera] = useState(false);
+  const [amigosDeAmigos, setAmigosDeAmigos] = useState(false);
+  const [habilidadesSel, setHabilidadesSel] = useState<number[]>([]);
+  const [interesesSel, setInteresesSel] = useState<number[]>([]);
+
+  const { data: habilidades = [] } = useQuery({ queryKey: ['catalogo-habilidades'], queryFn: getHabilidades });
+  const { data: intereses = [] } = useQuery({ queryKey: ['catalogo-intereses'], queryFn: getIntereses });
+
+  const { resultados, isLoading, enabled } = useBuscarUsuarios({
+    q,
+    carrera,
+    amigosDeAmigos,
+    habilidades: habilidadesSel,
+    intereses: interesesSel,
+  });
   const { solicitudes } = useSolicitudesAmistadPendientes();
   const aceptarSolicitud = useAceptarSolicitudAmistad();
   const rechazarSolicitud = useRechazarSolicitudAmistad();
+
+  function toggleHabilidad(id: number) {
+    setHabilidadesSel((prev) => (prev.includes(id) ? prev.filter((h) => h !== id) : [...prev, id]));
+  }
+
+  function toggleInteres(id: number) {
+    setInteresesSel((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+  }
 
   return (
     <div className="px-8 pb-12 pt-8">
@@ -151,14 +239,49 @@ export default function PersonasPage() {
       )}
 
       <section>
-        <div className="relative mb-6 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nombre o apellido..."
-            className="pl-9"
-          />
+        <div className="mb-6 space-y-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por nombre o apellido..."
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-6">
+            <label className="flex items-center gap-2 text-sm font-medium text-on-surface">
+              <Checkbox checked={carrera} onCheckedChange={(v) => setCarrera(v === true)} />
+              Misma carrera
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-on-surface">
+              <Checkbox checked={amigosDeAmigos} onCheckedChange={(v) => setAmigosDeAmigos(v === true)} />
+              Amigos de amigos
+            </label>
+          </div>
+
+          {habilidades.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-black uppercase tracking-wider text-on-surface-variant">Habilidades</p>
+              <ChipToggleGroup
+                opciones={habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad }))}
+                seleccionados={habilidadesSel}
+                onToggle={toggleHabilidad}
+              />
+            </div>
+          )}
+
+          {intereses.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-black uppercase tracking-wider text-on-surface-variant">Intereses</p>
+              <ChipToggleGroup
+                opciones={intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres }))}
+                seleccionados={interesesSel}
+                onToggle={toggleInteres}
+              />
+            </div>
+          )}
         </div>
 
         {enabled && !isLoading && resultados.length === 0 && (
@@ -168,7 +291,7 @@ export default function PersonasPage() {
             </EmptyMedia>
             <EmptyHeader>
               <EmptyTitle className="text-lg">Sin resultados</EmptyTitle>
-              <EmptyDescription>No encontramos personas con ese nombre.</EmptyDescription>
+              <EmptyDescription>No encontramos personas con esos filtros.</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
