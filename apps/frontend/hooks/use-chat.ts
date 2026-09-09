@@ -16,6 +16,29 @@ import {
 } from '@/lib/query-keys/chat';
 import type { ChatMensaje, CreateConversationPayload } from '@/lib/types/chat';
 
+/**
+ * 'joinConversation' es fire-and-forget salvo por este ack: sin él, un join
+ * que falla (p. ej. la comprobación de ConversacionParticipante en el
+ * gateway tarda o la fila aún no existe) deja al cliente creyendo que está
+ * en la room `conversation:{id}` cuando en realidad nunca recibirá
+ * `newMessage`. Reintenta unas pocas veces antes de rendirse.
+ */
+async function joinConversationReliably(
+  socket: Socket,
+  idConversacion: number,
+  shouldAbort: () => boolean,
+) {
+  for (let attempt = 0; attempt < 3 && !shouldAbort(); attempt++) {
+    try {
+      const ack = await socket.timeout(3000).emitWithAck('joinConversation', { idConversacion });
+      if (ack?.joined) return;
+    } catch {
+      // sin ack (timeout o desconexión): reintenta
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+}
+
 export function useConversations(idProyecto: number) {
   const query = useQuery({
     queryKey: projectConversationsQueryKey(idProyecto),
@@ -102,14 +125,27 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
       idConversacion: number;
       mensaje: ChatMensaje;
     }) => {
+      let huboCache = false;
       queryClient.setQueryData<ChatMensaje[]>(
         conversationMessagesQueryKey(idProyecto, idConversacion),
         (current) => {
           if (!current) return current;
+          huboCache = true;
           if (current.some((m) => m.idMensaje === mensaje.idMensaje)) return current;
           return [...current, mensaje];
         },
       );
+      // Sin cache previa (p. ej. la conversación se acaba de abrir y su
+      // fetch inicial todavía no resuelve) no hay nada que anexar — pero
+      // descartar el mensaje en silencio lo pierde para siempre si ese
+      // fetch inicial ya había arrancado con datos viejos. Forzar un
+      // refetch explícito de ESTA conversación en vez de confiar en que
+      // projectConversationsQueryKey la invalide por accidente de prefijo.
+      if (!huboCache) {
+        queryClient.invalidateQueries({
+          queryKey: conversationMessagesQueryKey(idProyecto, idConversacion),
+        });
+      }
       queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
     };
 
@@ -124,8 +160,9 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
     // "conectado" a simple vista.
     const handleConnect = () => {
       setIsConnected(true);
-      if (activeConversationIdRef.current != null) {
-        socket.emit('joinConversation', { idConversacion: activeConversationIdRef.current });
+      const idConversacion = activeConversationIdRef.current;
+      if (idConversacion != null) {
+        joinConversationReliably(socket, idConversacion, () => activeConversationIdRef.current !== idConversacion);
       }
     };
 
@@ -152,8 +189,10 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
     const socket = socketRef.current;
     if (!socket || activeConversationId == null) return;
 
-    socket.emit('joinConversation', { idConversacion: activeConversationId });
+    let cancelado = false;
+    joinConversationReliably(socket, activeConversationId, () => cancelado);
     return () => {
+      cancelado = true;
       socket.emit('leaveConversation', { idConversacion: activeConversationId });
     };
   }, [activeConversationId]);
