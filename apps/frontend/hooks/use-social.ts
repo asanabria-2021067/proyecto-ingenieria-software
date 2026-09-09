@@ -23,6 +23,7 @@ import {
   rechazarSolicitudAmistad,
   seguirUsuario,
 } from '@/lib/services/social';
+import type { BuscarUsuariosFiltros } from '@/lib/types/social';
 
 function invalidateSocialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: amigosQueryKey() });
@@ -54,11 +55,17 @@ export function useSeguidores() {
   return { seguidores: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
 }
 
-export function useBuscarUsuarios(q: string) {
-  const enabled = q.trim().length >= 2;
+export function useBuscarUsuarios(filtros: BuscarUsuariosFiltros) {
+  const q = filtros.q?.trim() ?? '';
+  const hayFiltros =
+    Boolean(filtros.carrera) ||
+    Boolean(filtros.amigosDeAmigos) ||
+    Boolean(filtros.habilidades?.length) ||
+    Boolean(filtros.intereses?.length);
+  const enabled = q.length >= 2 || hayFiltros;
   const query = useQuery({
-    queryKey: buscarUsuariosQueryKey(q),
-    queryFn: () => buscarUsuarios(q),
+    queryKey: buscarUsuariosQueryKey(filtros),
+    queryFn: () => buscarUsuarios(filtros),
     enabled,
   });
   return { resultados: query.data ?? [], isLoading: query.isLoading, isError: query.isError, enabled };

@@ -1,13 +1,21 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoAmistad } from '@prisma/client';
+import { EstadoAmistad, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { BuscarUsuariosQueryDto } from './dto/buscar-usuarios-query.dto';
 
 const USUARIO_RESUMEN_SELECT = {
   idUsuario: true,
   nombre: true,
   apellido: true,
   fotoUrl: true,
+} as const;
+
+const USUARIO_BUSQUEDA_SELECT = {
+  ...USUARIO_RESUMEN_SELECT,
+  perfil: { select: { carrera: { select: { nombreCarrera: true } } } },
+  habilidades: { select: { habilidad: { select: { nombreHabilidad: true } } } },
+  intereses: { select: { interes: { select: { nombreInteres: true } } } },
 } as const;
 
 @Injectable()
@@ -146,6 +154,43 @@ export class SocialService {
     return amistades.map((a) => (a.idUsuarioSolicitante === idUsuario ? a.idUsuarioReceptor : a.idUsuarioSolicitante));
   }
 
+  async getAmigosDeAmigosIds(idUsuario: number): Promise<number[]> {
+    const amigoIds = await this.getAmigoIds(idUsuario);
+    if (amigoIds.length === 0) {
+      return [];
+    }
+
+    const filas = await this.prisma.$queryRaw<{ idUsuario: number }[]>(Prisma.sql`
+      SELECT DISTINCT
+        CASE WHEN id_usuario_solicitante IN (${Prisma.join(amigoIds)})
+          THEN id_usuario_receptor
+          ELSE id_usuario_solicitante
+        END AS "idUsuario"
+      FROM amistad
+      WHERE estado = 'ACEPTADA'
+        AND (id_usuario_solicitante IN (${Prisma.join(amigoIds)}) OR id_usuario_receptor IN (${Prisma.join(amigoIds)}))
+    `);
+
+    const excluir = new Set([idUsuario, ...amigoIds]);
+    return filas.map((f) => f.idUsuario).filter((id) => !excluir.has(id));
+  }
+
+  private async getIdsMismaCarrera(idUsuario: number): Promise<number[]> {
+    const perfil = await this.prisma.perfilEstudiante.findUnique({
+      where: { idUsuario },
+      select: { idCarrera: true },
+    });
+    if (!perfil?.idCarrera) {
+      return [];
+    }
+
+    const perfiles = await this.prisma.perfilEstudiante.findMany({
+      where: { idCarrera: perfil.idCarrera },
+      select: { idUsuario: true },
+    });
+    return perfiles.map((p) => p.idUsuario);
+  }
+
   async seguirUsuario(idUsuario: number, idSeguido: number) {
     if (idUsuario === idSeguido) {
       throw new BadRequestException('No puedes seguirte a ti mismo');
@@ -208,21 +253,55 @@ export class SocialService {
     return seguimientos.map((s) => s.idSeguido);
   }
 
-  async buscarUsuarios(idUsuario: number, q: string) {
-    const query = q.trim();
-    if (query.length < 2) {
+  async buscarUsuarios(idUsuario: number, filtros: BuscarUsuariosQueryDto = {}) {
+    const query = (filtros.q ?? '').trim();
+    if (query.length > 0 && query.length < 2) {
       throw new BadRequestException('La búsqueda requiere al menos 2 caracteres');
     }
 
-    const usuarios = await this.prisma.usuario.findMany({
-      where: {
-        idUsuario: { not: idUsuario },
+    const hayFiltros =
+      query.length > 0 ||
+      Boolean(filtros.carrera) ||
+      Boolean(filtros.amigosDeAmigos) ||
+      Boolean(filtros.habilidades?.length) ||
+      Boolean(filtros.intereses?.length);
+
+    if (!hayFiltros) {
+      return [];
+    }
+
+    const condiciones: Prisma.UsuarioWhereInput[] = [{ idUsuario: { not: idUsuario } }];
+
+    if (query) {
+      condiciones.push({
         OR: [
           { nombre: { contains: query, mode: 'insensitive' } },
           { apellido: { contains: query, mode: 'insensitive' } },
         ],
-      },
-      select: USUARIO_RESUMEN_SELECT,
+      });
+    }
+
+    if (filtros.carrera) {
+      const idsCarrera = await this.getIdsMismaCarrera(idUsuario);
+      condiciones.push({ idUsuario: { in: idsCarrera } });
+    }
+
+    if (filtros.amigosDeAmigos) {
+      const idsAmigosDeAmigos = await this.getAmigosDeAmigosIds(idUsuario);
+      condiciones.push({ idUsuario: { in: idsAmigosDeAmigos } });
+    }
+
+    if (filtros.habilidades?.length) {
+      condiciones.push({ habilidades: { some: { idHabilidad: { in: filtros.habilidades } } } });
+    }
+
+    if (filtros.intereses?.length) {
+      condiciones.push({ intereses: { some: { idInteres: { in: filtros.intereses } } } });
+    }
+
+    const usuarios = await this.prisma.usuario.findMany({
+      where: { AND: condiciones },
+      select: USUARIO_BUSQUEDA_SELECT,
       take: 20,
     });
 
@@ -268,10 +347,16 @@ export class SocialService {
       }
 
       return {
-        ...usuario,
+        idUsuario: usuario.idUsuario,
+        nombre: usuario.nombre,
+        apellido: usuario.apellido,
+        fotoUrl: usuario.fotoUrl,
         esAmigo,
         solicitudPendiente,
         loSigo: seguidosSet.has(usuario.idUsuario),
+        carrera: usuario.perfil?.carrera?.nombreCarrera ?? null,
+        habilidades: usuario.habilidades.map((h) => h.habilidad.nombreHabilidad),
+        intereses: usuario.intereses.map((i) => i.interes.nombreInteres),
       };
     });
   }
