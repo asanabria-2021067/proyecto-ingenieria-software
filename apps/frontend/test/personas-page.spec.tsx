@@ -14,7 +14,7 @@ const seguirUsuarioMock = vi.fn().mockResolvedValue({ idSeguimiento: 1 });
 const dejarDeSeguirMock = vi.fn().mockResolvedValue({ eliminado: true });
 
 vi.mock('@/lib/services/social', () => ({
-  buscarUsuarios: (q: string) => buscarUsuariosMock(q),
+  buscarUsuarios: (filtros: unknown) => buscarUsuariosMock(filtros),
   getSolicitudesPendientes: () => getSolicitudesPendientesMock(),
   getAmigos: () => Promise.resolve([]),
   getSiguiendo: () => Promise.resolve([]),
@@ -28,6 +28,11 @@ vi.mock('@/lib/services/social', () => ({
   dejarDeSeguir: (id: number) => dejarDeSeguirMock(id),
 }));
 
+vi.mock('@/lib/services/catalogs', () => ({
+  getHabilidades: () => Promise.resolve([]),
+  getIntereses: () => Promise.resolve([]),
+}));
+
 function usuario(overrides: Partial<UsuarioBusquedaDto> = {}): UsuarioBusquedaDto {
   return {
     idUsuario: 1,
@@ -37,6 +42,9 @@ function usuario(overrides: Partial<UsuarioBusquedaDto> = {}): UsuarioBusquedaDt
     esAmigo: false,
     solicitudPendiente: null,
     loSigo: false,
+    carrera: null,
+    habilidades: [],
+    intereses: [],
     ...overrides,
   };
 }
