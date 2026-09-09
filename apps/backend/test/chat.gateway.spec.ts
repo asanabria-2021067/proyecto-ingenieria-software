@@ -71,13 +71,14 @@ describe('ChatGateway', () => {
       const socket = makeSocket();
       socket.data.userId = 99;
 
-      await gateway.joinConversation(socket as any, { idConversacion: 1 });
+      const ack = await gateway.joinConversation(socket as any, { idConversacion: 1 });
 
       expect(findUnique).toHaveBeenCalledWith({
         where: { idConversacion_idUsuario: { idConversacion: 1, idUsuario: 99 } },
         select: { idUsuario: true },
       });
       expect(socket.join).not.toHaveBeenCalled();
+      expect(ack).toEqual({ joined: false });
     });
 
     it('sin userId autenticado en el socket, ni siquiera consulta la participación', async () => {
@@ -85,21 +86,23 @@ describe('ChatGateway', () => {
       const { gateway } = makeGateway({ findUnique });
       const socket = makeSocket();
 
-      await gateway.joinConversation(socket as any, { idConversacion: 1 });
+      const ack = await gateway.joinConversation(socket as any, { idConversacion: 1 });
 
       expect(findUnique).not.toHaveBeenCalled();
       expect(socket.join).not.toHaveBeenCalled();
+      expect(ack).toEqual({ joined: false });
     });
 
-    it('con fila en ConversacionParticipante, sí une al cliente a la room conversation:{id}', async () => {
+    it('con fila en ConversacionParticipante, sí une al cliente a la room conversation:{id} y confirma con { joined: true }', async () => {
       const findUnique = vi.fn().mockResolvedValue({ idUsuario: 5 });
       const { gateway } = makeGateway({ findUnique });
       const socket = makeSocket();
       socket.data.userId = 5;
 
-      await gateway.joinConversation(socket as any, { idConversacion: 3 });
+      const ack = await gateway.joinConversation(socket as any, { idConversacion: 3 });
 
       expect(socket.join).toHaveBeenCalledWith('conversation:3');
+      expect(ack).toEqual({ joined: true });
     });
   });
 
@@ -114,6 +117,19 @@ describe('ChatGateway', () => {
 
       expect(to).toHaveBeenCalledWith('conversation:3');
       expect(emit).toHaveBeenCalledWith('newMessage', { idConversacion: 3, mensaje: { contenido: 'hola' } });
+    });
+
+    it('además emite conversationUpdated a la room user:{id} de CADA destinatario, sin depender de que estén en la room de la conversación', () => {
+      const { gateway } = makeGateway();
+      const emit = vi.fn();
+      const to = vi.fn(() => ({ emit }));
+      Reflect.set(gateway, 'server', { to });
+
+      gateway.broadcastMessage(3, [5, 6], { contenido: 'hola' });
+
+      expect(to).toHaveBeenCalledWith('user:5');
+      expect(to).toHaveBeenCalledWith('user:6');
+      expect(emit).toHaveBeenCalledWith('conversationUpdated', { idConversacion: 3 });
     });
   });
 
