@@ -23,6 +23,17 @@ export interface UsuarioBusquedaDto extends UsuarioResumenDto {
   esAmigo: boolean;
   solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
   loSigo: boolean;
+  carrera: string | null;
+  habilidades: string[];
+  intereses: string[];
+}
+
+export interface BuscarUsuariosFiltros {
+  q?: string;
+  carrera?: boolean;
+  amigosDeAmigos?: boolean;
+  habilidades?: number[];
+  intereses?: number[];
 }
 
 export interface ProyectoFeedDto {
