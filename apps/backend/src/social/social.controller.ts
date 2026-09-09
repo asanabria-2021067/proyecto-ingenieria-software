@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateAmistadDto } from './dto/create-amistad.dto';
 import { CreateSeguimientoDto } from './dto/create-seguimiento.dto';
+import { BuscarUsuariosQueryDto } from './dto/buscar-usuarios-query.dto';
 import { SocialService } from './social.service';
 import { SocialFeedService } from './social-feed.service';
 
@@ -67,8 +68,8 @@ export class SocialController {
   }
 
   @Get('usuarios/buscar')
-  buscarUsuarios(@Query('q') q: string, @CurrentUser() user: { userId: number }) {
-    return this.social.buscarUsuarios(user.userId, q ?? '');
+  buscarUsuarios(@Query() query: BuscarUsuariosQueryDto, @CurrentUser() user: { userId: number }) {
+    return this.social.buscarUsuarios(user.userId, query);
   }
 
   @Get('feed')
