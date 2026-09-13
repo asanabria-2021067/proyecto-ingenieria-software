@@ -30,10 +30,10 @@ export function FontScaleToggle() {
   };
 
   const buttonClass =
-    'p-2 rounded-full bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface disabled:opacity-50 disabled:cursor-not-allowed';
+    'flex size-10 items-center justify-center rounded-control bg-muted text-meta text-text-primary transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-micro">
       <button
         type="button"
         onClick={() => changeLevel(levelIndex - 1)}
