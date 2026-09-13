@@ -599,49 +599,26 @@ button:disabled {
 .swal2-container.swal2-bottom-start .swal2-popup,
 .swal2-container.swal2-bottom-end .swal2-popup {
   pointer-events: auto !important;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16) !important;
+  box-shadow: var(--shadow-card) !important;
 }
 
 /* Popup container – force theme colors, strip the hardcoded white */
 .swal2-popup {
-  background: var(--color-surface-container-lowest, #ffffff) !important;
-  background-color: var(--color-surface-container-lowest, #ffffff) !important;
-  color: var(--color-on-surface, #181c20) !important;
-  border: 1px solid color-mix(in srgb, var(--color-outline-variant, #bdcabd) 40%, transparent) !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
+  background: var(--color-card) !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-outline-variant) !important;
+  box-shadow: var(--shadow-raised) !important;
 }
 
 /* Title */
 .swal2-title {
-  color: var(--color-primary, #006735) !important;
+  color: var(--color-text-primary) !important;
 }
 
 /* Body text / html container */
 .swal2-html-container,
 .swal2-content {
-  color: var(--color-on-surface-variant, #43474e) !important;
-}
-
-/* Dark mode overrides for SweetAlert2 */
-.dark .swal2-popup,
-[data-theme='dark'] .swal2-popup {
-  background: #080b0e !important;
-  background-color: #080b0e !important;
-  color: #eef1f7 !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
-}
-
-.dark .swal2-title,
-[data-theme='dark'] .swal2-title {
-  color: #72dc93 !important;
-}
-
-.dark .swal2-html-container,
-.dark .swal2-content,
-[data-theme='dark'] .swal2-html-container,
-[data-theme='dark'] .swal2-content {
-  color: #c3c7cc !important;
+  color: var(--color-text-secondary) !important;
 }
 
 /* Icon border and color adaption */
@@ -652,8 +629,8 @@ button:disabled {
   background-color: var(--color-primary) !important;
 }
 .swal2-icon.swal2-warning {
-  border-color: #f59e0b !important;
-  color: #f59e0b !important;
+  border-color: var(--color-secondary) !important;
+  color: var(--color-secondary) !important;
 }
 .swal2-icon.swal2-error {
   border-color: var(--color-error) !important;
@@ -664,11 +641,11 @@ button:disabled {
   color: var(--color-on-surface-variant) !important;
 }
 .swal2-icon.swal2-info {
-  border-color: #3b82f6 !important;
-  color: #3b82f6 !important;
+  border-color: var(--color-on-surface-variant) !important;
+  color: var(--color-on-surface-variant) !important;
 }
 
 /* Progress loader (timer bar) */
 .swal2-timer-progress-bar {
-  background: var(--color-primary) !important;
+  background: var(--color-accent) !important;
 }
