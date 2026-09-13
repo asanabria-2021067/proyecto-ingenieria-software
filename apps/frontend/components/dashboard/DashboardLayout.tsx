@@ -117,21 +117,21 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-surface">
+    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-page">
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
       </a>
 
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-surface-container-low md:flex">
-        <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
+      <aside className="hidden h-full w-56 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex">
+        <div className="flex items-center gap-inline border-b border-outline-variant px-card py-stack">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
-          <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
+          <span className="type-section text-text-primary">UVGenius</span>
         </div>
 
         <SidebarNav entries={navEntries} />
 
-        <div className="px-3 py-4 border-t border-outline-variant">
+        <div className="border-t border-outline-variant px-inline py-stack">
           <UserMenu user={user} onLogout={handleLogout} variant="sidebar" />
         </div>
       </aside>
@@ -140,28 +140,28 @@ export default function DashboardLayout({
       <main
         id="dashboard-main"
         tabIndex={-1}
-        className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface focus:outline-none"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page focus:outline-none"
       >
         {/* Top Header Bar */}
-        <header className="h-16 border-b border-outline-variant px-4 md:px-8 flex items-center justify-between shrink-0 bg-surface-container-low z-30">
-          <div className="flex items-center gap-3">
+        <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-outline-variant bg-card px-stack md:px-section">
+          <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
-            <div className="md:hidden flex items-center gap-2">
+            <div className="flex items-center gap-tight md:hidden">
               <Image src={logo} alt="UVGENIUS" className="h-8 w-auto" />
-              <span className="font-headline font-black text-base text-primary">UVGenius</span>
+              <span className="type-subtitle text-text-primary">UVGenius</span>
             </div>
-            <span className="hidden md:inline font-headline font-bold text-sm text-tertiary">
+            <span className="type-body hidden text-text-secondary md:inline">
               Universidad del Valle de Guatemala
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-inline">
             {!!user && (
               <span
                 role="status"
                 title={notificationsConnected ? 'Notificaciones en vivo conectadas' : 'Reconectando notificaciones en vivo…'}
                 aria-label={notificationsConnected ? 'Notificaciones en vivo conectadas' : 'Reconectando notificaciones en vivo'}
                 className={`size-2 shrink-0 rounded-full ${
-                  notificationsConnected ? 'bg-green-500' : 'animate-pulse bg-amber-500'
+                  notificationsConnected ? 'bg-status-success' : 'animate-pulse bg-status-warning'
                 }`}
               />
             )}
@@ -187,7 +187,7 @@ export default function DashboardLayout({
       </main>
 
       {/* Bottom Navigation Bar - Mobile Only */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-outline-variant bg-card px-tight pb-safe shadow-card md:hidden">
         {navItemsMobile.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
@@ -197,8 +197,8 @@ export default function DashboardLayout({
               id={`nav-item-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`}
               aria-label={label}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ${
-                active ? 'text-primary bg-primary/10' : 'text-outline hover:text-on-surface'
+              className={`flex h-12 w-12 flex-col items-center justify-center rounded-control transition-all duration-200 ${
+                active ? 'bg-action text-on-action' : 'text-text-secondary hover:bg-muted hover:text-text-primary'
               }`}
               title={label}
             >
