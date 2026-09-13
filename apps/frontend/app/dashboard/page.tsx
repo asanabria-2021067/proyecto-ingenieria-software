@@ -12,13 +12,24 @@ import {
   Calendar,
   ClipboardList,
   FolderOpen,
-  Building2,
-  Users,
   Award,
   Info,
   NotebookPen,
 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
 import {
   Empty,
@@ -28,13 +39,6 @@ import {
   EmptySteps,
   EmptyTitle,
 } from '@/components/ui/empty';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '@/components/ui/carousel';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
@@ -43,13 +47,10 @@ import type { ProyectoResumen } from '@/types';
 import { apiFetch } from '@/lib/api/client';
 import {
   estadoBadgeLabel,
-  estadoBadgeStyle,
   tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
-import { useTheme } from 'next-themes';
 import { useFeedSocial } from '@/hooks/use-social';
 import { SocialProjectCard } from '@/components/social/social-project-card';
 
@@ -58,7 +59,9 @@ import { SocialProjectCard } from '@/components/social/social-project-card';
  * SIN pasar por punto flotante. Devuelve `null` si el bloque no vino o es
  * inválido, para que la card lo muestre como «no disponible» sin romper nada.
  */
-export function formatearHorasDashboard(value: string | null | undefined): string | null {
+export function formatearHorasDashboard(
+  value: string | null | undefined,
+): string | null {
   if (typeof value !== 'string' || !/^-?\d+(\.\d+)?$/.test(value)) return null;
   const [entera, decimal = ''] = value.split('.');
   const dec = decimal.replace(/0+$/, '');
@@ -71,29 +74,30 @@ function HorasKpiCard({
   valor,
   ayuda,
   icon: Icon,
-  tone,
 }: {
   id: string;
   titulo: string;
   valor: string | null;
   ayuda: string;
   icon: typeof Award;
-  tone: 'primary' | 'secondary';
 }) {
-  const color = tone === 'primary' ? 'text-primary' : 'text-secondary';
   return (
     <div
       id={id}
       role="group"
       aria-label={titulo}
-      className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8"
+      className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden"
     >
       <div className="relative z-10">
-        <span className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-tertiary">
+        <span className="type-meta mb-micro flex items-center gap-tight uppercase tracking-wider">
           {titulo}
           <Tooltip>
             <TooltipTrigger asChild>
-              <button type="button" aria-label={`Qué significa: ${titulo}`} className="rounded-full text-tertiary hover:text-on-surface">
+              <button
+                type="button"
+                aria-label={`Qué significa: ${titulo}`}
+                className="rounded-pill text-text-secondary hover:text-text-primary"
+              >
                 <Info className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </TooltipTrigger>
@@ -101,16 +105,18 @@ function HorasKpiCard({
           </Tooltip>
         </span>
         {valor === null ? (
-          <span className="block text-base font-semibold text-tertiary">No disponible por ahora</span>
+          <span className="type-subtitle block text-text-secondary">
+            No disponible por ahora
+          </span>
         ) : (
           <div className="flex items-baseline gap-1">
-            <span className={`text-5xl font-black leading-none tracking-tighter ${color}`}>{valor}</span>
-            <span className={`text-lg font-bold ${color}`}>h</span>
+            <span className="type-section text-text-primary">{valor}</span>
+            <span className="type-body font-medium text-text-secondary">h</span>
           </div>
         )}
       </div>
-      <p className="relative z-10 mt-4 text-xs text-on-surface-variant">{ayuda}</p>
-      <div className={`absolute -bottom-4 -right-4 ${tone === 'primary' ? 'text-primary/5' : 'text-secondary/5'}`}>
+      <p className="type-meta relative z-10 mt-stack">{ayuda}</p>
+      <div className="absolute -bottom-stack -right-stack text-text-secondary/10">
         <Icon className="h-16 w-16" />
       </div>
     </div>
@@ -118,38 +124,78 @@ function HorasKpiCard({
 }
 
 const estadoColors: Record<string, string> = {
-  PENDIENTE: 'bg-blue-100 text-blue-800',
-  ACEPTADA: 'bg-green-100 text-green-800',
-  RECHAZADA: 'bg-red-100 text-red-800',
+  PENDIENTE: 'pill-warning',
+  ACEPTADA: 'pill-success',
+  RECHAZADA: 'pill-error',
 };
 
-function DashboardSkeleton() {
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-  const baseColor = isDark ? '#202020' : '#ebebeb';
-  const highlightColor = isDark ? '#444' : '#f5f5f5';
-
+function DashboardProjectCard({
+  project,
+}: {
+  project: ProyectoListItemDTO | ProyectoResumen;
+}) {
   return (
-    <SkeletonTheme baseColor={baseColor} highlightColor={highlightColor}>
-      <div className="px-8 pb-12 pt-8">
-        <section className="mb-12">
+    <article className="card-base group flex min-h-52 flex-col">
+      <div className="mb-stack flex items-start justify-between gap-tight">
+        <div className="flex flex-wrap items-center gap-tight">
+          <span className="pill pill-accent">
+            {tipoBadgeLabel(project.tipoProyecto)}
+          </span>
+          <span className="pill pill-neutral">
+            {estadoBadgeLabel(project.estadoProyecto)}
+          </span>
+        </div>
+        <span className="type-meta shrink-0">ID: {project.idProyecto}</span>
+      </div>
+      <h3 className="type-subtitle mb-tight text-text-primary">
+        {project.tituloProyecto}
+      </h3>
+      <p className="type-body mb-card line-clamp-2 text-text-secondary">
+        {project.descripcionProyecto || 'Sin descripción disponible.'}
+      </p>
+      <div className="mt-auto flex items-center justify-between gap-stack">
+        <span className="type-meta flex items-center gap-tight uppercase">
+          <Clock className="size-4" aria-hidden="true" />
+          {project.modalidadProyecto}
+        </span>
+        <Button asChild size="sm">
+          <Link
+            href={`/dashboard/proyectos/${project.idProyecto}`}
+            aria-label={`Ver ${project.tituloProyecto}`}
+          >
+            Ver
+          </Link>
+        </Button>
+      </div>
+    </article>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <SkeletonTheme
+      baseColor="var(--color-surface-container)"
+      highlightColor="var(--color-surface-container-high)"
+    >
+      <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
+        <section className="mb-section">
           <Skeleton width={150} height={16} className="mb-2" />
           <Skeleton width={300} height={48} />
           <Skeleton width={500} height={20} className="mt-2" />
         </section>
 
-        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <Skeleton height={192} borderRadius={12} />
-          <Skeleton height={192} borderRadius={12} />
-          <Skeleton height={192} borderRadius={12} />
+        <div className="mb-section grid grid-cols-1 gap-grid md:grid-cols-3">
+          <Skeleton height={192} borderRadius="var(--radius-card)" />
+          <Skeleton height={192} borderRadius="var(--radius-card)" />
+          <Skeleton height={192} borderRadius="var(--radius-card)" />
         </div>
 
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-grid lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <Skeleton width={200} height={32} className="mb-8" />
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-               <Skeleton height={200} borderRadius={12} />
-               <Skeleton height={200} borderRadius={12} />
+            <Skeleton width={200} height={32} className="mb-section" />
+            <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
+              <Skeleton height={200} borderRadius="var(--radius-card)" />
+              <Skeleton height={200} borderRadius="var(--radius-card)" />
             </div>
           </div>
         </div>
@@ -172,7 +218,9 @@ export default function DashboardPage() {
     queryFn: getDashboardStats,
   });
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery<ProyectoListItemDTO[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<
+    ProyectoListItemDTO[]
+  >({
     queryKey: ['dashboard-projects'],
     queryFn: async () => {
       const p = await searchProjects('');
@@ -180,14 +228,17 @@ export default function DashboardPage() {
     },
   });
 
-  const { data: featured = [], isLoading: featuredLoading } = useQuery<ProyectoResumen[]>({
+  const { data: featured = [], isLoading: featuredLoading } = useQuery<
+    ProyectoResumen[]
+  >({
     queryKey: ['dashboard-featured'],
     queryFn: () => apiFetch('/proyectos/destacados'),
   });
 
   const { proyectosDeAmigos, proyectosDeSeguidos } = useFeedSocial();
 
-  const isLoading = userLoading || statsLoading || projectsLoading || featuredLoading;
+  const isLoading =
+    userLoading || statsLoading || projectsLoading || featuredLoading;
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -199,18 +250,26 @@ export default function DashboardPage() {
   const horasExtensionRequeridas = stats?.horasExtensionRequeridas ?? null;
   const proyectosActivos = stats?.proyectosActivos ?? 0;
   // VIEW-08: dos métricas SEPARADAS (nunca se suman): significan cosas distintas.
-  const horasAbiertas = formatearHorasDashboard(stats?.horasRegistradasEnProyectosAbiertos);
+  const horasAbiertas = formatearHorasDashboard(
+    stats?.horasRegistradasEnProyectosAbiertos,
+  );
   const horasAcreditadas = formatearHorasDashboard(stats?.horasAcreditadas);
-  const requiereHorasBeca = horasBecaRequeridas !== null && horasBecaRequeridas > 0;
+  const requiereHorasBeca =
+    horasBecaRequeridas !== null && horasBecaRequeridas > 0;
   const requiereHorasExtension =
     horasExtensionRequeridas !== null && horasExtensionRequeridas > 0;
   const progressBeca = requiereHorasBeca
-    ? Math.min(100, Math.round((horasBeca / (horasBecaRequeridas as number)) * 100))
+    ? Math.min(
+        100,
+        Math.round((horasBeca / (horasBecaRequeridas as number)) * 100),
+      )
     : 0;
   const progressExtension = requiereHorasExtension
     ? Math.min(
         100,
-        Math.round((horasExtension / (horasExtensionRequeridas as number)) * 100),
+        Math.round(
+          (horasExtension / (horasExtensionRequeridas as number)) * 100,
+        ),
       )
     : 0;
 
@@ -228,45 +287,49 @@ export default function DashboardPage() {
         }}
       />
 
-      <div className="px-8 pb-12 pt-8">
+      <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
         {/* Welcome */}
-        <section className="mb-12">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary">
+        <section className="mb-section">
+          <span className="pill pill-accent mb-tight">
             Bienvenido de vuelta
           </span>
-          <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
+          <h1 className="type-display text-text-primary">
             Hola, {user?.nombre ?? ''}
           </h1>
-          <p className="mt-2 max-w-2xl text-lg text-on-surface-variant">
-            Tu progreso academico este semestre. Tienes {projects.length} proyectos disponibles.
+          <p className="type-body mt-tight max-w-prose text-text-secondary">
+            Tu progreso académico este semestre. Tienes {projects.length}{' '}
+            proyectos disponibles.
           </p>
         </section>
 
         {/* Stats */}
-        <div id="stats-container" className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div
+          id="stats-container"
+          className="mb-section grid grid-cols-1 gap-gap md:grid-cols-3"
+        >
           {/* Horas Beca */}
           {requiereHorasBeca && (
-            <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
+            <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
               <div className="relative z-10">
-                <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-tertiary">
+                <span className="type-meta mb-micro block uppercase tracking-wider">
                   Horas Beca Acumuladas
                 </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-black leading-none tracking-tighter text-primary">
+                <div className="flex items-baseline gap-tight">
+                  <span className="type-section text-text-primary">
                     {horasBeca}
                   </span>
-                  <span className="text-lg font-bold text-primary-container">
+                  <span className="type-body text-text-secondary">
                     / {horasBecaRequeridas}
                   </span>
                 </div>
               </div>
-              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
+              <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-highest">
                 <div
-                  className="h-full rounded-full bg-primary"
+                  className="h-full rounded-pill bg-accent"
                   style={{ width: `${progressBeca}%` }}
                 />
               </div>
-              <div className="absolute -bottom-4 -right-4 text-primary/5">
+              <div className="absolute -bottom-stack -right-stack text-text-secondary/10">
                 <GraduationCap className="h-16 w-16" />
               </div>
             </div>
@@ -274,51 +337,51 @@ export default function DashboardPage() {
 
           {/* Horas Extension */}
           {requiereHorasExtension && (
-            <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8">
+            <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
               <div className="relative z-10">
-                <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-tertiary">
+                <span className="type-meta mb-micro block uppercase tracking-wider">
                   Horas de Extension
                 </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-black leading-none tracking-tighter text-secondary">
+                <div className="flex items-baseline gap-tight">
+                  <span className="type-section text-text-primary">
                     {horasExtension}
                   </span>
-                  <span className="text-lg font-bold text-secondary-container">
+                  <span className="type-body text-text-secondary">
                     / {horasExtensionRequeridas}
                   </span>
                 </div>
               </div>
-              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
+              <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-highest">
                 <div
-                  className="h-full rounded-full bg-secondary"
+                  className="h-full rounded-pill bg-accent"
                   style={{ width: `${progressExtension}%` }}
                 />
               </div>
-              <div className="absolute -bottom-4 -right-4 text-secondary/5">
+              <div className="absolute -bottom-stack -right-stack text-text-secondary/10">
                 <HeartHandshake className="h-16 w-16" />
               </div>
             </div>
           )}
 
           {/* Proyectos Activos */}
-          <div className="relative flex h-48 flex-col justify-between overflow-hidden rounded-xl bg-primary p-8 text-on-primary">
+          <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
             <div className="relative z-10">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-on-primary-container">
+              <span className="type-meta mb-micro block uppercase tracking-wider">
                 Proyectos Activos
               </span>
-              <span className="text-5xl font-black leading-none tracking-tighter">
+              <span className="type-section text-text-primary">
                 {String(proyectosActivos).padStart(2, '0')}
               </span>
             </div>
-            <div className="relative z-10 flex gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                <Zap className="h-5 w-5 text-white" />
+            <div className="relative z-10 flex gap-tight">
+              <div className="flex h-10 w-10 items-center justify-center rounded-control bg-surface-container-high">
+                <Zap className="h-5 w-5 text-text-secondary" />
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                <Calendar className="h-5 w-5 text-white" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-control bg-surface-container-high">
+                <Calendar className="h-5 w-5 text-text-secondary" />
               </div>
             </div>
-            <Zap className="absolute -bottom-4 -right-4 h-20 w-20 text-white/10" />
+            <Zap className="absolute -bottom-stack -right-stack h-20 w-20 text-text-secondary/10" />
           </div>
 
           {/* S7 VIEW-08: horas en proyectos abiertos vs. acreditadas (separadas) */}
@@ -328,7 +391,6 @@ export default function DashboardPage() {
             valor={horasAbiertas}
             ayuda="Horas que registraste en proyectos aún no cerrados. Pueden cambiar hasta que el proyecto se cierre."
             icon={NotebookPen}
-            tone="secondary"
           />
           <HorasKpiCard
             id="stats-horas-acreditadas"
@@ -336,16 +398,13 @@ export default function DashboardPage() {
             valor={horasAcreditadas}
             ayuda="Horas aprobadas por administración al cerrar tus proyectos. Ya no cambian."
             icon={Award}
-            tone="primary"
           />
         </div>
 
         {proyectosDeAmigos.length > 0 && (
-          <section className="mb-12">
-            <h2 className="mb-6 font-headline text-2xl font-black tracking-tight">
-              Proyectos de tus amigos
-            </h2>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <section className="mb-section">
+            <h2 className="type-section mb-card">Proyectos de tus amigos</h2>
+            <div className="grid grid-cols-1 gap-gap md:grid-cols-3">
               {proyectosDeAmigos.map((p) => (
                 <SocialProjectCard key={p.idProyecto} proyecto={p} />
               ))}
@@ -354,11 +413,9 @@ export default function DashboardPage() {
         )}
 
         {proyectosDeSeguidos.length > 0 && (
-          <section className="mb-12">
-            <h2 className="mb-6 font-headline text-2xl font-black tracking-tight">
-              De personas que sigues
-            </h2>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <section className="mb-section">
+            <h2 className="type-section mb-card">De personas que sigues</h2>
+            <div className="grid grid-cols-1 gap-gap md:grid-cols-3">
               {proyectosDeSeguidos.map((p) => (
                 <SocialProjectCard key={p.idProyecto} proyecto={p} />
               ))}
@@ -366,66 +423,28 @@ export default function DashboardPage() {
           </section>
         )}
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-          <div className="space-y-12 lg:col-span-8">
+        <div className="layout-grid">
+          <div className="layout-main space-y-section">
             {/* Featured Projects */}
             {featured.length > 0 && (
               <section>
-                <div className="mb-6 flex items-end justify-between">
+                <div className="mb-card flex items-end justify-between gap-stack">
                   <div>
-                    <h2 className="font-headline text-2xl font-black tracking-tight">
-                      Proyectos Destacados
-                    </h2>
-                    <p className="text-sm text-on-surface-variant">
+                    <h2 className="type-section">Proyectos Destacados</h2>
+                    <p className="type-body text-text-secondary">
                       Los proyectos más populares con más postulaciones
                     </p>
                   </div>
                   <Link
                     href="/dashboard/proyectos"
-                    className="text-sm font-bold text-primary hover:underline"
+                    className="type-body font-medium text-primary hover:underline"
                   >
                     Ver todos
                   </Link>
                 </div>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
                   {featured.slice(0, 4).map((p) => (
-                    <div
-                      key={p.idProyecto}
-                      className="group rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-6 shadow-sm transition-shadow hover:shadow-md"
-                    >
-                      <div className="mb-4 flex items-start justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${tipoBadgeStyle(p.tipoProyecto)}`}>
-                            {tipoBadgeLabel(p.tipoProyecto)}
-                          </span>
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${estadoBadgeStyle(p.estadoProyecto)}`}>
-                            {estadoBadgeLabel(p.estadoProyecto)}
-                          </span>
-                        </div>
-                        <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                          ID: {p.idProyecto}
-                        </span>
-                      </div>
-                      <h3 className="mb-2 text-lg font-bold text-on-surface transition-colors group-hover:text-primary">
-                        {p.tituloProyecto}
-                      </h3>
-                      <p className="mb-6 line-clamp-2 text-sm text-on-surface-variant">
-                        {p.descripcionProyecto}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs font-medium text-on-surface-variant">
-                          <Clock className="h-4 w-4" />
-                          {p.modalidadProyecto}
-                        </div>
-                        <Link
-                          href={`/dashboard/proyectos/${p.idProyecto}`}
-                          aria-label={`Ver ${p.tituloProyecto}`}
-                          className="rounded-xl bg-surface-container-high px-6 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
-                        >
-                          Ver
-                        </Link>
-                      </div>
-                    </div>
+                    <DashboardProjectCard key={p.idProyecto} project={p} />
                   ))}
                 </div>
               </section>
@@ -433,72 +452,41 @@ export default function DashboardPage() {
 
             {/* Recommended Projects */}
             <section>
-              <div className="mb-6 flex items-end justify-between">
+              <div className="mb-card flex items-end justify-between gap-stack">
                 <div>
-                  <h2 className="font-headline text-2xl font-black tracking-tight">
-                    Proyectos Disponibles
-                  </h2>
-                  <p className="text-sm text-on-surface-variant">
+                  <h2 className="type-section">Proyectos Disponibles</h2>
+                  <p className="type-body text-text-secondary">
                     Proyectos publicados recientemente
                   </p>
                 </div>
                 <Link
                   href="/dashboard/proyectos"
-                  className="text-sm font-bold text-primary hover:underline"
+                  className="type-body font-medium text-primary hover:underline"
                 >
                   Ver todos
                 </Link>
               </div>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
                 {projects.map((p) => (
-                  <div
-                    key={p.idProyecto}
-                    className="group rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-6 shadow-sm transition-shadow hover:shadow-md"
-                  >
-                    <div className="mb-4 flex items-start justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${tipoBadgeStyle(p.tipoProyecto)}`}>
-                          {tipoBadgeLabel(p.tipoProyecto)}
-                        </span>
-                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${estadoBadgeStyle(p.estadoProyecto)}`}>
-                          {estadoBadgeLabel(p.estadoProyecto)}
-                        </span>
-                      </div>
-                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                        ID: {p.idProyecto}
-                      </span>
-                    </div>
-                    <h3 className="mb-2 text-lg font-bold text-on-surface transition-colors group-hover:text-primary">
-                      {p.tituloProyecto}
-                    </h3>
-                    <p className="mb-6 line-clamp-2 text-sm text-on-surface-variant">
-                      {p.descripcionProyecto}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs font-medium text-on-surface-variant">
-                        <Clock className="h-4 w-4" />
-                        {p.modalidadProyecto}
-                      </div>
-                      <Link
-                        href={`/dashboard/proyectos/${p.idProyecto}`}
-                        aria-label={`Ver ${p.tituloProyecto}`}
-                        className="rounded-xl bg-surface-container-high px-6 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
-                      >
-                        Ver
-                      </Link>
-                    </div>
-                  </div>
+                  <DashboardProjectCard key={p.idProyecto} project={p} />
                 ))}
                 {projects.length === 0 && (
                   <div className="col-span-2">
-                    <Empty tone="muted" className="surface-enter" aria-live="polite">
+                    <Empty
+                      tone="muted"
+                      className="surface-enter"
+                      aria-live="polite"
+                    >
                       <EmptyMedia variant="compact">
                         <FolderOpen aria-hidden="true" className="h-6 w-6" />
                       </EmptyMedia>
                       <EmptyHeader>
-                        <EmptyTitle className="text-lg">No hay proyectos disponibles</EmptyTitle>
+                        <EmptyTitle className="type-subtitle">
+                          No hay proyectos disponibles
+                        </EmptyTitle>
                         <EmptyDescription>
-                          Cuando se publiquen nuevas oportunidades, apareceran aqui para que puedas revisarlas rapido.
+                          Cuando se publiquen nuevas oportunidades, apareceran
+                          aqui para que puedas revisarlas rapido.
                         </EmptyDescription>
                       </EmptyHeader>
                       <EmptySteps />
@@ -510,132 +498,142 @@ export default function DashboardPage() {
 
             {/* Applications Status */}
             <section>
-              <h2 className="mb-6 font-headline text-2xl font-black tracking-tight">
-                Estado de Aplicaciones
-              </h2>
-              <div className="overflow-hidden rounded-xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-surface-container-low">
-                      <tr>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-                          Proyecto
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-                          Fecha
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-                          Estado
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-                          Accion
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-surface-container">
-                      {stats?.postulacionesRecientes.map((a) => (
-                        <tr key={a.idPostulacion}>
-                          <td className="px-6 py-5">
-                            <div className="text-sm font-bold text-on-surface">
-                              {a.rolProyecto.proyecto.tituloProyecto}
-                            </div>
-                            <div className="text-xs text-on-surface-variant">
-                              {tipoBadgeLabel(a.rolProyecto.proyecto.tipoProyecto)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-5 text-sm text-on-surface-variant">
-                            {new Date(a.fechaPostulacion).toLocaleDateString('es-GT')}
-                          </td>
-                          <td className="px-6 py-5">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
-                                estadoColors[a.estadoPostulacion] ?? 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {a.estadoPostulacion}
-                            </span>
-                          </td>
-                          <td className="px-6 py-5">
+              <h2 className="type-section mb-card">Estado de Aplicaciones</h2>
+              <div className="card-base overflow-hidden p-0">
+                <Table>
+                  <TableHeader className="bg-page">
+                    <TableRow>
+                      <TableHead className="px-card">Proyecto</TableHead>
+                      <TableHead className="px-card">Fecha</TableHead>
+                      <TableHead className="px-card">Estado</TableHead>
+                      <TableHead className="px-card">Acción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats?.postulacionesRecientes.map((a) => (
+                      <TableRow key={a.idPostulacion}>
+                        <TableCell className="px-card py-stack">
+                          <div className="type-subtitle text-text-primary">
+                            {a.rolProyecto.proyecto.tituloProyecto}
+                          </div>
+                          <div className="type-meta">
+                            {tipoBadgeLabel(
+                              a.rolProyecto.proyecto.tipoProyecto,
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="type-body px-card py-stack text-text-secondary">
+                          {new Date(a.fechaPostulacion).toLocaleDateString(
+                            'es-GT',
+                          )}
+                        </TableCell>
+                        <TableCell className="px-card py-stack">
+                          <span
+                            className={`pill ${estadoColors[a.estadoPostulacion] ?? 'pill-neutral'}`}
+                          >
+                            {a.estadoPostulacion}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-card py-stack">
+                          <Link
+                            href="/dashboard/mis-postulaciones"
+                            aria-label={`Ver postulacion para ${a.rolProyecto.proyecto.tituloProyecto}`}
+                            className="inline-flex rounded-control p-tight text-primary hover:bg-muted"
+                          >
+                            <Eye className="h-5 w-5" />
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {(!stats || stats.postulacionesRecientes.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="px-card py-section">
+                          <div className="flex flex-col items-center gap-tight text-center">
+                            <ClipboardList
+                              aria-hidden="true"
+                              className="h-7 w-7 text-primary"
+                            />
+                            <p className="type-body font-medium text-text-primary">
+                              No tienes postulaciones aun
+                            </p>
                             <Link
-                              href="/dashboard/mis-postulaciones"
-                              aria-label={`Ver postulacion para ${a.rolProyecto.proyecto.tituloProyecto}`}
-                              className="inline-flex rounded-lg p-2 text-primary hover:bg-primary/10"
+                              href="/dashboard/proyectos"
+                              className="type-body font-medium text-primary hover:underline"
                             >
-                              <Eye className="h-5 w-5" />
+                              Explorar proyectos
                             </Link>
-                          </td>
-                        </tr>
-                      ))}
-                      {(!stats || stats.postulacionesRecientes.length === 0) && (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-8">
-                            <div className="flex flex-col items-center gap-2 text-center">
-                              <ClipboardList aria-hidden="true" className="h-7 w-7 text-primary" />
-                              <p className="text-sm font-semibold text-on-surface">
-                                No tienes postulaciones aun
-                              </p>
-                              <Link
-                                href="/dashboard/proyectos"
-                                className="text-sm font-bold text-primary hover:underline"
-                              >
-                                Explorar proyectos
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </section>
           </div>
 
           {/* Right Column */}
-          <div className="space-y-8 lg:col-span-4">
+          <aside className="layout-aside">
             {/* Quick info */}
-            <div id="dashboard-profile-card" className="rounded-xl bg-surface-container-low p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-headline text-lg font-black tracking-tight">Tu perfil</h3>
+            <div
+              id="dashboard-profile-card"
+              className="card-base lg:sticky lg:top-section"
+            >
+              <div className="mb-stack flex items-center justify-between gap-tight">
+                <h2 className="type-section">Tu perfil</h2>
                 <button
                   type="button"
-                  onClick={() => window.dispatchEvent(new Event('start-onboarding-tour'))}
+                  onClick={() =>
+                    window.dispatchEvent(new Event('start-onboarding-tour'))
+                  }
                   aria-label="Repetir tour de bienvenida"
-                  className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                  className="type-meta cursor-pointer font-medium text-primary hover:underline"
                 >
                   Repetir Tour 🔄
                 </button>
               </div>
               {user?.perfil?.carrera && (
-                <div className="mb-3">
-                  <span className="text-xs font-bold uppercase tracking-widest text-tertiary">Carrera</span>
-                  <p className="text-sm font-medium text-on-surface">{user.perfil.carrera.nombreCarrera}</p>
+                <div className="mb-inline">
+                  <span className="type-meta uppercase tracking-wider">
+                    Carrera
+                  </span>
+                  <p className="type-body text-text-primary">
+                    {user.perfil.carrera.nombreCarrera}
+                  </p>
                 </div>
               )}
               {user?.perfil?.semestre && (
-                <div className="mb-3">
-                  <span className="text-xs font-bold uppercase tracking-widest text-tertiary">Semestre</span>
-                  <p className="text-sm font-medium text-on-surface">{user.perfil.semestre}</p>
+                <div className="mb-inline">
+                  <span className="type-meta uppercase tracking-wider">
+                    Semestre
+                  </span>
+                  <p className="type-body text-text-primary">
+                    {user.perfil.semestre}
+                  </p>
                 </div>
               )}
               <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-tertiary">Habilidades</span>
-                <div className="mt-1 flex flex-wrap gap-1">
+                <span className="type-meta uppercase tracking-wider">
+                  Habilidades
+                </span>
+                <div className="mt-micro flex flex-wrap gap-micro">
                   {user?.habilidades.map((h) => (
                     <span
                       key={h.idUsuarioHabilidad}
-                      className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                      className="pill pill-accent"
                     >
                       {h.habilidad.nombreHabilidad}
                     </span>
                   ))}
                   {(!user?.habilidades || user.habilidades.length === 0) && (
-                    <span className="text-xs text-tertiary">Sin habilidades registradas</span>
+                    <span className="type-meta">
+                      Sin habilidades registradas
+                    </span>
                   )}
                 </div>
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
     </>
