@@ -48,7 +48,7 @@ function UserAvatar({ user, theme }: { user: UserMenuUser | null | undefined; th
       className={
         theme === 'admin'
           ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold'
-          : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-container text-xs font-bold text-on-primary-container'
+          : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-accent text-meta font-medium text-on-accent'
       }
       style={
         theme === 'admin'
@@ -73,10 +73,10 @@ function UserMenuContent({
       {user && (
         <>
           <DropdownMenuLabel className="font-normal">
-            <p className="truncate text-sm font-medium text-on-surface">
+            <p className="type-body truncate font-medium text-text-primary">
               {user.nombre} {user.apellido}
             </p>
-            <p className="truncate text-xs font-normal text-tertiary">{user.correo}</p>
+            <p className="type-meta truncate">{user.correo}</p>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
         </>
@@ -125,7 +125,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
             className={
               isAdmin
                 ? 'admin-nav-inactive flex h-12 w-12 items-center justify-center rounded-xl outline-none transition-colors'
-                : 'flex h-12 w-12 items-center justify-center rounded-xl outline-none transition-colors hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-primary/30'
+                : 'flex h-12 w-12 items-center justify-center rounded-control outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary/30'
             }
           >
             <UserAvatar user={user} theme={theme} />
@@ -144,7 +144,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
           className={
             isAdmin
               ? 'admin-nav-inactive flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left outline-none transition-colors'
-              : 'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left outline-none transition-colors hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-primary/30'
+              : 'flex w-full items-center gap-inline rounded-control px-inline py-tight text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary/30'
           }
           style={isAdmin ? { color: 'var(--admin-text)' } : undefined}
         >
@@ -152,13 +152,13 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
           {user && (
             <div className="min-w-0 flex-1">
               <p
-                className={isAdmin ? 'truncate text-sm font-medium' : 'truncate text-sm font-medium text-on-surface'}
+                className={isAdmin ? 'truncate text-sm font-medium' : 'type-body truncate font-medium text-text-primary'}
                 style={isAdmin ? { color: 'var(--admin-text)' } : undefined}
               >
                 {user.nombre} {user.apellido}
               </p>
               <p
-                className={isAdmin ? 'truncate text-xs' : 'truncate text-xs text-tertiary'}
+                className={isAdmin ? 'truncate text-xs' : 'type-meta truncate'}
                 style={isAdmin ? { color: 'var(--admin-text-muted)' } : undefined}
               >
                 {user.correo}
