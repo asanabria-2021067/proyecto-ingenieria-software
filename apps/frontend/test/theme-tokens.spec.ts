@@ -70,11 +70,12 @@ describe('Tokens de color del tema', () => {
     expect(faltantes).toEqual([]);
   });
 
-  it('el botón por defecto declara color de texto y ese token existe (verde oscuro nunca hereda letra negra)', () => {
+  it('el botón por defecto usa el par action/on-action', () => {
     const boton = readFileSync(join(UI_DIR, 'button.tsx'), 'utf8');
     const variantePorDefecto = /default:\s*'([^']+)'/.exec(boton)?.[1] ?? '';
 
-    expect(variantePorDefecto).toContain('bg-primary');
+    expect(variantePorDefecto).toContain('bg-action');
+    expect(variantePorDefecto).toContain('text-on-action');
     const claseTexto = /\btext-([a-z-]+)\b/.exec(variantePorDefecto)?.[1];
     expect(claseTexto).toBeDefined();
     expect(tokenEstaDefinido(claseTexto as string)).toBe(true);
@@ -109,5 +110,36 @@ describe('Tokens de color del tema', () => {
     // que basta con que el sistema mantenga esa inversión.
     expect(bloque('@theme {')).toMatch(/--color-on-primary:\s*#ffffff/i);
     expect(bloque('.dark {')).toMatch(/--color-on-primary:\s*#003918/i);
+  });
+});
+
+describe('Sistema de diseño HU-163', () => {
+  it('publica los cinco niveles tipográficos con cuerpo de 15 px', () => {
+    for (const nivel of ['display', 'section', 'subtitle', 'body', 'meta']) {
+      expect(CSS).toMatch(new RegExp(`--text-${nivel}:`));
+      expect(CSS).toMatch(new RegExp(`\\.type-${nivel}\\s*\\{`));
+    }
+    expect(CSS).toMatch(/--text-body:\s*0\.9375rem/);
+  });
+
+  it('agrega las escalas y roles después de los temas M3 existentes', () => {
+    const inicioSistema = CSS.indexOf('/* HU-163:');
+    expect(inicioSistema).toBeGreaterThan(CSS.indexOf('.dark {'));
+    expect(CSS).toMatch(/--spacing-micro:\s*0\.25rem/);
+    expect(CSS).toMatch(/--spacing-page:\s*3rem/);
+    expect(CSS).toMatch(/--color-accent:\s*var\(--color-secondary-container\)/);
+    expect(CSS).toMatch(/--color-action:\s*var\(--color-inverse-surface\)/);
+  });
+
+  it('define la rejilla 8 + 4 con quiebre a 1024 px', () => {
+    expect(CSS).toMatch(/@media \(min-width:\s*64rem\)/);
+    expect(CSS).toMatch(/\.layout-main\s*\{[^}]*grid-column:\s*span 8/s);
+    expect(CSS).toMatch(/\.layout-aside\s*\{[^}]*grid-column:\s*span 4/s);
+  });
+
+  it('documenta la prohibición de valores literales y el uso del acento', () => {
+    const reglas = readFileSync(join(__dirname, '..', '..', '..', 'docs', 'design-system.md'), 'utf8');
+    expect(reglas).toMatch(/nunca se usa como color de letra/i);
+    expect(reglas).toMatch(/color, tamaño tipográfico, radio o sombra literal nuevo/i);
   });
 });
