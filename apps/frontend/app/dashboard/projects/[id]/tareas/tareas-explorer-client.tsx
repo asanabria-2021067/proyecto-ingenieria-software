@@ -40,9 +40,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import {
-  ESTADO_COLUMNA_STYLE,
   ESTADO_LABEL,
-  PRIORIDAD_COLOR,
   PRIORIDAD_ICON,
   PRIORIDAD_LABEL,
 } from '@/components/projects/task-board.utils';
@@ -63,6 +61,17 @@ interface Props {
 
 const TAMANO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
+const ESTADO_TONE: Record<EstadoTarea, string> = {
+  POR_HACER: 'pill-neutral',
+  EN_PROGRESO: 'pill-warning',
+  EN_REVISION: 'pill-neutral',
+  HECHO: 'pill-success',
+};
+const PRIORIDAD_TONE: Record<Prioridad, string> = {
+  BAJA: 'pill-neutral',
+  MEDIA: 'pill-warning',
+  ALTA: 'pill-error',
+};
 
 const OPCIONES_ORDEN: { value: string; label: string; campo: CriterioOrdenTarea; direccion: DireccionOrden }[] = [
   { value: 'fechaLimite:asc', label: 'Fecha límite: más próxima primero', campo: 'fechaLimite', direccion: 'asc' },
@@ -84,11 +93,8 @@ function formatFecha(fecha: string | null): string {
 }
 
 function EstadoBadge({ estado }: { estado: EstadoTarea }) {
-  const estilo = ESTADO_COLUMNA_STYLE[estado];
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estilo.headerBg} ${estilo.headerText}`}
-    >
+    <span className={`pill ${ESTADO_TONE[estado]}`}>
       {ESTADO_LABEL[estado]}
     </span>
   );
@@ -97,7 +103,7 @@ function EstadoBadge({ estado }: { estado: EstadoTarea }) {
 function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
   const Icono = PRIORIDAD_ICON[prioridad];
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${PRIORIDAD_COLOR[prioridad]}`}>
+    <span className={`pill ${PRIORIDAD_TONE[prioridad]}`}>
       <Icono className="size-3.5" aria-hidden="true" />
       {PRIORIDAD_LABEL[prioridad]}
     </span>
@@ -163,13 +169,13 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-5 pb-10 pt-5 md:px-7">
+    <div className="mx-auto w-full max-w-content px-stack py-section md:px-section">
       {/* breadcrumb */}
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList className="text-[13px]">
+      <Breadcrumb className="mb-stack">
+        <BreadcrumbList className="type-meta">
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href="/dashboard/projects/mine" className="text-tertiary hover:text-on-surface">
+              <Link href="/dashboard/projects/mine" className="text-text-secondary hover:text-text-primary">
                 Mis proyectos
               </Link>
             </BreadcrumbLink>
@@ -179,7 +185,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
             <BreadcrumbLink asChild>
               <Link
                 href={`/dashboard/projects/${idProyecto}/kanban`}
-                className="max-w-[16rem] truncate text-tertiary hover:text-on-surface"
+                className="max-w-64 truncate text-text-secondary hover:text-text-primary"
               >
                 {proyecto?.tituloProyecto ?? 'Proyecto'}
               </Link>
@@ -187,22 +193,22 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage className="font-medium text-on-surface">Lista de tareas</BreadcrumbPage>
+            <BreadcrumbPage className="font-medium text-text-primary">Lista de tareas</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       {/* encabezado */}
-      <div className="mb-4 flex flex-col gap-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:flex-row md:items-start md:justify-between md:p-6">
-        <div className="min-w-0 space-y-1">
+      <div className="card-base mb-stack flex flex-col gap-stack md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 space-y-micro">
           {isLoadingProyecto ? (
             <Skeleton className="h-8 w-64" />
           ) : (
-            <h1 className="line-clamp-2 text-2xl font-bold leading-tight text-on-surface md:text-[28px]">
+            <h1 className="type-display line-clamp-2 text-text-primary">
               {proyecto?.tituloProyecto ?? 'Proyecto'}
             </h1>
           )}
-          <p className="text-sm text-tertiary">
+          <p className="type-body text-text-secondary">
             Vista de solo lectura de todas las tareas del proyecto. Para editar, abre el Kanban.
           </p>
         </div>
@@ -211,7 +217,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
           asChild
           variant="outline"
           size="sm"
-          className="shrink-0 gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
+          className="shrink-0 border-outline-variant"
         >
           <Link href={`/dashboard/projects/${idProyecto}/kanban`}>
             <ArrowLeft className="size-3.5" aria-hidden="true" />
@@ -221,11 +227,11 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
       </div>
 
       {/* toolbar + tabla + paginación */}
-      <div className="min-h-0 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm md:p-5">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+      <div className="card-base min-h-0">
+        <div className="mb-stack flex flex-col gap-inline lg:flex-row lg:flex-wrap lg:items-center">
           <div className="relative w-full lg:max-w-xs">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tertiary"
+              className="pointer-events-none absolute left-inline top-1/2 size-4 -translate-y-1/2 text-text-secondary"
               aria-hidden="true"
             />
             <Input
@@ -233,14 +239,14 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
               onChange={(e) => actualizarBusqueda(e.target.value)}
               placeholder="Buscar por título o descripción..."
               aria-label="Buscar tareas por título o descripción"
-              className="rounded-xl border-outline-variant/30 bg-surface-container-low pl-9 text-sm"
+              className="rounded-control border-outline-variant bg-page pl-9 text-body"
             />
           </div>
 
           <Select value={estadoFiltro} onValueChange={actualizarEstado}>
             <SelectTrigger
               aria-label="Filtrar por estado"
-              className="w-full rounded-xl border-outline-variant/30 bg-surface-container-low text-sm lg:w-44"
+              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-44"
             >
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
@@ -257,7 +263,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
           <Select value={prioridadFiltro} onValueChange={actualizarPrioridad}>
             <SelectTrigger
               aria-label="Filtrar por prioridad"
-              className="w-full rounded-xl border-outline-variant/30 bg-surface-container-low text-sm lg:w-44"
+              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-44"
             >
               <SelectValue placeholder="Prioridad" />
             </SelectTrigger>
@@ -274,7 +280,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
           <Select value={ordenValor} onValueChange={actualizarOrden}>
             <SelectTrigger
               aria-label="Ordenar tareas"
-              className="w-full rounded-xl border-outline-variant/30 bg-surface-container-low text-sm lg:w-64"
+              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-64"
             >
               <SelectValue placeholder="Ordenar" />
             </SelectTrigger>
@@ -293,7 +299,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
               variant="ghost"
               size="sm"
               onClick={limpiarFiltros}
-              className="text-xs font-semibold text-primary lg:ml-auto"
+              className="font-medium text-primary lg:ml-auto"
             >
               Limpiar filtros
             </Button>
@@ -301,12 +307,12 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
         </div>
 
         {/* contador de resultados */}
-        <div className="mb-3 flex items-center gap-2" aria-live="polite" role="status">
-          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+        <div className="mb-inline flex items-center gap-tight" aria-live="polite" role="status">
+          <span className="pill pill-accent">
             {tareasFiltradas.length} {tareasFiltradas.length === 1 ? 'resultado' : 'resultados'}
           </span>
           {hayFiltrosActivos && (
-            <span className="text-xs text-tertiary">de {tasks.length} tareas en total</span>
+            <span className="type-meta">de {tasks.length} tareas en total</span>
           )}
         </div>
 
@@ -386,7 +392,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
               <TableBody>
                 {paginado.items.map((tarea) => (
                   <TableRow key={tarea.idTarea}>
-                    <TableCell className="max-w-[22rem] whitespace-normal font-medium text-on-surface">
+                    <TableCell className="max-w-sm whitespace-normal font-medium text-text-primary">
                       {tarea.tituloTarea}
                     </TableCell>
                     <TableCell>
@@ -395,21 +401,21 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                     <TableCell>
                       <PrioridadBadge prioridad={tarea.prioridad} />
                     </TableCell>
-                    <TableCell className="text-tertiary">{formatFecha(tarea.fechaLimite)}</TableCell>
-                    <TableCell className="text-tertiary">
+                    <TableCell className="text-text-secondary">{formatFecha(tarea.fechaLimite)}</TableCell>
+                    <TableCell className="text-text-secondary">
                       {tarea.asignacionActiva
                         ? `${tarea.asignacionActiva.usuario.nombre} ${tarea.asignacionActiva.usuario.apellido}`
                         : 'Sin asignar'}
                     </TableCell>
                     <TableCell>
                       {tarea.etiquetas.length === 0 ? (
-                        <span className="text-tertiary">—</span>
+                        <span className="text-text-secondary">—</span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
                           {tarea.etiquetas.map((etiqueta) => (
                             <span
                               key={etiqueta.idEtiqueta}
-                              className="inline-flex items-center rounded-full border border-outline-variant/30 px-2 py-0.5 text-[10px] font-medium text-on-surface-variant"
+                              className="pill pill-neutral"
                             >
                               {etiqueta.nombreEtiqueta}
                             </span>
@@ -425,7 +431,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
             {/* paginación */}
             <nav
               aria-label="Paginación de tareas"
-              className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-3"
+              className="mt-stack flex items-center justify-between gap-inline border-t border-outline-variant pt-inline"
             >
               <Button
                 type="button"
@@ -437,7 +443,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
               >
                 Anterior
               </Button>
-              <span className="text-xs font-medium text-tertiary" aria-live="polite">
+              <span className="type-meta font-medium" aria-live="polite">
                 Página {paginado.pagina} de {paginado.totalPaginas}
               </span>
               <Button
