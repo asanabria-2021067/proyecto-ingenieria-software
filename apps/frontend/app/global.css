@@ -173,6 +173,180 @@
   --sparkles-color: #72dc93;
 }
 
+/* HU-163: roles y escalas del sistema de diseño. Los tokens M3 anteriores
+   siguen siendo la fuente de color para claro y oscuro. */
+@theme {
+  --text-display: 2rem;
+  --text-display--line-height: 2.5rem;
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.02em;
+
+  --text-section: 1.25rem;
+  --text-section--line-height: 1.75rem;
+  --text-section--font-weight: 600;
+  --text-section--letter-spacing: -0.01em;
+
+  --text-subtitle: 1rem;
+  --text-subtitle--line-height: 1.5rem;
+  --text-subtitle--font-weight: 500;
+
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5rem;
+  --text-body--font-weight: 400;
+
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.125rem;
+  --text-meta--font-weight: 400;
+
+  --spacing-micro: 0.25rem;
+  --spacing-tight: 0.5rem;
+  --spacing-inline: 0.75rem;
+  --spacing-stack: 1rem;
+  --spacing-gap: 1rem;
+  --spacing-card: 1.5rem;
+  --spacing-grid: 1.5rem;
+  --spacing-section: 2rem;
+  --spacing-page: 3rem;
+
+  --radius-card: 1rem;
+  --radius-control: 0.75rem;
+  --radius-pill: 9999px;
+
+  --shadow-card:
+    0 1px 2px color-mix(in srgb, var(--color-on-surface) 4%, transparent),
+    0 8px 24px -12px color-mix(in srgb, var(--color-on-surface) 12%, transparent);
+  --shadow-raised:
+    0 2px 4px color-mix(in srgb, var(--color-on-surface) 6%, transparent),
+    0 16px 32px -16px color-mix(in srgb, var(--color-on-surface) 18%, transparent);
+
+  --container-content: 80rem;
+  --container-prose: 42rem;
+
+  --color-accent: var(--color-secondary-container);
+  --color-on-accent: var(--color-on-secondary-fixed);
+  --color-action: var(--color-inverse-surface);
+  --color-on-action: var(--color-inverse-on-surface);
+
+  --color-text-primary: var(--color-on-surface);
+  --color-text-secondary: var(--color-on-surface-variant);
+  --color-text-disabled: color-mix(in srgb, var(--color-on-surface) 38%, transparent);
+  --color-page: var(--color-surface-container-low);
+  --color-card: var(--color-surface-container-lowest);
+
+  --color-status-success: var(--color-primary-container);
+  --color-on-status-success: var(--color-on-primary-container);
+  --color-status-warning: var(--color-secondary-container);
+  --color-on-status-warning: var(--color-on-secondary-fixed);
+  --color-status-error: var(--color-error-container);
+  --color-on-status-error: var(--color-error);
+}
+
+@layer components {
+  .type-display {
+    font-family: var(--font-family-headline);
+    font-size: var(--text-display);
+    font-weight: var(--text-display--font-weight);
+    line-height: var(--text-display--line-height);
+    letter-spacing: var(--text-display--letter-spacing);
+  }
+
+  .type-section {
+    font-family: var(--font-family-headline);
+    font-size: var(--text-section);
+    font-weight: var(--text-section--font-weight);
+    line-height: var(--text-section--line-height);
+    letter-spacing: var(--text-section--letter-spacing);
+  }
+
+  .type-subtitle {
+    font-family: var(--font-family-body);
+    font-size: var(--text-subtitle);
+    font-weight: var(--text-subtitle--font-weight);
+    line-height: var(--text-subtitle--line-height);
+  }
+
+  .type-body {
+    font-family: var(--font-family-body);
+    font-size: var(--text-body);
+    font-weight: var(--text-body--font-weight);
+    line-height: var(--text-body--line-height);
+  }
+
+  .type-meta {
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-body);
+    font-size: var(--text-meta);
+    font-weight: var(--text-meta--font-weight);
+    line-height: var(--text-meta--line-height);
+  }
+
+  .card-base {
+    background: var(--color-card);
+    border: 1px solid color-mix(in srgb, var(--color-outline-variant) 45%, transparent);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: var(--spacing-card);
+  }
+
+  .pill {
+    align-items: center;
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    font-size: var(--text-meta);
+    font-weight: 500;
+    gap: var(--spacing-micro);
+    line-height: var(--text-meta--line-height);
+    padding: var(--spacing-micro) var(--spacing-tight);
+  }
+
+  .pill-accent {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .pill-neutral {
+    background: var(--color-surface-container-high);
+    color: var(--color-text-secondary);
+  }
+
+  .pill-success {
+    background: var(--color-status-success);
+    color: var(--color-on-status-success);
+  }
+
+  .pill-warning {
+    background: var(--color-status-warning);
+    color: var(--color-on-status-warning);
+  }
+
+  .pill-error {
+    background: var(--color-status-error);
+    color: var(--color-on-status-error);
+  }
+
+  .layout-grid {
+    display: grid;
+    gap: var(--spacing-grid);
+    grid-template-columns: minmax(0, 1fr);
+    margin-inline: auto;
+    max-width: var(--container-content);
+  }
+
+  @media (min-width: 64rem) {
+    .layout-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .layout-main {
+      grid-column: span 8 / span 8;
+    }
+
+    .layout-aside {
+      grid-column: span 4 / span 4;
+    }
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
