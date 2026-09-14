@@ -43,11 +43,12 @@ import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
-import type { ProyectoResumen } from '@/types';
+import type { ProyectoResumen, TipoProyecto } from '@/types';
 import { apiFetch } from '@/lib/api/client';
 import {
   estadoBadgeLabel,
   tipoBadgeLabel,
+  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
@@ -88,8 +89,8 @@ function HorasKpiCard({
       aria-label={titulo}
       className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden"
     >
-      <div className="relative z-10">
-        <span className="type-meta mb-micro flex items-center gap-tight uppercase tracking-wider">
+      <div className="relative z-10 flex items-start justify-between gap-tight">
+        <span className="type-meta flex items-center gap-tight uppercase tracking-wider">
           {titulo}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -104,6 +105,11 @@ function HorasKpiCard({
             <TooltipContent className="max-w-xs">{ayuda}</TooltipContent>
           </Tooltip>
         </span>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container-high text-text-secondary">
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <div className="relative z-10 mt-tight">
         {valor === null ? (
           <span className="type-subtitle block text-text-secondary">
             No disponible por ahora
@@ -122,6 +128,12 @@ function HorasKpiCard({
     </div>
   );
 }
+
+const TIPOS_ACREDITACION: TipoProyecto[] = [
+  'ACADEMICO_HORAS_BECA',
+  'ACADEMICO_EXPERIENCIA',
+  'EXTRACURRICULAR_EXTENSION',
+];
 
 const estadoColors: Record<string, string> = {
   PENDIENTE: 'pill-warning',
@@ -208,6 +220,9 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const [wizardDismissed, setWizardDismissed] = useState(false);
+  const [projectTab, setProjectTab] = useState<'destacados' | 'disponibles'>(
+    'destacados',
+  );
   const showWizard = useMemo(
     () => !wizardDismissed && !!user && isProfileIncomplete(user),
     [wizardDismissed, user],
@@ -289,17 +304,20 @@ export default function DashboardPage() {
 
       <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
         {/* Welcome */}
-        <section className="mb-section">
-          <span className="pill pill-accent mb-tight">
-            Bienvenido de vuelta
-          </span>
-          <h1 className="type-display text-text-primary">
-            Hola, {user?.nombre ?? ''}
-          </h1>
-          <p className="type-body mt-tight max-w-prose text-text-secondary">
-            Tu progreso académico este semestre. Tienes {projects.length}{' '}
-            proyectos disponibles.
-          </p>
+        <section className="relative mb-section overflow-hidden rounded-card bg-primary p-card text-on-primary shadow-card">
+          <div className="absolute -right-10 -bottom-10 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+          <div className="relative z-10 max-w-prose">
+            <span className="pill mb-tight bg-white/15 text-on-primary">
+              Bienvenido de vuelta
+            </span>
+            <h1 className="type-display text-on-primary">
+              Hola, {user?.nombre ?? ''}
+            </h1>
+            <p className="type-body mt-tight text-on-primary/80">
+              Tu progreso académico este semestre. Tienes {projects.length}{' '}
+              proyectos disponibles listos para postularte hoy.
+            </p>
+          </div>
         </section>
 
         {/* Stats */}
@@ -310,76 +328,79 @@ export default function DashboardPage() {
           {/* Horas Beca */}
           {requiereHorasBeca && (
             <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
-              <div className="relative z-10">
-                <span className="type-meta mb-micro block uppercase tracking-wider">
+              <div className="relative z-10 flex items-start justify-between gap-tight">
+                <span className="type-meta uppercase tracking-wider">
                   Horas Beca Acumuladas
                 </span>
-                <div className="flex items-baseline gap-tight">
-                  <span className="type-section text-text-primary">
-                    {horasBeca}
-                  </span>
-                  <span className="type-body text-text-secondary">
-                    / {horasBecaRequeridas}
-                  </span>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-primary-container/15 text-primary">
+                  <GraduationCap className="h-4 w-4" />
                 </div>
               </div>
-              <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-highest">
+              <div className="relative z-10 mt-tight flex items-baseline gap-tight">
+                <span className="type-section text-text-primary">
+                  {horasBeca}
+                </span>
+                <span className="type-body text-text-secondary">
+                  / {horasBecaRequeridas}
+                </span>
+              </div>
+              <div className="relative z-10 mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-highest">
                 <div
                   className="h-full rounded-pill bg-accent"
                   style={{ width: `${progressBeca}%` }}
                 />
               </div>
-              <div className="absolute -bottom-stack -right-stack text-text-secondary/10">
-                <GraduationCap className="h-16 w-16" />
-              </div>
+              <GraduationCap className="absolute -bottom-stack -right-stack h-20 w-20 text-text-secondary/10" />
             </div>
           )}
 
           {/* Horas Extension */}
           {requiereHorasExtension && (
             <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
-              <div className="relative z-10">
-                <span className="type-meta mb-micro block uppercase tracking-wider">
+              <div className="relative z-10 flex items-start justify-between gap-tight">
+                <span className="type-meta uppercase tracking-wider">
                   Horas de Extension
                 </span>
-                <div className="flex items-baseline gap-tight">
-                  <span className="type-section text-text-primary">
-                    {horasExtension}
-                  </span>
-                  <span className="type-body text-text-secondary">
-                    / {horasExtensionRequeridas}
-                  </span>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-secondary-container/40 text-secondary">
+                  <HeartHandshake className="h-4 w-4" />
                 </div>
               </div>
-              <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-highest">
+              <div className="relative z-10 mt-tight flex items-baseline gap-tight">
+                <span className="type-section text-text-primary">
+                  {horasExtension}
+                </span>
+                <span className="type-body text-text-secondary">
+                  / {horasExtensionRequeridas}
+                </span>
+              </div>
+              <div className="relative z-10 mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-highest">
                 <div
                   className="h-full rounded-pill bg-accent"
                   style={{ width: `${progressExtension}%` }}
                 />
               </div>
-              <div className="absolute -bottom-stack -right-stack text-text-secondary/10">
-                <HeartHandshake className="h-16 w-16" />
-              </div>
+              <HeartHandshake className="absolute -bottom-stack -right-stack h-20 w-20 text-text-secondary/10" />
             </div>
           )}
 
           {/* Proyectos Activos */}
           <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
-            <div className="relative z-10">
-              <span className="type-meta mb-micro block uppercase tracking-wider">
+            <div className="relative z-10 flex items-start justify-between gap-tight">
+              <span className="type-meta uppercase tracking-wider">
                 Proyectos Activos
               </span>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container-high text-text-secondary">
+                <Zap className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="relative z-10 mt-tight">
               <span className="type-section text-text-primary">
                 {String(proyectosActivos).padStart(2, '0')}
               </span>
             </div>
-            <div className="relative z-10 flex gap-tight">
-              <div className="flex h-10 w-10 items-center justify-center rounded-control bg-surface-container-high">
-                <Zap className="h-5 w-5 text-text-secondary" />
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-control bg-surface-container-high">
-                <Calendar className="h-5 w-5 text-text-secondary" />
-              </div>
+            <div className="relative z-10 mt-stack flex items-center gap-tight type-meta">
+              <Calendar className="h-3.5 w-3.5" />
+              <span>En curso actual</span>
             </div>
             <Zap className="absolute -bottom-stack -right-stack h-20 w-20 text-text-secondary/10" />
           </div>
@@ -425,15 +446,57 @@ export default function DashboardPage() {
 
         <div className="layout-grid">
           <div className="layout-main space-y-section">
-            {/* Featured Projects */}
-            {featured.length > 0 && (
-              <section>
-                <div className="mb-card flex items-end justify-between gap-stack">
-                  <div>
-                    <h2 className="type-section">Proyectos Destacados</h2>
-                    <p className="type-body text-text-secondary">
-                      Los proyectos más populares con más postulaciones
-                    </p>
+            {/* Projects: Destacados / Disponibles */}
+            <section id="proyectos-catalogo">
+              <div className="mb-card flex flex-wrap items-center justify-between gap-stack">
+                <div>
+                  <h2 className="type-section">Proyectos</h2>
+                  <p className="type-body text-text-secondary">
+                    Explora convocatorias académicas y de extensión disponibles
+                  </p>
+                </div>
+                <div className="flex items-center gap-tight">
+                  <div className="flex items-center gap-tight rounded-pill bg-surface-container p-micro">
+                    <button
+                      type="button"
+                      onClick={() => setProjectTab('destacados')}
+                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${
+                        projectTab === 'destacados'
+                          ? 'bg-primary text-on-primary'
+                          : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      Destacados
+                      <span
+                        className={`rounded-pill px-tight text-[10px] font-bold ${
+                          projectTab === 'destacados'
+                            ? 'bg-white/20'
+                            : 'bg-surface-container-high'
+                        }`}
+                      >
+                        {featured.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProjectTab('disponibles')}
+                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${
+                        projectTab === 'disponibles'
+                          ? 'bg-primary text-on-primary'
+                          : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      Disponibles
+                      <span
+                        className={`rounded-pill px-tight text-[10px] font-bold ${
+                          projectTab === 'disponibles'
+                            ? 'bg-white/20'
+                            : 'bg-surface-container-high'
+                        }`}
+                      >
+                        {projects.length}
+                      </span>
+                    </button>
                   </div>
                   <Link
                     href="/dashboard/proyectos"
@@ -442,58 +505,67 @@ export default function DashboardPage() {
                     Ver todos
                   </Link>
                 </div>
+              </div>
+
+              {projectTab === 'destacados' ? (
                 <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
                   {featured.slice(0, 4).map((p) => (
                     <DashboardProjectCard key={p.idProyecto} project={p} />
                   ))}
+                  {featured.length === 0 && (
+                    <div className="col-span-2">
+                      <Empty
+                        tone="muted"
+                        className="surface-enter"
+                        aria-live="polite"
+                      >
+                        <EmptyMedia variant="compact">
+                          <FolderOpen aria-hidden="true" className="h-6 w-6" />
+                        </EmptyMedia>
+                        <EmptyHeader>
+                          <EmptyTitle className="type-subtitle">
+                            No hay proyectos destacados
+                          </EmptyTitle>
+                          <EmptyDescription>
+                            Aun no hay proyectos con suficientes postulaciones
+                            para destacar.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                        <EmptySteps />
+                      </Empty>
+                    </div>
+                  )}
                 </div>
-              </section>
-            )}
-
-            {/* Recommended Projects */}
-            <section>
-              <div className="mb-card flex items-end justify-between gap-stack">
-                <div>
-                  <h2 className="type-section">Proyectos Disponibles</h2>
-                  <p className="type-body text-text-secondary">
-                    Proyectos publicados recientemente
-                  </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
+                  {projects.map((p) => (
+                    <DashboardProjectCard key={p.idProyecto} project={p} />
+                  ))}
+                  {projects.length === 0 && (
+                    <div className="col-span-2">
+                      <Empty
+                        tone="muted"
+                        className="surface-enter"
+                        aria-live="polite"
+                      >
+                        <EmptyMedia variant="compact">
+                          <FolderOpen aria-hidden="true" className="h-6 w-6" />
+                        </EmptyMedia>
+                        <EmptyHeader>
+                          <EmptyTitle className="type-subtitle">
+                            No hay proyectos disponibles
+                          </EmptyTitle>
+                          <EmptyDescription>
+                            Cuando se publiquen nuevas oportunidades, apareceran
+                            aqui para que puedas revisarlas rapido.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                        <EmptySteps />
+                      </Empty>
+                    </div>
+                  )}
                 </div>
-                <Link
-                  href="/dashboard/proyectos"
-                  className="type-body font-medium text-primary hover:underline"
-                >
-                  Ver todos
-                </Link>
-              </div>
-              <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
-                {projects.map((p) => (
-                  <DashboardProjectCard key={p.idProyecto} project={p} />
-                ))}
-                {projects.length === 0 && (
-                  <div className="col-span-2">
-                    <Empty
-                      tone="muted"
-                      className="surface-enter"
-                      aria-live="polite"
-                    >
-                      <EmptyMedia variant="compact">
-                        <FolderOpen aria-hidden="true" className="h-6 w-6" />
-                      </EmptyMedia>
-                      <EmptyHeader>
-                        <EmptyTitle className="type-subtitle">
-                          No hay proyectos disponibles
-                        </EmptyTitle>
-                        <EmptyDescription>
-                          Cuando se publiquen nuevas oportunidades, apareceran
-                          aqui para que puedas revisarlas rapido.
-                        </EmptyDescription>
-                      </EmptyHeader>
-                      <EmptySteps />
-                    </Empty>
-                  </div>
-                )}
-              </div>
+              )}
             </section>
 
             {/* Applications Status */}
@@ -632,6 +704,25 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Tipos de Acreditacion */}
+            <div className="card-base">
+              <h4 className="type-subtitle mb-stack text-text-primary">
+                Tipos de Acreditación
+              </h4>
+              <ul className="space-y-tight">
+                {TIPOS_ACREDITACION.map((tipo) => (
+                  <li
+                    key={tipo}
+                    className="flex items-center justify-between rounded-control p-tight hover:bg-surface-container transition-colors"
+                  >
+                    <span className={`pill ${tipoBadgeStyle(tipo)}`}>
+                      {tipoBadgeLabel(tipo)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </aside>
         </div>
