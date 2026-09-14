@@ -11,6 +11,7 @@ import {
   Briefcase,
   FileText,
   ListChecks,
+  CalendarDays,
   RotateCcw,
   Users,
 } from 'lucide-react';
@@ -63,6 +64,11 @@ const navEntries: NavEntry[] = [
     icon: ListChecks,
     items: [
       { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
+      {
+        href: '/dashboard/calendario',
+        label: 'Calendario',
+        icon: CalendarDays,
+      },
       {
         href: '/dashboard/mis-postulaciones',
         label: 'Mis Postulaciones',
