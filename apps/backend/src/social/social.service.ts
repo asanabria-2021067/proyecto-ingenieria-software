@@ -345,7 +345,12 @@ export class SocialService {
       throw new BadRequestException('La búsqueda requiere al menos 2 caracteres');
     }
 
-    const condiciones: Prisma.UsuarioWhereInput[] = [{ idUsuario: { not: idUsuario } }];
+    const condiciones: Prisma.UsuarioWhereInput[] = [
+      { idUsuario: { not: idUsuario } },
+      // El directorio de personas es entre estudiantes: los administradores
+      // no aparecen como resultado de búsqueda ni como sugerencia.
+      { rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } } },
+    ];
 
     if (query) {
       condiciones.push({
