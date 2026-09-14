@@ -118,11 +118,11 @@ function FilaPersona({
         }
       }}
       aria-label={`Ver detalle de ${nombreCompleto}`}
-      className={`group flex w-full cursor-pointer items-center gap-inline rounded-control px-inline py-tight text-left transition-colors hover:bg-muted ${activa ? 'bg-muted' : ''}`}
+      className={`card-base group flex w-full cursor-pointer items-center gap-inline text-left transition-colors hover:bg-muted ${activa ? 'bg-muted' : ''}`}
     >
-      <Avatar className="shrink-0">
+      <Avatar className="size-12 shrink-0">
         {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
-        <AvatarFallback className="type-meta font-medium text-text-secondary">
+        <AvatarFallback className="type-subtitle font-medium text-text-secondary">
           {getIniciales(usuario.nombre, usuario.apellido)}
         </AvatarFallback>
       </Avatar>
@@ -357,119 +357,117 @@ export default function PersonasPage() {
 
       <div className="layout-grid">
         <main className="layout-main">
-          <div className="card-base">
-            <div className="flex items-center gap-inline">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
-                <Input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar por nombre o apellido"
-                  className="pl-9"
-                  aria-label="Buscar personas"
-                />
-              </div>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-tight">
-                    <SlidersHorizontal className="size-4" aria-hidden="true" />
-                    Filtros
-                    {totalFiltros > 0 && <span className="pill pill-accent">{totalFiltros}</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-80">
-                  {[
-                    { titulo: 'Habilidades', lista: habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad })), sel: habilidadesSel, toggle: toggleHabilidad },
-                    { titulo: 'Intereses', lista: intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres })), sel: interesesSel, toggle: toggleInteres },
-                  ].map(({ titulo, lista, sel, toggle }) =>
-                    lista.length > 0 ? (
-                      <section key={titulo} className="mb-stack last:mb-0">
-                        <h3 className="type-meta uppercase tracking-wide">{titulo}</h3>
-                        <div className="mt-tight flex flex-wrap gap-tight">
-                          {lista.map((opcion) => (
-                            <button
-                              key={opcion.id}
-                              type="button"
-                              aria-pressed={sel.includes(opcion.id)}
-                              onClick={() => toggle(opcion.id)}
-                              className={`pill ${sel.includes(opcion.id) ? 'pill-accent' : 'pill-neutral'}`}
-                            >
-                              {opcion.nombre}
-                            </button>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null,
-                  )}
-                </PopoverContent>
-              </Popover>
+          <div className="flex items-center gap-inline">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar por nombre o apellido"
+                className="pl-9"
+                aria-label="Buscar personas"
+              />
             </div>
 
-            <Tabs value={pestana} onValueChange={(v) => setPestana(v as PestanaId)} className="mt-stack">
-              <TabsList className="w-full justify-start gap-1 bg-transparent p-0">
-                {PESTANAS.map((p) => (
-                  <TabsTrigger
-                    key={p.id}
-                    value={p.id}
-                    className="rounded-pill data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none"
-                  >
-                    {p.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-
-              <TabsContent value={pestana} className="mt-stack">
-                {isLoading ? (
-                  <ListaSkeleton />
-                ) : resultados.length === 0 ? (
-                  <Empty tone="muted" aria-live="polite">
-                    <EmptyMedia variant="compact">
-                      <Users aria-hidden="true" className="size-6" />
-                    </EmptyMedia>
-                    <EmptyHeader>
-                      <EmptyTitle className="type-subtitle">{vacio.titulo}</EmptyTitle>
-                      <EmptyDescription>{vacio.descripcion}</EmptyDescription>
-                    </EmptyHeader>
-                    {totalFiltros > 0 && (
-                      <EmptyContent>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setHabilidadesSel([]);
-                            setInteresesSel([]);
-                          }}
-                        >
-                          Quitar filtros
-                        </Button>
-                      </EmptyContent>
-                    )}
-                  </Empty>
-                ) : (
-                  <>
-                    <ul className="grid gap-tight md:grid-cols-2 xl:grid-cols-3">
-                      {resultados.map((usuario) => (
-                        <li key={usuario.idUsuario}>
-                          <FilaPersona
-                            usuario={usuario}
-                            activa={seleccionado?.idUsuario === usuario.idUsuario}
-                            onSeleccionar={setSeleccionado}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                    {hasMore && (
-                      <div className="mt-stack flex justify-center">
-                        <Button variant="outline" onClick={cargarMas} disabled={cargandoMas}>
-                          {cargandoMas ? 'Cargando…' : 'Cargar más'}
-                        </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-tight">
+                  <SlidersHorizontal className="size-4" aria-hidden="true" />
+                  Filtros
+                  {totalFiltros > 0 && <span className="pill pill-accent">{totalFiltros}</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80">
+                {[
+                  { titulo: 'Habilidades', lista: habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad })), sel: habilidadesSel, toggle: toggleHabilidad },
+                  { titulo: 'Intereses', lista: intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres })), sel: interesesSel, toggle: toggleInteres },
+                ].map(({ titulo, lista, sel, toggle }) =>
+                  lista.length > 0 ? (
+                    <section key={titulo} className="mb-stack last:mb-0">
+                      <h3 className="type-meta uppercase tracking-wide">{titulo}</h3>
+                      <div className="mt-tight flex flex-wrap gap-tight">
+                        {lista.map((opcion) => (
+                          <button
+                            key={opcion.id}
+                            type="button"
+                            aria-pressed={sel.includes(opcion.id)}
+                            onClick={() => toggle(opcion.id)}
+                            className={`pill ${sel.includes(opcion.id) ? 'pill-accent' : 'pill-neutral'}`}
+                          >
+                            {opcion.nombre}
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  </>
+                    </section>
+                  ) : null,
                 )}
-              </TabsContent>
-            </Tabs>
+              </PopoverContent>
+            </Popover>
           </div>
+
+          <Tabs value={pestana} onValueChange={(v) => setPestana(v as PestanaId)} className="mt-card">
+            <TabsList className="w-full justify-start gap-1 border-b border-outline-variant bg-transparent p-0 pb-tight">
+              {PESTANAS.map((p) => (
+                <TabsTrigger
+                  key={p.id}
+                  value={p.id}
+                  className="rounded-pill data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none"
+                >
+                  {p.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <TabsContent value={pestana} className="mt-card">
+              {isLoading ? (
+                <ListaSkeleton />
+              ) : resultados.length === 0 ? (
+                <Empty tone="muted" aria-live="polite">
+                  <EmptyMedia variant="compact">
+                    <Users aria-hidden="true" className="size-6" />
+                  </EmptyMedia>
+                  <EmptyHeader>
+                    <EmptyTitle className="type-subtitle">{vacio.titulo}</EmptyTitle>
+                    <EmptyDescription>{vacio.descripcion}</EmptyDescription>
+                  </EmptyHeader>
+                  {totalFiltros > 0 && (
+                    <EmptyContent>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setHabilidadesSel([]);
+                          setInteresesSel([]);
+                        }}
+                      >
+                        Quitar filtros
+                      </Button>
+                    </EmptyContent>
+                  )}
+                </Empty>
+              ) : (
+                <>
+                  <ul className="grid gap-gap md:grid-cols-2 xl:grid-cols-3">
+                    {resultados.map((usuario) => (
+                      <li key={usuario.idUsuario}>
+                        <FilaPersona
+                          usuario={usuario}
+                          activa={seleccionado?.idUsuario === usuario.idUsuario}
+                          onSeleccionar={setSeleccionado}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                  {hasMore && (
+                    <div className="mt-card flex justify-center">
+                      <Button variant="outline" onClick={cargarMas} disabled={cargandoMas}>
+                        {cargandoMas ? 'Cargando…' : 'Cargar más'}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
         </main>
 
         {seleccionado ? <PanelDetalleConPersona usuario={seleccionado} /> : <PanelDetalleVacio />}
