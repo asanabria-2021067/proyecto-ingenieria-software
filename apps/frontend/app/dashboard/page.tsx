@@ -109,9 +109,8 @@ function HorasKpiCard({
           </Tooltip>
         </span>
         <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-on-primary ${
-            estadoTone === 'warning' ? 'bg-amber-400/30' : 'bg-emerald-400/30'
-          }`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-on-primary ${estadoTone === 'warning' ? 'bg-amber-400/30' : 'bg-emerald-400/30'
+            }`}
         >
           <Icon className="h-4 w-4" />
         </div>
@@ -130,9 +129,8 @@ function HorasKpiCard({
       </div>
       <span className="type-meta relative z-10 mt-stack flex items-center gap-tight font-medium text-on-primary/80">
         <span
-          className={`h-1.5 w-1.5 shrink-0 rounded-pill ${
-            estadoTone === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'
-          }`}
+          className={`h-1.5 w-1.5 shrink-0 rounded-pill ${estadoTone === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'
+            }`}
           aria-hidden="true"
         />
         {estadoLabel}
@@ -390,17 +388,17 @@ export default function DashboardPage() {
     horasExtensionRequeridas !== null && horasExtensionRequeridas > 0;
   const progressBeca = requiereHorasBeca
     ? Math.min(
-        100,
-        Math.round((horasBeca / (horasBecaRequeridas as number)) * 100),
-      )
+      100,
+      Math.round((horasBeca / (horasBecaRequeridas as number)) * 100),
+    )
     : 0;
   const progressExtension = requiereHorasExtension
     ? Math.min(
-        100,
-        Math.round(
-          (horasExtension / (horasExtensionRequeridas as number)) * 100,
-        ),
-      )
+      100,
+      Math.round(
+        (horasExtension / (horasExtensionRequeridas as number)) * 100,
+      ),
+    )
     : 0;
 
   return (
@@ -543,7 +541,7 @@ export default function DashboardPage() {
             <div className="mb-card flex flex-wrap items-center justify-between gap-stack">
               <h2 className="type-section">Proyectos de tus amigos</h2>
             </div>
-            <div className="grid grid-cols-1 gap-gap md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
               {proyectosDeAmigos.map((p) => (
                 <SocialProjectCard key={p.idProyecto} proyecto={p} />
               ))}
@@ -558,12 +556,6 @@ export default function DashboardPage() {
                 <h2 className="type-section">De personas que sigues</h2>
                 <span className="pill pill-neutral">Actividad reciente</span>
               </div>
-              <Link
-                href="/dashboard/personas"
-                className="type-body font-medium text-primary hover:underline"
-              >
-                Ver red
-              </Link>
             </div>
             <div className="grid grid-cols-1 gap-gap md:grid-cols-3">
               {proyectosDeSeguidos.map((p) => (
@@ -589,19 +581,17 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => setProjectTab('destacados')}
-                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${
-                        projectTab === 'destacados'
-                          ? 'bg-primary text-on-primary'
-                          : 'text-text-secondary hover:text-text-primary'
-                      }`}
+                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${projectTab === 'destacados'
+                        ? 'bg-primary text-on-primary'
+                        : 'text-text-secondary hover:text-text-primary'
+                        }`}
                     >
                       Destacados
                       <span
-                        className={`rounded-pill px-tight text-[10px] font-bold ${
-                          projectTab === 'destacados'
-                            ? 'bg-white/20'
-                            : 'bg-surface-container-high'
-                        }`}
+                        className={`rounded-pill px-tight text-[10px] font-bold ${projectTab === 'destacados'
+                          ? 'bg-white/20'
+                          : 'bg-surface-container-high'
+                          }`}
                       >
                         {featured.length}
                       </span>
@@ -609,19 +599,17 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => setProjectTab('disponibles')}
-                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${
-                        projectTab === 'disponibles'
-                          ? 'bg-primary text-on-primary'
-                          : 'text-text-secondary hover:text-text-primary'
-                      }`}
+                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${projectTab === 'disponibles'
+                        ? 'bg-primary text-on-primary'
+                        : 'text-text-secondary hover:text-text-primary'
+                        }`}
                     >
                       Disponibles
                       <span
-                        className={`rounded-pill px-tight text-[10px] font-bold ${
-                          projectTab === 'disponibles'
-                            ? 'bg-white/20'
-                            : 'bg-surface-container-high'
-                        }`}
+                        className={`rounded-pill px-tight text-[10px] font-bold ${projectTab === 'disponibles'
+                          ? 'bg-white/20'
+                          : 'bg-surface-container-high'
+                          }`}
                       >
                         {projects.length}
                       </span>
