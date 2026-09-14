@@ -140,13 +140,13 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="fixed inset-0 flex items-start gap-3 overflow-hidden overscroll-none bg-page p-3 md:gap-4 md:p-4">
+    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-page">
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
       </a>
 
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden h-full w-[231px] shrink-0 flex-col overflow-y-auto overscroll-contain rounded-3xl border border-outline-variant bg-card shadow-card md:flex">
+      <aside className="hidden h-full w-[231px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex">
         <div className="flex items-center gap-inline border-b border-outline-variant px-card py-stack">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
           <span className="type-section text-text-primary">UVGenius</span>
@@ -163,10 +163,10 @@ export default function DashboardLayout({
       <main
         id="dashboard-main"
         tabIndex={-1}
-        className="flex h-full min-w-0 flex-1 flex-col gap-3 overflow-hidden bg-page focus:outline-none md:gap-4"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page focus:outline-none"
       >
         {/* Top Header Bar */}
-        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline rounded-3xl border border-outline-variant bg-card px-stack shadow-card md:px-section">
+        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:px-section">
           <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
             <div className="flex items-center gap-tight md:hidden">
