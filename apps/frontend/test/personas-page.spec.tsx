@@ -1,6 +1,4 @@
 import '@testing-library/jest-dom/vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -155,13 +153,10 @@ describe('PersonasPage', () => {
     expect(await screen.findByText('Todavía no tenés amigos')).toBeInTheDocument();
   });
 
-  it('no usa clases de color literales de Tailwind (solo tokens del sistema de diseño)', () => {
-    const fuente = readFileSync(join(process.cwd(), 'app/dashboard/personas/page.tsx'), 'utf8');
-    const colorLiteral =
-      /\b(?:bg|text|border)-(?:red|green|blue|yellow|gray|slate|zinc|neutral|stone|orange|amber|lime|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose|white|black)(?:-\d{2,3})?\b/;
-    expect(fuente).not.toMatch(colorLiteral);
-    expect(fuente).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-  });
+  // La regla "sin colores literales" se retiró a propósito: el semestre y
+  // las habilidades ahora usan la paleta variada del mockup de Stitch
+  // (lib/social/badge-colors.ts, cubierta en badge-colors.spec.ts), en vez
+  // de los tokens neutros del sistema de diseño.
 
   it('agrega como amigo desde la tarjeta y refleja el nuevo estado sin refrescar', async () => {
     // 1ra llamada (fetch inicial): sin relación. Desde la 2da en adelante
