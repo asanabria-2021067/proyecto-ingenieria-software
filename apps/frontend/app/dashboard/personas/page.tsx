@@ -1,7 +1,7 @@
 'use client';
 
 /* ===========================================================================
-   Personas — rediseño sobre los tokens de HU-163 (apps/frontend/app/global.css)
+   Personas — tarjetas al estilo del mockup de Stitch "Comunidad UVG"
    ---------------------------------------------------------------------------
    1. "Misma carrera" y "Amigos de amigos" pasan de casillas a pestañas
       (motivos de recomendación excluyentes, no filtros acumulables).
@@ -9,8 +9,10 @@
       de un botón de filtros (Popover).
    3. La lista pasa a una rejilla densa; cada pestaña es una consulta
       paginada distinta al backend, no un filtro en el navegador.
-   4. Columna lateral con el detalle de la persona seleccionada, sobre la
-      rejilla 8+4 (`layout-grid` / `layout-main` / `layout-aside`).
+   4. Semestre y habilidades usan la paleta de colores variados del mockup
+      (lib/social/badge-colors.ts) en vez de los tokens neutros del sistema
+      de diseño — pedido explícito: la variedad de color es parte del diseño.
+      "Ver perfil" lleva a /dashboard/personas/[id], no a un panel lateral.
    =========================================================================== */
 
 import { useState } from 'react';
@@ -48,6 +50,7 @@ import {
   useSolicitudesAmistadPendientes,
 } from '@/hooks/use-social';
 import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
+import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import type { UsuarioBusquedaDto } from '@/lib/types/social';
 
 type PestanaId = 'todos' | 'amigos-de-amigos' | 'mi-carrera' | 'mis-amigos';
@@ -109,11 +112,19 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
 
       <div className="flex items-center justify-between gap-tight">
         {usuario.semestre != null ? (
-          <span className="pill pill-neutral">Semestre {usuario.semestre}</span>
+          <span className={`pill font-semibold ${getSemestreBadgeStyle(usuario.semestre)}`}>
+            Semestre {usuario.semestre}
+          </span>
         ) : (
           <span />
         )}
-        <Button size="sm" variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick}>
+        <Button
+          size="sm"
+          variant={amistad.variant}
+          disabled={amistad.disabled}
+          onClick={amistad.onClick}
+          className="h-7 rounded-pill px-2.5 text-[11px]"
+        >
           {amistad.label}
         </Button>
       </div>
@@ -122,7 +133,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
         <div className="flex flex-wrap gap-tight">
           {motivo && <span className="pill pill-accent">{motivo}</span>}
           {usuario.habilidades.slice(0, 2).map((h) => (
-            <span key={h} className="pill pill-neutral">
+            <span key={h} className={`pill font-semibold ${getHabilidadBadgeStyle(h)}`}>
               {h}
             </span>
           ))}
