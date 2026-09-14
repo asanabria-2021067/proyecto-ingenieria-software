@@ -9,12 +9,15 @@ import {
   Zap,
   Clock,
   Calendar,
+  CalendarClock,
   ClipboardList,
   FolderOpen,
   Award,
   CheckCircle2,
   Info,
 } from 'lucide-react';
+import { MiniCalendar } from '@/components/calendar/mini-calendar';
+import { parseFechaSolo, toDateKey } from '@/lib/calendar/utils';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -31,7 +34,12 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
-import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
+import {
+  getDashboardStats,
+  getMisTareas,
+  type DashboardStats,
+  type MiTareaDTO,
+} from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
 import type { ProyectoResumen, TipoProyecto } from '@/types';
@@ -138,6 +146,109 @@ const TIPOS_ACREDITACION: TipoProyecto[] = [
   'ACADEMICO_EXPERIENCIA',
   'EXTRACURRICULAR_EXTENSION',
 ];
+
+function tieneFechaLimitePendiente(
+  tarea: MiTareaDTO,
+): tarea is MiTareaDTO & { fechaLimite: string } {
+  return tarea.fechaLimite !== null && tarea.estadoTarea !== 'HECHO';
+}
+
+function formatFechaEvento(fecha: Date): string {
+  const texto = fecha.toLocaleDateString('es-GT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/** Widget compacto: próxima tarea por vencer + mini calendario con los días
+ *  que tienen entregas. Comparte cache de React Query con /dashboard/mis-tareas
+ *  y /dashboard/calendario (misma queryKey 'mis-tareas'). */
+function CalendarioWidget() {
+  const { data: tareas = [] } = useQuery<MiTareaDTO[]>({
+    queryKey: ['mis-tareas'],
+    queryFn: () => getMisTareas(),
+  });
+
+  const hoy = useMemo(() => new Date(), []);
+  const hoyKey = useMemo(() => toDateKey(hoy), [hoy]);
+  const [cursor, setCursor] = useState(() => ({
+    year: hoy.getFullYear(),
+    month: hoy.getMonth(),
+  }));
+
+  const pendientes = useMemo(
+    () => tareas.filter(tieneFechaLimitePendiente),
+    [tareas],
+  );
+
+  const marcados = useMemo(
+    () =>
+      new Set(pendientes.map((t) => toDateKey(parseFechaSolo(t.fechaLimite)))),
+    [pendientes],
+  );
+
+  const proxima = useMemo(() => {
+    const futuras = pendientes
+      .filter((t) => toDateKey(parseFechaSolo(t.fechaLimite)) >= hoyKey)
+      .sort((a, b) => a.fechaLimite.localeCompare(b.fechaLimite));
+    return futuras[0] ?? null;
+  }, [pendientes, hoyKey]);
+
+  return (
+    <div className="card-base space-y-stack">
+      <h4 className="type-subtitle text-text-primary">Calendario Académico</h4>
+      <MiniCalendar
+        year={cursor.year}
+        month={cursor.month}
+        todayKey={hoyKey}
+        markedDates={marcados}
+        onPrevMonth={() =>
+          setCursor(({ year, month }) =>
+            month === 0
+              ? { year: year - 1, month: 11 }
+              : { year, month: month - 1 },
+          )
+        }
+        onNextMonth={() =>
+          setCursor(({ year, month }) =>
+            month === 11
+              ? { year: year + 1, month: 0 }
+              : { year, month: month + 1 },
+          )
+        }
+      />
+      {proxima && (
+        <Link
+          href="/dashboard/calendario"
+          className="flex items-center gap-tight rounded-control bg-surface-container p-tight transition-colors hover:bg-surface-container-high"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary">
+            <CalendarClock className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="type-meta font-semibold uppercase tracking-wider text-primary">
+              Próxima entrega
+            </p>
+            <p className="type-body truncate font-medium text-text-primary">
+              {proxima.tituloTarea}
+            </p>
+            <p className="type-meta">
+              {formatFechaEvento(parseFechaSolo(proxima.fechaLimite))}
+            </p>
+          </div>
+        </Link>
+      )}
+      <Link
+        href="/dashboard/calendario"
+        className="type-body block text-center font-medium text-primary hover:underline"
+      >
+        Ver todo
+      </Link>
+    </div>
+  );
+}
 
 const estadoColors: Record<string, string> = {
   PENDIENTE: 'pill-warning',
@@ -429,7 +540,9 @@ export default function DashboardPage() {
 
         {proyectosDeAmigos.length > 0 && (
           <section className="mb-section">
-            <h2 className="type-section mb-card">Proyectos de tus amigos</h2>
+            <div className="mb-card flex flex-wrap items-center justify-between gap-stack">
+              <h2 className="type-section">Proyectos de tus amigos</h2>
+            </div>
             <div className="grid grid-cols-1 gap-gap md:grid-cols-3">
               {proyectosDeAmigos.map((p) => (
                 <SocialProjectCard key={p.idProyecto} proyecto={p} />
@@ -587,6 +700,9 @@ export default function DashboardPage() {
 
           {/* Right Column */}
           <aside className="layout-aside space-y-gap">
+            {/* Calendario Academico */}
+            <CalendarioWidget />
+
             {/* Tipos de Acreditacion */}
             <div className="card-base">
               <h4 className="type-subtitle mb-stack text-text-primary">
