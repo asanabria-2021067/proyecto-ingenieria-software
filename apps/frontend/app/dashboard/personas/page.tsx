@@ -100,7 +100,7 @@ function FilaPersona({
 }: {
   usuario: UsuarioBusquedaDto;
   activa: boolean;
-  onSeleccionar: (u: UsuarioBusquedaDto) => void;
+  onSeleccionar: (idUsuario: number) => void;
 }) {
   const { amistad, seguimiento } = useAccionesAmistad(usuario);
   const motivo = textoMotivo(usuario);
@@ -110,37 +110,23 @@ function FilaPersona({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onSeleccionar(usuario)}
+      onClick={() => onSeleccionar(usuario.idUsuario)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onSeleccionar(usuario);
+          onSeleccionar(usuario.idUsuario);
         }
       }}
       aria-label={`Ver detalle de ${nombreCompleto}`}
-      className={`card-base group flex w-full cursor-pointer items-center gap-inline text-left transition-colors hover:bg-muted ${activa ? 'bg-muted' : ''}`}
+      className={`card-base group relative flex cursor-pointer flex-col items-center gap-tight py-section text-center transition-colors hover:bg-muted ${activa ? 'bg-muted' : ''}`}
     >
-      <Avatar className="size-12 shrink-0">
-        {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
-        <AvatarFallback className="type-subtitle font-medium text-text-secondary">
-          {getIniciales(usuario.nombre, usuario.apellido)}
-        </AvatarFallback>
-      </Avatar>
-
-      <div className="min-w-0 flex-1">
-        <p className="type-subtitle truncate text-text-primary">{nombreCompleto}</p>
-        {usuario.carrera && <p className="type-meta truncate">{usuario.carrera}</p>}
-      </div>
-
-      {motivo && <span className="pill pill-accent max-lg:hidden shrink-0">{motivo}</span>}
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             onClick={(e) => e.stopPropagation()}
             aria-label={`Más acciones para ${nombreCompleto}`}
-            className="shrink-0 rounded-control p-tight text-text-secondary opacity-0 transition-opacity hover:bg-surface-container-high hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
+            className="absolute right-tight top-tight rounded-control p-tight text-text-secondary opacity-0 transition-opacity hover:bg-surface-container-high hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
           >
             <MoreVertical className="size-4" aria-hidden="true" />
           </button>
@@ -154,6 +140,24 @@ function FilaPersona({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* fila 1: imagen */}
+      <Avatar className="size-20 shrink-0">
+        {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
+        <AvatarFallback className="type-section font-medium text-text-secondary">
+          {getIniciales(usuario.nombre, usuario.apellido)}
+        </AvatarFallback>
+      </Avatar>
+
+      {/* fila 2: nombre */}
+      <p className="type-subtitle text-text-primary">{nombreCompleto}</p>
+
+      {/* fila 3: badges (carrera, semestre, motivo) */}
+      <div className="flex flex-wrap items-center justify-center gap-tight">
+        {usuario.carrera && <span className="pill pill-neutral max-w-full truncate">{usuario.carrera}</span>}
+        {usuario.semestre != null && <span className="pill pill-neutral">Semestre {usuario.semestre}</span>}
+        {motivo && <span className="pill pill-accent">{motivo}</span>}
+      </div>
     </div>
   );
 }
@@ -282,7 +286,7 @@ export default function PersonasPage() {
   const [q, setQ] = useState('');
   const [habilidadesSel, setHabilidadesSel] = useState<number[]>([]);
   const [interesesSel, setInteresesSel] = useState<number[]>([]);
-  const [seleccionado, setSeleccionado] = useState<UsuarioBusquedaDto | null>(null);
+  const [seleccionadoId, setSeleccionadoId] = useState<number | null>(null);
 
   const { data: habilidades = [] } = useQuery({ queryKey: ['catalogo-habilidades'], queryFn: getHabilidades });
   const { data: intereses = [] } = useQuery({ queryKey: ['catalogo-intereses'], queryFn: getIntereses });
@@ -312,6 +316,12 @@ export default function PersonasPage() {
   }
 
   const vacio = mensajeVacio(pestana, amigos.length > 0, totalFiltros > 0);
+
+  // Derivado de `resultados`, no un snapshot propio: así el panel y el
+  // estado "activa" de la fila siguen la data fresca después de una
+  // mutación (agregar amigo, seguir, ...) en vez de quedarse con el
+  // usuario tal como estaba al momento de seleccionarlo.
+  const seleccionado = resultados.find((u) => u.idUsuario === seleccionadoId) ?? null;
 
   return (
     <div className="px-section py-page">
@@ -451,8 +461,8 @@ export default function PersonasPage() {
                       <li key={usuario.idUsuario}>
                         <FilaPersona
                           usuario={usuario}
-                          activa={seleccionado?.idUsuario === usuario.idUsuario}
-                          onSeleccionar={setSeleccionado}
+                          activa={seleccionadoId === usuario.idUsuario}
+                          onSeleccionar={setSeleccionadoId}
                         />
                       </li>
                     ))}
