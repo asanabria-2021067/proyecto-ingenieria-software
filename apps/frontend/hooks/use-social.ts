@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   amigosQueryKey,
   buscarUsuariosQueryKey,
@@ -55,20 +55,31 @@ export function useSeguidores() {
   return { seguidores: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
 }
 
-export function useBuscarUsuarios(filtros: BuscarUsuariosFiltros) {
+/**
+ * Cada pestaña de Personas es una consulta distinta al servidor, paginada
+ * (no se filtra en el navegador una lista ya cargada). Un `q` a medio
+ * escribir (1 carácter) se omite del pedido en vez de bloquear la pestaña:
+ * el backend exige 2+ caracteres para filtrar por texto.
+ */
+export function useBuscarUsuarios(filtros: Omit<BuscarUsuariosFiltros, 'page'>) {
   const q = filtros.q?.trim() ?? '';
-  const hayFiltros =
-    Boolean(filtros.carrera) ||
-    Boolean(filtros.amigosDeAmigos) ||
-    Boolean(filtros.habilidades?.length) ||
-    Boolean(filtros.intereses?.length);
-  const enabled = q.length >= 2 || hayFiltros;
-  const query = useQuery({
-    queryKey: buscarUsuariosQueryKey(filtros),
-    queryFn: () => buscarUsuarios(filtros),
-    enabled,
+  const filtrosEfectivos: Omit<BuscarUsuariosFiltros, 'page'> = { ...filtros, q: q.length >= 2 ? q : undefined };
+
+  const query = useInfiniteQuery({
+    queryKey: buscarUsuariosQueryKey(filtrosEfectivos),
+    queryFn: ({ pageParam }) => buscarUsuarios({ ...filtrosEfectivos, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length + 1 : undefined),
   });
-  return { resultados: query.data ?? [], isLoading: query.isLoading, isError: query.isError, enabled };
+
+  return {
+    resultados: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
 }
 
 export function useFeedSocial() {
