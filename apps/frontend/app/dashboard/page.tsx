@@ -12,8 +12,8 @@ import {
   ClipboardList,
   FolderOpen,
   Award,
+  CheckCircle2,
   Info,
-  NotebookPen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -65,12 +65,16 @@ function HorasKpiCard({
   titulo,
   valor,
   ayuda,
+  estadoLabel,
+  estadoTone,
   icon: Icon,
 }: {
   id: string;
   titulo: string;
   valor: string | null;
   ayuda: string;
+  estadoLabel: string;
+  estadoTone: 'warning' | 'success';
   icon: typeof Award;
 }) {
   return (
@@ -78,17 +82,17 @@ function HorasKpiCard({
       id={id}
       role="group"
       aria-label={titulo}
-      className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden"
+      className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-stack"
     >
       <div className="relative z-10 flex items-start justify-between gap-tight">
-        <span className="type-meta flex items-center gap-tight uppercase tracking-wider">
+        <span className="type-meta flex items-center gap-tight uppercase tracking-wider text-on-primary/70">
           {titulo}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 aria-label={`Qué significa: ${titulo}`}
-                className="rounded-pill text-text-secondary hover:text-text-primary"
+                className="rounded-pill text-on-primary/70 hover:text-on-primary"
               >
                 <Info className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
@@ -96,26 +100,35 @@ function HorasKpiCard({
             <TooltipContent className="max-w-xs">{ayuda}</TooltipContent>
           </Tooltip>
         </span>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container-high text-text-secondary">
+        <div
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-on-primary ${
+            estadoTone === 'warning' ? 'bg-amber-400/30' : 'bg-emerald-400/30'
+          }`}
+        >
           <Icon className="h-4 w-4" />
         </div>
       </div>
       <div className="relative z-10 mt-tight">
         {valor === null ? (
-          <span className="type-subtitle block text-text-secondary">
+          <span className="type-subtitle block text-on-primary/70">
             No disponible por ahora
           </span>
         ) : (
           <div className="flex items-baseline gap-1">
-            <span className="type-section text-text-primary">{valor}</span>
-            <span className="type-body font-medium text-text-secondary">h</span>
+            <span className="type-section text-on-primary">{valor}</span>
+            <span className="type-body font-medium text-on-primary/70">h</span>
           </div>
         )}
       </div>
-      <p className="type-meta relative z-10 mt-stack">{ayuda}</p>
-      <div className="absolute -bottom-stack -right-stack text-text-secondary/10">
-        <Icon className="h-16 w-16" />
-      </div>
+      <span className="type-meta relative z-10 mt-stack flex items-center gap-tight font-medium text-on-primary/80">
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-pill ${
+            estadoTone === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'
+          }`}
+          aria-hidden="true"
+        />
+        {estadoLabel}
+      </span>
     </div>
   );
 }
@@ -294,7 +307,7 @@ export default function DashboardPage() {
       />
 
       <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
-        {/* Welcome */}
+        {/* Welcome + Stats */}
         <section className="relative mb-section overflow-hidden rounded-card bg-primary p-card text-on-primary shadow-card">
           <div className="absolute -right-10 -bottom-10 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
           <div className="relative z-10 max-w-prose">
@@ -309,109 +322,110 @@ export default function DashboardPage() {
               proyectos disponibles listos para postularte hoy.
             </p>
           </div>
-        </section>
 
-        {/* Stats */}
-        <div
-          id="stats-container"
-          className="mb-section grid grid-cols-1 gap-gap md:grid-cols-3"
-        >
-          {/* Horas Beca */}
-          {requiereHorasBeca && (
-            <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
-              <div className="relative z-10 flex items-start justify-between gap-tight">
-                <span className="type-meta uppercase tracking-wider">
-                  Horas Beca Acumuladas
-                </span>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-primary-container/15 text-primary">
-                  <GraduationCap className="h-4 w-4" />
+          {/* Stats */}
+          <div
+            id="stats-container"
+            className="relative z-10 mt-card grid grid-cols-1 gap-gap sm:grid-cols-3"
+          >
+            {/* Horas Beca */}
+            {requiereHorasBeca && (
+              <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-stack">
+                <div className="flex items-start justify-between gap-tight">
+                  <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                    Horas Beca Acumuladas
+                  </span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-white/15 text-on-primary">
+                    <GraduationCap className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-tight flex items-baseline gap-tight">
+                  <span className="type-section text-on-primary">
+                    {horasBeca}
+                  </span>
+                  <span className="type-body text-on-primary/70">
+                    / {horasBecaRequeridas}
+                  </span>
+                </div>
+                <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-white/20">
+                  <div
+                    className="h-full rounded-pill bg-white"
+                    style={{ width: `${progressBeca}%` }}
+                  />
                 </div>
               </div>
-              <div className="relative z-10 mt-tight flex items-baseline gap-tight">
-                <span className="type-section text-text-primary">
-                  {horasBeca}
-                </span>
-                <span className="type-body text-text-secondary">
-                  / {horasBecaRequeridas}
-                </span>
-              </div>
-              <div className="relative z-10 mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-highest">
-                <div
-                  className="h-full rounded-pill bg-accent"
-                  style={{ width: `${progressBeca}%` }}
-                />
-              </div>
-              <GraduationCap className="absolute -bottom-stack -right-stack h-20 w-20 text-text-secondary/10" />
-            </div>
-          )}
+            )}
 
-          {/* Horas Extension */}
-          {requiereHorasExtension && (
-            <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
-              <div className="relative z-10 flex items-start justify-between gap-tight">
-                <span className="type-meta uppercase tracking-wider">
-                  Horas de Extension
-                </span>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-secondary-container/40 text-secondary">
-                  <HeartHandshake className="h-4 w-4" />
+            {/* Horas Extension */}
+            {requiereHorasExtension && (
+              <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-stack">
+                <div className="flex items-start justify-between gap-tight">
+                  <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                    Horas de Extension
+                  </span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-white/15 text-on-primary">
+                    <HeartHandshake className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-tight flex items-baseline gap-tight">
+                  <span className="type-section text-on-primary">
+                    {horasExtension}
+                  </span>
+                  <span className="type-body text-on-primary/70">
+                    / {horasExtensionRequeridas}
+                  </span>
+                </div>
+                <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-white/20">
+                  <div
+                    className="h-full rounded-pill bg-white"
+                    style={{ width: `${progressExtension}%` }}
+                  />
                 </div>
               </div>
-              <div className="relative z-10 mt-tight flex items-baseline gap-tight">
-                <span className="type-section text-text-primary">
-                  {horasExtension}
-                </span>
-                <span className="type-body text-text-secondary">
-                  / {horasExtensionRequeridas}
-                </span>
-              </div>
-              <div className="relative z-10 mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-highest">
-                <div
-                  className="h-full rounded-pill bg-accent"
-                  style={{ width: `${progressExtension}%` }}
-                />
-              </div>
-              <HeartHandshake className="absolute -bottom-stack -right-stack h-20 w-20 text-text-secondary/10" />
-            </div>
-          )}
+            )}
 
-          {/* Proyectos Activos */}
-          <div className="card-base relative flex min-h-40 flex-col justify-between overflow-hidden">
-            <div className="relative z-10 flex items-start justify-between gap-tight">
-              <span className="type-meta uppercase tracking-wider">
-                Proyectos Activos
-              </span>
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container-high text-text-secondary">
-                <Zap className="h-4 w-4" />
+            {/* Proyectos Activos */}
+            <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-stack">
+              <div className="flex items-start justify-between gap-tight">
+                <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                  Proyectos Activos
+                </span>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-white/15 text-on-primary">
+                  <Zap className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-tight">
+                <span className="type-section text-on-primary">
+                  {String(proyectosActivos).padStart(2, '0')}
+                </span>
+              </div>
+              <div className="type-meta mt-stack flex items-center gap-tight text-on-primary/70">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>En curso actual</span>
               </div>
             </div>
-            <div className="relative z-10 mt-tight">
-              <span className="type-section text-text-primary">
-                {String(proyectosActivos).padStart(2, '0')}
-              </span>
-            </div>
-            <div className="relative z-10 mt-stack flex items-center gap-tight type-meta">
-              <Calendar className="h-3.5 w-3.5" />
-              <span>En curso actual</span>
-            </div>
-            <Zap className="absolute -bottom-stack -right-stack h-20 w-20 text-text-secondary/10" />
+
+            {/* S7 VIEW-08: horas en proyectos abiertos vs. acreditadas (separadas) */}
+            <HorasKpiCard
+              id="stats-horas-abiertas"
+              titulo="Horas Registradas"
+              valor={horasAbiertas}
+              ayuda="Horas que registraste en proyectos aún no cerrados. Pueden cambiar hasta que el proyecto se cierre."
+              estadoLabel="Pendiente de cierre"
+              estadoTone="warning"
+              icon={Clock}
+            />
+            <HorasKpiCard
+              id="stats-horas-acreditadas"
+              titulo="Horas acreditadas"
+              valor={horasAcreditadas}
+              ayuda="Horas aprobadas por administración al cerrar tus proyectos. Ya no cambian."
+              estadoLabel="Validado oficial"
+              estadoTone="success"
+              icon={CheckCircle2}
+            />
           </div>
-
-          {/* S7 VIEW-08: horas en proyectos abiertos vs. acreditadas (separadas) */}
-          <HorasKpiCard
-            id="stats-horas-abiertas"
-            titulo="Horas Registradas"
-            valor={horasAbiertas}
-            ayuda="Horas que registraste en proyectos aún no cerrados. Pueden cambiar hasta que el proyecto se cierre."
-            icon={NotebookPen}
-          />
-          <HorasKpiCard
-            id="stats-horas-acreditadas"
-            titulo="Horas acreditadas"
-            valor={horasAcreditadas}
-            ayuda="Horas aprobadas por administración al cerrar tus proyectos. Ya no cambian."
-            icon={Award}
-          />
-        </div>
+        </section>
 
         {proyectosDeAmigos.length > 0 && (
           <section className="mb-section">
