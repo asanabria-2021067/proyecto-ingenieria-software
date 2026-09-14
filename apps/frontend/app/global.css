@@ -243,6 +243,7 @@
 
 @layer components {
   .type-display {
+    color: var(--color-text-primary);
     font-family: var(--font-family-headline);
     font-size: var(--text-display);
     font-weight: var(--text-display--font-weight);
@@ -251,6 +252,7 @@
   }
 
   .type-section {
+    color: var(--color-text-primary);
     font-family: var(--font-family-headline);
     font-size: var(--text-section);
     font-weight: var(--text-section--font-weight);
@@ -259,6 +261,7 @@
   }
 
   .type-subtitle {
+    color: var(--color-text-primary);
     font-family: var(--font-family-body);
     font-size: var(--text-subtitle);
     font-weight: var(--text-subtitle--font-weight);
@@ -266,6 +269,7 @@
   }
 
   .type-body {
+    color: var(--color-text-primary);
     font-family: var(--font-family-body);
     font-size: var(--text-body);
     font-weight: var(--text-body--font-weight);
