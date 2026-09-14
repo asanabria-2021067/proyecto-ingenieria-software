@@ -24,6 +24,9 @@ export interface UsuarioBusquedaDto extends UsuarioResumenDto {
   solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
   loSigo: boolean;
   carrera: string | null;
+  /** Motivo estructurado: el backend nunca manda el texto ya armado. */
+  mismaCarrera: boolean;
+  amigosEnComun: number;
   habilidades: string[];
   intereses: string[];
 }
@@ -32,8 +35,15 @@ export interface BuscarUsuariosFiltros {
   q?: string;
   carrera?: boolean;
   amigosDeAmigos?: boolean;
+  soloAmigos?: boolean;
   habilidades?: number[];
   intereses?: number[];
+  page?: number;
+}
+
+export interface BuscarUsuariosResultado {
+  items: UsuarioBusquedaDto[];
+  hasMore: boolean;
 }
 
 export interface ProyectoFeedDto {
