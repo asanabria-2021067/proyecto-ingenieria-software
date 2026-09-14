@@ -24,6 +24,7 @@ export interface UsuarioBusquedaDto extends UsuarioResumenDto {
   solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
   loSigo: boolean;
   carrera: string | null;
+  semestre: number | null;
   /** Motivo estructurado: el backend nunca manda el texto ya armado. */
   mismaCarrera: boolean;
   amigosEnComun: number;
