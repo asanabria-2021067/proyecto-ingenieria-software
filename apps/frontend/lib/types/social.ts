@@ -32,6 +32,29 @@ export interface UsuarioBusquedaDto extends UsuarioResumenDto {
   intereses: string[];
 }
 
+export interface ProyectoParticipacionResumenDto {
+  idProyecto: number;
+  tituloProyecto: string;
+  estadoProyecto: string;
+  rolNombre: string;
+}
+
+/** Perfil público de un usuario (GET /social/usuarios/:id). A diferencia de
+ * `UsuarioBusquedaDto`, `amigosEnComun` viene como lista (no solo conteo). */
+export interface UsuarioPerfilDto extends UsuarioResumenDto {
+  correo: string;
+  esAmigo: boolean;
+  solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
+  loSigo: boolean;
+  carrera: string | null;
+  semestre: number | null;
+  mismaCarrera: boolean;
+  amigosEnComun: UsuarioResumenDto[];
+  habilidades: string[];
+  intereses: string[];
+  proyectosActivos: ProyectoParticipacionResumenDto[];
+}
+
 export interface BuscarUsuariosFiltros {
   q?: string;
   carrera?: boolean;
