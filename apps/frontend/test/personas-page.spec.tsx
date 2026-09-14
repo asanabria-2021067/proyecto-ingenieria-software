@@ -1,11 +1,14 @@
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { UsuarioBusquedaDto, SolicitudAmistadPendienteDto } from '@/lib/types/social';
 
 const buscarUsuariosMock = vi.fn();
 const getSolicitudesPendientesMock = vi.fn();
+const getAmigosMock = vi.fn();
 const crearSolicitudAmistadMock = vi.fn().mockResolvedValue({ idAmistad: 1, estado: 'PENDIENTE' });
 const aceptarSolicitudAmistadMock = vi.fn().mockResolvedValue({ idAmistad: 1, estado: 'ACEPTADA' });
 const rechazarSolicitudAmistadMock = vi.fn().mockResolvedValue({ idAmistad: 1, estado: 'RECHAZADA' });
@@ -16,7 +19,7 @@ const dejarDeSeguirMock = vi.fn().mockResolvedValue({ eliminado: true });
 vi.mock('@/lib/services/social', () => ({
   buscarUsuarios: (filtros: unknown) => buscarUsuariosMock(filtros),
   getSolicitudesPendientes: () => getSolicitudesPendientesMock(),
-  getAmigos: () => Promise.resolve([]),
+  getAmigos: () => getAmigosMock(),
   getSiguiendo: () => Promise.resolve([]),
   getSeguidores: () => Promise.resolve([]),
   getFeedSocial: () => Promise.resolve({ proyectosDeAmigos: [], proyectosDeSeguidos: [] }),
@@ -29,8 +32,8 @@ vi.mock('@/lib/services/social', () => ({
 }));
 
 vi.mock('@/lib/services/catalogs', () => ({
-  getHabilidades: () => Promise.resolve([]),
-  getIntereses: () => Promise.resolve([]),
+  getHabilidades: () => Promise.resolve([{ idHabilidad: 1, nombreHabilidad: 'React' }]),
+  getIntereses: () => Promise.resolve([{ idInteres: 1, nombreInteres: 'IA' }]),
 }));
 
 function usuario(overrides: Partial<UsuarioBusquedaDto> = {}): UsuarioBusquedaDto {
@@ -43,6 +46,8 @@ function usuario(overrides: Partial<UsuarioBusquedaDto> = {}): UsuarioBusquedaDt
     solicitudPendiente: null,
     loSigo: false,
     carrera: null,
+    mismaCarrera: false,
+    amigosEnComun: 0,
     habilidades: [],
     intereses: [],
     ...overrides,
@@ -59,6 +64,14 @@ function solicitud(overrides: Partial<SolicitudAmistadPendienteDto> = {}): Solic
   };
 }
 
+/** Radix Tabs selecciona en `onMouseDown`, no en `click` (ver
+ * @radix-ui/react-tabs `TabsTrigger`); `fireEvent.click` no dispara el
+ * mousedown sintético que Testing Library normalmente emite en un click
+ * real de usuario. */
+function clickTab(name: string) {
+  fireEvent.mouseDown(screen.getByRole('tab', { name }), { button: 0 });
+}
+
 async function renderPersonas() {
   const { default: PersonasPage } = await import('@/app/dashboard/personas/page');
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -69,53 +82,94 @@ async function renderPersonas() {
   );
 }
 
+beforeEach(() => {
+  getSolicitudesPendientesMock.mockResolvedValue([]);
+  getAmigosMock.mockResolvedValue([]);
+  buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
+});
+
 describe('PersonasPage', () => {
-  it('no busca con menos de 2 caracteres', async () => {
-    getSolicitudesPendientesMock.mockResolvedValue([]);
+  it('cambiar de pestaña dispara la consulta correspondiente', async () => {
     await renderPersonas();
+    await waitFor(() =>
+      expect(buscarUsuariosMock).toHaveBeenCalledWith(
+        expect.objectContaining({ carrera: false, amigosDeAmigos: false, soloAmigos: false }),
+      ),
+    );
 
-    fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/i), { target: { value: 'a' } });
+    clickTab('Mi carrera');
+    await waitFor(() =>
+      expect(buscarUsuariosMock).toHaveBeenCalledWith(
+        expect.objectContaining({ carrera: true, amigosDeAmigos: false, soloAmigos: false }),
+      ),
+    );
 
-    await waitFor(() => expect(buscarUsuariosMock).not.toHaveBeenCalled());
+    clickTab('Mis amigos');
+    await waitFor(() =>
+      expect(buscarUsuariosMock).toHaveBeenCalledWith(
+        expect.objectContaining({ carrera: false, amigosDeAmigos: false, soloAmigos: true }),
+      ),
+    );
   });
 
-  it('muestra "Agregar amigo" para un usuario sin relación y crea la solicitud al hacer clic', async () => {
-    getSolicitudesPendientesMock.mockResolvedValue([]);
-    buscarUsuariosMock.mockResolvedValue([usuario({ idUsuario: 10, nombre: 'Carla' })]);
+  it('el contador del botón de filtros refleja los chips seleccionados', async () => {
+    await renderPersonas();
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalled());
+
+    const botonFiltros = screen.getByRole('button', { name: /Filtros/i });
+    expect(within(botonFiltros).queryByText('1')).not.toBeInTheDocument();
+
+    fireEvent.click(botonFiltros);
+    fireEvent.click(await screen.findByRole('button', { name: 'React' }));
+
+    expect(within(botonFiltros).getByText('1')).toBeInTheDocument();
+  });
+
+  it('seleccionar una persona llena el panel lateral', async () => {
+    buscarUsuariosMock.mockResolvedValue({
+      items: [
+        usuario({ idUsuario: 10, nombre: 'Carla', apellido: 'Ruiz', carrera: 'Ingeniería', habilidades: ['React'] }),
+      ],
+      hasMore: false,
+    });
     await renderPersonas();
 
-    fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/i), { target: { value: 'carla' } });
+    expect(screen.getByText('Seleccioná a alguien')).toBeInTheDocument();
 
-    const boton = await screen.findByRole('button', { name: /Agregar amigo/i });
-    fireEvent.click(boton);
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalle de Carla Ruiz/i }));
+
+    expect(screen.queryByText('Seleccioná a alguien')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Carla Ruiz').length).toBeGreaterThan(0);
+    expect(screen.getByText('React')).toBeInTheDocument();
+  });
+
+  it('cada estado vacío renderiza su mensaje correspondiente', async () => {
+    await renderPersonas();
+    expect(await screen.findByText('No encontramos a nadie')).toBeInTheDocument();
+
+    clickTab('Amigos de amigos');
+    expect(await screen.findByText('Agregá a tu primer amigo')).toBeInTheDocument();
+
+    clickTab('Mis amigos');
+    expect(await screen.findByText('Todavía no tenés amigos')).toBeInTheDocument();
+  });
+
+  it('no usa clases de color literales de Tailwind (solo tokens del sistema de diseño)', () => {
+    const fuente = readFileSync(join(process.cwd(), 'app/dashboard/personas/page.tsx'), 'utf8');
+    const colorLiteral =
+      /\b(?:bg|text|border)-(?:red|green|blue|yellow|gray|slate|zinc|neutral|stone|orange|amber|lime|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose|white|black)(?:-\d{2,3})?\b/;
+    expect(fuente).not.toMatch(colorLiteral);
+    expect(fuente).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+  });
+
+  it('agrega como amigo desde el panel lateral', async () => {
+    buscarUsuariosMock.mockResolvedValue({ items: [usuario({ idUsuario: 10, nombre: 'Carla' })], hasMore: false });
+    await renderPersonas();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalle de Carla/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar como amigo' }));
 
     await waitFor(() => expect(crearSolicitudAmistadMock).toHaveBeenCalledWith(10));
-  });
-
-  it('muestra "Solicitud enviada" deshabilitado cuando la solicitud pendiente fue enviada por mí', async () => {
-    getSolicitudesPendientesMock.mockResolvedValue([]);
-    buscarUsuariosMock.mockResolvedValue([
-      usuario({ idUsuario: 11, solicitudPendiente: { direccion: 'enviada' } }),
-    ]);
-    await renderPersonas();
-
-    fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/i), { target: { value: 'ana' } });
-
-    const boton = await screen.findByRole('button', { name: /Solicitud enviada/i });
-    expect(boton).toBeDisabled();
-  });
-
-  it('muestra "Amigos" con opción de eliminar cuando ya son amigos', async () => {
-    getSolicitudesPendientesMock.mockResolvedValue([]);
-    buscarUsuariosMock.mockResolvedValue([usuario({ idUsuario: 12, esAmigo: true })]);
-    await renderPersonas();
-
-    fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/i), { target: { value: 'ana' } });
-
-    const boton = await screen.findByRole('button', { name: /Amigos/i });
-    fireEvent.click(boton);
-
-    await waitFor(() => expect(eliminarAmistadMock).toHaveBeenCalledWith(12));
   });
 
   it('lista solicitudes pendientes y permite aceptarlas', async () => {
