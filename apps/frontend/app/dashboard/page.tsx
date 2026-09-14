@@ -8,7 +8,6 @@ import {
   HeartHandshake,
   Zap,
   Clock,
-  Eye,
   Calendar,
   ClipboardList,
   FolderOpen,
@@ -17,14 +16,6 @@ import {
   NotebookPen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Tooltip,
   TooltipContent,
@@ -311,7 +302,7 @@ export default function DashboardPage() {
               Bienvenido de vuelta
             </span>
             <h1 className="type-display text-on-primary">
-              Hola, {user?.nombre ?? ''}
+              ¡Hola, {user?.nombre ?? ''}! 👋
             </h1>
             <p className="type-body mt-tight text-on-primary/80">
               Tu progreso académico este semestre. Tienes {projects.length}{' '}
@@ -408,7 +399,7 @@ export default function DashboardPage() {
           {/* S7 VIEW-08: horas en proyectos abiertos vs. acreditadas (separadas) */}
           <HorasKpiCard
             id="stats-horas-abiertas"
-            titulo="Horas registradas en proyectos abiertos"
+            titulo="Horas Registradas"
             valor={horasAbiertas}
             ayuda="Horas que registraste en proyectos aún no cerrados. Pueden cambiar hasta que el proyecto se cierre."
             icon={NotebookPen}
@@ -435,7 +426,18 @@ export default function DashboardPage() {
 
         {proyectosDeSeguidos.length > 0 && (
           <section className="mb-section">
-            <h2 className="type-section mb-card">De personas que sigues</h2>
+            <div className="mb-card flex flex-wrap items-center justify-between gap-stack">
+              <div className="flex items-center gap-tight">
+                <h2 className="type-section">De personas que sigues</h2>
+                <span className="pill pill-neutral">Actividad reciente</span>
+              </div>
+              <Link
+                href="/dashboard/personas"
+                className="type-body font-medium text-primary hover:underline"
+              >
+                Ver red
+              </Link>
+            </div>
             <div className="grid grid-cols-1 gap-gap md:grid-cols-3">
               {proyectosDeSeguidos.map((p) => (
                 <SocialProjectCard key={p.idProyecto} proyecto={p} />
@@ -567,145 +569,10 @@ export default function DashboardPage() {
                 </div>
               )}
             </section>
-
-            {/* Applications Status */}
-            <section>
-              <h2 className="type-section mb-card">Estado de Aplicaciones</h2>
-              <div className="card-base overflow-hidden p-0">
-                <Table>
-                  <TableHeader className="bg-page">
-                    <TableRow>
-                      <TableHead className="px-card">Proyecto</TableHead>
-                      <TableHead className="px-card">Fecha</TableHead>
-                      <TableHead className="px-card">Estado</TableHead>
-                      <TableHead className="px-card">Acción</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {stats?.postulacionesRecientes.map((a) => (
-                      <TableRow key={a.idPostulacion}>
-                        <TableCell className="px-card py-stack">
-                          <div className="type-subtitle text-text-primary">
-                            {a.rolProyecto.proyecto.tituloProyecto}
-                          </div>
-                          <div className="type-meta">
-                            {tipoBadgeLabel(
-                              a.rolProyecto.proyecto.tipoProyecto,
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="type-body px-card py-stack text-text-secondary">
-                          {new Date(a.fechaPostulacion).toLocaleDateString(
-                            'es-GT',
-                          )}
-                        </TableCell>
-                        <TableCell className="px-card py-stack">
-                          <span
-                            className={`pill ${estadoColors[a.estadoPostulacion] ?? 'pill-neutral'}`}
-                          >
-                            {a.estadoPostulacion}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-card py-stack">
-                          <Link
-                            href="/dashboard/mis-postulaciones"
-                            aria-label={`Ver postulacion para ${a.rolProyecto.proyecto.tituloProyecto}`}
-                            className="inline-flex rounded-control p-tight text-primary hover:bg-muted"
-                          >
-                            <Eye className="h-5 w-5" />
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {(!stats || stats.postulacionesRecientes.length === 0) && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="px-card py-section">
-                          <div className="flex flex-col items-center gap-tight text-center">
-                            <ClipboardList
-                              aria-hidden="true"
-                              className="h-7 w-7 text-primary"
-                            />
-                            <p className="type-body font-medium text-text-primary">
-                              No tienes postulaciones aun
-                            </p>
-                            <Link
-                              href="/dashboard/proyectos"
-                              className="type-body font-medium text-primary hover:underline"
-                            >
-                              Explorar proyectos
-                            </Link>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </section>
           </div>
 
           {/* Right Column */}
-          <aside className="layout-aside">
-            {/* Quick info */}
-            <div
-              id="dashboard-profile-card"
-              className="card-base lg:sticky lg:top-section"
-            >
-              <div className="mb-stack flex items-center justify-between gap-tight">
-                <h2 className="type-section">Tu perfil</h2>
-                <button
-                  type="button"
-                  onClick={() =>
-                    window.dispatchEvent(new Event('start-onboarding-tour'))
-                  }
-                  aria-label="Repetir tour de bienvenida"
-                  className="type-meta cursor-pointer font-medium text-primary hover:underline"
-                >
-                  Repetir Tour 🔄
-                </button>
-              </div>
-              {user?.perfil?.carrera && (
-                <div className="mb-inline">
-                  <span className="type-meta uppercase tracking-wider">
-                    Carrera
-                  </span>
-                  <p className="type-body text-text-primary">
-                    {user.perfil.carrera.nombreCarrera}
-                  </p>
-                </div>
-              )}
-              {user?.perfil?.semestre && (
-                <div className="mb-inline">
-                  <span className="type-meta uppercase tracking-wider">
-                    Semestre
-                  </span>
-                  <p className="type-body text-text-primary">
-                    {user.perfil.semestre}
-                  </p>
-                </div>
-              )}
-              <div>
-                <span className="type-meta uppercase tracking-wider">
-                  Habilidades
-                </span>
-                <div className="mt-micro flex flex-wrap gap-micro">
-                  {user?.habilidades.map((h) => (
-                    <span
-                      key={h.idUsuarioHabilidad}
-                      className="pill pill-accent"
-                    >
-                      {h.habilidad.nombreHabilidad}
-                    </span>
-                  ))}
-                  {(!user?.habilidades || user.habilidades.length === 0) && (
-                    <span className="type-meta">
-                      Sin habilidades registradas
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
+          <aside className="layout-aside space-y-gap">
             {/* Tipos de Acreditacion */}
             <div className="card-base">
               <h4 className="type-subtitle mb-stack text-text-primary">
@@ -723,6 +590,84 @@ export default function DashboardPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+
+            {/* Mis Postulaciones (micro) */}
+            <div className="card-base space-y-stack">
+              <div className="flex items-center justify-between gap-tight border-b border-outline-variant pb-stack">
+                <div className="flex items-center gap-tight">
+                  <span
+                    className="h-2.5 w-2.5 rounded-pill bg-primary"
+                    aria-hidden="true"
+                  />
+                  <h4 className="type-subtitle text-text-primary">
+                    Mis Postulaciones
+                  </h4>
+                </div>
+                <span className="pill pill-neutral">
+                  {stats?.postulacionesRecientes.filter(
+                    (a) => a.estadoPostulacion === 'PENDIENTE',
+                  ).length ?? 0}{' '}
+                  activas
+                </span>
+              </div>
+
+              {stats && stats.postulacionesRecientes.length > 0 ? (
+                <>
+                  <ul className="space-y-tight">
+                    {stats.postulacionesRecientes.slice(0, 3).map((a) => (
+                      <li key={a.idPostulacion}>
+                        <Link
+                          href="/dashboard/mis-postulaciones"
+                          className="flex items-center justify-between gap-tight rounded-control p-tight hover:bg-surface-container transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="type-body truncate font-medium text-text-primary">
+                              {a.rolProyecto.proyecto.tituloProyecto}
+                            </p>
+                            <p className="type-meta">
+                              {new Date(a.fechaPostulacion).toLocaleDateString(
+                                'es-GT',
+                              )}
+                            </p>
+                          </div>
+                          <span
+                            className={`pill shrink-0 ${estadoColors[a.estadoPostulacion] ?? 'pill-neutral'}`}
+                          >
+                            {a.estadoPostulacion}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/dashboard/mis-postulaciones"
+                    className="type-body block text-center font-medium text-primary hover:underline"
+                  >
+                    Ver todas
+                  </Link>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-tight rounded-control border border-dashed border-outline-variant p-card text-center">
+                  <ClipboardList
+                    aria-hidden="true"
+                    className="h-8 w-8 text-primary"
+                  />
+                  <p className="type-body font-medium text-text-primary">
+                    Sin postulaciones activas
+                  </p>
+                  <p className="type-meta max-w-[210px]">
+                    Explora proyectos y postula para cumplir tus horas del
+                    semestre.
+                  </p>
+                  <Link
+                    href="#proyectos-catalogo"
+                    className="pill pill-accent mt-tight font-semibold"
+                  >
+                    Explorar Proyectos
+                  </Link>
+                </div>
+              )}
             </div>
           </aside>
         </div>
