@@ -5,6 +5,7 @@ import {
   amigosQueryKey,
   buscarUsuariosQueryKey,
   feedSocialQueryKey,
+  perfilUsuarioQueryKey,
   seguidoresQueryKey,
   siguiendoQueryKey,
   solicitudesAmistadPendientesQueryKey,
@@ -17,6 +18,7 @@ import {
   eliminarAmistad,
   getAmigos,
   getFeedSocial,
+  getPerfilUsuario,
   getSeguidores,
   getSiguiendo,
   getSolicitudesPendientes,
@@ -30,6 +32,7 @@ function invalidateSocialQueries(queryClient: ReturnType<typeof useQueryClient>)
   queryClient.invalidateQueries({ queryKey: solicitudesAmistadPendientesQueryKey() });
   queryClient.invalidateQueries({ queryKey: ['social-buscar-usuarios'] });
   queryClient.invalidateQueries({ queryKey: feedSocialQueryKey() });
+  queryClient.invalidateQueries({ queryKey: ['social-perfil-usuario'] });
 }
 
 export function useAmigos() {
@@ -92,6 +95,15 @@ export function useFeedSocial() {
   };
 }
 
+export function usePerfilUsuario(idUsuario: number) {
+  const query = useQuery({
+    queryKey: perfilUsuarioQueryKey(idUsuario),
+    queryFn: () => getPerfilUsuario(idUsuario),
+    enabled: Number.isFinite(idUsuario),
+  });
+  return { perfil: query.data ?? null, isLoading: query.isLoading, isError: query.isError };
+}
+
 export function useCrearSolicitudAmistad() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -138,4 +150,52 @@ export function useDejarDeSeguir() {
     mutationFn: (idSeguido: number) => dejarDeSeguir(idSeguido),
     onSuccess: () => invalidateSocialQueries(queryClient),
   });
+}
+
+/** Forma mínima que necesita `useAccionesAmistad`: tanto `UsuarioBusquedaDto`
+ * (resultado de búsqueda) como `UsuarioPerfilDto` (perfil de una persona) la
+ * cumplen, así que las tarjetas de la lista y la página de perfil comparten
+ * la misma lógica de botones sin duplicarla. */
+interface UsuarioConRelacion {
+  idUsuario: number;
+  esAmigo: boolean;
+  solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
+  loSigo: boolean;
+}
+
+export function useAccionesAmistad(usuario: UsuarioConRelacion) {
+  const crearSolicitud = useCrearSolicitudAmistad();
+  const aceptarSolicitud = useAceptarSolicitudAmistad();
+  const eliminarAmistadMutation = useEliminarAmistad();
+  const seguir = useSeguirUsuario();
+  const dejarDeSeguirMutation = useDejarDeSeguir();
+
+  const amistad = usuario.esAmigo
+    ? {
+        label: 'Amigos',
+        variant: 'outline' as const,
+        disabled: eliminarAmistadMutation.isPending,
+        onClick: () => eliminarAmistadMutation.mutate(usuario.idUsuario),
+      }
+    : usuario.solicitudPendiente?.direccion === 'enviada'
+      ? { label: 'Solicitud enviada', variant: 'outline' as const, disabled: true, onClick: () => {} }
+      : usuario.solicitudPendiente?.direccion === 'recibida'
+        ? {
+            label: 'Aceptar solicitud',
+            variant: 'default' as const,
+            disabled: aceptarSolicitud.isPending,
+            onClick: () => aceptarSolicitud.mutate(usuario.idUsuario),
+          }
+        : {
+            label: 'Agregar como amigo',
+            variant: 'default' as const,
+            disabled: crearSolicitud.isPending,
+            onClick: () => crearSolicitud.mutate(usuario.idUsuario),
+          };
+
+  const seguimiento = usuario.loSigo
+    ? { label: 'Siguiendo', disabled: dejarDeSeguirMutation.isPending, onClick: () => dejarDeSeguirMutation.mutate(usuario.idUsuario) }
+    : { label: 'Seguir', disabled: seguir.isPending, onClick: () => seguir.mutate(usuario.idUsuario) };
+
+  return { amistad, seguimiento };
 }
