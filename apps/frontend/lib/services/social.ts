@@ -6,6 +6,7 @@ import type {
   FeedSocialDto,
   SolicitudAmistadPendienteDto,
   UsuarioBusquedaDto,
+  UsuarioPerfilDto,
   UsuarioResumenDto,
 } from '@/lib/types/social';
 
@@ -69,4 +70,8 @@ export function buscarUsuarios(filtros: BuscarUsuariosFiltros): Promise<BuscarUs
 
 export function getFeedSocial(): Promise<FeedSocialDto> {
   return apiFetch<FeedSocialDto>('/social/feed');
+}
+
+export function getPerfilUsuario(idUsuario: number): Promise<UsuarioPerfilDto> {
+  return apiFetch<UsuarioPerfilDto>(`/social/usuarios/${idUsuario}`);
 }
