@@ -227,6 +227,24 @@ describe('SocialService — buscarUsuarios', () => {
     );
   });
 
+  it('excluye a los administradores del directorio', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, {});
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: expect.arrayContaining([
+            { rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } } },
+          ]),
+        },
+      }),
+    );
+  });
+
   it('pagina: page=2 desplaza el skip y hasMore indica si sobra una fila', async () => {
     const prisma = makePrisma();
     const trece = Array.from({ length: 13 }, (_, i) => ({
