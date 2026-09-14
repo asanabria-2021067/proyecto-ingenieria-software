@@ -26,6 +26,7 @@ import {
   getIniciales,
 } from '@/components/projects/available-project-card';
 import { useAccionesAmistad, usePerfilUsuario } from '@/hooks/use-social';
+import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 
 function motivoAfinidad(mismaCarrera: boolean, amigosEnComun: number): string | null {
   if (amigosEnComun > 0) {
@@ -112,7 +113,11 @@ export default function PerfilPersonaPage() {
             {perfil.carrera && <p className="type-body text-text-secondary">{perfil.carrera}</p>}
 
             <div className="flex flex-wrap items-center justify-center gap-tight">
-              {perfil.semestre != null && <span className="pill pill-neutral">Semestre {perfil.semestre}</span>}
+              {perfil.semestre != null && (
+                <span className={`pill font-semibold ${getSemestreBadgeStyle(perfil.semestre)}`}>
+                  Semestre {perfil.semestre}
+                </span>
+              )}
               {motivo && <span className="pill pill-accent">{motivo}</span>}
             </div>
 
@@ -133,7 +138,7 @@ export default function PerfilPersonaPage() {
                   <h2 className="type-meta uppercase tracking-wide">Habilidades</h2>
                   <div className="mt-tight flex flex-wrap gap-tight">
                     {perfil.habilidades.map((h) => (
-                      <span key={h} className="pill pill-neutral">
+                      <span key={h} className={`pill font-semibold ${getHabilidadBadgeStyle(h)}`}>
                         {h}
                       </span>
                     ))}
@@ -145,7 +150,7 @@ export default function PerfilPersonaPage() {
                   <h2 className="type-meta uppercase tracking-wide">Intereses</h2>
                   <div className="mt-tight flex flex-wrap gap-tight">
                     {perfil.intereses.map((i) => (
-                      <span key={i} className="pill pill-neutral">
+                      <span key={i} className={`pill font-semibold ${getHabilidadBadgeStyle(i)}`}>
                         {i}
                       </span>
                     ))}
