@@ -11,6 +11,8 @@ const USUARIO_RESUMEN_SELECT = {
   fotoUrl: true,
 } as const;
 
+const PERSONAS_PAGE_SIZE = 12;
+
 const USUARIO_BUSQUEDA_SELECT = {
   ...USUARIO_RESUMEN_SELECT,
   perfil: { select: { carrera: { select: { nombreCarrera: true } } } },
@@ -259,17 +261,6 @@ export class SocialService {
       throw new BadRequestException('La búsqueda requiere al menos 2 caracteres');
     }
 
-    const hayFiltros =
-      query.length > 0 ||
-      Boolean(filtros.carrera) ||
-      Boolean(filtros.amigosDeAmigos) ||
-      Boolean(filtros.habilidades?.length) ||
-      Boolean(filtros.intereses?.length);
-
-    if (!hayFiltros) {
-      return [];
-    }
-
     const condiciones: Prisma.UsuarioWhereInput[] = [{ idUsuario: { not: idUsuario } }];
 
     if (query) {
@@ -281,14 +272,21 @@ export class SocialService {
       });
     }
 
+    // Se calcula siempre (no solo cuando `carrera` filtra) porque cada resultado
+    // necesita su bandera `mismaCarrera` para armar el motivo en cualquier pestaña.
+    const idsMismaCarrera = await this.getIdsMismaCarrera(idUsuario);
     if (filtros.carrera) {
-      const idsCarrera = await this.getIdsMismaCarrera(idUsuario);
-      condiciones.push({ idUsuario: { in: idsCarrera } });
+      condiciones.push({ idUsuario: { in: idsMismaCarrera } });
     }
 
     if (filtros.amigosDeAmigos) {
       const idsAmigosDeAmigos = await this.getAmigosDeAmigosIds(idUsuario);
       condiciones.push({ idUsuario: { in: idsAmigosDeAmigos } });
+    }
+
+    const idsAmigoActual = await this.getAmigoIds(idUsuario);
+    if (filtros.soloAmigos) {
+      condiciones.push({ idUsuario: { in: idsAmigoActual } });
     }
 
     if (filtros.habilidades?.length) {
@@ -299,18 +297,24 @@ export class SocialService {
       condiciones.push({ intereses: { some: { idInteres: { in: filtros.intereses } } } });
     }
 
+    const page = filtros.page ?? 1;
     const usuarios = await this.prisma.usuario.findMany({
       where: { AND: condiciones },
       select: USUARIO_BUSQUEDA_SELECT,
-      take: 20,
+      orderBy: { idUsuario: 'asc' },
+      skip: (page - 1) * PERSONAS_PAGE_SIZE,
+      take: PERSONAS_PAGE_SIZE + 1,
     });
 
-    if (usuarios.length === 0) {
-      return [];
+    const hasMore = usuarios.length > PERSONAS_PAGE_SIZE;
+    const pagina = hasMore ? usuarios.slice(0, PERSONAS_PAGE_SIZE) : usuarios;
+
+    if (pagina.length === 0) {
+      return { items: [], hasMore: false };
     }
 
-    const otrosIds = usuarios.map((u) => u.idUsuario);
-    const [amistades, seguidos] = await Promise.all([
+    const otrosIds = pagina.map((u) => u.idUsuario);
+    const [amistades, seguidos, mutuas] = await Promise.all([
       this.prisma.amistad.findMany({
         where: {
           OR: [
@@ -324,11 +328,35 @@ export class SocialService {
         where: { idSeguidor: idUsuario, idSeguido: { in: otrosIds } },
         select: { idSeguido: true },
       }),
+      idsAmigoActual.length > 0
+        ? this.prisma.amistad.findMany({
+            where: {
+              estado: EstadoAmistad.ACEPTADA,
+              OR: [
+                { idUsuarioSolicitante: { in: otrosIds }, idUsuarioReceptor: { in: idsAmigoActual } },
+                { idUsuarioReceptor: { in: otrosIds }, idUsuarioSolicitante: { in: idsAmigoActual } },
+              ],
+            },
+            select: { idUsuarioSolicitante: true, idUsuarioReceptor: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     const seguidosSet = new Set(seguidos.map((s) => s.idSeguido));
+    const idsMismaCarreraSet = new Set(idsMismaCarrera);
 
-    return usuarios.map((usuario) => {
+    const amigosEnComunPorUsuario = new Map<number, Set<number>>();
+    for (const fila of mutuas) {
+      const candidatoId = otrosIds.includes(fila.idUsuarioSolicitante)
+        ? fila.idUsuarioSolicitante
+        : fila.idUsuarioReceptor;
+      const amigoId = candidatoId === fila.idUsuarioSolicitante ? fila.idUsuarioReceptor : fila.idUsuarioSolicitante;
+      const set = amigosEnComunPorUsuario.get(candidatoId) ?? new Set<number>();
+      set.add(amigoId);
+      amigosEnComunPorUsuario.set(candidatoId, set);
+    }
+
+    const items = pagina.map((usuario) => {
       const relacion = amistades.find(
         (a) => a.idUsuarioSolicitante === usuario.idUsuario || a.idUsuarioReceptor === usuario.idUsuario,
       );
@@ -355,9 +383,13 @@ export class SocialService {
         solicitudPendiente,
         loSigo: seguidosSet.has(usuario.idUsuario),
         carrera: usuario.perfil?.carrera?.nombreCarrera ?? null,
+        mismaCarrera: idsMismaCarreraSet.has(usuario.idUsuario),
+        amigosEnComun: amigosEnComunPorUsuario.get(usuario.idUsuario)?.size ?? 0,
         habilidades: usuario.habilidades.map((h) => h.habilidad.nombreHabilidad),
         intereses: usuario.intereses.map((i) => i.interes.nombreInteres),
       };
     });
+
+    return { items, hasMore };
   }
 }
