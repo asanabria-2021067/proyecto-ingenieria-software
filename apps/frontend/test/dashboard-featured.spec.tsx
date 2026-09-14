@@ -14,16 +14,17 @@ import type { ProyectoResumen } from '@/types';
 // requiere al montarse.
 window.matchMedia =
   window.matchMedia ||
-  ((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  }) as unknown as MediaQueryList);
+  ((query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList);
 
 (globalThis as any).IntersectionObserver =
   (globalThis as any).IntersectionObserver ||
@@ -42,7 +43,9 @@ window.matchMedia =
   };
 
 vi.mock('@/components/dashboard/DashboardLayout', () => ({
-  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock('@/components/profile/CompleteProfileDialog', () => ({
@@ -73,6 +76,7 @@ vi.mock('@/lib/services/users', () => ({
       proyectosActivos: 0,
       postulacionesRecientes: [],
     }),
+  getMisTareas: () => Promise.resolve([]),
 }));
 
 vi.mock('@/lib/services/projects', () => ({
@@ -96,7 +100,9 @@ async function renderDashboard() {
   );
 }
 
-function proyectoResumen(overrides: Partial<ProyectoResumen> = {}): ProyectoResumen {
+function proyectoResumen(
+  overrides: Partial<ProyectoResumen> = {},
+): ProyectoResumen {
   return {
     idProyecto: 1,
     tituloProyecto: 'Proyecto destacado',
@@ -112,16 +118,16 @@ function proyectoResumen(overrides: Partial<ProyectoResumen> = {}): ProyectoResu
 }
 
 describe('Dashboard - seccion Proyectos Destacados', () => {
-  it('no muestra la seccion cuando no hay proyectos destacados', async () => {
+  it('muestra el estado vacio de destacados cuando no hay ninguno', async () => {
     apiFetchMock.mockResolvedValue([]);
 
     await renderDashboard();
 
     await waitFor(() => {
-      expect(screen.queryByText('Proyectos Disponibles')).toBeInTheDocument();
+      expect(
+        screen.getByText('No hay proyectos destacados'),
+      ).toBeInTheDocument();
     });
-
-    expect(screen.queryByText('Proyectos Destacados')).not.toBeInTheDocument();
   });
 
   it('el clic en una tarjeta destacada navega al detalle del proyecto', async () => {
