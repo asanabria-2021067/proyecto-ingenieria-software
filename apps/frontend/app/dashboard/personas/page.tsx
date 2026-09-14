@@ -1,16 +1,38 @@
 'use client';
 
+/* ===========================================================================
+   Personas — rediseño sobre los tokens de HU-163 (apps/frontend/app/global.css)
+   ---------------------------------------------------------------------------
+   1. "Misma carrera" y "Amigos de amigos" pasan de casillas a pestañas
+      (motivos de recomendación excluyentes, no filtros acumulables).
+   2. Habilidades e intereses salen de la vista principal y quedan detrás
+      de un botón de filtros (Popover).
+   3. La lista pasa a una rejilla densa; cada pestaña es una consulta
+      paginada distinta al backend, no un filtro en el navegador.
+   4. Columna lateral con el detalle de la persona seleccionada, sobre la
+      rejilla 8+4 (`layout-grid` / `layout-main` / `layout-aside`).
+   =========================================================================== */
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Search, UserPlus, UserCheck, UserX, Users } from 'lucide-react';
+import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
+import { MoreVertical, Search, SlidersHorizontal, UserCheck, UserX, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -18,6 +40,7 @@ import {
 } from '@/components/ui/empty';
 import {
   useAceptarSolicitudAmistad,
+  useAmigos,
   useBuscarUsuarios,
   useCrearSolicitudAmistad,
   useDejarDeSeguir,
@@ -29,165 +52,256 @@ import {
 import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
 import type { UsuarioBusquedaDto } from '@/lib/types/social';
 
-const MAX_CHIPS_VISIBLES = 3;
+type PestanaId = 'todos' | 'amigos-de-amigos' | 'mi-carrera' | 'mis-amigos';
 
-function ChipList({ items }: { items: string[] }) {
-  if (items.length === 0) return null;
-  const visibles = items.slice(0, MAX_CHIPS_VISIBLES);
-  const restantes = items.length - visibles.length;
+const PESTANAS: { id: PestanaId; label: string }[] = [
+  { id: 'todos', label: 'Todos' },
+  { id: 'amigos-de-amigos', label: 'Amigos de amigos' },
+  { id: 'mi-carrera', label: 'Mi carrera' },
+  { id: 'mis-amigos', label: 'Mis amigos' },
+];
 
-  return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      {visibles.map((item) => (
-        <Badge key={item} variant="secondary" className="font-normal">
-          {item}
-        </Badge>
-      ))}
-      {restantes > 0 && (
-        <Badge variant="outline" className="font-normal">
-          +{restantes} más
-        </Badge>
-      )}
-    </div>
-  );
+/** El motivo se arma acá a partir de los datos estructurados del backend
+ * (`amigosEnComun`, `mismaCarrera`); el backend nunca manda el texto armado. */
+function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
+  if (usuario.amigosEnComun > 0) {
+    return `${usuario.amigosEnComun} ${usuario.amigosEnComun === 1 ? 'amigo' : 'amigos'} en común`;
+  }
+  if (usuario.mismaCarrera) return 'De tu carrera';
+  return null;
 }
 
-function UsuarioCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
+function useAccionesAmistad(usuario: UsuarioBusquedaDto) {
   const crearSolicitud = useCrearSolicitudAmistad();
   const aceptarSolicitud = useAceptarSolicitudAmistad();
   const eliminarAmistad = useEliminarAmistad();
-  const seguirUsuario = useSeguirUsuario();
+  const seguir = useSeguirUsuario();
   const dejarDeSeguir = useDejarDeSeguir();
 
-  return (
-    <div className="flex items-start justify-between gap-3 rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-4">
-      <div className="flex items-start gap-3 min-w-0">
-        <Avatar>
-          {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt={`${usuario.nombre} ${usuario.apellido}`} />}
-          <AvatarFallback>{getIniciales(usuario.nombre, usuario.apellido)}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-on-surface">
-            {usuario.nombre} {usuario.apellido}
-          </p>
-          {usuario.carrera && (
-            <p className="truncate text-xs text-on-surface-variant">{usuario.carrera}</p>
-          )}
-          <ChipList items={usuario.habilidades} />
-          <ChipList items={usuario.intereses} />
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {usuario.esAmigo ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => eliminarAmistad.mutate(usuario.idUsuario)}
-            disabled={eliminarAmistad.isPending}
-          >
-            <Check className="h-4 w-4" /> Amigos
-          </Button>
-        ) : usuario.solicitudPendiente?.direccion === 'enviada' ? (
-          <Button variant="outline" size="sm" disabled>
-            Solicitud enviada
-          </Button>
-        ) : usuario.solicitudPendiente?.direccion === 'recibida' ? (
-          <Button
-            size="sm"
-            onClick={() => aceptarSolicitud.mutate(usuario.idUsuario)}
-            disabled={aceptarSolicitud.isPending}
-          >
-            <UserCheck className="h-4 w-4" /> Aceptar solicitud
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            className="text-white hover:text-white"
-            onClick={() => crearSolicitud.mutate(usuario.idUsuario)}
-            disabled={crearSolicitud.isPending}
-          >
-            <UserPlus className="h-4 w-4" /> Agregar amigo
-          </Button>
-        )}
+  const amistad = usuario.esAmigo
+    ? { label: 'Amigos', variant: 'outline' as const, disabled: eliminarAmistad.isPending, onClick: () => eliminarAmistad.mutate(usuario.idUsuario) }
+    : usuario.solicitudPendiente?.direccion === 'enviada'
+      ? { label: 'Solicitud enviada', variant: 'outline' as const, disabled: true, onClick: () => {} }
+      : usuario.solicitudPendiente?.direccion === 'recibida'
+        ? { label: 'Aceptar solicitud', variant: 'default' as const, disabled: aceptarSolicitud.isPending, onClick: () => aceptarSolicitud.mutate(usuario.idUsuario) }
+        : { label: 'Agregar como amigo', variant: 'default' as const, disabled: crearSolicitud.isPending, onClick: () => crearSolicitud.mutate(usuario.idUsuario) };
 
-        {usuario.loSigo ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => dejarDeSeguir.mutate(usuario.idUsuario)}
-            disabled={dejarDeSeguir.isPending}
-          >
-            Siguiendo
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => seguirUsuario.mutate(usuario.idUsuario)}
-            disabled={seguirUsuario.isPending}
-          >
-            Seguir
-          </Button>
-        )}
+  const seguimiento = usuario.loSigo
+    ? { label: 'Siguiendo', disabled: dejarDeSeguir.isPending, onClick: () => dejarDeSeguir.mutate(usuario.idUsuario) }
+    : { label: 'Seguir', disabled: seguir.isPending, onClick: () => seguir.mutate(usuario.idUsuario) };
+
+  return { amistad, seguimiento };
+}
+
+function FilaPersona({
+  usuario,
+  activa,
+  onSeleccionar,
+}: {
+  usuario: UsuarioBusquedaDto;
+  activa: boolean;
+  onSeleccionar: (u: UsuarioBusquedaDto) => void;
+}) {
+  const { amistad, seguimiento } = useAccionesAmistad(usuario);
+  const motivo = textoMotivo(usuario);
+  const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSeleccionar(usuario)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSeleccionar(usuario);
+        }
+      }}
+      aria-label={`Ver detalle de ${nombreCompleto}`}
+      className={`group flex w-full cursor-pointer items-center gap-inline rounded-control px-inline py-tight text-left transition-colors hover:bg-muted ${activa ? 'bg-muted' : ''}`}
+    >
+      <Avatar className="shrink-0">
+        {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
+        <AvatarFallback className="type-meta font-medium text-text-secondary">
+          {getIniciales(usuario.nombre, usuario.apellido)}
+        </AvatarFallback>
+      </Avatar>
+
+      <div className="min-w-0 flex-1">
+        <p className="type-subtitle truncate text-text-primary">{nombreCompleto}</p>
+        {usuario.carrera && <p className="type-meta truncate">{usuario.carrera}</p>}
       </div>
+
+      {motivo && <span className="pill pill-accent max-lg:hidden shrink-0">{motivo}</span>}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Más acciones para ${nombreCompleto}`}
+            className="shrink-0 rounded-control p-tight text-text-secondary opacity-0 transition-opacity hover:bg-surface-container-high hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            <MoreVertical className="size-4" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem disabled={amistad.disabled} onSelect={amistad.onClick}>
+            {amistad.label}
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={seguimiento.disabled} onSelect={seguimiento.onClick}>
+            {seguimiento.label}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
 
-function ChipToggleGroup({
-  opciones,
-  seleccionados,
-  onToggle,
-}: {
-  opciones: { id: number; nombre: string }[];
-  seleccionados: number[];
-  onToggle: (id: number) => void;
-}) {
-  if (opciones.length === 0) return null;
+function PanelDetalleVacio() {
+  return (
+    <aside className="layout-aside">
+      <div className="card-base flex min-h-64 flex-col items-center justify-center text-center">
+        <p className="type-subtitle text-text-primary">Seleccioná a alguien</p>
+        <p className="type-meta mt-tight max-w-prose">
+          Acá vas a ver su carrera, habilidades e intereses.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+function PanelDetalleConPersona({ usuario }: { usuario: UsuarioBusquedaDto }) {
+  const { amistad, seguimiento } = useAccionesAmistad(usuario);
+  const motivo = textoMotivo(usuario);
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {opciones.map((opcion) => {
-        const isSelected = seleccionados.includes(opcion.id);
-        return (
-          <button
-            key={opcion.id}
-            type="button"
-            onClick={() => onToggle(opcion.id)}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-              isSelected
-                ? 'border-primary bg-primary text-on-primary'
-                : 'border-outline-variant/30 bg-surface-container-low text-on-surface hover:bg-surface-container-high'
-            }`}
-          >
-            {opcion.nombre}
-          </button>
-        );
-      })}
-    </div>
+    <aside className="layout-aside">
+      <div className="card-base">
+        <div className="flex flex-col items-center text-center">
+          <Avatar className="size-20">
+            {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
+            <AvatarFallback className="type-section text-text-secondary">
+              {getIniciales(usuario.nombre, usuario.apellido)}
+            </AvatarFallback>
+          </Avatar>
+
+          <p className="type-section font-headline mt-stack text-text-primary">
+            {usuario.nombre} {usuario.apellido}
+          </p>
+          {usuario.carrera && <p className="type-meta mt-micro">{usuario.carrera}</p>}
+          {motivo && <span className="pill pill-accent mt-inline">{motivo}</span>}
+
+          <div className="mt-stack flex w-full flex-col gap-tight">
+            <Button
+              variant={amistad.variant}
+              disabled={amistad.disabled}
+              onClick={amistad.onClick}
+              className="w-full"
+            >
+              {amistad.label}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={seguimiento.disabled}
+              onClick={seguimiento.onClick}
+              className="w-full"
+            >
+              {seguimiento.label}
+            </Button>
+          </div>
+        </div>
+
+        {usuario.habilidades.length > 0 && (
+          <section className="mt-section">
+            <h3 className="type-meta uppercase tracking-wide">Habilidades</h3>
+            <div className="mt-tight flex flex-wrap gap-tight">
+              {usuario.habilidades.map((h) => (
+                <span key={h} className="pill pill-neutral">
+                  {h}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {usuario.intereses.length > 0 && (
+          <section className="mt-stack">
+            <h3 className="type-meta uppercase tracking-wide">Intereses</h3>
+            <div className="mt-tight flex flex-wrap gap-tight">
+              {usuario.intereses.map((i) => (
+                <span key={i} className="pill pill-neutral">
+                  {i}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </aside>
   );
+}
+
+function ListaSkeleton() {
+  return (
+    <SkeletonTheme baseColor="var(--color-surface-container)" highlightColor="var(--color-surface-container-high)">
+      <ul className="grid gap-tight md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+        {Array.from({ length: 9 }).map((_, i) => (
+          <li key={i} className="p-tight">
+            <Skeleton height={56} borderRadius="var(--radius-control)" />
+          </li>
+        ))}
+      </ul>
+    </SkeletonTheme>
+  );
+}
+
+function mensajeVacio(pestana: PestanaId, tieneAmigos: boolean, hayFiltrosActivos: boolean) {
+  if (pestana === 'amigos-de-amigos' && !tieneAmigos) {
+    return {
+      titulo: 'Agregá a tu primer amigo',
+      descripcion: 'Cuando tengas amigos vas a empezar a ver también a los suyos acá.',
+    };
+  }
+  if (pestana === 'mis-amigos' && !tieneAmigos) {
+    return {
+      titulo: 'Todavía no tenés amigos',
+      descripcion: 'Buscá compañeros en la pestaña Todos y agregalos.',
+    };
+  }
+  return {
+    titulo: 'No encontramos a nadie',
+    descripcion: hayFiltrosActivos
+      ? 'Probá con otro nombre o quitá algún filtro.'
+      : 'Probá con otro nombre.',
+  };
 }
 
 export default function PersonasPage() {
+  const [pestana, setPestana] = useState<PestanaId>('todos');
   const [q, setQ] = useState('');
-  const [carrera, setCarrera] = useState(false);
-  const [amigosDeAmigos, setAmigosDeAmigos] = useState(false);
   const [habilidadesSel, setHabilidadesSel] = useState<number[]>([]);
   const [interesesSel, setInteresesSel] = useState<number[]>([]);
+  const [seleccionado, setSeleccionado] = useState<UsuarioBusquedaDto | null>(null);
 
   const { data: habilidades = [] } = useQuery({ queryKey: ['catalogo-habilidades'], queryFn: getHabilidades });
   const { data: intereses = [] } = useQuery({ queryKey: ['catalogo-intereses'], queryFn: getIntereses });
 
-  const { resultados, isLoading, enabled } = useBuscarUsuarios({
+  const { amigos } = useAmigos();
+  const { resultados, hasMore, isLoading, cargarMas, cargandoMas } = useBuscarUsuarios({
     q,
-    carrera,
-    amigosDeAmigos,
+    carrera: pestana === 'mi-carrera',
+    amigosDeAmigos: pestana === 'amigos-de-amigos',
+    soloAmigos: pestana === 'mis-amigos',
     habilidades: habilidadesSel,
     intereses: interesesSel,
   });
+
   const { solicitudes } = useSolicitudesAmistadPendientes();
   const aceptarSolicitud = useAceptarSolicitudAmistad();
   const rechazarSolicitud = useRechazarSolicitudAmistad();
+
+  const totalFiltros = habilidadesSel.length + interesesSel.length;
 
   function toggleHabilidad(id: number) {
     setHabilidadesSel((prev) => (prev.includes(id) ? prev.filter((h) => h !== id) : [...prev, id]));
@@ -197,39 +311,42 @@ export default function PersonasPage() {
     setInteresesSel((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   }
 
+  const vacio = mensajeVacio(pestana, amigos.length > 0, totalFiltros > 0);
+
   return (
-    <div className="px-8 pb-12 pt-8">
-      <section className="mb-8">
-        <h1 className="font-headline text-3xl font-black tracking-tight text-on-surface">Personas</h1>
-        <p className="mt-1 text-on-surface-variant">Busca compañeros, sigue su actividad y hazte amigos.</p>
-      </section>
+    <div className="px-section py-page">
+      <header className="mx-auto mb-section max-w-content">
+        <h1 className="type-display text-text-primary">Personas</h1>
+        <p className="type-body mt-tight text-text-secondary">
+          Busca compañeros, sigue su actividad y hazte amigo.
+        </p>
+      </header>
 
       {solicitudes.length > 0 && (
-        <section className="mb-10">
-          <h2 className="mb-4 font-headline text-lg font-bold text-on-surface">Solicitudes pendientes</h2>
-          <div className="space-y-3">
+        <section className="mx-auto mb-section max-w-content">
+          <h2 className="type-section mb-card">Solicitudes pendientes</h2>
+          <div className="flex flex-col gap-tight">
             {solicitudes.map((s) => (
-              <div
-                key={s.idAmistad}
-                className="flex items-center justify-between gap-3 rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-4"
-              >
-                <div className="flex items-center gap-3">
+              <div key={s.idAmistad} className="card-base flex items-center justify-between gap-tight py-tight">
+                <div className="flex items-center gap-tight">
                   <Avatar>
                     {s.solicitante.fotoUrl && (
                       <AvatarImage src={s.solicitante.fotoUrl} alt={`${s.solicitante.nombre} ${s.solicitante.apellido}`} />
                     )}
-                    <AvatarFallback>{getIniciales(s.solicitante.nombre, s.solicitante.apellido)}</AvatarFallback>
+                    <AvatarFallback className="type-meta font-medium text-text-secondary">
+                      {getIniciales(s.solicitante.nombre, s.solicitante.apellido)}
+                    </AvatarFallback>
                   </Avatar>
-                  <p className="text-sm font-semibold text-on-surface">
+                  <p className="type-subtitle text-text-primary">
                     {s.solicitante.nombre} {s.solicitante.apellido}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-tight">
                   <Button size="sm" onClick={() => aceptarSolicitud.mutate(s.idAmistad)}>
-                    <UserCheck className="h-4 w-4" /> Aceptar
+                    <UserCheck className="size-4" aria-hidden="true" /> Aceptar
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => rechazarSolicitud.mutate(s.idAmistad)}>
-                    <UserX className="h-4 w-4" /> Rechazar
+                    <UserX className="size-4" aria-hidden="true" /> Rechazar
                   </Button>
                 </div>
               </div>
@@ -238,70 +355,125 @@ export default function PersonasPage() {
         </section>
       )}
 
-      <section>
-        <div className="mb-6 space-y-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar por nombre o apellido..."
-              className="pl-9"
-            />
-          </div>
+      <div className="layout-grid">
+        <main className="layout-main">
+          <div className="card-base">
+            <div className="flex items-center gap-inline">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
+                <Input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar por nombre o apellido"
+                  className="pl-9"
+                  aria-label="Buscar personas"
+                />
+              </div>
 
-          <div className="flex flex-wrap gap-6">
-            <label className="flex items-center gap-2 text-sm font-medium text-on-surface">
-              <Checkbox checked={carrera} onCheckedChange={(v) => setCarrera(v === true)} />
-              Misma carrera
-            </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-on-surface">
-              <Checkbox checked={amigosDeAmigos} onCheckedChange={(v) => setAmigosDeAmigos(v === true)} />
-              Amigos de amigos
-            </label>
-          </div>
-
-          {habilidades.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-black uppercase tracking-wider text-on-surface-variant">Habilidades</p>
-              <ChipToggleGroup
-                opciones={habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad }))}
-                seleccionados={habilidadesSel}
-                onToggle={toggleHabilidad}
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-tight">
+                    <SlidersHorizontal className="size-4" aria-hidden="true" />
+                    Filtros
+                    {totalFiltros > 0 && <span className="pill pill-accent">{totalFiltros}</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80">
+                  {[
+                    { titulo: 'Habilidades', lista: habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad })), sel: habilidadesSel, toggle: toggleHabilidad },
+                    { titulo: 'Intereses', lista: intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres })), sel: interesesSel, toggle: toggleInteres },
+                  ].map(({ titulo, lista, sel, toggle }) =>
+                    lista.length > 0 ? (
+                      <section key={titulo} className="mb-stack last:mb-0">
+                        <h3 className="type-meta uppercase tracking-wide">{titulo}</h3>
+                        <div className="mt-tight flex flex-wrap gap-tight">
+                          {lista.map((opcion) => (
+                            <button
+                              key={opcion.id}
+                              type="button"
+                              aria-pressed={sel.includes(opcion.id)}
+                              onClick={() => toggle(opcion.id)}
+                              className={`pill ${sel.includes(opcion.id) ? 'pill-accent' : 'pill-neutral'}`}
+                            >
+                              {opcion.nombre}
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null,
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
-          )}
 
-          {intereses.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-black uppercase tracking-wider text-on-surface-variant">Intereses</p>
-              <ChipToggleGroup
-                opciones={intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres }))}
-                seleccionados={interesesSel}
-                onToggle={toggleInteres}
-              />
-            </div>
-          )}
-        </div>
+            <Tabs value={pestana} onValueChange={(v) => setPestana(v as PestanaId)} className="mt-stack">
+              <TabsList className="w-full justify-start gap-1 bg-transparent p-0">
+                {PESTANAS.map((p) => (
+                  <TabsTrigger
+                    key={p.id}
+                    value={p.id}
+                    className="rounded-pill data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none"
+                  >
+                    {p.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
 
-        {enabled && !isLoading && resultados.length === 0 && (
-          <Empty tone="muted" aria-live="polite">
-            <EmptyMedia variant="compact">
-              <Users aria-hidden="true" className="h-6 w-6" />
-            </EmptyMedia>
-            <EmptyHeader>
-              <EmptyTitle className="text-lg">Sin resultados</EmptyTitle>
-              <EmptyDescription>No encontramos personas con esos filtros.</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
+              <TabsContent value={pestana} className="mt-stack">
+                {isLoading ? (
+                  <ListaSkeleton />
+                ) : resultados.length === 0 ? (
+                  <Empty tone="muted" aria-live="polite">
+                    <EmptyMedia variant="compact">
+                      <Users aria-hidden="true" className="size-6" />
+                    </EmptyMedia>
+                    <EmptyHeader>
+                      <EmptyTitle className="type-subtitle">{vacio.titulo}</EmptyTitle>
+                      <EmptyDescription>{vacio.descripcion}</EmptyDescription>
+                    </EmptyHeader>
+                    {totalFiltros > 0 && (
+                      <EmptyContent>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setHabilidadesSel([]);
+                            setInteresesSel([]);
+                          }}
+                        >
+                          Quitar filtros
+                        </Button>
+                      </EmptyContent>
+                    )}
+                  </Empty>
+                ) : (
+                  <>
+                    <ul className="grid gap-tight md:grid-cols-2 xl:grid-cols-3">
+                      {resultados.map((usuario) => (
+                        <li key={usuario.idUsuario}>
+                          <FilaPersona
+                            usuario={usuario}
+                            activa={seleccionado?.idUsuario === usuario.idUsuario}
+                            onSeleccionar={setSeleccionado}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                    {hasMore && (
+                      <div className="mt-stack flex justify-center">
+                        <Button variant="outline" onClick={cargarMas} disabled={cargandoMas}>
+                          {cargandoMas ? 'Cargando…' : 'Cargar más'}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        </main>
 
-        <div className="space-y-3">
-          {resultados.map((usuario) => (
-            <UsuarioCard key={usuario.idUsuario} usuario={usuario} />
-          ))}
-        </div>
-      </section>
+        {seleccionado ? <PanelDetalleConPersona usuario={seleccionado} /> : <PanelDetalleVacio />}
+      </div>
     </div>
   );
 }
