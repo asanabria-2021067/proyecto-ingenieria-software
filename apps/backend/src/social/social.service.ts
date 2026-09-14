@@ -15,7 +15,7 @@ const PERSONAS_PAGE_SIZE = 12;
 
 const USUARIO_BUSQUEDA_SELECT = {
   ...USUARIO_RESUMEN_SELECT,
-  perfil: { select: { carrera: { select: { nombreCarrera: true } } } },
+  perfil: { select: { semestre: true, carrera: { select: { nombreCarrera: true } } } },
   habilidades: { select: { habilidad: { select: { nombreHabilidad: true } } } },
   intereses: { select: { interes: { select: { nombreInteres: true } } } },
 } as const;
@@ -383,6 +383,7 @@ export class SocialService {
         solicitudPendiente,
         loSigo: seguidosSet.has(usuario.idUsuario),
         carrera: usuario.perfil?.carrera?.nombreCarrera ?? null,
+        semestre: usuario.perfil?.semestre ?? null,
         mismaCarrera: idsMismaCarreraSet.has(usuario.idUsuario),
         amigosEnComun: amigosEnComunPorUsuario.get(usuario.idUsuario)?.size ?? 0,
         habilidades: usuario.habilidades.map((h) => h.habilidad.nombreHabilidad),
