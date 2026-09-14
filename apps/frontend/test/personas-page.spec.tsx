@@ -126,7 +126,7 @@ describe('PersonasPage', () => {
     expect(within(botonFiltros).getByText('1')).toBeInTheDocument();
   });
 
-  it('seleccionar una persona llena el panel lateral', async () => {
+  it('la tarjeta muestra nombre, carrera y habilidades, y enlaza al perfil completo', async () => {
     buscarUsuariosMock.mockResolvedValue({
       items: [
         usuario({ idUsuario: 10, nombre: 'Carla', apellido: 'Ruiz', carrera: 'Ingeniería', habilidades: ['React'] }),
@@ -135,13 +135,13 @@ describe('PersonasPage', () => {
     });
     await renderPersonas();
 
-    expect(screen.getByText('Seleccioná a alguien')).toBeInTheDocument();
-
-    fireEvent.click(await screen.findByRole('button', { name: /Ver detalle de Carla Ruiz/i }));
-
-    expect(screen.queryByText('Seleccioná a alguien')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Carla Ruiz').length).toBeGreaterThan(0);
+    expect(await screen.findByText('Carla Ruiz')).toBeInTheDocument();
+    expect(screen.getByText('Ingeniería')).toBeInTheDocument();
     expect(screen.getByText('React')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ver perfil/i })).toHaveAttribute(
+      'href',
+      '/dashboard/personas/10',
+    );
   });
 
   it('cada estado vacío renderiza su mensaje correspondiente', async () => {
@@ -163,11 +163,11 @@ describe('PersonasPage', () => {
     expect(fuente).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
-  it('agrega como amigo desde el panel lateral y refleja el nuevo estado sin refrescar', async () => {
+  it('agrega como amigo desde la tarjeta y refleja el nuevo estado sin refrescar', async () => {
     // 1ra llamada (fetch inicial): sin relación. Desde la 2da en adelante
     // (refetch que dispara invalidateQueries tras la mutación): ya con
-    // solicitud enviada. El panel debe seguir el dato fresco de
-    // `resultados`, no un snapshot tomado al seleccionar la persona.
+    // solicitud enviada. La tarjeta debe seguir el dato fresco de
+    // `resultados`, no un snapshot tomado al montar.
     buscarUsuariosMock.mockResolvedValueOnce({ items: [usuario({ idUsuario: 10, nombre: 'Carla' })], hasMore: false });
     buscarUsuariosMock.mockResolvedValue({
       items: [usuario({ idUsuario: 10, nombre: 'Carla', solicitudPendiente: { direccion: 'enviada' } })],
@@ -175,7 +175,6 @@ describe('PersonasPage', () => {
     });
     await renderPersonas();
 
-    fireEvent.click(await screen.findByRole('button', { name: /Ver detalle de Carla/i }));
     fireEvent.click(await screen.findByRole('button', { name: 'Agregar como amigo' }));
 
     await waitFor(() => expect(crearSolicitudAmistadMock).toHaveBeenCalledWith(10));
