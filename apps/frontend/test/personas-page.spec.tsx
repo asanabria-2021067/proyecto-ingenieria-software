@@ -46,6 +46,7 @@ function usuario(overrides: Partial<UsuarioBusquedaDto> = {}): UsuarioBusquedaDt
     solicitudPendiente: null,
     loSigo: false,
     carrera: null,
+    semestre: null,
     mismaCarrera: false,
     amigosEnComun: 0,
     habilidades: [],
@@ -162,14 +163,23 @@ describe('PersonasPage', () => {
     expect(fuente).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
-  it('agrega como amigo desde el panel lateral', async () => {
-    buscarUsuariosMock.mockResolvedValue({ items: [usuario({ idUsuario: 10, nombre: 'Carla' })], hasMore: false });
+  it('agrega como amigo desde el panel lateral y refleja el nuevo estado sin refrescar', async () => {
+    // 1ra llamada (fetch inicial): sin relación. Desde la 2da en adelante
+    // (refetch que dispara invalidateQueries tras la mutación): ya con
+    // solicitud enviada. El panel debe seguir el dato fresco de
+    // `resultados`, no un snapshot tomado al seleccionar la persona.
+    buscarUsuariosMock.mockResolvedValueOnce({ items: [usuario({ idUsuario: 10, nombre: 'Carla' })], hasMore: false });
+    buscarUsuariosMock.mockResolvedValue({
+      items: [usuario({ idUsuario: 10, nombre: 'Carla', solicitudPendiente: { direccion: 'enviada' } })],
+      hasMore: false,
+    });
     await renderPersonas();
 
     fireEvent.click(await screen.findByRole('button', { name: /Ver detalle de Carla/i }));
     fireEvent.click(await screen.findByRole('button', { name: 'Agregar como amigo' }));
 
     await waitFor(() => expect(crearSolicitudAmistadMock).toHaveBeenCalledWith(10));
+    expect(await screen.findByRole('button', { name: 'Solicitud enviada' })).toBeDisabled();
   });
 
   it('lista solicitudes pendientes y permite aceptarlas', async () => {
