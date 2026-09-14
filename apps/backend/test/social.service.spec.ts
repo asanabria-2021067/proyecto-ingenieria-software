@@ -9,6 +9,7 @@ function makePrisma() {
   return {
     amistad: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       update: vi.fn(),
@@ -22,11 +23,15 @@ function makePrisma() {
     },
     usuario: {
       findUniqueOrThrow: vi.fn().mockResolvedValue({ nombre: 'Ana', apellido: 'Pérez' }),
+      findUnique: vi.fn(),
       findMany: vi.fn(),
     },
     perfilEstudiante: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+    },
+    participacionProyecto: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
     $queryRaw: vi.fn().mockResolvedValue([]),
   };
@@ -345,6 +350,101 @@ describe('SocialService — buscarUsuarios', () => {
         },
       }),
     );
+  });
+});
+
+describe('SocialService — obtenerPerfilPublico', () => {
+  it('lanza 404 si el usuario objetivo no existe', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findUnique.mockResolvedValue(null);
+    const { service } = makeService(prisma);
+
+    await expect(service.obtenerPerfilPublico(1, 999)).rejects.toThrow(NotFoundException);
+  });
+
+  it('arma el perfil con relación, amigos en común y proyectos activos', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findUnique.mockResolvedValue({
+      idUsuario: 2,
+      nombre: 'Carla',
+      apellido: 'Ruiz',
+      fotoUrl: null,
+      correo: 'carla@uvg.edu.gt',
+      perfil: { semestre: 5, carrera: { nombreCarrera: 'Ingeniería' } },
+      habilidades: [{ habilidad: { nombreHabilidad: 'React' } }],
+      intereses: [{ interes: { nombreInteres: 'IA' } }],
+    });
+    // amistad(1↔2): pendiente, enviada por mí
+    prisma.amistad.findFirst.mockResolvedValue({
+      idUsuarioSolicitante: 1,
+      idUsuarioReceptor: 2,
+      estado: EstadoAmistad.PENDIENTE,
+    });
+    prisma.seguimiento.findUnique.mockResolvedValue(null);
+    prisma.perfilEstudiante.findUnique.mockResolvedValue({ idCarrera: 7 });
+    prisma.perfilEstudiante.findMany.mockResolvedValue([{ idUsuario: 1 }, { idUsuario: 2 }]);
+    // getAmigoIds(1) luego getAmigoIds(2), en ese orden (Promise.all evalúa el arreglo en orden)
+    prisma.amistad.findMany
+      .mockResolvedValueOnce([{ idUsuarioSolicitante: 1, idUsuarioReceptor: 3, estado: EstadoAmistad.ACEPTADA }])
+      .mockResolvedValueOnce([{ idUsuarioSolicitante: 2, idUsuarioReceptor: 3, estado: EstadoAmistad.ACEPTADA }]);
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      {
+        rolProyecto: {
+          nombreRol: 'Desarrollador',
+          proyecto: { idProyecto: 9, tituloProyecto: 'Portal UVG', estadoProyecto: 'EN_PROGRESO' },
+        },
+      },
+    ]);
+    prisma.usuario.findMany.mockResolvedValue([{ idUsuario: 3, nombre: 'Beto', apellido: 'Gómez', fotoUrl: null }]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.obtenerPerfilPublico(1, 2);
+
+    expect(resultado).toMatchObject({
+      idUsuario: 2,
+      nombre: 'Carla',
+      apellido: 'Ruiz',
+      correo: 'carla@uvg.edu.gt',
+      esAmigo: false,
+      solicitudPendiente: { direccion: 'enviada' },
+      loSigo: false,
+      carrera: 'Ingeniería',
+      semestre: 5,
+      mismaCarrera: true,
+      habilidades: ['React'],
+      intereses: ['IA'],
+    });
+    expect(resultado.amigosEnComun).toEqual([{ idUsuario: 3, nombre: 'Beto', apellido: 'Gómez', fotoUrl: null }]);
+    expect(resultado.proyectosActivos).toEqual([
+      { idProyecto: 9, tituloProyecto: 'Portal UVG', estadoProyecto: 'EN_PROGRESO', rolNombre: 'Desarrollador' },
+    ]);
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { idUsuario: { in: [3] } } }),
+    );
+  });
+
+  it('sin amigos en común no consulta usuario.findMany para armar la lista', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findUnique.mockResolvedValue({
+      idUsuario: 2,
+      nombre: 'Carla',
+      apellido: 'Ruiz',
+      fotoUrl: null,
+      correo: 'carla@uvg.edu.gt',
+      perfil: null,
+      habilidades: [],
+      intereses: [],
+    });
+    prisma.amistad.findFirst.mockResolvedValue(null);
+    prisma.seguimiento.findUnique.mockResolvedValue(null);
+    prisma.perfilEstudiante.findUnique.mockResolvedValue(null);
+    prisma.amistad.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.obtenerPerfilPublico(1, 2);
+
+    expect(resultado.amigosEnComun).toEqual([]);
+    expect(prisma.usuario.findMany).not.toHaveBeenCalled();
   });
 });
 
