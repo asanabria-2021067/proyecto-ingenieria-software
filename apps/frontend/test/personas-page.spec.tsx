@@ -142,6 +142,33 @@ describe('PersonasPage', () => {
     );
   });
 
+  it('el toggle de vista cambia entre tarjetas y lista', async () => {
+    buscarUsuariosMock.mockResolvedValue({
+      items: [usuario({ idUsuario: 10, nombre: 'Carla', apellido: 'Ruiz' })],
+      hasMore: false,
+    });
+    await renderPersonas();
+
+    expect(await screen.findByText('Carla Ruiz')).toBeInTheDocument();
+    // en tarjetas, "Ver perfil" trae una flecha aparte del texto (article > a)
+    expect(screen.getByRole('button', { name: 'Ver como tarjetas' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver como lista' }));
+
+    expect(screen.getByRole('button', { name: 'Ver como lista' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Ver como tarjetas' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(screen.getByText('Carla Ruiz')).toBeInTheDocument();
+  });
+
   it('cada estado vacío renderiza su mensaje correspondiente', async () => {
     await renderPersonas();
     expect(await screen.findByText('No encontramos a nadie')).toBeInTheDocument();
