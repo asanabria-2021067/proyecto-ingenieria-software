@@ -20,12 +20,23 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
-import { ArrowRight, MoreVertical, Search, SlidersHorizontal, UserCheck, UserX, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  LayoutGrid,
+  List,
+  MoreVertical,
+  Search,
+  SlidersHorizontal,
+  UserCheck,
+  UserX,
+  Users,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +65,7 @@ import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badg
 import type { UsuarioBusquedaDto } from '@/lib/types/social';
 
 type PestanaId = 'todos' | 'amigos-de-amigos' | 'mi-carrera' | 'mis-amigos';
+type VistaId = 'tarjetas' | 'lista';
 
 const PESTANAS: { id: PestanaId; label: string }[] = [
   { id: 'todos', label: 'Todos' },
@@ -151,6 +163,79 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   );
 }
 
+/** Misma info que `PersonaCard`, en una fila horizontal para la vista de lista. */
+function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
+  const { amistad, seguimiento } = useAccionesAmistad(usuario);
+  const motivo = textoMotivo(usuario);
+  const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
+
+  return (
+    <article className="card-base flex items-center gap-tight py-tight transition-shadow hover:shadow-raised">
+      <Avatar className="size-11 shrink-0">
+        {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
+        <AvatarFallback className="type-body font-medium text-text-secondary">
+          {getIniciales(usuario.nombre, usuario.apellido)}
+        </AvatarFallback>
+      </Avatar>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-tight">
+          <p className="type-subtitle text-text-primary">{nombreCompleto}</p>
+          {usuario.semestre != null && (
+            <span className={`pill font-semibold ${getSemestreBadgeStyle(usuario.semestre)}`}>
+              Semestre {usuario.semestre}
+            </span>
+          )}
+        </div>
+        <div className="mt-micro flex flex-wrap items-center gap-tight">
+          {usuario.carrera && <span className="type-meta">{usuario.carrera}</span>}
+          {motivo && <span className="pill pill-accent">{motivo}</span>}
+          {usuario.habilidades.slice(0, 3).map((h) => (
+            <span key={h} className={`pill font-semibold ${getHabilidadBadgeStyle(h)}`}>
+              {h}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-tight">
+        <Button
+          size="sm"
+          variant={amistad.variant}
+          disabled={amistad.disabled}
+          onClick={amistad.onClick}
+          className="h-7 rounded-pill px-2.5 text-[11px]"
+        >
+          {amistad.label}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Más acciones para ${nombreCompleto}`}
+              className="rounded-control p-tight text-text-secondary hover:bg-surface-container-high hover:text-text-primary"
+            >
+              <MoreVertical className="size-4" aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem disabled={seguimiento.disabled} onSelect={seguimiento.onClick}>
+              {seguimiento.label}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Link
+          href={`/dashboard/personas/${usuario.idUsuario}`}
+          className="type-meta flex items-center gap-micro font-semibold text-primary hover:underline"
+        >
+          Ver perfil
+          <ArrowRight className="size-3.5" aria-hidden="true" />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 function ListaSkeleton() {
   return (
     <SkeletonTheme baseColor="var(--color-surface-container)" highlightColor="var(--color-surface-container-high)">
@@ -188,6 +273,7 @@ function mensajeVacio(pestana: PestanaId, tieneAmigos: boolean, hayFiltrosActivo
 
 export default function PersonasPage() {
   const [pestana, setPestana] = useState<PestanaId>('todos');
+  const [vista, setVista] = useState<VistaId>('tarjetas');
   const [q, setQ] = useState('');
   const [habilidadesSel, setHabilidadesSel] = useState<number[]>([]);
   const [interesesSel, setInteresesSel] = useState<number[]>([]);
@@ -311,6 +397,45 @@ export default function PersonasPage() {
                 )}
               </PopoverContent>
             </Popover>
+
+            <div className="flex items-center gap-micro rounded-control border border-outline-variant p-micro">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Ver como tarjetas"
+                    aria-pressed={vista === 'tarjetas'}
+                    onClick={() => setVista('tarjetas')}
+                    className={`flex size-8 items-center justify-center rounded-control transition-colors ${
+                      vista === 'tarjetas'
+                        ? 'bg-action text-on-action'
+                        : 'text-text-secondary hover:bg-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <LayoutGrid className="size-4" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Ver como tarjetas</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Ver como lista"
+                    aria-pressed={vista === 'lista'}
+                    onClick={() => setVista('lista')}
+                    className={`flex size-8 items-center justify-center rounded-control transition-colors ${
+                      vista === 'lista'
+                        ? 'bg-action text-on-action'
+                        : 'text-text-secondary hover:bg-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <List className="size-4" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Ver como lista</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
           <Tabs value={pestana} onValueChange={(v) => setPestana(v as PestanaId)} className="mt-card">
@@ -354,13 +479,23 @@ export default function PersonasPage() {
                 </Empty>
               ) : (
                 <>
-                  <ul className="grid gap-gap sm:grid-cols-2 xl:grid-cols-3">
-                    {resultados.map((usuario) => (
-                      <li key={usuario.idUsuario}>
-                        <PersonaCard usuario={usuario} />
-                      </li>
-                    ))}
-                  </ul>
+                  {vista === 'tarjetas' ? (
+                    <ul className="grid gap-gap sm:grid-cols-2 xl:grid-cols-3">
+                      {resultados.map((usuario) => (
+                        <li key={usuario.idUsuario}>
+                          <PersonaCard usuario={usuario} />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <ul className="flex flex-col gap-tight">
+                      {resultados.map((usuario) => (
+                        <li key={usuario.idUsuario}>
+                          <PersonaListRow usuario={usuario} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {hasMore && (
                     <div className="mt-card flex justify-center">
                       <Button variant="outline" onClick={cargarMas} disabled={cargandoMas}>
