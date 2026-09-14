@@ -12,3 +12,5 @@ export const buscarUsuariosQueryKey = (filtros: BuscarUsuariosFiltros) =>
   ['social-buscar-usuarios', filtros] as const;
 
 export const feedSocialQueryKey = () => ['social-feed'] as const;
+
+export const perfilUsuarioQueryKey = (idUsuario: number) => ['social-perfil-usuario', idUsuario] as const;
