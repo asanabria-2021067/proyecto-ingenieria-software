@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 function toIdArray({ value }: { value: unknown }): unknown {
   if (Array.isArray(value)) return value.map(Number);
@@ -21,6 +21,10 @@ export class BuscarUsuariosQueryDto {
   amigosDeAmigos?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  soloAmigos?: boolean;
+
+  @IsOptional()
   @Transform(toIdArray)
   @IsArray()
   @IsInt({ each: true })
@@ -31,4 +35,10 @@ export class BuscarUsuariosQueryDto {
   @IsArray()
   @IsInt({ each: true })
   intereses?: number[];
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => Number(value))
+  @IsInt()
+  @Min(1)
+  page?: number;
 }
