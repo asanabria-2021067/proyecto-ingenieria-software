@@ -15,9 +15,10 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
-import { MoreVertical, Search, SlidersHorizontal, UserCheck, UserX, Users } from 'lucide-react';
+import { ArrowRight, MoreVertical, Search, SlidersHorizontal, UserCheck, UserX, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -39,14 +40,11 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import {
+  useAccionesAmistad,
   useAceptarSolicitudAmistad,
   useAmigos,
   useBuscarUsuarios,
-  useCrearSolicitudAmistad,
-  useDejarDeSeguir,
-  useEliminarAmistad,
   useRechazarSolicitudAmistad,
-  useSeguirUsuario,
   useSolicitudesAmistadPendientes,
 } from '@/hooks/use-social';
 import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
@@ -71,60 +69,20 @@ function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
   return null;
 }
 
-function useAccionesAmistad(usuario: UsuarioBusquedaDto) {
-  const crearSolicitud = useCrearSolicitudAmistad();
-  const aceptarSolicitud = useAceptarSolicitudAmistad();
-  const eliminarAmistad = useEliminarAmistad();
-  const seguir = useSeguirUsuario();
-  const dejarDeSeguir = useDejarDeSeguir();
-
-  const amistad = usuario.esAmigo
-    ? { label: 'Amigos', variant: 'outline' as const, disabled: eliminarAmistad.isPending, onClick: () => eliminarAmistad.mutate(usuario.idUsuario) }
-    : usuario.solicitudPendiente?.direccion === 'enviada'
-      ? { label: 'Solicitud enviada', variant: 'outline' as const, disabled: true, onClick: () => {} }
-      : usuario.solicitudPendiente?.direccion === 'recibida'
-        ? { label: 'Aceptar solicitud', variant: 'default' as const, disabled: aceptarSolicitud.isPending, onClick: () => aceptarSolicitud.mutate(usuario.idUsuario) }
-        : { label: 'Agregar como amigo', variant: 'default' as const, disabled: crearSolicitud.isPending, onClick: () => crearSolicitud.mutate(usuario.idUsuario) };
-
-  const seguimiento = usuario.loSigo
-    ? { label: 'Siguiendo', disabled: dejarDeSeguir.isPending, onClick: () => dejarDeSeguir.mutate(usuario.idUsuario) }
-    : { label: 'Seguir', disabled: seguir.isPending, onClick: () => seguir.mutate(usuario.idUsuario) };
-
-  return { amistad, seguimiento };
-}
-
-function FilaPersona({
-  usuario,
-  activa,
-  onSeleccionar,
-}: {
-  usuario: UsuarioBusquedaDto;
-  activa: boolean;
-  onSeleccionar: (idUsuario: number) => void;
-}) {
+/** Tarjeta con avatar arriba centrado y acciones alineadas debajo (semestre +
+ * botón de amistad); "Ver perfil" lleva a la página de detalle, no a un panel
+ * lateral, para poder mostrar ahí el perfil completo (incluye amigos en común). */
+function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const { amistad, seguimiento } = useAccionesAmistad(usuario);
   const motivo = textoMotivo(usuario);
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onSeleccionar(usuario.idUsuario)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSeleccionar(usuario.idUsuario);
-        }
-      }}
-      aria-label={`Ver detalle de ${nombreCompleto}`}
-      className={`card-base group relative flex cursor-pointer flex-col items-center gap-tight py-section text-center transition-colors hover:bg-muted ${activa ? 'bg-muted' : ''}`}
-    >
+    <article className="card-base group relative flex flex-col gap-tight transition-shadow hover:shadow-raised">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            onClick={(e) => e.stopPropagation()}
             aria-label={`Más acciones para ${nombreCompleto}`}
             className="absolute right-tight top-tight rounded-control p-tight text-text-secondary opacity-0 transition-opacity hover:bg-surface-container-high hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
           >
@@ -132,117 +90,53 @@ function FilaPersona({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem disabled={amistad.disabled} onSelect={amistad.onClick}>
-            {amistad.label}
-          </DropdownMenuItem>
           <DropdownMenuItem disabled={seguimiento.disabled} onSelect={seguimiento.onClick}>
             {seguimiento.label}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* fila 1: imagen */}
-      <Avatar className="size-20 shrink-0">
-        {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
-        <AvatarFallback className="type-section font-medium text-text-secondary">
-          {getIniciales(usuario.nombre, usuario.apellido)}
-        </AvatarFallback>
-      </Avatar>
-
-      {/* fila 2: nombre */}
-      <p className="type-subtitle text-text-primary">{nombreCompleto}</p>
-
-      {/* fila 3: badges (carrera, semestre, motivo) */}
-      <div className="flex flex-wrap items-center justify-center gap-tight">
-        {usuario.carrera && <span className="pill pill-neutral max-w-full truncate">{usuario.carrera}</span>}
-        {usuario.semestre != null && <span className="pill pill-neutral">Semestre {usuario.semestre}</span>}
-        {motivo && <span className="pill pill-accent">{motivo}</span>}
+      <div className="flex flex-col items-center gap-micro text-center">
+        <Avatar className="size-16">
+          {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
+          <AvatarFallback className="type-section font-medium text-text-secondary">
+            {getIniciales(usuario.nombre, usuario.apellido)}
+          </AvatarFallback>
+        </Avatar>
+        <p className="type-subtitle text-text-primary">{nombreCompleto}</p>
+        {usuario.carrera && <p className="type-meta max-w-full truncate">{usuario.carrera}</p>}
       </div>
-    </div>
-  );
-}
 
-function PanelDetalleVacio() {
-  return (
-    <aside className="layout-aside">
-      <div className="card-base flex min-h-64 flex-col items-center justify-center text-center">
-        <p className="type-subtitle text-text-primary">Seleccioná a alguien</p>
-        <p className="type-meta mt-tight max-w-prose">
-          Acá vas a ver su carrera, habilidades e intereses.
-        </p>
+      <div className="flex items-center justify-between gap-tight">
+        {usuario.semestre != null ? (
+          <span className="pill pill-neutral">Semestre {usuario.semestre}</span>
+        ) : (
+          <span />
+        )}
+        <Button size="sm" variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick}>
+          {amistad.label}
+        </Button>
       </div>
-    </aside>
-  );
-}
 
-function PanelDetalleConPersona({ usuario }: { usuario: UsuarioBusquedaDto }) {
-  const { amistad, seguimiento } = useAccionesAmistad(usuario);
-  const motivo = textoMotivo(usuario);
-
-  return (
-    <aside className="layout-aside">
-      <div className="card-base">
-        <div className="flex flex-col items-center text-center">
-          <Avatar className="size-20">
-            {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
-            <AvatarFallback className="type-section text-text-secondary">
-              {getIniciales(usuario.nombre, usuario.apellido)}
-            </AvatarFallback>
-          </Avatar>
-
-          <p className="type-section font-headline mt-stack text-text-primary">
-            {usuario.nombre} {usuario.apellido}
-          </p>
-          {usuario.carrera && <p className="type-meta mt-micro">{usuario.carrera}</p>}
-          {motivo && <span className="pill pill-accent mt-inline">{motivo}</span>}
-
-          <div className="mt-stack flex w-full flex-col gap-tight">
-            <Button
-              variant={amistad.variant}
-              disabled={amistad.disabled}
-              onClick={amistad.onClick}
-              className="w-full"
-            >
-              {amistad.label}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={seguimiento.disabled}
-              onClick={seguimiento.onClick}
-              className="w-full"
-            >
-              {seguimiento.label}
-            </Button>
-          </div>
+      {(motivo || usuario.habilidades.length > 0) && (
+        <div className="flex flex-wrap gap-tight">
+          {motivo && <span className="pill pill-accent">{motivo}</span>}
+          {usuario.habilidades.slice(0, 2).map((h) => (
+            <span key={h} className="pill pill-neutral">
+              {h}
+            </span>
+          ))}
         </div>
+      )}
 
-        {usuario.habilidades.length > 0 && (
-          <section className="mt-section">
-            <h3 className="type-meta uppercase tracking-wide">Habilidades</h3>
-            <div className="mt-tight flex flex-wrap gap-tight">
-              {usuario.habilidades.map((h) => (
-                <span key={h} className="pill pill-neutral">
-                  {h}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {usuario.intereses.length > 0 && (
-          <section className="mt-stack">
-            <h3 className="type-meta uppercase tracking-wide">Intereses</h3>
-            <div className="mt-tight flex flex-wrap gap-tight">
-              {usuario.intereses.map((i) => (
-                <span key={i} className="pill pill-neutral">
-                  {i}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
-    </aside>
+      <Link
+        href={`/dashboard/personas/${usuario.idUsuario}`}
+        className="type-meta mt-tight flex items-center justify-end gap-micro border-t border-outline-variant pt-tight font-semibold text-primary hover:underline"
+      >
+        Ver perfil
+        <ArrowRight className="size-3.5" aria-hidden="true" />
+      </Link>
+    </article>
   );
 }
 
@@ -286,7 +180,6 @@ export default function PersonasPage() {
   const [q, setQ] = useState('');
   const [habilidadesSel, setHabilidadesSel] = useState<number[]>([]);
   const [interesesSel, setInteresesSel] = useState<number[]>([]);
-  const [seleccionadoId, setSeleccionadoId] = useState<number | null>(null);
 
   const { data: habilidades = [] } = useQuery({ queryKey: ['catalogo-habilidades'], queryFn: getHabilidades });
   const { data: intereses = [] } = useQuery({ queryKey: ['catalogo-intereses'], queryFn: getIntereses });
@@ -316,12 +209,6 @@ export default function PersonasPage() {
   }
 
   const vacio = mensajeVacio(pestana, amigos.length > 0, totalFiltros > 0);
-
-  // Derivado de `resultados`, no un snapshot propio: así el panel y el
-  // estado "activa" de la fila siguen la data fresca después de una
-  // mutación (agregar amigo, seguir, ...) en vez de quedarse con el
-  // usuario tal como estaba al momento de seleccionarlo.
-  const seleccionado = resultados.find((u) => u.idUsuario === seleccionadoId) ?? null;
 
   return (
     <div className="px-section py-page">
@@ -365,8 +252,8 @@ export default function PersonasPage() {
         </section>
       )}
 
-      <div className="layout-grid">
-        <main className="layout-main">
+      <div className="mx-auto max-w-content">
+        <main>
           <div className="flex items-center gap-inline">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
@@ -456,14 +343,10 @@ export default function PersonasPage() {
                 </Empty>
               ) : (
                 <>
-                  <ul className="grid gap-gap md:grid-cols-2 xl:grid-cols-3">
+                  <ul className="grid gap-gap sm:grid-cols-2 xl:grid-cols-3">
                     {resultados.map((usuario) => (
                       <li key={usuario.idUsuario}>
-                        <FilaPersona
-                          usuario={usuario}
-                          activa={seleccionadoId === usuario.idUsuario}
-                          onSeleccionar={setSeleccionadoId}
-                        />
+                        <PersonaCard usuario={usuario} />
                       </li>
                     ))}
                   </ul>
@@ -479,8 +362,6 @@ export default function PersonasPage() {
             </TabsContent>
           </Tabs>
         </main>
-
-        {seleccionado ? <PanelDetalleConPersona usuario={seleccionado} /> : <PanelDetalleVacio />}
       </div>
     </div>
   );
