@@ -72,6 +72,13 @@ export class SocialController {
     return this.social.buscarUsuarios(user.userId, query);
   }
 
+  // Después de 'usuarios/buscar': si va antes, Express matchea /usuarios/buscar
+  // contra :id (ParseIntPipe rechazaría "buscar" con 400 en vez de resolver la ruta correcta).
+  @Get('usuarios/:id')
+  obtenerPerfilPublico(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number }) {
+    return this.social.obtenerPerfilPublico(user.userId, id);
+  }
+
   @Get('feed')
   getFeed(@CurrentUser() user: { userId: number }) {
     return this.feed.getFeed(user.userId);
