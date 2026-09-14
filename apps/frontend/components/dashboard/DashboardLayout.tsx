@@ -11,13 +11,18 @@ import {
   Briefcase,
   FileText,
   ListChecks,
+  RotateCcw,
   Users,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { UserMenu } from '@/components/dashboard/UserMenu';
-import { SidebarNav, flattenNavEntries, type NavEntry } from '@/components/dashboard/SidebarNav';
+import {
+  SidebarNav,
+  flattenNavEntries,
+  type NavEntry,
+} from '@/components/dashboard/SidebarNav';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
@@ -28,15 +33,28 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
 
 const navEntries: NavEntry[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    exact: true,
+  },
   { href: '/dashboard/personas', label: 'Personas', icon: Users },
   {
     type: 'group',
     label: 'Proyectos',
     icon: Briefcase,
     items: [
-      { href: '/dashboard/proyectos', label: 'Explorar Proyectos', icon: FolderOpen },
-      { href: '/dashboard/projects/mine', label: 'Mis Proyectos', icon: Briefcase },
+      {
+        href: '/dashboard/proyectos',
+        label: 'Explorar Proyectos',
+        icon: FolderOpen,
+      },
+      {
+        href: '/dashboard/projects/mine',
+        label: 'Mis Proyectos',
+        icon: Briefcase,
+      },
     ],
   },
   {
@@ -45,7 +63,11 @@ const navEntries: NavEntry[] = [
     icon: ListChecks,
     items: [
       { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
-      { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
+      {
+        href: '/dashboard/mis-postulaciones',
+        label: 'Mis Postulaciones',
+        icon: FileText,
+      },
     ],
   },
 ];
@@ -63,7 +85,8 @@ export default function DashboardLayout({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user, isLoading, isError } = useCurrentUser();
-  const { latestNotification, isConnected: notificationsConnected } = useRealtimeNotifications(!!user);
+  const { latestNotification, isConnected: notificationsConnected } =
+    useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
 
   useEffect(() => {
@@ -117,13 +140,13 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-page">
+    <div className="fixed inset-0 flex items-start gap-3 overflow-hidden overscroll-none bg-page p-3 md:gap-4 md:p-4">
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
       </a>
 
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden h-full w-[231px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex">
+      <aside className="hidden h-full w-[231px] shrink-0 flex-col overflow-y-auto overscroll-contain rounded-3xl border border-outline-variant bg-card shadow-card md:flex">
         <div className="flex items-center gap-inline border-b border-outline-variant px-card py-stack">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
           <span className="type-section text-text-primary">UVGenius</span>
@@ -140,35 +163,62 @@ export default function DashboardLayout({
       <main
         id="dashboard-main"
         tabIndex={-1}
-        className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page focus:outline-none"
+        className="flex h-full min-w-0 flex-1 flex-col gap-3 overflow-hidden bg-page focus:outline-none md:gap-4"
       >
         {/* Top Header Bar */}
-        <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-outline-variant bg-card px-stack md:px-section">
+        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline rounded-3xl border border-outline-variant bg-card px-stack shadow-card md:px-section">
           <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
             <div className="flex items-center gap-tight md:hidden">
               <Image src={logo} alt="UVGENIUS" className="h-8 w-auto" />
               <span className="type-subtitle text-text-primary">UVGenius</span>
             </div>
-            <span className="type-body hidden text-text-secondary md:inline">
-              Universidad del Valle de Guatemala
-            </span>
+            {/* Reemplaza al buscador del mockup: el control de tamaño de
+                fuente ya existente ocupa el mismo lugar prominente. */}
+            <div className="hidden md:block">
+              <FontScaleToggle />
+            </div>
           </div>
-          <div className="flex items-center gap-inline">
+          <div className="flex items-center gap-tight">
             {!!user && (
               <span
                 role="status"
-                title={notificationsConnected ? 'Notificaciones en vivo conectadas' : 'Reconectando notificaciones en vivo…'}
-                aria-label={notificationsConnected ? 'Notificaciones en vivo conectadas' : 'Reconectando notificaciones en vivo'}
+                title={
+                  notificationsConnected
+                    ? 'Notificaciones en vivo conectadas'
+                    : 'Reconectando notificaciones en vivo…'
+                }
+                aria-label={
+                  notificationsConnected
+                    ? 'Notificaciones en vivo conectadas'
+                    : 'Reconectando notificaciones en vivo'
+                }
                 className={`size-2 shrink-0 rounded-full ${
-                  notificationsConnected ? 'bg-status-success' : 'animate-pulse bg-status-warning'
+                  notificationsConnected
+                    ? 'bg-status-success'
+                    : 'animate-pulse bg-status-warning'
                 }`}
               />
             )}
             <NotificationsBell onlyIcon />
-            <FontScaleToggle />
+            <button
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(new Event('start-onboarding-tour'))
+              }
+              aria-label="Repetir tour de bienvenida"
+              className="flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary"
+            >
+              <RotateCcw className="size-5" aria-hidden="true" />
+            </button>
             <div id="dashboard-theme-toggle">
               <ThemeToggle />
+            </div>
+            <div
+              id="dashboard-account-menu"
+              className="hidden border-l border-outline-variant pl-tight lg:block"
+            >
+              <UserMenu user={user} onLogout={handleLogout} variant="compact" />
             </div>
           </div>
         </header>
@@ -198,7 +248,9 @@ export default function DashboardLayout({
               aria-label={label}
               aria-current={active ? 'page' : undefined}
               className={`flex h-12 w-12 flex-col items-center justify-center rounded-control transition-all duration-200 ${
-                active ? 'bg-action text-on-action' : 'text-text-secondary hover:bg-muted hover:text-text-primary'
+                active
+                  ? 'bg-action text-on-action'
+                  : 'text-text-secondary hover:bg-muted hover:text-text-primary'
               }`}
               title={label}
             >
