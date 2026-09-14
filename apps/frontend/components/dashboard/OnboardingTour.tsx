@@ -83,27 +83,30 @@ export default function OnboardingTour() {
   const { data: user } = useCurrentUser();
   const [run, setRun] = useState(false);
 
-  const startTour = useCallback((force = false) => {
-    if (!user) return;
+  const startTour = useCallback(
+    (force = false) => {
+      if (!user) return;
 
-    // Si el perfil está incompleto (sale la pantalla de "Completa tu perfil"),
-    // no mostramos el tour hasta que termine de completarlo, a menos que sea forzado (ayuda)
-    if (isProfileIncomplete(user) && !force) {
-      return;
-    }
+      // Si el perfil está incompleto (sale la pantalla de "Completa tu perfil"),
+      // no mostramos el tour hasta que termine de completarlo, a menos que sea forzado (ayuda)
+      if (isProfileIncomplete(user) && !force) {
+        return;
+      }
 
-    const tourKey = `onboarding_seen_${user.idUsuario}`;
-    const hasSeenTour = localStorage.getItem(tourKey);
+      const tourKey = `onboarding_seen_${user.idUsuario}`;
+      const hasSeenTour = localStorage.getItem(tourKey);
 
-    if (hasSeenTour && !force) {
-      return;
-    }
+      if (hasSeenTour && !force) {
+        return;
+      }
 
-    // Retardo para asegurar que los elementos del DOM estén completamente listos
-    setTimeout(() => {
-      setRun(true);
-    }, 800);
-  }, [user]);
+      // Retardo para asegurar que los elementos del DOM estén completamente listos
+      setTimeout(() => {
+        setRun(true);
+      }, 800);
+    },
+    [user],
+  );
 
   useEffect(() => {
     if (user) {
@@ -139,43 +142,49 @@ export default function OnboardingTour() {
     {
       target: 'body',
       title: '¡Bienvenido a UVGenius!',
-      content: 'Tu portal inteligente para gestionar proyectos, horas beca y extensión en la UVG. Permítenos darte un recorrido rápido de 1 minuto por tus herramientas principales.',
+      content:
+        'Tu portal inteligente para gestionar proyectos, horas beca y extensión en la UVG. Permítenos darte un recorrido rápido de 1 minuto por tus herramientas principales.',
       placement: 'center',
       disableBeacon: true,
     },
     {
       target: '#stats-container',
       title: 'Progreso y Horas Académicas',
-      content: 'Mantén el control en tiempo real de tus Horas Beca y de Extensión acumuladas. Aquí verás tu avance respecto a la meta y tus proyectos activos.',
+      content:
+        'Mantén el control en tiempo real de tus Horas Beca y de Extensión acumuladas. Aquí verás tu avance respecto a la meta y tus proyectos activos.',
       placement: 'bottom',
       disableBeacon: true,
     },
     {
       target: '#nav-item-explorar-proyectos',
       title: 'Búsqueda de Proyectos',
-      content: 'Explora la lista completa de proyectos disponibles en la universidad, fíltralos por tus intereses y postúlate fácilmente.',
+      content:
+        'Explora la lista completa de proyectos disponibles en la universidad, fíltralos por tus intereses y postúlate fácilmente.',
       placement: 'right',
       disableBeacon: true,
     },
     {
       target: '#nav-item-mis-postulaciones',
       title: 'Tus Postulaciones',
-      content: 'Lleva el control del estado de tus aplicaciones. Descubre de inmediato si has sido aceptado, si estás en revisión o si hay feedback de los directores.',
+      content:
+        'Lleva el control del estado de tus aplicaciones. Descubre de inmediato si has sido aceptado, si estás en revisión o si hay feedback de los directores.',
       placement: 'right',
       disableBeacon: true,
     },
     {
       target: '#dashboard-theme-toggle',
       title: 'Tema Claro / Oscuro',
-      content: 'Cambia el aspecto visual de la aplicación según tu preferencia con un solo clic.',
+      content:
+        'Cambia el aspecto visual de la aplicación según tu preferencia con un solo clic.',
       placement: 'bottom',
       disableBeacon: true,
     },
     {
-      target: '#dashboard-profile-card',
+      target: '#dashboard-account-menu',
       title: 'Tu Perfil Profesional',
-      content: 'Mantén al día tus habilidades e intereses en esta sección para que los directores de proyectos puedan invitarte a colaborar.',
-      placement: 'left',
+      content:
+        'Mantén al día tus habilidades e intereses desde tu cuenta, aquí arriba, para que los directores de proyectos puedan invitarte a colaborar.',
+      placement: 'bottom',
       disableBeacon: true,
     },
   ];
@@ -185,7 +194,9 @@ export default function OnboardingTour() {
     steps,
     continuous: true,
     onEvent: handleJoyrideCallback,
-    tooltipComponent: (props: any) => <CustomTooltip {...props} size={steps.length} />,
+    tooltipComponent: (props: any) => (
+      <CustomTooltip {...props} size={steps.length} />
+    ),
     styles: {
       options: {
         overlayColor: 'rgba(5, 12, 8, 0.7)',
@@ -202,7 +213,9 @@ export default function OnboardingTour() {
   return (
     <>
       {Tour}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         /* Animación y estilos de spotlight personalizados para React Joyride */
         @keyframes pulse-joyride-spotlight {
           0% {
@@ -229,7 +242,9 @@ export default function OnboardingTour() {
             transition: none !important;
           }
         }
-      `}} />
+      `,
+        }}
+      />
     </>
   );
 }
