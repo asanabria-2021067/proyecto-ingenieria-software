@@ -150,7 +150,7 @@ export function ProjectReviewSheet({
           confirmButtonText: 'Entendido',
           customClass: {
             ...swalCustomClass,
-            confirmButton: 'rounded-xl bg-amber-600 px-5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-md mx-4',
+            confirmButton: 'rounded-control bg-status-warning px-card py-tight text-body font-medium text-on-status-warning hover:bg-status-warning/90 transition-colors',
           },
         });
         return;
@@ -164,7 +164,7 @@ export function ProjectReviewSheet({
         cancelButtonText: 'Cancelar',
         customClass: {
           ...swalCustomClass,
-          confirmButton: 'rounded-xl bg-amber-600 px-5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-md mx-4',
+          confirmButton: 'rounded-control bg-status-warning px-card py-tight text-body font-medium text-on-status-warning hover:bg-status-warning/90 transition-colors',
         },
       });
       if (!isConfirmed) return;
