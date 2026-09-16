@@ -163,28 +163,34 @@ function describirEvento(evento: EventoBitacoraDto, miembros: MiembroResumen[]):
 }
 
 function BitacoraItemSkeleton() {
-  return <Skeleton className="h-20 w-full rounded-xl" />;
+  return <Skeleton className="h-24 w-full rounded-card" />;
 }
 
+/**
+ * T-223 (HU-156): tamaño de texto e interlineado subidos con los tokens de
+ * HU-163 (`type-subtitle`/`type-body`/`type-meta`), no con tamaños sueltos —
+ * fecha y autor bajan a color secundario/tamaño de metadato para no competir
+ * con el evento.
+ */
 function BitacoraItem({ evento, miembros }: { evento: EventoBitacoraDto; miembros: MiembroResumen[] }) {
   const estilo = estiloDe(evento.tipoEvento);
   const Icon = estilo.icon;
   const actor = evento.actor ? `${evento.actor.nombre} ${evento.actor.apellido}` : 'Alguien';
 
   return (
-    <div className="flex gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-        <Icon className="size-4 text-primary" aria-hidden="true" />
+    <div className="flex gap-inline rounded-card border border-outline-variant bg-surface-container-lowest p-card shadow-card">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary/10">
+        <Icon className="size-5 text-primary" aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-bold text-on-surface">{estilo.label}</p>
-          <time className="text-xs text-tertiary" dateTime={evento.fechaEvento}>
+        <div className="flex flex-wrap items-center justify-between gap-tight">
+          <p className="type-subtitle text-text-primary">{estilo.label}</p>
+          <time className="type-meta" dateTime={evento.fechaEvento}>
             {formatearFechaHora(evento.fechaEvento)}
           </time>
         </div>
-        <p className="mt-1 text-sm text-on-surface">{describirEvento(evento, miembros)}</p>
-        <p className="mt-1 text-xs text-tertiary">Por {actor}</p>
+        <p className="type-body mt-tight text-text-primary">{describirEvento(evento, miembros)}</p>
+        <p className="type-meta mt-micro">Por {actor}</p>
       </div>
     </div>
   );
@@ -299,7 +305,7 @@ export default function BitacoraPage() {
           </div>
 
           {cargando && (
-            <div className="space-y-3">
+            <div className="space-y-stack">
               <BitacoraItemSkeleton />
               <BitacoraItemSkeleton />
               <BitacoraItemSkeleton />
@@ -348,7 +354,7 @@ export default function BitacoraPage() {
             <>
               {/* Región con nombre: separa los eventos del panel de filtros,
                   que ahora repite las mismas etiquetas en su desplegable. */}
-              <section aria-label="Eventos de la bitácora" className="space-y-3">
+              <section aria-label="Eventos de la bitácora" className="space-y-stack">
                 {eventos.map((evento) => (
                   <BitacoraItem key={evento.idAuditoria} evento={evento} miembros={members} />
                 ))}
