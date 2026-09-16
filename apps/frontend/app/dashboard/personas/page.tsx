@@ -62,7 +62,7 @@ import {
 } from '@/hooks/use-social';
 import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
-import type { UsuarioBusquedaDto } from '@/lib/types/social';
+import type { SemestreRango, UsuarioBusquedaDto } from '@/lib/types/social';
 
 type PestanaId = 'todos' | 'amigos-de-amigos' | 'mi-carrera' | 'mis-amigos';
 type VistaId = 'tarjetas' | 'lista';
@@ -72,6 +72,15 @@ const PESTANAS: { id: PestanaId; label: string }[] = [
   { id: 'amigos-de-amigos', label: 'Amigos de amigos' },
   { id: 'mi-carrera', label: 'Mi carrera' },
   { id: 'mis-amigos', label: 'Mis amigos' },
+];
+
+/** T-195: rangos fijos, mutuamente excluyentes (no acumulables como
+ * habilidades/intereses) — "Todos" es la ausencia de filtro. */
+const SEMESTRE_OPCIONES: { id: SemestreRango | 'todos'; label: string }[] = [
+  { id: 'todos', label: 'Todos' },
+  { id: '1-4', label: '1°-4°' },
+  { id: '5-7', label: '5°-7°' },
+  { id: '8+', label: '8°+' },
 ];
 
 /** El motivo se arma acá a partir de los datos estructurados del backend
@@ -277,6 +286,7 @@ export default function PersonasPage() {
   const [q, setQ] = useState('');
   const [habilidadesSel, setHabilidadesSel] = useState<number[]>([]);
   const [interesesSel, setInteresesSel] = useState<number[]>([]);
+  const [semestreRango, setSemestreRango] = useState<SemestreRango | undefined>(undefined);
 
   const { data: habilidades = [] } = useQuery({ queryKey: ['catalogo-habilidades'], queryFn: getHabilidades });
   const { data: intereses = [] } = useQuery({ queryKey: ['catalogo-intereses'], queryFn: getIntereses });
@@ -289,13 +299,14 @@ export default function PersonasPage() {
     soloAmigos: pestana === 'mis-amigos',
     habilidades: habilidadesSel,
     intereses: interesesSel,
+    semestreRango,
   });
 
   const { solicitudes } = useSolicitudesAmistadPendientes();
   const aceptarSolicitud = useAceptarSolicitudAmistad();
   const rechazarSolicitud = useRechazarSolicitudAmistad();
 
-  const totalFiltros = habilidadesSel.length + interesesSel.length;
+  const totalFiltros = habilidadesSel.length + interesesSel.length + (semestreRango ? 1 : 0);
 
   function toggleHabilidad(id: number) {
     setHabilidadesSel((prev) => (prev.includes(id) ? prev.filter((h) => h !== id) : [...prev, id]));
@@ -372,6 +383,25 @@ export default function PersonasPage() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-80">
+                <section className="mb-stack">
+                  <h3 className="type-meta uppercase tracking-wide">Semestre</h3>
+                  <div className="mt-tight flex flex-wrap gap-tight">
+                    {SEMESTRE_OPCIONES.map((opcion) => {
+                      const activo = opcion.id === 'todos' ? !semestreRango : semestreRango === opcion.id;
+                      return (
+                        <button
+                          key={opcion.id}
+                          type="button"
+                          aria-pressed={activo}
+                          onClick={() => setSemestreRango(opcion.id === 'todos' ? undefined : opcion.id)}
+                          className={`pill ${activo ? 'pill-accent' : 'pill-neutral'}`}
+                        >
+                          {opcion.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
                 {[
                   { titulo: 'Habilidades', lista: habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad })), sel: habilidadesSel, toggle: toggleHabilidad },
                   { titulo: 'Intereses', lista: intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres })), sel: interesesSel, toggle: toggleInteres },
@@ -470,6 +500,7 @@ export default function PersonasPage() {
                         onClick={() => {
                           setHabilidadesSel([]);
                           setInteresesSel([]);
+                          setSemestreRango(undefined);
                         }}
                       >
                         Quitar filtros

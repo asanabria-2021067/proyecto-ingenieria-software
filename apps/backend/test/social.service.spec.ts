@@ -369,6 +369,39 @@ describe('SocialService — buscarUsuarios', () => {
       }),
     );
   });
+
+  // T-195: filtro de semestre en Personas.
+  it.each([
+    ['1-4', { gte: 1, lte: 4 }],
+    ['5-7', { gte: 5, lte: 7 }],
+    ['8+', { gte: 8 }],
+  ] as const)('filtra por rango de semestre %s', async (rango, limites) => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, { semestreRango: rango });
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: expect.arrayContaining([{ perfil: { semestre: limites } }]),
+        },
+      }),
+    );
+  });
+
+  it('sin semestreRango, no agrega ninguna condición de semestre', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, {});
+
+    const llamada = prisma.usuario.findMany.mock.calls[0][0];
+    const condiciones = llamada.where.AND as unknown[];
+    expect(condiciones.some((c) => typeof c === 'object' && c !== null && 'perfil' in c)).toBe(false);
+  });
 });
 
 describe('SocialService — obtenerPerfilPublico', () => {

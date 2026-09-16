@@ -64,6 +64,7 @@ export function buscarUsuarios(filtros: BuscarUsuariosFiltros): Promise<BuscarUs
   if (filtros.soloAmigos) params.set('soloAmigos', 'true');
   if (filtros.habilidades?.length) params.set('habilidades', filtros.habilidades.join(','));
   if (filtros.intereses?.length) params.set('intereses', filtros.intereses.join(','));
+  if (filtros.semestreRango) params.set('semestreRango', filtros.semestreRango);
   if (filtros.page) params.set('page', String(filtros.page));
   return apiFetch<BuscarUsuariosResultado>(`/social/usuarios/buscar?${params.toString()}`);
 }
