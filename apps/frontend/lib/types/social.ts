@@ -55,6 +55,10 @@ export interface UsuarioPerfilDto extends UsuarioResumenDto {
   proyectosActivos: ProyectoParticipacionResumenDto[];
 }
 
+/** T-195: rangos fijos del filtro de semestre en Personas. "Todos" no es un
+ * valor de este tipo: es la ausencia del filtro (`undefined`). */
+export type SemestreRango = '1-4' | '5-7' | '8+';
+
 export interface BuscarUsuariosFiltros {
   q?: string;
   carrera?: boolean;
@@ -62,6 +66,7 @@ export interface BuscarUsuariosFiltros {
   soloAmigos?: boolean;
   habilidades?: number[];
   intereses?: number[];
+  semestreRango?: SemestreRango;
   page?: number;
 }
 
