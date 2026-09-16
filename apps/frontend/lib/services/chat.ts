@@ -1,5 +1,11 @@
 import { apiFetch } from '@/lib/api/client';
-import type { ChatConversacion, ChatMensaje, CreateConversationPayload } from '@/lib/types/chat';
+import type {
+  ChatConversacion,
+  ChatMensaje,
+  CreateConversationPayload,
+  ListArchivedConversationsFiltros,
+  ListArchivedConversationsResultado,
+} from '@/lib/types/chat';
 
 export function listConversations(idProyecto: number): Promise<ChatConversacion[]> {
   return apiFetch(`/proyectos/${idProyecto}/conversaciones`);
@@ -39,4 +45,14 @@ export function markConversationRead(idProyecto: number, idConversacion: number)
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/leido`, {
     method: 'POST',
   });
+}
+
+/** T-236: cruza todos los proyectos del usuario, no uno solo. */
+export function listArchivedConversations(
+  filtros: ListArchivedConversationsFiltros,
+): Promise<ListArchivedConversationsResultado> {
+  const params = new URLSearchParams();
+  if (filtros.q) params.set('q', filtros.q);
+  if (filtros.page) params.set('page', String(filtros.page));
+  return apiFetch(`/chats/archivados?${params.toString()}`);
 }
