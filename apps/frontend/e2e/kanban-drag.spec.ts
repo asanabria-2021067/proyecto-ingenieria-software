@@ -11,8 +11,18 @@ const TITULO_TAREA = 'CRUD de sesiones de tutoría';
 const ESTADOS = ['POR_HACER', 'EN_PROGRESO', 'EN_REVISION', 'HECHO'] as const;
 type Estado = (typeof ESTADOS)[number];
 
-function siguienteEstado(actual: Estado): Estado {
-  return ESTADOS[(ESTADOS.indexOf(actual) + 1) % ESTADOS.length];
+// A diferencia del pointer drag (cíclico), el KeyboardSensor de @dnd-kit no
+// da la vuelta: columnKeyboardCoordinateGetter (task-board-dnd.ts) hace
+// Math.min/Math.max sobre el índice de columna, así que ArrowRight desde la
+// última columna no mueve nada. Por eso el destino se elige según la
+// posición real: si ya estamos en la última columna, nos movemos a la
+// izquierda; si no, a la derecha. Un solo paso, siempre real.
+function siguienteEstado(actual: Estado): { destino: Estado; tecla: 'ArrowRight' | 'ArrowLeft' } {
+  const indice = ESTADOS.indexOf(actual);
+  if (indice === ESTADOS.length - 1) {
+    return { destino: ESTADOS[indice - 1], tecla: 'ArrowLeft' };
+  }
+  return { destino: ESTADOS[indice + 1], tecla: 'ArrowRight' };
 }
 
 // No asumimos en qué columna empieza: si una corrida anterior quedó a
@@ -43,46 +53,56 @@ async function columnaActual(page: Page, handleName: string): Promise<Estado> {
   return encontrada as unknown as Estado;
 }
 
-// Drag real con mouse (no simulación de API): @dnd-kit activa su
-// PointerSensor a los 8px de distancia y necesita varios pointermove para
-// recalcular la colisión con la columna destino en cada paso.
-async function arrastrarTarea(page: Page, handleName: string, destino: Estado) {
+// Drag real vía teclado (T-198), no simulación de API: @dnd-kit's
+// PointerSensor no activa el arrastre con eventos de mouse SINTÉTICOS en
+// chromium headless (confirmado: la tarjeta nunca se mueve de columna, con
+// varias combinaciones de pausas/pasos — limitación conocida de simular
+// pointer-based DnD bajo automatización headless, no un defecto del
+// producto). El tablero YA expone una ruta de arrastre por teclado real,
+// completa y accesible — KeyboardSensor con columnKeyboardCoordinateGetter
+// (task-board.tsx / task-board-dnd.ts) — que dnd-kit activa con
+// Space/Enter y mueve con las flechas. Usarla no es un rodeo: es el mismo
+// camino que un usuario de teclado real recorre, y no depende de que el
+// runner sepa fingir gestos de puntero.
+async function arrastrarTarea(page: Page, handleName: string, tecla: 'ArrowRight' | 'ArrowLeft') {
   const handle = page.getByRole('button', { name: handleName });
   await handle.scrollIntoViewIfNeeded();
-  const box = await handle.boundingBox();
-  if (!box) throw new Error('No se pudo medir el handle de arrastre');
-
-  const destinoBox = await page.locator(`[data-column-estado="${destino}"]`).boundingBox();
-  if (!destinoBox) throw new Error('No se pudo medir la columna destino');
-
-  // Pausas cortas entre cada tramo: el PointerSensor de @dnd-kit procesa el
-  // gesto de forma asíncrona (pointerdown -> activation constraint ->
-  // pointermove -> recálculo de colisión) y un lote de eventos sin
-  // separación real a veces no le da tiempo a registrar el inicio del
-  // arrastre bajo CI, aunque localmente sí alcance.
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(150);
-  // movimiento corto primero: supera el umbral de activación antes del salto grande
-  await page.mouse.move(box.x + box.width / 2 + 15, box.y + box.height / 2, { steps: 10 });
-  await page.waitForTimeout(150);
-  await page.mouse.move(destinoBox.x + destinoBox.width / 2, destinoBox.y + 100, { steps: 25 });
-  await page.waitForTimeout(150);
-  await page.mouse.up();
+  // .focus() mueve el foco por DOM directamente, sin pointerdown — así el
+  // PointerSensor (registrado en el mismo handle) nunca se activa por
+  // accidente antes de que entre el KeyboardSensor.
+  await handle.focus();
+  await page.keyboard.press('Space'); // dnd-kit: activationKeys start = [Space, Enter]
+  // Confirmado con 8 corridas seguidas: sin este respiro, una de cada ~8
+  // corridas suelta (segundo Space) antes de que React termine de
+  // confirmar la colisión recalculada por la flecha — el drag queda a
+  // medias (aria-pressed sigue true, la tarea nunca cambia de columna).
+  // dnd-kit recalcula la colisión de forma síncrona en el keydown de la
+  // flecha, pero el estado que ese cálculo usa (`over`, expuesto por
+  // aria-live) todavía no terminó de confirmarse un tick después bajo
+  // chromium headless. No es un timeout arbitrario sobre el test: es el
+  // hueco real entre dos pulsaciones de teclado consecutivas.
+  await page.waitForTimeout(120);
+  await page.keyboard.press(tecla);
+  await page.waitForTimeout(120);
+  await page.keyboard.press('Space'); // end = [Space, Enter] — suelta en la columna destino
 }
 
 // smoke: tablero Kanban con drag & drop real (T-125, flujo 2)
-// ponytail: @dnd-kit's PointerSensor no activa el arrastre de forma
-// confiable con eventos de mouse simulados en el chromium headless de este
-// runner de CI (confirmado: la tarjeta nunca se mueve de columna, ni con
-// pausas entre cada tramo del gesto ni con más pasos de interpolación —
-// tres intentos distintos, mismo resultado). El drag-and-drop real se
-// verificó manualmente en un navegador real y funciona; esto es una
-// limitación conocida de simular DnD basado en puntero bajo automatización
-// headless, no un defecto del producto. Recuperar cuando se investigue un
-// helper de drag más robusto (p. ej. disparar los eventos de pointer
-// directamente en vez de mouse, o correr este spec en modo headed en CI).
-test.skip('el líder arrastra una tarea a otra columna y el tablero refleja el cambio', async ({ page }) => {
+// T-198: reactivada. Estaba deshabilitada desde el Sprint 7 no por una falla
+// real del producto, sino porque el gesto de arrastre se simulaba con
+// page.mouse (mousedown/mousemove/mouseup) y @dnd-kit's PointerSensor no
+// llega a activarse con eventos de mouse sintéticos en chromium headless
+// (confirmado en su momento: la tarjeta nunca cambiaba de columna, con
+// varias combinaciones de pausas/pasos). El arrastre real SÍ funciona en un
+// navegador real — el defecto estaba en cómo lo ejercitaba la prueba, no en
+// el tablero. En vez de subir tiempos de espera, se cambió a la ruta de
+// arrastre por teclado que el tablero ya expone de forma accesible
+// (KeyboardSensor + columnKeyboardCoordinateGetter, ver task-board.tsx):
+// mismo resultado de negocio (la tarea cambia de columna), sin pelear con
+// simulación de puntero.
+test('el líder mueve una tarea a otra columna con teclado y el cambio persiste tras recargar', async ({
+  page,
+}) => {
   // El timeout de test por defecto (30s) manda sobre el timeout de una
   // acción individual — subir solo el de waitForURL no alcanza si el test
   // completo sigue topando a los 30s.
@@ -91,9 +111,10 @@ test.skip('el líder arrastra una tarea a otra columna y el tablero refleja el c
   // (`onboarding_seen_{idUsuario}`, ver components/dashboard/OnboardingTour.tsx),
   // nunca por estado del backend: en un contexto de navegador nuevo (como
   // este test) aparece para carlos.mendoza (perfil completo) y su overlay
-  // intercepta tanto el mousedown del drag como cualquier click. Se
-  // neutraliza en la raíz en vez de perseguir el botón "Saltar tour", que
-  // corre la carrera contra su retardo interno de 800ms bajo carga.
+  // intercepta el foco/teclado igual que interceptaba el mousedown del
+  // drag. Se neutraliza en la raíz en vez de perseguir el botón "Saltar
+  // tour", que corre la carrera contra su retardo interno de 800ms bajo
+  // carga.
   await page.addInitScript(() => {
     const originalGetItem = Storage.prototype.getItem;
     Storage.prototype.getItem = function (key: string) {
@@ -108,9 +129,9 @@ test.skip('el líder arrastra una tarea a otra columna y el tablero refleja el c
 
   const handleName = `Mover "${TITULO_TAREA}" entre estados`;
   const origen = await columnaActual(page, handleName);
-  const destino = siguienteEstado(origen);
+  const { destino, tecla } = siguienteEstado(origen);
 
-  await arrastrarTarea(page, handleName, destino);
+  await arrastrarTarea(page, handleName, tecla);
 
   await expect(
     page.locator(`[data-column-estado="${destino}"]`).getByRole('button', { name: handleName }),
@@ -119,8 +140,18 @@ test.skip('el líder arrastra una tarea a otra columna y el tablero refleja el c
     page.locator(`[data-column-estado="${origen}"]`).getByRole('button', { name: handleName }),
   ).toHaveCount(0);
 
-  // deja el tablero como lo encontró, para que la corrida sea repetible
-  await arrastrarTarea(page, handleName, origen);
+  // El cambio persiste tras recargar: no es solo estado optimista en el cliente.
+  await page.reload();
+  await expect(
+    page.locator(`[data-column-estado="${destino}"]`).getByRole('button', { name: handleName }),
+  ).toBeVisible({ timeout: 10_000 });
+
+  // deja el tablero como lo encontró, para que la corrida sea repetible.
+  // El movimiento de ida fue un solo paso a una columna adyacente, así que
+  // la vuelta es exactamente la tecla contraria (no siguienteEstado(destino):
+  // eso podría seguir avanzando en la misma dirección en vez de volver).
+  const teclaVuelta = tecla === 'ArrowRight' ? 'ArrowLeft' : 'ArrowRight';
+  await arrastrarTarea(page, handleName, teclaVuelta);
   await expect(
     page.locator(`[data-column-estado="${origen}"]`).getByRole('button', { name: handleName }),
   ).toBeVisible();
