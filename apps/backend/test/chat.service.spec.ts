@@ -150,4 +150,77 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(resultado).toEqual(historial);
     });
   });
+
+  describe('listArchivedConversations — T-236', () => {
+    function conversacionArchivadaRow(overrides: Partial<{ idConversacion: number; nombre: string | null }> = {}) {
+      return {
+        idConversacion: overrides.idConversacion ?? 1,
+        tipo: 'INDIVIDUAL' as const,
+        nombre: overrides.nombre ?? null,
+        proyecto: { idProyecto: 17, tituloProyecto: 'Feria de Ciencias UVG 2026' },
+        participantes: [
+          { idUsuario: 1, usuario: USUARIO },
+          { idUsuario: 2, usuario: { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null } },
+        ],
+        mensajes: [],
+      };
+    }
+
+    it('solo trae conversaciones de proyectos CERRADO, nunca de proyectos activos', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([conversacionArchivadaRow()]);
+
+      await service.listArchivedConversations(1, {});
+
+      expect(prisma.conversacion.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            proyecto: { estadoProyecto: 'CERRADO' },
+          }),
+        }),
+      );
+    });
+
+    it('cada item viene marcado archivada: true', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([conversacionArchivadaRow()]);
+
+      const resultado = await service.listArchivedConversations(1, {});
+
+      expect(resultado.items).toHaveLength(1);
+      expect(resultado.items[0].archivada).toBe(true);
+      expect(resultado.items[0].proyecto).toEqual({ idProyecto: 17, tituloProyecto: 'Feria de Ciencias UVG 2026' });
+    });
+
+    it('con q, busca por nombre de chat O por participante (excluyendo al propio usuario)', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([]);
+
+      await service.listArchivedConversations(1, { q: 'rosa' });
+
+      const llamada = prisma.conversacion.findMany.mock.calls[0][0];
+      expect(llamada.where.OR).toEqual([
+        { nombre: { contains: 'rosa', mode: 'insensitive' } },
+        {
+          participantes: {
+            some: {
+              idUsuario: { not: 1 },
+              usuario: {
+                OR: [
+                  { nombre: { contains: 'rosa', mode: 'insensitive' } },
+                  { apellido: { contains: 'rosa', mode: 'insensitive' } },
+                ],
+              },
+            },
+          },
+        },
+      ]);
+    });
+
+    it('sin q, no agrega ninguna condición OR de búsqueda', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([]);
+
+      await service.listArchivedConversations(1, {});
+
+      const llamada = prisma.conversacion.findMany.mock.calls[0][0];
+      expect(llamada.where.OR).toBeUndefined();
+    });
+  });
 });

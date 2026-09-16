@@ -474,7 +474,7 @@ export default function PersonasPage() {
                 <TabsTrigger
                   key={p.id}
                   value={p.id}
-                  className="rounded-pill data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none"
+                  className="rounded-pill text-text-primary data-[state=active]:bg-primary data-[state=active]:text-on-primary data-[state=active]:shadow-none"
                 >
                   {p.label}
                 </TabsTrigger>

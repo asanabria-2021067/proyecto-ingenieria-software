@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoProyecto } from '@prisma/client';
+import { EstadoProyecto, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -33,6 +34,8 @@ const MENSAJE_SELECT = {
   enviadoEn: true,
   remitente: USUARIO_SELECT,
 } as const;
+
+const ARCHIVADOS_PAGE_SIZE = 20;
 
 @Injectable()
 export class ChatService {
@@ -221,5 +224,71 @@ export class ChatService {
       where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
       data: { ultimaLecturaEn: new Date() },
     });
+  }
+
+  /**
+   * T-236: conversaciones archivadas del usuario A TRAVÉS DE TODOS sus
+   * proyectos (a diferencia de listConversations, que solo mira uno). Nunca
+   * puede devolver una conversación activa: el filtro por
+   * `proyecto.estadoProyecto = CERRADO` es parte del WHERE, no un chequeo
+   * posterior — así que aunque un proyecto se reabra entre que el cliente
+   * pagina, esa página ya no la va a incluir.
+   */
+  async listArchivedConversations(userId: number, filtros: ListArchivedConversationsQueryDto = {}) {
+    const query = (filtros.q ?? '').trim();
+    const page = filtros.page ?? 1;
+
+    const busquedaPorPersona: Prisma.ConversacionWhereInput = {
+      participantes: {
+        some: {
+          idUsuario: { not: userId },
+          usuario: {
+            OR: [
+              { nombre: { contains: query, mode: 'insensitive' } },
+              { apellido: { contains: query, mode: 'insensitive' } },
+            ],
+          },
+        },
+      },
+    };
+
+    const conversaciones = await this.prisma.conversacion.findMany({
+      where: {
+        participantes: { some: { idUsuario: userId } },
+        proyecto: { estadoProyecto: EstadoProyecto.CERRADO },
+        ...(query
+          ? {
+              OR: [
+                { nombre: { contains: query, mode: 'insensitive' } },
+                busquedaPorPersona,
+              ],
+            }
+          : {}),
+      },
+      include: {
+        proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+        participantes: { select: { idUsuario: true, usuario: USUARIO_SELECT } },
+        mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
+      },
+      orderBy: { creadaEn: 'desc' },
+      skip: (page - 1) * ARCHIVADOS_PAGE_SIZE,
+      take: ARCHIVADOS_PAGE_SIZE + 1,
+    });
+
+    const hasMore = conversaciones.length > ARCHIVADOS_PAGE_SIZE;
+    const pagina = hasMore ? conversaciones.slice(0, ARCHIVADOS_PAGE_SIZE) : conversaciones;
+
+    return {
+      items: pagina.map((c) => ({
+        idConversacion: c.idConversacion,
+        tipo: c.tipo,
+        nombre: c.nombre,
+        proyecto: c.proyecto,
+        participantes: c.participantes.map((p) => p.usuario),
+        ultimoMensaje: c.mensajes[0] ?? null,
+        archivada: true as const,
+      })),
+      hasMore,
+    };
   }
 }

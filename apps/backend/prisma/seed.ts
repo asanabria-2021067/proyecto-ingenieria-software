@@ -3,6 +3,17 @@ import { hashSync } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+/** Fecha relativa a "ahora" (siempre futura si n > 0): para que las tareas de
+ * prueba del calendario sigan apareciendo como pendientes sin importar
+ * cuándo se corra el seed, en vez de una fecha fija que termina quedando
+ * en el pasado. */
+function enDias(n: number): Date {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() + n);
+  fecha.setHours(0, 0, 0, 0);
+  return fecha;
+}
+
 async function main() {
   const PASSWORD_HASH = hashSync('Test1234!', 10);
 
@@ -590,9 +601,17 @@ async function main() {
   // ─── Tareas ─────────────────────────────────────────────
   const tareas = await Promise.all([
     prisma.tarea.upsert({ where: { idTarea: 1 }, update: {}, create: { idTarea: 1, idProyecto: pTutorias.idProyecto, idSprint: sprintTutorias.idSprint, idHito: hitos[0].idHito, tituloTarea: 'Crear mockups en Figma', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 2 }, update: {}, create: { idTarea: 2, idProyecto: pTutorias.idProyecto, idSprint: sprintTutorias.idSprint, idHito: hitos[1].idHito, tituloTarea: 'Implementar autenticación', estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 3 }, update: {}, create: { idTarea: 3, idProyecto: pTutorias.idProyecto, idSprint: sprintTutorias.idSprint, idHito: hitos[1].idHito, tituloTarea: 'CRUD de sesiones de tutoría', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: carlos.idUsuario } }),
-    prisma.tarea.upsert({ where: { idTarea: 4 }, update: {}, create: { idTarea: 4, idProyecto: pAmbiental.idProyecto, idSprint: sprintAmbiental.idSprint, idHito: hitos[2].idHito, tituloTarea: 'Investigar sensores de CO2', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: maria.idUsuario } }),
+    // fechaLimite en tareas 2/3/4 (T-195 seed): son las únicas tareas POR_HACER/EN_PROGRESO
+    // con asignación real (José en 2 y 3, María en 4 — ver asignData más abajo),
+    // así que son las que de verdad pueden aparecer en /dashboard/calendario
+    // de esos usuarios (getMisTareas filtra por asignaciones, no por creadaPor).
+    // update reafirma estadoTarea además de fechaLimite: la tarea 3 es la
+    // misma que kanban-drag.spec.ts arrastra entre columnas en e2e — sin
+    // resetear el estado acá, una corrida de esa prueba que no restaure al
+    // final deja el seed con un estado que ya no es el que declara.
+    prisma.tarea.upsert({ where: { idTarea: 2 }, update: { fechaLimite: enDias(3), estadoTarea: 'EN_PROGRESO' }, create: { idTarea: 2, idProyecto: pTutorias.idProyecto, idSprint: sprintTutorias.idSprint, idHito: hitos[1].idHito, tituloTarea: 'Implementar autenticación', estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', creadaPor: carlos.idUsuario, fechaLimite: enDias(3) } }),
+    prisma.tarea.upsert({ where: { idTarea: 3 }, update: { fechaLimite: enDias(7), estadoTarea: 'POR_HACER' }, create: { idTarea: 3, idProyecto: pTutorias.idProyecto, idSprint: sprintTutorias.idSprint, idHito: hitos[1].idHito, tituloTarea: 'CRUD de sesiones de tutoría', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: carlos.idUsuario, fechaLimite: enDias(7) } }),
+    prisma.tarea.upsert({ where: { idTarea: 4 }, update: { fechaLimite: enDias(5), estadoTarea: 'POR_HACER' }, create: { idTarea: 4, idProyecto: pAmbiental.idProyecto, idSprint: sprintAmbiental.idSprint, idHito: hitos[2].idHito, tituloTarea: 'Investigar sensores de CO2', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: maria.idUsuario, fechaLimite: enDias(5) } }),
     prisma.tarea.upsert({ where: { idTarea: 5 }, update: {}, create: { idTarea: 5, idProyecto: pNeural.idProyecto, idSprint: sprintNeural.idSprint, idHito: hitos[3].idHito, tituloTarea: 'Leer papers sobre transformers', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: luis.idUsuario } }),
     prisma.tarea.upsert({ where: { idTarea: 6 }, update: {}, create: { idTarea: 6, idProyecto: pEmpleo.idProyecto, idSprint: sprintEmpleo.idSprint, idHito: hitos[5].idHito, tituloTarea: 'Diseñar schema Prisma', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
     prisma.tarea.upsert({ where: { idTarea: 7 }, update: {}, create: { idTarea: 7, idProyecto: pEmpleo.idProyecto, idSprint: sprintEmpleo.idSprint, tituloTarea: 'Implementar búsqueda de empleos', estadoTarea: 'EN_PROGRESO', prioridad: 'MEDIA', creadaPor: carlos.idUsuario } }),
@@ -1567,6 +1586,92 @@ async function main() {
       },
     });
   }
+
+  // ─── Chats de prueba (T-234 seed) ───────────────────────
+  // Una conversación ARCHIVADA (pFeriaCiencias, idProyecto 17, ya CERRADO en
+  // este mismo seed) entre María (creadora) y Rosa (mentora activa en ese
+  // proyecto), y una conversación ACTIVA en pTutorias (idProyecto 1,
+  // PUBLICADO) entre Carlos y José, para poder comparar los dos estados sin
+  // tener que cerrar un proyecto a mano.
+  const conversacionArchivada = await prisma.conversacion.upsert({
+    where: { idConversacion: 1 },
+    update: {},
+    create: {
+      idConversacion: 1,
+      idProyecto: pFeriaCiencias.idProyecto,
+      tipo: 'INDIVIDUAL',
+      creadaPor: maria.idUsuario,
+    },
+  });
+  await Promise.all(
+    [maria.idUsuario, mentorRosa.idUsuario].map((idUsuario) =>
+      prisma.conversacionParticipante.upsert({
+        where: { idConversacion_idUsuario: { idConversacion: conversacionArchivada.idConversacion, idUsuario } },
+        update: {},
+        create: { idConversacion: conversacionArchivada.idConversacion, idUsuario },
+      }),
+    ),
+  );
+  await prisma.mensajeChat.upsert({
+    where: { idMensaje: 1 },
+    update: {},
+    create: {
+      idMensaje: 1,
+      idConversacion: conversacionArchivada.idConversacion,
+      idRemitente: maria.idUsuario,
+      contenido: 'Rosa, gracias por mentorear el equipo durante la feria. ¡Quedó excelente!',
+    },
+  });
+  await prisma.mensajeChat.upsert({
+    where: { idMensaje: 2 },
+    update: {},
+    create: {
+      idMensaje: 2,
+      idConversacion: conversacionArchivada.idConversacion,
+      idRemitente: mentorRosa.idUsuario,
+      contenido: 'Un placer, María. El equipo tuvo muy buen nivel este ciclo.',
+    },
+  });
+
+  const conversacionActiva = await prisma.conversacion.upsert({
+    where: { idConversacion: 2 },
+    update: {},
+    create: {
+      idConversacion: 2,
+      idProyecto: pTutorias.idProyecto,
+      tipo: 'INDIVIDUAL',
+      creadaPor: carlos.idUsuario,
+    },
+  });
+  await Promise.all(
+    [carlos.idUsuario, jose.idUsuario].map((idUsuario) =>
+      prisma.conversacionParticipante.upsert({
+        where: { idConversacion_idUsuario: { idConversacion: conversacionActiva.idConversacion, idUsuario } },
+        update: {},
+        create: { idConversacion: conversacionActiva.idConversacion, idUsuario },
+      }),
+    ),
+  );
+  await prisma.mensajeChat.upsert({
+    where: { idMensaje: 3 },
+    update: {},
+    create: {
+      idMensaje: 3,
+      idConversacion: conversacionActiva.idConversacion,
+      idRemitente: carlos.idUsuario,
+      contenido: '¿Cómo vas con la autenticación? La necesitamos para el próximo sprint.',
+    },
+  });
+  await prisma.mensajeChat.upsert({
+    where: { idMensaje: 4 },
+    update: {},
+    create: {
+      idMensaje: 4,
+      idConversacion: conversacionActiva.idConversacion,
+      idRemitente: jose.idUsuario,
+      contenido: 'Voy avanzado, la termino esta semana.',
+    },
+  });
 
   console.log('Seed completed successfully');
 }

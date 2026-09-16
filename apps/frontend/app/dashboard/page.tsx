@@ -338,14 +338,14 @@ export default function DashboardPage() {
     queryFn: getDashboardStats,
   });
 
+  // Sin slice acá: projects.length se usa como el conteo REAL de disponibles
+  // (hero + pestaña "Disponibles"). Recortar a 4 solo pasa al renderizar las
+  // tarjetas, igual que ya hace "featured".
   const { data: projects = [], isLoading: projectsLoading } = useQuery<
     ProyectoListItemDTO[]
   >({
     queryKey: ['dashboard-projects'],
-    queryFn: async () => {
-      const p = await searchProjects('');
-      return p.slice(0, 4);
-    },
+    queryFn: () => searchProjects(''),
   });
 
   const { data: featured = [], isLoading: featuredLoading } = useQuery<
@@ -650,7 +650,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
-                  {projects.map((p) => (
+                  {projects.slice(0, 4).map((p) => (
                     <DashboardProjectCard key={p.idProyecto} project={p} />
                   ))}
                   {projects.length === 0 && (
