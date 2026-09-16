@@ -625,27 +625,36 @@ button:disabled {
   color: var(--color-text-secondary) !important;
 }
 
-/* Icon border and color adaption */
+/* Icono con círculo de fondo sólido (en vez del anillo hueco por defecto de
+   SweetAlert2): mismo tratamiento en todas las alertas de la app — sin
+   tocar cada .fire() — para que el ícono lea de inmediato como
+   éxito/advertencia/error, no solo por el color de línea. */
+.swal2-icon {
+  border-color: transparent !important;
+}
+.swal2-icon.swal2-success {
+  background: var(--color-status-success) !important;
+}
 .swal2-icon.swal2-success .swal2-success-ring {
-  border-color: color-mix(in srgb, var(--color-primary) 25%, transparent) !important;
+  border-color: transparent !important;
 }
 .swal2-icon.swal2-success [class^='swal2-success-line'] {
-  background-color: var(--color-primary) !important;
+  background-color: var(--color-on-status-success) !important;
 }
 .swal2-icon.swal2-warning {
-  border-color: var(--color-secondary) !important;
-  color: var(--color-secondary) !important;
+  background: var(--color-status-warning) !important;
+  color: var(--color-on-status-warning) !important;
 }
 .swal2-icon.swal2-error {
-  border-color: var(--color-error) !important;
-  color: var(--color-error) !important;
+  background: var(--color-status-error) !important;
+  color: var(--color-on-status-error) !important;
 }
 .swal2-icon.swal2-question {
-  border-color: var(--color-outline) !important;
+  background: var(--color-surface-container-high) !important;
   color: var(--color-on-surface-variant) !important;
 }
 .swal2-icon.swal2-info {
-  border-color: var(--color-on-surface-variant) !important;
+  background: var(--color-surface-container-high) !important;
   color: var(--color-on-surface-variant) !important;
 }
 
