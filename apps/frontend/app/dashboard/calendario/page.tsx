@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ChevronRight,
   ClipboardList,
+  Target,
 } from 'lucide-react';
 import {
   Empty,
@@ -17,7 +18,15 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { getMisTareas, type MiTareaDTO } from '@/lib/services/users';
+import {
+  getDashboardStats,
+  getMisTareas,
+  type DashboardStats,
+  type MiTareaDTO,
+} from '@/lib/services/users';
+import { getMyProjects } from '@/lib/services/projects';
+import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
+import { estadoBadgeLabel } from '@/components/projects/available-project-card';
 import { MiniCalendar } from '@/components/calendar/mini-calendar';
 import { parseFechaSolo, toDateKey } from '@/lib/calendar/utils';
 
@@ -28,13 +37,24 @@ const ESTADO_TAREA_LABEL: Record<string, string> = {
   HECHO: 'Hecho',
 };
 
-const TAREA_ESTADO_STYLES: Record<string, string> = {
-  POR_HACER: 'bg-surface-container-high text-on-surface-variant',
-  EN_PROGRESO:
-    'bg-blue-500/10 text-blue-500 dark:bg-blue-500/20 dark:text-blue-300',
-  EN_REVISION:
-    'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300',
-  HECHO: 'bg-secondary-container text-on-secondary-container font-semibold',
+const TAREA_ESTADO_PILL: Record<string, string> = {
+  POR_HACER: 'pill-neutral',
+  EN_PROGRESO: 'pill-accent',
+  EN_REVISION: 'pill-warning',
+  HECHO: 'pill-success',
+};
+
+const PRIORIDAD_LABEL: Record<MiTareaDTO['prioridad'], string> = {
+  ALTA: 'Alta',
+  MEDIA: 'Media',
+  BAJA: 'Baja',
+};
+
+/** Color por prioridad real de la tarea (dato del backend, no decorativo). */
+const PRIORIDAD_BORDE: Record<MiTareaDTO['prioridad'], string> = {
+  ALTA: 'border-l-status-error',
+  MEDIA: 'border-l-status-warning',
+  BAJA: 'border-l-outline-variant',
 };
 
 function tieneFechaLimite(
@@ -69,6 +89,16 @@ export default function CalendarioPage() {
   } = useQuery<MiTareaDTO[]>({
     queryKey: ['mis-tareas'],
     queryFn: () => getMisTareas(),
+  });
+
+  const { data: stats } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: getDashboardStats,
+  });
+
+  const { data: misProyectos = [] } = useQuery<MiProyectoListItemDTO[]>({
+    queryKey: ['dashboard-mis-proyectos'],
+    queryFn: getMyProjects,
   });
 
   const hoy = useMemo(() => new Date(), []);
@@ -112,6 +142,30 @@ export default function CalendarioPage() {
     return [...mapa.values()];
   }, [agenda]);
 
+  // Meta de horas: misma fuente y misma regla que el dashboard (VIEW-08) —
+  // Beca y Extensión nunca se suman. Se muestra la primera que aplique.
+  const metaHoras = useMemo(() => {
+    if (!stats) return null;
+    if (stats.horasBecaRequeridas !== null && stats.horasBecaRequeridas > 0) {
+      return {
+        etiqueta: 'Horas Beca',
+        actual: stats.horasBeca,
+        requeridas: stats.horasBecaRequeridas,
+      };
+    }
+    if (stats.horasExtensionRequeridas !== null && stats.horasExtensionRequeridas > 0) {
+      return {
+        etiqueta: 'Horas de Extensión',
+        actual: stats.horasExtension,
+        requeridas: stats.horasExtensionRequeridas,
+      };
+    }
+    return null;
+  }, [stats]);
+  const metaProgreso = metaHoras
+    ? Math.min(100, Math.round((metaHoras.actual / metaHoras.requeridas) * 100))
+    : 0;
+
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
       <div className="mb-8">
@@ -124,6 +178,7 @@ export default function CalendarioPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-grid lg:grid-cols-[380px_1fr]">
+        <div className="space-y-gap">
         <div className="card-base h-fit">
           <MiniCalendar
             year={cursor.year}
@@ -166,6 +221,52 @@ export default function CalendarioPage() {
               Ver todas las fechas
             </button>
           )}
+        </div>
+
+        {metaHoras && (
+          <div className="card-base h-fit">
+            <div className="mb-stack flex items-center gap-tight">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
+                <Target className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="type-subtitle text-text-primary">Meta de Horas</h3>
+                <p className="type-meta">{metaHoras.etiqueta}</p>
+              </div>
+              <span className="type-section ml-auto text-text-primary">{metaProgreso}%</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-pill bg-surface-container-high">
+              <div
+                className="h-full rounded-pill bg-accent"
+                style={{ width: `${metaProgreso}%` }}
+              />
+            </div>
+            <p className="type-meta mt-tight">
+              {metaHoras.actual} de {metaHoras.requeridas} hrs
+            </p>
+          </div>
+        )}
+
+        {misProyectos.length > 0 && (
+          <div className="card-base h-fit">
+            <h3 className="type-subtitle mb-stack text-text-primary">Mis Proyectos</h3>
+            <ul className="space-y-tight">
+              {misProyectos.slice(0, 4).map((p) => (
+                <li key={p.idProyecto}>
+                  <Link
+                    href={`/dashboard/projects/${p.idProyecto}`}
+                    className="flex items-center justify-between gap-tight rounded-control px-tight py-tight transition-colors hover:bg-surface-container"
+                  >
+                    <span className="type-body truncate text-text-primary">{p.tituloProyecto}</span>
+                    <span className="pill pill-neutral shrink-0">
+                      {estadoBadgeLabel(p.estadoProyecto)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         </div>
 
         <div className="space-y-section">
@@ -231,7 +332,7 @@ export default function CalendarioPage() {
                   <Link
                     key={tarea.idTarea}
                     href={`/dashboard/projects/${tarea.proyecto.idProyecto}/kanban/tasks/${tarea.idTarea}`}
-                    className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-container-low px-4 py-3 transition-colors hover:bg-surface-container"
+                    className={`flex flex-wrap items-center gap-3 rounded-xl border-l-4 bg-surface-container-low px-4 py-3 transition-colors hover:bg-surface-container ${PRIORIDAD_BORDE[tarea.prioridad]}`}
                   >
                     <span className="min-w-[10rem] flex-1 truncate text-sm text-on-surface">
                       {tarea.tituloTarea}
@@ -239,11 +340,11 @@ export default function CalendarioPage() {
                     <span className="shrink-0 text-xs text-tertiary">
                       {tarea.proyecto.tituloProyecto}
                     </span>
+                    <span className="pill pill-neutral shrink-0">
+                      {PRIORIDAD_LABEL[tarea.prioridad]}
+                    </span>
                     <span
-                      className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium uppercase ${
-                        TAREA_ESTADO_STYLES[tarea.estadoTarea] ??
-                        'bg-surface-container-high text-on-surface-variant'
-                      }`}
+                      className={`pill shrink-0 ${TAREA_ESTADO_PILL[tarea.estadoTarea] ?? 'pill-neutral'}`}
                     >
                       {ESTADO_TAREA_LABEL[tarea.estadoTarea] ??
                         tarea.estadoTarea}
