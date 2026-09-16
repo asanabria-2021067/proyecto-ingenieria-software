@@ -96,6 +96,32 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
 };
 
 /**
+ * T-223/T-224 (HU-156): la pastilla de color agrupa por `tipoEntidad` —el
+ * campo que el backend ya asigna a cada evento (bitacora-eventos.service.ts)—
+ * en vez de mapear cada uno de los ~34 `tipoEvento` a mano. Con solo 5 tonos
+ * disponibles (HU-163) y 6 entidades, REVISION_CIERRE y DOCUMENTO_CIERRE
+ * comparten tono: siguen siendo distinguibles por su ícono propio, que es la
+ * distinción que no depende del color (daltonismo/impresión).
+ */
+const ENTIDAD_TONE: Record<string, string> = {
+  TAREA: 'pill-accent',
+  SPRINT: 'pill-success',
+  PROYECTO: 'pill-warning',
+  APELACION_LIDERAZGO: 'pill-error',
+  REVISION_CIERRE: 'pill-neutral',
+  DOCUMENTO_CIERRE: 'pill-neutral',
+};
+
+const ENTIDAD_LABEL: Record<string, string> = {
+  TAREA: 'Tarea',
+  SPRINT: 'Sprint',
+  PROYECTO: 'Proyecto',
+  APELACION_LIDERAZGO: 'Liderazgo',
+  REVISION_CIERRE: 'Cierre',
+  DOCUMENTO_CIERRE: 'Cierre',
+};
+
+/**
  * La bitácora es un registro histórico: puede contener eventos que este
  * cliente todavía no conoce, y uno solo no debe tumbar la página entera.
  * Antes se leía `EVENTO_STYLE[tipo].icon` a pelo y cualquier tipo nuevo del
@@ -176,6 +202,8 @@ function BitacoraItem({ evento, miembros }: { evento: EventoBitacoraDto; miembro
   const estilo = estiloDe(evento.tipoEvento);
   const Icon = estilo.icon;
   const actor = evento.actor ? `${evento.actor.nombre} ${evento.actor.apellido}` : 'Alguien';
+  const tono = ENTIDAD_TONE[evento.tipoEntidad] ?? 'pill-neutral';
+  const categoria = ENTIDAD_LABEL[evento.tipoEntidad] ?? evento.tipoEntidad;
 
   return (
     <div className="flex gap-inline rounded-card border border-outline-variant bg-surface-container-lowest p-card shadow-card">
@@ -183,9 +211,13 @@ function BitacoraItem({ evento, miembros }: { evento: EventoBitacoraDto; miembro
         <Icon className="size-5 text-primary" aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center justify-between gap-tight">
+        <div className="flex flex-wrap items-center gap-tight">
+          {/* Pastilla por tipoEntidad: color con texto oscuro sobre fondo
+              sólido (nunca texto de color a secas), contraste AA heredado de
+              los mismos tonos ya usados para estados de tarea/prioridad. */}
+          <span className={`pill ${tono}`}>{categoria}</span>
           <p className="type-subtitle text-text-primary">{estilo.label}</p>
-          <time className="type-meta" dateTime={evento.fechaEvento}>
+          <time className="type-meta ml-auto shrink-0" dateTime={evento.fechaEvento}>
             {formatearFechaHora(evento.fechaEvento)}
           </time>
         </div>
