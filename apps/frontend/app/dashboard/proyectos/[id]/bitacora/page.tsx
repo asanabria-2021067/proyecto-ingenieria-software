@@ -36,6 +36,7 @@ import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectBitacora } from '@/hooks/use-project-bitacora';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -257,16 +258,24 @@ export default function BitacoraPage() {
   // `habilitado: isLeader` evita disparar la petición mientras no se sabe
   // que el usuario (identificado vía la cookie JWT) es líder — el backend
   // respondería 403 igual, pero no hace falta pedirlo.
-  const { eventos, totalPages, isLoading, isError, error, refetch } = useProjectBitacora(
+  const { eventos, total, totalPages, isLoading, isError, error, refetch } = useProjectBitacora(
     idProyecto,
     filtros,
     isLeader,
   );
 
   const cargando = isLoading || cargandoProyecto || cargandoUsuario;
+  const hayFiltrosActivos = idSprintFiltro !== '' || idActorFiltro !== '' || tipoEventoFiltro !== '';
 
   function actualizarFiltro(setter: (value: string) => void, value: string) {
     setter(value);
+    setPage(1);
+  }
+
+  function limpiarFiltros() {
+    setIdSprintFiltro('');
+    setIdActorFiltro('');
+    setTipoEventoFiltro('');
     setPage(1);
   }
 
@@ -334,7 +343,30 @@ export default function BitacoraPage() {
                 </option>
               ))}
             </select>
+
+            {hayFiltrosActivos && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={limpiarFiltros}
+                className="font-medium text-primary"
+              >
+                Limpiar filtros
+              </Button>
+            )}
           </div>
+
+          {/* Refleja si se está viendo todo o una parte filtrada — el
+              usuario siempre sabe qué alcance tiene la lista de abajo. */}
+          {!cargando && !isError && (
+            <div className="mb-stack flex items-center gap-tight" aria-live="polite" role="status">
+              <span className="pill pill-accent">
+                {total} {total === 1 ? 'evento' : 'eventos'}
+              </span>
+              {hayFiltrosActivos && <span className="type-meta">con filtros aplicados</span>}
+            </div>
+          )}
 
           {cargando && (
             <div className="space-y-stack">
