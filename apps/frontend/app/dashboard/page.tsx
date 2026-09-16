@@ -86,16 +86,21 @@ function HorasKpiCard({
   icon: typeof Award;
 }) {
   return (
-    <div id={id} role="group" aria-label={titulo} className="card-base flex flex-col justify-between">
-      <div className="flex items-start justify-between gap-tight">
-        <span className="type-meta flex items-center gap-tight uppercase tracking-wider text-text-secondary">
+    <div
+      id={id}
+      role="group"
+      aria-label={titulo}
+      className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack"
+    >
+      <div className="relative z-10 flex items-start justify-between gap-tight">
+        <span className="type-meta flex items-center gap-tight uppercase tracking-wider text-on-primary/70">
           {titulo}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 aria-label={`Qué significa: ${titulo}`}
-                className="rounded-pill text-text-secondary hover:text-text-primary"
+                className="rounded-pill text-on-primary/70 hover:text-on-primary"
               >
                 <Info className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
@@ -103,23 +108,23 @@ function HorasKpiCard({
             <TooltipContent className="max-w-xs">{ayuda}</TooltipContent>
           </Tooltip>
         </span>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <div className="mt-tight">
+      <div className="relative z-10 mt-tight">
         {valor === null ? (
-          <span className="type-subtitle block text-text-secondary">
+          <span className="type-subtitle block text-on-primary/70">
             No disponible por ahora
           </span>
         ) : (
           <div className="flex items-baseline gap-1">
-            <span className="type-display text-text-primary">{valor}</span>
-            <span className="type-body font-medium text-text-secondary">h</span>
+            <span className="type-section text-on-primary">{valor}</span>
+            <span className="type-body font-medium text-on-primary/70">h</span>
           </div>
         )}
       </div>
-      <span className={`pill mt-stack w-fit ${estadoTone === 'warning' ? 'pill-warning' : 'pill-success'}`}>
+      <span className={`pill relative z-10 mt-stack w-fit ${estadoTone === 'warning' ? 'pill-warning' : 'pill-success'}`}>
         {estadoLabel}
       </span>
     </div>
@@ -209,11 +214,11 @@ function CalendarioWidget() {
           href="/dashboard/calendario"
           className="flex items-center gap-tight rounded-control bg-surface-container p-tight transition-colors hover:bg-surface-container-high"
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container-high text-text-secondary">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary">
             <CalendarClock className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="type-meta font-semibold uppercase tracking-wider">
+            <p className="type-meta font-semibold uppercase tracking-wider text-primary">
               Próxima entrega
             </p>
             <p className="type-body truncate font-medium text-text-primary">
@@ -403,119 +408,127 @@ export default function DashboardPage() {
       />
 
       <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
-        {/* Welcome */}
-        <section className="mb-section">
-          <span className="pill pill-neutral mb-tight">Bienvenido de vuelta</span>
-          <h1 className="type-display text-text-primary">
-            ¡Hola, {user?.nombre ?? ''}! 👋
-          </h1>
-          <p className="type-body mt-tight max-w-prose text-text-secondary">
-            Tu progreso académico este semestre. Tienes {projects.length}{' '}
-            proyectos disponibles listos para postularte hoy.
-          </p>
-        </section>
-
-        {/* Stats */}
-        <section
-          id="stats-container"
-          className="mb-section grid grid-cols-1 gap-grid sm:grid-cols-2 lg:grid-cols-4"
-        >
-          {/* Horas Beca */}
-          {requiereHorasBeca && (
-            <div className="card-base flex flex-col justify-between">
-              <div className="flex items-start justify-between gap-tight">
-                <span className="type-meta uppercase tracking-wider text-text-secondary">
-                  Horas Beca Acumuladas
-                </span>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
-                  <GraduationCap className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-tight flex items-baseline gap-tight">
-                <span className="type-display text-text-primary">
-                  {horasBeca}
-                </span>
-                <span className="type-body text-text-secondary">
-                  / {horasBecaRequeridas}
-                </span>
-              </div>
-              <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-high">
-                <div
-                  className="h-full rounded-pill bg-accent"
-                  style={{ width: `${progressBeca}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Horas Extension */}
-          {requiereHorasExtension && (
-            <div className="card-base flex flex-col justify-between">
-              <div className="flex items-start justify-between gap-tight">
-                <span className="type-meta uppercase tracking-wider text-text-secondary">
-                  Horas de Extension
-                </span>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
-                  <HeartHandshake className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-tight flex items-baseline gap-tight">
-                <span className="type-display text-text-primary">
-                  {horasExtension}
-                </span>
-                <span className="type-body text-text-secondary">
-                  / {horasExtensionRequeridas}
-                </span>
-              </div>
-              <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-surface-container-high">
-                <div
-                  className="h-full rounded-pill bg-accent"
-                  style={{ width: `${progressExtension}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Proyectos Activos */}
-          <div className="card-base flex flex-col justify-between">
-            <div className="flex items-start justify-between gap-tight">
-              <span className="type-meta uppercase tracking-wider text-text-secondary">
-                Proyectos Activos
-              </span>
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
-                <Zap className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="mt-tight">
-              <span className="type-display text-text-primary">
-                {String(proyectosActivos).padStart(2, '0')}
-              </span>
-            </div>
-            <div className="type-meta mt-stack flex items-center gap-tight text-text-secondary">
-              <Calendar className="h-3.5 w-3.5" />
-              <span>En curso actual</span>
-            </div>
+        {/* Welcome + Stats */}
+        <section className="relative mb-section overflow-hidden rounded-card bg-primary p-card text-on-primary shadow-card">
+          <div className="absolute -right-10 -bottom-10 h-56 w-56 rounded-full bg-on-primary/10 blur-3xl" />
+          <div className="relative z-10 max-w-prose">
+            <span className="pill mb-tight bg-on-primary/15 text-on-primary">
+              Bienvenido de vuelta
+            </span>
+            <h1 className="type-display text-on-primary">
+              ¡Hola, {user?.nombre ?? ''}! 👋
+            </h1>
+            <p className="type-body mt-tight text-on-primary/80">
+              Tu progreso académico este semestre. Tienes{' '}
+              <span className="font-semibold text-on-primary">
+                {projects.length} proyectos
+              </span>{' '}
+              disponibles listos para postularte hoy.
+            </p>
           </div>
 
-          {/* S7 VIEW-08: horas en proyectos abiertos vs. acreditadas (separadas) */}
-          <HorasKpiCard
-            id="stats-horas-abiertas"
-            titulo="Horas Registradas"
-            valor={horasAbiertas}
-            ayuda="Horas que registraste en proyectos aún no cerrados. Pueden cambiar hasta que el proyecto se cierre."
-            estadoLabel="Pendiente de cierre"
-            estadoTone="warning"
-            icon={Clock}
-          />
-          <HorasKpiCard
-            id="stats-horas-acreditadas"
-            titulo="Horas acreditadas"
-            valor={horasAcreditadas}
-            ayuda="Horas aprobadas por administración al cerrar tus proyectos. Ya no cambian."
-            estadoLabel="Validado oficial"
-            estadoTone="success"
-            icon={CheckCircle2}
-          />
+          {/* Stats */}
+          <div
+            id="stats-container"
+            className="relative z-10 mt-card grid grid-cols-1 gap-gap sm:grid-cols-2 lg:grid-cols-4"
+          >
+            {/* Horas Beca */}
+            {requiereHorasBeca && (
+              <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
+                <div className="flex items-start justify-between gap-tight">
+                  <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                    Horas Beca Acumuladas
+                  </span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
+                    <GraduationCap className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-tight flex items-baseline gap-tight">
+                  <span className="type-section text-on-primary">
+                    {horasBeca}
+                  </span>
+                  <span className="type-body text-on-primary/70">
+                    / {horasBecaRequeridas}
+                  </span>
+                </div>
+                <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-on-primary/20">
+                  <div
+                    className="h-full rounded-pill bg-accent"
+                    style={{ width: `${progressBeca}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Horas Extension */}
+            {requiereHorasExtension && (
+              <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
+                <div className="flex items-start justify-between gap-tight">
+                  <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                    Horas de Extension
+                  </span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
+                    <HeartHandshake className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-tight flex items-baseline gap-tight">
+                  <span className="type-section text-on-primary">
+                    {horasExtension}
+                  </span>
+                  <span className="type-body text-on-primary/70">
+                    / {horasExtensionRequeridas}
+                  </span>
+                </div>
+                <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-on-primary/20">
+                  <div
+                    className="h-full rounded-pill bg-accent"
+                    style={{ width: `${progressExtension}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Proyectos Activos */}
+            <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
+              <div className="flex items-start justify-between gap-tight">
+                <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                  Proyectos Activos
+                </span>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
+                  <Zap className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-tight">
+                <span className="type-section text-on-primary">
+                  {String(proyectosActivos).padStart(2, '0')}
+                </span>
+              </div>
+              <div className="type-meta mt-stack flex items-center gap-tight text-on-primary/70">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>En curso actual</span>
+              </div>
+            </div>
+
+            {/* S7 VIEW-08: horas en proyectos abiertos vs. acreditadas (separadas) */}
+            <HorasKpiCard
+              id="stats-horas-abiertas"
+              titulo="Horas Registradas"
+              valor={horasAbiertas}
+              ayuda="Horas que registraste en proyectos aún no cerrados. Pueden cambiar hasta que el proyecto se cierre."
+              estadoLabel="Pendiente de cierre"
+              estadoTone="warning"
+              icon={Clock}
+            />
+            <HorasKpiCard
+              id="stats-horas-acreditadas"
+              titulo="Horas acreditadas"
+              valor={horasAcreditadas}
+              ayuda="Horas aprobadas por administración al cerrar tus proyectos. Ya no cambian."
+              estadoLabel="Validado oficial"
+              estadoTone="success"
+              icon={CheckCircle2}
+            />
+          </div>
         </section>
 
         <div className="layout-grid">
