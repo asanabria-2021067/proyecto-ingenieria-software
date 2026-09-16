@@ -278,7 +278,7 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
       customClass: {
         ...swalCustomClass,
         confirmButton:
-          'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md mx-4',
+          'rounded-control bg-error px-card py-tight text-body font-medium text-on-error hover:bg-error/90 transition-colors',
       },
     });
     if (!result.isConfirmed) return;
