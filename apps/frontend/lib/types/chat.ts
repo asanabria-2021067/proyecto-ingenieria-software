@@ -20,6 +20,8 @@ export interface ChatConversacion {
   participantes: ChatUsuario[];
   ultimoMensaje: ChatMensaje | null;
   noLeidos: number;
+  /** T-234: el proyecto ya cerró — solo lectura, sin mensajes nuevos. */
+  archivada: boolean;
 }
 
 export interface CreateConversationPayload {
