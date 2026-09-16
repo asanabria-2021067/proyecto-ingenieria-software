@@ -13,8 +13,16 @@ function readStoredIndex(): number {
   return SCALE_LEVELS[parsed] !== undefined ? parsed : DEFAULT_INDEX;
 }
 
+/** Además del fontSize del <html> (de donde salen casi todos los `rem` del
+ * layout), expone la escala y su inverso como custom properties: el sidebar
+ * (`.sidebar-scale-lock`, global.css) los usa para quedar con tamaño fijo
+ * en pantalla sin importar el nivel elegido acá. */
 function applyFontScale(index: number) {
-  document.documentElement.style.fontSize = `${SCALE_LEVELS[index] * 100}%`;
+  const scale = SCALE_LEVELS[index];
+  const root = document.documentElement;
+  root.style.fontSize = `${scale * 100}%`;
+  root.style.setProperty('--font-scale', String(scale));
+  root.style.setProperty('--font-scale-inverse', String(1 / scale));
 }
 
 export function FontScaleToggle() {

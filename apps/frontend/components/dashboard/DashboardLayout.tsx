@@ -14,6 +14,7 @@ import {
   CalendarDays,
   RotateCcw,
   Users,
+  Archive,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
@@ -73,6 +74,11 @@ const navEntries: NavEntry[] = [
         href: '/dashboard/mis-postulaciones',
         label: 'Mis Postulaciones',
         icon: FileText,
+      },
+      {
+        href: '/dashboard/chats/archivados',
+        label: 'Chats archivados',
+        icon: Archive,
       },
     ],
   },
@@ -152,7 +158,7 @@ export default function DashboardLayout({
       </a>
 
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden h-full w-[231px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex">
+      <aside className="sidebar-scale-lock hidden h-full shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex">
         <div className="flex items-center gap-inline border-b border-outline-variant px-card py-stack">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
           <span className="type-section text-text-primary">UVGenius</span>
