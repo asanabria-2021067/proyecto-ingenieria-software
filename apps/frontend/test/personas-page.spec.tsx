@@ -124,6 +124,40 @@ describe('PersonasPage', () => {
     expect(within(botonFiltros).getByText('1')).toBeInTheDocument();
   });
 
+  // T-195: el filtro de semestre vive dentro del popover de Filtros.
+  it('T-195: el contador del botón Filtros suma también el filtro de semestre', async () => {
+    await renderPersonas();
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalled());
+
+    const botonFiltros = screen.getByRole('button', { name: /Filtros/i });
+    fireEvent.click(botonFiltros);
+    fireEvent.click(await screen.findByRole('button', { name: '1°-4°' }));
+
+    expect(within(botonFiltros).getByText('1')).toBeInTheDocument();
+  });
+
+  it('T-195: filtrar por semestre desde el popover dispara la consulta con el rango elegido', async () => {
+    await renderPersonas();
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: /Filtros/i }));
+    fireEvent.click(await screen.findByRole('button', { name: '8°+' }));
+
+    await waitFor(() =>
+      expect(buscarUsuariosMock).toHaveBeenCalledWith(
+        expect.objectContaining({ semestreRango: '8+' }),
+      ),
+    );
+
+    // Volver a "Todos" quita el filtro (undefined, no un string vacío).
+    fireEvent.click(screen.getByRole('button', { name: 'Todos', pressed: false }));
+    await waitFor(() =>
+      expect(buscarUsuariosMock).toHaveBeenCalledWith(
+        expect.objectContaining({ semestreRango: undefined }),
+      ),
+    );
+  });
+
   it('la tarjeta muestra nombre, carrera y habilidades, y enlaza al perfil completo', async () => {
     buscarUsuariosMock.mockResolvedValue({
       items: [
@@ -178,6 +212,24 @@ describe('PersonasPage', () => {
 
     clickTab('Mis amigos');
     expect(await screen.findByText('Todavía no tenés amigos')).toBeInTheDocument();
+  });
+
+  // T-195: chips de señal (motivo de recomendación) vs. chips de etiqueta
+  // (habilidad) usan clases distintas — señal lleva el rol accent del
+  // sistema de diseño, etiqueta se queda con la paleta tenue variada.
+  it('T-195: el chip de motivo (señal) y el chip de habilidad (etiqueta) usan clases distintas', async () => {
+    buscarUsuariosMock.mockResolvedValue({
+      items: [usuario({ idUsuario: 10, nombre: 'Carla', mismaCarrera: true, habilidades: ['React'] })],
+      hasMore: false,
+    });
+    await renderPersonas();
+
+    const chipSenal = await screen.findByText('De tu carrera');
+    const chipEtiqueta = screen.getByText('React');
+
+    expect(chipSenal.className).toContain('pill-accent');
+    expect(chipEtiqueta.className).not.toContain('pill-accent');
+    expect(chipSenal.className).not.toBe(chipEtiqueta.className);
   });
 
   // La regla "sin colores literales" se retiró a propósito: el semestre y
