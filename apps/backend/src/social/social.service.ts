@@ -13,6 +13,13 @@ const USUARIO_RESUMEN_SELECT = {
 
 const PERSONAS_PAGE_SIZE = 12;
 
+/** T-195: límites reales de cada rango del filtro de semestre en Personas. */
+const SEMESTRE_RANGO_LIMITES: Record<'1-4' | '5-7' | '8+', { gte: number; lte?: number }> = {
+  '1-4': { gte: 1, lte: 4 },
+  '5-7': { gte: 5, lte: 7 },
+  '8+': { gte: 8 },
+};
+
 const USUARIO_BUSQUEDA_SELECT = {
   ...USUARIO_RESUMEN_SELECT,
   perfil: { select: { semestre: true, carrera: { select: { nombreCarrera: true } } } },
@@ -384,6 +391,11 @@ export class SocialService {
 
     if (filtros.intereses?.length) {
       condiciones.push({ intereses: { some: { idInteres: { in: filtros.intereses } } } });
+    }
+
+    if (filtros.semestreRango) {
+      const limites = SEMESTRE_RANGO_LIMITES[filtros.semestreRango];
+      condiciones.push({ perfil: { semestre: limites } });
     }
 
     const page = filtros.page ?? 1;
