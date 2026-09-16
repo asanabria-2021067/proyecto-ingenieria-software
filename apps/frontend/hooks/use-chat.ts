@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createConversation,
   getMessages,
+  listArchivedConversations,
   listConversations,
   markConversationRead,
   sendMessage,
 } from '@/lib/services/chat';
 import {
+  archivedConversationsQueryKey,
   conversationMessagesQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
@@ -79,6 +81,25 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
       queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
     },
   });
+}
+
+/** T-236: paginado, con búsqueda por nombre de chat o por persona (el `q`
+ * viaja tal cual al backend, que compara contra ambos). */
+export function useArchivedConversations(q: string) {
+  const query = useInfiniteQuery({
+    queryKey: archivedConversationsQueryKey(q.trim()),
+    queryFn: ({ pageParam }) => listArchivedConversations({ q: q.trim() || undefined, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length + 1 : undefined),
+  });
+  return {
+    conversaciones: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
 }
 
 export function useMarkConversationRead(idProyecto: number) {
