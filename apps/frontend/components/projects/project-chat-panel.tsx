@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, MessageSquarePlus, Send, Users as UsersIcon } from 'lucide-react';
+import { Loader2, Lock, MessageSquarePlus, Send, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -139,11 +139,17 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
                 </AvatarFallback>
               </Avatar>
             )}
-            <span className="min-w-0 flex-1 truncate font-medium">{nombreConversacion(c, currentUserId)}</span>
-            {c.noLeidos > 0 && (
-              <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-on-primary">
-                {c.noLeidos}
-              </span>
+            <span className={`min-w-0 flex-1 truncate font-medium ${c.archivada ? 'text-text-secondary' : ''}`}>
+              {nombreConversacion(c, currentUserId)}
+            </span>
+            {c.archivada ? (
+              <Lock className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
+            ) : (
+              c.noLeidos > 0 && (
+                <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-on-primary">
+                  {c.noLeidos}
+                </span>
+              )
             )}
           </button>
         ))}
@@ -378,6 +384,15 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
           </SheetTitle>
         </SheetHeader>
 
+        {conversacion?.archivada && (
+          <div className="flex items-center gap-2 border-b border-outline-variant bg-surface-container px-4 py-2.5">
+            <Lock className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
+            <p className="type-meta text-text-secondary">
+              El proyecto ya cerró. Esta conversación quedó archivada y en solo lectura.
+            </p>
+          </div>
+        )}
+
         <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
           {isLoading && <p className="text-xs text-tertiary">Cargando historial…</p>}
           {!isLoading && messages.length === 0 && (
@@ -413,25 +428,27 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
           })}
         </div>
 
-        <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-3">
-          <Input
-            value={texto}
-            onChange={(event) => setTexto(event.target.value)}
-            placeholder="Escribe un mensaje…"
-            maxLength={4000}
-            disabled={enviar.isPending}
-            className="h-10 flex-1 rounded-full border-outline-variant text-sm"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={enviar.isPending || texto.trim().length === 0}
-            className="size-10 shrink-0 rounded-full bg-primary text-white hover:bg-primary/90 hover:text-white"
-            aria-label="Enviar mensaje"
-          >
-            <Send className="size-4" aria-hidden="true" />
-          </Button>
-        </form>
+        {!conversacion?.archivada && (
+          <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-3">
+            <Input
+              value={texto}
+              onChange={(event) => setTexto(event.target.value)}
+              placeholder="Escribe un mensaje…"
+              maxLength={4000}
+              disabled={enviar.isPending}
+              className="h-10 flex-1 rounded-full border-outline-variant text-sm"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={enviar.isPending || texto.trim().length === 0}
+              className="size-10 shrink-0 rounded-full bg-primary text-white hover:bg-primary/90 hover:text-white"
+              aria-label="Enviar mensaje"
+            >
+              <Send className="size-4" aria-hidden="true" />
+            </Button>
+          </form>
+        )}
       </SheetContent>
     </Sheet>
   );
