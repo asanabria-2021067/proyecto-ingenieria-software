@@ -91,7 +91,7 @@ export default function MyProjectsPage() {
       cancelButtonText: 'Cancelar',
       customClass: {
         ...swalCustomClass,
-        confirmButton: 'rounded-xl bg-error px-5 py-2 text-xs font-bold text-on-error hover:bg-error/90 transition-all shadow-md mx-4',
+        confirmButton: 'rounded-control bg-error px-card py-tight text-body font-medium text-on-error hover:bg-error/90 transition-colors',
       },
     });
 
