@@ -441,6 +441,19 @@ html {
   transform: translateY(0);
 }
 
+/* El selector de tamaño de fuente (font-scale-toggle.tsx) cambia el
+   font-size del <html>, y casi todo el layout usa `rem` (que siempre se
+   mide contra el root, nunca contra un ancestro) — así que sin esto el
+   sidebar también se reescala. `zoom` corre DESPUÉS del layout normal, y
+   compensando el ancho declarado con el mismo factor de escala, el
+   tamaño del sidebar en pantalla queda fijo en 231px pase lo que pase
+   con --font-scale, mientras su contenido interno (texto, íconos,
+   padding) renderiza como si el usuario nunca hubiera tocado el control. */
+.sidebar-scale-lock {
+  width: calc(231px * var(--font-scale, 1));
+  zoom: var(--font-scale-inverse, 1);
+}
+
 .skip-link {
   position: fixed;
   left: 1rem;
@@ -650,8 +663,8 @@ button:disabled {
   color: var(--color-on-status-error) !important;
 }
 .swal2-icon.swal2-question {
-  background: var(--color-surface-container-high) !important;
-  color: var(--color-on-surface-variant) !important;
+  background: var(--color-primary-container) !important;
+  color: var(--color-on-primary-container) !important;
 }
 .swal2-icon.swal2-info {
   background: var(--color-surface-container-high) !important;
