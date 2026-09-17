@@ -22,17 +22,16 @@ interface DetalleJsonEvento {
 }
 
 /**
- * T-164: `GET /proyectos/:id/bitacora` — exclusivo del líder
- * (BitacoraContextService.assertProjectLeader, a diferencia de
- * tareas/sprints que también permiten al participante activo). El
- * aislamiento cross-project no puede apoyarse en una columna `idProyecto`
- * real (bitacora_auditoria no la tiene y T-140 exige "sin migración"), así
- * que vive en un filtro `detalleJson.idProyecto` sobre el JSON escrito por
- * BitacoraEventosService — nunca confiado a un filtro posterior en memoria.
- * `accion IN (...TipoEventoBitacora)` excluye siempre las filas genéricas de
- * AuditInterceptor (que escribe `"${method} ${url}"` en `accion`, un valor
- * que nunca coincide con el enum funcional), separando el log técnico del
- * funcional sin tocar el esquema.
+ * T-164/HU-170: `GET /proyectos/:id/bitacora` — líder, admin y (T-269)
+ * participante activo en solo lectura, sin ver eventos administrativos
+ * (`TipoEventoBitacora.ADMINISTRATIVOS`). El aislamiento cross-project no
+ * puede apoyarse en una columna `idProyecto` real (bitacora_auditoria no la
+ * tiene y T-140 exige "sin migración"), así que vive en un filtro
+ * `detalleJson.idProyecto` sobre el JSON escrito por BitacoraEventosService —
+ * nunca confiado a un filtro posterior en memoria. `accion IN (...)` excluye
+ * siempre las filas genéricas de AuditInterceptor (que escribe
+ * `"${method} ${url}"` en `accion`, un valor que nunca coincide con el enum
+ * funcional), separando el log técnico del funcional sin tocar el esquema.
  */
 @Injectable()
 export class BitacoraConsultaService {
@@ -43,9 +42,12 @@ export class BitacoraConsultaService {
   ) {}
 
   /**
-   * C048 (06 v2 §34/§43/§41 E091): la audiencia la decide la política de
-   * lectura con scope `bitacora` —líder actual y administrador, nunca un
-   * participante— en un solo lugar, en vez de repetir la regla aquí. Los
+   * C048 (06 v2 §34/§43/§41 E091, ampliado por HU-170): la audiencia la
+   * decide la política de lectura con scope `bitacora` —líder actual,
+   * administrador y participante activo— en un solo lugar, en vez de repetir
+   * la regla aquí. El perfil que devuelve esa decisión determina además si se
+   * ven los eventos administrativos: nunca para un participante, aunque los
+   * pida por filtro explícito de `tipoEvento` (ver `tiposVisiblesPara`). Los
    * filtros de la consulta y el contrato de HU-D3 se conservan intactos, y el
    * módulo no gana ningún writer por esta lectura.
    */
@@ -54,16 +56,18 @@ export class BitacoraConsultaService {
     userId: number,
     filtros: FiltrosBitacoraInput,
   ): Promise<BitacoraPaginadaDto> {
-    await this.readPolicy.assertRead(undefined, {
+    const decision = await this.readPolicy.assertRead(undefined, {
       projectId,
       actorId: userId,
       scope: 'bitacora',
     });
 
     const { idSprint, idActor, tipoEvento, page, limit } = filtros;
+    const puedeVerAdministrativos = decision.profile === 'LIDER' || decision.profile === 'ADMIN';
+    const tiposVisibles = this.tiposVisiblesPara(puedeVerAdministrativos);
 
     const andConditions: Prisma.BitacoraAuditoriaWhereInput[] = [
-      { accion: tipoEvento ? tipoEvento : { in: [...TipoEventoBitacora.VALORES] } },
+      { accion: tipoEvento ? this.accionFiltroPara(tipoEvento, tiposVisibles) : { in: [...tiposVisibles] } },
       { detalleJson: { path: ['idProyecto'], equals: projectId } },
     ];
     if (idSprint !== undefined) {
@@ -93,6 +97,27 @@ export class BitacoraConsultaService {
       page,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /** HU-170: catálogo completo para líder/admin; sin administrativos para el resto. */
+  private tiposVisiblesPara(puedeVerAdministrativos: boolean): readonly TipoEventoBitacoraValor[] {
+    if (puedeVerAdministrativos) {
+      return TipoEventoBitacora.VALORES;
+    }
+    return TipoEventoBitacora.VALORES.filter((valor) => !TipoEventoBitacora.ADMINISTRATIVOS.has(valor));
+  }
+
+  /**
+   * Un participante que filtra explícitamente por un `tipoEvento`
+   * administrativo (p. ej. `?tipoEvento=LEADERSHIP_CHANGED`) no debe recibir
+   * esas filas solo porque las pidió por nombre: `{ in: [] }` fuerza cero
+   * resultados en vez de colar el valor tal cual a `accion`.
+   */
+  private accionFiltroPara(
+    tipoEvento: TipoEventoBitacoraValor,
+    tiposVisibles: readonly TipoEventoBitacoraValor[],
+  ): Prisma.BitacoraAuditoriaWhereInput['accion'] {
+    return tiposVisibles.includes(tipoEvento) ? tipoEvento : { in: [] };
   }
 
   private mapEvento(
