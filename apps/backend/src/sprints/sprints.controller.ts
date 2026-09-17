@@ -83,6 +83,24 @@ export class SprintsController {
     return this.sprintsService.closeSprint(projectId, sprintId, user.userId);
   }
 
+  /**
+   * T-238 (HU-160): regenera la instantánea de HOY del Sprint (líder). No
+   * pasa por `ProjectWriteGuard`/catálogo de familias — a diferencia de
+   * iniciar/finalizar/cerrar, no transiciona ningún estado del Sprint ni del
+   * proyecto: es un upsert idempotente sobre una fila derivada
+   * (`InstantaneaSprint`), gateado únicamente por
+   * `SprintsAuthorizationService.assertCanManageSprintSnapshot`.
+   */
+  @Post(':sprintId/instantanea')
+  @HttpCode(HttpStatus.OK)
+  regenerarInstantanea(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.regenerarInstantaneaDeHoy(projectId, sprintId, user.userId);
+  }
+
   /** E066: resumen de cierre (líder actual mientras el Sprint no esté cerrado). */
   @Get(':sprintId/resumen-cierre')
   @HttpCode(HttpStatus.OK)

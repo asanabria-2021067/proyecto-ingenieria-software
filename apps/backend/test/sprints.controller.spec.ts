@@ -14,6 +14,7 @@ function makeService() {
     getSprintDetail: vi.fn(),
     getSprintAnalytics: vi.fn(),
     getSprintsAnalytics: vi.fn(),
+    regenerarInstantaneaDeHoy: vi.fn(),
   };
 }
 
@@ -161,6 +162,53 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     const controller = makeController(service);
 
     await expect(controller.close(5, 12, { userId: 9 })).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.regenerarInstantanea (POST /proyectos/:projectId/sprints/:sprintId/instantanea) — T-238/HU-160', () => {
+  it('está registrado como POST en :sprintId/instantanea', () => {
+    expect(
+      Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.regenerarInstantanea),
+    ).toBe(':sprintId/instantanea');
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.regenerarInstantanea),
+    ).toBe(1); // POST
+  });
+
+  it('responde con 200 OK', () => {
+    expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.regenerarInstantanea),
+    ).toBe(200);
+  });
+
+  it('delega en SprintsService.regenerarInstantaneaDeHoy con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.regenerarInstantanea(5, 12, { userId: 9 });
+
+    expect(service.regenerarInstantaneaDeHoy).toHaveBeenCalledTimes(1);
+    expect(service.regenerarInstantaneaDeHoy).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.regenerarInstantaneaDeHoy, sin transformarlo', async () => {
+    const service = makeService();
+    const instantanea = { idInstantanea: 1, idSprint: 12, fecha: '2026-09-16' };
+    service.regenerarInstantaneaDeHoy.mockResolvedValue(instantanea);
+    const controller = makeController(service);
+
+    const result = await controller.regenerarInstantanea(5, 12, { userId: 9 });
+
+    expect(result).toBe(instantanea);
+  });
+
+  it('propaga los errores de autorización que lance SprintsService.regenerarInstantaneaDeHoy', async () => {
+    const service = makeService();
+    const error = new Error('no autorizado');
+    service.regenerarInstantaneaDeHoy.mockRejectedValue(error);
+    const controller = makeController(service);
+
+    await expect(controller.regenerarInstantanea(5, 12, { userId: 9 })).rejects.toBe(error);
   });
 });
 
