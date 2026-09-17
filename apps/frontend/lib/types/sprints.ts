@@ -23,6 +23,7 @@ export interface SprintDto {
   numero: number;
   estado: EstadoSprint;
   fechaInicio: string;
+  fechaFinPlaneada: string | null;
   fechaFinalizacionIniciada: string | null;
   fechaCierre: string | null;
   cerradoPor?: number | null;
@@ -100,6 +101,7 @@ export interface SprintDetailDto {
   numero: number;
   estado: EstadoSprint;
   fechaInicio: string;
+  fechaFinPlaneada: string | null;
   fechaFinalizacionIniciada: string | null;
   fechaCierre: string | null;
   cerradoPor: number | null;

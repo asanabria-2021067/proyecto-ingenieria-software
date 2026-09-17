@@ -71,7 +71,7 @@ export function useStartSprint(idProyecto: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => startSprint(idProyecto),
+    mutationFn: (fechaFinPlaneada?: string) => startSprint(idProyecto, fechaFinPlaneada),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(idProyecto) });
     },
