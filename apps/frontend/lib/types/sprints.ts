@@ -294,3 +294,25 @@ export interface SprintComparativeAnalyticsDto {
   idProyecto: number;
   sprints: SprintComparativeAnalyticsItemDto[];
 }
+
+/**
+ * `GET /proyectos/:projectId/sprints/:sprintId/burndown` (T-240, HU-160) —
+ * refleja `SprintBurndownDto`. `instantaneas` viene tal cual T-238 las
+ * guardó, sin rellenar huecos: un día sin fila es un hueco real que el
+ * gráfico debe mostrar como corte, nunca interpolar.
+ */
+export interface SprintBurndownInstantaneaDto {
+  fecha: string;
+  tareasPendientes: number;
+  tareasCompletadas: number;
+  puntosHistoriaRestantes: number;
+}
+
+export interface SprintBurndownDto {
+  idSprint: number;
+  fechaInicio: string;
+  fechaFinPlaneada: string | null;
+  tareasPlanificadasTotal: number;
+  puntosHistoriaPlanificadosTotal: number;
+  instantaneas: SprintBurndownInstantaneaDto[];
+}
