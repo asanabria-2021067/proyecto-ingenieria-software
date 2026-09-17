@@ -437,11 +437,58 @@ describe('SprintsService', () => {
       );
     });
 
-    it('caso 2: una tarea EN_PROGRESO bloquea, sin updateMany ni notificaciones', async () => {
+    it('caso 2 (HU-148/HU-160): una tarea EN_PROGRESO ya NO bloquea — finaliza igual y notifica', async () => {
+      const tx = makeTx();
+      const sprint = sprintActivo();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { estadoTarea: 'EN_PROGRESO' })]);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
+      tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      const result = await service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result).toBe(sprintFinalizado);
+      expect(tx.sprint.updateMany).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyProjectActiveParticipants).toHaveBeenCalledTimes(1);
+    });
+
+    it('caso 3 (HU-148/HU-160): una tarea POR_HACER ya NO bloquea — el arrastre real queda para T-239, no para F1', async () => {
+      const tx = makeTx();
+      const sprint = sprintActivo();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanFinalizeSprint.mockResolvedValue(sprint);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { estadoTarea: 'POR_HACER' })]);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintFinalizado = { ...sprint, estado: 'EN_FINALIZACION', fechaFinalizacionIniciada: new Date() };
+      tx.sprint.findFirst.mockResolvedValue(sprintFinalizado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      const result = await service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result).toBe(sprintFinalizado);
+      // F1 sigue mirando solo el conjunto vigente: una tarea eliminada no
+      // cuenta (a diferencia de F2, que sí la incluye).
+      expect(tx.tarea.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { idProyecto: PROJECT_ID, idSprint: SPRINT_ID, eliminadoEn: null },
+        }),
+      );
+    });
+
+    it('caso 3b (HU-148/HU-160): una tarea HECHO sin traza sigue bloqueando (F1 no desaparece, solo deja de exigir 100%)', async () => {
       const tx = makeTx();
       const authorization = makeSprintsAuthorization();
       authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { estadoTarea: 'EN_PROGRESO' })]);
+      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { _count: { asignaciones: 0 } })]);
       const prisma = makePrisma(tx);
       const context = makeSprintsContext();
       const notifications = makeNotifications();
@@ -452,29 +499,6 @@ describe('SprintsService', () => {
       );
       expect(tx.sprint.updateMany).not.toHaveBeenCalled();
       expect(notifications.notifyProjectActiveParticipants).not.toHaveBeenCalled();
-      expect(notifications.notifySprintFinalizationStarted).not.toHaveBeenCalled();
-    });
-
-    it('caso 3: una tarea PENDIENTE (POR_HACER) bloquea igual que cualquier estado != HECHO', async () => {
-      const tx = makeTx();
-      const authorization = makeSprintsAuthorization();
-      authorization.assertCanFinalizeSprint.mockResolvedValue(sprintActivo());
-      tx.tarea.findMany.mockResolvedValue([tareaHecha(1, { estadoTarea: 'POR_HACER' })]);
-      const prisma = makePrisma(tx);
-      const context = makeSprintsContext();
-      const notifications = makeNotifications();
-      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
-
-      await expect(service.finalizeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
-        ConflictException,
-      );
-      // F1 sigue mirando solo el conjunto vigente: una tarea eliminada no
-      // cuenta como pendiente (a diferencia de F2, que sí la incluye).
-      expect(tx.tarea.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { idProyecto: PROJECT_ID, idSprint: SPRINT_ID, eliminadoEn: null },
-        }),
-      );
     });
 
     it('caso 4: Sprint EN_FINALIZACION rechaza sin notificar', async () => {
