@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   projectSprintsQueryKey,
   sprintAnalyticsQueryKey,
+  sprintBurndownQueryKey,
   sprintClosingSummaryQueryKey,
   sprintDetailQueryKey,
   sprintsAnalyticsQueryKey,
@@ -13,6 +14,7 @@ import {
   finalizeSprint,
   getProjectSprints,
   getSprintAnalytics,
+  getSprintBurndown,
   getSprintClosingSummary,
   getSprintDetail,
   getSprintsAnalytics,
@@ -20,6 +22,7 @@ import {
 } from '@/lib/services/sprints';
 import type {
   SprintAnalyticsDto,
+  SprintBurndownDto,
   SprintClosingSummaryDto,
   SprintComparativeAnalyticsDto,
   SprintDetailDto,
@@ -190,6 +193,29 @@ export function useSprintsAnalytics(idProyecto: number) {
 
   return {
     sprints: query.data?.sprints ?? [],
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Burndown de un Sprint (T-240, HU-160) — `GET /proyectos/:id/sprints/:sprintId/burndown`.
+ * Read-only, mismo patrón que `useSprintAnalytics`.
+ */
+export function useSprintBurndown(idProyecto: number, idSprint: number) {
+  const enabled = isValidId(idProyecto) && isValidId(idSprint);
+
+  const query = useQuery<SprintBurndownDto>({
+    queryKey: sprintBurndownQueryKey(idProyecto, idSprint),
+    queryFn: () => getSprintBurndown(idProyecto, idSprint),
+    enabled,
+  });
+
+  return {
+    burndown: query.data,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,

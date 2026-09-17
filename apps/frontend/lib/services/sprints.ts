@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   SprintAnalyticsDto,
+  SprintBurndownDto,
   SprintClosingMemberTotalsDto,
   SprintClosingSummaryDto,
   SprintComparativeAnalyticsDto,
@@ -69,4 +70,9 @@ export function getSprintAnalytics(idProyecto: number, idSprint: number): Promis
 /** Analítica comparativa entre Sprints del proyecto (T-173) — `GET /proyectos/:id/sprints/analytics`. */
 export function getSprintsAnalytics(idProyecto: number): Promise<SprintComparativeAnalyticsDto> {
   return apiFetch<SprintComparativeAnalyticsDto>(`/proyectos/${idProyecto}/sprints/analytics`);
+}
+
+/** Burndown de un Sprint (T-240, HU-160) — `GET /proyectos/:id/sprints/:sprintId/burndown`. */
+export function getSprintBurndown(idProyecto: number, idSprint: number): Promise<SprintBurndownDto> {
+  return apiFetch<SprintBurndownDto>(`/proyectos/${idProyecto}/sprints/${idSprint}/burndown`);
 }
