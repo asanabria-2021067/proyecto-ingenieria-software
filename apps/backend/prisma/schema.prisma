@@ -773,17 +773,53 @@ model Sprint {
   numero                    Int
   estado                    EstadoSprint @default(ACTIVO)
   fechaInicio               DateTime     @default(now()) @map("fecha_inicio")
+  fechaFinPlaneada          DateTime?    @map("fecha_fin_planeada") @db.Date
   fechaFinalizacionIniciada DateTime?    @map("fecha_finalizacion_iniciada")
   fechaCierre               DateTime?    @map("fecha_cierre")
   cerradoPor                Int?         @map("cerrado_por")
+
+  /// T-239 (HU-160): instantánea congelada de la fila al cerrar el Sprint —
+  /// null hasta CERRADO, escrita una única vez dentro de la misma transacción
+  /// que `closeSprint`. `getSprintsAnalytics` lee estas columnas para
+  /// Sprints CERRADO en vez de recalcular desde `tarea`, para que una
+  /// corrección posterior sobre una tarea vieja nunca reescriba el pasado.
+  tareasPlanificadasCierre         Int? @map("tareas_planificadas_cierre")
+  tareasCompletadasCierre          Int? @map("tareas_completadas_cierre")
+  hitosTotalesCierre               Int? @map("hitos_totales_cierre")
+  hitosCompletadosCierre           Int? @map("hitos_completados_cierre")
+  porcentajeCumplimientoCierre     Int? @map("porcentaje_cumplimiento_cierre")
+  puntosHistoriaPlanificadosCierre Int? @map("puntos_historia_planificados_cierre")
+  puntosHistoriaCompletadosCierre  Int? @map("puntos_historia_completados_cierre")
 
   proyecto           Proyecto             @relation(fields: [idProyecto], references: [idProyecto])
   cerrador           Usuario?             @relation(fields: [cerradoPor], references: [idUsuario])
   tareas             Tarea[]
   horasParticipacion HorasParticipacion[]
+  instantaneas       InstantaneaSprint[]
 
   @@index([idProyecto, estado])
   @@map("sprint")
+}
+
+/// T-238 (HU-160): instantánea diaria del estado de un Sprint activo, fuente
+/// del burndown. `@@unique([idSprint, fecha])` es la garantía estructural de
+/// inmutabilidad: regenerar "hoy" es un upsert sobre esa clave, y ninguna
+/// operación del código apunta jamás a una `fecha` pasada — así una
+/// corrección retroactiva de una tarea nunca puede tocar una fila ya tomada.
+/// Un día sin fila (servidor caído) es un hueco real, nunca se rellena.
+model InstantaneaSprint {
+  idInstantanea           Int      @id @default(autoincrement()) @map("id_instantanea")
+  idSprint                Int      @map("id_sprint")
+  fecha                   DateTime @db.Date
+  tareasPendientes        Int      @map("tareas_pendientes")
+  tareasCompletadas       Int      @map("tareas_completadas")
+  puntosHistoriaRestantes Int      @map("puntos_historia_restantes")
+  generadaEn              DateTime @default(now()) @map("generada_en")
+
+  sprint Sprint @relation(fields: [idSprint], references: [idSprint])
+
+  @@unique([idSprint, fecha])
+  @@map("instantanea_sprint")
 }
 
 model Tarea {
