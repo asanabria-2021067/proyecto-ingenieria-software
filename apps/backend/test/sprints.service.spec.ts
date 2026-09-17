@@ -148,7 +148,14 @@ describe('SprintsService', () => {
 
       expect(result).toBe(nuevoSprint);
       expect(tx.sprint.create).toHaveBeenCalledWith({
-        data: { idProyecto: PROJECT_ID, numero: 1, estado: 'ACTIVO' },
+        data: {
+          idProyecto: PROJECT_ID,
+          numero: 1,
+          estado: 'ACTIVO',
+          fechaInicio: expect.any(Date),
+          // HU-160: sin fechaFinPlaneada explícita, default fechaInicio + 14 días.
+          fechaFinPlaneada: expect.any(Date),
+        },
       });
     });
 
@@ -173,7 +180,33 @@ describe('SprintsService', () => {
         select: { numero: true },
       });
       expect(tx.sprint.create).toHaveBeenCalledWith({
-        data: { idProyecto: PROJECT_ID, numero: 3, estado: 'ACTIVO' },
+        data: {
+          idProyecto: PROJECT_ID,
+          numero: 3,
+          estado: 'ACTIVO',
+          fechaInicio: expect.any(Date),
+          fechaFinPlaneada: expect.any(Date),
+        },
+      });
+    });
+
+    it('caso 2b (HU-160): fechaFinPlaneada explícita se usa tal cual, sin aplicar el default de 14 días', async () => {
+      const tx = makeTx();
+      tx.sprint.findFirst.mockResolvedValue(null);
+      const nuevoSprint = { idSprint: 1, idProyecto: PROJECT_ID, numero: 1, estado: 'ACTIVO' };
+      tx.sprint.create.mockResolvedValue(nuevoSprint);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      context.getCurrentSprint.mockResolvedValue(null);
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await service.startSprint(PROJECT_ID, LIDER_ID, '2026-12-01');
+
+      expect(tx.sprint.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          fechaFinPlaneada: new Date('2026-12-01T00:00:00.000Z'),
+        }),
       });
     });
 

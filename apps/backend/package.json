@@ -47,6 +47,7 @@
     "class-validator": "^0.15.1",
     "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
+    "date-fns": "4.1.0",
     "dotenv": "^17.3.1",
     "helmet": "^8.1.0",
     "jspdf": "^3.0.3",
