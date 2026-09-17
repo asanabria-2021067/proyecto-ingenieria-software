@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { addDays } from 'date-fns';
 import { EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
@@ -41,6 +42,14 @@ import { HoursRecognitionService } from './hours-recognition.service';
  * `ACTIVO`/`EN_FINALIZACION`; el cuerpo de consolidación de `closeSprint` se
  * conserva tal cual hasta su propio commit.
  */
+/**
+ * HU-160: duración por defecto (en días calendario) de la fecha fin
+ * planeada de un Sprint cuando `startSprint` no la recibe explícita — mismo
+ * criterio que el modal "Start Sprint" de Jira, pero sin bloquear los
+ * llamados existentes que aún no la envían.
+ */
+const DURACION_PLANEADA_DEFAULT_DIAS = 14;
+
 /** Participante que aparece por su agregado pero no tiene tramos en el Sprint. */
 const SIN_TRAMOS: SprintClosingMemberTotalsDto = {
   tareasDistintas: 0,
@@ -247,7 +256,7 @@ export class SprintsService {
    * un posible número duplicado pudiera materializarse en una fila
    * persistida.
    */
-  async startSprint(projectId: number, userId: number) {
+  async startSprint(projectId: number, userId: number, fechaFinPlaneada?: string) {
     return this.projectTx.run(projectId, userId, 'sprints.startSprint', async (ctx) => {
       const { tx } = ctx;
       await this.sprintsAuthorization.assertCanStartSprint(projectId, userId, tx);
@@ -269,6 +278,15 @@ export class SprintsService {
       });
       const siguienteNumero = (ultimoSprint?.numero ?? 0) + 1;
 
+      // HU-160: fecha fin planeada explícita, o `fechaInicio + 14 días` por
+      // defecto — ancla únicamente la línea ideal del burndown (T-240); el
+      // cierre real del Sprint sigue siendo el flujo Finalizar -> Cerrar,
+      // independiente de esta fecha.
+      const fechaInicio = new Date();
+      const fechaFinPlaneadaResuelta = fechaFinPlaneada
+        ? new Date(`${fechaFinPlaneada}T00:00:00.000Z`)
+        : addDays(fechaInicio, DURACION_PLANEADA_DEFAULT_DIAS);
+
       let sprintCreado;
       try {
         sprintCreado = await tx.sprint.create({
@@ -276,6 +294,8 @@ export class SprintsService {
             idProyecto: projectId,
             numero: siguienteNumero,
             estado: EstadoSprint.ACTIVO,
+            fechaInicio,
+            fechaFinPlaneada: fechaFinPlaneadaResuelta,
           },
         });
       } catch (error) {

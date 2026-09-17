@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -13,6 +14,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { SprintsService } from './sprints.service';
+import { StartSprintDto } from './dto/start-sprint.dto';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): ciclo de vida del Sprint. El proyecto se
@@ -50,8 +52,9 @@ export class SprintsController {
   start(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
+    @Body() body: StartSprintDto,
   ) {
-    return this.sprintsService.startSprint(projectId, user.userId);
+    return this.sprintsService.startSprint(projectId, user.userId, body.fechaFinPlaneada);
   }
 
   /** E061: finalizar el Sprint ACTIVO. */

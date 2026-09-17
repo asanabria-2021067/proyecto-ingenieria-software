@@ -31,14 +31,23 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.start)).toBe(201);
   });
 
-  it('delega en SprintsService.startSprint con projectId y userId (CurrentUser)', () => {
+  it('delega en SprintsService.startSprint con projectId, userId (CurrentUser) y sin fechaFinPlaneada', () => {
     const service = makeService();
     const controller = makeController(service);
 
-    controller.start(5, { userId: 9 });
+    controller.start(5, { userId: 9 }, {});
 
     expect(service.startSprint).toHaveBeenCalledTimes(1);
-    expect(service.startSprint).toHaveBeenCalledWith(5, 9);
+    expect(service.startSprint).toHaveBeenCalledWith(5, 9, undefined);
+  });
+
+  it('HU-160: delega la fechaFinPlaneada del body cuando viene explícita', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.start(5, { userId: 9 }, { fechaFinPlaneada: '2026-12-01' });
+
+    expect(service.startSprint).toHaveBeenCalledWith(5, 9, '2026-12-01');
   });
 
   it('retorna exactamente lo que resuelve SprintsService.startSprint, sin transformarlo', async () => {
@@ -47,7 +56,7 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     service.startSprint.mockResolvedValue(sprintCreado);
     const controller = makeController(service);
 
-    const result = await controller.start(5, { userId: 9 });
+    const result = await controller.start(5, { userId: 9 }, {});
 
     expect(result).toBe(sprintCreado);
   });
@@ -58,7 +67,7 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     service.startSprint.mockRejectedValue(error);
     const controller = makeController(service);
 
-    await expect(controller.start(5, { userId: 9 })).rejects.toBe(error);
+    await expect(controller.start(5, { userId: 9 }, {})).rejects.toBe(error);
   });
 });
 
