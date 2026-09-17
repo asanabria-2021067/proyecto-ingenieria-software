@@ -82,9 +82,11 @@ export class SprintsService {
    * C075 (06 v2 §12): las cuatro revalidaciones de finalización, siempre bajo
    * el lock y siempre sobre el conjunto HISTÓRICO. El detalle importa:
    *
-   *   F1 — las tareas operativas están HECHO y con traza: un HECHO sin
-   *        ninguna asignación histórica no es trabajo realizado, es una
-   *        casilla marcada.
+   *   F1 — toda tarea marcada HECHO tiene traza: un HECHO sin ninguna
+   *        asignación histórica no es trabajo realizado, es una casilla
+   *        marcada. Desde HU-148/HU-160 ya NO exige que todas las tareas
+   *        estén HECHO — cerrar con pendientes es válido (ver comentario
+   *        junto al filtro `sinTraza`).
    *   F2 — NINGUNA asignación del Sprint sigue abierta, **incluidas las de
    *        tareas eliminadas**: borrar la tarea no cierra el tramo, y un
    *        tramo abierto al consolidar dejaría horas fuera del corte.
@@ -109,16 +111,22 @@ export class SprintsService {
       where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
       select: { idTarea: true, estadoTarea: true, _count: { select: { asignaciones: true } } },
     });
-    const pendientes = tareas.filter((tarea) => tarea.estadoTarea !== EstadoTarea.HECHO);
-    if (pendientes.length > 0) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'SPRINT_F1_TAREAS_PENDIENTES',
-        message: 'No se puede finalizar el Sprint mientras existan tareas pendientes',
-        idsTarea: pendientes.map((tarea) => tarea.idTarea),
-      });
-    }
-    const sinTraza = tareas.filter((tarea) => tarea._count.asignaciones === 0);
+    // HU-148 (mini, vía HU-160): aquí existía un bloqueo
+    // (SPRINT_F1_TAREAS_PENDIENTES) que impedía finalizar/cerrar el Sprint si
+    // quedaba alguna tarea no HECHO. Se quita a propósito: cerrar con
+    // pendientes es lo que permite que el cumplimiento congelado (T-239)
+    // refleje arrastre real en vez de ser 100% por construcción. Una tarea
+    // pendiente de un Sprint cerrado se queda registrada contra ESE Sprint —
+    // no hay arrastre automático a un Sprint siguiente, eso es explícitamente
+    // otro alcance.
+    //
+    // Como consecuencia, `tareas` ya NO está garantizado HECHO en su
+    // totalidad (ese bloqueo era justamente lo que lo garantizaba) — este
+    // predicado filtra explícitamente por HECHO para no acusar de "sin traza"
+    // a una tarea pendiente que legítimamente nadie tomó todavía.
+    const sinTraza = tareas.filter(
+      (tarea) => tarea.estadoTarea === EstadoTarea.HECHO && tarea._count.asignaciones === 0,
+    );
     if (sinTraza.length > 0) {
       throw new ConflictException({
         statusCode: 409,
@@ -300,7 +308,9 @@ export class SprintsService {
    * Finaliza el Sprint (ACTIVO -> EN_FINALIZACION): exclusivo del líder
    * (reutiliza SprintsAuthorizationService.assertCanFinalizeSprint, que ya
    * aísla projectId+sprintId — Contrato A1/A3), solo si el Sprint sigue
-   * ACTIVO y todas sus tareas (no eliminadas) están HECHO. Toda la
+   * ACTIVO. Desde HU-148/HU-160 ya NO exige que todas las tareas estén
+   * HECHO — cerrar con pendientes es válido (ver `assertFinalizationPredicatesTx`).
+   * Toda la
    * validación y la transición ocurren dentro de una única transacción:
    *
    *   autorización -> estado ACTIVO -> tareas no-HECHO -> updateMany
