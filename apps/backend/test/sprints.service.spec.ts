@@ -1242,6 +1242,38 @@ describe('SprintsService', () => {
       });
     });
 
+    it('T-241 (HU-160): congela null (no 0) en los puntos de historia cuando NINGUNA tarea del Sprint tiene puntos asignados', async () => {
+      const tx = makeTx();
+      const sprint = sprintEnFinalizacion();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+      tx.tarea.findMany.mockResolvedValue([
+        { idTarea: 1, estadoTarea: 'HECHO', idHito: null, puntosHistoria: null, _count: { asignaciones: 1 } },
+        { idTarea: 2, estadoTarea: 'POR_HACER', idHito: null, puntosHistoria: null, _count: { asignaciones: 0 } },
+      ]);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintCerrado = { ...sprint, estado: 'CERRADO' };
+      tx.sprint.findFirst.mockResolvedValue(sprintCerrado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(tx.sprint.updateMany).toHaveBeenCalledWith({
+        where: { idSprint: SPRINT_ID, idProyecto: PROJECT_ID, estado: 'EN_FINALIZACION' },
+        data: expect.objectContaining({
+          tareasPlanificadasCierre: 2,
+          tareasCompletadasCierre: 1,
+          // "Sin puntos asignados" se congela como null, nunca como 0 —
+          // distinto del caso "1 tarea de 0 puntos" (que sí congelaría 0).
+          puntosHistoriaPlanificadosCierre: null,
+          puntosHistoriaCompletadosCierre: null,
+        }),
+      });
+    });
+
     describe('A9.1 — SPRINT_CLOSED realtime post-commit', () => {
       it('se emite DESPUÉS de que la transacción resuelve (no antes ni dentro): el orden de llamadas lo demuestra', async () => {
         const tx = makeTx();
@@ -2101,6 +2133,7 @@ describe('SprintsService', () => {
           tareasCompletadas: 3,
           hitosTotales: 2,
           hitosCompletados: 1,
+          puntosHistoriaCompletados: 8,
         },
         {
           idSprint: 21,
@@ -2110,6 +2143,7 @@ describe('SprintsService', () => {
           tareasCompletadas: 0,
           hitosTotales: 0,
           hitosCompletados: 0,
+          puntosHistoriaCompletados: null,
         },
       ]);
       const context = makeSprintsContext();
@@ -2129,6 +2163,7 @@ describe('SprintsService', () => {
           porcentajeCumplimiento: 75,
           hitosTotales: 2,
           hitosCompletados: 1,
+          puntosHistoriaCompletados: 8,
         },
         {
           idSprint: 21,
@@ -2140,10 +2175,37 @@ describe('SprintsService', () => {
           porcentajeCumplimiento: 0,
           hitosTotales: 0,
           hitosCompletados: 0,
+          // T-241: un Sprint no CERRADO nunca tiene velocidad, nunca 0 por defecto.
+          puntosHistoriaCompletados: null,
         },
       ]);
       expect(Object.keys(result.sprints[0])).toContain('tareasCompletadas');
       expect(Object.keys(result.sprints[0])).not.toContain('velocity');
+    });
+
+    it('T-241 (HU-160): "puntosHistoriaCompletados" es la velocidad — se lee de la columna congelada solo para CERRADO, null en otro caso', async () => {
+      const prisma = makePrisma();
+      prisma.$queryRaw.mockResolvedValue([
+        {
+          idSprint: 30,
+          numero: 1,
+          estado: 'CERRADO',
+          tareasPlanificadas: 3,
+          tareasCompletadas: 3,
+          hitosTotales: 0,
+          hitosCompletados: 0,
+          // Congelado por T-239 cuando el Sprint cerró sin ninguna tarea con puntos asignados.
+          puntosHistoriaCompletados: null,
+        },
+      ]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      const result = await service.getSprintsAnalytics(PROJECT_ID, LIDER_ID);
+
+      // "Sin puntos asignados" nunca se convierte en 0: pasa tal cual del congelado.
+      expect(result.sprints[0].puntosHistoriaCompletados).toBeNull();
     });
 
     it('caso 2: una única consulta agregada por invocación, independiente de cuántos Sprints tenga el proyecto', async () => {

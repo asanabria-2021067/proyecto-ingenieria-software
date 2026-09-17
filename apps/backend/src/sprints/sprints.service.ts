@@ -248,8 +248,8 @@ export class SprintsService {
     hitosTotalesCierre: number;
     hitosCompletadosCierre: number;
     porcentajeCumplimientoCierre: number;
-    puntosHistoriaPlanificadosCierre: number;
-    puntosHistoriaCompletadosCierre: number;
+    puntosHistoriaPlanificadosCierre: number | null;
+    puntosHistoriaCompletadosCierre: number | null;
   }> {
     const tareas = await tx.tarea.findMany({
       where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
@@ -263,14 +263,18 @@ export class SprintsService {
       tareasPlanificadasCierre === 0
         ? 0
         : Math.round((tareasCompletadasCierre / tareasPlanificadasCierre) * 100);
-    const puntosHistoriaPlanificadosCierre = tareas.reduce(
-      (acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0),
-      0,
-    );
-    const puntosHistoriaCompletadosCierre = completadas.reduce(
-      (acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0),
-      0,
-    );
+    // T-241 (HU-160): si el Sprint tiene tareas pero NINGUNA lleva story
+    // points, congelamos `null` (no `0`) — "sin puntos asignados" no es lo
+    // mismo que "0 puntos completados", y la comparativa debe poder
+    // distinguirlo explícitamente en vez de mostrar una velocidad falsa.
+    const sinPuntosHistoriaAsignados =
+      tareas.length > 0 && tareas.every((tarea) => tarea.puntosHistoria === null);
+    const puntosHistoriaPlanificadosCierre = sinPuntosHistoriaAsignados
+      ? null
+      : tareas.reduce((acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0), 0);
+    const puntosHistoriaCompletadosCierre = sinPuntosHistoriaAsignados
+      ? null
+      : completadas.reduce((acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0), 0);
 
     const idsHitosDistintos = [
       ...new Set(
@@ -1574,6 +1578,12 @@ export class SprintsService {
    * Sprint ya cerrado ajusta el Sprint EN CURSO, pero nunca reescribe la
    * fila ya congelada. `ACTIVO`/`EN_FINALIZACION` siguen el cálculo en vivo
    * de siempre.
+   *
+   * T-241 (HU-160): `puntosHistoriaCompletados` (la velocidad, en story
+   * points) se lee EXCLUSIVAMENTE de `puntos_historia_completados_cierre`
+   * para Sprints `CERRADO` — a propósito, sin la rama "en vivo" que sí
+   * tienen los demás campos: la velocidad solo existe una vez que el Sprint
+   * cerró y su congelado quedó fijo (`null` en cualquier otro estado).
    */
   async getSprintsAnalytics(
     projectId: number,
@@ -1639,7 +1649,11 @@ export class SprintsService {
         CASE WHEN s.estado = 'CERRADO'
           THEN COALESCE(s.hitos_completados_cierre, 0)
           ELSE COALESCE(ha."hitosCompletados", 0)
-        END AS "hitosCompletados"
+        END AS "hitosCompletados",
+        CASE WHEN s.estado = 'CERRADO'
+          THEN s.puntos_historia_completados_cierre
+          ELSE NULL
+        END AS "puntosHistoriaCompletados"
       FROM sprint s
       LEFT JOIN tareas_agregadas ta ON ta."idSprint" = s.id_sprint
       LEFT JOIN hitos_agregados ha ON ha."idSprint" = s.id_sprint
