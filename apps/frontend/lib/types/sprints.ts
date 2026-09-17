@@ -276,8 +276,15 @@ export interface SprintAnalyticsDto {
 
 /**
  * Un elemento de `GET /proyectos/:projectId/sprints/analytics` (T-173,
- * HU-143) — refleja `SprintComparativeAnalyticsItemDto`. El campo se llama
- * literalmente `tareasCompletadas`, nunca "velocity".
+ * HU-143) — refleja `SprintComparativeAnalyticsItemDto`. `tareasCompletadas`
+ * es un conteo de tareas, no la velocidad del Sprint.
+ *
+ * `puntosHistoriaCompletados` (T-241, HU-160) es la velocidad real, en story
+ * points, leída EXCLUSIVAMENTE del congelado de T-239 — nunca del estado
+ * actual de las tareas. `null` para un Sprint que no está `CERRADO` (todavía
+ * no hay congelado), y también para un Sprint `CERRADO` cuyas tareas no
+ * tenían ningún story point asignado: esa ausencia de dato nunca se
+ * confunde con "0 puntos completados".
  */
 export interface SprintComparativeAnalyticsItemDto {
   idSprint: number;
@@ -288,6 +295,7 @@ export interface SprintComparativeAnalyticsItemDto {
   porcentajeCumplimiento: number;
   hitosTotales: number;
   hitosCompletados: number;
+  puntosHistoriaCompletados: number | null;
 }
 
 export interface SprintComparativeAnalyticsDto {
