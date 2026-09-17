@@ -139,6 +139,86 @@ describe('BitacoraConsultaService.listEventos', () => {
     });
   });
 
+  describe('eventos administrativos por perfil (HU-170/T-269)', () => {
+    function readPolicyCon(profile: 'LIDER' | 'ADMIN' | 'PARTICIPANTE_ACTIVO') {
+      const readPolicy = makeProjectReadPolicyDouble();
+      readPolicy.assertRead.mockResolvedValue({ profile, sprintEstados: null, ownOnly: false, isAdmin: profile === 'ADMIN' });
+      return readPolicy;
+    }
+
+    it('un líder consulta el catálogo completo, incluidos eventos administrativos', async () => {
+      const prisma = makePrisma();
+      const context = makeContext();
+      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('LIDER'));
+
+      await service.listEventos(5, 1, { page: 1, limit: 20 });
+
+      const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+      expect(llamada.where.AND[0].accion.in).toContain(TipoEventoBitacora.LEADERSHIP_CHANGED);
+      expect(llamada.where.AND[0].accion.in).toContain(TipoEventoBitacora.TASK_CREATED);
+    });
+
+    it('un administrador consulta el catálogo completo, incluidos eventos administrativos', async () => {
+      const prisma = makePrisma();
+      const context = makeContext();
+      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('ADMIN'));
+
+      await service.listEventos(5, 42, { page: 1, limit: 20 });
+
+      const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+      expect(llamada.where.AND[0].accion.in).toContain(TipoEventoBitacora.LEADERSHIP_CHANGED);
+    });
+
+    it('un participante activo NO consulta eventos administrativos (LEADERSHIP_CHANGED, EXIT_REQUEST_APPROVED, PROJECT_HOURS_CREDITED quedan fuera)', async () => {
+      const prisma = makePrisma();
+      const context = makeContext();
+      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('PARTICIPANTE_ACTIVO'));
+
+      await service.listEventos(5, 42, { page: 1, limit: 20 });
+
+      const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+      const tiposConsultados = llamada.where.AND[0].accion.in;
+      expect(tiposConsultados).not.toContain(TipoEventoBitacora.LEADERSHIP_CHANGED);
+      expect(tiposConsultados).not.toContain(TipoEventoBitacora.EXIT_REQUEST_APPROVED);
+      expect(tiposConsultados).not.toContain(TipoEventoBitacora.PROJECT_HOURS_CREDITED);
+      // Los eventos operativos (tarea/sprint/horas) se conservan intactos.
+      expect(tiposConsultados).toContain(TipoEventoBitacora.TASK_CREATED);
+      expect(tiposConsultados).toContain(TipoEventoBitacora.SPRINT_STARTED);
+    });
+
+    it('un participante activo que filtra por un tipoEvento administrativo explícito (?tipoEvento=LEADERSHIP_CHANGED) recibe cero resultados, no la fila real', async () => {
+      const prisma = makePrisma();
+      const context = makeContext();
+      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('PARTICIPANTE_ACTIVO'));
+
+      await service.listEventos(5, 42, {
+        page: 1,
+        limit: 20,
+        tipoEvento: TipoEventoBitacora.LEADERSHIP_CHANGED,
+      });
+
+      const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+      // Nunca debe colarse el literal 'LEADERSHIP_CHANGED' tal cual a `accion`.
+      expect(llamada.where.AND[0].accion).not.toBe(TipoEventoBitacora.LEADERSHIP_CHANGED);
+      expect(llamada.where.AND[0].accion).toEqual({ in: [] });
+    });
+
+    it('un líder que filtra por el mismo tipoEvento administrativo sí lo recibe (sin restricción)', async () => {
+      const prisma = makePrisma();
+      const context = makeContext();
+      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('LIDER'));
+
+      await service.listEventos(5, 1, {
+        page: 1,
+        limit: 20,
+        tipoEvento: TipoEventoBitacora.LEADERSHIP_CHANGED,
+      });
+
+      const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+      expect(llamada.where.AND[0].accion).toBe(TipoEventoBitacora.LEADERSHIP_CHANGED);
+    });
+  });
+
   it('nunca expone filas de AuditInterceptor: el filtro accion IN excluye "METHOD /url" técnico', async () => {
     // AuditInterceptor escribe accion = `${method} ${url}` (p. ej. "POST
     // /api/proyectos/5/tareas"), un valor que nunca pertenece al catálogo

@@ -135,6 +135,39 @@ export class TipoEventoBitacora {
     'POSTULACION',
     'SOLICITUD_SALIDA',
   ] as const;
+
+  /**
+   * HU-170: eventos administrativos/sensibles de proceso (liderazgo, cierre
+   * de proyecto, salidas, horas acreditadas/reconciliadas) — quedan fuera de
+   * la vista de bitácora de un participante activo (BitacoraConsultaService
+   * los excluye antes de paginar). No se clasifica por `tipoObjeto`
+   * (`tipoEntidad`) porque no es consistente: p. ej. LEADERSHIP_CHANGED y
+   * EXIT_REQUEST_APPROVED se registran con tipoEntidad 'PROYECTO', igual que
+   * eventos operativos normales. El resto de VALORES (tarea/sprint/horas)
+   * es operativo y visible para cualquier lector autorizado.
+   */
+  static readonly ADMINISTRATIVOS: ReadonlySet<TipoEventoBitacoraValor> = new Set([
+    'EXIT_REQUEST_APPROVED',
+    'EXIT_REQUEST_REJECTED',
+    'LEADERSHIP_APPEAL_CREATED',
+    'LEADERSHIP_APPEAL_CANCELLED',
+    'LEADERSHIP_APPEAL_ACCEPTED',
+    'LEADERSHIP_APPEAL_DENIED',
+    'LEADERSHIP_CHANGED',
+    'PROJECT_CLOSE_REQUESTED',
+    'POSTULATIONS_AUTO_REJECTED',
+    'CLOSURE_DRAFT_CREATED',
+    'CLOSURE_AUTOREPORT_GENERATED',
+    'CLOSURE_DOCUMENT_ADDED',
+    'CLOSURE_DOCUMENT_REMOVED',
+    'PROJECT_CLOSE_DOCUMENTS_SUBMITTED',
+    'PROJECT_CLOSE_REVIEW_APPROVED',
+    'PROJECT_HOURS_CREDITED',
+    'PROJECT_CLOSE_REVIEW_DOC_CORRECTION',
+    'PROJECT_CLOSE_RETURNED_TO_EXECUTION',
+    'CLOSURE_STORAGE_SWEPT',
+    'LEGACY_HOURS_RECONCILED',
+  ]);
 }
 
 /** Tipo derivado del catálogo — usar este nombre (no `TipoEventoBitacora`) en anotaciones de tipo. */

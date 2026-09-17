@@ -36,6 +36,7 @@ import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectBitacora } from '@/hooks/use-project-bitacora';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -93,6 +94,32 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
   PROJECT_CLOSE_RETURNED_TO_EXECUTION: { label: 'Proyecto devuelto a ejecución', icon: Undo2 },
   CLOSURE_STORAGE_SWEPT: { label: 'Almacenamiento de cierre depurado', icon: Trash2 },
   LEGACY_HOURS_RECONCILED: { label: 'Horas heredadas reconciliadas', icon: Clock },
+};
+
+/**
+ * T-223/T-224 (HU-156): la pastilla de color agrupa por `tipoEntidad` —el
+ * campo que el backend ya asigna a cada evento (bitacora-eventos.service.ts)—
+ * en vez de mapear cada uno de los ~34 `tipoEvento` a mano. Con solo 5 tonos
+ * disponibles (HU-163) y 6 entidades, REVISION_CIERRE y DOCUMENTO_CIERRE
+ * comparten tono: siguen siendo distinguibles por su ícono propio, que es la
+ * distinción que no depende del color (daltonismo/impresión).
+ */
+const ENTIDAD_TONE: Record<string, string> = {
+  TAREA: 'pill-accent',
+  SPRINT: 'pill-success',
+  PROYECTO: 'pill-warning',
+  APELACION_LIDERAZGO: 'pill-error',
+  REVISION_CIERRE: 'pill-neutral',
+  DOCUMENTO_CIERRE: 'pill-neutral',
+};
+
+const ENTIDAD_LABEL: Record<string, string> = {
+  TAREA: 'Tarea',
+  SPRINT: 'Sprint',
+  PROYECTO: 'Proyecto',
+  APELACION_LIDERAZGO: 'Liderazgo',
+  REVISION_CIERRE: 'Cierre',
+  DOCUMENTO_CIERRE: 'Cierre',
 };
 
 /**
@@ -163,28 +190,40 @@ function describirEvento(evento: EventoBitacoraDto, miembros: MiembroResumen[]):
 }
 
 function BitacoraItemSkeleton() {
-  return <Skeleton className="h-20 w-full rounded-xl" />;
+  return <Skeleton className="h-24 w-full rounded-card" />;
 }
 
+/**
+ * T-223 (HU-156): tamaño de texto e interlineado subidos con los tokens de
+ * HU-163 (`type-subtitle`/`type-body`/`type-meta`), no con tamaños sueltos —
+ * fecha y autor bajan a color secundario/tamaño de metadato para no competir
+ * con el evento.
+ */
 function BitacoraItem({ evento, miembros }: { evento: EventoBitacoraDto; miembros: MiembroResumen[] }) {
   const estilo = estiloDe(evento.tipoEvento);
   const Icon = estilo.icon;
   const actor = evento.actor ? `${evento.actor.nombre} ${evento.actor.apellido}` : 'Alguien';
+  const tono = ENTIDAD_TONE[evento.tipoEntidad] ?? 'pill-neutral';
+  const categoria = ENTIDAD_LABEL[evento.tipoEntidad] ?? evento.tipoEntidad;
 
   return (
-    <div className="flex gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-        <Icon className="size-4 text-primary" aria-hidden="true" />
+    <div className="flex gap-inline rounded-card border border-outline-variant bg-surface-container-lowest p-card shadow-card">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary/10">
+        <Icon className="size-5 text-primary" aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-bold text-on-surface">{estilo.label}</p>
-          <time className="text-xs text-tertiary" dateTime={evento.fechaEvento}>
+        <div className="flex flex-wrap items-center gap-tight">
+          {/* Pastilla por tipoEntidad: color con texto oscuro sobre fondo
+              sólido (nunca texto de color a secas), contraste AA heredado de
+              los mismos tonos ya usados para estados de tarea/prioridad. */}
+          <span className={`pill ${tono}`}>{categoria}</span>
+          <p className="type-subtitle text-text-primary">{estilo.label}</p>
+          <time className="type-meta ml-auto shrink-0" dateTime={evento.fechaEvento}>
             {formatearFechaHora(evento.fechaEvento)}
           </time>
         </div>
-        <p className="mt-1 text-sm text-on-surface">{describirEvento(evento, miembros)}</p>
-        <p className="mt-1 text-xs text-tertiary">Por {actor}</p>
+        <p className="type-body mt-tight text-text-primary">{describirEvento(evento, miembros)}</p>
+        <p className="type-meta mt-micro">Por {actor}</p>
       </div>
     </div>
   );
@@ -200,14 +239,22 @@ export default function BitacoraPage() {
   const [tipoEventoFiltro, setTipoEventoFiltro] = useState<string>('');
 
   const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
-  const { isLoading: cargandoUsuario } = useCurrentUser();
+  const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
   // Validación de rol vía el usuario identificado por la cookie JWT httpOnly
   // (ver hooks/use-is-project-leader.ts) — misma fuente de verdad que usa
   // ProjectSidebar para decidir si mostrar el enlace "Bitácora".
   const isLeader = useIsProjectLeader(idProyecto);
 
   const { sprints } = useProjectSprints(idProyecto);
-  const { members } = useProjectMembers(idProyecto);
+  const { members, isLoading: cargandoMembers } = useProjectMembers(idProyecto);
+  // HU-170: un integrante activo también puede leer la bitácora en modo
+  // solo lectura — mismo criterio de "esParticipante" que ya usa
+  // ProjectSidebar para decidir a quién mostrarle el enlace "Bitácora". El
+  // backend (BitacoraConsultaService vía ProjectReadPolicyService) es quien
+  // realmente autoriza esto; aquí solo evitamos pedirle al backend lo que
+  // ya sabemos que va a rechazar.
+  const esParticipante = !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
+  const puedeVerBitacora = isLeader || esParticipante;
 
   const filtros = {
     idSprint: idSprintFiltro ? Number(idSprintFiltro) : undefined,
@@ -216,19 +263,28 @@ export default function BitacoraPage() {
     page,
     limit: LIMITE_POR_PAGINA,
   };
-  // `habilitado: isLeader` evita disparar la petición mientras no se sabe
-  // que el usuario (identificado vía la cookie JWT) es líder — el backend
-  // respondería 403 igual, pero no hace falta pedirlo.
-  const { eventos, totalPages, isLoading, isError, error, refetch } = useProjectBitacora(
+  // `habilitado: puedeVerBitacora` evita disparar la petición mientras no se
+  // sabe que el usuario (identificado vía la cookie JWT) es líder o
+  // integrante activo — el backend respondería 403 igual, pero no hace
+  // falta pedirlo.
+  const { eventos, total, totalPages, isLoading, isError, error, refetch } = useProjectBitacora(
     idProyecto,
     filtros,
-    isLeader,
+    puedeVerBitacora,
   );
 
   const cargando = isLoading || cargandoProyecto || cargandoUsuario;
+  const hayFiltrosActivos = idSprintFiltro !== '' || idActorFiltro !== '' || tipoEventoFiltro !== '';
 
   function actualizarFiltro(setter: (value: string) => void, value: string) {
     setter(value);
+    setPage(1);
+  }
+
+  function limpiarFiltros() {
+    setIdSprintFiltro('');
+    setIdActorFiltro('');
+    setTipoEventoFiltro('');
     setPage(1);
   }
 
@@ -242,7 +298,7 @@ export default function BitacoraPage() {
         Volver al proyecto
       </Link>
 
-      {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
+      {!cargandoProyecto && !cargandoUsuario && !cargandoMembers && !puedeVerBitacora ? (
         <LeaderOnlyNotice description="No puedes acceder a la bitácora de este proyecto." />
       ) : (
         <>
@@ -296,10 +352,33 @@ export default function BitacoraPage() {
                 </option>
               ))}
             </select>
+
+            {hayFiltrosActivos && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={limpiarFiltros}
+                className="font-medium text-primary"
+              >
+                Limpiar filtros
+              </Button>
+            )}
           </div>
 
+          {/* Refleja si se está viendo todo o una parte filtrada — el
+              usuario siempre sabe qué alcance tiene la lista de abajo. */}
+          {!cargando && !isError && (
+            <div className="mb-stack flex items-center gap-tight" aria-live="polite" role="status">
+              <span className="pill pill-accent">
+                {total} {total === 1 ? 'evento' : 'eventos'}
+              </span>
+              {hayFiltrosActivos && <span className="type-meta">con filtros aplicados</span>}
+            </div>
+          )}
+
           {cargando && (
-            <div className="space-y-3">
+            <div className="space-y-stack">
               <BitacoraItemSkeleton />
               <BitacoraItemSkeleton />
               <BitacoraItemSkeleton />
@@ -348,7 +427,7 @@ export default function BitacoraPage() {
             <>
               {/* Región con nombre: separa los eventos del panel de filtros,
                   que ahora repite las mismas etiquetas en su desplegable. */}
-              <section aria-label="Eventos de la bitácora" className="space-y-3">
+              <section aria-label="Eventos de la bitácora" className="space-y-stack">
                 {eventos.map((evento) => (
                   <BitacoraItem key={evento.idAuditoria} evento={evento} miembros={members} />
                 ))}
