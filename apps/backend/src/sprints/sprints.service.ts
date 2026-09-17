@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { addDays } from 'date-fns';
-import { EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
+import { EstadoHito, EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
@@ -228,6 +228,73 @@ export class SprintsService {
     }
 
     return { f1: tareas.length, f2: abiertas.length, f3: conHoras.length, f4: granulares.length };
+  }
+
+  /**
+   * T-239 (HU-160): mismo criterio de agregación que `getSprintsAnalytics`
+   * (tareas no eliminadas del Sprint + Hitos DISTINTOS que esas tareas
+   * referencian), pero acotado a UN sprint y llamado dentro de la
+   * transacción de `closeSprint` — nunca se invoca fuera de ahí, así que
+   * siempre corre bajo el lock del proyecto.
+   */
+  private async calcularCongeladoDeCierreTx(
+    tx: Prisma.TransactionClient,
+    projectId: number,
+    sprintId: number,
+  ): Promise<{
+    tareasPlanificadasCierre: number;
+    tareasCompletadasCierre: number;
+    hitosTotalesCierre: number;
+    hitosCompletadosCierre: number;
+    porcentajeCumplimientoCierre: number;
+    puntosHistoriaPlanificadosCierre: number;
+    puntosHistoriaCompletadosCierre: number;
+  }> {
+    const tareas = await tx.tarea.findMany({
+      where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
+      select: { estadoTarea: true, idHito: true, puntosHistoria: true },
+    });
+
+    const completadas = tareas.filter((tarea) => tarea.estadoTarea === EstadoTarea.HECHO);
+    const tareasPlanificadasCierre = tareas.length;
+    const tareasCompletadasCierre = completadas.length;
+    const porcentajeCumplimientoCierre =
+      tareasPlanificadasCierre === 0
+        ? 0
+        : Math.round((tareasCompletadasCierre / tareasPlanificadasCierre) * 100);
+    const puntosHistoriaPlanificadosCierre = tareas.reduce(
+      (acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0),
+      0,
+    );
+    const puntosHistoriaCompletadosCierre = completadas.reduce(
+      (acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0),
+      0,
+    );
+
+    const idsHitosDistintos = [
+      ...new Set(
+        tareas
+          .map((tarea) => tarea.idHito)
+          .filter((idHito): idHito is number => idHito !== null),
+      ),
+    ];
+    const hitosTotalesCierre = idsHitosDistintos.length;
+    const hitosCompletadosCierre =
+      idsHitosDistintos.length === 0
+        ? 0
+        : await tx.hito.count({
+            where: { idHito: { in: idsHitosDistintos }, estadoHito: EstadoHito.COMPLETADO },
+          });
+
+    return {
+      tareasPlanificadasCierre,
+      tareasCompletadasCierre,
+      hitosTotalesCierre,
+      hitosCompletadosCierre,
+      porcentajeCumplimientoCierre,
+      puntosHistoriaPlanificadosCierre,
+      puntosHistoriaCompletadosCierre,
+    };
   }
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -904,6 +971,14 @@ export class SprintsService {
         });
       }
 
+      // T-239 (HU-160): congela la fila ANTES de la transición — en la misma
+      // transacción que la vuelve CERRADO, así que si cualquier paso
+      // posterior lanza, el congelamiento se revierte junto con todo lo
+      // demás. A partir de aquí, `getSprintsAnalytics` deja de recalcular
+      // este Sprint desde `tarea`: lee estas columnas tal cual quedaron hoy,
+      // sin importar qué corrección se le haga después a una tarea vieja.
+      const congelado = await this.calcularCongeladoDeCierreTx(tx, projectId, sprintId);
+
       const actualizado = await tx.sprint.updateMany({
         where: {
           idSprint: sprintId,
@@ -914,6 +989,7 @@ export class SprintsService {
           estado: EstadoSprint.CERRADO,
           fechaCierre: new Date(),
           cerradoPor: userId,
+          ...congelado,
         },
       });
 
@@ -1408,6 +1484,14 @@ export class SprintsService {
    * A12 — esta consulta nunca lo recalcula). Un Sprint sin tareas/hitos
    * nunca desaparece del resultado (`LEFT JOIN` + `COALESCE(..., 0)`), igual
    * que `getSprintAggregatesByProject`.
+   *
+   * T-239 (HU-160): para un Sprint `CERRADO`, los cuatro campos se leen de
+   * las columnas `*Cierre` congeladas por `calcularCongeladoDeCierreTx`
+   * (escritas una única vez dentro de `closeSprint`) en vez de recalcularse
+   * desde `tarea` — así una corrección posterior sobre una tarea de un
+   * Sprint ya cerrado ajusta el Sprint EN CURSO, pero nunca reescribe la
+   * fila ya congelada. `ACTIVO`/`EN_FINALIZACION` siguen el cálculo en vivo
+   * de siempre.
    */
   async getSprintsAnalytics(
     projectId: number,
@@ -1458,10 +1542,22 @@ export class SprintsService {
         s.id_sprint AS "idSprint",
         s.numero AS "numero",
         s.estado AS "estado",
-        COALESCE(ta."tareasPlanificadas", 0) AS "tareasPlanificadas",
-        COALESCE(ta."tareasCompletadas", 0) AS "tareasCompletadas",
-        COALESCE(ha."hitosTotales", 0) AS "hitosTotales",
-        COALESCE(ha."hitosCompletados", 0) AS "hitosCompletados"
+        CASE WHEN s.estado = 'CERRADO'
+          THEN COALESCE(s.tareas_planificadas_cierre, 0)
+          ELSE COALESCE(ta."tareasPlanificadas", 0)
+        END AS "tareasPlanificadas",
+        CASE WHEN s.estado = 'CERRADO'
+          THEN COALESCE(s.tareas_completadas_cierre, 0)
+          ELSE COALESCE(ta."tareasCompletadas", 0)
+        END AS "tareasCompletadas",
+        CASE WHEN s.estado = 'CERRADO'
+          THEN COALESCE(s.hitos_totales_cierre, 0)
+          ELSE COALESCE(ha."hitosTotales", 0)
+        END AS "hitosTotales",
+        CASE WHEN s.estado = 'CERRADO'
+          THEN COALESCE(s.hitos_completados_cierre, 0)
+          ELSE COALESCE(ha."hitosCompletados", 0)
+        END AS "hitosCompletados"
       FROM sprint s
       LEFT JOIN tareas_agregadas ta ON ta."idSprint" = s.id_sprint
       LEFT JOIN hitos_agregados ha ON ha."idSprint" = s.id_sprint
