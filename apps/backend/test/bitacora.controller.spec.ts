@@ -23,6 +23,30 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     expect(Reflect.getMetadata(METHOD_METADATA, BitacoraController.prototype.findAll)).toBe(0); // GET
   });
 
+  /**
+   * T-269 (HU-170, parte 2): "solo lectura" no es un aviso en el frontend —
+   * es la ausencia real de handlers de escritura en este controller. La
+   * bitácora no expone POST/PUT/PATCH/DELETE porque sus entradas se escriben
+   * únicamente como efecto de otras operaciones de dominio ya protegidas por
+   * sus propias políticas (crear tarea, cerrar sprint, etc.), nunca por una
+   * llamada directa a este módulo — llamar a esos verbos aquí no golpea un
+   * handler denegado, golpea una ruta que Nest nunca registró (404).
+   */
+  it('no expone ningún handler de escritura (POST/PUT/PATCH/DELETE): findAll es el único método del controller', () => {
+    const metodos = Object.getOwnPropertyNames(BitacoraController.prototype).filter(
+      (nombre) => nombre !== 'constructor',
+    );
+
+    expect(metodos).toEqual(['findAll']);
+    metodos.forEach((nombre) => {
+      const metodoHttp = Reflect.getMetadata(
+        METHOD_METADATA,
+        (BitacoraController.prototype as unknown as Record<string, () => unknown>)[nombre],
+      );
+      expect(metodoHttp).toBe(0); // GET (RequestMethod.GET) — nunca POST(1)/DELETE(2)/PUT(3)/PATCH(4)
+    });
+  });
+
   it('delega en BitacoraConsultaService.listEventos con projectId, userId y defaults de paginación', async () => {
     const consulta = makeConsulta();
     const controller = new BitacoraController(consulta);

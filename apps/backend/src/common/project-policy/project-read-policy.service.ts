@@ -168,11 +168,16 @@ export class ProjectReadPolicyService {
   }
 
   /**
-   * Matriz de 06 v2 §34 con las precisiones por ruta de §41:
+   * Matriz de 06 v2 §34 con las precisiones por ruta de §41 (HU-170 añade la
+   * excepción de bitácora para el participante activo):
    * - líder actual: todo en vivo; histórico completo en CERRADO;
    * - admin: resumen/equipo/liderazgo/bitácora y solo Sprints CERRADO en vivo; todo en CERRADO;
-   * - participante activo: lecturas normales sin liderazgo/documentos/bitácora; histórico en CERRADO;
-   * - participante retirado/completado: su contribución histórica en vivo; histórico en CERRADO;
+   * - participante activo: lecturas normales sin liderazgo/documentos, más bitácora
+   *   en solo lectura (HU-170 — BitacoraConsultaService excluye ahí los eventos
+   *   administrativos/sensibles); histórico completo en CERRADO;
+   * - participante retirado/completado: su contribución histórica en vivo, sin
+   *   bitácora (HU-170 la reserva al participante actual); histórico completo
+   *   —bitácora incluida— en CERRADO, igual que antes;
    * - exlíder sin participación: vista pública P/E y sus propios hechos de liderazgo;
    * - externo: nada por esta política (el GET público de proyecto queda fuera de ella).
    */
@@ -209,7 +214,10 @@ export class ProjectReadPolicyService {
         if (closed) {
           return allow(null);
         }
-        return scope === 'liderazgo' || scope === 'documentos' || scope === 'bitacora' ? deny() : allow(null);
+        // HU-170: a diferencia de liderazgo/documentos, bitácora sí se abre al
+        // participante activo — en solo lectura y sin eventos administrativos
+        // (BitacoraConsultaService filtra esos antes de paginar).
+        return scope === 'liderazgo' || scope === 'documentos' ? deny() : allow(null);
       case 'PARTICIPANTE_HISTORICO':
         if (closed) {
           return allow(null);

@@ -36,13 +36,23 @@ function parseTipoEventoParam(value: string | undefined): TipoEventoBitacoraValo
   return value as TipoEventoBitacoraValor;
 }
 
-/** T-164: bitácora semántica de Sprint (HU-140) — exclusiva del líder del proyecto. */
+/**
+ * T-164/HU-170: bitácora semántica de Sprint (HU-140) — único endpoint del
+ * módulo (GET, solo lectura); no existe alta, edición ni borrado directo de
+ * entradas, que se escriben únicamente como efecto de otras operaciones de
+ * dominio ya protegidas por sus propias políticas (crear tarea, cerrar
+ * sprint, etc.).
+ */
 @Controller('proyectos/:projectId/bitacora')
 @UseGuards(JwtAuthGuard)
 export class BitacoraController {
   constructor(private readonly bitacoraConsulta: BitacoraConsultaService) {}
 
-  /** E091: bitácora del proyecto; la audiencia (líder/admin) la decide §34. */
+  /**
+   * E091/T-269: la audiencia (líder, admin o participante activo) y qué
+   * eventos ve cada uno los decide BitacoraConsultaService.listEventos (§34 +
+   * TipoEventoBitacora.ADMINISTRATIVOS) — nunca este controller.
+   */
   @Get()
   findAll(
     @Param('projectId', ParseIntPipe) projectId: number,
