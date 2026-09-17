@@ -64,6 +64,9 @@ function makeTx() {
     // hacen. Por defecto todo vacío = los cuatro predicados se cumplen.
     asignacionTarea: { findMany: vi.fn().mockResolvedValue([]) },
     horasParticipacion: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
+    // T-239 (HU-160): congelado de cierre — por defecto sin hitos (0 tareas),
+    // así que `calcularCongeladoDeCierreTx` nunca llega a invocar `count`.
+    hito: { count: vi.fn().mockResolvedValue(0) },
     // C080: cerrar consolida y avisa; el título del proyecto solo se consulta
     // cuando hay destinatarios.
     proyecto: { findUniqueOrThrow: vi.fn().mockResolvedValue({ tituloProyecto: 'Proyecto' }) },
@@ -1174,6 +1177,14 @@ describe('SprintsService', () => {
           estado: 'CERRADO',
           fechaCierre: expect.any(Date),
           cerradoPor: LIDER_ID,
+          // T-239 (HU-160): congelado calculado sobre 0 tareas (mock por defecto de `makeTx`).
+          tareasPlanificadasCierre: 0,
+          tareasCompletadasCierre: 0,
+          hitosTotalesCierre: 0,
+          hitosCompletadosCierre: 0,
+          porcentajeCumplimientoCierre: 0,
+          puntosHistoriaPlanificadosCierre: 0,
+          puntosHistoriaCompletadosCierre: 0,
         },
       });
       // A9.1: SPRINT_CLOSED se emite exactamente una vez, con el payload real.
@@ -1181,6 +1192,51 @@ describe('SprintsService', () => {
       expect(notifications.notifySprintClosed).toHaveBeenCalledWith(PROJECT_ID, LIDER_ID, {
         projectId: PROJECT_ID,
         sprintId: SPRINT_ID,
+      });
+    });
+
+    it('T-239 (HU-160): congela cumplimiento parcial, puntos de historia e hitos distintos al cerrar con pendientes', async () => {
+      const tx = makeTx();
+      const sprint = sprintEnFinalizacion();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+      // El mismo mock de `tx.tarea.findMany` alimenta tanto F1-F4
+      // (`assertFinalizationPredicatesTx`, que exige `idTarea`/`_count`)
+      // como el congelado (`calcularCongeladoDeCierreTx`, que exige
+      // `idHito`/`puntosHistoria`) — cada objeto trae ambos.
+      tx.tarea.findMany.mockResolvedValue([
+        { idTarea: 1, estadoTarea: 'HECHO', idHito: 1, puntosHistoria: 5, _count: { asignaciones: 1 } },
+        { idTarea: 2, estadoTarea: 'HECHO', idHito: 1, puntosHistoria: 3, _count: { asignaciones: 1 } },
+        { idTarea: 3, estadoTarea: 'EN_PROGRESO', idHito: 2, puntosHistoria: 2, _count: { asignaciones: 0 } },
+        { idTarea: 4, estadoTarea: 'POR_HACER', idHito: null, puntosHistoria: null, _count: { asignaciones: 0 } },
+      ]);
+      tx.hito.count.mockResolvedValue(1); // solo el Hito 1 está COMPLETADO
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintCerrado = { ...sprint, estado: 'CERRADO' };
+      tx.sprint.findFirst.mockResolvedValue(sprintCerrado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(tx.hito.count).toHaveBeenCalledWith({
+        where: { idHito: { in: [1, 2] }, estadoHito: 'COMPLETADO' },
+      });
+      expect(tx.sprint.updateMany).toHaveBeenCalledWith({
+        where: { idSprint: SPRINT_ID, idProyecto: PROJECT_ID, estado: 'EN_FINALIZACION' },
+        data: expect.objectContaining({
+          tareasPlanificadasCierre: 4,
+          tareasCompletadasCierre: 2,
+          hitosTotalesCierre: 2,
+          hitosCompletadosCierre: 1,
+          porcentajeCumplimientoCierre: 50,
+          // 5 + 3 (HECHO) + 2 (EN_PROGRESO) + 0 (POR_HACER, null->0) = 10
+          puntosHistoriaPlanificadosCierre: 10,
+          // Solo las HECHO: 5 + 3
+          puntosHistoriaCompletadosCierre: 8,
+        }),
       });
     });
 
