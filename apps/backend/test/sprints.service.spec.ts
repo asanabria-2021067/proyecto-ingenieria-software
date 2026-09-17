@@ -113,6 +113,7 @@ function makeSprintsAuthorization() {
     assertCanViewSprintHistory: vi.fn().mockResolvedValue(undefined),
     assertCanViewSprintAnalytics: vi.fn().mockResolvedValue(undefined),
     assertCanListSprintAnalytics: vi.fn().mockResolvedValue(undefined),
+    assertCanManageSprintSnapshot: vi.fn().mockResolvedValue(undefined),
   };
   return authorization as typeof authorization & SprintsAuthorizationService;
 }
@@ -420,6 +421,70 @@ describe('SprintsService', () => {
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(context.getCurrentSprint).toHaveBeenCalledWith(PROJECT_ID, tx);
+    });
+  });
+
+  describe('regenerarInstantaneaDeHoy (T-238/HU-160)', () => {
+    function makeSnapshots() {
+      return { generarInstantaneaDelDia: vi.fn().mockResolvedValue({ idInstantanea: 1 }) };
+    }
+
+    it('exige autorización de líder antes de delegar en SprintSnapshotsService', async () => {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const snapshots = makeSnapshots();
+      const service = new SprintsService(
+        prisma,
+        context,
+        authorization,
+        makeNotifications(),
+        new ProjectTransactionService(prisma as unknown as PrismaService),
+        makeProjectPolicyDouble(),
+        makeProjectReadPolicyDouble(),
+        undefined,
+        undefined,
+        undefined,
+        snapshots as any,
+      );
+
+      const resultado = await service.regenerarInstantaneaDeHoy(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(authorization.assertCanManageSprintSnapshot).toHaveBeenCalledWith(
+        PROJECT_ID,
+        SPRINT_ID,
+        LIDER_ID,
+      );
+      expect(snapshots.generarInstantaneaDelDia).toHaveBeenCalledWith(SPRINT_ID);
+      expect(resultado).toEqual({ idInstantanea: 1 });
+    });
+
+    it('propaga el rechazo de autorización sin llamar a SprintSnapshotsService', async () => {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanManageSprintSnapshot.mockRejectedValue(new Error('no autorizado'));
+      const snapshots = makeSnapshots();
+      const service = new SprintsService(
+        prisma,
+        context,
+        authorization,
+        makeNotifications(),
+        new ProjectTransactionService(prisma as unknown as PrismaService),
+        makeProjectPolicyDouble(),
+        makeProjectReadPolicyDouble(),
+        undefined,
+        undefined,
+        undefined,
+        snapshots as any,
+      );
+
+      await expect(
+        service.regenerarInstantaneaDeHoy(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toThrow('no autorizado');
+      expect(snapshots.generarInstantaneaDelDia).not.toHaveBeenCalled();
     });
   });
 

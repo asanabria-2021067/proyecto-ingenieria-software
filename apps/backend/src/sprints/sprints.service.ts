@@ -34,6 +34,7 @@ import { ProjectPolicyService } from '../common/project-policy/project-policy.se
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { ProjectHoursSummaryService } from './project-hours-summary.service';
 import { HoursRecognitionService } from './hours-recognition.service';
+import { SprintSnapshotsService } from './sprint-snapshots.service';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): iniciar, finalizar y cerrar un Sprint
@@ -85,6 +86,9 @@ export class SprintsService {
     // servicio; `closeSprint` solo lo ORQUESTA y es el único que cambia el
     // estado del Sprint.
     private readonly recognition?: HoursRecognitionService,
+    // T-238 (HU-160): la instantánea diaria vive en su propio servicio;
+    // Sprints solo decide quién puede pedir la regeneración manual de hoy.
+    private readonly snapshots?: SprintSnapshotsService,
   ) {}
 
   /**
@@ -325,13 +329,28 @@ export class SprintsService {
   }
 
   /**
+   * T-238 (HU-160): regenera la instantánea de HOY del Sprint (exclusivo del
+   * líder). Nunca puede tocar una fecha pasada — `SprintSnapshotsService`
+   * siempre calcula la fecha internamente como "hoy", nunca la recibe de
+   * este método ni del llamador. Fuera de transacción: es una lectura del
+   * estado actual seguida de un upsert idempotente, no una transición de
+   * estado del Sprint.
+   */
+  async regenerarInstantaneaDeHoy(projectId: number, sprintId: number, userId: number) {
+    await this.sprintsAuthorization.assertCanManageSprintSnapshot(projectId, sprintId, userId);
+    if (!this.snapshots) {
+      throw new Error('SprintSnapshotsService no está disponible');
+    }
+    return this.snapshots.generarInstantaneaDelDia(sprintId);
+  }
+
+  /**
    * Finaliza el Sprint (ACTIVO -> EN_FINALIZACION): exclusivo del líder
    * (reutiliza SprintsAuthorizationService.assertCanFinalizeSprint, que ya
    * aísla projectId+sprintId — Contrato A1/A3), solo si el Sprint sigue
    * ACTIVO. Desde HU-148/HU-160 ya NO exige que todas las tareas estén
    * HECHO — cerrar con pendientes es válido (ver `assertFinalizationPredicatesTx`).
-   * Toda la
-   * validación y la transición ocurren dentro de una única transacción:
+   * Toda la validación y la transición ocurren dentro de una única transacción:
    *
    *   autorización -> estado ACTIVO -> tareas no-HECHO -> updateMany
    *   condicionado por estado=ACTIVO -> lectura final
