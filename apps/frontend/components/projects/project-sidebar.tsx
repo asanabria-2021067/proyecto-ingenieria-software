@@ -124,12 +124,19 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         label: 'Sprints',
         icon: Rocket,
       },
-      {
-        href: `/dashboard/proyectos/${idProyecto}/bitacora`,
-        label: 'Bitácora',
-        icon: ScrollText,
-      },
     );
+  }
+
+  // HU-170/T-269: a diferencia de Miembros/Liderazgo/Sprints (arriba,
+  // exclusivos del líder), la bitácora también se abre al integrante activo
+  // en solo lectura — el backend (BitacoraConsultaService vía
+  // ProjectReadPolicyService) es quien realmente lo autoriza.
+  if (isLeader || esParticipante) {
+    navItems.push({
+      href: `/dashboard/proyectos/${idProyecto}/bitacora`,
+      label: 'Bitácora',
+      icon: ScrollText,
+    });
   }
 
   // S7 (VIEW-13): entrada a la preparación del cierre, solo para el líder y
