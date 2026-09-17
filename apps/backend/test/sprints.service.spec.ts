@@ -89,6 +89,8 @@ function makePrisma(tx = makeTx()) {
     // para no romper los tests preexistentes de getSprintDetail que nunca
     // configuran este mock explícitamente.
     tarea: { findMany: vi.fn().mockResolvedValue([]) },
+    // T-240 (HU-160): burndown — por defecto sin instantáneas.
+    instantaneaSprint: { findMany: vi.fn().mockResolvedValue([]) },
   };
   prisma.$transaction.mockImplementation(async (callback: (tx: ReturnType<typeof makeTx>) => unknown) => callback(tx));
   // C045: el runner real bloquea el proyecto antes del callback.
@@ -2197,6 +2199,115 @@ describe('SprintsService', () => {
       const sqlEjecutado = prisma.$queryRaw.mock.calls[0][0] as { sql: string; values: unknown[] };
       expect(sqlEjecutado.sql).toContain('id_proyecto = ?');
       expect(sqlEjecutado.values).toContain(PROJECT_ID);
+    });
+  });
+
+  describe('getSprintBurndown (T-240, HU-160)', () => {
+    it('caso 1: un Sprint CERRADO reporta el total planeado desde las columnas *Cierre congeladas, sin volver a agregar tarea', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue({
+        idSprint: SPRINT_ID,
+        estado: 'CERRADO',
+        fechaInicio: new Date('2026-01-01T00:00:00.000Z'),
+        fechaFinPlaneada: new Date('2026-01-15T00:00:00.000Z'),
+        tareasPlanificadasCierre: 4,
+        puntosHistoriaPlanificadosCierre: 13,
+      });
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      const result = await service.getSprintBurndown(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.tareasPlanificadasTotal).toBe(4);
+      expect(result.puntosHistoriaPlanificadosTotal).toBe(13);
+      expect(prisma.tarea.findMany).not.toHaveBeenCalled();
+      expect(result.fechaInicio).toBe('2026-01-01T00:00:00.000Z');
+      expect(result.fechaFinPlaneada).toBe('2026-01-15T00:00:00.000Z');
+    });
+
+    it('caso 2: un Sprint ACTIVO agrega en vivo TODAS sus tareas vigentes (HECHO o no), tratando puntosHistoria null como 0', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue({
+        idSprint: SPRINT_ID,
+        estado: 'ACTIVO',
+        fechaInicio: new Date('2026-01-01T00:00:00.000Z'),
+        fechaFinPlaneada: null,
+        tareasPlanificadasCierre: null,
+        puntosHistoriaPlanificadosCierre: null,
+      });
+      prisma.tarea.findMany.mockResolvedValue([
+        { puntosHistoria: 5 },
+        { puntosHistoria: null },
+        { puntosHistoria: 2 },
+      ]);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      const result = await service.getSprintBurndown(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(result.tareasPlanificadasTotal).toBe(3);
+      expect(result.puntosHistoriaPlanificadosTotal).toBe(7);
+      expect(result.fechaFinPlaneada).toBeNull();
+    });
+
+    it('caso 3: las instantáneas se devuelven ordenadas por fecha, sin rellenar ningún hueco', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue({
+        idSprint: SPRINT_ID,
+        estado: 'ACTIVO',
+        fechaInicio: new Date('2026-01-01T00:00:00.000Z'),
+        fechaFinPlaneada: new Date('2026-01-15T00:00:00.000Z'),
+        tareasPlanificadasCierre: null,
+        puntosHistoriaPlanificadosCierre: null,
+      });
+      const instantaneas = [
+        { fecha: new Date('2026-01-01T00:00:00.000Z'), tareasPendientes: 3, tareasCompletadas: 0, puntosHistoriaRestantes: 8 },
+        // 2026-01-02 falta a propósito: hueco real, no se inventa.
+        { fecha: new Date('2026-01-03T00:00:00.000Z'), tareasPendientes: 2, tareasCompletadas: 1, puntosHistoriaRestantes: 5 },
+      ];
+      prisma.instantaneaSprint.findMany.mockResolvedValue(instantaneas);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      const result = await service.getSprintBurndown(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(prisma.instantaneaSprint.findMany).toHaveBeenCalledWith({
+        where: { idSprint: SPRINT_ID },
+        select: { fecha: true, tareasPendientes: true, tareasCompletadas: true, puntosHistoriaRestantes: true },
+        orderBy: { fecha: 'asc' },
+      });
+      expect(result.instantaneas).toEqual([
+        { fecha: '2026-01-01T00:00:00.000Z', tareasPendientes: 3, tareasCompletadas: 0, puntosHistoriaRestantes: 8 },
+        { fecha: '2026-01-03T00:00:00.000Z', tareasPendientes: 2, tareasCompletadas: 1, puntosHistoriaRestantes: 5 },
+      ]);
+    });
+
+    it('caso 4: exige autorización (líder o integrante activo) antes de leer el Sprint', async () => {
+      const prisma = makePrisma();
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanViewSprintAnalytics.mockRejectedValue(new ForbiddenException('no autorizado'));
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await expect(
+        service.getSprintBurndown(PROJECT_ID, SPRINT_ID, NO_LIDER_ID),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.sprint.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('caso 5: Sprint inexistente en el proyecto lanza NotFoundException', async () => {
+      const prisma = makePrisma();
+      prisma.sprint.findFirst.mockResolvedValue(null);
+      const context = makeSprintsContext();
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await expect(
+        service.getSprintBurndown(PROJECT_ID, SPRINT_ID, LIDER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

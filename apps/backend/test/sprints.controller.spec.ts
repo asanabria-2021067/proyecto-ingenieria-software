@@ -15,6 +15,7 @@ function makeService() {
     getSprintAnalytics: vi.fn(),
     getSprintsAnalytics: vi.fn(),
     regenerarInstantaneaDeHoy: vi.fn(),
+    getSprintBurndown: vi.fn(),
   };
 }
 
@@ -448,5 +449,48 @@ describe('SprintsController.getComparativeAnalytics (GET /proyectos/:projectId/s
       (nombreMetodo) => Reflect.getMetadata(METHOD_METADATA, prototype[nombreMetodo]) === 0,
     );
     expect(rutasGet.indexOf('getComparativeAnalytics')).toBeLessThan(rutasGet.indexOf('detail'));
+  });
+});
+
+describe('SprintsController.getBurndown (GET /proyectos/:projectId/sprints/:sprintId/burndown) — T-240/HU-160', () => {
+  it('está registrado como GET en :sprintId/burndown', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.getBurndown)).toBe(
+      ':sprintId/burndown',
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.getBurndown)).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.getBurndown)).toBe(200);
+  });
+
+  it('delega en SprintsService.getSprintBurndown con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.getBurndown(5, 12, { userId: 9 });
+
+    expect(service.getSprintBurndown).toHaveBeenCalledTimes(1);
+    expect(service.getSprintBurndown).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.getSprintBurndown, sin transformarlo', async () => {
+    const service = makeService();
+    const burndown = { idSprint: 12, fechaInicio: '2026-01-01', instantaneas: [] };
+    service.getSprintBurndown.mockResolvedValue(burndown);
+    const controller = makeController(service);
+
+    const result = await controller.getBurndown(5, 12, { userId: 9 });
+
+    expect(result).toBe(burndown);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.getSprintBurndown', async () => {
+    const service = makeService();
+    const error = new Error('no encontrado');
+    service.getSprintBurndown.mockRejectedValue(error);
+    const controller = makeController(service);
+
+    await expect(controller.getBurndown(5, 12, { userId: 9 })).rejects.toBe(error);
   });
 });

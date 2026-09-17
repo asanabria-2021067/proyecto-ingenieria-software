@@ -23,6 +23,7 @@ import {
   SprintComparativeAnalyticsDto,
   SprintComparativeAnalyticsItemDto,
 } from './dto/sprint-analytics.dto';
+import { SprintBurndownDto } from './dto/sprint-burndown.dto';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import {
@@ -1454,6 +1455,87 @@ export class SprintsService {
         tareasCompletadas,
         horasEstimadas,
       },
+    };
+  }
+
+  /**
+   * T-240 (HU-160): datos crudos del burndown de un Sprint — el front
+   * dibuja la línea ideal (`fechaInicio` -> `fechaFinPlaneada`) y la línea
+   * real (`instantaneas`, sin rellenar huecos). Misma autorización que
+   * `getSprintAnalytics` (líder o integrante activo): es analítica, no
+   * gestión del Sprint.
+   *
+   * El total planeado sigue el mismo criterio de congelamiento que T-239:
+   * un Sprint `CERRADO` reporta sus columnas `*Cierre` (ya congeladas por
+   * `closeSprint`, nunca recalculadas); uno `ACTIVO`/`EN_FINALIZACION`
+   * agrega en vivo TODAS sus tareas vigentes (HECHO o no — es "lo
+   * planeado", no "lo pendiente").
+   */
+  async getSprintBurndown(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+  ): Promise<SprintBurndownDto> {
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
+    await this.sprintsAuthorization.assertCanViewSprintAnalytics(projectId, sprintId, userId);
+
+    const sprint = await this.prisma.sprint.findFirst({
+      where: { idSprint: sprintId, idProyecto: projectId },
+      select: {
+        idSprint: true,
+        estado: true,
+        fechaInicio: true,
+        fechaFinPlaneada: true,
+        tareasPlanificadasCierre: true,
+        puntosHistoriaPlanificadosCierre: true,
+      },
+    });
+    if (!sprint) {
+      throw new NotFoundException(
+        `Sprint con id ${sprintId} no encontrado en el proyecto ${projectId}`,
+      );
+    }
+
+    let tareasPlanificadasTotal: number;
+    let puntosHistoriaPlanificadosTotal: number;
+    if (sprint.estado === EstadoSprint.CERRADO) {
+      tareasPlanificadasTotal = sprint.tareasPlanificadasCierre ?? 0;
+      puntosHistoriaPlanificadosTotal = sprint.puntosHistoriaPlanificadosCierre ?? 0;
+    } else {
+      const tareas = await this.prisma.tarea.findMany({
+        where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
+        select: { puntosHistoria: true },
+      });
+      tareasPlanificadasTotal = tareas.length;
+      puntosHistoriaPlanificadosTotal = tareas.reduce(
+        (acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0),
+        0,
+      );
+    }
+
+    const instantaneasRows = await this.prisma.instantaneaSprint.findMany({
+      where: { idSprint: sprintId },
+      select: { fecha: true, tareasPendientes: true, tareasCompletadas: true, puntosHistoriaRestantes: true },
+      orderBy: { fecha: 'asc' },
+    });
+
+    return {
+      idSprint: sprint.idSprint,
+      fechaInicio: sprint.fechaInicio.toISOString(),
+      fechaFinPlaneada: sprint.fechaFinPlaneada ? sprint.fechaFinPlaneada.toISOString() : null,
+      tareasPlanificadasTotal,
+      puntosHistoriaPlanificadosTotal,
+      instantaneas: instantaneasRows.map((fila) => ({
+        fecha: fila.fecha.toISOString(),
+        tareasPendientes: fila.tareasPendientes,
+        tareasCompletadas: fila.tareasCompletadas,
+        puntosHistoriaRestantes: fila.puntosHistoriaRestantes,
+      })),
     };
   }
 
