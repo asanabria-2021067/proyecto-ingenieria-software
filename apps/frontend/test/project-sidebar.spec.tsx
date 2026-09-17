@@ -140,6 +140,38 @@ describe('ProjectSidebar', () => {
     expect(screen.queryByRole('link', { name: /miembros/i })).not.toBeInTheDocument();
   });
 
+  it('HU-170: el líder ve el destino de Bitácora', () => {
+    mockLeader();
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /bitácora/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/bitacora',
+    );
+  });
+
+  it('HU-170: un integrante (no líder) también ve «Bitácora», a diferencia de Miembros/Liderazgo/Sprints', () => {
+    mockParticipante();
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /bitácora/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/bitacora',
+    );
+    expect(screen.queryByRole('link', { name: /sprints/i })).not.toBeInTheDocument();
+  });
+
+  it('un usuario ajeno al proyecto (ni líder ni integrante) no ve «Bitácora»', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    (useProjectDetail as any).mockReturnValue({
+      data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', creador: { idUsuario: 1 } },
+    });
+    (useProjectMembers as any).mockReturnValue({ members: [{ idUsuario: 2 }] });
+    renderSidebar();
+
+    expect(screen.queryByRole('link', { name: /bitácora/i })).not.toBeInTheDocument();
+  });
+
   it('al entrar al Tablero (ruta anidada bajo Resumen) solo un NavItem queda activo', () => {
     mockLeader();
     pathnameMock.mockReturnValue('/dashboard/projects/42/kanban');

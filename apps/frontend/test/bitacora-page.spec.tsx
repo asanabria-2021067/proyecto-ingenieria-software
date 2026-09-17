@@ -150,6 +150,69 @@ describe('BitacoraPage — autorización (exclusiva del líder)', () => {
   });
 });
 
+describe('BitacoraPage — autorización (HU-170: integrante en solo lectura)', () => {
+  it('un integrante activo (no líder) ve la línea de tiempo en vez del aviso de "solo líder"', () => {
+    mockLeader(false);
+    mockSprints();
+    // El usuario actual (idUsuario 999, definido por mockLeader(false)) SÍ
+    // está en la lista de miembros del proyecto: es integrante activo, no
+    // un ajeno. A diferencia del test de "autorización (exclusiva del
+    // líder)" de arriba, donde el usuario 999 no aparece en mockMembers().
+    mockMembers([{ idUsuario: 999, nombre: 'Carlos', apellido: 'Diaz' }]);
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.queryByText('¡No eres líder!')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Bitácora' })).toBeInTheDocument();
+  });
+
+  it('un integrante activo SÍ dispara la petición (useProjectBitacora recibe habilitado=true)', () => {
+    mockLeader(false);
+    mockSprints();
+    mockMembers([{ idUsuario: 999, nombre: 'Carlos', apellido: 'Diaz' }]);
+    mockBitacora();
+
+    renderPage();
+
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[2]).toBe(true);
+  });
+
+  it('un usuario ajeno (ni líder ni integrante) sigue viendo el aviso y NUNCA dispara la petición', () => {
+    mockLeader(false);
+    mockSprints();
+    // idUsuario 999 (el usuario actual) no aparece en esta lista de miembros.
+    mockMembers([{ idUsuario: 1, nombre: 'Ana', apellido: 'Lopez' }]);
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.getByText('¡No eres líder!')).toBeInTheDocument();
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[2]).toBe(false);
+  });
+
+  it('un integrante ve los mismos filtros y la misma paginación que el líder, sin ningún control de crear/editar/borrar', () => {
+    mockLeader(false);
+    mockSprints();
+    mockMembers([{ idUsuario: 999, nombre: 'Carlos', apellido: 'Diaz' }]);
+    mockBitacora({ totalPages: 2 });
+
+    renderPage();
+
+    expect(screen.getByLabelText('Filtrar por sprint')).toBeInTheDocument();
+    expect(screen.getByLabelText('Filtrar por integrante')).toBeInTheDocument();
+    expect(screen.getByLabelText('Filtrar por tipo de evento')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeInTheDocument();
+    // La bitácora nunca tuvo endpoints de escritura (T-269): esta pantalla
+    // tampoco debe ofrecer ningún control para crear, editar o borrar.
+    expect(screen.queryByRole('button', { name: /crear|nueva entrada/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /editar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /borrar|eliminar/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('BitacoraPage — loading', () => {
   it('mientras carga: skeletons, sin Empty ni eventos falsos', () => {
     mockLeader();

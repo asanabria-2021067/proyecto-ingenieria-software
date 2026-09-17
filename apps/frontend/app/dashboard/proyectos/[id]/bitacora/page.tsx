@@ -239,14 +239,22 @@ export default function BitacoraPage() {
   const [tipoEventoFiltro, setTipoEventoFiltro] = useState<string>('');
 
   const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
-  const { isLoading: cargandoUsuario } = useCurrentUser();
+  const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
   // Validación de rol vía el usuario identificado por la cookie JWT httpOnly
   // (ver hooks/use-is-project-leader.ts) — misma fuente de verdad que usa
   // ProjectSidebar para decidir si mostrar el enlace "Bitácora".
   const isLeader = useIsProjectLeader(idProyecto);
 
   const { sprints } = useProjectSprints(idProyecto);
-  const { members } = useProjectMembers(idProyecto);
+  const { members, isLoading: cargandoMembers } = useProjectMembers(idProyecto);
+  // HU-170: un integrante activo también puede leer la bitácora en modo
+  // solo lectura — mismo criterio de "esParticipante" que ya usa
+  // ProjectSidebar para decidir a quién mostrarle el enlace "Bitácora". El
+  // backend (BitacoraConsultaService vía ProjectReadPolicyService) es quien
+  // realmente autoriza esto; aquí solo evitamos pedirle al backend lo que
+  // ya sabemos que va a rechazar.
+  const esParticipante = !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
+  const puedeVerBitacora = isLeader || esParticipante;
 
   const filtros = {
     idSprint: idSprintFiltro ? Number(idSprintFiltro) : undefined,
@@ -255,13 +263,14 @@ export default function BitacoraPage() {
     page,
     limit: LIMITE_POR_PAGINA,
   };
-  // `habilitado: isLeader` evita disparar la petición mientras no se sabe
-  // que el usuario (identificado vía la cookie JWT) es líder — el backend
-  // respondería 403 igual, pero no hace falta pedirlo.
+  // `habilitado: puedeVerBitacora` evita disparar la petición mientras no se
+  // sabe que el usuario (identificado vía la cookie JWT) es líder o
+  // integrante activo — el backend respondería 403 igual, pero no hace
+  // falta pedirlo.
   const { eventos, total, totalPages, isLoading, isError, error, refetch } = useProjectBitacora(
     idProyecto,
     filtros,
-    isLeader,
+    puedeVerBitacora,
   );
 
   const cargando = isLoading || cargandoProyecto || cargandoUsuario;
@@ -289,7 +298,7 @@ export default function BitacoraPage() {
         Volver al proyecto
       </Link>
 
-      {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
+      {!cargandoProyecto && !cargandoUsuario && !cargandoMembers && !puedeVerBitacora ? (
         <LeaderOnlyNotice description="No puedes acceder a la bitácora de este proyecto." />
       ) : (
         <>
