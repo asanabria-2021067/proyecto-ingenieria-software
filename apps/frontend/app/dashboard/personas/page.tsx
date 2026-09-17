@@ -28,6 +28,7 @@ import {
   Search,
   SlidersHorizontal,
   UserCheck,
+  UserPlus,
   UserX,
   Users,
 } from 'lucide-react';
@@ -57,11 +58,14 @@ import {
   useAceptarSolicitudAmistad,
   useAmigos,
   useBuscarUsuarios,
+  useCrearSolicitudAmistad,
   useRechazarSolicitudAmistad,
+  useRecomendaciones,
   useSolicitudesAmistadPendientes,
 } from '@/hooks/use-social';
 import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
+import { formatMotivoRecomendacion } from '@/lib/social/recomendaciones';
 import type { SemestreRango, UsuarioBusquedaDto } from '@/lib/types/social';
 
 type PestanaId = 'todos' | 'amigos-de-amigos' | 'mi-carrera' | 'mis-amigos';
@@ -245,6 +249,35 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
   );
 }
 
+function RecomendacionCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
+  const crearSolicitud = useCrearSolicitudAmistad();
+  const motivo = formatMotivoRecomendacion(usuario);
+  const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
+
+  return (
+    <article className="card-base flex items-center gap-tight">
+      <Avatar className="size-11 shrink-0">
+        {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
+        <AvatarFallback className="type-body font-medium text-text-secondary">
+          {getIniciales(usuario.nombre, usuario.apellido)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <p className="type-subtitle truncate text-text-primary">{nombreCompleto}</p>
+        {motivo && <span className="pill pill-accent mt-micro">{motivo}</span>}
+      </div>
+      <Button
+        size="sm"
+        className="h-7 shrink-0 rounded-pill px-2.5 text-[11px]"
+        onClick={() => crearSolicitud.mutate(usuario.idUsuario)}
+        disabled={crearSolicitud.isPending}
+      >
+        <UserPlus className="size-3.5" aria-hidden="true" /> Agregar
+      </Button>
+    </article>
+  );
+}
+
 function ListaSkeleton() {
   return (
     <SkeletonTheme baseColor="var(--color-surface-container)" highlightColor="var(--color-surface-container-high)">
@@ -303,6 +336,7 @@ export default function PersonasPage() {
   });
 
   const { solicitudes } = useSolicitudesAmistadPendientes();
+  const { recomendaciones, isLoading: isLoadingRecomendaciones } = useRecomendaciones();
   const aceptarSolicitud = useAceptarSolicitudAmistad();
   const rechazarSolicitud = useRechazarSolicitudAmistad();
 
@@ -357,6 +391,31 @@ export default function PersonasPage() {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {!isLoadingRecomendaciones && (
+        <section className="mx-auto mb-section max-w-content">
+          <h2 className="type-section mb-card">Personas que quizás conozcas</h2>
+          {recomendaciones.length > 0 ? (
+            <div className="grid gap-tight sm:grid-cols-2 xl:grid-cols-3">
+              {recomendaciones.map((usuario) => (
+                <RecomendacionCard key={usuario.idUsuario} usuario={usuario} />
+              ))}
+            </div>
+          ) : (
+            <Empty tone="muted" aria-live="polite">
+              <EmptyMedia variant="compact">
+                <Users aria-hidden="true" className="size-6" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle className="type-subtitle">Sin recomendaciones por ahora</EmptyTitle>
+                <EmptyDescription>
+                  Agrega amigos o completa tu perfil para que te sugiramos personas.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
         </section>
       )}
 
