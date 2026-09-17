@@ -17,9 +17,11 @@ export function getSprintDetail(idProyecto: number, idSprint: number): Promise<S
   return apiFetch<SprintDetailDto>(`/proyectos/${idProyecto}/sprints/${idSprint}`);
 }
 
-export function startSprint(idProyecto: number): Promise<SprintDto> {
+/** HU-160: fechaFinPlaneada es opcional — si se omite, el backend calcula fechaInicio + 14 días. */
+export function startSprint(idProyecto: number, fechaFinPlaneada?: string): Promise<SprintDto> {
   return apiFetch<SprintDto>(`/proyectos/${idProyecto}/sprints`, {
     method: 'POST',
+    body: JSON.stringify(fechaFinPlaneada ? { fechaFinPlaneada } : {}),
   });
 }
 

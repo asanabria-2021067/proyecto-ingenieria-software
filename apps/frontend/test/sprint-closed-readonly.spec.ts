@@ -37,6 +37,7 @@ function sprint(overrides: Partial<SprintDto> = {}): SprintDto {
     numero: 4,
     estado: 'CERRADO',
     fechaInicio: '2026-05-12T12:00:00.000Z',
+    fechaFinPlaneada: null,
     fechaFinalizacionIniciada: '2026-05-25T12:00:00.000Z',
     fechaCierre: '2026-05-26T12:00:00.000Z',
     tareas: 6,
