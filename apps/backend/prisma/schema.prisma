@@ -798,6 +798,7 @@ model Tarea {
   prioridad           Prioridad   @default(MEDIA)
   orden               Int         @default(0) @map("orden")
   tiempoEstimadoHoras Int?        @map("tiempo_estimado_horas")
+  puntosHistoria      Int?        @map("puntos_historia")
   creadaPor           Int         @map("creada_por")
   fechaCreacion       DateTime    @default(now()) @map("fecha_creacion")
   fechaLimite         DateTime?   @map("fecha_limite") @db.Date
