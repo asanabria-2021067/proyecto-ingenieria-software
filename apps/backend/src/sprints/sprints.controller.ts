@@ -174,4 +174,15 @@ export class SprintsController {
   ) {
     return this.sprintsService.getSprintAnalytics(projectId, sprintId, user.userId);
   }
+
+  /** T-240 (HU-160): datos crudos del burndown, mismo alcance por actor que `getAnalytics`. */
+  @Get(':sprintId/burndown')
+  @HttpCode(HttpStatus.OK)
+  getBurndown(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.getSprintBurndown(projectId, sprintId, user.userId);
+  }
 }
