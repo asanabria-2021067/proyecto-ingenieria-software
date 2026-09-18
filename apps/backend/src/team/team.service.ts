@@ -344,16 +344,27 @@ export class TeamService {
       scope: 'equipo',
     });
     const proyecto = await this.requireOwner(idProyecto, userId);
+    return this.buildTeamSummary(idProyecto, proyecto.creadoPor);
+  }
 
+  /**
+   * T-261 (HU-164): cuerpo de `getTeamSummary` extraído para que el export
+   * de miembros/horas (ExportsService) reutilice EXACTAMENTE el mismo
+   * cálculo de `grupo`/`horasReconocidas` sin pasar por `requireOwner`
+   * (líder-only) — la autorización de quién puede llamar esto es
+   * responsabilidad de cada caller (`getTeamSummary` vía `requireOwner`; el
+   * export vía la policy `exportacion`, que admite líder y administración).
+   */
+  async buildTeamSummary(idProyecto: number, idCreador: number): Promise<TeamSummaryResponseDto> {
     // El líder no tiene ParticipacionProyecto propia (ver comentario sobre
     // Proyecto.creadoPor en schema.prisma): se resuelve aparte con una única
     // query fija a Usuario, nunca a partir de las participaciones.
     const liderUsuario = await this.prisma.usuario.findUnique({
-      where: { idUsuario: proyecto.creadoPor },
+      where: { idUsuario: idCreador },
       select: { idUsuario: true, nombre: true, apellido: true, correo: true, fotoUrl: true },
     });
     if (!liderUsuario) {
-      throw new NotFoundException(`Usuario líder con id ${proyecto.creadoPor} no encontrado`);
+      throw new NotFoundException(`Usuario líder con id ${idCreador} no encontrado`);
     }
 
     // Participaciones del proyecto, excluyendo al creador: el líder se
@@ -363,7 +374,7 @@ export class TeamService {
     const participaciones = await this.prisma.participacionProyecto.findMany({
       where: {
         rolProyecto: { idProyecto },
-        idUsuario: { not: proyecto.creadoPor },
+        idUsuario: { not: idCreador },
       },
       select: {
         idUsuario: true,
