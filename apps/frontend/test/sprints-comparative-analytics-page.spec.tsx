@@ -9,6 +9,17 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('../hooks/use-project-sprints', () => ({ useSprintsAnalytics: vi.fn() }));
+// T-259/T-260 (HU-164): el botón de exportar tiene su propio spec
+// (project-export-buttons.spec.tsx); aquí solo se stubea para que esta
+// página no dependa de QueryClientProvider ni del resto de sus hooks.
+vi.mock('../hooks/use-is-project-leader', () => ({ useIsProjectLeader: () => false }));
+vi.mock('../hooks/use-current-user', () => ({ useIsAdmin: () => false }));
+vi.mock('../hooks/use-project-export', () => ({
+  useProjectExport: () => ({
+    exportCsv: { mutate: vi.fn(), isPending: false, isError: false },
+    exportPdf: { mutate: vi.fn(), isPending: false, isError: false },
+  }),
+}));
 
 import SprintsAnalyticsPage from '../app/dashboard/proyectos/[id]/sprints/analytics/page';
 import { useSprintsAnalytics } from '../hooks/use-project-sprints';
