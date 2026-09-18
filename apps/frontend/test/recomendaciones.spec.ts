@@ -66,6 +66,42 @@ describe('seleccionarRecomendaciones', () => {
     expect(resultado.map((u) => u.idUsuario)).toEqual([2, 3, 1]);
   });
 
+  it('excluye por solicitud pendiente enviada', () => {
+    const resultado = seleccionarRecomendaciones([
+      candidato({ idUsuario: 1, solicitudPendiente: { direccion: 'enviada' } }),
+      candidato({ idUsuario: 2 }),
+    ]);
+
+    expect(resultado.map((u) => u.idUsuario)).toEqual([2]);
+  });
+
+  it('excluye por solicitud pendiente recibida', () => {
+    const resultado = seleccionarRecomendaciones([
+      candidato({ idUsuario: 1, solicitudPendiente: { direccion: 'recibida' } }),
+      candidato({ idUsuario: 2 }),
+    ]);
+
+    expect(resultado.map((u) => u.idUsuario)).toEqual([2]);
+  });
+
+  it('la exclusión por amistad prevalece aunque haya amigos en común', () => {
+    const resultado = seleccionarRecomendaciones([
+      candidato({ idUsuario: 1, esAmigo: true, amigosEnComun: 5 }),
+      candidato({ idUsuario: 2, amigosEnComun: 1 }),
+    ]);
+
+    expect(resultado.map((u) => u.idUsuario)).toEqual([2]);
+  });
+
+  it('T-196: un candidato con 2 amigos en común se recomienda antes que uno que solo coincide en carrera', () => {
+    const resultado = seleccionarRecomendaciones([
+      candidato({ idUsuario: 1, amigosEnComun: 0, mismaCarrera: true }),
+      candidato({ idUsuario: 2, amigosEnComun: 2, mismaCarrera: false }),
+    ]);
+
+    expect(resultado.map((u) => u.idUsuario)).toEqual([2, 1]);
+  });
+
   it('recorta al límite pedido', () => {
     const items = Array.from({ length: 10 }, (_, i) => candidato({ idUsuario: i }));
     expect(seleccionarRecomendaciones(items, 6)).toHaveLength(6);
