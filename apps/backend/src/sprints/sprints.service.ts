@@ -1,6 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { addDays } from 'date-fns';
-import { EstadoHito, EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
+import { DestinoArrastre, EstadoHito, EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
@@ -245,6 +245,7 @@ export class SprintsService {
   ): Promise<{
     tareasPlanificadasCierre: number;
     tareasCompletadasCierre: number;
+    tareasArrastradasCierre: number;
     hitosTotalesCierre: number;
     hitosCompletadosCierre: number;
     porcentajeCumplimientoCierre: number;
@@ -259,6 +260,7 @@ export class SprintsService {
     const completadas = tareas.filter((tarea) => tarea.estadoTarea === EstadoTarea.HECHO);
     const tareasPlanificadasCierre = tareas.length;
     const tareasCompletadasCierre = completadas.length;
+    const tareasArrastradasCierre = tareasPlanificadasCierre - tareasCompletadasCierre;
     const porcentajeCumplimientoCierre =
       tareasPlanificadasCierre === 0
         ? 0
@@ -294,6 +296,7 @@ export class SprintsService {
     return {
       tareasPlanificadasCierre,
       tareasCompletadasCierre,
+      tareasArrastradasCierre,
       hitosTotalesCierre,
       hitosCompletadosCierre,
       porcentajeCumplimientoCierre,
@@ -394,6 +397,19 @@ export class SprintsService {
         tipoEntidad: 'SPRINT',
         idEntidad: sprintCreado.idSprint,
         valorNuevo: { numero: sprintCreado.numero },
+      });
+
+      await tx.tarea.updateMany({
+        where: {
+          idProyecto: projectId,
+          idSprint: null,
+          destinoArrastre: DestinoArrastre.SIGUIENTE_SPRINT,
+          eliminadoEn: null,
+        },
+        data: {
+          idSprint: sprintCreado.idSprint,
+          destinoArrastre: null,
+        },
       });
 
       return sprintCreado;
@@ -913,7 +929,7 @@ export class SprintsService {
    * es una señal técnica realtime para que F6 invalide/oculte el banner de
    * bloqueo, no un mensaje de bandeja.
    */
-  async closeSprint(projectId: number, sprintId: number, userId: number) {
+  async closeSprint(projectId: number, sprintId: number, userId: number, destino?: DestinoArrastre) {
     const sprintCerrado = await this.projectTx.run(
       projectId,
       userId,
@@ -983,6 +999,26 @@ export class SprintsService {
       // este Sprint desde `tarea`: lee estas columnas tal cual quedaron hoy,
       // sin importar qué corrección se le haga después a una tarea vieja.
       const congelado = await this.calcularCongeladoDeCierreTx(tx, projectId, sprintId);
+
+      if (congelado.tareasArrastradasCierre > 0) {
+        if (!destino) {
+          throw new BadRequestException(
+            'El Sprint tiene tareas pendientes: se requiere elegir destino (SIGUIENTE_SPRINT o BACKLOG)',
+          );
+        }
+        await tx.tarea.updateMany({
+          where: {
+            idProyecto: projectId,
+            idSprint: sprintId,
+            eliminadoEn: null,
+            estadoTarea: { not: EstadoTarea.HECHO },
+          },
+          data: {
+            idSprint: null,
+            destinoArrastre: destino,
+          },
+        });
+      }
 
       const actualizado = await tx.sprint.updateMany({
         where: {

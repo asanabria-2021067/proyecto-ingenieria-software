@@ -15,6 +15,7 @@ import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { SprintsService } from './sprints.service';
 import { StartSprintDto } from './dto/start-sprint.dto';
+import { CloseSprintDto } from './dto/close-sprint.dto';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): ciclo de vida del Sprint. El proyecto se
@@ -79,8 +80,9 @@ export class SprintsController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('sprintId', ParseIntPipe) sprintId: number,
     @CurrentUser() user: { userId: number },
+    @Body() body: CloseSprintDto,
   ) {
-    return this.sprintsService.closeSprint(projectId, sprintId, user.userId);
+    return this.sprintsService.closeSprint(projectId, sprintId, user.userId, body.destino);
   }
 
   /**
