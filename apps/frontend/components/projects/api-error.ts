@@ -96,8 +96,12 @@ export function getApiErrorMessage(error: unknown, scope: ApiErrorScope = 'task'
       // y de chat (participante sin participación activa, conteo inválido…)
       // devuelven un mensaje funcional específico que conviene mostrar tal cual.
       // Los scopes S7 también: el backend explica exactamente qué campo falla
-      // (p. ej. «se requiere justificacionExceso»).
+      // (p. ej. «se requiere justificacionExceso»). `task` se suma aquí por
+      // HU-147/T-185: el 400 de idHito obligatorio/no removible explica
+      // exactamente qué hacer («…necesita un hito antes de poder entrar al
+      // tablero o a un sprint»), y el genérico anterior lo ocultaba.
       if (
+        scope === 'task' ||
         scope === 'role' ||
         scope === 'chat' ||
         scope === 'hours' ||

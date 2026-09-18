@@ -610,6 +610,8 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               milestones={proyecto.hitos}
               members={members}
               labels={labels}
+              puedeCrear={puedeCrear}
+              crearHito={crearHito}
             />
           </TabsContent>
         </Tabs>

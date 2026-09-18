@@ -59,6 +59,46 @@ describe('useProjectMilestones', () => {
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
+  describe('T-186 — invalidación adicional cuando el payload trae idsTareas', () => {
+    it('con idsTareas no vacío: también invalida project-tasks y project-avance', async () => {
+      (createHito as any).mockResolvedValue({ idHito: 1, idsTareasAsignadas: [1, 2] });
+      const { wrapper, queryClient } = createWrapper();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useProjectMilestones(7), { wrapper });
+
+      result.current.crearHito.mutate({ tituloHito: 'Entrega de MVP', idsTareas: [1, 2] });
+
+      await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['project', 7] }));
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['project-tasks', 7] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['project-avance', 7] });
+    });
+
+    it('sin idsTareas (crear un hito suelto): no toca project-tasks ni project-avance', async () => {
+      (createHito as any).mockResolvedValue({ idHito: 1 });
+      const { wrapper, queryClient } = createWrapper();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useProjectMilestones(7), { wrapper });
+
+      result.current.crearHito.mutate({ tituloHito: 'Entrega de MVP' });
+
+      await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['project', 7] }));
+      expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-tasks', 7] });
+      expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-avance', 7] });
+    });
+
+    it('idsTareas: [] (vacío) se trata igual que ausente: no invalida tareas/avance', async () => {
+      (createHito as any).mockResolvedValue({ idHito: 1 });
+      const { wrapper, queryClient } = createWrapper();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useProjectMilestones(7), { wrapper });
+
+      result.current.crearHito.mutate({ tituloHito: 'Entrega de MVP', idsTareas: [] });
+
+      await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['project', 7] }));
+      expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-tasks', 7] });
+    });
+  });
+
   it('propaga el error enriquecido sin transformarlo', async () => {
     const enriched = Object.assign(new Error('No eres el líder de este proyecto'), {
       statusCode: 403,
