@@ -1344,7 +1344,9 @@ describe('SprintsService', () => {
             idSprint: SPRINT_ID,
             tipoEntidad: 'SPRINT',
             idEntidad: SPRINT_ID,
-            valorNuevo: expect.objectContaining({ tareasArrastradas: 0 }),
+            // Sin pendientes, `destino` nunca se exige ni se usa (T-189):
+            // el evento lo refleja como null, no como un valor inventado.
+            valorNuevo: expect.objectContaining({ tareasArrastradas: 0, destinoArrastre: null }),
           }),
         );
       });
@@ -1371,13 +1373,44 @@ describe('SprintsService', () => {
         const bitacora = makeBitacora();
         const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), bitacora);
 
-        await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+        // Con pendientes (T-189), `destino` es obligatorio: BACKLOG en este caso.
+        await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID, 'BACKLOG');
 
         expect(bitacora.registrarEvento).toHaveBeenCalledWith(
           expect.objectContaining({
             tipoEvento: 'SPRINT_CLOSED',
             idSprint: SPRINT_ID,
-            valorNuevo: expect.objectContaining({ tareasArrastradas: 2 }),
+            // El evento registra el RESULTADO de la decisión de T-189
+            // (destino real usado para mover las tareas), no una lógica propia.
+            valorNuevo: expect.objectContaining({ tareasArrastradas: 2, destinoArrastre: 'BACKLOG' }),
+          }),
+        );
+      });
+
+      it('cierre con tareas pendientes hacia SIGUIENTE_SPRINT: el evento refleja el destino elegido', async () => {
+        const tx = makeTx();
+        const sprint = sprintEnFinalizacion();
+        const authorization = makeSprintsAuthorization();
+        authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+        tx.tarea.findMany.mockResolvedValue([
+          { idTarea: 1, estadoTarea: 'HECHO', idHito: null, puntosHistoria: null, _count: { asignaciones: 1 } },
+          { idTarea: 2, estadoTarea: 'POR_HACER', idHito: null, puntosHistoria: null, _count: { asignaciones: 0 } },
+        ]);
+        tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+        const sprintCerrado = { ...sprint, estado: 'CERRADO' };
+        tx.sprint.findFirst.mockResolvedValue(sprintCerrado);
+        const prisma = makePrisma(tx);
+        const context = makeSprintsContext();
+        const notifications = makeNotifications();
+        const bitacora = makeBitacora();
+        const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), bitacora);
+
+        await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID, 'SIGUIENTE_SPRINT');
+
+        expect(bitacora.registrarEvento).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tipoEvento: 'SPRINT_CLOSED',
+            valorNuevo: expect.objectContaining({ tareasArrastradas: 1, destinoArrastre: 'SIGUIENTE_SPRINT' }),
           }),
         );
       });

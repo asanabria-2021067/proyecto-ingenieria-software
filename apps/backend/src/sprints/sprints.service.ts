@@ -1070,13 +1070,14 @@ export class SprintsService {
           estado: EstadoSprint.CERRADO,
           fechaCierre: filaFinal.fechaCierre?.toISOString() ?? null,
           cerradoPor: userId,
-          // T-191 (HU-148): conteo de arrastre = tareas del Sprint que NO
-          // quedaron HECHO al cerrar. Se deriva de `congelado` (T-239, ya
-          // calculado arriba para las columnas `*Cierre`) en vez de volver a
-          // consultar `tarea` — mismo resultado, una sola fuente de verdad.
-          // El movimiento real a otro Sprint/backlog es otro alcance de
-          // HU-148 y no se implementa aquí.
-          tareasArrastradas: congelado.tareasPlanificadasCierre - congelado.tareasCompletadasCierre,
+          // T-191 (HU-148): mismo conteo que congela T-239/T-189 en
+          // `sprint.tareasArrastradasCierre` — se lee de `congelado`, nunca
+          // se recalcula aquí, para no tener dos fuentes de verdad.
+          tareasArrastradas: congelado.tareasArrastradasCierre,
+          // Destino real que T-189 usó para mover las tareas pendientes
+          // (SIGUIENTE_SPRINT o BACKLOG) — null cuando no hubo arrastre, ya
+          // que en ese caso `destino` nunca se exige ni se usa.
+          destinoArrastre: congelado.tareasArrastradasCierre > 0 ? destino ?? null : null,
         },
       });
 
