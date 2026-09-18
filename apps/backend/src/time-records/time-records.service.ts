@@ -138,7 +138,7 @@ export interface TramoHorasResumen {
 
 export interface TaskHoursSummary {
   taskId: number;
-  sprintId: number;
+  sprintId: number | null;
   estimacion: number | null;
   horasReportadasTarea: string;
   horasLegacyNoGranulares: string;
@@ -410,7 +410,7 @@ export class TimeRecordsService {
   private async assertRecordOwnerTx(
     tx: Prisma.TransactionClient,
     project: ProjectLockRow,
-    tarea: { idTarea: number; idSprint: number },
+    tarea: { idTarea: number; idSprint: number | null },
     recordId: number,
     userId: number,
   ) {
@@ -724,7 +724,9 @@ export class TimeRecordsService {
         where: { idProyecto: projectId, estado: { in: [EstadoSprint.ACTIVO, EstadoSprint.EN_FINALIZACION] } },
         select: { estado: true },
       }),
-      this.prisma.sprint.findUnique({ where: { idSprint: tarea.idSprint }, select: { estado: true } }),
+      tarea.idSprint === null
+        ? Promise.resolve(null)
+        : this.prisma.sprint.findUnique({ where: { idSprint: tarea.idSprint }, select: { estado: true } }),
     ]);
 
     let reportadasTarea = new Prisma.Decimal(0);
