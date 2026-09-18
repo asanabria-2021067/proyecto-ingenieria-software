@@ -37,6 +37,7 @@ import { TeamModule } from './team/team.module';
 import { SocialModule } from './social/social.module';
 import { ChatModule } from './chat/chat.module';
 import { BitacoraModule } from './bitacora/bitacora.module';
+import { ExportsModule } from './exports/exports.module';
 
 @Module({
   imports: [
@@ -98,6 +99,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
     SocialModule,
     ChatModule,
     BitacoraModule,
+    ExportsModule,
   ],
   controllers: [AppController],
   providers: [
