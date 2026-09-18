@@ -1371,13 +1371,28 @@ export class SprintsService {
       scope: 'sprints',
     });
     await this.sprintsAuthorization.assertCanListSprintAnalytics(projectId, userId);
+    return this.computeSprintsComparative(projectId, decision.sprintEstados);
+  }
+
+  /**
+   * T-261 (HU-164): consulta cruda de `getSprintsAnalytics` extraída sin
+   * autorización propia, para que el export de proyecto (ExportsService) la
+   * reutilice tal cual con el `sprintEstados` que ya resolvió SU propia
+   * política ('exportacion') — `assertCanListSprintAnalytics` exige líder o
+   * integrante activo y rechazaría a un admin exportador que no participa.
+   * Igual que `ProjectHoursSummaryService.forProject`: sin auth interna, el
+   * caller es quien ya autorizó.
+   */
+  async computeSprintsComparative(
+    projectId: number,
+    sprintEstados: readonly EstadoSprint[] | null,
+  ): Promise<SprintComparativeAnalyticsDto> {
     // La comparativa es SQL agregado: el ámbito se aplica como fragmento
     // parametrizado, nunca interpolando estados en el texto de la consulta.
-    const estadosVisibles = decision.sprintEstados;
     const filtroEstados =
-      estadosVisibles === null
+      sprintEstados === null
         ? Prisma.empty
-        : Prisma.sql` AND s.estado::text IN (${Prisma.join([...estadosVisibles])})`;
+        : Prisma.sql` AND s.estado::text IN (${Prisma.join([...sprintEstados])})`;
 
     const filas = await this.prisma.$queryRaw<
       Omit<SprintComparativeAnalyticsItemDto, 'porcentajeCumplimiento'>[]
