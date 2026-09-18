@@ -139,10 +139,10 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     const service = makeService();
     const controller = makeController(service);
 
-    controller.close(5, 12, { userId: 9 });
+    controller.close(5, 12, { userId: 9 }, {});
 
     expect(service.closeSprint).toHaveBeenCalledTimes(1);
-    expect(service.closeSprint).toHaveBeenCalledWith(5, 12, 9);
+    expect(service.closeSprint).toHaveBeenCalledWith(5, 12, 9, undefined);
   });
 
   it('retorna exactamente lo que resuelve SprintsService.closeSprint, sin transformarlo', async () => {
@@ -151,7 +151,7 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     service.closeSprint.mockResolvedValue(sprintCerrado);
     const controller = makeController(service);
 
-    const result = await controller.close(5, 12, { userId: 9 });
+    const result = await controller.close(5, 12, { userId: 9 }, {});
 
     expect(result).toBe(sprintCerrado);
   });
@@ -162,7 +162,7 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     service.closeSprint.mockRejectedValue(error);
     const controller = makeController(service);
 
-    await expect(controller.close(5, 12, { userId: 9 })).rejects.toBe(error);
+    await expect(controller.close(5, 12, { userId: 9 }, {})).rejects.toBe(error);
   });
 });
 

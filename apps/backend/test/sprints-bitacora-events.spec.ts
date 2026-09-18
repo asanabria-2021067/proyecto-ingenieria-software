@@ -14,6 +14,9 @@ function makeTx() {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({ idSprint: 10, idProyecto: 5, numero: 1, estado: 'ACTIVO' }),
     },
+    tarea: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
   };
 }
 

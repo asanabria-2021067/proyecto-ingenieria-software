@@ -58,7 +58,7 @@ function makeForeignKeyError() {
 function makeTx() {
   return {
     sprint: { findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
-    tarea: { count: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    tarea: { count: vi.fn(), findMany: vi.fn().mockResolvedValue([]), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     // C075 (§12): finalizar revalida F1–F4 sobre el conjunto histórico, así
     // que el doble expone las consultas de tramos que esas revalidaciones
     // hacen. Por defecto todo vacío = los cuatro predicados se cumplen.
@@ -1187,6 +1187,7 @@ describe('SprintsService', () => {
           porcentajeCumplimientoCierre: 0,
           puntosHistoriaPlanificadosCierre: 0,
           puntosHistoriaCompletadosCierre: 0,
+          tareasArrastradasCierre: 0,
         },
       });
       // A9.1: SPRINT_CLOSED se emite exactamente una vez, con el payload real.
@@ -1221,7 +1222,7 @@ describe('SprintsService', () => {
       const notifications = makeNotifications();
       const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID, 'BACKLOG');
 
       expect(tx.hito.count).toHaveBeenCalledWith({
         where: { idHito: { in: [1, 2] }, estadoHito: 'COMPLETADO' },
@@ -1259,7 +1260,7 @@ describe('SprintsService', () => {
       const notifications = makeNotifications();
       const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID, 'BACKLOG');
 
       expect(tx.sprint.updateMany).toHaveBeenCalledWith({
         where: { idSprint: SPRINT_ID, idProyecto: PROJECT_ID, estado: 'EN_FINALIZACION' },
