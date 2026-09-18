@@ -55,7 +55,16 @@ async function parseAssign(plain: unknown): Promise<AssignTaskDto> {
 const { usuarios: U, proyectos: P, roles: R, hitos: H, etiquetas: E } = FIXTURE_IDS;
 
 function baseCreatePayload(overrides: Record<string, unknown> = {}) {
-  return { tituloTarea: 'Tarea de prueba', fechaLimite: FECHA_FUTURA, prioridad: 'MEDIA', ...overrides };
+  // HU-147/T-185: idHito es obligatorio en CreateTaskDto. H.A es un hito
+  // válido de P.A ya usado en el resto de la suite; los tests que ejercen
+  // específicamente el rechazo/ausencia de hito lo overridean explícitamente.
+  return {
+    tituloTarea: 'Tarea de prueba',
+    fechaLimite: FECHA_FUTURA,
+    prioridad: 'MEDIA',
+    idHito: H.A,
+    ...overrides,
+  };
 }
 
 async function expectStatus<T extends { getStatus(): number }>(
@@ -126,7 +135,10 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       const creada = await tasksService.create(P.A, U.liderA, dtoCrear);
       expectPublicContract(creada);
       expect(creada.idRolProyecto).toBeNull();
-      expect(creada.idHito).toBeNull();
+      // HU-147/T-185: idHito ya es obligatorio en creación (baseCreatePayload
+      // lo incluye por defecto); este escenario prueba la ausencia de ROL,
+      // no la de hito.
+      expect(creada.idHito).toBe(H.A);
       expect(creada.etiquetas).toEqual([]);
       expect(creada.asignacionActiva).toBeNull();
       expect(creada.estadoTarea).toBe('POR_HACER');
@@ -347,17 +359,20 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
       expect(env.state.tareaEtiquetas.filter((te) => te.idTarea === creada.idTarea)).toHaveLength(0);
     });
 
-    it('B.7 idHito: null retira el hito; idRolProyecto: null retira el rol sin tocar la asignación activa', async () => {
+    it('B.7 idHito: null se rechaza (HU-147/T-185); idRolProyecto: null retira el rol sin tocar la asignación activa', async () => {
       const env = setupLifecycleEnv();
       const creada = await crearTareaCompleta(env);
       const activaAntes = env.state.asignaciones.find(
         (a) => a.idTarea === creada.idTarea && a.desasignadaEn === null,
       )!;
 
-      const dtoSinHito = await parseUpdate({ idHito: null });
-      const sinHito = await env.tasksService.update(P.A, creada.idTarea, U.liderA, dtoSinHito);
-      expect(sinHito.idHito).toBeNull();
-      expect(sinHito.idRolProyecto).toBe(R.desarrolloA);
+      // HU-147/T-185: a diferencia de idRolProyecto, idHito ya no admite
+      // `null` — quitaría el hito de una tarea que, al no existir backlog en
+      // este proyecto, ya está en el tablero/sprint. El rechazo ocurre en la
+      // validación del DTO, antes de llegar al service.
+      await expect(parseUpdate({ idHito: null })).rejects.toBeInstanceOf(BadRequestException);
+      const filaSinCambios = env.state.tareas.find((t) => t.idTarea === creada.idTarea)!;
+      expect(filaSinCambios.idHito).toBe(H.A);
 
       const dtoSinRol = await parseUpdate({ idRolProyecto: null });
       const sinRol = await env.tasksService.update(P.A, creada.idTarea, U.liderA, dtoSinRol);
@@ -639,7 +654,13 @@ describe('Ciclo de vida integral del backend de tareas (Tarea 27)', () => {
 
     it('tarea de otro proyecto → 404, indistinguible de inexistente', async () => {
       const env = setupLifecycleEnv();
-      const creadaEnB = await env.tasksService.create(P.B, U.liderB, await parseCreate(baseCreatePayload()));
+      // baseCreatePayload() por defecto usa H.A (hito de P.A); esta tarea se
+      // crea en P.B, así que necesita su propio hito (H.B).
+      const creadaEnB = await env.tasksService.create(
+        P.B,
+        U.liderB,
+        await parseCreate(baseCreatePayload({ idHito: H.B })),
+      );
       const errorOtroProyecto = await expectStatus(
         env.tasksService.findOne(P.A, creadaEnB.idTarea, U.liderA),
         NotFoundException,
