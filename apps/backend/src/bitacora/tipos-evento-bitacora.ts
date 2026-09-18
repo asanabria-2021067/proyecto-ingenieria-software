@@ -79,6 +79,10 @@ export class TipoEventoBitacora {
   static readonly CLOSURE_STORAGE_SWEPT = 'CLOSURE_STORAGE_SWEPT' as const;
   /** CLI apply — proyecto, manifestHash, IDs/antes/después y evidencia identificable. */
   static readonly LEGACY_HOURS_RECONCILED = 'LEGACY_HOURS_RECONCILED' as const;
+  /** Exports.csv — proyecto, actor/fecha, sin datos de terceros en el detalle (T-261/HU-164). */
+  static readonly PROJECT_EXPORT_CSV_GENERATED = 'PROJECT_EXPORT_CSV_GENERATED' as const;
+  /** Exports.pdf — proyecto, actor/fecha, sin datos de terceros en el detalle (T-261/HU-164). */
+  static readonly PROJECT_EXPORT_PDF_GENERATED = 'PROJECT_EXPORT_PDF_GENERATED' as const;
 
   static readonly VALORES = [
     'TASK_CREATED',
@@ -116,6 +120,8 @@ export class TipoEventoBitacora {
     'PROJECT_CLOSE_RETURNED_TO_EXECUTION',
     'CLOSURE_STORAGE_SWEPT',
     'LEGACY_HOURS_RECONCILED',
+    'PROJECT_EXPORT_CSV_GENERATED',
+    'PROJECT_EXPORT_PDF_GENERATED',
   ] as const;
 
   /**
@@ -167,6 +173,11 @@ export class TipoEventoBitacora {
     'PROJECT_CLOSE_RETURNED_TO_EXECUTION',
     'CLOSURE_STORAGE_SWEPT',
     'LEGACY_HOURS_RECONCILED',
+    // T-261: un export concentra nombres y horas de TODO el equipo en un
+    // solo archivo — más sensible que un evento operativo cualquiera, se
+    // oculta al participante igual que el resto de esta lista.
+    'PROJECT_EXPORT_CSV_GENERATED',
+    'PROJECT_EXPORT_PDF_GENERATED',
   ]);
 }
 
