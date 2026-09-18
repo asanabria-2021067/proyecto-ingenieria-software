@@ -1034,6 +1034,13 @@ export class SprintsService {
           estado: EstadoSprint.CERRADO,
           fechaCierre: filaFinal.fechaCierre?.toISOString() ?? null,
           cerradoPor: userId,
+          // T-191 (HU-148): conteo de arrastre = tareas del Sprint que NO
+          // quedaron HECHO al cerrar. Se deriva de `congelado` (T-239, ya
+          // calculado arriba para las columnas `*Cierre`) en vez de volver a
+          // consultar `tarea` — mismo resultado, una sola fuente de verdad.
+          // El movimiento real a otro Sprint/backlog es otro alcance de
+          // HU-148 y no se implementa aquí.
+          tareasArrastradas: congelado.tareasPlanificadasCierre - congelado.tareasCompletadasCierre,
         },
       });
 
