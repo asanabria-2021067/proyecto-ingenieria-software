@@ -32,6 +32,17 @@ export interface BuildTaskFormSchemaOptions {
   /** Candidatos reales para el cascada rol → usuario asignado. */
   miembros: MiembroProyecto[];
   ahora?: Date;
+  /**
+   * HU-147/T-185: el backend exige idHito en la creación y ya no admite
+   * quitarlo en la edición (ver CreateTaskDto/UpdateTaskDto). Por defecto
+   * 'edit' — permisivo, sin exigir hito — para no romper los muchos tests
+   * de este schema que no ejercitan la regla de hito; quien construye un
+   * formulario de CREACIÓN real debe pasar 'create' explícitamente
+   * (TaskFormDialogContent ya lo hace).
+   */
+  mode?: 'create' | 'edit';
+  /** Hito ya persistido de la tarea (null si nunca tuvo uno). Solo importa en modo 'edit'. */
+  hitoOriginal?: number | null;
 }
 
 /**
@@ -42,7 +53,13 @@ export interface BuildTaskFormSchemaOptions {
  * del modo/tarea original — evita mantener dos schemas duplicados para
  * crear/editar.
  */
-export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = new Date() }: BuildTaskFormSchemaOptions) {
+export function buildTaskFormSchema({
+  fechaOriginal = null,
+  miembros,
+  ahora = new Date(),
+  mode = 'edit',
+  hitoOriginal = null,
+}: BuildTaskFormSchemaOptions) {
   const hoy = hoyLocalISO(ahora);
 
   return z
@@ -105,6 +122,27 @@ export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = ne
           code: z.ZodIssueCode.custom,
           path: ['idsEtiquetas'],
           message: 'Hay etiquetas duplicadas.',
+        });
+      }
+
+      // HU-147/T-185: toda tarea nueva necesita un hito para poder entrar al
+      // tablero/sprint (no existe backlog separado en este proyecto — crear
+      // la tarea YA la coloca ahí).
+      if (mode === 'create' && values.idHito === SIN_HITO) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['idHito'],
+          message: 'Selecciona un hito: la tarea lo necesita para poder entrar al tablero.',
+        });
+      }
+      // Igual regla en edición, pero solo si la tarea YA tenía un hito: no
+      // se puede retirarlo (el backend rechaza idHito: null en ese caso).
+      // Una tarea legacy sin hito puede seguir dejándose así.
+      if (mode === 'edit' && hitoOriginal !== null && values.idHito === SIN_HITO) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['idHito'],
+          message: 'No puedes quitar el hito de una tarea que ya está en el tablero o en un sprint.',
         });
       }
     });
