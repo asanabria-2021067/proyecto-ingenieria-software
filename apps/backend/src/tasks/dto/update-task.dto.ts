@@ -23,7 +23,8 @@ import { IsFutureCalendarDate } from './validators/is-future-calendar-date.valid
 // `undefined` (omite la validación en ambos casos), lo que aceptaría `null`
 // silenciosamente en campos que deben rechazarlo. Se usa @ValidateIf en su
 // lugar para distinguir explícitamente omisión (undefined, válido siempre)
-// de envío explícito de `null` (inválido, salvo en idHito/idRolProyecto).
+// de envío explícito de `null` (inválido, salvo en idRolProyecto — idHito
+// dejó de admitirlo en HU-147/T-185).
 export class UpdateTaskDto {
   @ValidateIf((_object, value) => value !== undefined)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
@@ -57,12 +58,18 @@ export class UpdateTaskDto {
   @Max(1000)
   tiempoEstimadoHoras?: number;
 
-  // `null` retira la relación; `undefined` (campo omitido) la conserva;
-  // cualquier otro valor debe validarse como entero positivo.
-  @ValidateIf((_object, value) => value !== undefined && value !== null)
-  @IsInt()
+  // `undefined` (campo omitido) conserva el hito actual; un entero positivo
+  // asigna/reemplaza el hito (incluida una tarea legacy que todavía no
+  // tenía uno). HU-147/T-185: a diferencia de idRolProyecto, `null`
+  // explícito ya NO se admite — quitaría el hito de una tarea que, al no
+  // existir backlog en este proyecto, ya está en el tablero/sprint.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt({
+    message:
+      'idHito no puede quitarse: la tarea necesita un hito mientras esté en el tablero o en un sprint',
+  })
   @Min(1)
-  idHito?: number | null;
+  idHito?: number;
 
   @ValidateIf((_object, value) => value !== undefined && value !== null)
   @IsInt()

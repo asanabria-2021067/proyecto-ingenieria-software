@@ -51,10 +51,15 @@ export class CreateTaskDto {
   @Max(1000)
   tiempoEstimadoHoras?: number;
 
-  @ValidateIf((_object, value) => value !== undefined)
-  @IsInt()
+  // Obligatoria (HU-147/T-185): este proyecto no tiene un backlog separado
+  // del tablero — crear la tarea ya la coloca en el Sprint activo (ver
+  // tasks.service.ts#create), así que el hito se exige aquí mismo.
+  @IsInt({
+    message:
+      'idHito es obligatorio: la tarea necesita un hito asignado antes de poder entrar al tablero o a un sprint',
+  })
   @Min(1)
-  idHito?: number;
+  idHito!: number;
 
   @ValidateIf((_object, value) => value !== undefined)
   @IsInt()

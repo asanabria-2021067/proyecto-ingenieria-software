@@ -39,6 +39,10 @@ function basePayload(overrides: Record<string, unknown> = {}) {
     tituloTarea: 'Implementar login',
     fechaLimite: TOMORROW,
     prioridad: 'MEDIA',
+    // HU-147/T-185: idHito es obligatorio desde esta tarea. Los tests que
+    // ejercen específicamente su ausencia/rechazo lo omiten u overridean
+    // explícitamente más abajo.
+    idHito: 4,
     ...overrides,
   };
 }
@@ -129,6 +133,11 @@ describe('CreateTaskDto', () => {
     await expect(parse(rest)).rejects.toThrow(BadRequestException);
   });
 
+  it('rechaza la ausencia de idHito (HU-147/T-185: obligatorio para entrar al tablero/sprint)', async () => {
+    const { idHito: _omit, ...rest } = basePayload();
+    await expect(parse(rest)).rejects.toThrow(BadRequestException);
+  });
+
   it.each([1, 1000])('acepta tiempoEstimadoHoras en el límite válido (%d)', async (value) => {
     const dto = await parse(basePayload({ tiempoEstimadoHoras: value }));
     expect(dto.tiempoEstimadoHoras).toBe(value);
@@ -196,7 +205,7 @@ describe('CreateTaskDto', () => {
       );
     });
 
-    it('rechaza idHito: null', async () => {
+    it('rechaza idHito: null (campo obligatorio, HU-147/T-185)', async () => {
       await expect(parse(basePayload({ idHito: null }))).rejects.toThrow(BadRequestException);
     });
 
@@ -233,11 +242,11 @@ describe('CreateTaskDto', () => {
       await expect(parse({ ...rest, prioridad: null })).rejects.toThrow(BadRequestException);
     });
 
-    it('sigue aceptando la omisión completa de los campos opcionales', async () => {
+    it('sigue aceptando la omisión completa de los campos opcionales (idHito es obligatorio, no opcional)', async () => {
       const dto = await parse(basePayload());
       expect(dto.descripcionTarea).toBeUndefined();
       expect(dto.tiempoEstimadoHoras).toBeUndefined();
-      expect(dto.idHito).toBeUndefined();
+      expect(dto.idHito).toBe(4);
       expect(dto.idRolProyecto).toBeUndefined();
       expect(dto.idUsuarioAsignado).toBeUndefined();
       expect(dto.idsEtiquetas).toBeUndefined();

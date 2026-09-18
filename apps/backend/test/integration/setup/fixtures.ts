@@ -104,6 +104,31 @@ export async function createIntegrationParticipation(
   });
 }
 
+interface IntegrationHitoOverrides {
+  tituloHito?: string;
+  orden?: number;
+}
+
+/**
+ * HU-147/T-185: CreateTaskDto.idHito es obligatorio desde esta tarea, así
+ * que cualquier integración que cree una tarea a través del DTO real (no
+ * `createIntegrationTask`, que escribe directo por Prisma) necesita un Hito
+ * real del mismo proyecto primero.
+ */
+export async function createIntegrationHito(
+  prisma: PrismaClient,
+  idProyecto: number,
+  overrides: IntegrationHitoOverrides = {},
+) {
+  return prisma.hito.create({
+    data: {
+      idProyecto,
+      tituloHito: overrides.tituloHito ?? `Hito ${randomUUID()}`,
+      orden: overrides.orden ?? 1,
+    },
+  });
+}
+
 interface IntegrationSprintOverrides {
   numero?: number;
   estado?: EstadoSprint;
