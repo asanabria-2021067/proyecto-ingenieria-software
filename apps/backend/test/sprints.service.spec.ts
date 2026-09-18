@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -59,7 +60,7 @@ function makeForeignKeyError() {
 function makeTx() {
   return {
     sprint: { findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
-    tarea: { count: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    tarea: { count: vi.fn(), findMany: vi.fn().mockResolvedValue([]), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     // C075 (§12): finalizar revalida F1–F4 sobre el conjunto histórico, así
     // que el doble expone las consultas de tramos que esas revalidaciones
     // hacen. Por defecto todo vacío = los cuatro predicados se cumplen.
@@ -169,6 +170,33 @@ describe('SprintsService', () => {
           fechaInicio: expect.any(Date),
           // HU-160: sin fechaFinPlaneada explícita, default fechaInicio + 14 días.
           fechaFinPlaneada: expect.any(Date),
+        },
+      });
+    });
+
+    it('T-189: recoge las tareas marcadas para siguiente sprint y las asigna al nuevo Sprint', async () => {
+      const tx = makeTx();
+      tx.sprint.findFirst.mockResolvedValue(null);
+      const nuevoSprint = { idSprint: 7, idProyecto: PROJECT_ID, numero: 1, estado: 'ACTIVO' };
+      tx.sprint.create.mockResolvedValue(nuevoSprint);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      context.getCurrentSprint.mockResolvedValue(null);
+      const authorization = makeSprintsAuthorization();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await service.startSprint(PROJECT_ID, LIDER_ID);
+
+      expect(tx.tarea.updateMany).toHaveBeenCalledWith({
+        where: {
+          idProyecto: PROJECT_ID,
+          idSprint: null,
+          destinoArrastre: 'SIGUIENTE_SPRINT',
+          eliminadoEn: null,
+        },
+        data: {
+          idSprint: 7,
+          destinoArrastre: null,
         },
       });
     });
@@ -1195,6 +1223,7 @@ describe('SprintsService', () => {
           porcentajeCumplimientoCierre: 0,
           puntosHistoriaPlanificadosCierre: 0,
           puntosHistoriaCompletadosCierre: 0,
+          tareasArrastradasCierre: 0,
         },
       });
       // A9.1: SPRINT_CLOSED se emite exactamente una vez, con el payload real.
@@ -1229,7 +1258,7 @@ describe('SprintsService', () => {
       const notifications = makeNotifications();
       const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID, 'BACKLOG');
 
       expect(tx.hito.count).toHaveBeenCalledWith({
         where: { idHito: { in: [1, 2] }, estadoHito: 'COMPLETADO' },
@@ -1246,6 +1275,7 @@ describe('SprintsService', () => {
           puntosHistoriaPlanificadosCierre: 10,
           // Solo las HECHO: 5 + 3
           puntosHistoriaCompletadosCierre: 8,
+          tareasArrastradasCierre: 2,
         }),
       });
     });
@@ -1267,7 +1297,7 @@ describe('SprintsService', () => {
       const notifications = makeNotifications();
       const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID, 'BACKLOG');
 
       expect(tx.sprint.updateMany).toHaveBeenCalledWith({
         where: { idSprint: SPRINT_ID, idProyecto: PROJECT_ID, estado: 'EN_FINALIZACION' },
@@ -1594,6 +1624,90 @@ describe('SprintsService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
       expect(tx.sprint.updateMany).not.toHaveBeenCalled();
     });
+    it('T-189: destino SIGUIENTE_SPRINT mueve las tareas pendientes (idSprint null, destinoArrastre SIGUIENTE_SPRINT)', async () => {
+      const tx = makeTx();
+      const sprint = sprintEnFinalizacion();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+      tx.tarea.findMany.mockResolvedValue([
+        { idTarea: 1, estadoTarea: 'HECHO', idHito: null, puntosHistoria: null, _count: { asignaciones: 1 } },
+        { idTarea: 2, estadoTarea: 'EN_PROGRESO', idHito: null, puntosHistoria: null, _count: { asignaciones: 1 } },
+      ]);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintCerrado = { ...sprint, estado: 'CERRADO' };
+      tx.sprint.findFirst.mockResolvedValue(sprintCerrado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID, 'SIGUIENTE_SPRINT');
+
+      expect(tx.tarea.updateMany).toHaveBeenCalledWith({
+        where: {
+          idProyecto: PROJECT_ID,
+          idSprint: SPRINT_ID,
+          eliminadoEn: null,
+          estadoTarea: { not: 'HECHO' },
+        },
+        data: {
+          idSprint: null,
+          destinoArrastre: 'SIGUIENTE_SPRINT',
+        },
+      });
+    });
+
+    it('T-189: destino BACKLOG mueve las tareas pendientes con destinoArrastre BACKLOG', async () => {
+      const tx = makeTx();
+      const sprint = sprintEnFinalizacion();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+      tx.tarea.findMany.mockResolvedValue([
+        { idTarea: 1, estadoTarea: 'POR_HACER', idHito: null, puntosHistoria: null, _count: { asignaciones: 0 } },
+      ]);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      const sprintCerrado = { ...sprint, estado: 'CERRADO' };
+      tx.sprint.findFirst.mockResolvedValue(sprintCerrado);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const notifications = makeNotifications();
+      const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID, 'BACKLOG');
+
+      expect(tx.tarea.updateMany).toHaveBeenCalledWith({
+        where: {
+          idProyecto: PROJECT_ID,
+          idSprint: SPRINT_ID,
+          eliminadoEn: null,
+          estadoTarea: { not: 'HECHO' },
+        },
+        data: {
+          idSprint: null,
+          destinoArrastre: 'BACKLOG',
+        },
+      });
+    });
+
+    it('T-189: con pendientes y sin destino, rechaza con BadRequestException sin arrastrar ni cerrar', async () => {
+      const tx = makeTx();
+      const sprint = sprintEnFinalizacion();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+      tx.tarea.findMany.mockResolvedValue([
+        { idTarea: 1, estadoTarea: 'POR_HACER', idHito: null, puntosHistoria: null, _count: { asignaciones: 0 } },
+      ]);
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await expect(service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(tx.tarea.updateMany).not.toHaveBeenCalled();
+      expect(tx.sprint.updateMany).not.toHaveBeenCalled();
+    });
+
   });
 
   describe('listSprints', () => {

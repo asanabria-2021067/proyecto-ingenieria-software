@@ -93,7 +93,6 @@ describeIntegration(
       });
       scope.taskIds = [hecha.idTarea, pendiente.idTarea];
 
-      // F1 (traza) sigue vigente: un HECHO exige una asignación histórica.
       const role = await createIntegrationProjectRole(prisma, project.idProyecto);
       scope.roleIds = [role.idRolProyecto];
       const participation = await createIntegrationParticipation(prisma, leader.idUsuario, role.idRolProyecto, {
@@ -103,31 +102,28 @@ describeIntegration(
       const trace = await createIntegrationTaskAssignment(prisma, hecha.idTarea, leader.idUsuario, leader.idUsuario, {
         idParticipacion: participation.idParticipacion,
         desasignadaEn: new Date('2026-09-02T12:00:00.000Z'),
-        // F4 exige que un tramo GRANULAR cuadre con la suma de sus registros
-        // de tiempo; sin registros, 0 es lo que cuadra (evita depender de
-        // HoursRecognitionService.normalizeClosedGranularTx en este test).
         horasReales: 0,
       });
       scope.assignmentIds = [trace.idAsignacion];
 
       const service = makeService();
 
-      // ACTIVO -> EN_FINALIZACION: ya no bloquea con la tarea EN_PROGRESO (mini-HU-148).
       await service.finalizeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
-      // EN_FINALIZACION -> CERRADO: congela la fila con 1/2 tareas completadas.
-      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
+      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario, 'BACKLOG');
 
       const antes = await service.getSprintsAnalytics(project.idProyecto, leader.idUsuario);
       const filaAntes = antes.sprints.find((fila) => fila.idSprint === sprint.idSprint);
+      const sprintCongeladoAntes = await prisma.sprint.findUniqueOrThrow({
+        where: { idSprint: sprint.idSprint },
+        select: { tareasArrastradasCierre: true },
+      });
+      expect(sprintCongeladoAntes.tareasArrastradasCierre).toBe(1);
       expect(filaAntes).toMatchObject({
         tareasPlanificadas: 2,
         tareasCompletadas: 1,
         porcentajeCumplimiento: 50,
       });
 
-      // Corrección retroactiva: alguien marca como HECHO la tarea que quedó
-      // pendiente en un Sprint YA CERRADO — igual que corregir una tarea
-      // vieja después de cerrar.
       await prisma.tarea.update({
         where: { idTarea: pendiente.idTarea },
         data: { estadoTarea: 'HECHO' },
@@ -135,9 +131,12 @@ describeIntegration(
 
       const despues = await service.getSprintsAnalytics(project.idProyecto, leader.idUsuario);
       const filaDespues = despues.sprints.find((fila) => fila.idSprint === sprint.idSprint);
+      const sprintCongeladoDespues = await prisma.sprint.findUniqueOrThrow({
+        where: { idSprint: sprint.idSprint },
+        select: { tareasArrastradasCierre: true },
+      });
+      expect(sprintCongeladoDespues.tareasArrastradasCierre).toBe(1);
 
-      // El histórico no se movió: sigue congelado en 1/2 (50%), pese a que
-      // la tabla `tarea` ya dice 2/2 HECHO.
       expect(filaDespues).toEqual(filaAntes);
       expect(filaDespues).toMatchObject({
         tareasPlanificadas: 2,
@@ -173,6 +172,47 @@ describeIntegration(
         tareasCompletadas: 1,
         porcentajeCumplimiento: 100,
       });
+    });
+
+    it('la velocidad congelada (puntosHistoriaCompletados) coincide con la suma de puntos de las tareas HECHO', async () => {
+      const leader = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      scope.projectIds = [project.idProyecto];
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
+      scope.sprintIds = [sprint.idSprint];
+
+      const hecha = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, {
+        estadoTarea: 'HECHO',
+        puntosHistoria: 5,
+      });
+      const pendiente = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, {
+        estadoTarea: 'EN_PROGRESO',
+        puntosHistoria: 3,
+      });
+      scope.taskIds = [hecha.idTarea, pendiente.idTarea];
+
+      const role = await createIntegrationProjectRole(prisma, project.idProyecto);
+      scope.roleIds = [role.idRolProyecto];
+      const participation = await createIntegrationParticipation(prisma, leader.idUsuario, role.idRolProyecto, {
+        estadoParticipacion: 'ACTIVO',
+      });
+      scope.participationIds = [participation.idParticipacion];
+      const trace = await createIntegrationTaskAssignment(prisma, hecha.idTarea, leader.idUsuario, leader.idUsuario, {
+        idParticipacion: participation.idParticipacion,
+        desasignadaEn: new Date('2026-09-02T12:00:00.000Z'),
+        horasReales: 0,
+      });
+      scope.assignmentIds = [trace.idAsignacion];
+
+      const service = makeService();
+      await service.finalizeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
+      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario, 'BACKLOG');
+
+      const analytics = await service.getSprintsAnalytics(project.idProyecto, leader.idUsuario);
+      const fila = analytics.sprints.find((s) => s.idSprint === sprint.idSprint);
+
+      expect(fila).toMatchObject({ puntosHistoriaCompletados: 5 });
     });
   },
 );
