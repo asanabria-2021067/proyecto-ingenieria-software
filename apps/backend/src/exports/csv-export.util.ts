@@ -22,11 +22,14 @@ function escapeCsvField(value: string): string {
   return value;
 }
 
-export function buildCsv(headers: string[], rows: ReadonlyArray<ReadonlyArray<string | number>>): string {
-  const lineas = [headers, ...rows].map((fila) =>
-    fila.map((celda) => escapeCsvField(String(celda))).join(CSV_SEPARATOR),
-  );
+/** Serializa filas ya completas (sin distinguir cabecera): cada una se escapa igual. */
+export function buildCsvFromRows(rows: ReadonlyArray<ReadonlyArray<string | number>>): string {
+  const lineas = rows.map((fila) => fila.map((celda) => escapeCsvField(String(celda))).join(CSV_SEPARATOR));
   return CSV_BOM + lineas.join(CSV_LINE_BREAK) + CSV_LINE_BREAK;
+}
+
+export function buildCsv(headers: string[], rows: ReadonlyArray<ReadonlyArray<string | number>>): string {
+  return buildCsvFromRows([headers, ...rows]);
 }
 
 /**
