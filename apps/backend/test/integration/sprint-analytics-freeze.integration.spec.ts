@@ -109,10 +109,15 @@ describeIntegration(
       const service = makeService();
 
       await service.finalizeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
-      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
+      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario, 'BACKLOG');
 
       const antes = await service.getSprintsAnalytics(project.idProyecto, leader.idUsuario);
       const filaAntes = antes.sprints.find((fila) => fila.idSprint === sprint.idSprint);
+      const sprintCongeladoAntes = await prisma.sprint.findUniqueOrThrow({
+        where: { idSprint: sprint.idSprint },
+        select: { tareasArrastradasCierre: true },
+      });
+      expect(sprintCongeladoAntes.tareasArrastradasCierre).toBe(1);
       expect(filaAntes).toMatchObject({
         tareasPlanificadas: 2,
         tareasCompletadas: 1,
@@ -126,6 +131,11 @@ describeIntegration(
 
       const despues = await service.getSprintsAnalytics(project.idProyecto, leader.idUsuario);
       const filaDespues = despues.sprints.find((fila) => fila.idSprint === sprint.idSprint);
+      const sprintCongeladoDespues = await prisma.sprint.findUniqueOrThrow({
+        where: { idSprint: sprint.idSprint },
+        select: { tareasArrastradasCierre: true },
+      });
+      expect(sprintCongeladoDespues.tareasArrastradasCierre).toBe(1);
 
       expect(filaDespues).toEqual(filaAntes);
       expect(filaDespues).toMatchObject({
@@ -197,7 +207,7 @@ describeIntegration(
 
       const service = makeService();
       await service.finalizeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
-      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
+      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario, 'BACKLOG');
 
       const analytics = await service.getSprintsAnalytics(project.idProyecto, leader.idUsuario);
       const fila = analytics.sprints.find((s) => s.idSprint === sprint.idSprint);
