@@ -145,12 +145,18 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
           undefined,
           undefined,
           undefined,
+          undefined,
+          undefined,
+          undefined,
           '1',
           '2',
         );
         const paginaDos = await controller.findAll(
           project.idProyecto,
           { userId: member.idUsuario },
+          undefined,
+          undefined,
+          undefined,
           undefined,
           undefined,
           undefined,
@@ -173,6 +179,7 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
           { userId: member.idUsuario },
           undefined,
           undefined,
+          undefined,
           TipoEventoBitacora.TASK_CREATED,
         );
         expect(filtradoOperativo.total).toBe(3);
@@ -180,6 +187,7 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
         const filtradoAdministrativo = await controller.findAll(
           project.idProyecto,
           { userId: member.idUsuario },
+          undefined,
           undefined,
           undefined,
           TipoEventoBitacora.LEADERSHIP_CHANGED,
@@ -191,6 +199,7 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
         const filtradoAdministrativoComoLider = await controller.findAll(
           project.idProyecto,
           { userId: leader.idUsuario },
+          undefined,
           undefined,
           undefined,
           TipoEventoBitacora.LEADERSHIP_CHANGED,
