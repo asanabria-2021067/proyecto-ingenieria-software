@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BitacoraContextService } from './bitacora-context.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { UserNameSearchService } from '../common/search/user-name-search.service';
 import { TipoEntidadBitacora, TipoEventoBitacora, TipoEventoBitacoraValor } from './tipos-evento-bitacora';
 import { BitacoraPaginadaDto, EventoBitacoraDto, FiltrosBitacoraInput } from './dto/bitacora-evento.dto';
 
@@ -39,6 +40,7 @@ export class BitacoraConsultaService {
     private readonly prisma: PrismaService,
     private readonly bitacoraContext: BitacoraContextService,
     private readonly readPolicy: ProjectReadPolicyService,
+    private readonly userNameSearch: UserNameSearchService,
   ) {}
 
   /**
@@ -77,14 +79,10 @@ export class BitacoraConsultaService {
       andConditions.push({ idUsuario: idActor });
     }
     if (persona !== undefined) {
-      andConditions.push({
-        usuario: {
-          OR: [
-            { nombre: { contains: persona, mode: 'insensitive' } },
-            { apellido: { contains: persona, mode: 'insensitive' } },
-          ],
-        },
-      });
+      // T-245: resuelto en BD (nombre/apellido, tolerante a acentos y
+      // parcial) por el servicio reutilizable — nunca comparado en memoria.
+      const idsPersona = await this.userNameSearch.findMatchingUserIds(persona);
+      andConditions.push({ idUsuario: { in: idsPersona } });
     }
     if (desde !== undefined) {
       andConditions.push({ fechaEvento: { gte: desde } });

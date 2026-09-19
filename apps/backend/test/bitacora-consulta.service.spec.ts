@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { BitacoraContextService } from '../src/bitacora/bitacora-context.service';
+import type { UserNameSearchService } from '../src/common/search/user-name-search.service';
 import { BitacoraConsultaService } from '../src/bitacora/bitacora-consulta.service';
 import { TipoEventoBitacora } from '../src/bitacora/tipos-evento-bitacora';
 import { makeProjectReadPolicyDouble } from './helpers/project-policy.double';
@@ -40,6 +41,12 @@ function makeContext(shouldThrow = false) {
   } as unknown as BitacoraContextService;
 }
 
+function makeUserNameSearch(idsCoincidentes: number[] = []) {
+  return {
+    findMatchingUserIds: vi.fn().mockResolvedValue(idsCoincidentes),
+  } as unknown as UserNameSearchService & { findMatchingUserIds: ReturnType<typeof vi.fn> };
+}
+
 describe('BitacoraConsultaService.listEventos', () => {
   it('rechaza con ForbiddenException cuando la política de lectura no autoriza al actor, sin llegar a consultar bitacora_auditoria', async () => {
     const prisma = makePrisma();
@@ -50,7 +57,7 @@ describe('BitacoraConsultaService.listEventos', () => {
     readPolicy.assertRead.mockRejectedValue(
       new ForbiddenException('No tienes acceso a esta información del proyecto'),
     );
-    const service = new BitacoraConsultaService(prisma, context, readPolicy);
+    const service = new BitacoraConsultaService(prisma, context, readPolicy, makeUserNameSearch());
 
     await expect(
       service.listEventos(5, 3, { page: 1, limit: 20 }),
@@ -61,7 +68,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('filtra por accion IN (eventos funcionales) y detalleJson.idProyecto — nunca por idProyecto directo (no existe la columna)', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
 
     await service.listEventos(5, 9, { page: 1, limit: 20 });
 
@@ -73,7 +80,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('aplica el filtro idSprint sobre detalleJson cuando se envía', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
 
     await service.listEventos(5, 9, { page: 1, limit: 20, idSprint: 3 });
 
@@ -84,7 +91,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('aplica el filtro idActor sobre la columna real idUsuario', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
 
     await service.listEventos(5, 9, { page: 1, limit: 20, idActor: 7 });
 
@@ -92,28 +99,36 @@ describe('BitacoraConsultaService.listEventos', () => {
     expect(llamada.where.AND).toContainEqual({ idUsuario: 7 });
   });
 
-  it('aplica el filtro persona como OR sobre nombre/apellido del usuario relacionado (contains, insensitive)', async () => {
+  it('aplica el filtro persona resolviendo idUsuario vía UserNameSearchService (T-245: tolerante a acentos/parcial)', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const userNameSearch = makeUserNameSearch([9, 42]);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), userNameSearch);
 
     await service.listEventos(5, 9, { page: 1, limit: 20, persona: 'saul' });
 
+    expect(userNameSearch.findMatchingUserIds).toHaveBeenCalledWith('saul');
     const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
-    expect(llamada.where.AND).toContainEqual({
-      usuario: {
-        OR: [
-          { nombre: { contains: 'saul', mode: 'insensitive' } },
-          { apellido: { contains: 'saul', mode: 'insensitive' } },
-        ],
-      },
-    });
+    expect(llamada.where.AND).toContainEqual({ idUsuario: { in: [9, 42] } });
+  });
+
+  it('cuando persona no matchea a ningún usuario, filtra por idUsuario: { in: [] } — cero resultados, no todos', async () => {
+    const prisma = makePrisma();
+    const context = makeContext();
+    const userNameSearch = makeUserNameSearch([]);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), userNameSearch);
+
+    await service.listEventos(5, 9, { page: 1, limit: 20, persona: 'nadie-existe' });
+
+    const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+    expect(llamada.where.AND).toContainEqual({ idUsuario: { in: [] } });
   });
 
   it('combina persona con idSprint, idActor, tipoEvento y rango de fechas en el mismo AND', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const userNameSearch = makeUserNameSearch([3]);
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), userNameSearch);
     const desde = new Date('2026-01-01T00:00:00.000Z');
     const hasta = new Date('2026-01-31T23:59:59.999Z');
 
@@ -128,17 +143,11 @@ describe('BitacoraConsultaService.listEventos', () => {
       hasta,
     });
 
+    expect(userNameSearch.findMatchingUserIds).toHaveBeenCalledWith('hernandez');
     const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
     expect(llamada.where.AND).toContainEqual({ detalleJson: { path: ['idSprint'], equals: 3 } });
     expect(llamada.where.AND).toContainEqual({ idUsuario: 7 });
-    expect(llamada.where.AND).toContainEqual({
-      usuario: {
-        OR: [
-          { nombre: { contains: 'hernandez', mode: 'insensitive' } },
-          { apellido: { contains: 'hernandez', mode: 'insensitive' } },
-        ],
-      },
-    });
+    expect(llamada.where.AND).toContainEqual({ idUsuario: { in: [3] } });
     expect(llamada.where.AND).toContainEqual({ accion: TipoEventoBitacora.SPRINT_STARTED });
     expect(llamada.where.AND).toContainEqual({ fechaEvento: { gte: desde } });
     expect(llamada.where.AND).toContainEqual({ fechaEvento: { lte: hasta } });
@@ -147,7 +156,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('aplica el filtro desde (gte) sobre fechaEvento cuando se envía', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
     const desde = new Date('2026-01-01T00:00:00.000Z');
 
     await service.listEventos(5, 9, { page: 1, limit: 20, desde });
@@ -159,7 +168,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('aplica el filtro hasta (lte) sobre fechaEvento cuando se envía', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
     const hasta = new Date('2026-01-31T23:59:59.999Z');
 
     await service.listEventos(5, 9, { page: 1, limit: 20, hasta });
@@ -171,7 +180,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('combina desde y hasta con los demás filtros en el mismo AND (idSprint + idActor + tipoEvento + rango de fechas)', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
     const desde = new Date('2026-01-01T00:00:00.000Z');
     const hasta = new Date('2026-01-31T23:59:59.999Z');
 
@@ -196,7 +205,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('filtra por un tipoEvento específico cuando se envía (en vez del IN completo)', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
 
     await service.listEventos(5, 9, { page: 1, limit: 20, tipoEvento: TipoEventoBitacora.SPRINT_STARTED });
 
@@ -207,7 +216,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('pagina con skip/take y devuelve total/totalPages', async () => {
     const prisma = makePrisma([eventoRow()], 45);
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
 
     const resultado = await service.listEventos(5, 9, { page: 2, limit: 20 });
 
@@ -222,7 +231,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('ordena por fechaEvento desc con idAuditoria desc como desempate estable (T-244)', async () => {
     const prisma = makePrisma();
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
 
     await service.listEventos(5, 9, { page: 1, limit: 20 });
 
@@ -233,7 +242,7 @@ describe('BitacoraConsultaService.listEventos', () => {
   it('mapea la fila cruda de BitacoraAuditoria a EventoBitacoraDto, incluyendo el actor', async () => {
     const prisma = makePrisma([eventoRow()]);
     const context = makeContext();
-    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble(), makeUserNameSearch());
 
     const resultado = await service.listEventos(5, 9, { page: 1, limit: 20 });
 
@@ -261,7 +270,7 @@ describe('BitacoraConsultaService.listEventos', () => {
     it('un líder consulta el catálogo completo, incluidos eventos administrativos', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('LIDER'));
+      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('LIDER'), makeUserNameSearch());
 
       await service.listEventos(5, 1, { page: 1, limit: 20 });
 
@@ -273,7 +282,7 @@ describe('BitacoraConsultaService.listEventos', () => {
     it('un administrador consulta el catálogo completo, incluidos eventos administrativos', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('ADMIN'));
+      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('ADMIN'), makeUserNameSearch());
 
       await service.listEventos(5, 42, { page: 1, limit: 20 });
 
@@ -284,7 +293,12 @@ describe('BitacoraConsultaService.listEventos', () => {
     it('un participante activo NO consulta eventos administrativos (LEADERSHIP_CHANGED, EXIT_REQUEST_APPROVED, PROJECT_HOURS_CREDITED quedan fuera)', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('PARTICIPANTE_ACTIVO'));
+      const service = new BitacoraConsultaService(
+        prisma,
+        context,
+        readPolicyCon('PARTICIPANTE_ACTIVO'),
+        makeUserNameSearch(),
+      );
 
       await service.listEventos(5, 42, { page: 1, limit: 20 });
 
@@ -301,7 +315,12 @@ describe('BitacoraConsultaService.listEventos', () => {
     it('un participante activo que filtra por un tipoEvento administrativo explícito (?tipoEvento=LEADERSHIP_CHANGED) recibe cero resultados, no la fila real', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('PARTICIPANTE_ACTIVO'));
+      const service = new BitacoraConsultaService(
+        prisma,
+        context,
+        readPolicyCon('PARTICIPANTE_ACTIVO'),
+        makeUserNameSearch(),
+      );
 
       await service.listEventos(5, 42, {
         page: 1,
@@ -318,7 +337,7 @@ describe('BitacoraConsultaService.listEventos', () => {
     it('un líder que filtra por el mismo tipoEvento administrativo sí lo recibe (sin restricción)', async () => {
       const prisma = makePrisma();
       const context = makeContext();
-      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('LIDER'));
+      const service = new BitacoraConsultaService(prisma, context, readPolicyCon('LIDER'), makeUserNameSearch());
 
       await service.listEventos(5, 1, {
         page: 1,
