@@ -99,7 +99,11 @@ export class BitacoraConsultaService {
     const [rows, total] = await Promise.all([
       this.prisma.bitacoraAuditoria.findMany({
         where,
-        orderBy: { fechaEvento: 'desc' },
+        // T-244: fechaEvento no es única (varios eventos pueden compartir el
+        // mismo instante) — idAuditoria (PK autoincremental) desempata para
+        // que el orden sea determinístico entre páginas, sin repetir ni
+        // saltar filas.
+        orderBy: [{ fechaEvento: 'desc' }, { idAuditoria: 'desc' }],
         take: limit,
         skip,
         include: { usuario: { select: ACTOR_SELECT } },
