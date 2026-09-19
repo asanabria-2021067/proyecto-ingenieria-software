@@ -27,6 +27,7 @@ import type {
   SprintComparativeAnalyticsDto,
   SprintDetailDto,
   SprintDto,
+  DestinoArrastre,
 } from '@/lib/types/sprints';
 
 function isValidProjectId(idProyecto: number): boolean {
@@ -98,7 +99,8 @@ export function useCloseSprint(idProyecto: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (idSprint: number) => closeSprint(idProyecto, idSprint),
+    mutationFn: (input: { idSprint: number; destino?: DestinoArrastre }) =>
+      closeSprint(idProyecto, input.idSprint, input.destino),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(idProyecto) });
     },
