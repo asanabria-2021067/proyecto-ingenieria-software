@@ -24,6 +24,7 @@ vi.mock('../hooks/use-project-sprints', () => ({
   useSprintClosingSummary: vi.fn(),
   useProjectSprints: vi.fn(),
   useCloseSprint: vi.fn(),
+  useSprintDetail: vi.fn(),
 }));
 vi.mock('../hooks/use-hour-adjustments', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../hooks/use-hour-adjustments')>();
@@ -37,7 +38,7 @@ vi.mock('@/lib/swal', () => ({
 }));
 
 import SprintClosingPage from '../app/dashboard/proyectos/[id]/sprints/[sprintId]/finalizar/page';
-import { useCloseSprint, useProjectSprints, useSprintClosingSummary } from '../hooks/use-project-sprints';
+import { useCloseSprint, useProjectSprints, useSprintClosingSummary, useSprintDetail } from '../hooks/use-project-sprints';
 import { useHourAdjustments } from '../hooks/use-hour-adjustments';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useCurrentUser } from '../hooks/use-current-user';
@@ -56,6 +57,7 @@ beforeEach(() => {
     sprints: [{ idSprint: 1, idProyecto: 42, numero: 4, estado: 'EN_FINALIZACION' }],
     isLoading: false,
   });
+  (useSprintDetail as any).mockReturnValue({ detail: undefined, isLoading: false });
   (useHourAdjustments as any).mockReturnValue({
     upsert: mutationStub(),
     revert: mutationStub(),
@@ -245,7 +247,7 @@ describe('SprintClosingPage — cierre', () => {
     fireEvent.click(screen.getByRole('button', { name: /confirmar cierre del sprint/i }));
 
     await waitFor(() => expect(mutateAsyncClose).toHaveBeenCalledTimes(1));
-    expect(mutateAsyncClose).toHaveBeenCalledWith(1);
+    expect(mutateAsyncClose).toHaveBeenCalledWith({ idSprint: 1, destino: undefined });
     expect(push).toHaveBeenCalledWith('/dashboard/projects/42');
     expect(uvgSwal.fire).toHaveBeenCalled();
   });
@@ -316,7 +318,7 @@ describe('SprintClosingPage — sin contribuciones', () => {
     expect(screen.getByText('Este Sprint no tiene contribuciones registradas.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /confirmar cierre del sprint/i }));
 
-    await waitFor(() => expect(mutateAsyncClose).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(mutateAsyncClose).toHaveBeenCalledWith({ idSprint: 1, destino: undefined }));
     expect(push).toHaveBeenCalledWith('/dashboard/projects/42');
   });
 });

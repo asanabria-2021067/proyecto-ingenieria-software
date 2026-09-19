@@ -7,6 +7,7 @@ import type {
   SprintComparativeAnalyticsDto,
   SprintDetailDto,
   SprintDto,
+  DestinoArrastre,
 } from '@/lib/types/sprints';
 
 export function getProjectSprints(idProyecto: number): Promise<SprintDto[]> {
@@ -32,9 +33,10 @@ export function finalizeSprint(idProyecto: number, idSprint: number): Promise<Sp
   });
 }
 
-export function closeSprint(idProyecto: number, idSprint: number): Promise<SprintDto> {
+export function closeSprint(idProyecto: number, idSprint: number, destino?: DestinoArrastre): Promise<SprintDto> {
   return apiFetch<SprintDto>(`/proyectos/${idProyecto}/sprints/${idSprint}/cerrar`, {
     method: 'POST',
+    body: JSON.stringify(destino ? { destino } : {}),
   });
 }
 

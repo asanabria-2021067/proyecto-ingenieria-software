@@ -17,6 +17,8 @@ import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 
 export type EstadoSprint = 'ACTIVO' | 'EN_FINALIZACION' | 'CERRADO';
 
+export type DestinoArrastre = 'SIGUIENTE_SPRINT' | 'BACKLOG';
+
 export interface SprintDto {
   idSprint: number;
   idProyecto: number;
