@@ -92,6 +92,58 @@ describe('BitacoraConsultaService.listEventos', () => {
     expect(llamada.where.AND).toContainEqual({ idUsuario: 7 });
   });
 
+  it('aplica el filtro persona como OR sobre nombre/apellido del usuario relacionado (contains, insensitive)', async () => {
+    const prisma = makePrisma();
+    const context = makeContext();
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+
+    await service.listEventos(5, 9, { page: 1, limit: 20, persona: 'saul' });
+
+    const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+    expect(llamada.where.AND).toContainEqual({
+      usuario: {
+        OR: [
+          { nombre: { contains: 'saul', mode: 'insensitive' } },
+          { apellido: { contains: 'saul', mode: 'insensitive' } },
+        ],
+      },
+    });
+  });
+
+  it('combina persona con idSprint, idActor, tipoEvento y rango de fechas en el mismo AND', async () => {
+    const prisma = makePrisma();
+    const context = makeContext();
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+    const desde = new Date('2026-01-01T00:00:00.000Z');
+    const hasta = new Date('2026-01-31T23:59:59.999Z');
+
+    await service.listEventos(5, 9, {
+      page: 1,
+      limit: 20,
+      idSprint: 3,
+      idActor: 7,
+      persona: 'hernandez',
+      tipoEvento: TipoEventoBitacora.SPRINT_STARTED,
+      desde,
+      hasta,
+    });
+
+    const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+    expect(llamada.where.AND).toContainEqual({ detalleJson: { path: ['idSprint'], equals: 3 } });
+    expect(llamada.where.AND).toContainEqual({ idUsuario: 7 });
+    expect(llamada.where.AND).toContainEqual({
+      usuario: {
+        OR: [
+          { nombre: { contains: 'hernandez', mode: 'insensitive' } },
+          { apellido: { contains: 'hernandez', mode: 'insensitive' } },
+        ],
+      },
+    });
+    expect(llamada.where.AND).toContainEqual({ accion: TipoEventoBitacora.SPRINT_STARTED });
+    expect(llamada.where.AND).toContainEqual({ fechaEvento: { gte: desde } });
+    expect(llamada.where.AND).toContainEqual({ fechaEvento: { lte: hasta } });
+  });
+
   it('aplica el filtro desde (gte) sobre fechaEvento cuando se envía', async () => {
     const prisma = makePrisma();
     const context = makeContext();

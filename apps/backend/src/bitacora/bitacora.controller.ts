@@ -26,6 +26,15 @@ function parsePositiveIntParam(value: string | undefined, fieldName: string): nu
   return parsed;
 }
 
+/** Mismo criterio que ProjectsController.findAll (`q`): string vacía/solo espacios se trata como ausente. */
+function parsePersonaParam(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function parseTipoEventoParam(value: string | undefined): TipoEventoBitacoraValor | undefined {
   if (value === undefined) {
     return undefined;
@@ -76,6 +85,7 @@ export class BitacoraController {
     @CurrentUser() user: { userId: number },
     @Query('idSprint') idSprintRaw?: string,
     @Query('idActor') idActorRaw?: string,
+    @Query('persona') personaRaw?: string,
     @Query('tipoEvento') tipoEventoRaw?: string,
     @Query('desde') desdeRaw?: string,
     @Query('hasta') hastaRaw?: string,
@@ -91,6 +101,7 @@ export class BitacoraController {
     return this.bitacoraConsulta.listEventos(projectId, user.userId, {
       idSprint: parsePositiveIntParam(idSprintRaw, 'idSprint'),
       idActor: parsePositiveIntParam(idActorRaw, 'idActor'),
+      persona: parsePersonaParam(personaRaw),
       tipoEvento: parseTipoEventoParam(tipoEventoRaw),
       desde,
       hasta,
