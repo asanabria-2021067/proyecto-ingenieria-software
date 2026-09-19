@@ -36,6 +36,23 @@ function parseTipoEventoParam(value: string | undefined): TipoEventoBitacoraValo
   return value as TipoEventoBitacoraValor;
 }
 
+const FECHA_YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Mismo criterio de fecha que CreateTimeRecordDto/tasks.service.ts: `YYYY-MM-DD` interpretado en UTC. */
+function parseFechaParam(value: string | undefined, fieldName: string, finDeDia: boolean): Date | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!FECHA_YYYY_MM_DD.test(value)) {
+    throw new BadRequestException(`${fieldName} debe tener el formato YYYY-MM-DD`);
+  }
+  const fecha = new Date(`${value}T${finDeDia ? '23:59:59.999' : '00:00:00.000'}Z`);
+  if (Number.isNaN(fecha.getTime())) {
+    throw new BadRequestException(`${fieldName} debe ser una fecha válida`);
+  }
+  return fecha;
+}
+
 /**
  * T-164/HU-170: bitácora semántica de Sprint (HU-140) — único endpoint del
  * módulo (GET, solo lectura); no existe alta, edición ni borrado directo de
@@ -60,13 +77,23 @@ export class BitacoraController {
     @Query('idSprint') idSprintRaw?: string,
     @Query('idActor') idActorRaw?: string,
     @Query('tipoEvento') tipoEventoRaw?: string,
+    @Query('desde') desdeRaw?: string,
+    @Query('hasta') hastaRaw?: string,
     @Query('page') pageRaw?: string,
     @Query('limit') limitRaw?: string,
   ) {
+    const desde = parseFechaParam(desdeRaw, 'desde', false);
+    const hasta = parseFechaParam(hastaRaw, 'hasta', true);
+    if (desde !== undefined && hasta !== undefined && desde > hasta) {
+      throw new BadRequestException('desde no puede ser posterior a hasta');
+    }
+
     return this.bitacoraConsulta.listEventos(projectId, user.userId, {
       idSprint: parsePositiveIntParam(idSprintRaw, 'idSprint'),
       idActor: parsePositiveIntParam(idActorRaw, 'idActor'),
       tipoEvento: parseTipoEventoParam(tipoEventoRaw),
+      desde,
+      hasta,
       page: parsePaginationParam(pageRaw, 1, Number.MAX_SAFE_INTEGER),
       limit: parsePaginationParam(limitRaw, 20, 50),
     });
