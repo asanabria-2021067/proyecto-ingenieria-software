@@ -38,6 +38,12 @@ export interface BitacoraPaginadaDto {
 export interface FiltrosBitacoraInput {
   idSprint?: number;
   idActor?: number;
+  /**
+   * Filtro por nombre de persona (nombre o apellido del actor), parcial e
+   * insensible a mayúsculas/minúsculas. T-245 lo hace además tolerante a
+   * acentos sin cambiar este contrato.
+   */
+  persona?: string;
   tipoEvento?: TipoEventoBitacoraValor;
   /** Límite inferior inclusive de `fechaEvento` (00:00:00.000Z del día `desde`). */
   desde?: Date;

@@ -62,7 +62,7 @@ export class BitacoraConsultaService {
       scope: 'bitacora',
     });
 
-    const { idSprint, idActor, tipoEvento, desde, hasta, page, limit } = filtros;
+    const { idSprint, idActor, persona, tipoEvento, desde, hasta, page, limit } = filtros;
     const puedeVerAdministrativos = decision.profile === 'LIDER' || decision.profile === 'ADMIN';
     const tiposVisibles = this.tiposVisiblesPara(puedeVerAdministrativos);
 
@@ -75,6 +75,16 @@ export class BitacoraConsultaService {
     }
     if (idActor !== undefined) {
       andConditions.push({ idUsuario: idActor });
+    }
+    if (persona !== undefined) {
+      andConditions.push({
+        usuario: {
+          OR: [
+            { nombre: { contains: persona, mode: 'insensitive' } },
+            { apellido: { contains: persona, mode: 'insensitive' } },
+          ],
+        },
+      });
     }
     if (desde !== undefined) {
       andConditions.push({ fechaEvento: { gte: desde } });

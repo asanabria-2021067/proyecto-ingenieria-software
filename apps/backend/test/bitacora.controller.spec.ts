@@ -56,6 +56,7 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     expect(consulta.listEventos).toHaveBeenCalledWith(5, 9, {
       idSprint: undefined,
       idActor: undefined,
+      persona: undefined,
       tipoEvento: undefined,
       desde: undefined,
       hasta: undefined,
@@ -68,7 +69,18 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     const consulta = makeConsulta();
     const controller = new BitacoraController(consulta);
 
-    await controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, undefined, undefined, '0', '999');
+    await controller.findAll(
+      5,
+      { userId: 9 },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      '0',
+      '999',
+    );
 
     expect(consulta.listEventos).toHaveBeenCalledWith(
       5,
@@ -102,7 +114,14 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     const consulta = makeConsulta();
     const controller = new BitacoraController(consulta);
 
-    await controller.findAll(5, { userId: 9 }, undefined, undefined, TipoEventoBitacora.SPRINT_STARTED);
+    await controller.findAll(
+      5,
+      { userId: 9 },
+      undefined,
+      undefined,
+      undefined,
+      TipoEventoBitacora.SPRINT_STARTED,
+    );
 
     expect(consulta.listEventos).toHaveBeenCalledWith(
       5,
@@ -115,8 +134,23 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     const consulta = makeConsulta();
     const controller = new BitacoraController(consulta);
 
-    expect(() => controller.findAll(5, { userId: 9 }, undefined, undefined, 'NO_EXISTE')).toThrow(
-      BadRequestException,
+    expect(() =>
+      controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, 'NO_EXISTE'),
+    ).toThrow(BadRequestException);
+  });
+
+  it('parsea persona y recorta espacios; una cadena vacía/solo espacios se trata como ausente', async () => {
+    const consulta = makeConsulta();
+    const controller = new BitacoraController(consulta);
+
+    await controller.findAll(5, { userId: 9 }, undefined, undefined, '  saul  ');
+    expect(consulta.listEventos).toHaveBeenCalledWith(5, 9, expect.objectContaining({ persona: 'saul' }));
+
+    await controller.findAll(5, { userId: 9 }, undefined, undefined, '   ');
+    expect(consulta.listEventos).toHaveBeenLastCalledWith(
+      5,
+      9,
+      expect.objectContaining({ persona: undefined }),
     );
   });
 
@@ -124,7 +158,16 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     const consulta = makeConsulta();
     const controller = new BitacoraController(consulta);
 
-    await controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, '2026-01-01', '2026-01-31');
+    await controller.findAll(
+      5,
+      { userId: 9 },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      '2026-01-01',
+      '2026-01-31',
+    );
 
     expect(consulta.listEventos).toHaveBeenCalledWith(
       5,
@@ -141,10 +184,19 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     const controller = new BitacoraController(consulta);
 
     expect(() =>
-      controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, '01/01/2026'),
+      controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, undefined, '01/01/2026'),
     ).toThrow(BadRequestException);
     expect(() =>
-      controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, undefined, 'no-es-fecha'),
+      controller.findAll(
+        5,
+        { userId: 9 },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'no-es-fecha',
+      ),
     ).toThrow(BadRequestException);
   });
 
@@ -153,7 +205,16 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     const controller = new BitacoraController(consulta);
 
     expect(() =>
-      controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, '2026-02-01', '2026-01-01'),
+      controller.findAll(
+        5,
+        { userId: 9 },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        '2026-02-01',
+        '2026-01-01',
+      ),
     ).toThrow(BadRequestException);
   });
 
