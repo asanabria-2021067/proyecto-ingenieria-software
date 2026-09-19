@@ -39,6 +39,10 @@ export interface FiltrosBitacoraInput {
   idSprint?: number;
   idActor?: number;
   tipoEvento?: TipoEventoBitacoraValor;
+  /** Límite inferior inclusive de `fechaEvento` (00:00:00.000Z del día `desde`). */
+  desde?: Date;
+  /** Límite superior inclusive de `fechaEvento` (23:59:59.999Z del día `hasta`). */
+  hasta?: Date;
   page: number;
   limit: number;
 }

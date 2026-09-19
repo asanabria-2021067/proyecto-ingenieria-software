@@ -57,6 +57,8 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
       idSprint: undefined,
       idActor: undefined,
       tipoEvento: undefined,
+      desde: undefined,
+      hasta: undefined,
       page: 1,
       limit: 20,
     });
@@ -66,7 +68,7 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     const consulta = makeConsulta();
     const controller = new BitacoraController(consulta);
 
-    await controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, '0', '999');
+    await controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, undefined, undefined, '0', '999');
 
     expect(consulta.listEventos).toHaveBeenCalledWith(
       5,
@@ -116,6 +118,43 @@ describe('BitacoraController (GET /proyectos/:projectId/bitacora)', () => {
     expect(() => controller.findAll(5, { userId: 9 }, undefined, undefined, 'NO_EXISTE')).toThrow(
       BadRequestException,
     );
+  });
+
+  it('parsea desde/hasta a Date (UTC, inicio/fin de día) cuando se envían', async () => {
+    const consulta = makeConsulta();
+    const controller = new BitacoraController(consulta);
+
+    await controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, '2026-01-01', '2026-01-31');
+
+    expect(consulta.listEventos).toHaveBeenCalledWith(
+      5,
+      9,
+      expect.objectContaining({
+        desde: new Date('2026-01-01T00:00:00.000Z'),
+        hasta: new Date('2026-01-31T23:59:59.999Z'),
+      }),
+    );
+  });
+
+  it('rechaza desde/hasta con formato distinto de YYYY-MM-DD con BadRequestException', () => {
+    const consulta = makeConsulta();
+    const controller = new BitacoraController(consulta);
+
+    expect(() =>
+      controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, '01/01/2026'),
+    ).toThrow(BadRequestException);
+    expect(() =>
+      controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, undefined, 'no-es-fecha'),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rechaza cuando desde es posterior a hasta con BadRequestException', () => {
+    const consulta = makeConsulta();
+    const controller = new BitacoraController(consulta);
+
+    expect(() =>
+      controller.findAll(5, { userId: 9 }, undefined, undefined, undefined, '2026-02-01', '2026-01-01'),
+    ).toThrow(BadRequestException);
   });
 
   it('retorna exactamente lo que resuelve BitacoraConsultaService.listEventos, sin transformarlo', async () => {
