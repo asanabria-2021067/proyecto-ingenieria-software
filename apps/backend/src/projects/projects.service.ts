@@ -1231,6 +1231,39 @@ export class ProjectsService {
    * escribir nada: si falta alguna tarea, lanza y no actualiza ninguna
    * (todo o nada, igual que el resto de esta transacción).
    */
+  async assignHitoTasks(
+    idProyecto: number,
+    idHito: number,
+    userId: number,
+    idsTareas: number[],
+  ) {
+    return this.projectTx.run(idProyecto, userId, 'projects.assignHitoTasks', async (ctx) => {
+      const { tx } = ctx;
+      await this._requireActiveMember(idProyecto, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'HITO_CREATE', userId);
+
+      const hito = await tx.hito.findFirst({
+        where: { idHito, idProyecto },
+        select: { idHito: true },
+      });
+
+      if (!hito) {
+        throw new NotFoundException(
+          `Hito con id ${idHito} no encontrado en el proyecto ${idProyecto}`,
+        );
+      }
+
+      const idsTareasAsignadas = await this._asignarHitoATareas(
+        tx,
+        idProyecto,
+        idHito,
+        idsTareas,
+      );
+
+      return { idHito, idsTareasAsignadas };
+    });
+  }
+
   private async _asignarHitoATareas(
     tx: Prisma.TransactionClient,
     idProyecto: number,

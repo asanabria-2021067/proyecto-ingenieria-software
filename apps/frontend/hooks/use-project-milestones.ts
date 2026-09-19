@@ -1,9 +1,9 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createHito } from '@/lib/services/projects';
+import { assignHitoTasks, createHito } from '@/lib/services/projects';
 import { projectAvanceQueryKey, projectTasksQueryKey } from '@/lib/query-keys/tasks';
-import type { CreateHitoPayload } from '@/lib/dto/project.dto';
+import type { AssignHitoTasksPayload, CreateHitoPayload } from '@/lib/dto/project.dto';
 
 /**
  * Los hitos del proyecto viven embebidos en `useProjectDetail` (query key
@@ -32,5 +32,20 @@ export function useProjectMilestones(idProyecto: number) {
     },
   });
 
-  return { crearHito };
+  const asignarHitoTareas = useMutation({
+    mutationFn: ({
+      idHito,
+      input,
+    }: {
+      idHito: number;
+      input: AssignHitoTasksPayload;
+    }) => assignHitoTasks(idProyecto, idHito, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', idProyecto] });
+      queryClient.invalidateQueries({ queryKey: projectTasksQueryKey(idProyecto) });
+      queryClient.invalidateQueries({ queryKey: projectAvanceQueryKey(idProyecto) });
+    },
+  });
+
+  return { crearHito, asignarHitoTareas };
 }

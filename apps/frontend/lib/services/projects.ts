@@ -8,6 +8,8 @@ import type {
   CreateProjectPayload,
   CreateHitoPayload,
   CreateHitoResult,
+  AssignHitoTasksPayload,
+  AssignHitoTasksResult,
   ResolverRevisionPayload,
 } from '@/lib/dto/project.dto';
 
@@ -156,4 +158,18 @@ export async function createHito(idProyecto: number, payload: CreateHitoPayload)
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function assignHitoTasks(
+  idProyecto: number,
+  idHito: number,
+  payload: AssignHitoTasksPayload,
+): Promise<AssignHitoTasksResult> {
+  return apiFetch<AssignHitoTasksResult>(
+    `/proyectos/${idProyecto}/hitos/${idHito}/tareas`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
 }

@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
+import { AssignMilestoneDialog } from '@/components/projects/assign-milestone-dialog';
 import {
   ESTADO_COLUMNA_STYLE,
   ESTADO_LABEL,
@@ -76,6 +77,7 @@ interface HitosSectionProps {
    */
   puedeCrear?: boolean;
   crearHito?: MilestonesHook['crearHito'];
+  asignarHitoTareas?: MilestonesHook['asignarHitoTareas'];
 }
 
 interface HitoStats {
@@ -390,19 +392,23 @@ function MilestoneCard({
 
 function UnassignedMilestoneTasksSection({
   tareas,
+  hitos,
   forcedVisible,
   onOpenTask,
   onOpenComments,
   puedeCrear = false,
   crearHito,
+  asignarHitoTareas,
 }: {
   tareas: TareaPublicaDTO[];
+  hitos: { idHito: number; tituloHito: string }[];
   forcedVisible: boolean;
   onOpenTask: (tarea: TareaPublicaDTO, tab: DetalleTab) => void;
   onOpenComments: (tarea: TareaPublicaDTO) => void;
   /** T-186 (HU-147): habilita selección múltiple + "Crear hito y asignar". */
   puedeCrear?: boolean;
   crearHito?: MilestonesHook['crearHito'];
+  asignarHitoTareas?: MilestonesHook['asignarHitoTareas'];
 }) {
   const [expanded, setExpanded] = useState(true);
   const [seleccionadas, setSeleccionadas] = useState<number[]>([]);
@@ -411,7 +417,7 @@ function UnassignedMilestoneTasksSection({
 
   // T-186: la selección múltiple solo tiene sentido con permiso de crear
   // hitos y con la mutation disponible (el caller la omite si no la tiene).
-  const seleccionHabilitada = puedeCrear && crearHito !== undefined;
+  const seleccionHabilitada = puedeCrear && crearHito !== undefined && asignarHitoTareas !== undefined;
   const tareasOrdenadas = ordenarTareas(tareas);
   const idsVisibles = tareasOrdenadas.map((t) => t.idTarea);
   const seleccionadasVisibles = seleccionadas.filter((id) => idsVisibles.includes(id));
@@ -454,7 +460,7 @@ function UnassignedMilestoneTasksSection({
               onClick={() => setDialogoAbierto(true)}
               className="h-8 gap-1.5 rounded-md bg-primary px-2.5 text-[11px] font-bold text-on-primary hover:bg-primary/90"
             >
-              Crear hito y asignar ({seleccionadasVisibles.length})
+              Asignar hito ({seleccionadasVisibles.length})
             </Button>
           )}
           <button
@@ -505,10 +511,12 @@ function UnassignedMilestoneTasksSection({
       )}
 
       {seleccionHabilitada && crearHito && (
-        <CreateMilestoneDialog
+        <AssignMilestoneDialog
           open={dialogoAbierto}
           onOpenChange={setDialogoAbierto}
+          hitos={hitos}
           crearHito={crearHito}
+          asignarHitoTareas={asignarHitoTareas}
           tareasSeleccionadas={tareasSeleccionadasResumen}
           onAsignado={() => setSeleccionadas([])}
         />
@@ -527,6 +535,7 @@ export function HitosSection({
   onVerTodasLasTareas,
   puedeCrear = false,
   crearHito,
+  asignarHitoTareas,
 }: HitosSectionProps) {
   // El detalle de la tarea vive ahora en su propia ruta dedicada (Sección 10):
   // pulsar una tarea o sus comentarios navega hacia ella, no abre un Sheet.
@@ -634,11 +643,13 @@ export function HitosSection({
 
       <UnassignedMilestoneTasksSection
         tareas={tareasSinHitoVisibles}
+        hitos={hitosOrdenados}
         forcedVisible={filtroPorHitoSinHito}
         onOpenTask={abrirDetalle}
         onOpenComments={(tarea) => abrirDetalle(tarea, 'comentarios')}
         puedeCrear={puedeCrear}
         crearHito={crearHito}
+        asignarHitoTareas={asignarHitoTareas}
       />
     </div>
   );
