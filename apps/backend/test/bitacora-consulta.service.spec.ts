@@ -219,6 +219,17 @@ describe('BitacoraConsultaService.listEventos', () => {
     expect(resultado.totalPages).toBe(3);
   });
 
+  it('ordena por fechaEvento desc con idAuditoria desc como desempate estable (T-244)', async () => {
+    const prisma = makePrisma();
+    const context = makeContext();
+    const service = new BitacoraConsultaService(prisma, context, makeProjectReadPolicyDouble());
+
+    await service.listEventos(5, 9, { page: 1, limit: 20 });
+
+    const llamada = prisma.bitacoraAuditoria.findMany.mock.calls[0][0];
+    expect(llamada.orderBy).toEqual([{ fechaEvento: 'desc' }, { idAuditoria: 'desc' }]);
+  });
+
   it('mapea la fila cruda de BitacoraAuditoria a EventoBitacoraDto, incluyendo el actor', async () => {
     const prisma = makePrisma([eventoRow()]);
     const context = makeContext();
