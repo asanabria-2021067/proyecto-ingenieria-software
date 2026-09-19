@@ -140,10 +140,21 @@ describe('useStartSprint', () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
 
-    result.current.mutate();
+    result.current.mutate(undefined);
 
     await waitFor(() => expect(startSprint).toHaveBeenCalledTimes(1));
-    expect(startSprint).toHaveBeenCalledWith(7);
+    expect(startSprint).toHaveBeenCalledWith(7, undefined);
+  });
+
+  it('HU-160: pasa fechaFinPlaneada al service cuando se envía explícita', async () => {
+    (startSprint as any).mockResolvedValue(sprint());
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useStartSprint(7), { wrapper });
+
+    result.current.mutate('2026-12-01');
+
+    await waitFor(() => expect(startSprint).toHaveBeenCalledTimes(1));
+    expect(startSprint).toHaveBeenCalledWith(7, '2026-12-01');
   });
 
   it('en éxito invalida exactamente project-sprints del proyecto', async () => {
@@ -152,7 +163,7 @@ describe('useStartSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
 
-    result.current.mutate();
+    result.current.mutate(undefined);
 
     await waitFor(() => expect(startSprint).toHaveBeenCalledTimes(1));
     await waitFor(() =>
@@ -167,7 +178,7 @@ describe('useStartSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
 
-    await expect(result.current.mutateAsync()).rejects.toThrow('409');
+    await expect(result.current.mutateAsync(undefined)).rejects.toThrow('409');
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });
@@ -238,10 +249,10 @@ describe('useCloseSprint', () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCloseSprint(7), { wrapper });
 
-    result.current.mutate(1);
+    result.current.mutate({ idSprint: 1 });
 
     await waitFor(() => expect(closeSprint).toHaveBeenCalledTimes(1));
-    expect(closeSprint).toHaveBeenCalledWith(7, 1);
+    expect(closeSprint).toHaveBeenCalledWith(7, 1, undefined);
   });
 
   it('en éxito invalida exactamente project-sprints del proyecto (idProyecto conservado del hook)', async () => {
@@ -250,7 +261,7 @@ describe('useCloseSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useCloseSprint(7), { wrapper });
 
-    result.current.mutate(1);
+    result.current.mutate({ idSprint: 1 });
 
     await waitFor(() => expect(closeSprint).toHaveBeenCalledTimes(1));
     await waitFor(() =>
@@ -265,7 +276,7 @@ describe('useCloseSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useCloseSprint(7), { wrapper });
 
-    result.current.mutate(1);
+    result.current.mutate({ idSprint: 1 });
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(1));
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['project-tasks', 7] });
@@ -279,7 +290,7 @@ describe('useCloseSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useCloseSprint(7), { wrapper });
 
-    await expect(result.current.mutateAsync(1)).rejects.toThrow('409');
+    await expect(result.current.mutateAsync({ idSprint: 1 })).rejects.toThrow('409');
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });

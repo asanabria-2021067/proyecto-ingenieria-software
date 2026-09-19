@@ -230,7 +230,7 @@ describe('SprintClosingPage — ajustes por asignación (F002)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /confirmar cierre del sprint/i }));
 
-    await waitFor(() => expect(closeSprint).toHaveBeenCalledWith(42, 1));
+    await waitFor(() => expect(closeSprint).toHaveBeenCalledWith(42, 1, undefined));
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectSprintsQueryKey(42) }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sprintClosingSummaryQueryKey(42, 1) });
     expect(push).toHaveBeenCalledWith('/dashboard/projects/42');

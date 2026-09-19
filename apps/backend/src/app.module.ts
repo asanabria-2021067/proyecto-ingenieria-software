@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -42,6 +43,8 @@ import { BitacoraModule } from './bitacora/bitacora.module';
   imports: [
     ConfigModule.forRoot(buildEnvOptions()),
     EventEmitterModule.forRoot(),
+    // HU-160/T-238: instantánea diaria del Sprint activo (SprintSnapshotsService).
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         name: 'short',

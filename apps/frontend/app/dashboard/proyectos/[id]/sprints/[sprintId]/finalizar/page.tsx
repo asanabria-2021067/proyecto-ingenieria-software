@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -15,11 +15,12 @@ import {
   Flag,
   Loader2,
 } from 'lucide-react';
-import { useCloseSprint, useProjectSprints, useSprintClosingSummary } from '@/hooks/use-project-sprints';
+import { useCloseSprint, useProjectSprints, useSprintClosingSummary, useSprintDetail } from '@/hooks/use-project-sprints';
 import { useHourAdjustments } from '@/hooks/use-hour-adjustments';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
+import { SprintCloseConfirmModal } from '@/components/projects/sprint-close-confirm-modal';
 import { HourAdjustmentRow, formatearDecimal } from '@/components/hours/hour-adjustment-row';
 import { getApiErrorMessage, getApiErrorStatus, isProyectoOcupado } from '@/components/projects/api-error';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -51,6 +52,7 @@ import type {
   SprintClosingSummaryParticipantDto,
   SprintClosingTramoDto,
   UpsertHourAdjustmentInput,
+  DestinoArrastre,
 } from '@/lib/types/sprints';
 
 const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
@@ -61,10 +63,9 @@ function getInitials(nombre: string, apellido: string): string {
 
 function mensajeDeError(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
-  return 'Ocurrió un error inesperado. Intenta nuevamente.';
+  return 'Ocurrio un error inesperado. Intenta nuevamente.';
 }
 
-/** Suma importes decimales (string) en centésimas enteras y devuelve un string decimal. */
 function sumarDecimales(valores: string[]): string {
   const total = valores.reduce((acc, v) => acc + Math.round(Number(v) * 100), 0);
   const signo = total < 0 ? '-' : '';
@@ -131,7 +132,6 @@ function Kpi({
   );
 }
 
-// ─── Integrante (acordeón) ───────────────────────────────────────────────────
 function MemberItem({
   participante,
   readOnly,
@@ -156,7 +156,6 @@ function MemberItem({
     return map;
   }, [participante.participaciones]);
 
-  // rol → tarea → tramos
   const arbol = useMemo(() => {
     const porRol = new Map<string, Map<number, { titulo: string; tramos: SprintClosingTramoDto[] }>>();
     for (const tramo of totales.tramos) {
@@ -251,7 +250,6 @@ function MemberItem({
   );
 }
 
-// ─── Página ──────────────────────────────────────────────────────────────────
 export default function SprintClosingPage() {
   const { id, sprintId } = useParams<{ id: string; sprintId: string }>();
   const idProyecto = Number(id);
@@ -262,17 +260,17 @@ export default function SprintClosingPage() {
   const { summary, isLoading, isError, error, refetch } = useSprintClosingSummary(idProyecto, idSprint);
   const { sprints } = useProjectSprints(idProyecto);
   const closeSprint = useCloseSprint(idProyecto);
+  const { detail: sprintDetail } = useSprintDetail(idProyecto, idSprint);
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const { upsert, revert, history } = useHourAdjustments(idProyecto, idSprint);
 
-  // GET .../resumen-cierre es exclusivo del líder en backend
-  // (assertCanViewClosingSummary). Mismo criterio de detección client-side
-  // que el resto de proyectos/[id]/*.
   const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
   const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
   const volverHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
 
   const sprint = sprints.find((s) => s.idSprint === idSprint) ?? null;
+  const tareasPendientes = (sprintDetail?.tareas ?? []).filter((t) => t.estadoTarea !== 'HECHO');
   const estadoSprint = summary?.estadoSprint ?? sprint?.estado ?? null;
   const readOnly = estadoSprint === 'CERRADO' || estadoSprint === 'ACTIVO';
   const blockers = summary?.blockers ?? [];
@@ -306,8 +304,8 @@ export default function SprintClosingPage() {
     if (status === 409) {
       setGlobalError({
         message: isProyectoOcupado(err)
-          ? 'El proyecto está ocupado por otra operación. Actualiza e inténtalo de nuevo.'
-          : 'El resumen cambió mientras trabajabas. Actualiza para ver el estado actual.',
+          ? 'El proyecto esta ocupado por otra operacion. Actualiza e intentalo de nuevo.'
+          : 'El resumen cambio mientras trabajabas. Actualiza para ver el estado actual.',
         conflict: true,
       });
       return;
@@ -352,11 +350,11 @@ export default function SprintClosingPage() {
     refetch();
   };
 
-  const confirmarCierre = async () => {
+  const ejecutarCierre = async (destino?: DestinoArrastre) => {
     setCloseError(null);
     setClosing(true);
     try {
-      await closeSprint.mutateAsync(idSprint);
+      await closeSprint.mutateAsync({ idSprint, destino });
       queryClient.invalidateQueries({ queryKey: sprintClosingSummaryQueryKey(idProyecto, idSprint) });
       void uvgSwal.fire({
         icon: 'success',
@@ -370,10 +368,9 @@ export default function SprintClosingPage() {
     } catch (err) {
       const status = getApiErrorStatus(err);
       if (status === 409) {
-        // No se pisa nada: el resumen se refresca y los blockers se vuelven a evaluar.
         refetch();
         setCloseError(
-          `${mensajeDeError(err)} Se actualizó el resumen; revisa los bloqueos antes de volver a intentarlo.`,
+          `${mensajeDeError(err)} Se actualizo el resumen; revisa los bloqueos antes de volver a intentarlo.`,
         );
       } else {
         setCloseError(getApiErrorMessage(err, 'hours'));
@@ -382,21 +379,29 @@ export default function SprintClosingPage() {
     }
   };
 
+  const handleClickCerrar = () => {
+    if (tareasPendientes.length > 0) {
+      setShowCloseModal(true);
+      return;
+    }
+    void ejecutarCierre();
+  };
+
   const puedeCerrar = !readOnly && blockers.length === 0 && !closing && pendingId == null;
   const motivoNoCerrar = readOnly
     ? estadoSprint === 'CERRADO'
-      ? 'Este Sprint ya está cerrado.'
-      : 'El Sprint debe estar en finalización para cerrarlo.'
+      ? 'Este Sprint ya esta cerrado.'
+      : 'El Sprint debe estar en finalizacion para cerrarlo.'
     : blockers.length > 0
       ? `Hay ${blockers.length} ${blockers.length === 1 ? 'bloqueo' : 'bloqueos'} pendientes: ${blockers
           .map((b) => b.message)
-          .join(' · ')}`
+          .join(' - ')}`
       : 'Hay un ajuste en curso.';
 
   const botonCerrar = (
     <Button
       type="button"
-      onClick={confirmarCierre}
+      onClick={handleClickCerrar}
       disabled={!puedeCerrar}
       className="h-10 w-full gap-1.5 rounded-lg bg-primary px-6 text-sm font-bold text-on-primary hover:bg-primary/90 sm:w-auto"
     >
@@ -435,7 +440,7 @@ export default function SprintClosingPage() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <BreadcrumbPage className="font-medium text-on-surface">
-              {sprint ? `Sprint ${sprint.numero}` : 'Sprint'} · Finalizar
+              {sprint ? `Sprint ${sprint.numero}` : 'Sprint'} - Finalizar
             </BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -473,7 +478,6 @@ export default function SprintClosingPage() {
 
           {!isLoading && !isError && summary && (
             <div className="space-y-5">
-              {/* Cabecera */}
               <div className={CARD}>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
@@ -505,7 +509,6 @@ export default function SprintClosingPage() {
                 </p>
               </div>
 
-              {/* KPIs */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Kpi icon={ClipboardList} label="Tareas distintas" value={String(kpis.tareasDistintas)} />
                 <Kpi icon={Clock} label="Horas reportadas" value={`${formatearDecimal(kpis.reportadas)} h`} />
@@ -518,7 +521,6 @@ export default function SprintClosingPage() {
                 <Kpi icon={BarChart3} label="Horas propuestas" value={`${formatearDecimal(kpis.propuestas)} h`} />
               </div>
 
-              {/* Blockers */}
               {blockers.length > 0 && (
                 <div
                   role="alert"
@@ -526,7 +528,7 @@ export default function SprintClosingPage() {
                 >
                   <p className="flex items-center gap-2 font-semibold">
                     <AlertTriangle className="size-4" aria-hidden="true" />
-                    El Sprint aún no puede cerrarse
+                    El Sprint aun no puede cerrarse
                   </p>
                   <ul className="mt-2 list-disc space-y-1 pl-6">
                     {blockers.map((b) => (
@@ -550,7 +552,6 @@ export default function SprintClosingPage() {
                 </p>
               )}
 
-              {/* Integrantes */}
               {summary.participantes.length === 0 ? (
                 <Empty tone="muted" role="status">
                   <EmptyMedia variant="icon">
@@ -559,7 +560,7 @@ export default function SprintClosingPage() {
                   <EmptyHeader>
                     <EmptyTitle>Este Sprint no tiene contribuciones registradas.</EmptyTitle>
                     <EmptyDescription>
-                      No hay participantes con tareas u horas asociadas a este Sprint todavía.
+                      No hay participantes con tareas u horas asociadas a este Sprint todavia.
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
@@ -588,7 +589,6 @@ export default function SprintClosingPage() {
             </div>
           )}
 
-          {/* Footer sticky */}
           {!isLoading && !isError && summary && (
             <div className="fixed inset-x-0 bottom-0 z-30 border-t border-outline-variant/40 bg-surface-container-lowest/95 px-4 py-3 backdrop-blur pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8">
               <div className="mx-auto flex max-w-[1400px] flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -610,6 +610,17 @@ export default function SprintClosingPage() {
               </div>
             </div>
           )}
+
+          <SprintCloseConfirmModal
+            open={showCloseModal}
+            onOpenChange={setShowCloseModal}
+            tareasPendientes={tareasPendientes.map((t) => ({ idTarea: t.idTarea, tituloTarea: t.tituloTarea }))}
+            isPending={closing}
+            onConfirm={(destino) => {
+              setShowCloseModal(false);
+              void ejecutarCierre(destino);
+            }}
+          />
         </>
       )}
     </div>

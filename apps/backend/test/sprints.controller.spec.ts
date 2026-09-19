@@ -14,6 +14,8 @@ function makeService() {
     getSprintDetail: vi.fn(),
     getSprintAnalytics: vi.fn(),
     getSprintsAnalytics: vi.fn(),
+    regenerarInstantaneaDeHoy: vi.fn(),
+    getSprintBurndown: vi.fn(),
   };
 }
 
@@ -31,14 +33,23 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.start)).toBe(201);
   });
 
-  it('delega en SprintsService.startSprint con projectId y userId (CurrentUser)', () => {
+  it('delega en SprintsService.startSprint con projectId, userId (CurrentUser) y sin fechaFinPlaneada', () => {
     const service = makeService();
     const controller = makeController(service);
 
-    controller.start(5, { userId: 9 });
+    controller.start(5, { userId: 9 }, {});
 
     expect(service.startSprint).toHaveBeenCalledTimes(1);
-    expect(service.startSprint).toHaveBeenCalledWith(5, 9);
+    expect(service.startSprint).toHaveBeenCalledWith(5, 9, undefined);
+  });
+
+  it('HU-160: delega la fechaFinPlaneada del body cuando viene explícita', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.start(5, { userId: 9 }, { fechaFinPlaneada: '2026-12-01' });
+
+    expect(service.startSprint).toHaveBeenCalledWith(5, 9, '2026-12-01');
   });
 
   it('retorna exactamente lo que resuelve SprintsService.startSprint, sin transformarlo', async () => {
@@ -47,7 +58,7 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     service.startSprint.mockResolvedValue(sprintCreado);
     const controller = makeController(service);
 
-    const result = await controller.start(5, { userId: 9 });
+    const result = await controller.start(5, { userId: 9 }, {});
 
     expect(result).toBe(sprintCreado);
   });
@@ -58,7 +69,7 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     service.startSprint.mockRejectedValue(error);
     const controller = makeController(service);
 
-    await expect(controller.start(5, { userId: 9 })).rejects.toBe(error);
+    await expect(controller.start(5, { userId: 9 }, {})).rejects.toBe(error);
   });
 });
 
@@ -128,10 +139,10 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     const service = makeService();
     const controller = makeController(service);
 
-    controller.close(5, 12, { userId: 9 });
+    controller.close(5, 12, { userId: 9 }, {});
 
     expect(service.closeSprint).toHaveBeenCalledTimes(1);
-    expect(service.closeSprint).toHaveBeenCalledWith(5, 12, 9);
+    expect(service.closeSprint).toHaveBeenCalledWith(5, 12, 9, undefined);
   });
 
   it('retorna exactamente lo que resuelve SprintsService.closeSprint, sin transformarlo', async () => {
@@ -140,7 +151,7 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     service.closeSprint.mockResolvedValue(sprintCerrado);
     const controller = makeController(service);
 
-    const result = await controller.close(5, 12, { userId: 9 });
+    const result = await controller.close(5, 12, { userId: 9 }, {});
 
     expect(result).toBe(sprintCerrado);
   });
@@ -151,7 +162,54 @@ describe('SprintsController.close (POST /proyectos/:projectId/sprints/:sprintId/
     service.closeSprint.mockRejectedValue(error);
     const controller = makeController(service);
 
-    await expect(controller.close(5, 12, { userId: 9 })).rejects.toBe(error);
+    await expect(controller.close(5, 12, { userId: 9 }, {})).rejects.toBe(error);
+  });
+});
+
+describe('SprintsController.regenerarInstantanea (POST /proyectos/:projectId/sprints/:sprintId/instantanea) — T-238/HU-160', () => {
+  it('está registrado como POST en :sprintId/instantanea', () => {
+    expect(
+      Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.regenerarInstantanea),
+    ).toBe(':sprintId/instantanea');
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.regenerarInstantanea),
+    ).toBe(1); // POST
+  });
+
+  it('responde con 200 OK', () => {
+    expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.regenerarInstantanea),
+    ).toBe(200);
+  });
+
+  it('delega en SprintsService.regenerarInstantaneaDeHoy con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.regenerarInstantanea(5, 12, { userId: 9 });
+
+    expect(service.regenerarInstantaneaDeHoy).toHaveBeenCalledTimes(1);
+    expect(service.regenerarInstantaneaDeHoy).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.regenerarInstantaneaDeHoy, sin transformarlo', async () => {
+    const service = makeService();
+    const instantanea = { idInstantanea: 1, idSprint: 12, fecha: '2026-09-16' };
+    service.regenerarInstantaneaDeHoy.mockResolvedValue(instantanea);
+    const controller = makeController(service);
+
+    const result = await controller.regenerarInstantanea(5, 12, { userId: 9 });
+
+    expect(result).toBe(instantanea);
+  });
+
+  it('propaga los errores de autorización que lance SprintsService.regenerarInstantaneaDeHoy', async () => {
+    const service = makeService();
+    const error = new Error('no autorizado');
+    service.regenerarInstantaneaDeHoy.mockRejectedValue(error);
+    const controller = makeController(service);
+
+    await expect(controller.regenerarInstantanea(5, 12, { userId: 9 })).rejects.toBe(error);
   });
 });
 
@@ -391,5 +449,48 @@ describe('SprintsController.getComparativeAnalytics (GET /proyectos/:projectId/s
       (nombreMetodo) => Reflect.getMetadata(METHOD_METADATA, prototype[nombreMetodo]) === 0,
     );
     expect(rutasGet.indexOf('getComparativeAnalytics')).toBeLessThan(rutasGet.indexOf('detail'));
+  });
+});
+
+describe('SprintsController.getBurndown (GET /proyectos/:projectId/sprints/:sprintId/burndown) — T-240/HU-160', () => {
+  it('está registrado como GET en :sprintId/burndown', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, SprintsController.prototype.getBurndown)).toBe(
+      ':sprintId/burndown',
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintsController.prototype.getBurndown)).toBe(0); // GET
+  });
+
+  it('responde con 200 OK', () => {
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, SprintsController.prototype.getBurndown)).toBe(200);
+  });
+
+  it('delega en SprintsService.getSprintBurndown con projectId, sprintId y userId (CurrentUser)', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.getBurndown(5, 12, { userId: 9 });
+
+    expect(service.getSprintBurndown).toHaveBeenCalledTimes(1);
+    expect(service.getSprintBurndown).toHaveBeenCalledWith(5, 12, 9);
+  });
+
+  it('retorna exactamente lo que resuelve SprintsService.getSprintBurndown, sin transformarlo', async () => {
+    const service = makeService();
+    const burndown = { idSprint: 12, fechaInicio: '2026-01-01', instantaneas: [] };
+    service.getSprintBurndown.mockResolvedValue(burndown);
+    const controller = makeController(service);
+
+    const result = await controller.getBurndown(5, 12, { userId: 9 });
+
+    expect(result).toBe(burndown);
+  });
+
+  it('propaga los errores de autorización/negocio que lance SprintsService.getSprintBurndown', async () => {
+    const service = makeService();
+    const error = new Error('no encontrado');
+    service.getSprintBurndown.mockRejectedValue(error);
+    const controller = makeController(service);
+
+    await expect(controller.getBurndown(5, 12, { userId: 9 })).rejects.toBe(error);
   });
 });
