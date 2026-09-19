@@ -33,6 +33,18 @@ function crearHitoStub(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function asignarHitoTareasStub(overrides: Record<string, unknown> = {}) {
+  return {
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ idHito: 1, idsTareasAsignadas: [1] }),
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+    ...overrides,
+  };
+}
+
 function hito(overrides: Partial<HitoDTO> = {}): HitoDTO {
   return {
     idHito: 1,
@@ -227,7 +239,7 @@ describe('HitosSection', () => {
       );
 
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-      expect(screen.queryByText(/Crear hito y asignar/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Asignar hito/)).not.toBeInTheDocument();
     });
 
     it('con permiso: muestra un checkbox por tarea sin hito y "Seleccionar todas"', () => {
@@ -241,6 +253,7 @@ describe('HitosSection', () => {
           idProyecto: 10,
           puedeCrear: true,
           crearHito: crearHitoStub() as any,
+          asignarHitoTareas: asignarHitoTareasStub() as any,
         }),
       );
 
@@ -261,12 +274,13 @@ describe('HitosSection', () => {
           idProyecto: 10,
           puedeCrear: true,
           crearHito: crearHitoStub() as any,
+          asignarHitoTareas: asignarHitoTareasStub() as any,
         }),
       );
 
-      expect(screen.queryByText(/Crear hito y asignar/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Asignar hito/)).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar Suelta A' }));
-      expect(screen.getByRole('button', { name: 'Crear hito y asignar (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Asignar hito (1)' })).toBeInTheDocument();
     });
 
     it('marcar/desmarcar la fila no abre el detalle de la tarea (stopPropagation)', () => {
@@ -277,6 +291,7 @@ describe('HitosSection', () => {
           idProyecto: 10,
           puedeCrear: true,
           crearHito: crearHitoStub() as any,
+          asignarHitoTareas: asignarHitoTareasStub() as any,
         }),
       );
 
@@ -295,21 +310,24 @@ describe('HitosSection', () => {
           idProyecto: 10,
           puedeCrear: true,
           crearHito: crearHitoStub() as any,
+          asignarHitoTareas: asignarHitoTareasStub() as any,
         }),
       );
 
       fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar todas las tareas sin hito' }));
-      expect(screen.getByRole('button', { name: 'Crear hito y asignar (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Asignar hito (2)' })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar todas las tareas sin hito' }));
-      expect(screen.queryByText(/Crear hito y asignar/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Asignar hito/)).not.toBeInTheDocument();
     });
 
-    it('abre CreateMilestoneDialog con las tareas seleccionadas y limpia la selección al asignar', async () => {
+    it('abre el flujo de asignacion con las tareas seleccionadas', () => {
       const crearHito = crearHitoStub() as any;
+      const asignarHitoTareas = asignarHitoTareasStub() as any;
+
       render(
         createElement(HitosSection, {
-          hitos: [],
+          hitos: [hito({ idHito: 7, tituloHito: 'Entrega existente' })],
           tareas: [
             tarea({ idTarea: 1, tituloTarea: 'Suelta A' }),
             tarea({ idTarea: 2, tituloTarea: 'Suelta B' }),
@@ -317,29 +335,18 @@ describe('HitosSection', () => {
           idProyecto: 10,
           puedeCrear: true,
           crearHito,
+          asignarHitoTareas,
         }),
       );
 
       fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar Suelta A' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Crear hito y asignar (1)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Asignar hito (1)' }));
 
-      expect(screen.getByTestId('hito-tareas-seleccionadas')).toHaveTextContent('Suelta A');
-
-      fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Entrega del MVP' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Crear y asignar' }));
-
-      await waitFor(() =>
-        expect(crearHito.mutateAsync).toHaveBeenCalledWith({
-          tituloHito: 'Entrega del MVP',
-          descripcionHito: undefined,
-          fechaLimite: undefined,
-          idsTareas: [1],
-        }),
-      );
-
-      // Tras asignar, el botón de asignación masiva vuelve a desaparecer
-      // (la selección se limpió vía onAsignado).
-      await waitFor(() => expect(screen.queryByText(/Crear hito y asignar/)).not.toBeInTheDocument());
+      expect(screen.getByRole('heading', { name: 'Asignar hito' })).toBeInTheDocument();
+      expect(screen.getByText('1 tarea seleccionada')).toBeInTheDocument();
+      expect(screen.getAllByText('Suelta A')).toHaveLength(2);
+      expect(screen.getByRole('button', { name: 'Hito existente' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Nuevo hito' })).toBeInTheDocument();
     });
   });
 });

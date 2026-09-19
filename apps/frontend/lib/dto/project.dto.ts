@@ -239,6 +239,15 @@ export interface CreateHitoResult extends HitoDTO {
   idsTareasAsignadas?: number[];
 }
 
+export interface AssignHitoTasksPayload {
+  idsTareas: number[];
+}
+
+export interface AssignHitoTasksResult {
+  idHito: number;
+  idsTareasAsignadas: number[];
+}
+
 /** Payload para resolver una revisión (admin) */
 export interface ResolverRevisionPayload {
   resultado: 'APROBADA' | 'OBSERVADA';
