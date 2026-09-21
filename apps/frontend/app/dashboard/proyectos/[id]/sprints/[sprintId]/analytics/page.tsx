@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, ArrowLeft, BarChart3, CheckCircle2, Clock, Flag, ListChecks } from 'lucide-react';
-import { useSprintAnalytics } from '@/hooks/use-project-sprints';
+import { useSprintAnalytics, useSprintBurndown } from '@/hooks/use-project-sprints';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -13,6 +13,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { BurndownChart } from '@/components/projects/burndown-chart';
 import { ESTADO_LABEL, PRIORIDAD_LABEL } from '@/components/projects/task-board.utils';
 import type { EstadoHito, SprintAnalyticsDto } from '@/lib/types/sprints';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
@@ -166,6 +167,51 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
   );
 }
 
+/**
+ * T-240 (HU-160): sección independiente del resto de `AnalyticsContent` —
+ * su propia query (`useSprintBurndown`), así que un fallo o una carga lenta
+ * del burndown nunca bloquea el resto de la analítica ya cargada. Funciona
+ * igual para un Sprint `CERRADO` (mismo endpoint, mismas instantáneas
+ * históricas tomadas mientras estuvo activo).
+ */
+function BurndownSection({ idProyecto, idSprint }: { idProyecto: number; idSprint: number }) {
+  const { burndown, isLoading, isError, error, refetch } = useSprintBurndown(idProyecto, idSprint);
+
+  if (isLoading) {
+    return <Skeleton className="h-[340px] w-full rounded-xl" />;
+  }
+
+  if (isError) {
+    return (
+      <Empty tone="danger" role="alert">
+        <EmptyMedia variant="icon">
+          <AlertCircle aria-hidden="true" className="h-7 w-7" />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>
+            {error instanceof Error && error.message
+              ? error.message
+              : 'No fue posible cargar el burndown de este Sprint.'}
+          </EmptyTitle>
+        </EmptyHeader>
+        <EmptyContent>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+          >
+            Reintentar
+          </button>
+        </EmptyContent>
+      </Empty>
+    );
+  }
+
+  if (!burndown) return null;
+
+  return <BurndownChart burndown={burndown} />;
+}
+
 export default function SprintAnalyticsPage() {
   const { id, sprintId } = useParams<{ id: string; sprintId: string }>();
   const idProyecto = Number(id);
@@ -225,7 +271,14 @@ export default function SprintAnalyticsPage() {
         </Empty>
       )}
 
-      {!isLoading && !isError && analytics && <AnalyticsContent analytics={analytics} />}
+      {!isLoading && !isError && analytics && (
+        <>
+          <AnalyticsContent analytics={analytics} />
+          <div className="mt-6">
+            <BurndownSection idProyecto={idProyecto} idSprint={idSprint} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
