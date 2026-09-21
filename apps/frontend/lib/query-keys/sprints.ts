@@ -43,3 +43,11 @@ export const sprintAnalyticsQueryKey = (idProyecto: number, idSprint: number) =>
  */
 export const sprintsAnalyticsQueryKey = (idProyecto: number) =>
   ['sprints-analytics', idProyecto] as const;
+
+/**
+ * Burndown de un Sprint (T-240, HU-160) — read-model distinto de
+ * `sprint-analytics` (`GET .../burndown`, no `GET .../analytics`), mismo
+ * criterio de namespace propio + ambos ids.
+ */
+export const sprintBurndownQueryKey = (idProyecto: number, idSprint: number) =>
+  ['sprint-burndown', idProyecto, idSprint] as const;

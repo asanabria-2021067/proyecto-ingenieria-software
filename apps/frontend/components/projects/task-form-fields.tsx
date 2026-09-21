@@ -326,6 +326,32 @@ export function TaskFormFields({
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={control}
+              name="puntosHistoria"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Puntos de historia</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={100}
+                      step={1}
+                      placeholder="Opcional"
+                      className="h-10"
+                    />
+                  </FormControl>
+                  <FormDescription className="text-xs">
+                    Tamaño relativo del esfuerzo, usado en el burndown y la velocidad del sprint.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
         </div>
       </section>
