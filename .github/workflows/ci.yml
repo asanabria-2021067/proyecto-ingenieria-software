@@ -121,26 +121,13 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
-      # La suite de vitest+jsdom (~105 archivos) es pesada en memoria (ver
-      # vitest.config.ts) y no debe bloquear la velocidad del pipeline de
-      # deploy. Corre completa solo en PR (el gate real antes de mergear);
-      # en push/deploy el pipeline queda rapido con lint + el build de
-      # Next.js (ya corre en build-frontend de deploy.yml) como red de
-      # seguridad.
-      #
-      # Sin --coverage y en lotes de proceso separado: verificado en CI real
-      # que ninguna combinación de forks/techo de heap/cobertura evita que
-      # jsdom acumule memoria dentro de un mismo proceso hasta reventar
-      # (probado con 1, 2 y 4 forks, con y sin --coverage, siempre el mismo
-      # "heap out of memory" cerca de los ~6GB). Cada lote de 20 archivos
-      # corre como una invocación de vitest totalmente nueva: el proceso
-      # termina y libera toda su memoria antes de que arranque el próximo,
-      # así que ninguna acumulación puede cruzar de un lote a otro. Cada
-      # lote individual ya se verificó limpio y rápido en corridas locales.
-      - name: Pruebas unitarias (Vitest, sin cobertura, en lotes)
+      # La cobertura es un gate obligatorio en Pull Requests.
+      # Los umbrales se definen en apps/frontend/vitest.config.ts.
+      # Si la cobertura cae por debajo del mínimo acordado, Vitest
+      # termina con error y este job impide integrar el PR.
+      - name: Pruebas unitarias con cobertura (Vitest)
         if: github.event_name == 'pull_request'
-        run: |
-          ls test/*.spec.ts test/*.spec.tsx 2>/dev/null | xargs -n 10 npx vitest run
+        run: npm run test:coverage
 
   e2e:
     name: E2E - suite de humo (Playwright)
