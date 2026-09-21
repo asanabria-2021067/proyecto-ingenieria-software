@@ -301,6 +301,35 @@ describe('SocialService — buscarUsuarios', () => {
     expect(resultado.items[0]).toMatchObject({ mismaCarrera: true, amigosEnComun: 1 });
   });
 
+  // T-196: A y B no son amigos directos, pero comparten 2 amigos (C y D) —
+  // con amigosDeAmigos, B debe aparecer como candidato con el conteo real.
+  it('con amigosDeAmigos, calcula el conteo real cuando hay 2 amigos en común', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([
+      { idUsuario: 2, nombre: 'Beto', apellido: 'Gómez', fotoUrl: null, perfil: null, habilidades: [], intereses: [] },
+    ]);
+    prisma.amistad.findMany
+      .mockResolvedValueOnce([
+        { idUsuarioSolicitante: 1, idUsuarioReceptor: 3 },
+        { idUsuarioSolicitante: 1, idUsuarioReceptor: 4 },
+      ]) // amigos de A=1 (getAmigoIds dentro de getAmigosDeAmigosIds): C=3, D=4
+      .mockResolvedValueOnce([
+        { idUsuarioSolicitante: 1, idUsuarioReceptor: 3 },
+        { idUsuarioSolicitante: 1, idUsuarioReceptor: 4 },
+      ]) // mismos amigos de A, para idsAmigoActual
+      .mockResolvedValueOnce([]) // relación directa entre A=1 y el candidato B=2
+      .mockResolvedValueOnce([
+        { idUsuarioSolicitante: 2, idUsuarioReceptor: 3 },
+        { idUsuarioSolicitante: 4, idUsuarioReceptor: 2 },
+      ]); // B=2 es amigo tanto de C=3 como de D=4
+    prisma.$queryRaw.mockResolvedValue([{ idUsuario: 2 }]); // amigos-de-amigos de A: B=2
+    const { service } = makeService(prisma);
+
+    const resultado = await service.buscarUsuarios(1, { amigosDeAmigos: true });
+
+    expect(resultado.items[0]).toMatchObject({ idUsuario: 2, amigosEnComun: 2 });
+  });
+
   it('excluye al propio usuario del resultado', async () => {
     const prisma = makePrisma();
     prisma.usuario.findMany.mockResolvedValue([]);
