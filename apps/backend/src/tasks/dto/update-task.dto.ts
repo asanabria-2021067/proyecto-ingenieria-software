@@ -58,16 +58,18 @@ export class UpdateTaskDto {
   @Max(1000)
   tiempoEstimadoHoras?: number;
 
-  // `undefined` (campo omitido) conserva el hito actual; un entero positivo
-  // asigna/reemplaza el hito (incluida una tarea legacy que todavía no
-  // tenía uno). HU-147/T-185: a diferencia de idRolProyecto, `null`
-  // explícito ya NO se admite — quitaría el hito de una tarea que, al no
-  // existir backlog en este proyecto, ya está en el tablero/sprint.
+  // HU-160/T-240: mismo criterio que tiempoEstimadoHoras — se valida
+  // únicamente cuando se envía; si se omite, no se toca el valor almacenado.
   @ValidateIf((_object, value) => value !== undefined)
-  @IsInt({
-    message:
-      'idHito no puede quitarse: la tarea necesita un hito mientras esté en el tablero o en un sprint',
-  })
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  puntosHistoria?: number;
+
+  // `null` retira la relación; `undefined` (campo omitido) la conserva;
+  // cualquier otro valor debe validarse como entero positivo.
+  @ValidateIf((_object, value) => value !== undefined && value !== null)
+  @IsInt()
   @Min(1)
   idHito?: number;
 

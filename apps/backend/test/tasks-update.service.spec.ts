@@ -907,6 +907,7 @@ describe('TasksService.update', () => {
           'fechaLimite',
           'actualizadaEn',
           'tiempoEstimadoHoras',
+          'puntosHistoria',
           'asignacionActiva',
           'rolProyecto',
           'hito',

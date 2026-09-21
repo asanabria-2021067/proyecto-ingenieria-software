@@ -34,7 +34,7 @@ export interface ProjectIdRequestLike {
 }
 
 export type ResolvedProjectEntity =
-  | { type: 'task'; idTarea: number; idProyecto: number; idSprint: number; eliminadoEn: Date | null }
+  | { type: 'task'; idTarea: number; idProyecto: number; idSprint: number | null; eliminadoEn: Date | null }
   | {
       type: 'comment';
       idComentario: number;
@@ -43,7 +43,7 @@ export type ResolvedProjectEntity =
       idTarea: number | null;
       idHito: number | null;
       eliminadoEn: Date | null;
-      tarea: { idProyecto: number; idSprint: number } | null;
+      tarea: { idProyecto: number; idSprint: number | null } | null;
       hito: { idProyecto: number } | null;
     }
   | {

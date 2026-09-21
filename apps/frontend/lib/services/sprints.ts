@@ -1,11 +1,13 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   SprintAnalyticsDto,
+  SprintBurndownDto,
   SprintClosingMemberTotalsDto,
   SprintClosingSummaryDto,
   SprintComparativeAnalyticsDto,
   SprintDetailDto,
   SprintDto,
+  DestinoArrastre,
 } from '@/lib/types/sprints';
 
 export function getProjectSprints(idProyecto: number): Promise<SprintDto[]> {
@@ -17,9 +19,11 @@ export function getSprintDetail(idProyecto: number, idSprint: number): Promise<S
   return apiFetch<SprintDetailDto>(`/proyectos/${idProyecto}/sprints/${idSprint}`);
 }
 
-export function startSprint(idProyecto: number): Promise<SprintDto> {
+/** HU-160: fechaFinPlaneada es opcional — si se omite, el backend calcula fechaInicio + 14 días. */
+export function startSprint(idProyecto: number, fechaFinPlaneada?: string): Promise<SprintDto> {
   return apiFetch<SprintDto>(`/proyectos/${idProyecto}/sprints`, {
     method: 'POST',
+    body: JSON.stringify(fechaFinPlaneada ? { fechaFinPlaneada } : {}),
   });
 }
 
@@ -29,9 +33,10 @@ export function finalizeSprint(idProyecto: number, idSprint: number): Promise<Sp
   });
 }
 
-export function closeSprint(idProyecto: number, idSprint: number): Promise<SprintDto> {
+export function closeSprint(idProyecto: number, idSprint: number, destino?: DestinoArrastre): Promise<SprintDto> {
   return apiFetch<SprintDto>(`/proyectos/${idProyecto}/sprints/${idSprint}/cerrar`, {
     method: 'POST',
+    body: JSON.stringify(destino ? { destino } : {}),
   });
 }
 
@@ -67,4 +72,9 @@ export function getSprintAnalytics(idProyecto: number, idSprint: number): Promis
 /** Analítica comparativa entre Sprints del proyecto (T-173) — `GET /proyectos/:id/sprints/analytics`. */
 export function getSprintsAnalytics(idProyecto: number): Promise<SprintComparativeAnalyticsDto> {
   return apiFetch<SprintComparativeAnalyticsDto>(`/proyectos/${idProyecto}/sprints/analytics`);
+}
+
+/** Burndown de un Sprint (T-240, HU-160) — `GET /proyectos/:id/sprints/:sprintId/burndown`. */
+export function getSprintBurndown(idProyecto: number, idSprint: number): Promise<SprintBurndownDto> {
+  return apiFetch<SprintBurndownDto>(`/proyectos/${idProyecto}/sprints/${idSprint}/burndown`);
 }

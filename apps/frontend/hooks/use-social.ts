@@ -6,6 +6,7 @@ import {
   buscarUsuariosQueryKey,
   feedSocialQueryKey,
   perfilUsuarioQueryKey,
+  recomendacionesQueryKey,
   seguidoresQueryKey,
   siguiendoQueryKey,
   solicitudesAmistadPendientesQueryKey,
@@ -25,7 +26,8 @@ import {
   rechazarSolicitudAmistad,
   seguirUsuario,
 } from '@/lib/services/social';
-import type { BuscarUsuariosFiltros } from '@/lib/types/social';
+import { seleccionarRecomendaciones } from '@/lib/social/recomendaciones';
+import type { BuscarUsuariosFiltros, UsuarioBusquedaDto } from '@/lib/types/social';
 
 function invalidateSocialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: amigosQueryKey() });
@@ -33,6 +35,22 @@ function invalidateSocialQueries(queryClient: ReturnType<typeof useQueryClient>)
   queryClient.invalidateQueries({ queryKey: ['social-buscar-usuarios'] });
   queryClient.invalidateQueries({ queryKey: feedSocialQueryKey() });
   queryClient.invalidateQueries({ queryKey: ['social-perfil-usuario'] });
+  queryClient.invalidateQueries({ queryKey: recomendacionesQueryKey() });
+}
+
+export function useRecomendaciones() {
+  const query = useQuery({
+    queryKey: recomendacionesQueryKey(),
+    queryFn: async (): Promise<UsuarioBusquedaDto[]> => {
+      let { items } = await buscarUsuarios({ amigosDeAmigos: true, page: 1 });
+      if (items.length === 0) {
+        ({ items } = await buscarUsuarios({ carrera: true, page: 1 }));
+      }
+      return seleccionarRecomendaciones(items);
+    },
+  });
+
+  return { recomendaciones: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
 }
 
 export function useAmigos() {
@@ -108,6 +126,19 @@ export function useCrearSolicitudAmistad() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (idReceptor: number) => crearSolicitudAmistad(idReceptor),
+    onMutate: async (idReceptor: number) => {
+      await queryClient.cancelQueries({ queryKey: recomendacionesQueryKey() });
+      const previas = queryClient.getQueryData<UsuarioBusquedaDto[]>(recomendacionesQueryKey());
+      queryClient.setQueryData<UsuarioBusquedaDto[]>(recomendacionesQueryKey(), (actuales) =>
+        (actuales ?? []).filter((u) => u.idUsuario !== idReceptor),
+      );
+      return { previas };
+    },
+    onError: (_err, _idReceptor, context) => {
+      if (context?.previas) {
+        queryClient.setQueryData(recomendacionesQueryKey(), context.previas);
+      }
+    },
     onSuccess: () => invalidateSocialQueries(queryClient),
   });
 }

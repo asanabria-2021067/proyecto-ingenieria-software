@@ -96,6 +96,7 @@ const PUBLIC_TAREA_KEYS = [
   'fechaLimite',
   'actualizadaEn',
   'tiempoEstimadoHoras',
+  'puntosHistoria',
   'asignacionActiva',
   'rolProyecto',
   'hito',

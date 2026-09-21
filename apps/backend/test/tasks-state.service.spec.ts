@@ -405,6 +405,7 @@ describe('TasksService.updateEstado', () => {
           'fechaLimite',
           'actualizadaEn',
           'tiempoEstimadoHoras',
+          'puntosHistoria',
           'asignacionActiva',
           'rolProyecto',
           'hito',

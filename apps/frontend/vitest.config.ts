@@ -44,11 +44,14 @@ export default defineConfig({
         'app/**/layout.tsx',
         '.next/**',
       ],
+      // Estos umbrales son el mínimo de cobertura acordado por el equipo.
+      // Reducirlos requiere acuerdo explícito del equipo y no debe usarse
+      // como solución temporal para hacer pasar CI ante una regresión.
       thresholds: {
-        lines: 30,
+        lines: 55,
         functions: 60,
         branches: 60,
-        statements: 30,
+        statements: 55,
       },
     },
   },
