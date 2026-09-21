@@ -58,6 +58,7 @@ export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = ne
       }),
       fechaLimite: z.string().regex(DATE_FORMAT, 'Selecciona una fecha límite válida.'),
       tiempoEstimadoHoras: z.string(),
+      puntosHistoria: z.string(),
       idRolProyecto: z.string().min(1),
       idUsuarioAsignado: z.string().min(1),
       idHito: z.string().min(1),
@@ -80,6 +81,17 @@ export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = ne
             code: z.ZodIssueCode.custom,
             path: ['tiempoEstimadoHoras'],
             message: 'El tiempo estimado debe ser un número entero entre 1 y 1000.',
+          });
+        }
+      }
+
+      if (values.puntosHistoria !== '') {
+        const n = Number(values.puntosHistoria);
+        if (!Number.isInteger(n) || n < 1 || n > 100) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['puntosHistoria'],
+            message: 'Los puntos de historia deben ser un número entero entre 1 y 100.',
           });
         }
       }
@@ -121,6 +133,7 @@ export function defaultTaskFormValues(tarea: TareaPublicaDTO | null): TaskFormVa
       prioridad: 'MEDIA',
       fechaLimite: '',
       tiempoEstimadoHoras: '',
+      puntosHistoria: '',
       idRolProyecto: SIN_ROL,
       idUsuarioAsignado: SIN_ASIGNAR,
       idHito: SIN_HITO,
@@ -134,6 +147,7 @@ export function defaultTaskFormValues(tarea: TareaPublicaDTO | null): TaskFormVa
     prioridad: tarea.prioridad,
     fechaLimite: tarea.fechaLimite ?? '',
     tiempoEstimadoHoras: tarea.tiempoEstimadoHoras === null ? '' : String(tarea.tiempoEstimadoHoras),
+    puntosHistoria: tarea.puntosHistoria === null ? '' : String(tarea.puntosHistoria),
     idRolProyecto: tarea.idRolProyecto === null ? SIN_ROL : String(tarea.idRolProyecto),
     // Precarga el asignado activo; las asignaciones históricas nunca llegan
     // aquí (mapTarea ya filtra `desasignadaEn: null` en el backend).
@@ -156,6 +170,7 @@ export function buildCreatePayload(values: TaskFormValues): CreateTaskInput {
   if (descripcion !== '') input.descripcionTarea = descripcion;
 
   if (values.tiempoEstimadoHoras !== '') input.tiempoEstimadoHoras = Number(values.tiempoEstimadoHoras);
+  if (values.puntosHistoria !== '') input.puntosHistoria = Number(values.puntosHistoria);
   if (values.idHito !== SIN_HITO) input.idHito = Number(values.idHito);
   if (values.idRolProyecto !== SIN_ROL) input.idRolProyecto = Number(values.idRolProyecto);
   if (values.idUsuarioAsignado !== SIN_ASIGNAR) input.idUsuarioAsignado = Number(values.idUsuarioAsignado);
@@ -194,6 +209,11 @@ export function buildUpdatePayload(original: TareaPublicaDTO, values: TaskFormVa
   if (values.tiempoEstimadoHoras !== '') {
     const tiempoNuevo = Number(values.tiempoEstimadoHoras);
     if (tiempoNuevo !== original.tiempoEstimadoHoras) input.tiempoEstimadoHoras = tiempoNuevo;
+  }
+
+  if (values.puntosHistoria !== '') {
+    const puntosNuevos = Number(values.puntosHistoria);
+    if (puntosNuevos !== original.puntosHistoria) input.puntosHistoria = puntosNuevos;
   }
 
   const hitoNuevo = values.idHito === SIN_HITO ? null : Number(values.idHito);

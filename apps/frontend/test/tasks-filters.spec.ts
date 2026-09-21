@@ -32,6 +32,7 @@ function tarea(overrides: Partial<TareaTest> = {}): TareaTest {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    puntosHistoria: null,
     asignacionActiva: null,
     rolProyecto: null,
     hito: null,
