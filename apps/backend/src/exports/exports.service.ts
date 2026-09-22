@@ -6,6 +6,7 @@ import { SprintsService } from '../sprints/sprints.service';
 import { ProjectHoursSummaryService } from '../sprints/project-hours-summary.service';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacoraValor } from '../bitacora/tipos-evento-bitacora';
+import { SprintBurndownDto } from '../sprints/dto/sprint-burndown.dto';
 import { ProjectExportMemberDto, ProjectExportModel } from './dto/project-export.dto';
 
 /**
@@ -111,6 +112,24 @@ export class ExportsService {
         tipoEntidad: 'PROYECTO',
         idEntidad: projectId,
       }),
+    );
+  }
+
+  /**
+   * T-260 (HU-164, decisión del líder de proyecto, 2026-09-22): el burndown
+   * impreso solo cubre Sprints CERRADO — nunca el Sprint activo, cuyo
+   * burndown todavía cambia día a día. Mientras el proyecto no tenga NINGÚN
+   * Sprint cerrado, el caller pasa `[]` y esta función ni siquiera consulta
+   * (el PDF debe mostrar el aviso de "aún no disponible", no un burndown
+   * vacío). Sin autorización propia: el caller (ExportsController, vía el
+   * PDF) ya pasó por `getProjectExportModel` en la misma petición.
+   */
+  async getBurndownForClosedSprints(
+    projectId: number,
+    idsSprintsCerrados: number[],
+  ): Promise<SprintBurndownDto[]> {
+    return Promise.all(
+      idsSprintsCerrados.map((idSprint) => this.sprintsService.computeSprintBurndown(projectId, idSprint)),
     );
   }
 }
