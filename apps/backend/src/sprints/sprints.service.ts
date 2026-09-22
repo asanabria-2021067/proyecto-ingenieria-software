@@ -1531,7 +1531,18 @@ export class SprintsService {
       entitySprintId: sprintId,
     });
     await this.sprintsAuthorization.assertCanViewSprintAnalytics(projectId, sprintId, userId);
+    return this.computeSprintBurndown(projectId, sprintId);
+  }
 
+  /**
+   * T-259/T-260/T-261 (HU-164): datos crudos del burndown extraídos sin
+   * autorización propia, mismo motivo que `computeSprintsComparative` — el
+   * export de proyecto (ExportsService) ya autorizó al actor por su propio
+   * scope ('exportacion', que admite admin) antes de llamar aquí;
+   * `assertCanViewSprintAnalytics` exige líder o integrante activo y
+   * rechazaría a un admin exportador que no participa.
+   */
+  async computeSprintBurndown(projectId: number, sprintId: number): Promise<SprintBurndownDto> {
     const sprint = await this.prisma.sprint.findFirst({
       where: { idSprint: sprintId, idProyecto: projectId },
       select: {
