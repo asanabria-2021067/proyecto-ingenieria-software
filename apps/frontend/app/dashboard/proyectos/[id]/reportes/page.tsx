@@ -63,7 +63,8 @@ export default function ReportesProyectoPage() {
               <h2 className="mb-1 font-headline text-lg font-bold text-on-surface">Reporte PDF del proyecto</h2>
               <p className="text-sm text-tertiary">
                 Documento listo para entregar: datos del proyecto, líder, miembros, horas y avance por
-                Sprint. Los mismos números que ves en la plataforma.
+                Sprint. Incluye el burndown de cada Sprint cerrado (disponible desde que se cierra el
+                primero). Los mismos números que ves en la plataforma.
               </p>
             </div>
           </div>
