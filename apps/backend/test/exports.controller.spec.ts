@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import type { Response } from 'express';
-import { EstadoProyecto, TipoProyecto } from '@prisma/client';
+import { EstadoProyecto, EstadoSprint, TipoProyecto } from '@prisma/client';
 import { ExportsController } from '../src/exports/exports.controller';
 import type { ExportsService } from '../src/exports/exports.service';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
@@ -22,13 +22,15 @@ const MODELO_VACIO: ProjectExportModel = {
   avance: { idProyecto: 5, sprints: [] },
 };
 
-function makeExportsService() {
+function makeExportsService(modelo: ProjectExportModel = MODELO_VACIO) {
   return {
-    getProjectExportModel: vi.fn().mockResolvedValue(MODELO_VACIO),
+    getProjectExportModel: vi.fn().mockResolvedValue(modelo),
     registrarExportacion: vi.fn().mockResolvedValue(undefined),
+    getBurndownForClosedSprints: vi.fn().mockResolvedValue([]),
   } as unknown as ExportsService & {
     getProjectExportModel: ReturnType<typeof vi.fn>;
     registrarExportacion: ReturnType<typeof vi.fn>;
+    getBurndownForClosedSprints: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -116,6 +118,54 @@ describe('ExportsController (T-259/T-260/T-261)', () => {
       await expect(controller.exportPdf(5, { userId: 42 }, res)).rejects.toBeInstanceOf(ForbiddenException);
       expect(res.end).not.toHaveBeenCalled();
       expect(service.registrarExportacion).not.toHaveBeenCalled();
+    });
+
+    it('T-260: pide el burndown solo de los Sprints CERRADO, nunca del activo', async () => {
+      const modelo: ProjectExportModel = {
+        ...MODELO_VACIO,
+        avance: {
+          idProyecto: 5,
+          sprints: [
+            {
+              idSprint: 10,
+              numero: 1,
+              estado: EstadoSprint.CERRADO,
+              tareasPlanificadas: 4,
+              tareasCompletadas: 4,
+              porcentajeCumplimiento: 100,
+              hitosTotales: 0,
+              hitosCompletados: 0,
+            },
+            {
+              idSprint: 11,
+              numero: 2,
+              estado: EstadoSprint.ACTIVO,
+              tareasPlanificadas: 3,
+              tareasCompletadas: 1,
+              porcentajeCumplimiento: 33,
+              hitosTotales: 0,
+              hitosCompletados: 0,
+            },
+          ],
+        },
+      };
+      const service = makeExportsService(modelo);
+      const controller = new ExportsController(service);
+      const res = makeResponse();
+
+      await controller.exportPdf(5, { userId: 9 }, res);
+
+      expect(service.getBurndownForClosedSprints).toHaveBeenCalledWith(5, [10]);
+    });
+
+    it('T-260: sin ningún Sprint cerrado, igual llama a getBurndownForClosedSprints con []', async () => {
+      const service = makeExportsService();
+      const controller = new ExportsController(service);
+      const res = makeResponse();
+
+      await controller.exportPdf(5, { userId: 9 }, res);
+
+      expect(service.getBurndownForClosedSprints).toHaveBeenCalledWith(5, []);
     });
   });
 });
