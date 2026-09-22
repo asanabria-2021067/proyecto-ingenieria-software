@@ -57,6 +57,7 @@ const TASK_SELECT = {
   fechaLimite: true,
   actualizadaEn: true,
   tiempoEstimadoHoras: true,
+  puntosHistoria: true,
   hito: {
     select: { idHito: true, tituloHito: true },
   },
@@ -100,6 +101,7 @@ const UPDATE_TASK_FIELDS = [
   'fechaLimite',
   'prioridad',
   'tiempoEstimadoHoras',
+  'puntosHistoria',
   'idHito',
   'idRolProyecto',
   'idsEtiquetas',
@@ -152,6 +154,7 @@ export interface TareaPublica {
   fechaLimite: string | null;
   actualizadaEn: Date | null;
   tiempoEstimadoHoras: number | null;
+  puntosHistoria: number | null;
   asignacionActiva: AsignacionActivaPublica | null;
   rolProyecto: RolProyectoResumenPublico | null;
   hito: HitoResumenPublico | null;
@@ -192,6 +195,7 @@ function mapTarea(row: TareaRow): TareaPublica {
     fechaLimite: toDateOnly(row.fechaLimite),
     actualizadaEn: row.actualizadaEn,
     tiempoEstimadoHoras: row.tiempoEstimadoHoras,
+    puntosHistoria: row.puntosHistoria,
     asignacionActiva: asignacion
       ? {
           idAsignacion: asignacion.idAsignacion,
@@ -413,6 +417,7 @@ export class TasksService {
           // el enum real en vez de depender del @default(POR_HACER).
           estadoTarea: EstadoTarea.POR_HACER,
           tiempoEstimadoHoras: dto.tiempoEstimadoHoras ?? null,
+          puntosHistoria: dto.puntosHistoria ?? null,
           idHito: recursos.hito?.idHito ?? null,
           idRolProyecto: recursos.rolProyecto?.idRolProyecto ?? null,
         },
@@ -599,6 +604,9 @@ export class TasksService {
       }
       if (Object.prototype.hasOwnProperty.call(dto, 'tiempoEstimadoHoras')) {
         data.tiempoEstimadoHoras = dto.tiempoEstimadoHoras;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'puntosHistoria')) {
+        data.puntosHistoria = dto.puntosHistoria;
       }
       if (Object.prototype.hasOwnProperty.call(dto, 'fechaLimite')) {
         data.fechaLimite = new Date(`${dto.fechaLimite}T00:00:00.000Z`);

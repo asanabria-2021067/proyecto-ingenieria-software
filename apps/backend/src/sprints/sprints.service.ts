@@ -1,5 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { addDays } from 'date-fns';
+import { DestinoArrastre, EstadoHito, EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
@@ -22,6 +23,7 @@ import {
   SprintComparativeAnalyticsDto,
   SprintComparativeAnalyticsItemDto,
 } from './dto/sprint-analytics.dto';
+import { SprintBurndownDto } from './dto/sprint-burndown.dto';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import {
@@ -33,6 +35,7 @@ import { ProjectPolicyService } from '../common/project-policy/project-policy.se
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { ProjectHoursSummaryService } from './project-hours-summary.service';
 import { HoursRecognitionService } from './hours-recognition.service';
+import { SprintSnapshotsService } from './sprint-snapshots.service';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): iniciar, finalizar y cerrar un Sprint
@@ -41,6 +44,14 @@ import { HoursRecognitionService } from './hours-recognition.service';
  * `ACTIVO`/`EN_FINALIZACION`; el cuerpo de consolidación de `closeSprint` se
  * conserva tal cual hasta su propio commit.
  */
+/**
+ * HU-160: duración por defecto (en días calendario) de la fecha fin
+ * planeada de un Sprint cuando `startSprint` no la recibe explícita — mismo
+ * criterio que el modal "Start Sprint" de Jira, pero sin bloquear los
+ * llamados existentes que aún no la envían.
+ */
+const DURACION_PLANEADA_DEFAULT_DIAS = 14;
+
 /** Participante que aparece por su agregado pero no tiene tramos en el Sprint. */
 const SIN_TRAMOS: SprintClosingMemberTotalsDto = {
   tareasDistintas: 0,
@@ -76,15 +87,20 @@ export class SprintsService {
     // servicio; `closeSprint` solo lo ORQUESTA y es el único que cambia el
     // estado del Sprint.
     private readonly recognition?: HoursRecognitionService,
+    // T-238 (HU-160): la instantánea diaria vive en su propio servicio;
+    // Sprints solo decide quién puede pedir la regeneración manual de hoy.
+    private readonly snapshots?: SprintSnapshotsService,
   ) {}
 
   /**
    * C075 (06 v2 §12): las cuatro revalidaciones de finalización, siempre bajo
    * el lock y siempre sobre el conjunto HISTÓRICO. El detalle importa:
    *
-   *   F1 — las tareas operativas están HECHO y con traza: un HECHO sin
-   *        ninguna asignación histórica no es trabajo realizado, es una
-   *        casilla marcada.
+   *   F1 — toda tarea marcada HECHO tiene traza: un HECHO sin ninguna
+   *        asignación histórica no es trabajo realizado, es una casilla
+   *        marcada. Desde HU-148/HU-160 ya NO exige que todas las tareas
+   *        estén HECHO — cerrar con pendientes es válido (ver comentario
+   *        junto al filtro `sinTraza`).
    *   F2 — NINGUNA asignación del Sprint sigue abierta, **incluidas las de
    *        tareas eliminadas**: borrar la tarea no cierra el tramo, y un
    *        tramo abierto al consolidar dejaría horas fuera del corte.
@@ -109,16 +125,22 @@ export class SprintsService {
       where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
       select: { idTarea: true, estadoTarea: true, _count: { select: { asignaciones: true } } },
     });
-    const pendientes = tareas.filter((tarea) => tarea.estadoTarea !== EstadoTarea.HECHO);
-    if (pendientes.length > 0) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'SPRINT_F1_TAREAS_PENDIENTES',
-        message: 'No se puede finalizar el Sprint mientras existan tareas pendientes',
-        idsTarea: pendientes.map((tarea) => tarea.idTarea),
-      });
-    }
-    const sinTraza = tareas.filter((tarea) => tarea._count.asignaciones === 0);
+    // HU-148 (mini, vía HU-160): aquí existía un bloqueo
+    // (SPRINT_F1_TAREAS_PENDIENTES) que impedía finalizar/cerrar el Sprint si
+    // quedaba alguna tarea no HECHO. Se quita a propósito: cerrar con
+    // pendientes es lo que permite que el cumplimiento congelado (T-239)
+    // refleje arrastre real en vez de ser 100% por construcción. Una tarea
+    // pendiente de un Sprint cerrado se queda registrada contra ESE Sprint —
+    // no hay arrastre automático a un Sprint siguiente, eso es explícitamente
+    // otro alcance.
+    //
+    // Como consecuencia, `tareas` ya NO está garantizado HECHO en su
+    // totalidad (ese bloqueo era justamente lo que lo garantizaba) — este
+    // predicado filtra explícitamente por HECHO para no acusar de "sin traza"
+    // a una tarea pendiente que legítimamente nadie tomó todavía.
+    const sinTraza = tareas.filter(
+      (tarea) => tarea.estadoTarea === EstadoTarea.HECHO && tarea._count.asignaciones === 0,
+    );
     if (sinTraza.length > 0) {
       throw new ConflictException({
         statusCode: 409,
@@ -209,6 +231,80 @@ export class SprintsService {
     return { f1: tareas.length, f2: abiertas.length, f3: conHoras.length, f4: granulares.length };
   }
 
+  /**
+   * T-239 (HU-160): mismo criterio de agregación que `getSprintsAnalytics`
+   * (tareas no eliminadas del Sprint + Hitos DISTINTOS que esas tareas
+   * referencian), pero acotado a UN sprint y llamado dentro de la
+   * transacción de `closeSprint` — nunca se invoca fuera de ahí, así que
+   * siempre corre bajo el lock del proyecto.
+   */
+  private async calcularCongeladoDeCierreTx(
+    tx: Prisma.TransactionClient,
+    projectId: number,
+    sprintId: number,
+  ): Promise<{
+    tareasPlanificadasCierre: number;
+    tareasCompletadasCierre: number;
+    tareasArrastradasCierre: number;
+    hitosTotalesCierre: number;
+    hitosCompletadosCierre: number;
+    porcentajeCumplimientoCierre: number;
+    puntosHistoriaPlanificadosCierre: number | null;
+    puntosHistoriaCompletadosCierre: number | null;
+  }> {
+    const tareas = await tx.tarea.findMany({
+      where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
+      select: { estadoTarea: true, idHito: true, puntosHistoria: true },
+    });
+
+    const completadas = tareas.filter((tarea) => tarea.estadoTarea === EstadoTarea.HECHO);
+    const tareasPlanificadasCierre = tareas.length;
+    const tareasCompletadasCierre = completadas.length;
+    const tareasArrastradasCierre = tareasPlanificadasCierre - tareasCompletadasCierre;
+    const porcentajeCumplimientoCierre =
+      tareasPlanificadasCierre === 0
+        ? 0
+        : Math.round((tareasCompletadasCierre / tareasPlanificadasCierre) * 100);
+    // T-241 (HU-160): si el Sprint tiene tareas pero NINGUNA lleva story
+    // points, congelamos `null` (no `0`) — "sin puntos asignados" no es lo
+    // mismo que "0 puntos completados", y la comparativa debe poder
+    // distinguirlo explícitamente en vez de mostrar una velocidad falsa.
+    const sinPuntosHistoriaAsignados =
+      tareas.length > 0 && tareas.every((tarea) => tarea.puntosHistoria === null);
+    const puntosHistoriaPlanificadosCierre = sinPuntosHistoriaAsignados
+      ? null
+      : tareas.reduce((acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0), 0);
+    const puntosHistoriaCompletadosCierre = sinPuntosHistoriaAsignados
+      ? null
+      : completadas.reduce((acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0), 0);
+
+    const idsHitosDistintos = [
+      ...new Set(
+        tareas
+          .map((tarea) => tarea.idHito)
+          .filter((idHito): idHito is number => idHito !== null),
+      ),
+    ];
+    const hitosTotalesCierre = idsHitosDistintos.length;
+    const hitosCompletadosCierre =
+      idsHitosDistintos.length === 0
+        ? 0
+        : await tx.hito.count({
+            where: { idHito: { in: idsHitosDistintos }, estadoHito: EstadoHito.COMPLETADO },
+          });
+
+    return {
+      tareasPlanificadasCierre,
+      tareasCompletadasCierre,
+      tareasArrastradasCierre,
+      hitosTotalesCierre,
+      hitosCompletadosCierre,
+      porcentajeCumplimientoCierre,
+      puntosHistoriaPlanificadosCierre,
+      puntosHistoriaCompletadosCierre,
+    };
+  }
+
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
     if (!ctx.project) {
       throw new NotFoundException('Proyecto no encontrado');
@@ -239,7 +335,7 @@ export class SprintsService {
    * un posible número duplicado pudiera materializarse en una fila
    * persistida.
    */
-  async startSprint(projectId: number, userId: number) {
+  async startSprint(projectId: number, userId: number, fechaFinPlaneada?: string) {
     return this.projectTx.run(projectId, userId, 'sprints.startSprint', async (ctx) => {
       const { tx } = ctx;
       await this.sprintsAuthorization.assertCanStartSprint(projectId, userId, tx);
@@ -261,6 +357,15 @@ export class SprintsService {
       });
       const siguienteNumero = (ultimoSprint?.numero ?? 0) + 1;
 
+      // HU-160: fecha fin planeada explícita, o `fechaInicio + 14 días` por
+      // defecto — ancla únicamente la línea ideal del burndown (T-240); el
+      // cierre real del Sprint sigue siendo el flujo Finalizar -> Cerrar,
+      // independiente de esta fecha.
+      const fechaInicio = new Date();
+      const fechaFinPlaneadaResuelta = fechaFinPlaneada
+        ? new Date(`${fechaFinPlaneada}T00:00:00.000Z`)
+        : addDays(fechaInicio, DURACION_PLANEADA_DEFAULT_DIAS);
+
       let sprintCreado;
       try {
         sprintCreado = await tx.sprint.create({
@@ -268,6 +373,8 @@ export class SprintsService {
             idProyecto: projectId,
             numero: siguienteNumero,
             estado: EstadoSprint.ACTIVO,
+            fechaInicio,
+            fechaFinPlaneada: fechaFinPlaneadaResuelta,
           },
         });
       } catch (error) {
@@ -292,16 +399,46 @@ export class SprintsService {
         valorNuevo: { numero: sprintCreado.numero },
       });
 
+      await tx.tarea.updateMany({
+        where: {
+          idProyecto: projectId,
+          idSprint: null,
+          destinoArrastre: DestinoArrastre.SIGUIENTE_SPRINT,
+          eliminadoEn: null,
+        },
+        data: {
+          idSprint: sprintCreado.idSprint,
+          destinoArrastre: null,
+        },
+      });
+
       return sprintCreado;
     });
+  }
+
+  /**
+   * T-238 (HU-160): regenera la instantánea de HOY del Sprint (exclusivo del
+   * líder). Nunca puede tocar una fecha pasada — `SprintSnapshotsService`
+   * siempre calcula la fecha internamente como "hoy", nunca la recibe de
+   * este método ni del llamador. Fuera de transacción: es una lectura del
+   * estado actual seguida de un upsert idempotente, no una transición de
+   * estado del Sprint.
+   */
+  async regenerarInstantaneaDeHoy(projectId: number, sprintId: number, userId: number) {
+    await this.sprintsAuthorization.assertCanManageSprintSnapshot(projectId, sprintId, userId);
+    if (!this.snapshots) {
+      throw new Error('SprintSnapshotsService no está disponible');
+    }
+    return this.snapshots.generarInstantaneaDelDia(sprintId);
   }
 
   /**
    * Finaliza el Sprint (ACTIVO -> EN_FINALIZACION): exclusivo del líder
    * (reutiliza SprintsAuthorizationService.assertCanFinalizeSprint, que ya
    * aísla projectId+sprintId — Contrato A1/A3), solo si el Sprint sigue
-   * ACTIVO y todas sus tareas (no eliminadas) están HECHO. Toda la
-   * validación y la transición ocurren dentro de una única transacción:
+   * ACTIVO. Desde HU-148/HU-160 ya NO exige que todas las tareas estén
+   * HECHO — cerrar con pendientes es válido (ver `assertFinalizationPredicatesTx`).
+   * Toda la validación y la transición ocurren dentro de una única transacción:
    *
    *   autorización -> estado ACTIVO -> tareas no-HECHO -> updateMany
    *   condicionado por estado=ACTIVO -> lectura final
@@ -792,7 +929,7 @@ export class SprintsService {
    * es una señal técnica realtime para que F6 invalide/oculte el banner de
    * bloqueo, no un mensaje de bandeja.
    */
-  async closeSprint(projectId: number, sprintId: number, userId: number) {
+  async closeSprint(projectId: number, sprintId: number, userId: number, destino?: DestinoArrastre) {
     const sprintCerrado = await this.projectTx.run(
       projectId,
       userId,
@@ -855,6 +992,34 @@ export class SprintsService {
         });
       }
 
+      // T-239 (HU-160): congela la fila ANTES de la transición — en la misma
+      // transacción que la vuelve CERRADO, así que si cualquier paso
+      // posterior lanza, el congelamiento se revierte junto con todo lo
+      // demás. A partir de aquí, `getSprintsAnalytics` deja de recalcular
+      // este Sprint desde `tarea`: lee estas columnas tal cual quedaron hoy,
+      // sin importar qué corrección se le haga después a una tarea vieja.
+      const congelado = await this.calcularCongeladoDeCierreTx(tx, projectId, sprintId);
+
+      if (congelado.tareasArrastradasCierre > 0) {
+        if (!destino) {
+          throw new BadRequestException(
+            'El Sprint tiene tareas pendientes: se requiere elegir destino (SIGUIENTE_SPRINT o BACKLOG)',
+          );
+        }
+        await tx.tarea.updateMany({
+          where: {
+            idProyecto: projectId,
+            idSprint: sprintId,
+            eliminadoEn: null,
+            estadoTarea: { not: EstadoTarea.HECHO },
+          },
+          data: {
+            idSprint: null,
+            destinoArrastre: destino,
+          },
+        });
+      }
+
       const actualizado = await tx.sprint.updateMany({
         where: {
           idSprint: sprintId,
@@ -865,6 +1030,7 @@ export class SprintsService {
           estado: EstadoSprint.CERRADO,
           fechaCierre: new Date(),
           cerradoPor: userId,
+          ...congelado,
         },
       });
 
@@ -904,6 +1070,14 @@ export class SprintsService {
           estado: EstadoSprint.CERRADO,
           fechaCierre: filaFinal.fechaCierre?.toISOString() ?? null,
           cerradoPor: userId,
+          // T-191 (HU-148): mismo conteo que congela T-239/T-189 en
+          // `sprint.tareasArrastradasCierre` — se lee de `congelado`, nunca
+          // se recalcula aquí, para no tener dos fuentes de verdad.
+          tareasArrastradas: congelado.tareasArrastradasCierre,
+          // Destino real que T-189 usó para mover las tareas pendientes
+          // (SIGUIENTE_SPRINT o BACKLOG) — null cuando no hubo arrastre, ya
+          // que en ese caso `destino` nunca se exige ni se usa.
+          destinoArrastre: congelado.tareasArrastradasCierre > 0 ? destino ?? null : null,
         },
       });
 
@@ -1333,6 +1507,87 @@ export class SprintsService {
   }
 
   /**
+   * T-240 (HU-160): datos crudos del burndown de un Sprint — el front
+   * dibuja la línea ideal (`fechaInicio` -> `fechaFinPlaneada`) y la línea
+   * real (`instantaneas`, sin rellenar huecos). Misma autorización que
+   * `getSprintAnalytics` (líder o integrante activo): es analítica, no
+   * gestión del Sprint.
+   *
+   * El total planeado sigue el mismo criterio de congelamiento que T-239:
+   * un Sprint `CERRADO` reporta sus columnas `*Cierre` (ya congeladas por
+   * `closeSprint`, nunca recalculadas); uno `ACTIVO`/`EN_FINALIZACION`
+   * agrega en vivo TODAS sus tareas vigentes (HECHO o no — es "lo
+   * planeado", no "lo pendiente").
+   */
+  async getSprintBurndown(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+  ): Promise<SprintBurndownDto> {
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'sprints',
+      entitySprintId: sprintId,
+    });
+    await this.sprintsAuthorization.assertCanViewSprintAnalytics(projectId, sprintId, userId);
+
+    const sprint = await this.prisma.sprint.findFirst({
+      where: { idSprint: sprintId, idProyecto: projectId },
+      select: {
+        idSprint: true,
+        estado: true,
+        fechaInicio: true,
+        fechaFinPlaneada: true,
+        tareasPlanificadasCierre: true,
+        puntosHistoriaPlanificadosCierre: true,
+      },
+    });
+    if (!sprint) {
+      throw new NotFoundException(
+        `Sprint con id ${sprintId} no encontrado en el proyecto ${projectId}`,
+      );
+    }
+
+    let tareasPlanificadasTotal: number;
+    let puntosHistoriaPlanificadosTotal: number;
+    if (sprint.estado === EstadoSprint.CERRADO) {
+      tareasPlanificadasTotal = sprint.tareasPlanificadasCierre ?? 0;
+      puntosHistoriaPlanificadosTotal = sprint.puntosHistoriaPlanificadosCierre ?? 0;
+    } else {
+      const tareas = await this.prisma.tarea.findMany({
+        where: { idProyecto: projectId, idSprint: sprintId, eliminadoEn: null },
+        select: { puntosHistoria: true },
+      });
+      tareasPlanificadasTotal = tareas.length;
+      puntosHistoriaPlanificadosTotal = tareas.reduce(
+        (acumulado, tarea) => acumulado + (tarea.puntosHistoria ?? 0),
+        0,
+      );
+    }
+
+    const instantaneasRows = await this.prisma.instantaneaSprint.findMany({
+      where: { idSprint: sprintId },
+      select: { fecha: true, tareasPendientes: true, tareasCompletadas: true, puntosHistoriaRestantes: true },
+      orderBy: { fecha: 'asc' },
+    });
+
+    return {
+      idSprint: sprint.idSprint,
+      fechaInicio: sprint.fechaInicio.toISOString(),
+      fechaFinPlaneada: sprint.fechaFinPlaneada ? sprint.fechaFinPlaneada.toISOString() : null,
+      tareasPlanificadasTotal,
+      puntosHistoriaPlanificadosTotal,
+      instantaneas: instantaneasRows.map((fila) => ({
+        fecha: fila.fecha.toISOString(),
+        tareasPendientes: fila.tareasPendientes,
+        tareasCompletadas: fila.tareasCompletadas,
+        puntosHistoriaRestantes: fila.puntosHistoriaRestantes,
+      })),
+    };
+  }
+
+  /**
    * T-173 (HU-143): analítica comparativa entre TODOS los Sprints del
    * proyecto — cumplimiento por Sprint, planificado frente a completado,
    * evolución de hitos y tareas completadas por Sprint. Restricción
@@ -1359,6 +1614,20 @@ export class SprintsService {
    * A12 — esta consulta nunca lo recalcula). Un Sprint sin tareas/hitos
    * nunca desaparece del resultado (`LEFT JOIN` + `COALESCE(..., 0)`), igual
    * que `getSprintAggregatesByProject`.
+   *
+   * T-239 (HU-160): para un Sprint `CERRADO`, los cuatro campos se leen de
+   * las columnas `*Cierre` congeladas por `calcularCongeladoDeCierreTx`
+   * (escritas una única vez dentro de `closeSprint`) en vez de recalcularse
+   * desde `tarea` — así una corrección posterior sobre una tarea de un
+   * Sprint ya cerrado ajusta el Sprint EN CURSO, pero nunca reescribe la
+   * fila ya congelada. `ACTIVO`/`EN_FINALIZACION` siguen el cálculo en vivo
+   * de siempre.
+   *
+   * T-241 (HU-160): `puntosHistoriaCompletados` (la velocidad, en story
+   * points) se lee EXCLUSIVAMENTE de `puntos_historia_completados_cierre`
+   * para Sprints `CERRADO` — a propósito, sin la rama "en vivo" que sí
+   * tienen los demás campos: la velocidad solo existe una vez que el Sprint
+   * cerró y su congelado quedó fijo (`null` en cualquier otro estado).
    */
   async getSprintsAnalytics(
     projectId: number,
@@ -1424,10 +1693,26 @@ export class SprintsService {
         s.id_sprint AS "idSprint",
         s.numero AS "numero",
         s.estado AS "estado",
-        COALESCE(ta."tareasPlanificadas", 0) AS "tareasPlanificadas",
-        COALESCE(ta."tareasCompletadas", 0) AS "tareasCompletadas",
-        COALESCE(ha."hitosTotales", 0) AS "hitosTotales",
-        COALESCE(ha."hitosCompletados", 0) AS "hitosCompletados"
+        CASE WHEN s.estado = 'CERRADO'
+          THEN COALESCE(s.tareas_planificadas_cierre, 0)
+          ELSE COALESCE(ta."tareasPlanificadas", 0)
+        END AS "tareasPlanificadas",
+        CASE WHEN s.estado = 'CERRADO'
+          THEN COALESCE(s.tareas_completadas_cierre, 0)
+          ELSE COALESCE(ta."tareasCompletadas", 0)
+        END AS "tareasCompletadas",
+        CASE WHEN s.estado = 'CERRADO'
+          THEN COALESCE(s.hitos_totales_cierre, 0)
+          ELSE COALESCE(ha."hitosTotales", 0)
+        END AS "hitosTotales",
+        CASE WHEN s.estado = 'CERRADO'
+          THEN COALESCE(s.hitos_completados_cierre, 0)
+          ELSE COALESCE(ha."hitosCompletados", 0)
+        END AS "hitosCompletados",
+        CASE WHEN s.estado = 'CERRADO'
+          THEN s.puntos_historia_completados_cierre
+          ELSE NULL
+        END AS "puntosHistoriaCompletados"
       FROM sprint s
       LEFT JOIN tareas_agregadas ta ON ta."idSprint" = s.id_sprint
       LEFT JOIN hitos_agregados ha ON ha."idSprint" = s.id_sprint

@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
@@ -86,6 +86,7 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    puntosHistoria: null,
     asignacionActiva: null,
     rolProyecto: null,
     hito: null,
@@ -156,6 +157,7 @@ function sprint(overrides: Partial<SprintDto> = {}): SprintDto {
     numero: 1,
     estado: 'ACTIVO',
     fechaInicio: '2026-01-01T00:00:00.000Z',
+    fechaFinPlaneada: null,
     fechaFinalizacionIniciada: null,
     fechaCierre: null,
     ...overrides,
@@ -544,29 +546,35 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     expect(screen.getByRole('button', { name: /nueva tarea/i })).toBeInTheDocument();
   });
 
-  it('Caso 5 — "Iniciar Sprint" invoca la mutación de F1 exactamente una vez', () => {
+  it('Caso 5 (HU-160) — "Iniciar Sprint" abre el diálogo de fecha planeada y confirmar invoca la mutación de F1 exactamente una vez', async () => {
     mockUseProjectSprints({ sprints: [] });
-    const mutate = vi.fn();
-    mockUseStartSprint({ mutate });
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    mockUseStartSprint({ mutateAsync });
 
     renderWorkspace();
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sprint' }));
 
-    expect(mutate).toHaveBeenCalledTimes(1);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Iniciar Sprint' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     expect(useStartSprint).toHaveBeenCalledWith(42);
   });
 
-  it('Caso 6 — mientras startSprint está pendiente, el botón queda disabled y evita doble click', () => {
+  it('Caso 6 (HU-160) — mientras startSprint está pendiente, el botón de confirmar del diálogo queda disabled y evita doble click', () => {
     mockUseProjectSprints({ sprints: [] });
-    const mutate = vi.fn();
-    mockUseStartSprint({ mutate, isPending: true });
+    const mutateAsync = vi.fn();
+    mockUseStartSprint({ mutateAsync, isPending: true });
 
     renderWorkspace();
-    const boton = screen.getByRole('button', { name: /iniciando/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sprint' }));
+
+    const dialog = screen.getByRole('dialog');
+    const boton = within(dialog).getByRole('button', { name: /iniciando/i });
     expect(boton).toBeDisabled();
 
     fireEvent.click(boton);
-    expect(mutate).not.toHaveBeenCalled();
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 
   it('Caso 7 — mientras useProjectSprints está cargando no aparece el falso Empty state', () => {

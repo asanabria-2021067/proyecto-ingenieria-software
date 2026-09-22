@@ -134,6 +134,7 @@ interface IntegrationTaskOverrides {
   tituloTarea?: string;
   estadoTarea?: EstadoTarea;
   idRolProyecto?: number | null;
+  puntosHistoria?: number | null;
 }
 
 /**
@@ -159,6 +160,7 @@ export async function createIntegrationTask(
       tituloTarea: overrides.tituloTarea ?? `Tarea ${randomUUID()}`,
       ...(overrides.estadoTarea !== undefined ? { estadoTarea: overrides.estadoTarea } : {}),
       ...(overrides.idRolProyecto !== undefined ? { idRolProyecto: overrides.idRolProyecto } : {}),
+      ...(overrides.puntosHistoria !== undefined ? { puntosHistoria: overrides.puntosHistoria } : {}),
     },
   });
 }

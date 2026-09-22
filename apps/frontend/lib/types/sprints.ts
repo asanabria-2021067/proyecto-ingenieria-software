@@ -17,12 +17,15 @@ import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 
 export type EstadoSprint = 'ACTIVO' | 'EN_FINALIZACION' | 'CERRADO';
 
+export type DestinoArrastre = 'SIGUIENTE_SPRINT' | 'BACKLOG';
+
 export interface SprintDto {
   idSprint: number;
   idProyecto: number;
   numero: number;
   estado: EstadoSprint;
   fechaInicio: string;
+  fechaFinPlaneada: string | null;
   fechaFinalizacionIniciada: string | null;
   fechaCierre: string | null;
   cerradoPor?: number | null;
@@ -100,6 +103,7 @@ export interface SprintDetailDto {
   numero: number;
   estado: EstadoSprint;
   fechaInicio: string;
+  fechaFinPlaneada: string | null;
   fechaFinalizacionIniciada: string | null;
   fechaCierre: string | null;
   cerradoPor: number | null;
@@ -274,8 +278,15 @@ export interface SprintAnalyticsDto {
 
 /**
  * Un elemento de `GET /proyectos/:projectId/sprints/analytics` (T-173,
- * HU-143) — refleja `SprintComparativeAnalyticsItemDto`. El campo se llama
- * literalmente `tareasCompletadas`, nunca "velocity".
+ * HU-143) — refleja `SprintComparativeAnalyticsItemDto`. `tareasCompletadas`
+ * es un conteo de tareas, no la velocidad del Sprint.
+ *
+ * `puntosHistoriaCompletados` (T-241, HU-160) es la velocidad real, en story
+ * points, leída EXCLUSIVAMENTE del congelado de T-239 — nunca del estado
+ * actual de las tareas. `null` para un Sprint que no está `CERRADO` (todavía
+ * no hay congelado), y también para un Sprint `CERRADO` cuyas tareas no
+ * tenían ningún story point asignado: esa ausencia de dato nunca se
+ * confunde con "0 puntos completados".
  */
 export interface SprintComparativeAnalyticsItemDto {
   idSprint: number;
@@ -286,9 +297,32 @@ export interface SprintComparativeAnalyticsItemDto {
   porcentajeCumplimiento: number;
   hitosTotales: number;
   hitosCompletados: number;
+  puntosHistoriaCompletados: number | null;
 }
 
 export interface SprintComparativeAnalyticsDto {
   idProyecto: number;
   sprints: SprintComparativeAnalyticsItemDto[];
+}
+
+/**
+ * `GET /proyectos/:projectId/sprints/:sprintId/burndown` (T-240, HU-160) —
+ * refleja `SprintBurndownDto`. `instantaneas` viene tal cual T-238 las
+ * guardó, sin rellenar huecos: un día sin fila es un hueco real que el
+ * gráfico debe mostrar como corte, nunca interpolar.
+ */
+export interface SprintBurndownInstantaneaDto {
+  fecha: string;
+  tareasPendientes: number;
+  tareasCompletadas: number;
+  puntosHistoriaRestantes: number;
+}
+
+export interface SprintBurndownDto {
+  idSprint: number;
+  fechaInicio: string;
+  fechaFinPlaneada: string | null;
+  tareasPlanificadasTotal: number;
+  puntosHistoriaPlanificadosTotal: number;
+  instantaneas: SprintBurndownInstantaneaDto[];
 }
