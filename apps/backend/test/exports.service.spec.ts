@@ -102,6 +102,16 @@ function makeDeps(overrides: {
 
   const sprintsService = {
     computeSprintsComparative: vi.fn().mockResolvedValue(AVANCE_BASE),
+    computeSprintBurndown: vi.fn().mockImplementation((projectId: number, idSprint: number) =>
+      Promise.resolve({
+        idSprint,
+        fechaInicio: '2026-01-01T00:00:00.000Z',
+        fechaFinPlaneada: '2026-01-15T00:00:00.000Z',
+        tareasPlanificadasTotal: 4,
+        puntosHistoriaPlanificadosTotal: 13,
+        instantaneas: [],
+      }),
+    ),
   } as unknown as SprintsService;
 
   const projectHours = {
@@ -237,5 +247,29 @@ describe('ExportsService.registrarExportacion', () => {
         idEntidad: 5,
       }),
     );
+  });
+});
+
+describe('ExportsService.getBurndownForClosedSprints (T-260)', () => {
+  it('pide el burndown de cada sprint cerrado, sin autorizar de nuevo (el caller ya autorizó)', async () => {
+    const deps = makeDeps();
+    const service = makeService(deps);
+
+    const burndowns = await service.getBurndownForClosedSprints(5, [10, 11]);
+
+    expect(deps.sprintsService.computeSprintBurndown).toHaveBeenCalledWith(5, 10);
+    expect(deps.sprintsService.computeSprintBurndown).toHaveBeenCalledWith(5, 11);
+    expect(burndowns).toHaveLength(2);
+    expect(burndowns.map((b) => b.idSprint)).toEqual([10, 11]);
+  });
+
+  it('una lista vacía de sprints cerrados no llama a computeSprintBurndown y devuelve []', async () => {
+    const deps = makeDeps();
+    const service = makeService(deps);
+
+    const burndowns = await service.getBurndownForClosedSprints(5, []);
+
+    expect(deps.sprintsService.computeSprintBurndown).not.toHaveBeenCalled();
+    expect(burndowns).toEqual([]);
   });
 });
