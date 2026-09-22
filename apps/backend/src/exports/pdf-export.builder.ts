@@ -4,7 +4,9 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatFechaCsv } from './csv-export.util';
 import { formatEstadoParticipacion, formatTipoProyecto } from './project-export-labels';
+import { drawBurndownChart } from './burndown-chart.builder';
 import type { ProjectExportModel } from './dto/project-export.dto';
+import type { SprintBurndownDto } from '../sprints/dto/sprint-burndown.dto';
 
 /**
  * T-260 (HU-164): render del reporte de proyecto EN EL PROCESO de Node —
@@ -46,14 +48,16 @@ interface DocConAutoTable {
 const MIEMBROS_HEADER = ['Integrante', 'Rol', 'Estado', 'Horas confirmadas', 'Horas pendientes'] as const;
 const AVANCE_HEADER = ['Sprint', 'Estado', 'Tareas planificadas', 'Tareas completadas', '% cumplimiento'] as const;
 const MARGEN = { top: 40, bottom: 40, left: 40, right: 40 };
+const A4_HEIGHT_PT = 841.89;
+const BURNDOWN_BLOCK_ALTO_ESTIMADO = 190;
 
 /**
- * T-260: sección de avance aislada a propósito. Hoy compone la tabla desde
- * `SprintComparativeAnalyticsDto` (distribución de tareas/hitos por Sprint,
- * SIN velocity ni puntos de historia — restricción vigente de HU-143). El
- * burndown (T-240, rama feature/graficos-burndown-velocidad) todavía no
- * existe en esta rama; cuando se fusione, el punto de extensión es esta
- * función — agregar su gráfico aquí no debería tocar el resto del render.
+ * T-260: sección de avance — tabla desde `SprintComparativeAnalyticsDto`
+ * (distribución de tareas/hitos por Sprint, SIN velocity ni puntos de
+ * historia como métrica de esta tabla — restricción vigente de HU-143). El
+ * burndown va en su propia sección aparte (ver `buildBurndownSection` más
+ * abajo), aislado a propósito desde que este archivo se escribió sin el
+ * burndown disponible todavía en esta rama.
  */
 function buildAvanceSection(
   doc: jsPDF,
@@ -81,7 +85,56 @@ function buildAvanceSection(
   }
 }
 
-export function renderProjectReportPdf(modelo: ProjectExportModel): PdfRenderResult {
+/**
+ * T-260 (HU-164, decisión del líder de proyecto, 2026-09-22): mientras el
+ * proyecto no tenga NINGÚN Sprint cerrado, `burndowns` llega vacío
+ * (ExportsController ni siquiera lo consulta) y esta sección se limita a
+ * avisar que el burndown no está disponible todavía — nunca dibuja un
+ * gráfico vacío ni el burndown en vivo del Sprint activo. Apenas se cierra
+ * el primer Sprint, se imprime el burndown de TODOS los Sprints cerrados
+ * (nunca el activo, que sigue cambiando día a día).
+ */
+function buildBurndownSection(
+  doc: jsPDF,
+  modelo: ProjectExportModel,
+  burndowns: SprintBurndownDto[],
+  startY: number,
+  textosRenderizados: string[],
+): void {
+  const alturaNecesaria = 20 + (burndowns.length === 0 ? 20 : BURNDOWN_BLOCK_ALTO_ESTIMADO);
+  let y = startY;
+  if (y + alturaNecesaria > A4_HEIGHT_PT - MARGEN.bottom) {
+    doc.addPage();
+    y = MARGEN.top + 16;
+  }
+
+  doc.setFontSize(13);
+  doc.text('Burndown de Sprints cerrados', 40, y);
+  textosRenderizados.push('Burndown de Sprints cerrados');
+  y += 20;
+
+  if (burndowns.length === 0) {
+    const nota = 'El burndown estará disponible en este reporte cuando se cierre el primer Sprint del proyecto.';
+    doc.setFontSize(9);
+    doc.text(nota, 40, y);
+    textosRenderizados.push(nota);
+    return;
+  }
+
+  const numeroPorSprint = new Map(modelo.avance.sprints.map((sprint) => [sprint.idSprint, sprint.numero]));
+  for (const burndown of burndowns) {
+    if (y + BURNDOWN_BLOCK_ALTO_ESTIMADO > A4_HEIGHT_PT - MARGEN.bottom) {
+      doc.addPage();
+      y = MARGEN.top + 16;
+    }
+    const numero = numeroPorSprint.get(burndown.idSprint) ?? burndown.idSprint;
+    const resultado = drawBurndownChart(doc, numero, burndown, y);
+    textosRenderizados.push(...resultado.textosRenderizados);
+    y = resultado.finalY + 20;
+  }
+}
+
+export function renderProjectReportPdf(modelo: ProjectExportModel, burndowns: SprintBurndownDto[]): PdfRenderResult {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
   doc.addFileToVFS(FONT_FILE, fontBase64());
   doc.addFont(FONT_FILE, PROJECT_REPORT_FONT, 'normal');
@@ -131,6 +184,9 @@ export function renderProjectReportPdf(modelo: ProjectExportModel): PdfRenderRes
   const avanceStartY = finalYMiembros + 40;
   escribir('Avance por Sprint', 40, avanceStartY - 16, 13);
   buildAvanceSection(doc, modelo, avanceStartY, textosRenderizados);
+
+  const avanceFinalY = (doc as unknown as DocConAutoTable).lastAutoTable?.finalY ?? avanceStartY;
+  buildBurndownSection(doc, modelo, burndowns, avanceFinalY + 36, textosRenderizados);
 
   // Metadatos con la fecha FIJA de generación del modelo — nunca `now()` en
   // el render, para que dos renders del mismo modelo no difieran.

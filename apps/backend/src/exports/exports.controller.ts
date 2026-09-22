@@ -1,5 +1,6 @@
 import { Controller, Get, Param, ParseIntPipe, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
+import { EstadoSprint } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ExportsService } from './exports.service';
@@ -49,7 +50,16 @@ export class ExportsController {
     @Res() res: Response,
   ): Promise<void> {
     const modelo = await this.exportsService.getProjectExportModel(projectId, user.userId);
-    const { pdf } = renderProjectReportPdf(modelo);
+    // T-260 (decisión del líder de proyecto, 2026-09-22): el burndown
+    // impreso es exclusivo de Sprints CERRADO — mientras el proyecto no
+    // tenga ninguno, se pasa `[]` sin ni siquiera consultar la instantánea
+    // del Sprint activo (`renderProjectReportPdf` interpreta `[]` como "aún
+    // no disponible", no como "sin datos").
+    const idsSprintsCerrados = modelo.avance.sprints
+      .filter((sprint) => sprint.estado === EstadoSprint.CERRADO)
+      .map((sprint) => sprint.idSprint);
+    const burndowns = await this.exportsService.getBurndownForClosedSprints(projectId, idsSprintsCerrados);
+    const { pdf } = renderProjectReportPdf(modelo, burndowns);
     await this.exportsService.registrarExportacion(
       projectId,
       user.userId,

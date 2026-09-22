@@ -86,7 +86,7 @@ export function drawBurndownChart(
   // Línea real: solo conecta días CONSECUTIVOS con instantánea — un hueco
   // real (sin `connectNulls`) rompe la línea, igual que en pantalla.
   doc.setDrawColor(GRIS_REAL);
-  doc.setFillColor(GRIS_REAL);
+  doc.setFillColor(GRIS_REAL, GRIS_REAL, GRIS_REAL);
   doc.setLineWidth(1.25);
   for (let i = 0; i < serie.length - 1; i++) {
     const actual = serie[i];
