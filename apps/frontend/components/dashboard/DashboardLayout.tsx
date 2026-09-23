@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,10 +15,12 @@ import {
   RotateCcw,
   Users,
   Archive,
+  Search as SearchIcon,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
+import { GlobalSearchInput } from '@/components/layout/global-search-input';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import {
   SidebarNav,
@@ -100,6 +102,7 @@ export default function DashboardLayout({
   const { latestNotification, isConnected: notificationsConnected } =
     useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   useEffect(() => {
     if (!allowAdmin && !isLoading && isAdminUser(user)) {
@@ -185,10 +188,18 @@ export default function DashboardLayout({
               <Image src={logo} alt="UVGENIUS" className="h-8 w-auto" />
               <span className="type-subtitle text-text-primary">UVGenius</span>
             </div>
-            {/* Reemplaza al buscador del mockup: el control de tamaño de
-                fuente ya existente ocupa el mismo lugar prominente. */}
-            <div className="hidden md:block">
+            <button
+              type="button"
+              onClick={() => setMobileSearchOpen((v) => !v)}
+              aria-label="Buscar"
+              aria-expanded={mobileSearchOpen}
+              className="flex size-9 items-center justify-center rounded-control text-text-secondary hover:bg-surface-container-high hover:text-text-primary md:hidden"
+            >
+              <SearchIcon className="size-5" aria-hidden="true" />
+            </button>
+            <div className="hidden items-center gap-inline md:flex">
               <FontScaleToggle />
+              <GlobalSearchInput className="w-56 lg:w-72" />
             </div>
           </div>
           <div className="flex items-center gap-tight">
@@ -234,6 +245,16 @@ export default function DashboardLayout({
             </div>
           </div>
         </header>
+
+        {mobileSearchOpen && (
+          <div className="border-b border-outline-variant bg-card px-stack py-tight md:hidden">
+            <GlobalSearchInput
+              autoFocus
+              onNavigate={() => setMobileSearchOpen(false)}
+              className="w-full"
+            />
+          </div>
+        )}
 
         {/* F6: franja global de bloqueo por finalización de Sprint — fuera del
             área con scroll para que no desaparezca al desplazar la página,
