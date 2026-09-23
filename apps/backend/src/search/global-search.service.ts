@@ -1,0 +1,80 @@
+import { Injectable } from '@nestjs/common';
+import { EstadoParticipacion, EstadoProyecto, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { UserNameSearchService } from '../common/search/user-name-search.service';
+
+export const GLOBAL_SEARCH_LIMIT = 5;
+
+export interface GlobalSearchGroup<T> {
+  items: T[];
+  hasMore: boolean;
+}
+
+export interface ProyectoResultadoBusqueda {
+  idProyecto: number;
+  tituloProyecto: string;
+  tipoProyecto: string;
+  modalidadProyecto: string;
+}
+
+export interface PersonaResultadoBusqueda {
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  fotoUrl: string | null;
+  carrera: string | null;
+}
+
+export interface TareaResultadoBusqueda {
+  idTarea: number;
+  tituloTarea: string;
+  idProyecto: number;
+  tituloProyecto: string;
+  estadoTarea: string;
+}
+
+export interface GlobalSearchResult {
+  proyectos: GlobalSearchGroup<ProyectoResultadoBusqueda>;
+  personas: GlobalSearchGroup<PersonaResultadoBusqueda>;
+  tareas: GlobalSearchGroup<TareaResultadoBusqueda>;
+}
+
+const ESTADOS_PROYECTO_VISIBLES: EstadoProyecto[] = [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO];
+
+function truncar<T>(filas: T[], limite: number): GlobalSearchGroup<T> {
+  const hasMore = filas.length > limite;
+  return { items: hasMore ? filas.slice(0, limite) : filas, hasMore };
+}
+
+/** Escapa los comodines de LIKE (%, _, \) — mismo criterio que UserNameSearchService. */
+function likePattern(texto: string): string {
+  const escapado = texto.replace(/[\\%_]/g, (c) => `\\${c}`);
+  return `%${escapado}%`;
+}
+
+@Injectable()
+export class GlobalSearchService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly userNameSearch: UserNameSearchService,
+  ) {}
+
+  async buscarProyectos(q: string): Promise<GlobalSearchGroup<ProyectoResultadoBusqueda>> {
+    const patron = likePattern(q);
+    const filas = await this.prisma.$queryRaw<{ id_proyecto: number }[]>(Prisma.sql`
+      SELECT id_proyecto FROM proyecto
+      WHERE eliminado_en IS NULL
+        AND immutable_unaccent(lower(titulo_proyecto)) LIKE immutable_unaccent(lower(${patron})) ESCAPE '\\'
+    `);
+    const ids = filas.map((f) => f.id_proyecto);
+
+    const proyectos = await this.prisma.proyecto.findMany({
+      where: { idProyecto: { in: ids }, estadoProyecto: { in: ESTADOS_PROYECTO_VISIBLES }, eliminadoEn: null },
+      select: { idProyecto: true, tituloProyecto: true, tipoProyecto: true, modalidadProyecto: true },
+      orderBy: { fechaCreacion: 'desc' },
+      take: GLOBAL_SEARCH_LIMIT + 1,
+    });
+
+    return truncar(proyectos, GLOBAL_SEARCH_LIMIT);
+  }
+}
