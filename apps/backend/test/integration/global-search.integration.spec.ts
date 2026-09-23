@@ -116,6 +116,33 @@ describeIntegration('GlobalSearchService — permisos y acentos (Postgres real)'
     expect(resultado.tareas.items.map((t) => t.idTarea)).toContain(tarea.idTarea);
   });
 
+  it('no muestra tareas de un proyecto CANCELADO aunque el usuario sea participante activo', async () => {
+    const lider = await createIntegrationUser(prisma, { nombre: 'Lider', apellido: 'Cancelado' });
+    const miembro = await createIntegrationUser(prisma, { nombre: 'Miembro', apellido: 'Cancelado' });
+    const proyecto = await createIntegrationProject(prisma, lider.idUsuario, {
+      tituloProyecto: 'Proyecto suspendido',
+      estadoProyecto: EstadoProyecto.CANCELADO,
+    });
+    const rol = await createIntegrationProjectRole(prisma, proyecto.idProyecto);
+    const participacion = await createIntegrationParticipation(prisma, miembro.idUsuario, rol.idRolProyecto, {
+      estadoParticipacion: EstadoParticipacion.ACTIVO,
+    });
+    const sprint = await createIntegrationSprint(prisma, proyecto.idProyecto);
+    const tarea = await createIntegrationTask(prisma, proyecto.idProyecto, lider.idUsuario, sprint.idSprint, {
+      tituloTarea: 'Tarea suspendida unica',
+    });
+    scope.userIds = [lider.idUsuario, miembro.idUsuario];
+    scope.projectIds = [proyecto.idProyecto];
+    scope.sprintIds = [sprint.idSprint];
+    scope.taskIds = [tarea.idTarea];
+    scope.roleIds = [rol.idRolProyecto];
+    scope.participationIds = [participacion.idParticipacion];
+
+    const resultado = await service.buscar(miembro.idUsuario, 'suspendida');
+
+    expect(resultado.tareas.items.map((t) => t.idTarea)).not.toContain(tarea.idTarea);
+  });
+
   it('tolera acentos y coincidencias parciales (reutiliza casos de T-247)', async () => {
     const usuario = await createIntegrationUser(prisma, { nombre: 'Saúl', apellido: 'Castillo' });
     scope.userIds = [usuario.idUsuario];
