@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Loader2 } from 'lucide-react';
 import { useGlobalSearch } from '@/hooks/use-global-search';
@@ -50,12 +50,14 @@ export function GlobalSearchInput({
   className?: string;
 }) {
   const router = useRouter();
+  const uid = useId();
+  const listboxId = `global-search-results-${uid}`;
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { data, isFetching } = useGlobalSearch(query);
+  const { data, isFetching, isDebouncing } = useGlobalSearch(query);
   const flat = useMemo(() => aplanar(data), [data]);
 
   useEffect(() => {
@@ -99,10 +101,11 @@ export function GlobalSearchInput({
   }
 
   const showDropdown = open && query.trim().length > 0;
-  const grupos: { titulo: string; items: ResultadoAplanado[] }[] = [
-    { titulo: 'Proyectos', items: flat.filter((r) => r.tipo === 'proyecto') },
-    { titulo: 'Personas', items: flat.filter((r) => r.tipo === 'persona') },
-    { titulo: 'Tareas', items: flat.filter((r) => r.tipo === 'tarea') },
+  const sinResultadosTodavia = !isFetching && !isDebouncing && flat.length === 0;
+  const grupos: { titulo: string; items: ResultadoAplanado[]; hasMore: boolean }[] = [
+    { titulo: 'Proyectos', items: flat.filter((r) => r.tipo === 'proyecto'), hasMore: data?.proyectos.hasMore ?? false },
+    { titulo: 'Personas', items: flat.filter((r) => r.tipo === 'persona'), hasMore: data?.personas.hasMore ?? false },
+    { titulo: 'Tareas', items: flat.filter((r) => r.tipo === 'tarea'), hasMore: data?.tareas.hasMore ?? false },
   ];
 
   return (
@@ -125,7 +128,9 @@ export function GlobalSearchInput({
           value={query}
           aria-label="Buscar proyectos, personas y tareas"
           aria-expanded={showDropdown}
-          aria-controls="global-search-results"
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={activeIndex >= 0 ? `${uid}-${flat[activeIndex].id}` : undefined}
           role="combobox"
           placeholder="Buscar…"
           onChange={(e) => {
@@ -145,12 +150,12 @@ export function GlobalSearchInput({
 
       {showDropdown && (
         <div
-          id="global-search-results"
+          id={listboxId}
           role="listbox"
           aria-label="Resultados de busqueda"
           className="absolute right-0 top-full z-50 mt-1.5 w-80 overflow-hidden rounded-control border border-outline-variant bg-card shadow-raised"
         >
-          {!isFetching && flat.length === 0 && (
+          {sinResultadosTodavia && (
             <div className="px-4 py-4 text-center" role="status">
               <p className="text-sm font-semibold text-text-primary">Sin coincidencias</p>
               <p className="mt-1 text-xs text-text-secondary">Prueba con otro texto.</p>
@@ -158,11 +163,11 @@ export function GlobalSearchInput({
           )}
           {grupos.map((grupo) =>
             grupo.items.length === 0 ? null : (
-              <div key={grupo.titulo} className="border-b border-outline-variant last:border-b-0">
+              <div key={grupo.titulo} role="group" aria-label={grupo.titulo} className="border-b border-outline-variant last:border-b-0">
                 <p className="px-4 pt-2.5 pb-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                   {grupo.titulo}
                 </p>
-                <ul>
+                <ul role="presentation">
                   {grupo.items.map((r) => {
                     const globalIndex = flat.indexOf(r);
                     const activo = globalIndex === activeIndex;
@@ -170,7 +175,7 @@ export function GlobalSearchInput({
                       <li key={r.id} role="none">
                         <button
                           type="button"
-                          id={r.id}
+                          id={`${uid}-${r.id}`}
                           role="option"
                           aria-selected={activo}
                           onMouseEnter={() => setActiveIndex(globalIndex)}
@@ -198,6 +203,9 @@ export function GlobalSearchInput({
                     );
                   })}
                 </ul>
+                {grupo.hasMore && (
+                  <p className="px-4 pb-2 text-[11px] text-text-secondary">Hay más resultados, afina la búsqueda.</p>
+                )}
               </div>
             ),
           )}
