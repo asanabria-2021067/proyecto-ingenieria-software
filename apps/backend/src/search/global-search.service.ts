@@ -109,4 +109,57 @@ export class GlobalSearchService {
 
     return truncar(personas, GLOBAL_SEARCH_LIMIT);
   }
+
+  async buscarTareas(q: string, userId: number): Promise<GlobalSearchGroup<TareaResultadoBusqueda>> {
+    const patron = likePattern(q);
+    const filas = await this.prisma.$queryRaw<{ id_tarea: number }[]>(Prisma.sql`
+      SELECT id_tarea FROM tarea
+      WHERE eliminado_en IS NULL
+        AND immutable_unaccent(lower(titulo_tarea)) LIKE immutable_unaccent(lower(${patron})) ESCAPE '\\'
+    `);
+    const ids = filas.map((f) => f.id_tarea);
+
+    const tareas = await this.prisma.tarea.findMany({
+      where: {
+        idTarea: { in: ids },
+        eliminadoEn: null,
+        // Solo tareas de proyectos donde el usuario es lider o participante
+        // activo — nunca de todos los proyectos (T-270).
+        proyecto: {
+          eliminadoEn: null,
+          OR: [
+            { creadoPor: userId },
+            {
+              roles: {
+                some: {
+                  participaciones: {
+                    some: { idUsuario: userId, estadoParticipacion: EstadoParticipacion.ACTIVO },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      select: {
+        idTarea: true,
+        tituloTarea: true,
+        idProyecto: true,
+        estadoTarea: true,
+        proyecto: { select: { tituloProyecto: true } },
+      },
+      orderBy: { fechaCreacion: 'desc' },
+      take: GLOBAL_SEARCH_LIMIT + 1,
+    });
+
+    const items = tareas.map((t) => ({
+      idTarea: t.idTarea,
+      tituloTarea: t.tituloTarea,
+      idProyecto: t.idProyecto,
+      tituloProyecto: t.proyecto.tituloProyecto,
+      estadoTarea: t.estadoTarea,
+    }));
+
+    return truncar(items, GLOBAL_SEARCH_LIMIT);
+  }
 }

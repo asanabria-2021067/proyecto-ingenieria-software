@@ -113,3 +113,59 @@ describe('GlobalSearchService.buscarPersonas', () => {
     expect(resultado).toEqual({ items: [], hasMore: false });
   });
 });
+
+describe('GlobalSearchService.buscarTareas', () => {
+  it('filtra por proyectos donde el usuario es lider o participante activo', async () => {
+    const prisma = makePrisma();
+    prisma.$queryRaw.mockResolvedValueOnce([{ id_tarea: 1 }]);
+    prisma.tarea.findMany.mockResolvedValueOnce([
+      {
+        idTarea: 1,
+        tituloTarea: 'Diseñar login',
+        idProyecto: 7,
+        estadoTarea: 'POR_HACER',
+        proyecto: { tituloProyecto: 'App móvil' },
+      },
+    ]);
+    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+
+    const resultado = await service.buscarTareas('login', 99);
+
+    expect(prisma.tarea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          idTarea: { in: [1] },
+          eliminadoEn: null,
+          proyecto: expect.objectContaining({
+            OR: [
+              { creadoPor: 99 },
+              {
+                roles: {
+                  some: {
+                    participaciones: {
+                      some: { idUsuario: 99, estadoParticipacion: 'ACTIVO' },
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+        }),
+      }),
+    );
+    expect(resultado.items).toEqual([
+      { idTarea: 1, tituloTarea: 'Diseñar login', idProyecto: 7, tituloProyecto: 'App móvil', estadoTarea: 'POR_HACER' },
+    ]);
+  });
+
+  it('sin proyectos propios, no lanza y devuelve items vacios', async () => {
+    const prisma = makePrisma();
+    prisma.$queryRaw.mockResolvedValueOnce([]);
+    prisma.tarea.findMany.mockResolvedValueOnce([]);
+    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+
+    const resultado = await service.buscarTareas('cualquier-cosa', 1);
+
+    expect(resultado).toEqual({ items: [], hasMore: false });
+  });
+});
