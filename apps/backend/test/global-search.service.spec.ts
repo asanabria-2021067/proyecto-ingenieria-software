@@ -169,3 +169,41 @@ describe('GlobalSearchService.buscarTareas', () => {
     expect(resultado).toEqual({ items: [], hasMore: false });
   });
 });
+
+describe('GlobalSearchService.buscar', () => {
+  it('query vacia devuelve estructura vacia sin tocar la base de datos', async () => {
+    const prisma = makePrisma();
+    const userNameSearch = makeUserNameSearch();
+    const service = new GlobalSearchService(prisma, userNameSearch);
+
+    const resultado = await service.buscar(1, '   ');
+
+    expect(resultado).toEqual({
+      proyectos: { items: [], hasMore: false },
+      personas: { items: [], hasMore: false },
+      tareas: { items: [], hasMore: false },
+    });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(prisma.proyecto.findMany).not.toHaveBeenCalled();
+    expect(userNameSearch.findMatchingUserIds).not.toHaveBeenCalled();
+  });
+
+  it('agrupa proyectos, personas y tareas en una sola respuesta', async () => {
+    const prisma = makePrisma();
+    const userNameSearch = makeUserNameSearch();
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.proyecto.findMany.mockResolvedValueOnce([]);
+    prisma.tarea.findMany.mockResolvedValueOnce([]);
+    userNameSearch.findMatchingUserIds.mockResolvedValueOnce([]);
+    prisma.usuario.findMany.mockResolvedValueOnce([]);
+    const service = new GlobalSearchService(prisma, userNameSearch);
+
+    const resultado = await service.buscar(1, 'react');
+
+    expect(resultado).toEqual({
+      proyectos: { items: [], hasMore: false },
+      personas: { items: [], hasMore: false },
+      tareas: { items: [], hasMore: false },
+    });
+  });
+});
