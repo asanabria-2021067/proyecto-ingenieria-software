@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { EstadoParticipacion, EstadoProyecto, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserNameSearchService } from '../common/search/user-name-search.service';
@@ -124,9 +124,13 @@ export class GlobalSearchService {
         idTarea: { in: ids },
         eliminadoEn: null,
         // Solo tareas de proyectos donde el usuario es lider o participante
-        // activo — nunca de todos los proyectos (T-270).
+        // activo — nunca de todos los proyectos (T-270). CANCELADO se excluye
+        // aparte: ProjectReadPolicyService le niega la lectura a todo el que
+        // no sea LIDER/ADMIN incluso siendo participante activo, así que
+        // mostrar sus tareas aquí llevaría a un enlace que 403ea al abrirlo.
         proyecto: {
           eliminadoEn: null,
+          estadoProyecto: { not: EstadoProyecto.CANCELADO },
           OR: [
             { creadoPor: userId },
             {
@@ -165,9 +169,14 @@ export class GlobalSearchService {
 
   async buscar(userId: number, qRaw: string | undefined): Promise<GlobalSearchResult> {
     const q = (qRaw ?? '').trim();
-    const vacio = { items: [], hasMore: false };
     if (q.length === 0) {
+      const vacio = { items: [], hasMore: false };
       return { proyectos: vacio, personas: vacio, tareas: vacio };
+    }
+    // Mismo mínimo que SocialService.buscarUsuarios: un solo carácter
+    // hace fan-out contra toda la tabla sin acotar nada útil.
+    if (q.length < 2) {
+      throw new BadRequestException('La búsqueda requiere al menos 2 caracteres');
     }
 
     const [proyectos, personas, tareas] = await Promise.all([

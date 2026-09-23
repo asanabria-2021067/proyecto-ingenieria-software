@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { BadRequestException } from '@nestjs/common';
 import { GlobalSearchService } from '../src/search/global-search.service';
 import type { UserNameSearchService } from '../src/common/search/user-name-search.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -115,6 +116,23 @@ describe('GlobalSearchService.buscarPersonas', () => {
 });
 
 describe('GlobalSearchService.buscarTareas', () => {
+  it('excluye tareas de proyectos CANCELADO, aunque el usuario sea lider o participante activo', async () => {
+    const prisma = makePrisma();
+    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+
+    await service.buscarTareas('login', 99);
+
+    expect(prisma.tarea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          proyecto: expect.objectContaining({
+            estadoProyecto: { not: 'CANCELADO' },
+          }),
+        }),
+      }),
+    );
+  });
+
   it('filtra por proyectos donde el usuario es lider o participante activo', async () => {
     const prisma = makePrisma();
     prisma.$queryRaw.mockResolvedValueOnce([{ id_tarea: 1 }]);
@@ -205,5 +223,15 @@ describe('GlobalSearchService.buscar', () => {
       personas: { items: [], hasMore: false },
       tareas: { items: [], hasMore: false },
     });
+  });
+
+  it('rechaza un texto de un solo caracter sin tocar la base de datos', async () => {
+    const prisma = makePrisma();
+    const userNameSearch = makeUserNameSearch();
+    const service = new GlobalSearchService(prisma, userNameSearch);
+
+    await expect(service.buscar(1, 'a')).rejects.toThrow(BadRequestException);
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(userNameSearch.findMatchingUserIds).not.toHaveBeenCalled();
   });
 });
