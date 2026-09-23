@@ -74,3 +74,42 @@ describe('GlobalSearchService.buscarProyectos', () => {
     expect(sql.values).toEqual(['%50\\%\\_raro\\\\%']);
   });
 });
+
+describe('GlobalSearchService.buscarPersonas', () => {
+  it('reutiliza UserNameSearchService.findMatchingUserIds y excluye administradores', async () => {
+    const prisma = makePrisma();
+    const userNameSearch = makeUserNameSearch();
+    userNameSearch.findMatchingUserIds.mockResolvedValueOnce([9, 42]);
+    prisma.usuario.findMany.mockResolvedValueOnce([
+      { idUsuario: 9, nombre: 'Saúl', apellido: 'Castillo', fotoUrl: null, perfil: { carrera: { nombreCarrera: 'Ing.' } } },
+    ]);
+    const service = new GlobalSearchService(prisma, userNameSearch);
+
+    const resultado = await service.buscarPersonas('saul');
+
+    expect(userNameSearch.findMatchingUserIds).toHaveBeenCalledWith('saul');
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          idUsuario: { in: [9, 42] },
+          rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } },
+        }),
+      }),
+    );
+    expect(resultado.items).toEqual([
+      { idUsuario: 9, nombre: 'Saúl', apellido: 'Castillo', fotoUrl: null, carrera: 'Ing.' },
+    ]);
+  });
+
+  it('sin coincidencias, no llama a usuario.findMany con lista vacia y devuelve estructura vacia', async () => {
+    const prisma = makePrisma();
+    const userNameSearch = makeUserNameSearch();
+    userNameSearch.findMatchingUserIds.mockResolvedValueOnce([]);
+    prisma.usuario.findMany.mockResolvedValueOnce([]);
+    const service = new GlobalSearchService(prisma, userNameSearch);
+
+    const resultado = await service.buscarPersonas('zzz-no-existe');
+
+    expect(resultado).toEqual({ items: [], hasMore: false });
+  });
+});
