@@ -162,4 +162,20 @@ export class GlobalSearchService {
 
     return truncar(items, GLOBAL_SEARCH_LIMIT);
   }
+
+  async buscar(userId: number, qRaw: string | undefined): Promise<GlobalSearchResult> {
+    const q = (qRaw ?? '').trim();
+    const vacio = { items: [], hasMore: false };
+    if (q.length === 0) {
+      return { proyectos: vacio, personas: vacio, tareas: vacio };
+    }
+
+    const [proyectos, personas, tareas] = await Promise.all([
+      this.buscarProyectos(q),
+      this.buscarPersonas(q),
+      this.buscarTareas(q, userId),
+    ]);
+
+    return { proyectos, personas, tareas };
+  }
 }

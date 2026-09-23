@@ -38,6 +38,7 @@ import { TeamModule } from './team/team.module';
 import { SocialModule } from './social/social.module';
 import { ChatModule } from './chat/chat.module';
 import { BitacoraModule } from './bitacora/bitacora.module';
+import { GlobalSearchModule } from './search/global-search.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
     SocialModule,
     ChatModule,
     BitacoraModule,
+    GlobalSearchModule,
   ],
   controllers: [AppController],
   providers: [
