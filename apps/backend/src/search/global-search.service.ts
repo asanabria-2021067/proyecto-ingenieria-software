@@ -77,4 +77,36 @@ export class GlobalSearchService {
 
     return truncar(proyectos, GLOBAL_SEARCH_LIMIT);
   }
+
+  async buscarPersonas(q: string): Promise<GlobalSearchGroup<PersonaResultadoBusqueda>> {
+    const ids = await this.userNameSearch.findMatchingUserIds(q);
+
+    const usuarios = await this.prisma.usuario.findMany({
+      where: {
+        idUsuario: { in: ids },
+        // Mismo criterio que el directorio de SocialService.buscarUsuarios:
+        // los administradores no aparecen como resultado de búsqueda.
+        rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } },
+      },
+      select: {
+        idUsuario: true,
+        nombre: true,
+        apellido: true,
+        fotoUrl: true,
+        perfil: { select: { carrera: { select: { nombreCarrera: true } } } },
+      },
+      orderBy: { idUsuario: 'asc' },
+      take: GLOBAL_SEARCH_LIMIT + 1,
+    });
+
+    const personas = usuarios.map((u) => ({
+      idUsuario: u.idUsuario,
+      nombre: u.nombre,
+      apellido: u.apellido,
+      fotoUrl: u.fotoUrl,
+      carrera: u.perfil?.carrera?.nombreCarrera ?? null,
+    }));
+
+    return truncar(personas, GLOBAL_SEARCH_LIMIT);
+  }
 }
