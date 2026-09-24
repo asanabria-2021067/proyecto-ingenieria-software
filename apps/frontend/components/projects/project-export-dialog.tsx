@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -10,12 +10,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ColorPicker } from '@/components/ui/color-picker';
 import {
-  COLOR_OPCIONES,
   DEFAULT_EXPORT_OPTIONS,
   FUENTE_OPCIONES,
   GRAFICA_OPCIONES,
   SECCION_OPCIONES,
+  diaDeCreacion,
+  erroresDeFechas,
+  hoyLocal,
   validarOpciones,
   type ExportOptions,
   type FormatoExport,
@@ -26,6 +29,8 @@ interface ProjectExportDialogProps {
   onOpenChange: (open: boolean) => void;
   formato: FormatoExport;
   isPending: boolean;
+  /** ISO de la creación del proyecto: el "Desde" no puede ser anterior. Sin ella no se pone mínimo. */
+  fechaCreacionProyecto?: string | null;
   onConfirm: (opciones: ExportOptions) => void;
 }
 
@@ -50,11 +55,20 @@ export function ProjectExportDialog({
   onOpenChange,
   formato,
   isPending,
+  fechaCreacionProyecto = null,
   onConfirm,
 }: ProjectExportDialogProps) {
   const [opciones, setOpciones] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
   const esPdf = formato === 'pdf';
-  const error = validarOpciones(formato, opciones);
+  // "Hoy" se fija al abrir el diálogo: un diálogo abierto pasada la medianoche
+  // seguiría con el día en que se abrió; el backend revalida de todos modos.
+  const contexto = useMemo(
+    () => ({ hoy: hoyLocal(), fechaCreacion: diaDeCreacion(fechaCreacionProyecto) }),
+    [fechaCreacionProyecto],
+  );
+  const erroresFecha = erroresDeFechas(opciones, contexto);
+  const error = validarOpciones(formato, opciones, contexto);
+  const errorDatos = error && !erroresFecha.desde && !erroresFecha.hasta ? error : null;
   const sinMiembros = !opciones.secciones.includes('miembros');
   const etiqueta = esPdf ? 'PDF' : 'CSV';
 
@@ -100,25 +114,10 @@ export function ProjectExportDialog({
 
               <fieldset>
                 <legend className={LEGEND}>Color de las tablas</legend>
-                <div className="flex flex-wrap gap-4">
-                  {COLOR_OPCIONES.map(({ value, label, hex }) => (
-                    <label key={value} className={OPCION}>
-                      <input
-                        type="radio"
-                        name="color"
-                        value={value}
-                        checked={opciones.color === value}
-                        onChange={() => setOpciones({ ...opciones, color: value })}
-                      />
-                      <span
-                        aria-hidden="true"
-                        className="inline-block size-3.5 rounded-sm border border-outline-variant"
-                        style={{ backgroundColor: hex }}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
+                <ColorPicker value={opciones.color} onChange={(color) => setOpciones({ ...opciones, color })} />
+                <p className="mt-1 text-xs text-tertiary">
+                  El texto del encabezado cambia solo entre blanco y negro para que siempre se lea.
+                </p>
               </fieldset>
 
               <fieldset>
@@ -174,33 +173,42 @@ export function ProjectExportDialog({
           <fieldset>
             <legend className={LEGEND}>Rango de fechas (opcional)</legend>
             <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1 text-sm text-on-surface">
-                <span>Desde</span>
-                <input
-                  type="date"
-                  className={INPUT_FECHA}
-                  value={opciones.desde}
-                  onChange={(e) => setOpciones({ ...opciones, desde: e.target.value })}
-                />
-              </label>
-              <label className="space-y-1 text-sm text-on-surface">
-                <span>Hasta</span>
-                <input
-                  type="date"
-                  className={INPUT_FECHA}
-                  value={opciones.hasta}
-                  onChange={(e) => setOpciones({ ...opciones, hasta: e.target.value })}
-                />
-              </label>
+              {(
+                [
+                  { campo: 'desde', etiqueta: 'Desde' },
+                  { campo: 'hasta', etiqueta: 'Hasta' },
+                ] as const
+              ).map(({ campo, etiqueta }) => (
+                <div key={campo} className="space-y-1">
+                  <label className="block space-y-1 text-sm text-on-surface">
+                    <span>{etiqueta}</span>
+                    <input
+                      type="date"
+                      className={`${INPUT_FECHA} ${erroresFecha[campo] ? 'border-error' : ''}`}
+                      value={opciones[campo]}
+                      min={contexto.fechaCreacion ?? undefined}
+                      max={contexto.hoy}
+                      aria-invalid={erroresFecha[campo] ? true : undefined}
+                      aria-describedby={erroresFecha[campo] ? `error-${campo}` : undefined}
+                      onChange={(e) => setOpciones({ ...opciones, [campo]: e.target.value })}
+                    />
+                  </label>
+                  {erroresFecha[campo] && (
+                    <p id={`error-${campo}`} role="alert" className="text-xs font-medium text-error">
+                      {erroresFecha[campo]}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
             <p className="mt-1 text-xs text-tertiary">
               Limita las horas y los Sprints a ese periodo. Sin fechas se exporta todo el proyecto.
             </p>
           </fieldset>
 
-          {error && (
+          {errorDatos && (
             <p role="alert" className="text-xs font-medium text-error">
-              {error}
+              {errorDatos}
             </p>
           )}
         </div>
