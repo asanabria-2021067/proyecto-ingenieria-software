@@ -181,7 +181,7 @@ export default function DashboardLayout({
         className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page focus:outline-none"
       >
         {/* Top Header Bar */}
-        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:px-section">
+        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_auto_1fr] md:px-section">
           <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
             <div className="flex items-center gap-tight md:hidden">
@@ -197,12 +197,14 @@ export default function DashboardLayout({
             >
               <SearchIcon className="size-5" aria-hidden="true" />
             </button>
-            <div className="hidden items-center gap-inline md:flex">
+            <div className="hidden md:block">
               <FontScaleToggle />
-              <GlobalSearchInput className="w-56 lg:w-72" />
             </div>
           </div>
-          <div className="flex items-center gap-tight">
+          <div className="hidden md:block">
+            <GlobalSearchInput className="w-64 lg:w-96" />
+          </div>
+          <div className="flex items-center gap-tight md:justify-self-end">
             {!!user && (
               <span
                 role="status"
