@@ -13,6 +13,7 @@ import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectPendingPostulations, useResolvePostulacion } from '@/hooks/use-project-pending-postulations';
 import { aviso, confirmar } from '@/lib/mensajes';
 import type { PostulacionRecibida } from '@/types';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 type Accion = 'ACEPTADA' | 'RECHAZADA';
 
@@ -194,9 +195,7 @@ export default function ProjectPendingPostulationsPage() {
                 </EmptyMedia>
                 <EmptyHeader>
                   <EmptyTitle>
-                    {error instanceof Error && error.message
-                      ? error.message
-                      : 'No fue posible cargar las postulaciones.'}
+                    {getApiErrorMessage(error, 'general', 'No fue posible cargar las postulaciones.')}
                   </EmptyTitle>
                 </EmptyHeader>
                 <EmptyContent>

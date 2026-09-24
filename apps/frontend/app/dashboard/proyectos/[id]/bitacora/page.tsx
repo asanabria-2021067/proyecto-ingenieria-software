@@ -47,6 +47,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import type { EventoBitacoraDto, TipoEventoBitacoraValor } from '@/lib/types/bitacora';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 const LIMITE_POR_PAGINA = 20;
 
@@ -402,9 +403,7 @@ export default function BitacoraPage() {
               </EmptyMedia>
               <EmptyHeader>
                 <EmptyTitle>
-                  {error instanceof Error && error.message
-                    ? error.message
-                    : 'No fue posible cargar la bitácora del proyecto.'}
+                  {getApiErrorMessage(error, 'general', 'No fue posible cargar la bitácora del proyecto.')}
                 </EmptyTitle>
               </EmptyHeader>
               <EmptyContent>

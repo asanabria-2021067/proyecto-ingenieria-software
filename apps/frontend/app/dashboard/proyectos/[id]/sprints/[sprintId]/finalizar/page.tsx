@@ -62,8 +62,7 @@ function getInitials(nombre: string, apellido: string): string {
 }
 
 function mensajeDeError(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return 'Ocurrio un error inesperado. Intenta nuevamente.';
+  return getApiErrorMessage(error, 'general');
 }
 
 function sumarDecimales(valores: string[]): string {
