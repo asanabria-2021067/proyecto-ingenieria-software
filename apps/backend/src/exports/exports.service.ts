@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoSprint } from '@prisma/client';
+import { EstadoHoras, EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { TeamService } from '../team/team.service';
@@ -9,6 +9,8 @@ import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacoraValor } from '../bitacora/tipos-evento-bitacora';
 import { SprintBurndownDto } from '../sprints/dto/sprint-burndown.dto';
 import { ProjectExportMemberDto, ProjectExportModel } from './dto/project-export.dto';
+import { DEFAULT_EXPORT_OPTIONS, ExportOptions } from './export-options';
+import { SprintComparativeAnalyticsDto } from '../sprints/dto/sprint-analytics.dto';
 
 /**
  * Portada del PDF (revisión del PR): el Sprint en curso rotula el reporte;
@@ -44,7 +46,11 @@ export class ExportsService {
     private readonly bitacoraEventos: BitacoraEventosService,
   ) {}
 
-  async getProjectExportModel(projectId: number, actorId: number): Promise<ProjectExportModel> {
+  async getProjectExportModel(
+    projectId: number,
+    actorId: number,
+    opciones: ExportOptions = DEFAULT_EXPORT_OPTIONS,
+  ): Promise<ProjectExportModel> {
     const decision = await this.readPolicy.assertRead(undefined, {
       projectId,
       actorId,
@@ -71,9 +77,12 @@ export class ExportsService {
       this.sprintsService.computeSprintsComparative(projectId, decision.sprintEstados),
     ]);
 
+    const conRango = opciones.desde !== null || opciones.hasta !== null;
+    const horasEnRango = conRango ? await this.horasEnRango(projectId, opciones) : null;
     const pendientesPorUsuario = new Map(
       horasProyecto.porUsuario.map((fila) => [fila.idUsuario, Number(fila.propuestasPendientes)]),
     );
+    const avanceFiltrado = conRango ? await this.sprintsEnRango(projectId, avance, opciones) : avance;
 
     // T-259 (decisión del líder de proyecto, 2026-09-17): retirados SIN
     // contribución no aportan horas ni datos relevantes al export — el
@@ -89,8 +98,12 @@ export class ExportsService {
         rol: miembro.roles.map((rol) => rol.nombreRol).join(', '),
         estadoParticipacion: miembro.estadoParticipacion,
         grupo: miembro.grupo,
-        horasConfirmadas: miembro.horasReconocidas,
-        horasPendientes: pendientesPorUsuario.get(miembro.idUsuario) ?? 0,
+        horasConfirmadas: horasEnRango
+          ? (horasEnRango.get(miembro.idUsuario)?.confirmadas ?? 0)
+          : miembro.horasReconocidas,
+        horasPendientes: horasEnRango
+          ? (horasEnRango.get(miembro.idUsuario)?.pendientes ?? 0)
+          : (pendientesPorUsuario.get(miembro.idUsuario) ?? 0),
       }));
 
     return {
@@ -103,9 +116,81 @@ export class ExportsService {
       lider: equipo.lider,
       miembros,
       fechaGeneracion: new Date(),
-      sprintPortada: sprintDePortada(avance.sprints),
-      avance,
+      sprintPortada: sprintDePortada(avanceFiltrado.sprints),
+      avance: avanceFiltrado,
     };
+  }
+
+  /**
+   * Revisión del PR: con rango de fechas, las horas se recalculan desde los
+   * registros de horas (`HorasParticipacion`) cuyo periodo se traslapa con
+   * el rango — APROBADA cuenta `horasAprobadas` (confirmadas) y PENDIENTE
+   * `horasCalculadas` (pendientes), el mismo criterio de las dos columnas
+   * sin rango. Sin rango NO se llama aquí: el export sigue saliendo del
+   * mismo cálculo que la pantalla de Miembros.
+   */
+  private async horasEnRango(
+    projectId: number,
+    opciones: ExportOptions,
+  ): Promise<Map<number, { confirmadas: number; pendientes: number }>> {
+    const filas = await this.prisma.horasParticipacion.findMany({
+      where: {
+        participacion: { rolProyecto: { idProyecto: projectId } },
+        estadoHoras: { in: [EstadoHoras.APROBADA, EstadoHoras.PENDIENTE] },
+        ...(opciones.hasta ? { periodoInicio: { lte: opciones.hasta } } : {}),
+        ...(opciones.desde ? { periodoFin: { gte: opciones.desde } } : {}),
+      },
+      select: {
+        estadoHoras: true,
+        horasAprobadas: true,
+        horasCalculadas: true,
+        participacion: { select: { idUsuario: true } },
+      },
+    });
+    const cero = new Prisma.Decimal(0);
+    const acumulado = new Map<number, { confirmadas: Prisma.Decimal; pendientes: Prisma.Decimal }>();
+    for (const fila of filas) {
+      const actual = acumulado.get(fila.participacion.idUsuario) ?? { confirmadas: cero, pendientes: cero };
+      if (fila.estadoHoras === EstadoHoras.APROBADA) {
+        actual.confirmadas = actual.confirmadas.plus(fila.horasAprobadas ?? cero);
+      } else {
+        actual.pendientes = actual.pendientes.plus(fila.horasCalculadas ?? cero);
+      }
+      acumulado.set(fila.participacion.idUsuario, actual);
+    }
+    return new Map(
+      [...acumulado].map(([id, v]) => [id, { confirmadas: v.confirmadas.toNumber(), pendientes: v.pendientes.toNumber() }]),
+    );
+  }
+
+  /**
+   * Un Sprint entra al rango si su vida (inicio → cierre, o fin planeado
+   * mientras siga abierto; sin ninguna de las dos, abierto hacia adelante)
+   * se traslapa con [desde, hasta]. La analítica comparativa no trae fechas,
+   * así que se consultan aparte y solo cuando hay rango.
+   */
+  private async sprintsEnRango(
+    projectId: number,
+    avance: SprintComparativeAnalyticsDto,
+    opciones: ExportOptions,
+  ): Promise<SprintComparativeAnalyticsDto> {
+    const fechas = await this.prisma.sprint.findMany({
+      where: { idProyecto: projectId },
+      select: { idSprint: true, fechaInicio: true, fechaCierre: true, fechaFinPlaneada: true },
+    });
+    const finExclusivo = opciones.hasta ? opciones.hasta.getTime() + 24 * 60 * 60 * 1000 : null;
+    const dentro = new Set(
+      fechas
+        .filter((sprint) => {
+          const fin = sprint.fechaCierre ?? sprint.fechaFinPlaneada;
+          const empiezaAntesDelFin = finExclusivo === null || sprint.fechaInicio.getTime() < finExclusivo;
+          const terminaDespuesDelInicio =
+            opciones.desde === null || fin === null || fin.getTime() >= opciones.desde.getTime();
+          return empiezaAntesDelFin && terminaDespuesDelInicio;
+        })
+        .map((sprint) => sprint.idSprint),
+    );
+    return { ...avance, sprints: avance.sprints.filter((sprint) => dentro.has(sprint.idSprint)) };
   }
 
   /**
