@@ -6,7 +6,8 @@
  */
 export type FormatoExport = 'csv' | 'pdf';
 export type Fuente = 'pequena' | 'mediana' | 'grande';
-export type ColorTabla = 'gris' | 'azul' | 'verde' | 'rojo';
+/** Hexadecimal `#rrggbb`, elegido con el selector de color. */
+export type ColorTabla = string;
 export type Seccion = 'miembros' | 'avance' | 'burndown';
 export type Grafica = 'barras' | 'pastel';
 
@@ -23,7 +24,7 @@ export interface ExportOptions {
 
 export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   fuente: 'mediana',
-  color: 'gris',
+  color: '#464646',
   secciones: ['miembros', 'avance', 'burndown'],
   graficas: [],
   desde: '',
@@ -34,14 +35,6 @@ export const FUENTE_OPCIONES: ReadonlyArray<{ value: Fuente; label: string }> = 
   { value: 'pequena', label: 'Pequeña' },
   { value: 'mediana', label: 'Mediana' },
   { value: 'grande', label: 'Grande' },
-];
-
-/** `hex` solo para la muestra en pantalla; el backend usa su propio tono oscuro por nombre. */
-export const COLOR_OPCIONES: ReadonlyArray<{ value: ColorTabla; label: string; hex: string }> = [
-  { value: 'gris', label: 'Gris', hex: '#464646' },
-  { value: 'azul', label: 'Azul', hex: '#1e408c' },
-  { value: 'verde', label: 'Verde', hex: '#166534' },
-  { value: 'rojo', label: 'Rojo', hex: '#991b1b' },
 ];
 
 export const SECCION_OPCIONES: ReadonlyArray<{ value: Seccion; label: string }> = [
@@ -55,10 +48,75 @@ export const GRAFICA_OPCIONES: ReadonlyArray<{ value: Grafica; label: string }> 
   { value: 'pastel', label: 'Gráfica de pastel (distribución de horas)' },
 ];
 
-/** Mensaje para mostrar bajo el formulario, o null si las opciones son exportables. */
-export function validarOpciones(formato: FormatoExport, opciones: ExportOptions): string | null {
-  if (opciones.desde && opciones.hasta && opciones.desde > opciones.hasta) {
-    return 'La fecha "Desde" no puede ser posterior a "Hasta".';
+export interface ContextoFechas {
+  /** Día actual del usuario, AAAA-MM-DD. */
+  hoy: string;
+  /** Día de creación del proyecto, AAAA-MM-DD; null si no se conoce. */
+  fechaCreacion: string | null;
+}
+
+export interface ErroresFechas {
+  desde?: string;
+  hasta?: string;
+}
+
+/** Día actual en la zona horaria del usuario, AAAA-MM-DD. */
+export function hoyLocal(): string {
+  const d = new Date();
+  const dos = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+
+/** Día UTC de una fecha ISO — el mismo criterio con el que el backend compara. */
+export function diaDeCreacion(iso: string | null | undefined): string | null {
+  return iso ? iso.slice(0, 10) : null;
+}
+
+function ddmmaaaa(dia: string): string {
+  const [a, m, d] = dia.split('-');
+  return `${d}/${m}/${a}`;
+}
+
+/**
+ * Errores del rango de fechas, cada uno con su tipo: anterior a la creación
+ * del proyecto, posterior a hoy, o "Desde" posterior a "Hasta". El backend
+ * repite estas reglas (es la autoridad); aquí se muestran antes de enviar.
+ */
+export function erroresDeFechas(opciones: ExportOptions, ctx: ContextoFechas): ErroresFechas {
+  const { desde, hasta } = opciones;
+  const errores: ErroresFechas = {};
+  const antesDeCreacion = (campo: string) =>
+    `La fecha "${campo}" debe ser igual o posterior a la fecha de creación del proyecto (${ddmmaaaa(ctx.fechaCreacion as string)}).`;
+  const futura = (campo: string) => `La fecha "${campo}" no puede ser posterior a la fecha actual.`;
+
+  if (desde) {
+    if (ctx.fechaCreacion && desde < ctx.fechaCreacion) {
+      errores.desde = antesDeCreacion('Desde');
+    } else if (desde > ctx.hoy) {
+      errores.desde = futura('Desde');
+    } else if (hasta && desde > hasta) {
+      errores.desde = 'La fecha "Desde" no puede ser posterior a la fecha "Hasta".';
+    }
+  }
+  if (hasta) {
+    if (hasta > ctx.hoy) {
+      errores.hasta = futura('Hasta');
+    } else if (ctx.fechaCreacion && hasta < ctx.fechaCreacion) {
+      errores.hasta = antesDeCreacion('Hasta');
+    }
+  }
+  return errores;
+}
+
+/** Primer error que impide exportar (fechas o datos), o null si las opciones son exportables. */
+export function validarOpciones(
+  formato: FormatoExport,
+  opciones: ExportOptions,
+  ctx: ContextoFechas = { hoy: hoyLocal(), fechaCreacion: null },
+): string | null {
+  const fechas = erroresDeFechas(opciones, ctx);
+  if (fechas.desde ?? fechas.hasta) {
+    return (fechas.desde ?? fechas.hasta) as string;
   }
   if (formato === 'pdf' && opciones.secciones.length === 0) {
     return 'Selecciona al menos un dato para exportar.';
