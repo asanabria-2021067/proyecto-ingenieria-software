@@ -1,9 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { Check, Clock, X } from 'lucide-react';
-import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
-import uvgSwal from '@/lib/swal';
+import { aviso, confirmar } from '@/lib/mensajes';
 import { useApproveExitRequest, useRejectExitRequest } from '@/hooks/use-exit-request';
 import type { PendingLeaderReviewDto } from '@/lib/types/exit-requests';
 
@@ -46,78 +44,51 @@ export function ExitRequestActions({
 }) {
   const aprobar = useApproveExitRequest(idProyecto);
   const rechazar = useRejectExitRequest(idProyecto);
-  const [accionConfirmar, setAccionConfirmar] = useState<AccionSalida | null>(null);
 
   const enCurso = aprobar.isPending || rechazar.isPending;
 
-  function cancelarConfirmacion() {
-    if (enCurso) return;
-    setAccionConfirmar(null);
-  }
-
-  function confirmar() {
-    if (!accionConfirmar) return;
-    const mutation = accionConfirmar === 'APROBAR' ? aprobar : rechazar;
+  async function resolver(accion: AccionSalida) {
+    const mutation = accion === 'APROBAR' ? aprobar : rechazar;
+    const confirmado = await confirmar({
+      titulo: accion === 'APROBAR' ? `¿Aprobar la salida de ${nombreCompleto}?` : `¿Rechazar la solicitud de salida de ${nombreCompleto}?`,
+      descripcion:
+        accion === 'APROBAR'
+          ? `${nombreCompleto} deja de participar en el proyecto.`
+          : `${nombreCompleto} continúa participando en el proyecto.`,
+      textoAccion: accion === 'APROBAR' ? 'Aprobar salida' : 'Rechazar salida',
+      destructiva: accion === 'APROBAR',
+    });
+    if (!confirmado) return;
 
     mutation.mutate(request.idSolicitud, {
-      onSuccess: () => {
-        setAccionConfirmar(null);
-        uvgSwal.fire({
-          icon: 'success',
-          title: accionConfirmar === 'APROBAR' ? 'Salida aprobada' : 'Salida rechazada',
-          timer: 2000,
-        });
-      },
-      onError: (error: any) => {
-        setAccionConfirmar(null);
-        uvgSwal.fire({
-          icon: 'error',
-          title: 'No se pudo resolver la solicitud de salida',
-          text: error?.message || 'Ocurrió un error inesperado.',
-        });
-      },
+      onSuccess: () => aviso.exito(accion === 'APROBAR' ? 'Salida aprobada' : 'Salida rechazada'),
+      onError: (error: any) =>
+        aviso.error('No se pudo resolver la solicitud de salida', error?.message),
     });
   }
 
   return (
-    <>
-      <div className="flex flex-wrap justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setAccionConfirmar('RECHAZAR')}
-          disabled={enCurso}
-          aria-label={`Rechazar solicitud de salida de ${nombreCompleto}`}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-semibold text-error transition-colors hover:bg-error-container disabled:opacity-50"
-        >
-          <X aria-hidden="true" className="h-3.5 w-3.5" />
-          Rechazar salida
-        </button>
-        <button
-          type="button"
-          onClick={() => setAccionConfirmar('APROBAR')}
-          disabled={enCurso}
-          aria-label={`Aprobar solicitud de salida de ${nombreCompleto}`}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          <Check aria-hidden="true" className="h-3.5 w-3.5" />
-          Aprobar salida
-        </button>
-      </div>
-
-      <ConfirmActionDialog
-        open={accionConfirmar !== null}
-        title={accionConfirmar === 'APROBAR' ? 'Aprobar salida' : 'Rechazar salida'}
-        description={
-          accionConfirmar === 'APROBAR'
-            ? `¿Confirmas que apruebas la salida de ${nombreCompleto} del proyecto? Esta acción no se puede deshacer.`
-            : `¿Confirmas que rechazas la solicitud de salida de ${nombreCompleto}?`
-        }
-        actionLabel={accionConfirmar === 'APROBAR' ? 'Sí, aprobar salida' : 'Sí, rechazar salida'}
-        variant={accionConfirmar === 'RECHAZAR' ? 'destructive' : 'default'}
-        isPending={enCurso}
-        onConfirm={confirmar}
-        onCancel={cancelarConfirmacion}
-      />
-    </>
+    <div className="flex flex-wrap justify-end gap-2">
+      <button
+        type="button"
+        onClick={() => void resolver('RECHAZAR')}
+        disabled={enCurso}
+        aria-label={`Rechazar solicitud de salida de ${nombreCompleto}`}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-semibold text-error transition-colors hover:bg-error-container disabled:opacity-50"
+      >
+        <X aria-hidden="true" className="h-3.5 w-3.5" />
+        Rechazar salida
+      </button>
+      <button
+        type="button"
+        onClick={() => void resolver('APROBAR')}
+        disabled={enCurso}
+        aria-label={`Aprobar solicitud de salida de ${nombreCompleto}`}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
+      >
+        <Check aria-hidden="true" className="h-3.5 w-3.5" />
+        Aprobar salida
+      </button>
+    </div>
   );
 }

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { AlertCircle, ArrowLeft, BriefcaseBusiness, Calendar, Clock3, UserRoundPlus, Users } from 'lucide-react';
@@ -8,12 +7,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectPendingPostulations, useResolvePostulacion } from '@/hooks/use-project-pending-postulations';
-import uvgSwal from '@/lib/swal';
+import { aviso, confirmar } from '@/lib/mensajes';
 import type { PostulacionRecibida } from '@/types';
 
 type Accion = 'ACEPTADA' | 'RECHAZADA';
@@ -96,56 +94,41 @@ export default function ProjectPendingPostulationsPage() {
 
   const { postulaciones, isLoading, isError, error, refetch } = useProjectPendingPostulations(idProyecto);
   const resolver = useResolvePostulacion(idProyecto);
-  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
 
   const rolesConSolicitudes = new Set(postulaciones.map((p) => p.rolProyecto.idRolProyecto)).size;
   const postulantesUnicos = new Set(postulaciones.map((p) => p.postulante.idUsuario)).size;
   const cargandoDatos = isLoading || cargandoPermisos;
 
-  function pedirConfirmacion(postulacion: PostulacionRecibida, accion: Accion) {
-    setConfirmTarget({ postulacion, accion });
-  }
-
-  function cancelarConfirmacion() {
-    if (resolver.isPending) return;
-    setConfirmTarget(null);
-  }
-
-  function confirmar() {
-    if (!confirmTarget) return;
-    const { postulacion, accion } = confirmTarget;
+  async function pedirConfirmacion(postulacion: PostulacionRecibida, accion: Accion) {
+    const { nombre, apellido } = postulacion.postulante;
+    const nombrePostulante = `${nombre} ${apellido}`;
+    const confirmado = await confirmar({
+      titulo: accion === 'ACEPTADA' ? `¿Aceptar la postulación de ${nombrePostulante}?` : `¿Rechazar la postulación de ${nombrePostulante}?`,
+      descripcion:
+        accion === 'ACEPTADA'
+          ? `${nombrePostulante} se une al proyecto en el rol solicitado.`
+          : `${nombrePostulante} no se une al proyecto en el rol solicitado.`,
+      textoAccion: accion === 'ACEPTADA' ? 'Aceptar postulación' : 'Rechazar postulación',
+      destructiva: accion === 'RECHAZADA',
+    });
+    if (!confirmado) return;
 
     resolver.mutate(
       { postulacionId: postulacion.idPostulacion, estadoPostulacion: accion },
       {
         onSuccess: () => {
-          setConfirmTarget(null);
-          const { nombre, apellido } = postulacion.postulante;
-          uvgSwal.fire({
-            icon: 'success',
-            title: accion === 'ACEPTADA' ? 'Nueva miembro activa' : 'Postulación rechazada',
-            text:
-              accion === 'ACEPTADA'
-                ? `${nombre} ${apellido} ya es parte del equipo y aparece en la lista de miembros activos.`
-                : undefined,
-            timer: 2200,
-          });
+          aviso.exito(
+            accion === 'ACEPTADA' ? 'Nueva miembro activa' : 'Postulación rechazada',
+            accion === 'ACEPTADA'
+              ? `${nombrePostulante} ya es parte del equipo y aparece en la lista de miembros activos.`
+              : undefined,
+          );
         },
-        onError: (mutationError: any) => {
-          setConfirmTarget(null);
-          uvgSwal.fire({
-            icon: 'error',
-            title: 'No se pudo resolver la postulación',
-            text: mutationError?.message || 'Ocurrió un error inesperado.',
-          });
-        },
+        onError: (mutationError: any) =>
+          aviso.error('No se pudo resolver la postulación', mutationError?.message),
       },
     );
   }
-
-  const nombrePostulante = confirmTarget
-    ? `${confirmTarget.postulacion.postulante.nombre} ${confirmTarget.postulacion.postulante.apellido}`
-    : '';
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
@@ -283,7 +266,7 @@ export default function ProjectPendingPostulationsPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => pedirConfirmacion(postulacion, 'RECHAZADA')}
+                              onClick={() => void pedirConfirmacion(postulacion, 'RECHAZADA')}
                               disabled={enCurso}
                               aria-label={`Rechazar postulación de ${nombreCompleto}`}
                               className="border-error px-4 font-bold text-error hover:bg-error-container"
@@ -292,7 +275,7 @@ export default function ProjectPendingPostulationsPage() {
                             </Button>
                             <Button
                               type="button"
-                              onClick={() => pedirConfirmacion(postulacion, 'ACEPTADA')}
+                              onClick={() => void pedirConfirmacion(postulacion, 'ACEPTADA')}
                               disabled={enCurso}
                               aria-label={`Aceptar postulación de ${nombreCompleto}`}
                               className="px-4 font-bold text-on-primary"
@@ -311,20 +294,6 @@ export default function ProjectPendingPostulationsPage() {
         </>
       )}
 
-      <ConfirmActionDialog
-        open={confirmTarget !== null}
-        title={confirmTarget?.accion === 'ACEPTADA' ? 'Aceptar postulación' : 'Rechazar postulación'}
-        description={
-          confirmTarget?.accion === 'ACEPTADA'
-            ? `¿Confirmas que deseas aceptar la postulación de ${nombrePostulante}?`
-            : `¿Confirmas que deseas rechazar la postulación de ${nombrePostulante}?`
-        }
-        actionLabel={confirmTarget?.accion === 'ACEPTADA' ? 'Sí, aceptar postulación' : 'Sí, rechazar postulación'}
-        variant={confirmTarget?.accion === 'RECHAZADA' ? 'destructive' : 'default'}
-        isPending={resolver.isPending}
-        onConfirm={confirmar}
-        onCancel={cancelarConfirmacion}
-      />
     </div>
   );
 }

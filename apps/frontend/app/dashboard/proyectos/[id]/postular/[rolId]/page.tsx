@@ -11,14 +11,14 @@ import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { Postulacion, Proyecto } from '@/types';
 
-const schema = z.object({
+export const postulacionSchema = z.object({
   justificacion: z
     .string()
     .min(40, 'La justificación debe tener al menos 40 caracteres.')
     .max(1000, 'La justificación no puede exceder 1000 caracteres.'),
 });
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.infer<typeof postulacionSchema>;
 
 export default function PostularPage() {
   const { id, rolId } = useParams<{ id: string; rolId: string }>();
@@ -54,7 +54,7 @@ export default function PostularPage() {
     handleSubmit,
     control,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+  } = useForm<FormData>({ resolver: zodResolver(postulacionSchema) });
 
   const justificacion = useWatch({ control, name: 'justificacion', defaultValue: '' });
 
@@ -178,9 +178,9 @@ export default function PostularPage() {
                 </Link>
               </div>
             ) : (
-              <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
+              <form noValidate onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-on-surface mb-1.5">
+                  <label htmlFor="justificacion" className="block text-sm font-semibold text-on-surface mb-1.5">
                     Justificación <span className="text-error">*</span>
                   </label>
                   <p className="text-xs text-tertiary mb-2">
@@ -188,9 +188,12 @@ export default function PostularPage() {
                     y motivación.
                   </p>
                   <textarea
+                    id="justificacion"
                     {...register('justificacion')}
                     rows={8}
                     placeholder="Escribe tu justificación aquí..."
+                    aria-invalid={errors.justificacion ? 'true' : undefined}
+                    aria-describedby={errors.justificacion ? 'justificacion-error' : undefined}
                     className={`w-full px-4 py-3 rounded-xl border text-on-surface text-sm leading-relaxed outline-none resize-none transition-colors ${
                       errors.justificacion
                         ? 'border-error bg-error-container/10 focus:ring-2 focus:ring-error'
@@ -199,7 +202,7 @@ export default function PostularPage() {
                   />
                   <div className="flex items-start justify-between mt-1.5">
                     {errors.justificacion ? (
-                      <p className="text-xs text-error">{errors.justificacion.message}</p>
+                      <p id="justificacion-error" role="alert" className="text-xs text-error">{errors.justificacion.message}</p>
                     ) : (
                       <span />
                     )}

@@ -7,12 +7,10 @@ import type { FormData } from './types';
 type Props = {
   form: FormData;
   saving: boolean;
-  isStep1Complete: boolean;
-  isStep2Complete: boolean;
   onSubmit: (accion: 'BORRADOR' | 'EN_REVISION') => void;
 };
 
-export function Step3({ form, saving, isStep1Complete, isStep2Complete, onSubmit }: Props) {
+export function Step3({ form, saving, onSubmit }: Props) {
   return (
     <div className="space-y-5">
       <p className="text-tertiary text-sm">Revisa los datos antes de guardar o enviar tu proyecto.</p>
@@ -49,14 +47,14 @@ export function Step3({ form, saving, isStep1Complete, isStep2Complete, onSubmit
 
       <div className="flex flex-col gap-3 pt-2">
         <button
-          disabled={saving || !isStep1Complete}
+          disabled={saving}
           onClick={() => onSubmit('BORRADOR')}
           className="w-full py-3 rounded-xl border-2 border-primary text-primary font-bold text-sm hover:bg-primary/5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Guardando...' : 'Guardar como borrador'}
         </button>
         <button
-          disabled={saving || !isStep1Complete || !isStep2Complete}
+          disabled={saving}
           onClick={() => onSubmit('EN_REVISION')}
           className="w-full py-3 rounded-xl bg-primary text-on-primary font-bold text-sm hover:bg-primary/90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >

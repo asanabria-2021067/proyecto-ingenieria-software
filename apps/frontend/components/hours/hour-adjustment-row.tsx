@@ -66,7 +66,7 @@ export function HourAdjustmentRow({
   const baseId = useId();
   const [propuestas, setPropuestas] = useState(formatearDecimal(tramo.propuestas));
   const [justificacion, setJustificacion] = useState(tramo.justificacionAjuste ?? '');
-  const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  const [errorLocal, setErrorLocal] = useState<{ field: 'propuestas' | 'justificacion'; message: string } | null>(null);
   // El panel del líder no está abierto de entrada: la fila se lee primero
   // (lo que hizo el estudiante) y solo se ajusta cuando se pide explícitamente.
   const [ajustando, setAjustando] = useState(false);
@@ -100,7 +100,7 @@ export function HourAdjustmentRow({
     toDeltaHoras(propuestasNum, tramo.reportadas) === (tramo.ajuste != null ? formatearSigno(tramo.ajuste) : '0.00') &&
     justificacion.trim() === (tramo.justificacionAjuste ?? '').trim();
   const puedeGuardar =
-    editable && propuestasValidas && !pending && !sinCambios && (!requiereJustificacion || justificacion.trim().length > 0);
+    editable && !pending && !sinCambios;
 
   const idPropuestas = `${baseId}-propuestas`;
   const idJustificacion = `${baseId}-justificacion`;
@@ -129,9 +129,21 @@ export function HourAdjustmentRow({
   };
 
   const guardar = () => {
-    if (!editable || !propuestasValidas) return;
+    if (!editable) return;
+    if (!propuestasValidas) {
+      setErrorLocal({ field: 'propuestas', message: 'Ingresa una cantidad de horas válida, igual o mayor que cero.' });
+      return;
+    }
+    if (!/^-?\d{1,10}\.\d{2}$/.test(delta)) {
+      setErrorLocal({ field: 'propuestas', message: 'La cantidad de horas es demasiado grande.' });
+      return;
+    }
     if (requiereJustificacion && justificacion.trim().length === 0) {
-      setErrorLocal('La justificación es obligatoria cuando cambias las horas propuestas.');
+      setErrorLocal({ field: 'justificacion', message: 'La justificación es obligatoria cuando cambias las horas propuestas.' });
+      return;
+    }
+    if (justificacion.trim().length > JUSTIFICACION_AJUSTE_MAX) {
+      setErrorLocal({ field: 'justificacion', message: 'La justificación no puede exceder 5000 caracteres.' });
       return;
     }
     setErrorLocal(null);
@@ -159,7 +171,8 @@ export function HourAdjustmentRow({
     }
   };
 
-  const mensajeError = error ?? errorLocal;
+  const errorPropuestas = errorLocal?.field === 'propuestas' ? errorLocal.message : null;
+  const errorJustificacion = error ?? (errorLocal?.field === 'justificacion' ? errorLocal.message : null);
   const motivoNoEditable = tramo.abierto
     ? 'Este tramo sigue abierto: el integrante debe cerrarlo antes de que puedas ajustar sus horas.'
     : consumido
@@ -271,13 +284,17 @@ export function HourAdjustmentRow({
               min={0}
               inputMode="decimal"
               value={propuestas}
-              onChange={(e) => setPropuestas(e.target.value)}
+              onChange={(e) => {
+                setPropuestas(e.target.value);
+                setErrorLocal(null);
+              }}
               disabled={pending}
               autoFocus
-              aria-describedby={mensajeError ? idError : undefined}
-              aria-invalid={mensajeError ? 'true' : undefined}
+              aria-describedby={errorPropuestas ? `${idError}-propuestas` : undefined}
+              aria-invalid={errorPropuestas ? 'true' : undefined}
               className="mt-1 h-9 text-sm"
             />
+            {errorPropuestas && <p id={`${idError}-propuestas`} role="alert" className="mt-1 text-xs text-error">{errorPropuestas}</p>}
           </div>
           <div>
             <Label htmlFor={idJustificacion} className="text-xs font-semibold text-on-surface">
@@ -286,19 +303,24 @@ export function HourAdjustmentRow({
             <Textarea
               id={idJustificacion}
               value={justificacion}
-              onChange={(e) => setJustificacion(e.target.value)}
+              onChange={(e) => {
+                setJustificacion(e.target.value);
+                setErrorLocal(null);
+              }}
               rows={2}
               maxLength={JUSTIFICACION_AJUSTE_MAX}
               disabled={pending}
               required={requiereJustificacion}
               aria-required={requiereJustificacion ? 'true' : undefined}
+              aria-invalid={errorJustificacion ? 'true' : undefined}
+              aria-describedby={errorJustificacion ? idError : undefined}
               placeholder={requiereJustificacion ? 'Explica el ajuste propuesto' : 'Sin ajuste'}
               className="mt-1 min-h-9 text-sm"
             />
             <div className="mt-1 flex items-start justify-between gap-2">
-              {mensajeError ? (
+              {errorJustificacion ? (
                 <p id={idError} role="alert" className="text-xs text-error">
-                  {mensajeError}
+                  {errorJustificacion}
                 </p>
               ) : (
                 <span />

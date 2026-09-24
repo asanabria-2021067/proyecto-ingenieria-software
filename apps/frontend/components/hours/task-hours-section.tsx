@@ -152,6 +152,32 @@ interface FormState {
   justificacion: string;
 }
 
+type FormErrors = Partial<Record<keyof FormState, string>>;
+
+function fechaISOValida(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function validarFormulario(form: FormState, requiereJustificacion: boolean): FormErrors {
+  const errors: FormErrors = {};
+  const horas = Number(form.horas);
+  if (form.horas.trim() === '') errors.horas = 'Ingresa las horas.';
+  else if (!Number.isFinite(horas) || horas < 0.01) errors.horas = 'Las horas deben ser un número mayor o igual a 0.01.';
+  if (!fechaISOValida(form.fecha)) errors.fecha = 'Selecciona una fecha válida.';
+  if (requiereJustificacion && form.justificacion.trim() === '') {
+    errors.justificacion = 'Debes justificar el exceso sobre la estimación.';
+  } else if (form.justificacion.trim().length > 5000) {
+    errors.justificacion = 'La justificación no puede exceder 5000 caracteres.';
+  }
+  return errors;
+}
+
 function emptyForm(): FormState {
   return { horas: '', fecha: hoyISO(), nota: '', justificacion: '' };
 }
@@ -178,12 +204,12 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editando, setEditando] = useState<RegistroTiempoTareaDTO | null>(null);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
-  const [errorJustificacion, setErrorJustificacion] = useState<string | null>(null);
+  const [erroresFormulario, setErroresFormulario] = useState<FormErrors>({});
   const [revocandoId, setRevocandoId] = useState<number | null>(null);
   const [errorRevocar, setErrorRevocar] = useState<string | null>(null);
 
   const horasNumericas = Number(form.horas);
-  const horasValidas = form.horas.trim().length > 0 && Number.isFinite(horasNumericas) && horasNumericas > 0;
+  const horasValidas = form.horas.trim().length > 0 && Number.isFinite(horasNumericas) && horasNumericas >= 0.01;
 
   // Delta que introduce la operación en curso sobre el total de la tarea.
   const delta = useMemo(() => {
@@ -205,18 +231,13 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
   const mutationActiva = modoEdicion ? editar : registrar;
   const pending = registrar.isPending || editar.isPending;
 
-  const puedeEnviar =
-    formularioHabilitado &&
-    horasValidas &&
-    form.fecha.length > 0 &&
-    (!cruzaEstimacion || form.justificacion.trim().length > 0) &&
-    !pending;
+  const puedeEnviar = formularioHabilitado && !pending;
 
   const resetForm = () => {
     setForm(emptyForm());
     setEditando(null);
     setErrorLocal(null);
-    setErrorJustificacion(null);
+    setErroresFormulario({});
     registrar.reset();
     editar.reset();
   };
@@ -225,19 +246,17 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
     setEditando(record);
     setForm(formFromRecord(record));
     setErrorLocal(null);
-    setErrorJustificacion(null);
+    setErroresFormulario({});
     registrar.reset();
     editar.reset();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formularioHabilitado || !horasValidas) return;
-    if (cruzaEstimacion && form.justificacion.trim().length === 0) {
-      setErrorJustificacion('Debes justificar el exceso sobre la estimación.');
-      return;
-    }
-    setErrorJustificacion(null);
+    if (!formularioHabilitado) return;
+    const errors = validarFormulario(form, cruzaEstimacion);
+    setErroresFormulario(errors);
+    if (Object.keys(errors).length > 0) return;
     setErrorLocal(null);
 
     const nota = form.nota.trim();
@@ -366,14 +385,15 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
           value={form.justificacion}
           onChange={(value) => {
             setForm((f) => ({ ...f, justificacion: value }));
-            if (value.trim()) setErrorJustificacion(null);
+            setErroresFormulario((current) => ({ ...current, justificacion: undefined }));
           }}
-          error={errorJustificacion}
+          error={erroresFormulario.justificacion ?? null}
           disabled={pending}
         />
       )}
 
       <form
+        noValidate
         onSubmit={handleSubmit}
         aria-label={modoEdicion ? 'Editar registro de horas' : 'Registrar horas'}
         className="space-y-3 rounded-md border border-outline-variant/40 p-3"
@@ -396,11 +416,15 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
               min={0.01}
               placeholder="1.5"
               value={form.horas}
-              onChange={(e) => setForm((f) => ({ ...f, horas: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, horas: e.target.value }));
+                setErroresFormulario((current) => ({ ...current, horas: undefined }));
+              }}
               disabled={!formularioHabilitado || pending}
-              aria-invalid={mutationStatus === 400 ? 'true' : undefined}
+              aria-invalid={erroresFormulario.horas || mutationStatus === 400 ? 'true' : undefined}
               className="mt-1 h-9 text-sm"
             />
+            {erroresFormulario.horas && <p role="alert" className="mt-1 text-xs text-error">{erroresFormulario.horas}</p>}
           </div>
           <div>
             <Label htmlFor={idFecha} className="text-xs font-semibold text-on-surface">
@@ -410,10 +434,15 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
               id={idFecha}
               type="date"
               value={form.fecha}
-              onChange={(e) => setForm((f) => ({ ...f, fecha: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, fecha: e.target.value }));
+                setErroresFormulario((current) => ({ ...current, fecha: undefined }));
+              }}
               disabled={!formularioHabilitado || pending}
+              aria-invalid={erroresFormulario.fecha ? 'true' : undefined}
               className="mt-1 h-9 text-sm"
             />
+            {erroresFormulario.fecha && <p role="alert" className="mt-1 text-xs text-error">{erroresFormulario.fecha}</p>}
           </div>
           <div>
             <Label htmlFor={idNota} className="text-xs font-semibold text-on-surface">

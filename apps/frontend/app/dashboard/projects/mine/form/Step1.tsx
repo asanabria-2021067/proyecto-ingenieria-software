@@ -27,8 +27,10 @@ export function Step1({ form, update, errors, partial = false }: Props) {
   return (
     <div className="space-y-5">
       <div>
-        <label className={labelClass}>Título del proyecto <span className="text-error">*</span></label>
+        <label htmlFor="tituloProyecto" className={labelClass}>Título del proyecto <span className="text-error">*</span></label>
         <input
+          id="tituloProyecto"
+          maxLength={200}
           className={`${inputClass} ${hasError('tituloProyecto', errors) ? 'border-error focus:border-error focus:ring-error/20' : ''}`}
           placeholder="Nombre descriptivo del proyecto"
           value={form.tituloProyecto}
@@ -38,8 +40,9 @@ export function Step1({ form, update, errors, partial = false }: Props) {
       </div>
 
       <div>
-        <label className={labelClass}>Descripción <span className="text-error">*</span></label>
+        <label htmlFor="descripcionProyecto" className={labelClass}>Descripción <span className="text-error">*</span></label>
         <textarea
+          id="descripcionProyecto"
           className={`${inputClass} resize-none ${hasError('descripcionProyecto', errors) ? 'border-error focus:border-error focus:ring-error/20' : ''}`}
           rows={3}
           placeholder="¿En qué consiste el proyecto?"
@@ -90,11 +93,13 @@ export function Step1({ form, update, errors, partial = false }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>Contexto académico</label>
-          <input className={inputClass} placeholder="ej. Tesis, proyecto de curso..." value={form.contextoAcademico} onChange={(e) => update('contextoAcademico', e.target.value)} />
+          <input maxLength={255} className={`${inputClass} ${hasError('contextoAcademico', errors) ? 'border-error' : ''}`} placeholder="ej. Tesis, proyecto de curso..." value={form.contextoAcademico} onChange={(e) => update('contextoAcademico', e.target.value)} />
+          <ErrMsg field="contextoAcademico" errors={errors} />
         </div>
         <div>
           <label className={labelClass}>Ubicación</label>
-          <input className={inputClass} placeholder="Ciudad o lugar" value={form.ubicacionProyecto} onChange={(e) => update('ubicacionProyecto', e.target.value)} />
+          <input maxLength={255} className={`${inputClass} ${hasError('ubicacionProyecto', errors) ? 'border-error' : ''}`} placeholder="Ciudad o lugar" value={form.ubicacionProyecto} onChange={(e) => update('ubicacionProyecto', e.target.value)} />
+          <ErrMsg field="ubicacionProyecto" errors={errors} />
         </div>
       </div>
 
@@ -102,7 +107,8 @@ export function Step1({ form, update, errors, partial = false }: Props) {
         {!partial && (
           <div>
             <label className={labelClass}>Fecha de inicio</label>
-            <input type="date" className={inputClass} value={form.fechaInicio} onChange={(e) => update('fechaInicio', e.target.value)} />
+            <input type="date" className={`${inputClass} ${hasError('fechaInicio', errors) ? 'border-error' : ''}`} value={form.fechaInicio} onChange={(e) => update('fechaInicio', e.target.value)} />
+            <ErrMsg field="fechaInicio" errors={errors} />
           </div>
         )}
         <div>
@@ -119,7 +125,8 @@ export function Step1({ form, update, errors, partial = false }: Props) {
 
       <div>
         <label className={labelClass}>URL recurso externo</label>
-        <input className={inputClass} placeholder="https://..." value={form.urlRecursoExterno} onChange={(e) => update('urlRecursoExterno', e.target.value)} />
+        <input maxLength={255} className={`${inputClass} ${hasError('urlRecursoExterno', errors) ? 'border-error' : ''}`} placeholder="https://..." value={form.urlRecursoExterno} onChange={(e) => update('urlRecursoExterno', e.target.value)} />
+        <ErrMsg field="urlRecursoExterno" errors={errors} />
       </div>
     </div>
   );
