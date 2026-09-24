@@ -5,6 +5,7 @@ import {
   colorTablaRgb,
   parseExportOptions,
   tamanosDeFuente,
+  textoSobreColor,
 } from '../src/exports/export-options';
 
 describe('parseExportOptions (revisión del PR: opciones de exportación)', () => {
@@ -12,7 +13,7 @@ describe('parseExportOptions (revisión del PR: opciones de exportación)', () =
     expect(parseExportOptions({})).toEqual(DEFAULT_EXPORT_OPTIONS);
     expect(DEFAULT_EXPORT_OPTIONS).toMatchObject({
       fuente: 'mediana',
-      colorTablas: 'gris',
+      colorTablas: '#464646',
       secciones: ['miembros', 'avance', 'burndown'],
       graficas: [],
       desde: null,
@@ -23,13 +24,13 @@ describe('parseExportOptions (revisión del PR: opciones de exportación)', () =
   it('acepta fuente, color, secciones y gráficas válidos', () => {
     const o = parseExportOptions({
       fuente: 'grande',
-      color: 'azul',
+      color: '#1E408C',
       secciones: 'miembros,avance',
       graficas: 'barras,pastel',
     });
 
     expect(o.fuente).toBe('grande');
-    expect(o.colorTablas).toBe('azul');
+    expect(o.colorTablas).toBe('#1e408c');
     expect(o.secciones).toEqual(['miembros', 'avance']);
     expect(o.graficas).toEqual(['barras', 'pastel']);
   });
@@ -49,6 +50,10 @@ describe('parseExportOptions (revisión del PR: opciones de exportación)', () =
   it.each([
     [{ fuente: 'enorme' }],
     [{ color: 'fucsia' }],
+    [{ color: '#12345' }],
+    [{ color: '123456' }],
+    [{ color: '#GGGGGG' }],
+    [{ color: '#1e408c80' }],
     [{ secciones: 'miembros,otra' }],
     [{ graficas: 'lineas' }],
     [{ desde: '01/02/2026' }],
@@ -80,10 +85,17 @@ describe('tamanosDeFuente / colorTablaRgb', () => {
     expect(tamanosDeFuente('grande').tabla).toBeGreaterThan(tamanosDeFuente('mediana').tabla);
   });
 
-  it('cada color de tabla es un RGB oscuro (texto blanco legible y distinguible en blanco y negro)', () => {
-    for (const c of ['gris', 'azul', 'verde', 'rojo'] as const) {
-      const [r, g, b] = colorTablaRgb(c);
-      expect(Math.max(r, g, b)).toBeLessThanOrEqual(160);
-    }
+  it('convierte el hex a RGB', () => {
+    expect(colorTablaRgb('#1e408c')).toEqual([30, 64, 140]);
+    expect(colorTablaRgb('#59f7ff')).toEqual([89, 247, 255]);
+  });
+
+  it('el texto del encabezado es blanco sobre colores oscuros y negro sobre claros (legible siempre)', () => {
+    expect(textoSobreColor([70, 70, 70])).toBe(255);
+    expect(textoSobreColor([30, 64, 140])).toBe(255);
+    expect(textoSobreColor([89, 247, 255])).toBe(0);
+    expect(textoSobreColor([255, 255, 0])).toBe(0);
+    expect(textoSobreColor([255, 255, 255])).toBe(0);
+    expect(textoSobreColor([0, 0, 0])).toBe(255);
   });
 });

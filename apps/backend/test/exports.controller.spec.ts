@@ -182,13 +182,13 @@ describe('ExportsController (T-259/T-260/T-261)', () => {
         5,
         { userId: 9 },
         makeResponse(),
-        { fuente: 'grande', color: 'azul', secciones: 'miembros', graficas: 'barras,pastel', desde: '2026-02-01', hasta: '2026-02-28' },
+        { fuente: 'grande', color: '#1e408c', secciones: 'miembros', graficas: 'barras,pastel', desde: '2026-02-01', hasta: '2026-02-28' },
       );
 
       const opciones = service.getProjectExportModel.mock.calls[0][2];
       expect(opciones).toMatchObject({
         fuente: 'grande',
-        colorTablas: 'azul',
+        colorTablas: '#1e408c',
         secciones: ['miembros'],
         graficas: ['barras', 'pastel'],
       });
@@ -232,7 +232,7 @@ describe('ExportsController (T-259/T-260/T-261)', () => {
         TipoEventoBitacora.PROJECT_EXPORT_PDF_GENERATED,
         {
           fuente: 'mediana',
-          color: 'gris',
+          color: '#464646',
           secciones: ['miembros'],
           graficas: ['pastel'],
           desde: '2026-02-01',

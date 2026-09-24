@@ -29,7 +29,7 @@ describe('drawBarChart (revisión del PR: gráfica de barras)', () => {
     const doc = makeDoc();
     const rectSpy = vi.spyOn(doc, 'rect');
 
-    const { textos, finalY } = drawBarChart(doc, MIEMBROS, 100, 'azul');
+    const { textos, finalY } = drawBarChart(doc, MIEMBROS, 100, '#1e408c');
 
     expect(textos.some((t) => t.includes('Horas por integrante'))).toBe(true);
     // 3 integrantes × 2 barras + 2 muestras de la leyenda.
@@ -38,7 +38,7 @@ describe('drawBarChart (revisión del PR: gráfica de barras)', () => {
   });
 
   it('rotula cada integrante con su nombre (acentos y ñ intactos) y la leyenda', () => {
-    const { textos } = drawBarChart(makeDoc(), MIEMBROS, 100, 'gris');
+    const { textos } = drawBarChart(makeDoc(), MIEMBROS, 100, '#464646');
 
     expect(textos.some((t) => t.includes('Ñandú'))).toBe(true);
     expect(textos).toContain('Horas confirmadas');
@@ -49,7 +49,7 @@ describe('drawBarChart (revisión del PR: gráfica de barras)', () => {
     const doc = makeDoc();
     const rectSpy = vi.spyOn(doc, 'rect');
 
-    const { textos } = drawBarChart(doc, [], 100, 'gris');
+    const { textos } = drawBarChart(doc, [], 100, '#464646');
 
     expect(textos.some((t) => t.includes('Sin integrantes para graficar'))).toBe(true);
     expect(rectSpy).not.toHaveBeenCalled();
@@ -57,7 +57,7 @@ describe('drawBarChart (revisión del PR: gráfica de barras)', () => {
 
   it('con todas las horas en cero no divide entre cero y genera un PDF válido', () => {
     const doc = makeDoc();
-    drawBarChart(doc, [miembro(1, 'Luz', 0, 0)], 100, 'rojo');
+    drawBarChart(doc, [miembro(1, 'Luz', 0, 0)], 100, '#991b1b');
 
     expect(Buffer.from(doc.output('arraybuffer')).subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
@@ -68,7 +68,7 @@ describe('drawPieChart (revisión del PR: gráfica de pastel)', () => {
     const doc = makeDoc();
     const triSpy = vi.spyOn(doc, 'triangle');
 
-    const { textos } = drawPieChart(doc, MIEMBROS, 100, 'verde');
+    const { textos } = drawPieChart(doc, MIEMBROS, 100, '#166534');
 
     expect(triSpy).toHaveBeenCalled();
     expect(textos.some((t) => t.includes('Distribución de horas'))).toBe(true);
@@ -77,7 +77,7 @@ describe('drawPieChart (revisión del PR: gráfica de pastel)', () => {
   });
 
   it('los porcentajes de la leyenda suman 100', () => {
-    const { textos } = drawPieChart(makeDoc(), MIEMBROS, 100, 'gris');
+    const { textos } = drawPieChart(makeDoc(), MIEMBROS, 100, '#464646');
 
     const porcentajes = textos
       .map((t) => /\((\d+) %\)/.exec(t)?.[1])
@@ -89,7 +89,7 @@ describe('drawPieChart (revisión del PR: gráfica de pastel)', () => {
   it('agrupa en "Otros" a partir del noveno integrante para no desbordar la leyenda', () => {
     const muchos = Array.from({ length: 12 }, (_, i) => miembro(i + 1, `M${i + 1}`, 10 - i * 0.5, 0));
 
-    const { textos } = drawPieChart(makeDoc(), muchos, 100, 'gris');
+    const { textos } = drawPieChart(makeDoc(), muchos, 100, '#464646');
 
     expect(textos.some((t) => t.startsWith('Otros'))).toBe(true);
     expect(textos.filter((t) => /\(\d+ %\)/.test(t))).toHaveLength(9);
@@ -99,7 +99,7 @@ describe('drawPieChart (revisión del PR: gráfica de pastel)', () => {
     const doc = makeDoc();
     const triSpy = vi.spyOn(doc, 'triangle');
 
-    const { textos } = drawPieChart(doc, [miembro(1, 'Luz', 0, 0)], 100, 'gris');
+    const { textos } = drawPieChart(doc, [miembro(1, 'Luz', 0, 0)], 100, '#464646');
 
     expect(textos.some((t) => t.includes('Sin horas para graficar'))).toBe(true);
     expect(triSpy).not.toHaveBeenCalled();
