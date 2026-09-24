@@ -12,6 +12,7 @@ import { getMyProjects, getContributorProjects, deleteProject } from '@/lib/serv
 import { TIPO_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
 import { aviso, confirmar } from '@/lib/mensajes';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   Empty,
   EmptyContent,
@@ -94,7 +95,7 @@ export default function MyProjectsPage() {
       await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
       aviso.exito('Proyecto eliminado', `"${proyecto.tituloProyecto}" ya no está disponible.`);
     } catch (err) {
-      aviso.error('No se pudo eliminar el proyecto', err instanceof Error ? err.message : undefined);
+      aviso.error('No se pudo eliminar el proyecto', getApiErrorMessage(err, 'general'));
     }
   }
 
