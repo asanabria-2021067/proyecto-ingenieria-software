@@ -16,18 +16,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { aviso, confirmar } from '@/lib/mensajes';
 import type { useProjectLabels } from '@/hooks/use-project-labels';
 import type { LabelDTO } from '@/lib/services/labels';
 import { cn } from '@/lib/utils';
@@ -413,8 +404,6 @@ export function ProjectLabelsDrawer({
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
-  const [labelToDelete, setLabelToDelete] = useState<LabelDTO | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const editingLabel = useMemo(
     () => labels.find((label) => label.idEtiqueta === editingLabelId) ?? null,
@@ -425,14 +414,13 @@ export function ProjectLabelsDrawer({
     setCreateError(null);
     setEditError(null);
     setEditingLabelId(null);
-    setLabelToDelete(null);
-    setDeleteError(null);
   };
 
   const handleCreateLabel = async (values: LabelFormState) => {
     setCreateError(null);
     try {
       await createLabel.mutateAsync(values);
+      aviso.exito('Etiqueta creada', `"${values.nombreEtiqueta.trim()}" ya está disponible para las tareas.`);
       return true;
     } catch (error) {
       setCreateError(getApiErrorMessage(error, 'label'));
@@ -445,19 +433,26 @@ export function ProjectLabelsDrawer({
     try {
       await updateLabel.mutateAsync({ labelId: label.idEtiqueta, input: values });
       setEditingLabelId(null);
+      aviso.exito('Etiqueta actualizada');
     } catch (error) {
       setEditError(getApiErrorMessage(error, 'label'));
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!labelToDelete) return;
-    setDeleteError(null);
+  const handleDelete = async (label: LabelDTO) => {
+    const confirmado = await confirmar({
+      titulo: `¿Eliminar la etiqueta "${label.nombreEtiqueta}"?`,
+      descripcion:
+        'La etiqueta dejará de estar disponible en el proyecto y desaparecerá de las tareas asociadas. Las tareas no serán eliminadas.',
+      textoAccion: 'Eliminar etiqueta',
+      destructiva: true,
+    });
+    if (!confirmado) return;
     try {
-      await deleteLabel.mutateAsync({ labelId: labelToDelete.idEtiqueta });
-      setLabelToDelete(null);
+      await deleteLabel.mutateAsync({ labelId: label.idEtiqueta });
+      aviso.exito('Etiqueta eliminada', `"${label.nombreEtiqueta}" se quitó del proyecto.`);
     } catch (error) {
-      setDeleteError(getApiErrorMessage(error, 'label'));
+      aviso.error('No se pudo eliminar la etiqueta', getApiErrorMessage(error, 'label'));
     }
   };
 
@@ -545,10 +540,7 @@ export function ProjectLabelsDrawer({
                           setEditingLabelId(nextLabel.idEtiqueta);
                           setEditError(null);
                         }}
-                        onDelete={(nextLabel) => {
-                          setDeleteError(null);
-                          setLabelToDelete(nextLabel);
-                        }}
+                        onDelete={(nextLabel) => void handleDelete(nextLabel)}
                       />
                     )
                   ))}
@@ -565,46 +557,6 @@ export function ProjectLabelsDrawer({
           </div>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog
-        open={labelToDelete !== null}
-        onOpenChange={(next) => {
-          if (!next) {
-            setLabelToDelete(null);
-            setDeleteError(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {labelToDelete ? `¿Eliminar la etiqueta "${labelToDelete.nombreEtiqueta}"?` : 'Eliminar etiqueta'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              La etiqueta dejará de estar disponible en el proyecto y desaparecerá de las tareas asociadas. Las tareas no serán eliminadas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {deleteError && (
-            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
-              {deleteError}
-            </p>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteLabel.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleteLabel.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                handleConfirmDelete();
-              }}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {deleteLabel.isPending && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />}
-              {deleteLabel.isPending ? 'Eliminando...' : 'Eliminar etiqueta'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

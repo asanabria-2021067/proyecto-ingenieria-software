@@ -12,7 +12,7 @@ import { Step1 } from './Step1';
 import { Step2 } from './Step2';
 import { Step3 } from './Step3';
 import {
-  STEPS, newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, zodToFieldErrors,
+  STEPS, newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, partialProjectSchema, zodToFieldErrors,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from './types';
 
@@ -97,20 +97,10 @@ function NewProjectFormContent() {
     });
   }, [proyectoExistente, editId, router]);
 
-  const isStep1Complete =
-    form.tituloProyecto.trim() !== '' &&
-    form.descripcionProyecto.trim() !== '' &&
-    form.tipoProyecto !== '' &&
-    form.modalidadProyecto !== '';
-
-  const isStep2Complete =
-    form.roles.length > 0 &&
-    form.roles.every((r) => r.nombreRol.trim() !== '' && r.cupos !== '');
-
   const goTo = (target: number) => {
     if (target > step && step === 0) setTriedStep1(true);
     if (target > step && step === 1) setTriedStep2(true);
-    if (target > step && step === 0 && !isStep1Complete) return;
+    if (target > step && step === 0 && !step1Schema.safeParse(form).success) return;
     setDirection(target > step ? 'forward' : 'backward');
     setStep(target);
   };
@@ -161,19 +151,6 @@ function NewProjectFormContent() {
     ? Object.fromEntries(form.roles.map((r) => [r.id, zodToFieldErrors(rolSchema.safeParse(r))]))
     : {};
 
-  const noRolesError = triedStep2 && form.roles.length === 0;
-
-  const validateBeforeSubmit = (): string[] => {
-    const result = formSchema.safeParse(form);
-    if (result.success) return [];
-    return result.error.issues.map((issue) => {
-      const path = issue.path.join('.');
-      const roleMatch = path.match(/^roles\.(\d+)\.(.+)$/);
-      if (roleMatch) return `Rol ${Number(roleMatch[1]) + 1}: ${issue.message}`;
-      return issue.message;
-    });
-  };
-
   const API_FIELD_LABELS: Record<string, string> = {
     nombreRol: 'Nombre del rol', cupos: 'Cupos',
     horasSemanalesEstimadas: 'Horas semanales', descripcionRolProyecto: 'Descripción del rol',
@@ -216,13 +193,12 @@ function NewProjectFormContent() {
   };
 
   const submit = async (accion: 'BORRADOR' | 'EN_REVISION') => {
-    const clientErrors = validateBeforeSubmit();
-    if (clientErrors.length > 0) {
-      uvgSwal.fire({
-        icon: 'warning',
-        title: 'Campos incompletos',
-        html: `<ul class="text-left text-sm space-y-1">${clientErrors.map(e => `<li>• ${e}</li>`).join('')}</ul>`,
-      });
+    const result = formSchema.safeParse(form);
+    if (!result.success) {
+      setTriedStep1(true);
+      setTriedStep2(true);
+      const firstPath = result.error.issues[0]?.path ?? [];
+      setStep(firstPath[0] === 'roles' ? 1 : 0);
       return;
     }
 
@@ -274,15 +250,12 @@ function NewProjectFormContent() {
     fechaFinEstimada: form.fechaFinEstimada || undefined,
   });
 
-  const partialErrors: FieldErrors = {};
-  if (triedParcial) {
-    if (form.tituloProyecto.trim() === '') partialErrors.tituloProyecto = 'El título es obligatorio.';
-    if (form.descripcionProyecto.trim() === '') partialErrors.descripcionProyecto = 'La descripción es obligatoria.';
-  }
+  const partialResult = partialProjectSchema.safeParse(form);
+  const partialErrors: FieldErrors = triedParcial ? zodToFieldErrors(partialResult) : {};
 
   const submitParcial = async () => {
     setTriedParcial(true);
-    if (form.tituloProyecto.trim() === '' || form.descripcionProyecto.trim() === '' || editId === null) return;
+    if (!partialResult.success || editId === null) return;
 
     setSaving(true);
     try {
@@ -407,17 +380,13 @@ function NewProjectFormContent() {
             {step === 1 && (
               <Step2
                 roles={form.roles} carreras={carreras} habilidades={habilidades}
-                errors={step2Errors} noRolesError={noRolesError}
+                errors={step2Errors}
                 onAddRol={addRol} onRemoveRol={removeRol} onUpdateRol={updateRol}
                 onAddRequisito={addRequisito} onRemoveRequisito={removeRequisito} onUpdateRequisito={updateRequisito}
               />
             )}
             {step === 2 && (
-              <Step3
-                form={form} saving={saving}
-                isStep1Complete={isStep1Complete} isStep2Complete={isStep2Complete}
-                onSubmit={submit}
-              />
+              <Step3 form={form} saving={saving} onSubmit={submit} />
             )}
           </div>
 
