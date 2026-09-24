@@ -27,6 +27,7 @@ function makeModelo(overrides: Partial<ProjectExportModel> = {}): ProjectExportM
       },
     ],
     fechaGeneracion: new Date('2026-03-05T15:30:00.000Z'),
+    sprintPortada: 1,
     avance: {
       idProyecto: 5,
       sprints: [
@@ -60,6 +61,34 @@ function makeBurndown(overrides: Partial<SprintBurndownDto> = {}): SprintBurndow
     ...overrides,
   };
 }
+
+describe('portada del PDF', () => {
+  it('imprime en tres líneas centradas: Sprint X, Proyecto y Reporte de Analíticas', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo({ sprintPortada: 3 }), []);
+
+    expect(resumen.textosPortada).toEqual([
+      'Sprint 3',
+      'Proyecto Sistema de Bibliotecas',
+      'Reporte de Analíticas',
+    ]);
+  });
+
+  it('sin sprint que mostrar omite la línea del Sprint y conserva las otras dos', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo({ sprintPortada: null }), []);
+
+    expect(resumen.textosPortada).toEqual(['Proyecto Sistema de Bibliotecas', 'Reporte de Analíticas']);
+  });
+
+  it('el resto del reporte empieza en la segunda página: hay al menos 2 páginas y el encabezado va después de la portada', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), []);
+
+    expect(resumen.paginas).toBeGreaterThanOrEqual(2);
+    const iPortada = resumen.textosRenderizados.indexOf('Reporte de Analíticas');
+    const iEncabezado = resumen.textosRenderizados.findIndex((t) => t.startsWith('Reporte del proyecto'));
+    expect(iPortada).toBeGreaterThanOrEqual(0);
+    expect(iEncabezado).toBeGreaterThan(iPortada);
+  });
+});
 
 describe('renderProjectReportPdf (T-260)', () => {
   it('genera un PDF con al menos una página', () => {

@@ -26,6 +26,7 @@ function makeModelo(overrides: Partial<ProjectExportModel> = {}): ProjectExportM
       },
     ],
     fechaGeneracion: new Date('2026-03-05T15:30:00.000Z'),
+    sprintPortada: null,
     avance: { idProyecto: 5, sprints: [] },
     ...overrides,
   };

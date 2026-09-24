@@ -32,6 +32,8 @@ export interface PdfRenderSummary {
   paginas: number;
   filasMiembros: number;
   fechaGeneracion: string;
+  /** Líneas de la portada (página 1), en el orden en que se dibujan. */
+  textosPortada: string[];
   /** Texto tal como se entregó al documento, para verificar que nada se sustituyó (mismo contrato que ClosureRenderSummary). */
   textosRenderizados: string[];
 }
@@ -50,6 +52,43 @@ const AVANCE_HEADER = ['Sprint', 'Estado', 'Tareas planificadas', 'Tareas comple
 const MARGEN = { top: 40, bottom: 40, left: 40, right: 40 };
 const A4_HEIGHT_PT = 841.89;
 const BURNDOWN_BLOCK_ALTO_ESTIMADO = 190;
+
+const A4_WIDTH_PT = 595.28;
+
+/**
+ * Portada (revisión del PR): página 1 con tres líneas centradas — Sprint X,
+ * Proyecto XXXX y "Reporte de Analíticas" — y el resto del reporte desde la
+ * página 2. Sin Sprint que mostrar se omite solo esa línea.
+ */
+function drawPortada(doc: jsPDF, modelo: ProjectExportModel, textosRenderizados: string[]): string[] {
+  const centro = A4_WIDTH_PT / 2;
+  const ancho = A4_WIDTH_PT - 2 * MARGEN.left - 40;
+  const lineas: Array<{ texto: string; tamano: number }> = [];
+  if (modelo.sprintPortada !== null) {
+    lineas.push({ texto: `Sprint ${modelo.sprintPortada}`, tamano: 32 });
+  }
+  lineas.push({ texto: `Proyecto ${modelo.proyecto.tituloProyecto}`, tamano: 24 });
+  lineas.push({ texto: 'Reporte de Analíticas', tamano: 20 });
+
+  doc.setDrawColor(60);
+  doc.setLineWidth(1.5);
+  doc.line(MARGEN.left + 40, 300, A4_WIDTH_PT - MARGEN.right - 40, 300);
+
+  let y = 350;
+  for (const { texto, tamano } of lineas) {
+    doc.setFontSize(tamano);
+    const partes: string[] = doc.splitTextToSize(texto, ancho);
+    doc.text(partes, centro, y, { align: 'center' });
+    y += partes.length * tamano * 1.2 + 24;
+    textosRenderizados.push(texto);
+  }
+
+  doc.line(MARGEN.left + 40, y, A4_WIDTH_PT - MARGEN.right - 40, y);
+  doc.setFontSize(10);
+  const generado = `Generado: ${formatFechaCsv(modelo.fechaGeneracion)}`;
+  doc.text(generado, centro, y + 28, { align: 'center' });
+  return lineas.map((l) => l.texto);
+}
 
 /**
  * T-260: sección de avance — tabla desde `SprintComparativeAnalyticsDto`
@@ -147,6 +186,9 @@ export function renderProjectReportPdf(modelo: ProjectExportModel, burndowns: Sp
     textosRenderizados.push(texto);
   };
 
+  const textosPortada = drawPortada(doc, modelo, textosRenderizados);
+  doc.addPage();
+
   // T-260: encabezado con nombre del proyecto y fecha de generación, para
   // que el documento se explique solo sin depender de la pantalla que lo
   // generó. Nada aquí depende del color (blanco y negro legible).
@@ -204,6 +246,7 @@ export function renderProjectReportPdf(modelo: ProjectExportModel, burndowns: Sp
       paginas: doc.getNumberOfPages(),
       filasMiembros: modelo.miembros.length,
       fechaGeneracion: fechaTexto,
+      textosPortada,
       textosRenderizados,
     },
   };

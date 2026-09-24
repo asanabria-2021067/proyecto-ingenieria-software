@@ -43,5 +43,7 @@ export interface ProjectExportModel {
   lider: TeamSummaryLeaderDto;
   miembros: ProjectExportMemberDto[];
   fechaGeneracion: Date;
+  /** Número del Sprint que rotula la portada: el activo/en finalización, si no el último cerrado; null si no hay Sprints. */
+  sprintPortada: number | null;
   avance: SprintComparativeAnalyticsDto;
 }
