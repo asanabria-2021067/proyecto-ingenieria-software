@@ -5,6 +5,15 @@ import autoTable from 'jspdf-autotable';
 import { formatFechaCsv } from './csv-export.util';
 import { formatEstadoParticipacion, formatTipoProyecto } from './project-export-labels';
 import { drawBurndownChart } from './burndown-chart.builder';
+import { drawBarChart, drawPieChart, ALTO_BARRAS_ESTIMADO, ALTO_PASTEL_ESTIMADO } from './pdf-charts.builder';
+import {
+  DEFAULT_EXPORT_OPTIONS,
+  colorTablaRgb,
+  tamanosDeFuente,
+  type ExportOptions,
+  type GraficaExport,
+  type SeccionExport,
+} from './export-options';
 import type { ProjectExportModel } from './dto/project-export.dto';
 import type { SprintBurndownDto } from '../sprints/dto/sprint-burndown.dto';
 
@@ -34,6 +43,11 @@ export interface PdfRenderSummary {
   fechaGeneracion: string;
   /** Líneas de la portada (página 1), en el orden en que se dibujan. */
   textosPortada: string[];
+  /** Opciones aplicadas — permiten verificar que lo elegido llegó al documento. */
+  tamanoTabla: number;
+  colorTablasRgb: [number, number, number];
+  seccionesRenderizadas: SeccionExport[];
+  graficasRenderizadas: GraficaExport[];
   /** Texto tal como se entregó al documento, para verificar que nada se sustituyó (mismo contrato que ClosureRenderSummary). */
   textosRenderizados: string[];
 }
@@ -51,9 +65,8 @@ const MIEMBROS_HEADER = ['Integrante', 'Rol', 'Estado', 'Horas confirmadas', 'Ho
 const AVANCE_HEADER = ['Sprint', 'Estado', 'Tareas planificadas', 'Tareas completadas', '% cumplimiento'] as const;
 const MARGEN = { top: 40, bottom: 40, left: 40, right: 40 };
 const A4_HEIGHT_PT = 841.89;
-const BURNDOWN_BLOCK_ALTO_ESTIMADO = 190;
-
 const A4_WIDTH_PT = 595.28;
+const BURNDOWN_BLOCK_ALTO_ESTIMADO = 190;
 
 /**
  * Portada (revisión del PR): página 1 con tres líneas centradas — Sprint X,
@@ -91,40 +104,6 @@ function drawPortada(doc: jsPDF, modelo: ProjectExportModel, textosRenderizados:
 }
 
 /**
- * T-260: sección de avance — tabla desde `SprintComparativeAnalyticsDto`
- * (distribución de tareas/hitos por Sprint, SIN velocity ni puntos de
- * historia como métrica de esta tabla — restricción vigente de HU-143). El
- * burndown va en su propia sección aparte (ver `buildBurndownSection` más
- * abajo), aislado a propósito desde que este archivo se escribió sin el
- * burndown disponible todavía en esta rama.
- */
-function buildAvanceSection(
-  doc: jsPDF,
-  modelo: ProjectExportModel,
-  startY: number,
-  textosRenderizados: string[],
-): void {
-  autoTable(doc, {
-    startY,
-    head: [[...AVANCE_HEADER]],
-    body: modelo.avance.sprints.map((sprint) => [
-      `Sprint ${sprint.numero}`,
-      sprint.estado,
-      String(sprint.tareasPlanificadas),
-      String(sprint.tareasCompletadas),
-      `${sprint.porcentajeCumplimiento}%`,
-    ]),
-    styles: { font: PROJECT_REPORT_FONT, fontSize: 9 },
-    headStyles: { font: PROJECT_REPORT_FONT, fontStyle: 'normal' },
-    showHead: 'everyPage',
-    margin: MARGEN,
-  });
-  for (const sprint of modelo.avance.sprints) {
-    textosRenderizados.push(`Sprint ${sprint.numero}`, String(sprint.porcentajeCumplimiento));
-  }
-}
-
-/**
  * T-260 (HU-164, decisión del líder de proyecto, 2026-09-22): mientras el
  * proyecto no tenga NINGÚN Sprint cerrado, `burndowns` llega vacío
  * (ExportsController ni siquiera lo consulta) y esta sección se limita a
@@ -138,8 +117,9 @@ function buildBurndownSection(
   modelo: ProjectExportModel,
   burndowns: SprintBurndownDto[],
   startY: number,
+  tamanoSeccion: number,
   textosRenderizados: string[],
-): void {
+): number {
   const alturaNecesaria = 20 + (burndowns.length === 0 ? 20 : BURNDOWN_BLOCK_ALTO_ESTIMADO);
   let y = startY;
   if (y + alturaNecesaria > A4_HEIGHT_PT - MARGEN.bottom) {
@@ -147,7 +127,7 @@ function buildBurndownSection(
     y = MARGEN.top + 16;
   }
 
-  doc.setFontSize(13);
+  doc.setFontSize(tamanoSeccion);
   doc.text('Burndown de Sprints cerrados', 40, y);
   textosRenderizados.push('Burndown de Sprints cerrados');
   y += 20;
@@ -157,7 +137,7 @@ function buildBurndownSection(
     doc.setFontSize(9);
     doc.text(nota, 40, y);
     textosRenderizados.push(nota);
-    return;
+    return y + 20;
   }
 
   const numeroPorSprint = new Map(modelo.avance.sprints.map((sprint) => [sprint.idSprint, sprint.numero]));
@@ -171,19 +151,45 @@ function buildBurndownSection(
     textosRenderizados.push(...resultado.textosRenderizados);
     y = resultado.finalY + 20;
   }
+  return y;
 }
 
-export function renderProjectReportPdf(modelo: ProjectExportModel, burndowns: SprintBurndownDto[]): PdfRenderResult {
+export function renderProjectReportPdf(
+  modelo: ProjectExportModel,
+  burndowns: SprintBurndownDto[],
+  opciones: ExportOptions = DEFAULT_EXPORT_OPTIONS,
+): PdfRenderResult {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
   doc.addFileToVFS(FONT_FILE, fontBase64());
   doc.addFont(FONT_FILE, PROJECT_REPORT_FONT, 'normal');
   doc.setFont(PROJECT_REPORT_FONT, 'normal');
 
+  const tam = tamanosDeFuente(opciones.fuente);
+  const colorTablas = colorTablaRgb(opciones.colorTablas);
   const textosRenderizados: string[] = [];
-  const escribir = (texto: string, x: number, y: number, tamano: number) => {
+  const escribir = (texto: string, x: number, yTexto: number, tamano: number) => {
     doc.setFontSize(tamano);
-    doc.text(texto, x, y);
+    doc.text(texto, x, yTexto);
     textosRenderizados.push(texto);
+  };
+  let y = 0;
+  const asegurarEspacio = (alto: number) => {
+    if (y + alto > A4_HEIGHT_PT - MARGEN.bottom) {
+      doc.addPage();
+      y = MARGEN.top + 16;
+    }
+  };
+  const tabla = (head: readonly string[], body: string[][]) => {
+    autoTable(doc, {
+      startY: y,
+      head: [[...head]],
+      body,
+      styles: { font: PROJECT_REPORT_FONT, fontSize: tam.tabla },
+      headStyles: { font: PROJECT_REPORT_FONT, fontStyle: 'normal', fillColor: colorTablas, textColor: 255 },
+      showHead: 'everyPage',
+      margin: MARGEN,
+    });
+    y = ((doc as unknown as DocConAutoTable).lastAutoTable?.finalY ?? y) + 28;
   };
 
   const textosPortada = drawPortada(doc, modelo, textosRenderizados);
@@ -193,42 +199,77 @@ export function renderProjectReportPdf(modelo: ProjectExportModel, burndowns: Sp
   // que el documento se explique solo sin depender de la pantalla que lo
   // generó. Nada aquí depende del color (blanco y negro legible).
   const fechaTexto = formatFechaCsv(modelo.fechaGeneracion);
-  escribir(`Reporte del proyecto — ${modelo.proyecto.tituloProyecto}`, 40, 56, 16);
-  escribir(`Generado: ${fechaTexto}`, 40, 74, 10);
-  escribir(`Líder: ${modelo.lider.nombre} ${modelo.lider.apellido}`, 40, 92, 11);
-  escribir(`Tipo de proyecto: ${formatTipoProyecto(modelo.proyecto.tipoProyecto)}`, 40, 108, 11);
-  escribir(`Estado del proyecto: ${modelo.proyecto.estadoProyecto}`, 40, 124, 11);
+  escribir(`Reporte del proyecto — ${modelo.proyecto.tituloProyecto}`, 40, 56, tam.titulo);
+  escribir(`Generado: ${fechaTexto}`, 40, 74, tam.texto - 1);
+  escribir(`Líder: ${modelo.lider.nombre} ${modelo.lider.apellido}`, 40, 92, tam.texto);
+  escribir(`Tipo de proyecto: ${formatTipoProyecto(modelo.proyecto.tipoProyecto)}`, 40, 108, tam.texto);
+  escribir(`Estado del proyecto: ${modelo.proyecto.estadoProyecto}`, 40, 124, tam.texto);
+  y = 150;
 
-  autoTable(doc, {
-    startY: 144,
-    head: [[...MIEMBROS_HEADER]],
-    body: modelo.miembros.map((miembro) => [
-      `${miembro.nombre} ${miembro.apellido}`,
-      miembro.rol,
-      formatEstadoParticipacion(miembro.estadoParticipacion),
-      miembro.horasConfirmadas.toFixed(2),
-      miembro.horasPendientes.toFixed(2),
-    ]),
-    styles: { font: PROJECT_REPORT_FONT, fontSize: 9 },
-    headStyles: { font: PROJECT_REPORT_FONT, fontStyle: 'normal' },
-    showHead: 'everyPage',
-    margin: MARGEN,
-  });
-  for (const miembro of modelo.miembros) {
-    textosRenderizados.push(
-      `${miembro.nombre} ${miembro.apellido}`,
-      miembro.horasConfirmadas.toFixed(2),
-      miembro.horasPendientes.toFixed(2),
+  const secciones = opciones.secciones;
+  const graficasRenderizadas: GraficaExport[] = [];
+
+  if (secciones.includes('miembros')) {
+    asegurarEspacio(60);
+    escribir('Miembros y horas', 40, y, tam.seccion);
+    y += 10;
+    tabla(
+      MIEMBROS_HEADER,
+      modelo.miembros.map((miembro) => [
+        `${miembro.nombre} ${miembro.apellido}`,
+        miembro.rol,
+        formatEstadoParticipacion(miembro.estadoParticipacion),
+        miembro.horasConfirmadas.toFixed(2),
+        miembro.horasPendientes.toFixed(2),
+      ]),
     );
+    for (const miembro of modelo.miembros) {
+      textosRenderizados.push(
+        `${miembro.nombre} ${miembro.apellido}`,
+        miembro.horasConfirmadas.toFixed(2),
+        miembro.horasPendientes.toFixed(2),
+      );
+    }
+
+    // Las gráficas salen de los datos de esta sección: sin ella no hay qué graficar.
+    if (opciones.graficas.includes('barras')) {
+      asegurarEspacio(ALTO_BARRAS_ESTIMADO);
+      const r = drawBarChart(doc, modelo.miembros, y, opciones.colorTablas);
+      textosRenderizados.push(...r.textos);
+      y = r.finalY + 16;
+      graficasRenderizadas.push('barras');
+    }
+    if (opciones.graficas.includes('pastel')) {
+      asegurarEspacio(ALTO_PASTEL_ESTIMADO);
+      const r = drawPieChart(doc, modelo.miembros, y, opciones.colorTablas);
+      textosRenderizados.push(...r.textos);
+      y = r.finalY + 16;
+      graficasRenderizadas.push('pastel');
+    }
   }
 
-  const finalYMiembros = (doc as unknown as DocConAutoTable).lastAutoTable?.finalY ?? 144;
-  const avanceStartY = finalYMiembros + 40;
-  escribir('Avance por Sprint', 40, avanceStartY - 16, 13);
-  buildAvanceSection(doc, modelo, avanceStartY, textosRenderizados);
+  if (secciones.includes('avance')) {
+    asegurarEspacio(60);
+    escribir('Avance por Sprint', 40, y, tam.seccion);
+    y += 10;
+    tabla(
+      AVANCE_HEADER,
+      modelo.avance.sprints.map((sprint) => [
+        `Sprint ${sprint.numero}`,
+        sprint.estado,
+        String(sprint.tareasPlanificadas),
+        String(sprint.tareasCompletadas),
+        `${sprint.porcentajeCumplimiento}%`,
+      ]),
+    );
+    for (const sprint of modelo.avance.sprints) {
+      textosRenderizados.push(`Sprint ${sprint.numero}`, String(sprint.porcentajeCumplimiento));
+    }
+  }
 
-  const avanceFinalY = (doc as unknown as DocConAutoTable).lastAutoTable?.finalY ?? avanceStartY;
-  buildBurndownSection(doc, modelo, burndowns, avanceFinalY + 36, textosRenderizados);
+  if (secciones.includes('burndown')) {
+    y = buildBurndownSection(doc, modelo, burndowns, y + 8, tam.seccion, textosRenderizados);
+  }
 
   // Metadatos con la fecha FIJA de generación del modelo — nunca `now()` en
   // el render, para que dos renders del mismo modelo no difieran.
@@ -244,9 +285,13 @@ export function renderProjectReportPdf(modelo: ProjectExportModel, burndowns: Sp
     pdf: Buffer.from(doc.output('arraybuffer')),
     resumen: {
       paginas: doc.getNumberOfPages(),
-      filasMiembros: modelo.miembros.length,
+      filasMiembros: secciones.includes('miembros') ? modelo.miembros.length : 0,
       fechaGeneracion: fechaTexto,
       textosPortada,
+      tamanoTabla: tam.tabla,
+      colorTablasRgb: colorTablas,
+      seccionesRenderizadas: [...secciones],
+      graficasRenderizadas,
       textosRenderizados,
     },
   };

@@ -154,12 +154,15 @@ export function drawPieChart(
   const cy = startY + 24 + radio;
   const base = colorTablaRgb(color);
   let angulo = -Math.PI / 2;
+  const limites: number[] = [];
 
-  doc.setDrawColor(255);
-  doc.setLineWidth(0.6);
   tajadas.forEach((tajada, i) => {
     const [r, g, b] = mezclarConBlanco(base, tajadas.length === 1 ? 0 : (0.7 * i) / (tajadas.length - 1));
     doc.setFillColor(r, g, b);
+    // Borde del mismo color que el relleno: un borde blanco dibujaría las
+    // costuras entre los triángulos del abanico como rayas radiales.
+    doc.setDrawColor(r, g, b);
+    doc.setLineWidth(0.4);
     const barrido = (tajada.horas / total) * 2 * Math.PI;
     const pasos = Math.max(2, Math.ceil(barrido / (Math.PI / 30)));
     for (let k = 0; k < pasos; k++) {
@@ -175,6 +178,7 @@ export function drawPieChart(
         'FD',
       );
     }
+    limites.push(angulo);
     angulo += barrido;
 
     const ly = startY + 30 + i * 14;
@@ -191,6 +195,16 @@ export function drawPieChart(
       8,
     );
   });
+
+  // Separadores blancos entre tajadas, al final para que ningún relleno
+  // posterior los tape.
+  if (tajadas.length > 1) {
+    doc.setDrawColor(255);
+    doc.setLineWidth(1.2);
+    for (const limite of limites) {
+      doc.line(cx, cy, cx + radio * Math.cos(limite), cy + radio * Math.sin(limite));
+    }
+  }
 
   const finalLeyenda = startY + 30 + tajadas.length * 14;
   return { finalY: Math.max(cy + radio, finalLeyenda) + 18, textos };
