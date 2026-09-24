@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoHoras, EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
@@ -9,6 +9,7 @@ import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacoraValor } from '../bitacora/tipos-evento-bitacora';
 import { SprintBurndownDto } from '../sprints/dto/sprint-burndown.dto';
 import { ProjectExportMemberDto, ProjectExportModel } from './dto/project-export.dto';
+import { formatFechaCsv } from './csv-export.util';
 import { DEFAULT_EXPORT_OPTIONS, ExportOptions } from './export-options';
 import { SprintComparativeAnalyticsDto } from '../sprints/dto/sprint-analytics.dto';
 
@@ -65,11 +66,13 @@ export class ExportsService {
         tipoProyecto: true,
         estadoProyecto: true,
         creadoPor: true,
+        fechaCreacion: true,
       },
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${projectId} no encontrado`);
     }
+    this.validarRango(opciones, proyecto.fechaCreacion);
 
     const [equipo, horasProyecto, avance] = await Promise.all([
       this.teamService.buildTeamSummary(projectId, proyecto.creadoPor),
@@ -119,6 +122,38 @@ export class ExportsService {
       sprintPortada: sprintDePortada(avanceFiltrado.sprints),
       avance: avanceFiltrado,
     };
+  }
+
+  /**
+   * Revisión del PR: el rango debe caer entre la creación del proyecto y hoy
+   * — antes o después no puede haber datos, y aceptarlo en silencio daría un
+   * reporte vacío sin explicación. Cada caso dice qué regla se incumplió.
+   * Se compara por día UTC (igual que las columnas `@db.Date`); a "hoy" se le
+   * da un día de holgura porque un usuario al oeste de UTC (Guatemala, UTC-6)
+   * ya está en "mañana" según UTC a última hora de su tarde.
+   */
+  private validarRango(opciones: ExportOptions, fechaCreacion: Date): void {
+    const dia = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const creacion = dia(fechaCreacion);
+    const limite = dia(new Date()) + 24 * 60 * 60 * 1000;
+    const creacionTexto = formatFechaCsv(new Date(creacion));
+
+    for (const [campo, valor] of [
+      ['Desde', opciones.desde],
+      ['Hasta', opciones.hasta],
+    ] as const) {
+      if (valor === null) {
+        continue;
+      }
+      if (valor.getTime() < creacion) {
+        throw new BadRequestException(
+          `La fecha "${campo}" debe ser igual o posterior a la fecha de creación del proyecto (${creacionTexto}).`,
+        );
+      }
+      if (valor.getTime() > limite) {
+        throw new BadRequestException(`La fecha "${campo}" no puede ser posterior a la fecha actual.`);
+      }
+    }
   }
 
   /**
