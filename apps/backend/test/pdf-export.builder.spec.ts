@@ -3,6 +3,9 @@ import { EstadoParticipacion, EstadoProyecto, EstadoSprint, TipoProyecto } from 
 import { renderProjectReportPdf } from '../src/exports/pdf-export.builder';
 import type { ProjectExportModel } from '../src/exports/dto/project-export.dto';
 import type { SprintBurndownDto } from '../src/sprints/dto/sprint-burndown.dto';
+import { DEFAULT_EXPORT_OPTIONS, colorTablaRgb, type ExportOptions } from '../src/exports/export-options';
+
+const opciones = (o: Partial<ExportOptions>): ExportOptions => ({ ...DEFAULT_EXPORT_OPTIONS, ...o });
 
 function makeModelo(overrides: Partial<ProjectExportModel> = {}): ProjectExportModel {
   return {
@@ -242,3 +245,96 @@ describe('renderProjectReportPdf (T-260)', () => {
     });
   });
 });
+
+describe('opciones de exportación (revisión del PR)', () => {
+  it('fuente: el tamaño de las tablas cambia con pequeña/mediana/grande', () => {
+    const t = (fuente: ExportOptions['fuente']) =>
+      renderProjectReportPdf(makeModelo(), [], opciones({ fuente })).resumen.tamanoTabla;
+
+    expect(t('pequena')).toBeLessThan(t('mediana'));
+    expect(t('mediana')).toBeLessThan(t('grande'));
+    expect(t('mediana')).toBe(9);
+  });
+
+  it('color: las tablas usan el color elegido en el encabezado', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), [], opciones({ colorTablas: 'verde' }));
+
+    expect(resumen.colorTablasRgb).toEqual(colorTablaRgb('verde'));
+  });
+
+  it('secciones: solo miembros omite avance y burndown', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), [], opciones({ secciones: ['miembros'] }));
+
+    expect(resumen.seccionesRenderizadas).toEqual(['miembros']);
+    expect(resumen.textosRenderizados).not.toContain('Avance por Sprint');
+    expect(resumen.textosRenderizados).not.toContain('Burndown de Sprints cerrados');
+    expect(resumen.filasMiembros).toBe(1);
+  });
+
+  it('secciones: solo avance omite la tabla de miembros', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), [], opciones({ secciones: ['avance'] }));
+
+    expect(resumen.seccionesRenderizadas).toEqual(['avance']);
+    expect(resumen.filasMiembros).toBe(0);
+    expect(resumen.textosRenderizados).toContain('Avance por Sprint');
+    expect(resumen.textosRenderizados.some((t) => t.includes('12.50'))).toBe(false);
+  });
+
+  it('secciones: solo burndown con sprints cerrados imprime el gráfico', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), [makeBurndown()], opciones({ secciones: ['burndown'] }));
+
+    expect(resumen.seccionesRenderizadas).toEqual(['burndown']);
+    expect(resumen.textosRenderizados).toContain('Real');
+    expect(resumen.textosRenderizados).not.toContain('Avance por Sprint');
+  });
+
+  it('gráficas: barras y pastel se imprimen cuando se piden y hay tabla de miembros', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), [], opciones({ graficas: ['barras', 'pastel'] }));
+
+    expect(resumen.graficasRenderizadas).toEqual(['barras', 'pastel']);
+    expect(resumen.textosRenderizados).toContain('Horas por integrante');
+    expect(resumen.textosRenderizados.some((t) => t.startsWith('Distribución de horas'))).toBe(true);
+  });
+
+  it('gráficas: solo una de las dos cuando solo se pide esa', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), [], opciones({ graficas: ['pastel'] }));
+
+    expect(resumen.graficasRenderizadas).toEqual(['pastel']);
+    expect(resumen.textosRenderizados).not.toContain('Horas por integrante');
+  });
+
+  it('gráficas: sin la sección de miembros no hay datos que graficar, no se imprimen', () => {
+    const { resumen } = renderProjectReportPdf(
+      makeModelo(),
+      [],
+      opciones({ secciones: ['avance'], graficas: ['barras', 'pastel'] }),
+    );
+
+    expect(resumen.graficasRenderizadas).toEqual([]);
+  });
+
+  it('por defecto no hay gráficas y se imprime todo el contenido', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), []);
+
+    expect(resumen.graficasRenderizadas).toEqual([]);
+    expect(resumen.seccionesRenderizadas).toEqual(['miembros', 'avance', 'burndown']);
+  });
+
+  it('con muchos integrantes y ambas gráficas el reporte pagina sin fallar y crece en páginas', () => {
+    const base = makeModelo();
+    const muchos = Array.from({ length: 60 }, (_, i) => ({
+      ...base.miembros[0],
+      idUsuario: 100 + i,
+      nombre: `Integrante${i}`,
+      horasConfirmadas: i,
+      horasPendientes: 1,
+    }));
+
+    const chico = renderProjectReportPdf(base, []).resumen.paginas;
+    const grande = renderProjectReportPdf({ ...base, miembros: muchos }, [], opciones({ graficas: ['barras', 'pastel'] }));
+
+    expect(grande.pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(grande.resumen.paginas).toBeGreaterThan(chico);
+  });
+});
+
