@@ -58,12 +58,7 @@ function BarraTareasCompletadas({ sprint, maximo }: { sprint: SprintComparativeA
  * asignados" — no se dibuja como una barra en 0, se rotula explícitamente.
  */
 function BarraVelocidad({ sprint, maximo }: { sprint: SprintComparativeAnalyticsItemDto; maximo: number }) {
-  // Narrowing por variable local (no por alias de `sprint.propiedad`): TS
-  // solo sigue el flujo de forma confiable cuando la comprobación y el uso
-  // caen sobre el mismo identificador, no sobre un acceso repetido a
-  // `sprint.puntosHistoriaCompletados`.
   const puntos = sprint.puntosHistoriaCompletados;
-  const sinPuntos = puntos === null;
   const porcentajeAncho = puntos === null || maximo === 0 ? 0 : Math.round((puntos / maximo) * 100);
   return (
     <div className="flex items-center gap-3">
@@ -82,7 +77,7 @@ function BarraVelocidad({ sprint, maximo }: { sprint: SprintComparativeAnalytics
         )}
       </div>
       <span className="w-32 shrink-0 text-right text-sm font-bold text-on-surface">
-        {sinPuntos ? 'Sin puntos asignados' : `${puntos} pts`}
+        {puntos === null ? 'Sin puntos asignados' : `${puntos} pts`}
       </span>
     </div>
   );
