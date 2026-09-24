@@ -257,9 +257,17 @@ describe('opciones de exportación (revisión del PR)', () => {
   });
 
   it('color: las tablas usan el color elegido en el encabezado', () => {
-    const { resumen } = renderProjectReportPdf(makeModelo(), [], opciones({ colorTablas: 'verde' }));
+    const { resumen } = renderProjectReportPdf(makeModelo(), [], opciones({ colorTablas: '#166534' }));
 
-    expect(resumen.colorTablasRgb).toEqual(colorTablaRgb('verde'));
+    expect(resumen.colorTablasRgb).toEqual([22, 101, 52]);
+    expect(resumen.colorTablasRgb).toEqual(colorTablaRgb('#166534'));
+  });
+
+  it('color claro: el texto del encabezado pasa a negro para seguir siendo legible', () => {
+    const { resumen } = renderProjectReportPdf(makeModelo(), [], opciones({ colorTablas: '#59f7ff' }));
+
+    expect(resumen.colorTextoEncabezado).toBe(0);
+    expect(renderProjectReportPdf(makeModelo(), [], opciones({ colorTablas: '#1e408c' })).resumen.colorTextoEncabezado).toBe(255);
   });
 
   it('secciones: solo miembros omite avance y burndown', () => {

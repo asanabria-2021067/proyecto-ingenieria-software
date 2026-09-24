@@ -10,6 +10,7 @@ import {
   DEFAULT_EXPORT_OPTIONS,
   colorTablaRgb,
   tamanosDeFuente,
+  textoSobreColor,
   type ExportOptions,
   type GraficaExport,
   type SeccionExport,
@@ -46,6 +47,8 @@ export interface PdfRenderSummary {
   /** Opciones aplicadas — permiten verificar que lo elegido llegó al documento. */
   tamanoTabla: number;
   colorTablasRgb: [number, number, number];
+  /** 255 (blanco) o 0 (negro): el que contrasta con el color de tablas elegido. */
+  colorTextoEncabezado: 0 | 255;
   seccionesRenderizadas: SeccionExport[];
   graficasRenderizadas: GraficaExport[];
   /** Texto tal como se entregó al documento, para verificar que nada se sustituyó (mismo contrato que ClosureRenderSummary). */
@@ -166,6 +169,7 @@ export function renderProjectReportPdf(
 
   const tam = tamanosDeFuente(opciones.fuente);
   const colorTablas = colorTablaRgb(opciones.colorTablas);
+  const colorTextoEncabezado = textoSobreColor(colorTablas);
   const textosRenderizados: string[] = [];
   const escribir = (texto: string, x: number, yTexto: number, tamano: number) => {
     doc.setFontSize(tamano);
@@ -185,7 +189,7 @@ export function renderProjectReportPdf(
       head: [[...head]],
       body,
       styles: { font: PROJECT_REPORT_FONT, fontSize: tam.tabla },
-      headStyles: { font: PROJECT_REPORT_FONT, fontStyle: 'normal', fillColor: colorTablas, textColor: 255 },
+      headStyles: { font: PROJECT_REPORT_FONT, fontStyle: 'normal', fillColor: colorTablas, textColor: colorTextoEncabezado },
       showHead: 'everyPage',
       margin: MARGEN,
     });
@@ -290,6 +294,7 @@ export function renderProjectReportPdf(
       textosPortada,
       tamanoTabla: tam.tabla,
       colorTablasRgb: colorTablas,
+      colorTextoEncabezado,
       seccionesRenderizadas: [...secciones],
       graficasRenderizadas,
       textosRenderizados,
