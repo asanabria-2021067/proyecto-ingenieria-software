@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { register, type RegisterPayload } from '@/lib/services/auth';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 export function useRegister() {
   const router = useRouter();
@@ -21,17 +22,11 @@ export function useRegister() {
         router.push('/dashboard');
       });
     },
-    onError: (error: any) => {
-      const messages: string[] = error?.message
-        ? Array.isArray(error.message)
-          ? error.message
-          : [error.message]
-        : ['Error al registrarse'];
-
+    onError: (error: unknown) => {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error en el registro',
-        html: messages.join('<br>'),
+        text: getApiErrorMessage(error, 'auth', 'No se pudo completar el registro. Intenta nuevamente.'),
       });
     },
   });

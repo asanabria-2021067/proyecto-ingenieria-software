@@ -6,6 +6,7 @@ import { login, type LoginPayload } from '@/lib/services/auth';
 import { getMe } from '@/lib/services/users';
 import { isAdminUser } from '@/hooks/use-current-user';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 export function useLogin() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export function useLogin() {
       });
     },
     onError: (error: Error & { details?: string | string[] }) => {
-      const msg = error.message || 'Credenciales invalidas';
+      const msg = getApiErrorMessage(error, 'auth');
       uvgSwal.fire({
         icon: 'error',
         title: 'Error al iniciar sesion',
