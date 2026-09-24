@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EstadoParticipacion, EstadoHoras, EstadoProyecto, EstadoSprint, Prisma, TipoProyecto } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { ProjectReadPolicyService } from '../src/common/project-policy/project-read-policy.service';
@@ -26,6 +26,7 @@ const PROYECTO_BASE = {
   tipoProyecto: TipoProyecto.ACADEMICO_HORAS_BECA,
   estadoProyecto: EstadoProyecto.EN_PROGRESO,
   creadoPor: 1,
+  fechaCreacion: new Date('2026-01-10T15:00:00.000Z'),
 };
 
 const EQUIPO_BASE = {
@@ -232,6 +233,79 @@ describe('ExportsService.getProjectExportModel', () => {
     const modelo = await service.getProjectExportModel(5, 9);
 
     expect(modelo.miembros).toEqual([]);
+  });
+});
+
+describe('ExportsService — validación del rango de fechas', () => {
+  const dia = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+  const con = (desde: string | null, hasta: string | null) => ({
+    ...DEFAULT_EXPORT_OPTIONS,
+    desde: desde ? dia(desde) : null,
+    hasta: hasta ? dia(hasta) : null,
+  });
+  const intentar = (desde: string | null, hasta: string | null) =>
+    makeService(makeDeps()).getProjectExportModel(5, 9, con(desde, hasta));
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('"Desde" anterior a la creación del proyecto: 400 que dice que debe ser posterior a la creación', async () => {
+    await expect(intentar('2026-01-09', null)).rejects.toThrow(
+      'La fecha "Desde" debe ser igual o posterior a la fecha de creación del proyecto (10/01/2026).',
+    );
+    await expect(intentar('2026-01-09', null)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('"Desde" igual al día de creación es válido', async () => {
+    await expect(intentar('2026-01-10', null)).resolves.toBeDefined();
+  });
+
+  it('"Hasta" posterior a la fecha actual: 400 que dice que no puede ser futura', async () => {
+    await expect(intentar(null, '2026-09-26')).rejects.toThrow(
+      'La fecha "Hasta" no puede ser posterior a la fecha actual.',
+    );
+  });
+
+  it('"Hasta" igual a hoy es válido', async () => {
+    await expect(intentar(null, '2026-09-24')).resolves.toBeDefined();
+  });
+
+  it('tolera un día de diferencia horaria: el "hoy" de un usuario al oeste de UTC puede ser mañana en UTC', async () => {
+    await expect(intentar(null, '2026-09-25')).resolves.toBeDefined();
+  });
+
+  it('"Desde" posterior a la fecha actual también es 400', async () => {
+    await expect(intentar('2026-10-30', null)).rejects.toThrow(
+      'La fecha "Desde" no puede ser posterior a la fecha actual.',
+    );
+  });
+
+  it('"Hasta" anterior a la creación del proyecto es 400', async () => {
+    await expect(intentar(null, '2026-01-01')).rejects.toThrow(
+      'La fecha "Hasta" debe ser igual o posterior a la fecha de creación del proyecto (10/01/2026).',
+    );
+  });
+
+  it('un rango válido dentro de [creación, hoy] pasa', async () => {
+    await expect(intentar('2026-02-01', '2026-03-01')).resolves.toBeDefined();
+  });
+
+  it('valida DESPUÉS de autorizar: un actor sin permiso recibe 403, no información sobre la fecha de creación', async () => {
+    const deps = makeDeps();
+    deps.readPolicy.assertRead = vi.fn().mockRejectedValue(new ForbiddenException());
+
+    await expect(makeService(deps).getProjectExportModel(5, 42, con('2020-01-01', null))).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('sin fechas no valida nada', async () => {
+    await expect(intentar(null, null)).resolves.toBeDefined();
   });
 });
 
