@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { useIsAdmin } from '@/hooks/use-current-user';
 import { useProjectExport } from '@/hooks/use-project-export';
+import { ProjectExportDialog } from '@/components/projects/project-export-dialog';
+import type { ExportOptions, FormatoExport } from '@/lib/export-options';
 
 interface ProjectExportButtonsProps {
   idProyecto: number;
@@ -21,6 +24,7 @@ export function ProjectExportButtons({ idProyecto }: ProjectExportButtonsProps) 
   const isLeader = useIsProjectLeader(idProyecto);
   const isAdmin = useIsAdmin();
   const { exportCsv, exportPdf } = useProjectExport(idProyecto);
+  const [formatoAbierto, setFormatoAbierto] = useState<FormatoExport | null>(null);
 
   if (!isLeader && !isAdmin) {
     return null;
@@ -28,12 +32,19 @@ export function ProjectExportButtons({ idProyecto }: ProjectExportButtonsProps) 
 
   const hayError = exportCsv.isError || exportPdf.isError;
 
+  // Un solo diálogo, según el formato pedido; se cierra al terminar (bien o
+  // mal — el error se muestra bajo los botones).
+  function confirmar(opciones: ExportOptions) {
+    const mutation = formatoAbierto === 'csv' ? exportCsv : exportPdf;
+    mutation.mutate(opciones, { onSettled: () => setFormatoAbierto(null) });
+  }
+
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => exportCsv.mutate()}
+          onClick={() => setFormatoAbierto('csv')}
           disabled={exportCsv.isPending}
           className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -46,7 +57,7 @@ export function ProjectExportButtons({ idProyecto }: ProjectExportButtonsProps) 
         </button>
         <button
           type="button"
-          onClick={() => exportPdf.mutate()}
+          onClick={() => setFormatoAbierto('pdf')}
           disabled={exportPdf.isPending}
           className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -58,6 +69,15 @@ export function ProjectExportButtons({ idProyecto }: ProjectExportButtonsProps) 
           {exportPdf.isPending ? 'Generando…' : 'Exportar PDF'}
         </button>
       </div>
+      {formatoAbierto && (
+        <ProjectExportDialog
+          open
+          onOpenChange={(abierto) => !abierto && setFormatoAbierto(null)}
+          formato={formatoAbierto}
+          isPending={(formatoAbierto === 'csv' ? exportCsv : exportPdf).isPending}
+          onConfirm={confirmar}
+        />
+      )}
       {hayError && (
         <p role="alert" className="text-xs font-medium text-error">
           No se pudo generar el archivo. Intenta de nuevo.

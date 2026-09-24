@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { DEFAULT_EXPORT_OPTIONS } from '@/lib/export-options';
 
 /**
  * T-259/T-260/T-261 (HU-164): el botón de exportar es solo conveniencia —
@@ -65,7 +66,20 @@ describe('ProjectExportButtons', () => {
     expect(screen.getByRole('button', { name: /exportar pdf/i })).toBeInTheDocument();
   });
 
-  it('el clic en "Exportar CSV" dispara exportCsv.mutate sin tocar exportPdf', () => {
+  it('"Exportar CSV" abre el diálogo de opciones y NO exporta hasta confirmar', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+    (useIsAdmin as any).mockReturnValue(false);
+    const exportCsv = mockMutation();
+    (useProjectExport as any).mockReturnValue({ exportCsv, exportPdf: mockMutation() });
+
+    renderButtons();
+    fireEvent.click(screen.getByRole('button', { name: /exportar csv/i }));
+
+    expect(screen.getByRole('dialog')).toHaveTextContent(/exportar csv/i);
+    expect(exportCsv.mutate).not.toHaveBeenCalled();
+  });
+
+  it('confirmar en el diálogo de CSV dispara exportCsv.mutate con las opciones, sin tocar exportPdf', () => {
     (useIsProjectLeader as any).mockReturnValue(true);
     (useIsAdmin as any).mockReturnValue(false);
     const exportCsv = mockMutation();
@@ -74,12 +88,14 @@ describe('ProjectExportButtons', () => {
 
     renderButtons();
     fireEvent.click(screen.getByRole('button', { name: /exportar csv/i }));
+    fireEvent.click(screen.getByRole('button', { name: /descargar csv/i }));
 
     expect(exportCsv.mutate).toHaveBeenCalledTimes(1);
+    expect(exportCsv.mutate).toHaveBeenCalledWith(DEFAULT_EXPORT_OPTIONS, expect.anything());
     expect(exportPdf.mutate).not.toHaveBeenCalled();
   });
 
-  it('el clic en "Exportar PDF" dispara exportPdf.mutate sin tocar exportCsv', () => {
+  it('confirmar en el diálogo de PDF dispara exportPdf.mutate con lo elegido, sin tocar exportCsv', () => {
     (useIsProjectLeader as any).mockReturnValue(true);
     (useIsAdmin as any).mockReturnValue(false);
     const exportCsv = mockMutation();
@@ -88,9 +104,30 @@ describe('ProjectExportButtons', () => {
 
     renderButtons();
     fireEvent.click(screen.getByRole('button', { name: /exportar pdf/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /grande/i }));
+    fireEvent.click(screen.getByRole('button', { name: /descargar pdf/i }));
 
     expect(exportPdf.mutate).toHaveBeenCalledTimes(1);
+    expect(exportPdf.mutate).toHaveBeenCalledWith(
+      { ...DEFAULT_EXPORT_OPTIONS, fuente: 'grande' },
+      expect.anything(),
+    );
     expect(exportCsv.mutate).not.toHaveBeenCalled();
+  });
+
+  it('el diálogo se cierra al terminar la exportación (onSettled)', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+    (useIsAdmin as any).mockReturnValue(false);
+    const exportPdf = mockMutation({
+      mutate: vi.fn((_opciones: unknown, callbacks: { onSettled: () => void }) => callbacks.onSettled()),
+    });
+    (useProjectExport as any).mockReturnValue({ exportCsv: mockMutation(), exportPdf });
+
+    renderButtons();
+    fireEvent.click(screen.getByRole('button', { name: /exportar pdf/i }));
+    fireEvent.click(screen.getByRole('button', { name: /descargar pdf/i }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('deshabilita el botón de CSV mientras exportCsv.isPending es true', () => {
