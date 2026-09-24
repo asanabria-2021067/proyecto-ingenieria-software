@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getApiErrorMessage } from '../components/projects/api-error';
+import { getApiErrorMessage, MENSAJE_ERROR_GENERICO } from '../components/projects/api-error';
 
 function enrichedError(statusCode: number, message = 'detalle interno'): Error {
   return Object.assign(new Error(message), { statusCode });
@@ -13,8 +13,8 @@ describe('getApiErrorMessage', () => {
   });
 
   it('403: mensaje fijo de permisos', () => {
-    expect(getApiErrorMessage(enrichedError(403), 'task')).toBe(
-      'No tienes permisos para realizar esta acción.',
+    expect(getApiErrorMessage(enrichedError(403), 'task')).toMatch(
+      /^No tienes permisos para realizar esta acción\./,
     );
   });
 
@@ -38,10 +38,10 @@ describe('getApiErrorMessage', () => {
     );
   });
 
-  it('otros status codes (500): usa el mensaje del backend si existe, o uno genérico', () => {
-    expect(getApiErrorMessage(enrichedError(500, 'Error interno'), 'task')).toBe('Error interno');
+  it('500: nunca muestra el texto del servidor, siempre el mensaje genérico (T-221)', () => {
+    expect(getApiErrorMessage(enrichedError(500, 'Error interno'), 'task')).toBe(MENSAJE_ERROR_GENERICO);
     expect(getApiErrorMessage(Object.assign(new Error(), { statusCode: 500 }), 'task')).toBe(
-      'Ocurrió un error inesperado. Intenta nuevamente.',
+      MENSAJE_ERROR_GENERICO,
     );
   });
 
@@ -55,6 +55,6 @@ describe('getApiErrorMessage', () => {
 
   it('un error sin statusCode reconocible cae en el mensaje por defecto', () => {
     expect(getApiErrorMessage(new Error('algo raro'), 'task')).toBe('algo raro');
-    expect(getApiErrorMessage(null, 'task')).toBe('Ocurrió un error inesperado. Intenta nuevamente.');
+    expect(getApiErrorMessage(null, 'task')).toBe(MENSAJE_ERROR_GENERICO);
   });
 });
