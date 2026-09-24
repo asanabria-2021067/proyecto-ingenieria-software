@@ -66,9 +66,11 @@ export class UpdateTaskDto {
   @Max(100)
   puntosHistoria?: number;
 
-  // `null` retira la relación; `undefined` (campo omitido) la conserva;
-  // cualquier otro valor debe validarse como entero positivo.
-  @ValidateIf((_object, value) => value !== undefined && value !== null)
+  // HU-147/T-185: idHito ya no admite retirarse. `undefined` (campo
+  // omitido) conserva el valor almacenado; `null` se rechaza explícitamente
+  // igual que tituloTarea; cualquier otro valor se valida como entero
+  // positivo.
+  @ValidateIf((_object, value) => value !== undefined)
   @IsInt()
   @Min(1)
   idHito?: number;
