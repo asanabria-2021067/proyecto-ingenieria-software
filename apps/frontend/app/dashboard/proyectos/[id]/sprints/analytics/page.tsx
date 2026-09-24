@@ -57,18 +57,18 @@ function BarraTareasCompletadas({ sprint, maximo }: { sprint: SprintComparativeA
  * asignados" — no se dibuja como una barra en 0, se rotula explícitamente.
  */
 function BarraVelocidad({ sprint, maximo }: { sprint: SprintComparativeAnalyticsItemDto; maximo: number }) {
-  const sinPuntos = sprint.puntosHistoriaCompletados === null;
-  const porcentajeAncho = sinPuntos || maximo === 0 ? 0 : Math.round((sprint.puntosHistoriaCompletados / maximo) * 100);
+  const puntos = sprint.puntosHistoriaCompletados;
+  const porcentajeAncho = puntos === null || maximo === 0 ? 0 : Math.round((puntos / maximo) * 100);
   return (
     <div className="flex items-center gap-3">
       <span className="w-16 shrink-0 text-sm font-semibold text-on-surface">Sprint {sprint.numero}</span>
       <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-container-high">
-        {!sinPuntos && (
+        {puntos !== null && (
           <div
             className="h-full rounded-full bg-primary transition-all"
             style={{ width: `${porcentajeAncho}%` }}
             role="progressbar"
-            aria-valuenow={sprint.puntosHistoriaCompletados}
+            aria-valuenow={puntos}
             aria-valuemin={0}
             aria-valuemax={maximo}
             aria-label={`Story points completados en Sprint ${sprint.numero}`}
@@ -76,7 +76,7 @@ function BarraVelocidad({ sprint, maximo }: { sprint: SprintComparativeAnalytics
         )}
       </div>
       <span className="w-32 shrink-0 text-right text-sm font-bold text-on-surface">
-        {sinPuntos ? 'Sin puntos asignados' : `${sprint.puntosHistoriaCompletados} pts`}
+        {puntos === null ? 'Sin puntos asignados' : `${puntos} pts`}
       </span>
     </div>
   );
