@@ -204,6 +204,7 @@ export class ExportsService {
     projectId: number,
     actorId: number,
     tipoEvento: TipoEventoBitacoraValor,
+    detalle?: Prisma.InputJsonValue,
   ): Promise<void> {
     await this.prisma.$transaction((tx) =>
       this.bitacoraEventos.registrarEvento({
@@ -213,6 +214,7 @@ export class ExportsService {
         idProyecto: projectId,
         tipoEntidad: 'PROYECTO',
         idEntidad: projectId,
+        valorNuevo: detalle ?? null,
       }),
     );
   }
