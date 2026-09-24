@@ -230,6 +230,50 @@ describe('ExportsService.getProjectExportModel', () => {
   });
 });
 
+describe('ExportsService — sprint de la portada', () => {
+  const sprint = (idSprint: number, numero: number, estado: EstadoSprint) => ({
+    idSprint,
+    numero,
+    estado,
+    tareasPlanificadas: 1,
+    tareasCompletadas: 0,
+    porcentajeCumplimiento: 0,
+    hitosTotales: 0,
+    hitosCompletados: 0,
+  });
+
+  async function portadaCon(sprints: ReturnType<typeof sprint>[]) {
+    const deps = makeDeps();
+    (deps.sprintsService.computeSprintsComparative as ReturnType<typeof vi.fn>).mockResolvedValue({
+      idProyecto: 5,
+      sprints,
+    });
+    return (await makeService(deps).getProjectExportModel(5, 9)).sprintPortada;
+  }
+
+  it('usa el Sprint activo cuando existe', async () => {
+    expect(
+      await portadaCon([sprint(1, 1, EstadoSprint.CERRADO), sprint(2, 2, EstadoSprint.ACTIVO)]),
+    ).toBe(2);
+  });
+
+  it('un Sprint en finalización también cuenta como en curso', async () => {
+    expect(
+      await portadaCon([sprint(1, 1, EstadoSprint.CERRADO), sprint(2, 2, EstadoSprint.EN_FINALIZACION)]),
+    ).toBe(2);
+  });
+
+  it('sin Sprint activo usa el último cerrado (el de mayor número)', async () => {
+    expect(
+      await portadaCon([sprint(1, 1, EstadoSprint.CERRADO), sprint(2, 2, EstadoSprint.CERRADO)]),
+    ).toBe(2);
+  });
+
+  it('sin Sprints devuelve null', async () => {
+    expect(await portadaCon([])).toBeNull();
+  });
+});
+
 describe('ExportsService.registrarExportacion', () => {
   it('registra el evento de bitácora dentro de una transacción, con tipoEntidad PROYECTO', async () => {
     const deps = makeDeps();

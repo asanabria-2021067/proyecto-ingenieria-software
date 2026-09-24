@@ -19,6 +19,7 @@ const MODELO_VACIO: ProjectExportModel = {
   lider: { idUsuario: 1, nombre: 'Ana', apellido: 'Líder', correo: 'ana@uvg.edu.gt', fotoUrl: null },
   miembros: [],
   fechaGeneracion: new Date('2026-03-05T00:00:00.000Z'),
+  sprintPortada: null,
   avance: { idProyecto: 5, sprints: [] },
 };
 

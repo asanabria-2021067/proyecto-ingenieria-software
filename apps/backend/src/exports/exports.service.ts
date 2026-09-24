@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EstadoSprint } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { TeamService } from '../team/team.service';
@@ -8,6 +9,21 @@ import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacoraValor } from '../bitacora/tipos-evento-bitacora';
 import { SprintBurndownDto } from '../sprints/dto/sprint-burndown.dto';
 import { ProjectExportMemberDto, ProjectExportModel } from './dto/project-export.dto';
+
+/**
+ * Portada del PDF (revisión del PR): el Sprint en curso rotula el reporte;
+ * sin uno en curso, el último cerrado (mayor número). Sin Sprints no hay
+ * línea de Sprint.
+ */
+export function sprintDePortada(
+  sprints: ReadonlyArray<{ numero: number; estado: EstadoSprint }>,
+): number | null {
+  const enCurso = sprints.filter(
+    (s) => s.estado === EstadoSprint.ACTIVO || s.estado === EstadoSprint.EN_FINALIZACION,
+  );
+  const candidatos = enCurso.length > 0 ? enCurso : sprints.filter((s) => s.estado === EstadoSprint.CERRADO);
+  return candidatos.length === 0 ? null : Math.max(...candidatos.map((s) => s.numero));
+}
 
 /**
  * T-259/T-260/T-261 (HU-164): orquesta el export de proyecto — nunca
@@ -87,6 +103,7 @@ export class ExportsService {
       lider: equipo.lider,
       miembros,
       fechaGeneracion: new Date(),
+      sprintPortada: sprintDePortada(avance.sprints),
       avance,
     };
   }
