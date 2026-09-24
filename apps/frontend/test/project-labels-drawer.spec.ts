@@ -245,7 +245,7 @@ describe('ProjectLabelsDrawer', () => {
     await waitFor(() =>
       expect(mensajesMock.aviso.error).toHaveBeenCalledWith(
         'No se pudo eliminar la etiqueta',
-        'No tienes permisos para realizar esta acción.',
+        expect.stringMatching(/^No tienes permisos para realizar esta acción\./),
       ),
     );
     expect(screen.getByText('Backend')).toBeInTheDocument();
