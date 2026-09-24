@@ -385,6 +385,20 @@ describe('ExportsService.registrarExportacion', () => {
   });
 });
 
+describe('ExportsService.registrarExportacion — detalle', () => {
+  it('guarda las opciones usadas en valorNuevo de la bitácora', async () => {
+    const deps = makeDeps();
+
+    await makeService(deps).registrarExportacion(5, 9, TipoEventoBitacora.PROJECT_EXPORT_PDF_GENERATED, {
+      fuente: 'grande',
+    });
+
+    expect(deps.bitacoraEventos.registrarEvento).toHaveBeenCalledWith(
+      expect.objectContaining({ valorNuevo: { fuente: 'grande' } }),
+    );
+  });
+});
+
 describe('ExportsService.getBurndownForClosedSprints (T-260)', () => {
   it('pide el burndown de cada sprint cerrado, sin autorizar de nuevo (el caller ya autorizó)', async () => {
     const deps = makeDeps();

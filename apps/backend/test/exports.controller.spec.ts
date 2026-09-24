@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import type { Response } from 'express';
 import { EstadoProyecto, EstadoSprint, TipoProyecto } from '@prisma/client';
@@ -8,6 +8,7 @@ import type { ExportsService } from '../src/exports/exports.service';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { TipoEventoBitacora } from '../src/bitacora/tipos-evento-bitacora';
 import type { ProjectExportModel } from '../src/exports/dto/project-export.dto';
+import { DEFAULT_EXPORT_OPTIONS } from '../src/exports/export-options';
 
 const MODELO_VACIO: ProjectExportModel = {
   proyecto: {
@@ -64,11 +65,12 @@ describe('ExportsController (T-259/T-260/T-261)', () => {
 
       await controller.exportCsv(5, { userId: 9 }, res);
 
-      expect(service.getProjectExportModel).toHaveBeenCalledWith(5, 9);
+      expect(service.getProjectExportModel).toHaveBeenCalledWith(5, 9, DEFAULT_EXPORT_OPTIONS);
       expect(service.registrarExportacion).toHaveBeenCalledWith(
         5,
         9,
         TipoEventoBitacora.PROJECT_EXPORT_CSV_GENERATED,
+        expect.anything(),
       );
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv; charset=utf-8');
       expect(res.setHeader).toHaveBeenCalledWith(
@@ -99,11 +101,12 @@ describe('ExportsController (T-259/T-260/T-261)', () => {
 
       await controller.exportPdf(5, { userId: 9 }, res);
 
-      expect(service.getProjectExportModel).toHaveBeenCalledWith(5, 9);
+      expect(service.getProjectExportModel).toHaveBeenCalledWith(5, 9, DEFAULT_EXPORT_OPTIONS);
       expect(service.registrarExportacion).toHaveBeenCalledWith(
         5,
         9,
         TipoEventoBitacora.PROJECT_EXPORT_PDF_GENERATED,
+        expect.anything(),
       );
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
       expect(res.status).toHaveBeenCalledWith(200);
@@ -167,6 +170,87 @@ describe('ExportsController (T-259/T-260/T-261)', () => {
       await controller.exportPdf(5, { userId: 9 }, res);
 
       expect(service.getBurndownForClosedSprints).toHaveBeenCalledWith(5, []);
+    });
+  });
+
+  describe('opciones de exportación (revisión del PR)', () => {
+    it('PDF: pasa al modelo las opciones parseadas del query string', async () => {
+      const service = makeExportsService();
+      const controller = new ExportsController(service);
+
+      await controller.exportPdf(
+        5,
+        { userId: 9 },
+        makeResponse(),
+        { fuente: 'grande', color: 'azul', secciones: 'miembros', graficas: 'barras,pastel', desde: '2026-02-01', hasta: '2026-02-28' },
+      );
+
+      const opciones = service.getProjectExportModel.mock.calls[0][2];
+      expect(opciones).toMatchObject({
+        fuente: 'grande',
+        colorTablas: 'azul',
+        secciones: ['miembros'],
+        graficas: ['barras', 'pastel'],
+      });
+      expect(opciones.desde.toISOString()).toBe('2026-02-01T00:00:00.000Z');
+      expect(opciones.hasta.toISOString()).toBe('2026-02-28T00:00:00.000Z');
+    });
+
+    it('PDF: una opción inválida responde 400 antes de tocar datos o bitácora', async () => {
+      const service = makeExportsService();
+      const controller = new ExportsController(service);
+
+      await expect(
+        controller.exportPdf(5, { userId: 9 }, makeResponse(), { fuente: 'enorme' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(service.getProjectExportModel).not.toHaveBeenCalled();
+      expect(service.registrarExportacion).not.toHaveBeenCalled();
+    });
+
+    it('PDF: sin la sección burndown no consulta el burndown de ningún Sprint', async () => {
+      const service = makeExportsService();
+      const controller = new ExportsController(service);
+
+      await controller.exportPdf(5, { userId: 9 }, makeResponse(), { secciones: 'miembros,avance' });
+
+      expect(service.getBurndownForClosedSprints).not.toHaveBeenCalled();
+    });
+
+    it('PDF: la bitácora guarda qué opciones se usaron', async () => {
+      const service = makeExportsService();
+      const controller = new ExportsController(service);
+
+      await controller.exportPdf(5, { userId: 9 }, makeResponse(), {
+        secciones: 'miembros',
+        graficas: 'pastel',
+        desde: '2026-02-01',
+      });
+
+      expect(service.registrarExportacion).toHaveBeenCalledWith(
+        5,
+        9,
+        TipoEventoBitacora.PROJECT_EXPORT_PDF_GENERATED,
+        {
+          fuente: 'mediana',
+          color: 'gris',
+          secciones: ['miembros'],
+          graficas: ['pastel'],
+          desde: '2026-02-01',
+          hasta: null,
+        },
+      );
+    });
+
+    it('CSV: acepta el rango de fechas y una opción inválida responde 400', async () => {
+      const service = makeExportsService();
+      const controller = new ExportsController(service);
+
+      await controller.exportCsv(5, { userId: 9 }, makeResponse(), { desde: '2026-02-01', hasta: '2026-02-28' });
+      expect(service.getProjectExportModel.mock.calls[0][2].desde.toISOString()).toBe('2026-02-01T00:00:00.000Z');
+
+      await expect(
+        controller.exportCsv(5, { userId: 9 }, makeResponse(), { desde: 'ayer' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });
