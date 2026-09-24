@@ -14,6 +14,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
+const vacio = { items: [], hasMore: false };
+
 async function renderInput() {
   const { GlobalSearchInput } = await import('@/components/layout/global-search-input');
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -24,15 +26,28 @@ async function renderInput() {
   );
 }
 
+function escribir(valor: string) {
+  const input = screen.getByRole('combobox', { name: /buscar/i });
+  fireEvent.change(input, { target: { value: valor } });
+  return input;
+}
+
+// Las coincidencias van en <mark>, que parte el nombre accesible: se busca por textContent.
+function opcionGet(texto: RegExp): HTMLElement {
+  const encontrada = screen.getAllByRole('option').find((o) => texto.test(o.textContent ?? ''));
+  if (!encontrada) throw new Error(`No hay opcion que coincida con ${texto}`);
+  return encontrada;
+}
+
+function opcionFind(texto: RegExp): Promise<HTMLElement> {
+  return waitFor(() => opcionGet(texto));
+}
+
 beforeEach(() => {
   vi.useRealTimers();
   searchGlobalMock.mockReset();
   pushMock.mockReset();
-  searchGlobalMock.mockResolvedValue({
-    proyectos: { items: [], hasMore: false },
-    personas: { items: [], hasMore: false },
-    tareas: { items: [], hasMore: false },
-  });
+  searchGlobalMock.mockResolvedValue({ proyectos: vacio, personas: vacio, tareas: vacio });
 });
 
 describe('GlobalSearchInput', () => {
@@ -56,26 +71,75 @@ describe('GlobalSearchInput', () => {
     });
     await renderInput();
 
-    fireEvent.change(screen.getByRole('combobox', { name: /buscar/i }), { target: { value: 'a' } });
+    escribir('a');
 
-    expect(await screen.findByText('Proyectos')).toBeInTheDocument();
-    expect(screen.getByText('Personas')).toBeInTheDocument();
-    expect(screen.getByText('Tareas')).toBeInTheDocument();
-    expect(screen.getByText('App móvil')).toBeInTheDocument();
-    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
-    expect(screen.getByText('Login')).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Proyectos' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Personas' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Tareas' })).toBeInTheDocument();
+    expect(opcionGet(/App móvil/)).toBeInTheDocument();
+    expect(opcionGet(/Ana Pérez/)).toBeInTheDocument();
+    expect(opcionGet(/Login/)).toBeInTheDocument();
+  });
+
+  it('muestra pestañas con contador por tipo y filtra al elegir una', async () => {
+    searchGlobalMock.mockResolvedValue({
+      proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'Proyecto uno', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },
+      personas: {
+        items: [
+          { idUsuario: 2, nombre: 'Ana', apellido: 'Uno', fotoUrl: null, carrera: null },
+          { idUsuario: 3, nombre: 'Beto', apellido: 'Uno', fotoUrl: null, carrera: null },
+        ],
+        hasMore: true,
+      },
+      tareas: vacio,
+    });
+    await renderInput();
+    escribir('uno');
+    await opcionFind(/Proyecto uno/);
+
+    expect(screen.getByRole('tab', { name: /Todo\s*3\+/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Proyectos\s*1$/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Personas\s*2\+/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Personas/ }));
+
+    expect(screen.getAllByRole('option').some((o) => /Proyecto uno/.test(o.textContent ?? ''))).toBe(false);
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+  });
+
+  it('resalta la coincidencia ignorando acentos y mayusculas', async () => {
+    searchGlobalMock.mockResolvedValue({
+      proyectos: vacio,
+      personas: { items: [{ idUsuario: 2, nombre: 'José', apellido: 'Ramírez', fotoUrl: null, carrera: null }], hasMore: false },
+      tareas: vacio,
+    });
+    await renderInput();
+    escribir('RAMIREZ');
+
+    const marca = await screen.findByText('Ramírez', { selector: 'mark' });
+    expect(marca).toBeInTheDocument();
+  });
+
+  it('el enlace Limpiar vacia el campo y cierra los resultados', async () => {
+    await renderInput();
+    const input = escribir('zzz');
+    expect(input).toHaveValue('zzz');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar' }));
+
+    expect(input).toHaveValue('');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
   it('navega con flechas y abre el resultado seleccionado con Enter', async () => {
     searchGlobalMock.mockResolvedValue({
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'Primero', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },
       personas: { items: [{ idUsuario: 2, nombre: 'Segundo', apellido: 'Persona', fotoUrl: null, carrera: null }], hasMore: false },
-      tareas: { items: [], hasMore: false },
+      tareas: vacio,
     });
     await renderInput();
-    const input = screen.getByRole('combobox', { name: /buscar/i });
-    fireEvent.change(input, { target: { value: 'a' } });
-    await screen.findByText('Primero');
+    const input = escribir('a');
+    await opcionFind(/Primero/);
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'ArrowDown' });
@@ -89,14 +153,10 @@ describe('GlobalSearchInput', () => {
     searchGlobalMock.mockReturnValue(new Promise((resolve) => { resolver = resolve; }));
     await renderInput();
 
-    fireEvent.change(screen.getByRole('combobox', { name: /buscar/i }), { target: { value: 'zzz' } });
+    escribir('zzz');
     expect(screen.queryByText(/sin coincidencias/i)).not.toBeInTheDocument();
 
-    resolver({
-      proyectos: { items: [], hasMore: false },
-      personas: { items: [], hasMore: false },
-      tareas: { items: [], hasMore: false },
-    });
+    resolver({ proyectos: vacio, personas: vacio, tareas: vacio });
 
     expect(await screen.findByText(/sin coincidencias/i)).toBeInTheDocument();
   });
@@ -106,49 +166,48 @@ describe('GlobalSearchInput', () => {
     searchGlobalMock.mockReturnValue(new Promise((resolve) => { resolver = resolve; }));
     await renderInput();
 
-    fireEvent.change(screen.getByRole('combobox', { name: /buscar/i }), { target: { value: 'a' } });
+    escribir('a');
 
     expect(await screen.findByRole('status', { name: /buscando/i })).toBeInTheDocument();
-    resolver({ proyectos: { items: [], hasMore: false }, personas: { items: [], hasMore: false }, tareas: { items: [], hasMore: false } });
+    resolver({ proyectos: vacio, personas: vacio, tareas: vacio });
   });
 
   it('avisa cuando un grupo tiene mas resultados de los mostrados', async () => {
     searchGlobalMock.mockResolvedValue({
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'Uno de varios', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: true },
-      personas: { items: [], hasMore: false },
-      tareas: { items: [], hasMore: false },
+      personas: vacio,
+      tareas: vacio,
     });
     await renderInput();
 
-    fireEvent.change(screen.getByRole('combobox', { name: /buscar/i }), { target: { value: 'a' } });
+    escribir('a');
 
-    expect(await screen.findByText('Uno de varios')).toBeInTheDocument();
+    expect(await opcionFind(/Uno de varios/)).toBeInTheDocument();
     expect(screen.getByText(/hay más resultados/i)).toBeInTheDocument();
   });
 
   it('actualiza aria-activedescendant al navegar con flechas', async () => {
     searchGlobalMock.mockResolvedValue({
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'Primero', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },
-      personas: { items: [], hasMore: false },
-      tareas: { items: [], hasMore: false },
+      personas: vacio,
+      tareas: vacio,
     });
     await renderInput();
-    const input = screen.getByRole('combobox', { name: /buscar/i });
-    fireEvent.change(input, { target: { value: 'a' } });
-    await screen.findByText('Primero');
+    const input = escribir('a');
+    await opcionFind(/Primero/);
     expect(input).not.toHaveAttribute('aria-activedescendant');
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
 
-    const opcion = screen.getByRole('option', { name: /Primero/i });
+    const opcion = opcionGet(/Primero/i);
     expect(input).toHaveAttribute('aria-activedescendant', opcion.id);
   });
 
   it('genera ids de DOM unicos por instancia (permite montar escritorio y movil a la vez)', async () => {
     searchGlobalMock.mockResolvedValue({
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'X', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },
-      personas: { items: [], hasMore: false },
-      tareas: { items: [], hasMore: false },
+      personas: vacio,
+      tareas: vacio,
     });
     const { GlobalSearchInput } = await import('@/components/layout/global-search-input');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
