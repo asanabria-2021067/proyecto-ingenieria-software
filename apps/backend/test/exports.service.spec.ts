@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { EstadoParticipacion, EstadoProyecto, EstadoSprint, TipoProyecto } from '@prisma/client';
+import { EstadoParticipacion, EstadoHoras, EstadoProyecto, EstadoSprint, Prisma, TipoProyecto } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { ProjectReadPolicyService } from '../src/common/project-policy/project-read-policy.service';
 import type { TeamService } from '../src/team/team.service';
@@ -9,6 +9,7 @@ import type { ProjectHoursSummaryService } from '../src/sprints/project-hours-su
 import type { BitacoraEventosService } from '../src/bitacora/bitacora-eventos.service';
 import { ExportsService } from '../src/exports/exports.service';
 import { TipoEventoBitacora } from '../src/bitacora/tipos-evento-bitacora';
+import { DEFAULT_EXPORT_OPTIONS } from '../src/exports/export-options';
 
 /**
  * T-259/T-260/T-261 (HU-164): ExportsService solo ORQUESTA — junta datos ya
@@ -80,12 +81,16 @@ function makeDeps(overrides: {
   decision?: Partial<{ profile: string; sprintEstados: readonly EstadoSprint[] | null }>;
   equipo?: typeof EQUIPO_BASE;
   horasPorUsuario?: Array<{ idUsuario: number; propuestasPendientes: string }>;
+  sprintsFechas?: Array<{ idSprint: number; fechaInicio: Date; fechaCierre: Date | null; fechaFinPlaneada: Date | null }>;
+  horasRango?: unknown[];
 } = {}) {
   const proyecto = 'proyecto' in overrides ? overrides.proyecto : PROYECTO_BASE;
 
   const prisma = {
     proyecto: { findFirst: vi.fn().mockResolvedValue(proyecto) },
     $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb({ bitacoraAuditoria: { create: vi.fn() } })),
+    sprint: { findMany: vi.fn().mockResolvedValue(overrides.sprintsFechas ?? []) },
+    horasParticipacion: { findMany: vi.fn().mockResolvedValue(overrides.horasRango ?? []) },
   } as unknown as PrismaService;
 
   const readPolicy = {
@@ -227,6 +232,92 @@ describe('ExportsService.getProjectExportModel', () => {
     const modelo = await service.getProjectExportModel(5, 9);
 
     expect(modelo.miembros).toEqual([]);
+  });
+});
+
+describe('ExportsService — rango de fechas', () => {
+  const dia = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+  const opciones = (desde: string | null, hasta: string | null) => ({
+    ...DEFAULT_EXPORT_OPTIONS,
+    desde: desde ? dia(desde) : null,
+    hasta: hasta ? dia(hasta) : null,
+  });
+  const fila = (estado: EstadoHoras, aprobadas: number | null, calculadas: number | null, idUsuario = 2) => ({
+    estadoHoras: estado,
+    horasAprobadas: aprobadas === null ? null : new Prisma.Decimal(aprobadas),
+    horasCalculadas: calculadas === null ? null : new Prisma.Decimal(calculadas),
+    participacion: { idUsuario },
+  });
+
+  it('sin rango no consulta horas ni fechas de Sprint: conserva el cálculo idéntico a la pantalla', async () => {
+    const deps = makeDeps();
+
+    await makeService(deps).getProjectExportModel(5, 9, DEFAULT_EXPORT_OPTIONS);
+
+    expect(deps.prisma.horasParticipacion.findMany).not.toHaveBeenCalled();
+    expect(deps.prisma.sprint.findMany).not.toHaveBeenCalled();
+  });
+
+  it('con rango recalcula las horas del integrante solo con periodos que se traslapan con el rango', async () => {
+    const deps = makeDeps({
+      horasRango: [fila('APROBADA', 4, 4), fila('APROBADA', 2.5, 2.5), fila('PENDIENTE', null, 3)],
+    });
+
+    const modelo = await makeService(deps).getProjectExportModel(5, 9, opciones('2026-02-01', '2026-02-28'));
+
+    expect(modelo.miembros[0].horasConfirmadas).toBe(6.5);
+    expect(modelo.miembros[0].horasPendientes).toBe(3);
+    const where = (deps.prisma.horasParticipacion.findMany as ReturnType<typeof vi.fn>).mock.calls[0][0].where;
+    expect(where.periodoInicio).toEqual({ lte: dia('2026-02-28') });
+    expect(where.periodoFin).toEqual({ gte: dia('2026-02-01') });
+  });
+
+  it('un integrante sin horas dentro del rango queda en 0, no con las horas totales', async () => {
+    const deps = makeDeps({ horasRango: [] });
+
+    const modelo = await makeService(deps).getProjectExportModel(5, 9, opciones('2026-02-01', null));
+
+    expect(modelo.miembros[0].horasConfirmadas).toBe(0);
+    expect(modelo.miembros[0].horasPendientes).toBe(0);
+  });
+
+  it('con rango deja solo los Sprints que se traslapan con él', async () => {
+    const deps = makeDeps({
+      sprintsFechas: [
+        { idSprint: 1, fechaInicio: dia('2026-01-01'), fechaCierre: dia('2026-01-15'), fechaFinPlaneada: dia('2026-01-14') },
+        { idSprint: 2, fechaInicio: dia('2026-02-01'), fechaCierre: dia('2026-02-15'), fechaFinPlaneada: dia('2026-02-14') },
+        { idSprint: 3, fechaInicio: dia('2026-03-01'), fechaCierre: null, fechaFinPlaneada: null },
+      ],
+    });
+    (deps.sprintsService.computeSprintsComparative as ReturnType<typeof vi.fn>).mockResolvedValue({
+      idProyecto: 5,
+      sprints: [1, 2, 3].map((n) => ({
+        idSprint: n, numero: n, estado: n === 3 ? EstadoSprint.ACTIVO : EstadoSprint.CERRADO,
+        tareasPlanificadas: 1, tareasCompletadas: 1, porcentajeCumplimiento: 100, hitosTotales: 0, hitosCompletados: 0,
+      })),
+    });
+
+    const modelo = await makeService(deps).getProjectExportModel(5, 9, opciones('2026-02-10', '2026-02-20'));
+
+    expect(modelo.avance.sprints.map((s) => s.idSprint)).toEqual([2]);
+    expect(modelo.sprintPortada).toBe(2);
+  });
+
+  it('un Sprint aún abierto (sin fecha de cierre ni fin planeada) se traslapa con cualquier rango posterior a su inicio', async () => {
+    const deps = makeDeps({
+      sprintsFechas: [{ idSprint: 3, fechaInicio: dia('2026-03-01'), fechaCierre: null, fechaFinPlaneada: null }],
+    });
+    (deps.sprintsService.computeSprintsComparative as ReturnType<typeof vi.fn>).mockResolvedValue({
+      idProyecto: 5,
+      sprints: [{
+        idSprint: 3, numero: 3, estado: EstadoSprint.ACTIVO, tareasPlanificadas: 1, tareasCompletadas: 0,
+        porcentajeCumplimiento: 0, hitosTotales: 0, hitosCompletados: 0,
+      }],
+    });
+
+    const modelo = await makeService(deps).getProjectExportModel(5, 9, opciones('2026-06-01', '2026-06-30'));
+
+    expect(modelo.avance.sprints).toHaveLength(1);
   });
 });
 
