@@ -301,7 +301,7 @@ export function GlobalSearchInput({
           <div
             role="tablist"
             aria-label="Filtrar resultados por tipo"
-            className="flex items-center gap-inline overflow-x-auto border-b border-outline-variant px-card"
+            className="flex items-center gap-inline overflow-x-auto overflow-y-hidden border-b border-outline-variant px-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {pestanas.map((p) => {
               const activa = pestana === p.valor;
