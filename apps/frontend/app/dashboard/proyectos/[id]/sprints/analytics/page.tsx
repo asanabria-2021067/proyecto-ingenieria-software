@@ -14,6 +14,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import type { EstadoSprint, SprintComparativeAnalyticsItemDto } from '@/lib/types/sprints';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 /** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE` en `sprints/page.tsx`/`sprints/[sprintId]/page.tsx`. */
 const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
@@ -226,9 +227,7 @@ export default function SprintsAnalyticsPage() {
           </EmptyMedia>
           <EmptyHeader>
             <EmptyTitle>
-              {error instanceof Error && error.message
-                ? error.message
-                : 'No fue posible cargar la analítica comparativa del proyecto.'}
+              {getApiErrorMessage(error, 'general', 'No fue posible cargar la analítica comparativa del proyecto.')}
             </EmptyTitle>
           </EmptyHeader>
           <EmptyContent>
