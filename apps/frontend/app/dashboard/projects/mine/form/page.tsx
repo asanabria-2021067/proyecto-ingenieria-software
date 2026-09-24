@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { createProject, updateProject, getMyProjectById, submitProjectForReview } from '@/lib/services/projects';
 import { getCarreras, getHabilidades, type Carrera, type Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage, getApiErrorStatus, traducirMensajeValidacion } from '@/components/projects/api-error';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
 import { Step1 } from './Step1';
 import { Step2 } from './Step2';
@@ -167,6 +168,10 @@ function NewProjectFormContent() {
   };
 
   const parseApiErrors = (raw: unknown): string => {
+    // T-221: fuera de la validación (400) el detalle crudo no sirve al usuario.
+    if (getApiErrorStatus(raw) !== 400) {
+      return getApiErrorMessage(raw, 'general', 'No se pudo guardar el proyecto.');
+    }
     const msgs: string[] = Array.isArray((raw as any)?.details)
       ? (raw as any).details
       : raw instanceof Error ? [raw.message] : ['No se pudo guardar el proyecto.'];
@@ -186,7 +191,7 @@ function NewProjectFormContent() {
         const issue = issueKey ? API_ISSUE_LABELS[issueKey] : rest;
         return issue ? `${API_FIELD_LABELS[fieldKey]}: ${issue}.` : null;
       }
-      return msg;
+      return traducirMensajeValidacion(msg) ?? msg;
     }).filter(Boolean);
 
     return translated.join('\n') || 'No se pudo guardar el proyecto.';

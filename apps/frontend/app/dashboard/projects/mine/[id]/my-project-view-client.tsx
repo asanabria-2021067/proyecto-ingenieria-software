@@ -16,6 +16,7 @@ import { getMyProjectById, updateProject, resubmitProject, getProjectRevisions }
 import { getCarreras, getHabilidades } from '@/lib/services/catalogs';
 import type { Carrera, Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   step1Schema, rolSchema, formSchema, zodToFieldErrors,
   newRol, newRequisito, safeId,
@@ -322,7 +323,7 @@ export default function MyProjectViewClient({ id }: Props) {
       await uvgSwal.fire({
         icon: 'error',
         title: 'No se pudo guardar',
-        text: err instanceof Error ? err.message : 'Ocurrió un error al guardar el proyecto.',
+        text: getApiErrorMessage(err, 'general', 'Ocurrió un error al guardar el proyecto.'),
       });
     } finally {
       setSaving(false);

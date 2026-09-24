@@ -54,8 +54,7 @@ function formatearFechaAsignacion(fechaIso: string): string {
 }
 
 function queryErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return 'No se pudo cargar la preparación de tu salida. Intenta nuevamente.';
+  return getApiErrorMessage(error, 'general', 'No se pudo cargar la preparación de tu salida. Intenta nuevamente.');
 }
 
 // ─── Columnas de preparación ─────────────────────────────────────────────────
