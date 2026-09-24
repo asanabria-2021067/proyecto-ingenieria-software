@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_EXPORT_OPTIONS } from '@/lib/export-options';
 
@@ -14,11 +14,13 @@ import { DEFAULT_EXPORT_OPTIONS } from '@/lib/export-options';
 vi.mock('@/hooks/use-is-project-leader', () => ({ useIsProjectLeader: vi.fn() }));
 vi.mock('@/hooks/use-current-user', () => ({ useIsAdmin: vi.fn() }));
 vi.mock('@/hooks/use-project-export', () => ({ useProjectExport: vi.fn() }));
+vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { useIsAdmin } from '@/hooks/use-current-user';
 import { useProjectExport } from '@/hooks/use-project-export';
+import { useProjectDetail } from '@/hooks/use-project-detail';
 
 function mockMutation(overrides: Record<string, unknown> = {}) {
   return { mutate: vi.fn(), isPending: false, isError: false, ...overrides };
@@ -29,6 +31,10 @@ function renderButtons() {
 }
 
 describe('ProjectExportButtons', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: { fechaCreacion: '2026-01-10T15:00:00.000Z' } });
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -155,5 +161,46 @@ describe('ProjectExportButtons', () => {
     renderButtons();
 
     expect(screen.getByRole('alert')).toHaveTextContent(/no se pudo generar/i);
+  });
+
+  it('el diálogo recibe la fecha de creación del proyecto como mínimo del "Desde"', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+    (useIsAdmin as any).mockReturnValue(false);
+    (useProjectExport as any).mockReturnValue({ exportCsv: mockMutation(), exportPdf: mockMutation() });
+
+    renderButtons();
+    fireEvent.click(screen.getByRole('button', { name: /exportar pdf/i }));
+
+    expect(screen.getByLabelText(/desde/i)).toHaveAttribute('min', '2026-01-10');
+  });
+
+  it('un 400 del backend muestra su mensaje concreto (el tipo de error), no uno genérico', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+    (useIsAdmin as any).mockReturnValue(false);
+    const error = Object.assign(new Error('La fecha "Hasta" no puede ser posterior a la fecha actual.'), {
+      statusCode: 400,
+    });
+    (useProjectExport as any).mockReturnValue({
+      exportCsv: mockMutation(),
+      exportPdf: mockMutation({ isError: true, error }),
+    });
+
+    renderButtons();
+
+    expect(screen.getByRole('alert')).toHaveTextContent('La fecha "Hasta" no puede ser posterior a la fecha actual.');
+  });
+
+  it('un error que no es de validación (500, red) sigue mostrando el aviso genérico', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+    (useIsAdmin as any).mockReturnValue(false);
+    (useProjectExport as any).mockReturnValue({
+      exportCsv: mockMutation({ isError: true, error: Object.assign(new Error('boom'), { statusCode: 500 }) }),
+      exportPdf: mockMutation(),
+    });
+
+    renderButtons();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/no se pudo generar el archivo/i);
+    expect(screen.getByRole('alert')).not.toHaveTextContent('boom');
   });
 });

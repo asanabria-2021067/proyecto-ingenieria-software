@@ -5,11 +5,43 @@ import { FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { useIsAdmin } from '@/hooks/use-current-user';
 import { useProjectExport } from '@/hooks/use-project-export';
+import { useProjectDetail } from '@/hooks/use-project-detail';
 import { ProjectExportDialog } from '@/components/projects/project-export-dialog';
 import type { ExportOptions, FormatoExport } from '@/lib/export-options';
 
 interface ProjectExportButtonsProps {
   idProyecto: number;
+}
+
+/**
+ * Un 400 del backend trae la regla concreta incumplida (fecha anterior a la
+ * creación del proyecto, fecha futura...): se muestra tal cual. Cualquier
+ * otro fallo (red, 500) no le dice nada útil al usuario y queda genérico.
+ */
+function mensajeDeError(error: unknown): string {
+  const e = error as { statusCode?: number; message?: string } | null;
+  return e?.statusCode === 400 && e.message ? e.message : 'No se pudo generar el archivo. Intenta de nuevo.';
+}
+
+/** Monta el diálogo solo abierto: así `useProjectDetail` no se consulta hasta que hace falta. */
+function DialogoConectado(props: {
+  idProyecto: number;
+  formato: FormatoExport;
+  isPending: boolean;
+  onOpenChange: (abierto: boolean) => void;
+  onConfirm: (opciones: ExportOptions) => void;
+}) {
+  const { data: proyecto } = useProjectDetail(props.idProyecto);
+  return (
+    <ProjectExportDialog
+      open
+      onOpenChange={props.onOpenChange}
+      formato={props.formato}
+      isPending={props.isPending}
+      fechaCreacionProyecto={proyecto?.fechaCreacion ?? null}
+      onConfirm={props.onConfirm}
+    />
+  );
 }
 
 /**
@@ -70,17 +102,17 @@ export function ProjectExportButtons({ idProyecto }: ProjectExportButtonsProps) 
         </button>
       </div>
       {formatoAbierto && (
-        <ProjectExportDialog
-          open
-          onOpenChange={(abierto) => !abierto && setFormatoAbierto(null)}
+        <DialogoConectado
+          idProyecto={idProyecto}
           formato={formatoAbierto}
           isPending={(formatoAbierto === 'csv' ? exportCsv : exportPdf).isPending}
+          onOpenChange={(abierto) => !abierto && setFormatoAbierto(null)}
           onConfirm={confirmar}
         />
       )}
       {hayError && (
         <p role="alert" className="text-xs font-medium text-error">
-          No se pudo generar el archivo. Intenta de nuevo.
+          {mensajeDeError(exportCsv.isError ? exportCsv.error : exportPdf.error)}
         </p>
       )}
     </div>
