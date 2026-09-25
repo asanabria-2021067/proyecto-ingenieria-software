@@ -135,8 +135,14 @@ function TaskFormDialogContent({
   onManageLabels,
 }: TaskFormDialogProps) {
   const schema = useMemo(
-    () => buildTaskFormSchema({ fechaOriginal: task?.fechaLimite ?? null, miembros: members }),
-    [task, members],
+    () =>
+      buildTaskFormSchema({
+        fechaOriginal: task?.fechaLimite ?? null,
+        miembros: members,
+        mode,
+        hitoOriginal: task?.idHito ?? null,
+      }),
+    [task, members, mode],
   );
 
   const form = useForm<TaskFormValues>({
@@ -241,6 +247,8 @@ function TaskFormDialogContent({
             members={members}
             labels={labels}
             onManageLabels={onManageLabels}
+            mode={mode}
+            hitoOriginal={task?.idHito ?? null}
           />
 
           {progreso && (

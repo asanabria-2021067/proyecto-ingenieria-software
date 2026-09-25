@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Crown,
+  FileSpreadsheet,
   FileText,
   Flag,
   Gavel,
@@ -94,6 +95,8 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
   PROJECT_CLOSE_RETURNED_TO_EXECUTION: { label: 'Proyecto devuelto a ejecución', icon: Undo2 },
   CLOSURE_STORAGE_SWEPT: { label: 'Almacenamiento de cierre depurado', icon: Trash2 },
   LEGACY_HOURS_RECONCILED: { label: 'Horas heredadas reconciliadas', icon: Clock },
+  PROJECT_EXPORT_CSV_GENERATED: { label: 'Exportación CSV generada', icon: FileSpreadsheet },
+  PROJECT_EXPORT_PDF_GENERATED: { label: 'Reporte PDF generado', icon: FileText },
 };
 
 /**
@@ -309,6 +312,16 @@ export default function BitacoraPage() {
           <p className="-mt-6 mb-6 text-sm text-tertiary">
             Registro de quién hizo qué, cuándo y cómo evolucionó el trabajo durante el sprint.
           </p>
+
+          {/* HU-170/T-268: el integrante necesita saber que está en modo
+              solo lectura para no buscar un botón de crear/editar/borrar
+              que no existe en esta pantalla. */}
+          {!isLeader && (
+            <p className="type-meta -mt-4 mb-6 flex items-center gap-1.5 text-tertiary" role="status">
+              <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Estás viendo esta bitácora en modo solo lectura: no puedes crear, editar ni borrar entradas.
+            </p>
+          )}
 
           <div className="mb-6 flex flex-wrap gap-3">
             <select

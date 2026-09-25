@@ -196,6 +196,43 @@ describe('buildTaskFormSchema — validación', () => {
     expect(schema().safeParse(valores({ idHito: '9' })).success).toBe(true);
   });
 
+  describe('idHito obligatorio en creación, no removible en edición (HU-147/T-185)', () => {
+    it('modo create: rechaza "sin hito"', () => {
+      const result = schema({ mode: 'create' }).safeParse(valores({ idHito: SIN_HITO }));
+      expect(result.success).toBe(false);
+    });
+
+    it('modo create: acepta un hito real seleccionado', () => {
+      const result = schema({ mode: 'create' }).safeParse(valores({ idHito: '9' }));
+      expect(result.success).toBe(true);
+    });
+
+    it('modo edit sin mode/hitoOriginal explícitos (default permisivo): sigue aceptando "sin hito"', () => {
+      const result = schema().safeParse(valores({ idHito: SIN_HITO }));
+      expect(result.success).toBe(true);
+    });
+
+    it('modo edit con hitoOriginal (la tarea ya tenía hito): rechaza retirarlo', () => {
+      const result = schema({ mode: 'edit', hitoOriginal: 3 }).safeParse(valores({ idHito: SIN_HITO }));
+      expect(result.success).toBe(false);
+    });
+
+    it('modo edit con hitoOriginal: acepta cambiar a otro hito real', () => {
+      const result = schema({ mode: 'edit', hitoOriginal: 3 }).safeParse(valores({ idHito: '5' }));
+      expect(result.success).toBe(true);
+    });
+
+    it('modo edit sin hitoOriginal (tarea legacy sin hito): sigue aceptando "sin hito"', () => {
+      const result = schema({ mode: 'edit', hitoOriginal: null }).safeParse(valores({ idHito: SIN_HITO }));
+      expect(result.success).toBe(true);
+    });
+
+    it('modo edit sin hitoOriginal: también acepta asignarle un hito real', () => {
+      const result = schema({ mode: 'edit', hitoOriginal: null }).safeParse(valores({ idHito: '5' }));
+      expect(result.success).toBe(true);
+    });
+  });
+
   it('rechaza etiquetas duplicadas', () => {
     const result = schema().safeParse(valores({ idsEtiquetas: [1, 2, 1] }));
     expect(result.success).toBe(false);

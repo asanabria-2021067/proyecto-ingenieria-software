@@ -951,7 +951,10 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
             tasksController.create(
               projectId,
               { userId: leader.idUsuario },
-              { tituloTarea: 'Tarea prohibida', fechaLimite: '2099-01-01', prioridad: 'MEDIA' },
+              // HU-147/T-185: idHito ahora es obligatorio en CreateTaskDto.
+              // El valor es irrelevante: el rechazo ocurre por estado/actor
+              // antes de llegar a validar el hito.
+              { tituloTarea: 'Tarea prohibida', fechaLimite: '2099-01-01', prioridad: 'MEDIA', idHito: 1 },
             ),
           ),
         ),
@@ -1057,7 +1060,9 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
           tasksController.create(
             projectId,
             { userId: externo.idUsuario },
-            { tituloTarea: 'Tarea de un ajeno', fechaLimite: '2099-01-01', prioridad: 'MEDIA' },
+            // HU-147/T-185: idHito ahora es obligatorio en CreateTaskDto; el
+            // rechazo ocurre por actor externo antes de validar el hito.
+            { tituloTarea: 'Tarea de un ajeno', fechaLimite: '2099-01-01', prioridad: 'MEDIA', idHito: 1 },
           ),
         ),
       ),
