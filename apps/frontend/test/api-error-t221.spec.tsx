@@ -184,3 +184,31 @@ describe('T-221: error no contemplado en el dashboard', () => {
     consoleSpy.mockRestore();
   });
 });
+
+describe('T-221: reglas de class-validator traducidas', () => {
+  it.each([
+    ['property foo should not exist', 'El campo «foo» no está permitido.'],
+    ['nombre should not be empty', 'El campo «nombre» es obligatorio.'],
+    ['nombre should not be null or undefined', 'El campo «nombre» es obligatorio.'],
+    ['nombre must be longer than or equal to 3 characters', 'El campo «nombre» debe tener al menos 3 caracteres.'],
+    ['nombre must be shorter than or equal to 50 characters', 'El campo «nombre» no puede superar 50 caracteres.'],
+    ['cupos must not be less than 1', 'El campo «cupos» debe ser mayor o igual a 1.'],
+    ['horas must not be greater than 40', 'El campo «horas» debe ser menor o igual a 40.'],
+    ['horas must be a positive number', 'El campo «horas» debe ser un número positivo.'],
+    ['cupos must be an integer number', 'El campo «cupos» debe ser un número entero.'],
+    ['horas must be a number conforming to the specified constraints', 'El campo «horas» debe ser un número.'],
+    ['nombre must be a string', 'El campo «nombre» debe ser un texto.'],
+    ['obligatorio must be a boolean value', 'El campo «obligatorio» debe ser verdadero o falso.'],
+    ['correo must be an email', 'El campo «correo» debe ser un correo electrónico válido.'],
+    ['roles must be an array', 'El campo «roles» debe ser una lista.'],
+    ['roles must contain at least 1 elements', 'El campo «roles» debe tener al menos 1 elementos.'],
+    ['roles must contain no more than 10 elements', 'El campo «roles» debe tener como máximo 10 elementos.'],
+    ['estado must be one of the following values: ACTIVO, CERRADO', 'El campo «estado» tiene un valor no permitido.'],
+    ['estado must be a valid enum value', 'El campo «estado» tiene un valor no permitido.'],
+    ['fechaInicio must be a Date instance', 'El campo «fecha inicio» debe ser una fecha válida.'],
+    ['carne must match /^\d+$/ regular expression', 'El campo «carne» tiene un formato no válido.'],
+    ['urlRecursoExterno must be a URL address', 'El campo «url recurso externo» tiene un formato no válido.'],
+  ])('%s', (entrada, esperado) => {
+    expect(traducirMensajeValidacion(entrada)).toBe(esperado);
+  });
+});
