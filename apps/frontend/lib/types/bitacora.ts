@@ -141,7 +141,10 @@ export interface BitacoraPaginadaDto {
 export interface FiltrosBitacora {
   idSprint?: number;
   idActor?: number;
+  persona?: string;
   tipoEvento?: TipoEventoBitacoraValor;
+  desde?: string;
+  hasta?: string;
   page?: number;
   limit?: number;
 }
