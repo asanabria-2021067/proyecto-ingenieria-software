@@ -51,6 +51,15 @@ export class CreateTaskDto {
   @Max(1000)
   tiempoEstimadoHoras?: number;
 
+  // HU-160/T-240: story points de la tarea, base de la velocidad y del eje
+  // del burndown. Opcional: una tarea sin puntos aporta 0 al eje de puntos
+  // pero sigue contando en el eje de número de tareas.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  puntosHistoria?: number;
+
   @ValidateIf((_object, value) => value !== undefined)
   @IsInt()
   @Min(1)

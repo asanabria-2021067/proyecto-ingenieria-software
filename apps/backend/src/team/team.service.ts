@@ -11,7 +11,7 @@ type PendingLeaderReview = Awaited<ReturnType<ExitRequestsService['getPendingLea
 
 type MemberDetailTask = {
   idTarea: number;
-  idSprint: number;
+  idSprint: number | null;
   tituloTarea: string;
   estadoTarea: string;
   prioridad: string;

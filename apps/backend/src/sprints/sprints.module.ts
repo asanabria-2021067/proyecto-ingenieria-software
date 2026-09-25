@@ -5,6 +5,7 @@ import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { SprintsService } from './sprints.service';
 import { HoursRecognitionService } from './hours-recognition.service';
 import { ProjectHoursSummaryService } from './project-hours-summary.service';
+import { SprintSnapshotsService } from './sprint-snapshots.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BitacoraModule } from '../bitacora/bitacora.module';
 import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
@@ -18,6 +19,7 @@ import { ProjectPolicyModule } from '../common/project-policy/project-policy.mod
     SprintsService,
     HoursRecognitionService,
     ProjectHoursSummaryService,
+    SprintSnapshotsService,
   ],
   exports: [
     SprintsContextService,
@@ -25,6 +27,7 @@ import { ProjectPolicyModule } from '../common/project-policy/project-policy.mod
     SprintsService,
     HoursRecognitionService,
     ProjectHoursSummaryService,
+    SprintSnapshotsService,
   ],
 })
 export class SprintsModule {}

@@ -8,6 +8,7 @@ import {
   createIntegrationProjectRole,
   createIntegrationParticipation,
   createIntegrationSprint,
+  createIntegrationTask,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { SprintsService } from '../../src/sprints/sprints.service';
@@ -328,6 +329,84 @@ describeIntegration(
       ).rejects.toBe(injectedError);
 
       expect(spy.calls).toHaveLength(0);
+    });
+
+    it('G. destino SIGUIENTE_SPRINT: la tarea pendiente termina en el Sprint recien creado tras startSprint', async () => {
+      const leader = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      scope.projectIds = [project.idProyecto];
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
+      scope.sprintIds = [sprint.idSprint];
+      const pendiente = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, {
+        estadoTarea: 'POR_HACER',
+      });
+      scope.taskIds = [pendiente.idTarea];
+
+      const service = makeService();
+      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario, 'SIGUIENTE_SPRINT');
+
+      const tareaTrasCierre = await prisma.tarea.findUniqueOrThrow({ where: { idTarea: pendiente.idTarea } });
+      expect(tareaTrasCierre.idSprint).toBeNull();
+      expect(tareaTrasCierre.destinoArrastre).toBe('SIGUIENTE_SPRINT');
+
+      const nuevoSprint = await service.startSprint(project.idProyecto, leader.idUsuario);
+      scope.sprintIds = [sprint.idSprint, nuevoSprint.idSprint];
+
+      const tareaTrasStart = await prisma.tarea.findUniqueOrThrow({ where: { idTarea: pendiente.idTarea } });
+      expect(tareaTrasStart.idSprint).toBe(nuevoSprint.idSprint);
+      expect(tareaTrasStart.destinoArrastre).toBeNull();
+    });
+
+    it('H. destino BACKLOG: la tarea pendiente queda sin Sprint y startSprint no la recoge', async () => {
+      const leader = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      scope.projectIds = [project.idProyecto];
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
+      scope.sprintIds = [sprint.idSprint];
+      const pendiente = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, {
+        estadoTarea: 'POR_HACER',
+      });
+      scope.taskIds = [pendiente.idTarea];
+
+      const service = makeService();
+      await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario, 'BACKLOG');
+
+      const nuevoSprint = await service.startSprint(project.idProyecto, leader.idUsuario);
+      scope.sprintIds = [sprint.idSprint, nuevoSprint.idSprint];
+
+      const tareaFinal = await prisma.tarea.findUniqueOrThrow({ where: { idTarea: pendiente.idTarea } });
+      expect(tareaFinal.idSprint).toBeNull();
+      expect(tareaFinal.destinoArrastre).toBe('BACKLOG');
+    });
+
+    it('I. rollback real del arrastre: si la transaccion falla, la tarea nunca se mueve y el Sprint sigue EN_FINALIZACION', async () => {
+      const leader = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      scope.projectIds = [project.idProyecto];
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'EN_FINALIZACION' });
+      scope.sprintIds = [sprint.idSprint];
+      const pendiente = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, {
+        estadoTarea: 'POR_HACER',
+      });
+      scope.taskIds = [pendiente.idTarea];
+
+      const injectedError = new Error('T-189 rollback test: fallo inyectado DESPUES del arrastre real');
+      const rollbackPrisma = wrapWithRollbackAfterRealWrite(prisma, injectedError);
+      const service = makeService(rollbackPrisma as unknown as PrismaClient);
+
+      await expect(
+        service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario, 'SIGUIENTE_SPRINT'),
+      ).rejects.toBe(injectedError);
+
+      const sprintTrasRollback = await prisma.sprint.findUniqueOrThrow({ where: { idSprint: sprint.idSprint } });
+      expect(sprintTrasRollback.estado).toBe('EN_FINALIZACION');
+
+      const tareaTrasRollback = await prisma.tarea.findUniqueOrThrow({ where: { idTarea: pendiente.idTarea } });
+      expect(tareaTrasRollback.idSprint).toBe(sprint.idSprint);
+      expect(tareaTrasRollback.destinoArrastre).toBeNull();
     });
   },
 );

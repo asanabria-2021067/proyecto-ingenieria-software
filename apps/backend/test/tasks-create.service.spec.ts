@@ -789,6 +789,7 @@ describe('TasksService.create', () => {
           'fechaLimite',
           'actualizadaEn',
           'tiempoEstimadoHoras',
+          'puntosHistoria',
           'asignacionActiva',
           'rolProyecto',
           'hito',

@@ -86,7 +86,7 @@ describeIntegration(
       await cleanupIntegrationFixtures(prisma, scope);
     });
 
-    it('tarea pendiente: finalizeSprint rechaza con ConflictException y el Sprint permanece ACTIVO sin fechaFinalizacionIniciada', async () => {
+    it('tarea pendiente (HU-148/HU-160): finalizeSprint ya NO rechaza — transiciona a EN_FINALIZACION igual', async () => {
       const leader = await createIntegrationUser(prisma);
       scope.userIds = [leader.idUsuario];
       const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
@@ -95,6 +95,33 @@ describeIntegration(
       scope.sprintIds = [sprint.idSprint];
       const task = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, {
         estadoTarea: 'EN_PROGRESO',
+      });
+      scope.taskIds = [task.idTarea];
+
+      const { service, notifications } = makeService();
+      let calledNotify = false;
+      notifications.notifyProjectActiveParticipants = async () => {
+        calledNotify = true;
+      };
+
+      const resultado = await service.finalizeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario);
+      expect(resultado.estado).toBe('EN_FINALIZACION');
+
+      const sprintFinal = await prisma.sprint.findUnique({ where: { idSprint: sprint.idSprint } });
+      expect(sprintFinal?.estado).toBe('EN_FINALIZACION');
+      expect(sprintFinal?.fechaFinalizacionIniciada).not.toBeNull();
+      expect(calledNotify).toBe(true);
+    });
+
+    it('tarea HECHO sin traza (F1 real): finalizeSprint sigue rechazando — el bloqueo que se quitó fue el de pendientes, no el de traza', async () => {
+      const leader = await createIntegrationUser(prisma);
+      scope.userIds = [leader.idUsuario];
+      const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
+      scope.projectIds = [project.idProyecto];
+      const sprint = await createIntegrationSprint(prisma, project.idProyecto, { estado: 'ACTIVO' });
+      scope.sprintIds = [sprint.idSprint];
+      const task = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint, {
+        estadoTarea: 'HECHO',
       });
       scope.taskIds = [task.idTarea];
 

@@ -117,6 +117,20 @@ export class SprintsAuthorizationService {
   }
 
   /**
+   * Regenerar la instantánea diaria del Sprint (T-238, HU-160): exclusivo
+   * del líder, mismo criterio que finalizar/cerrar — es una acción de
+   * gestión del Sprint, no una lectura.
+   */
+  async assertCanManageSprintSnapshot(
+    projectId: number,
+    sprintId: number,
+    userId: number,
+    tx?: TxClient,
+  ) {
+    return this._requireSprintAndLeadership(projectId, sprintId, userId, tx);
+  }
+
+  /**
    * Secuencia compartida por finalizar/cerrar: validar el Sprint dentro del
    * proyecto y luego exigir liderazgo, en ese orden (mismo patrón que
    * TasksAuthorizationService._requireTaskAndLeadership).

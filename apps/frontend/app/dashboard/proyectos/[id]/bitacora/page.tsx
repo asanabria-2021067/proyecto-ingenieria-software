@@ -310,6 +310,16 @@ export default function BitacoraPage() {
             Registro de quién hizo qué, cuándo y cómo evolucionó el trabajo durante el sprint.
           </p>
 
+          {/* HU-170/T-268: el integrante necesita saber que está en modo
+              solo lectura para no buscar un botón de crear/editar/borrar
+              que no existe en esta pantalla. */}
+          {!isLeader && (
+            <p className="type-meta -mt-4 mb-6 flex items-center gap-1.5 text-tertiary" role="status">
+              <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Estás viendo esta bitácora en modo solo lectura: no puedes crear, editar ni borrar entradas.
+            </p>
+          )}
+
           <div className="mb-6 flex flex-wrap gap-3">
             <select
               aria-label="Filtrar por sprint"
