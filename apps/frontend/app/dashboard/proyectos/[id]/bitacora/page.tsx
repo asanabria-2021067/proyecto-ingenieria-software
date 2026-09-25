@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Crown,
+  FileSpreadsheet,
   FileText,
   Flag,
   Gavel,
@@ -94,6 +95,8 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
   PROJECT_CLOSE_RETURNED_TO_EXECUTION: { label: 'Proyecto devuelto a ejecución', icon: Undo2 },
   CLOSURE_STORAGE_SWEPT: { label: 'Almacenamiento de cierre depurado', icon: Trash2 },
   LEGACY_HOURS_RECONCILED: { label: 'Horas heredadas reconciliadas', icon: Clock },
+  PROJECT_EXPORT_CSV_GENERATED: { label: 'Exportación CSV generada', icon: FileSpreadsheet },
+  PROJECT_EXPORT_PDF_GENERATED: { label: 'Reporte PDF generado', icon: FileText },
 };
 
 /**

@@ -9,6 +9,11 @@
         "include": "project-closure/assets/**/*",
         "outDir": "dist",
         "watchAssets": true
+      },
+      {
+        "include": "exports/assets/**/*",
+        "outDir": "dist",
+        "watchAssets": true
       }
     ]
   }
