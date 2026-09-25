@@ -63,6 +63,7 @@ function sprintDetail(overrides: Partial<SprintDetailDto> = {}): SprintDetailDto
     numero: 7,
     estado: 'CERRADO',
     fechaInicio: '2026-08-14T00:00:00.000Z',
+    fechaFinPlaneada: null,
     fechaFinalizacionIniciada: null,
     fechaCierre: null,
     cerradoPor: null,

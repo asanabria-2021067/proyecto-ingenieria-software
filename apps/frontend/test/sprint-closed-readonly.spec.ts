@@ -15,6 +15,7 @@ vi.mock('../hooks/use-project-sprints', () => ({
   useFinalizeSprint: vi.fn(),
   useSprintDetail: vi.fn(),
   useSprintAnalytics: vi.fn(),
+  useSprintBurndown: vi.fn(),
 }));
 vi.mock('../lib/swal', () => ({ default: { fire: vi.fn() } }));
 
@@ -27,6 +28,7 @@ import {
   useFinalizeSprint,
   useProjectSprints,
   useSprintAnalytics,
+  useSprintBurndown,
   useSprintDetail,
 } from '../hooks/use-project-sprints';
 
@@ -37,6 +39,7 @@ function sprint(overrides: Partial<SprintDto> = {}): SprintDto {
     numero: 4,
     estado: 'CERRADO',
     fechaInicio: '2026-05-12T12:00:00.000Z',
+    fechaFinPlaneada: null,
     fechaFinalizacionIniciada: '2026-05-25T12:00:00.000Z',
     fechaCierre: '2026-05-26T12:00:00.000Z',
     tareas: 6,
@@ -203,6 +206,14 @@ describe('VIEW-11 — analítica accesible para integrantes', () => {
         planificadoVsCompletado: { tareasPlanificadas: 6, tareasCompletadas: 6, horasEstimadas: 40 },
       },
       isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    // T-240 (HU-160): sección independiente, montada apenas analytics carga.
+    (useSprintBurndown as any).mockReturnValue({
+      burndown: undefined,
+      isLoading: true,
       isError: false,
       error: null,
       refetch: vi.fn(),

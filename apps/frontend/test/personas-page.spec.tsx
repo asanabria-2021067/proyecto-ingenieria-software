@@ -167,10 +167,11 @@ describe('PersonasPage', () => {
     });
     await renderPersonas();
 
-    expect(await screen.findByText('Carla Ruiz')).toBeInTheDocument();
-    expect(screen.getByText('Ingeniería')).toBeInTheDocument();
-    expect(screen.getByText('React')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Ver perfil/i })).toHaveAttribute(
+    const main = await screen.findByRole('main');
+    expect(await within(main).findByText('Carla Ruiz')).toBeInTheDocument();
+    expect(within(main).getByText('Ingeniería')).toBeInTheDocument();
+    expect(within(main).getByText('React')).toBeInTheDocument();
+    expect(within(main).getByRole('link', { name: /Ver perfil/i })).toHaveAttribute(
       'href',
       '/dashboard/personas/10',
     );
@@ -183,7 +184,8 @@ describe('PersonasPage', () => {
     });
     await renderPersonas();
 
-    expect(await screen.findByText('Carla Ruiz')).toBeInTheDocument();
+    const main = await screen.findByRole('main');
+    expect(await within(main).findByText('Carla Ruiz')).toBeInTheDocument();
     // en tarjetas, "Ver perfil" trae una flecha aparte del texto (article > a)
     expect(screen.getByRole('button', { name: 'Ver como tarjetas' })).toHaveAttribute(
       'aria-pressed',
@@ -200,7 +202,7 @@ describe('PersonasPage', () => {
       'aria-pressed',
       'false',
     );
-    expect(screen.getByText('Carla Ruiz')).toBeInTheDocument();
+    expect(within(main).getByText('Carla Ruiz')).toBeInTheDocument();
   });
 
   it('cada estado vacío renderiza su mensaje correspondiente', async () => {

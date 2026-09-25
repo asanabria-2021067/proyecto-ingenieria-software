@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -13,6 +14,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { SprintsService } from './sprints.service';
+import { StartSprintDto } from './dto/start-sprint.dto';
+import { CloseSprintDto } from './dto/close-sprint.dto';
 
 /**
  * C045 (06 v2 §32/§41 E060–E062): ciclo de vida del Sprint. El proyecto se
@@ -50,8 +53,9 @@ export class SprintsController {
   start(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
+    @Body() body: StartSprintDto,
   ) {
-    return this.sprintsService.startSprint(projectId, user.userId);
+    return this.sprintsService.startSprint(projectId, user.userId, body.fechaFinPlaneada);
   }
 
   /** E061: finalizar el Sprint ACTIVO. */
@@ -76,8 +80,27 @@ export class SprintsController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('sprintId', ParseIntPipe) sprintId: number,
     @CurrentUser() user: { userId: number },
+    @Body() body: CloseSprintDto,
   ) {
-    return this.sprintsService.closeSprint(projectId, sprintId, user.userId);
+    return this.sprintsService.closeSprint(projectId, sprintId, user.userId, body.destino);
+  }
+
+  /**
+   * T-238 (HU-160): regenera la instantánea de HOY del Sprint (líder). No
+   * pasa por `ProjectWriteGuard`/catálogo de familias — a diferencia de
+   * iniciar/finalizar/cerrar, no transiciona ningún estado del Sprint ni del
+   * proyecto: es un upsert idempotente sobre una fila derivada
+   * (`InstantaneaSprint`), gateado únicamente por
+   * `SprintsAuthorizationService.assertCanManageSprintSnapshot`.
+   */
+  @Post(':sprintId/instantanea')
+  @HttpCode(HttpStatus.OK)
+  regenerarInstantanea(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.regenerarInstantaneaDeHoy(projectId, sprintId, user.userId);
   }
 
   /** E066: resumen de cierre (líder actual mientras el Sprint no esté cerrado). */
@@ -152,5 +175,16 @@ export class SprintsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.sprintsService.getSprintAnalytics(projectId, sprintId, user.userId);
+  }
+
+  /** T-240 (HU-160): datos crudos del burndown, mismo alcance por actor que `getAnalytics`. */
+  @Get(':sprintId/burndown')
+  @HttpCode(HttpStatus.OK)
+  getBurndown(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.sprintsService.getSprintBurndown(projectId, sprintId, user.userId);
   }
 }

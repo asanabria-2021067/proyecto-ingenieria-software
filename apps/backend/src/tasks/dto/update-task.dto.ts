@@ -57,6 +57,14 @@ export class UpdateTaskDto {
   @Max(1000)
   tiempoEstimadoHoras?: number;
 
+  // HU-160/T-240: mismo criterio que tiempoEstimadoHoras — se valida
+  // únicamente cuando se envía; si se omite, no se toca el valor almacenado.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  puntosHistoria?: number;
+
   // `null` retira la relación; `undefined` (campo omitido) la conserva;
   // cualquier otro valor debe validarse como entero positivo.
   @ValidateIf((_object, value) => value !== undefined && value !== null)

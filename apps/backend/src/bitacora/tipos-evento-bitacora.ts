@@ -35,7 +35,7 @@ export class TipoEventoBitacora {
   static readonly TASK_HOURS_ADJUSTMENT_REVERTED = 'TASK_HOURS_ADJUSTMENT_REVERTED' as const;
   /** Sprints.finalize — Sprint, F1–F4 satisfechas/conteos. */
   static readonly SPRINT_FINALIZED = 'SPRINT_FINALIZED' as const;
-  /** Sprints.close — Sprint, fecha/actor. */
+  /** Sprints.close — Sprint, fecha/actor, tareasArrastradas (T-191, HU-148). */
   static readonly SPRINT_CLOSED = 'SPRINT_CLOSED' as const;
   /** Flow A — Sprint, IDs de tramos/participaciones y totales reportados/propuestos. */
   static readonly SPRINT_HOURS_CONSOLIDATED = 'SPRINT_HOURS_CONSOLIDATED' as const;

@@ -51,13 +51,95 @@ function BarraTareasCompletadas({ sprint, maximo }: { sprint: SprintComparativeA
   );
 }
 
+/**
+ * T-241 (HU-160): barra de velocidad por Sprint CERRADO, en story points
+ * completados. `sprint.puntosHistoriaCompletados === null` es "sin puntos
+ * asignados" — no se dibuja como una barra en 0, se rotula explícitamente.
+ */
+function BarraVelocidad({ sprint, maximo }: { sprint: SprintComparativeAnalyticsItemDto; maximo: number }) {
+  const puntos = sprint.puntosHistoriaCompletados;
+  const porcentajeAncho = puntos === null || maximo === 0 ? 0 : Math.round((puntos / maximo) * 100);
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-16 shrink-0 text-sm font-semibold text-on-surface">Sprint {sprint.numero}</span>
+      <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-container-high">
+        {puntos !== null && (
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${porcentajeAncho}%` }}
+            role="progressbar"
+            aria-valuenow={puntos}
+            aria-valuemin={0}
+            aria-valuemax={maximo}
+            aria-label={`Story points completados en Sprint ${sprint.numero}`}
+          />
+        )}
+      </div>
+      <span className="w-32 shrink-0 text-right text-sm font-bold text-on-surface">
+        {puntos === null ? 'Sin puntos asignados' : `${puntos} pts`}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * T-241 (HU-160): velocidad — la métrica PRINCIPAL de la comparativa, en
+ * story points, solo para Sprints `CERRADO` (la velocidad se alimenta del
+ * congelado de T-239, nunca del estado actual). El promedio ignora los
+ * Sprints "sin puntos asignados": promediarlos como 0 castigaría
+ * falsamente la referencia para comprometer el siguiente Sprint.
+ */
+function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItemDto[] }) {
+  const sprintsCerrados = sprints.filter((sprint) => sprint.estado === 'CERRADO');
+  const conPuntos = sprintsCerrados.filter(
+    (sprint): sprint is SprintComparativeAnalyticsItemDto & { puntosHistoriaCompletados: number } =>
+      sprint.puntosHistoriaCompletados !== null,
+  );
+  const promedio =
+    conPuntos.length === 0
+      ? null
+      : Math.round(
+          (conPuntos.reduce((acumulado, sprint) => acumulado + sprint.puntosHistoriaCompletados, 0) /
+            conPuntos.length) *
+            10,
+        ) / 10;
+  const maximo = Math.max(1, ...conPuntos.map((sprint) => sprint.puntosHistoriaCompletados));
+
+  return (
+    <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
+      <h2 className="mb-1 text-sm font-bold text-on-surface">Velocidad (story points completados)</h2>
+      <p className="mb-4 text-xs text-tertiary">
+        Story points completados por Sprint cerrado. El promedio es la referencia para comprometer el siguiente
+        Sprint.
+      </p>
+      {sprintsCerrados.length === 0 ? (
+        <p className="text-sm text-tertiary">Aún no hay Sprints cerrados para calcular la velocidad.</p>
+      ) : (
+        <>
+          <div className="space-y-3">
+            {sprintsCerrados.map((sprint) => (
+              <BarraVelocidad key={sprint.idSprint} sprint={sprint} maximo={maximo} />
+            ))}
+          </div>
+          <p className="mt-4 text-sm font-semibold text-on-surface">
+            Promedio: {promedio === null ? 'sin datos suficientes' : `${promedio} pts / sprint`}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ComparativeContent({ sprints }: { sprints: SprintComparativeAnalyticsItemDto[] }) {
   const maximoTareasCompletadas = Math.max(1, ...sprints.map((sprint) => sprint.tareasCompletadas));
 
   return (
     <>
+      <SeccionVelocidad sprints={sprints} />
+
       <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-bold text-on-surface">Tareas completadas por sprint</h2>
+        <h2 className="mb-1 text-sm font-bold text-on-surface">Tareas completadas por sprint</h2>
+        <p className="mb-4 text-xs text-tertiary">Vista alternativa por número de tareas, no la métrica principal.</p>
         <div className="space-y-3">
           {sprints.map((sprint) => (
             <BarraTareasCompletadas key={sprint.idSprint} sprint={sprint} maximo={maximoTareasCompletadas} />

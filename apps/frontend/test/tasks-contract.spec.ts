@@ -22,6 +22,7 @@ function baseTarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    puntosHistoria: null,
     asignacionActiva: null,
     rolProyecto: null,
     hito: null,
@@ -85,6 +86,11 @@ describe('contrato TareaPublicaDTO', () => {
   it('tiempo estimado presente y ausente', () => {
     expect(baseTarea().tiempoEstimadoHoras).toBeNull();
     expect(baseTarea({ tiempoEstimadoHoras: 8 }).tiempoEstimadoHoras).toBe(8);
+  });
+
+  it('puntos de historia presente y ausente', () => {
+    expect(baseTarea().puntosHistoria).toBeNull();
+    expect(baseTarea({ puntosHistoria: 5 }).puntosHistoria).toBe(5);
   });
 
   it('fechas como string, nunca Date', () => {

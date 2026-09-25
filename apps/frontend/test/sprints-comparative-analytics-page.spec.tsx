@@ -23,6 +23,7 @@ function item(overrides: Partial<SprintComparativeAnalyticsItemDto> = {}): Sprin
     porcentajeCumplimiento: 75,
     hitosTotales: 2,
     hitosCompletados: 1,
+    puntosHistoriaCompletados: 8,
     ...overrides,
   };
 }
@@ -128,5 +129,72 @@ describe('SprintsAnalyticsPage — rendering', () => {
     const tabla = within(screen.getByRole('table'));
     expect(tabla.getByText('Sprint 1')).toBeInTheDocument();
     expect(tabla.getByText('Sprint 2')).toBeInTheDocument();
+  });
+});
+
+describe('SprintsAnalyticsPage — velocidad (T-241)', () => {
+  it('muestra "Velocidad (story points completados)" como métrica principal, antes de la vista por tareas', () => {
+    mockAnalytics();
+
+    renderPage();
+
+    const encabezados = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+    expect(encabezados.indexOf('Velocidad (story points completados)')).toBeLessThan(
+      encabezados.indexOf('Tareas completadas por sprint'),
+    );
+  });
+
+  it('marca la vista por tareas como alternativa, no como métrica principal', () => {
+    mockAnalytics();
+
+    renderPage();
+
+    expect(screen.getByText('Vista alternativa por número de tareas, no la métrica principal.')).toBeInTheDocument();
+  });
+
+  it('muestra los story points completados de cada Sprint cerrado', () => {
+    mockAnalytics({
+      sprints: [item({ idSprint: 1, numero: 1, puntosHistoriaCompletados: 5 })],
+    });
+
+    renderPage();
+
+    expect(screen.getByText('5 pts')).toBeInTheDocument();
+  });
+
+  it('un Sprint sin puntos asignados se indica explícitamente, nunca como "0 pts"', () => {
+    mockAnalytics({
+      sprints: [item({ idSprint: 1, numero: 1, puntosHistoriaCompletados: null })],
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Sin puntos asignados')).toBeInTheDocument();
+    expect(screen.queryByText('0 pts')).not.toBeInTheDocument();
+  });
+
+  it('calcula el promedio de story points completados solo entre Sprints cerrados con datos', () => {
+    mockAnalytics({
+      sprints: [
+        item({ idSprint: 1, numero: 1, puntosHistoriaCompletados: 4 }),
+        item({ idSprint: 2, numero: 2, puntosHistoriaCompletados: 8 }),
+        // "Sin puntos asignados": no debe contarse como 0 al promediar.
+        item({ idSprint: 3, numero: 3, puntosHistoriaCompletados: null }),
+      ],
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Promedio: 6 pts / sprint')).toBeInTheDocument();
+  });
+
+  it('un Sprint no cerrado no aparece en la velocidad (la métrica solo existe para Sprints congelados)', () => {
+    mockAnalytics({
+      sprints: [item({ idSprint: 1, numero: 1, estado: 'ACTIVO', puntosHistoriaCompletados: null })],
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Aún no hay Sprints cerrados para calcular la velocidad.')).toBeInTheDocument();
   });
 });
