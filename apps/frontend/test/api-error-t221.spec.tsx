@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { apiFetch } from '../lib/api/client';
@@ -32,6 +32,12 @@ async function errorDelBackend(status: number, body: unknown, path = '/proyectos
 const CODIGO_SUELTO = /^\s*\d{3}\b/;
 
 describe('T-221: traducción de errores del backend', () => {
+  beforeEach(() => {
+    // `apiFetch` registra el error técnico; aquí solo interesa la traducción.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });

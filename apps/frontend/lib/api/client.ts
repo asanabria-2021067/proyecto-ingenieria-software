@@ -1,3 +1,5 @@
+import { redirectToLoginOnSessionExpired } from './session';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '/api';
 
@@ -77,21 +79,25 @@ export async function apiFetch<T>(
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(options.headers as Record<string, string>),
     },
+  }).catch((networkError: unknown) => {
+    logNetworkError(options.method, path, networkError);
+    throw networkError;
   });
 
   // Access token (1h) expirado a mitad de sesión: un refresh silencioso vía
   // la cookie refresh_token (30d) evita mandar al usuario de vuelta al login
   // solo porque dejó la pestaña abierta un rato. Nunca para las propias
   // rutas /auth/* (evita el loop obvio de reintentar un refresh fallido).
-  if (res.status === 401 && !_retriedAfterRefresh && !path.startsWith('/auth/')) {
-    const refreshed = await refreshSession();
-    if (refreshed) {
+  if (res.status === 401 && !path.startsWith('/auth/')) {
+    if (!_retriedAfterRefresh && (await refreshSession())) {
       return apiFetch<T>(path, options, true);
     }
+    // T-221: la sesión ya no se puede renovar → login conservando la ruta.
+    redirectToLoginOnSessionExpired();
   }
 
   if (!res.ok) {
-    throw await buildApiError(res);
+    throw await buildApiError(res, options.method, path);
   }
   if (res.status === 204) {
     return undefined as T;
@@ -105,7 +111,7 @@ export async function apiFetch<T>(
  * dominio (p. ej. `REGISTRO_YA_REVOCADO`, `CLOSURE_NO_CONFIGURADO`) para que
  * la UI distinga conflictos sin comparar textos.
  */
-async function buildApiError(res: Response): Promise<Error> {
+async function buildApiError(res: Response, method: string | undefined, path: string): Promise<Error> {
   const body = await res.json().catch(() => ({}));
   const error = new Error(
     Array.isArray(body.message) ? body.message.join(', ') : body.message || 'Error del servidor',
@@ -115,7 +121,46 @@ async function buildApiError(res: Response): Promise<Error> {
   if (typeof body.code === 'string') {
     (error as any).code = body.code;
   }
+  (error as any).method = (method ?? 'GET').toUpperCase();
+  (error as any).endpoint = stripQuery(path);
+  logApiError(error);
   return error;
+}
+
+/**
+ * T-221 — el usuario ve un mensaje traducido (`getApiErrorMessage`); aquí se
+ * conserva el error técnico para diagnóstico. Solo datos de la respuesta del
+ * backend: nunca el cuerpo de la petición (contraseñas), headers ni cookies
+ * (tokens), y el endpoint va sin query string (búsquedas del usuario).
+ */
+function stripQuery(path: string): string {
+  return path.split('?')[0];
+}
+
+function logApiError(error: Error): void {
+  const e = error as Error & { statusCode?: number; code?: string; details?: unknown; method?: string; endpoint?: string };
+  const registro = {
+    method: e.method,
+    endpoint: e.endpoint,
+    status: e.statusCode,
+    code: e.code,
+    message: e.message,
+    details: e.details,
+  };
+  // 4xx es un rechazo esperable del backend; 5xx es una falla a investigar.
+  if (typeof e.statusCode === 'number' && e.statusCode < 500) {
+    console.warn('[api] La petición fue rechazada por el backend', registro);
+  } else {
+    console.error('[api] Error del backend', registro);
+  }
+}
+
+function logNetworkError(method: string | undefined, path: string, error: unknown): void {
+  console.error('[api] No se pudo contactar al backend', {
+    method: (method ?? 'GET').toUpperCase(),
+    endpoint: stripQuery(path),
+    message: error instanceof Error ? error.message : String(error),
+  });
 }
 
 /**
@@ -139,17 +184,20 @@ export async function apiFetchBlob(
       Accept: 'application/pdf',
       ...(options.headers as Record<string, string>),
     },
+  }).catch((networkError: unknown) => {
+    logNetworkError(options.method, path, networkError);
+    throw networkError;
   });
 
-  if (res.status === 401 && !_retriedAfterRefresh && !path.startsWith('/auth/')) {
-    const refreshed = await refreshSession();
-    if (refreshed) {
+  if (res.status === 401 && !path.startsWith('/auth/')) {
+    if (!_retriedAfterRefresh && (await refreshSession())) {
       return apiFetchBlob(path, options, true);
     }
+    redirectToLoginOnSessionExpired();
   }
 
   if (!res.ok) {
-    throw await buildApiError(res);
+    throw await buildApiError(res, options.method, path);
   }
   return res.blob();
 }
