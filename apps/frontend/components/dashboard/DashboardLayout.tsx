@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,10 +15,12 @@ import {
   RotateCcw,
   Users,
   Archive,
+  Search as SearchIcon,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
+import { GlobalSearchInput } from '@/components/layout/global-search-input';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import {
   SidebarNav,
@@ -100,6 +102,7 @@ export default function DashboardLayout({
   const { latestNotification, isConnected: notificationsConnected } =
     useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   useEffect(() => {
     if (!allowAdmin && !isLoading && isAdminUser(user)) {
@@ -178,20 +181,30 @@ export default function DashboardLayout({
         className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page focus:outline-none"
       >
         {/* Top Header Bar */}
-        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:px-section">
+        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_auto_1fr] md:px-section">
           <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
             <div className="flex items-center gap-tight md:hidden">
               <Image src={logo} alt="UVGENIUS" className="h-8 w-auto" />
               <span className="type-subtitle text-text-primary">UVGenius</span>
             </div>
-            {/* Reemplaza al buscador del mockup: el control de tamaño de
-                fuente ya existente ocupa el mismo lugar prominente. */}
+            <button
+              type="button"
+              onClick={() => setMobileSearchOpen((v) => !v)}
+              aria-label="Buscar"
+              aria-expanded={mobileSearchOpen}
+              className="flex size-9 items-center justify-center rounded-control text-text-secondary hover:bg-surface-container-high hover:text-text-primary md:hidden"
+            >
+              <SearchIcon className="size-5" aria-hidden="true" />
+            </button>
             <div className="hidden md:block">
               <FontScaleToggle />
             </div>
           </div>
-          <div className="flex items-center gap-tight">
+          <div className="hidden md:block">
+            <GlobalSearchInput className="w-64 lg:w-96" />
+          </div>
+          <div className="flex items-center gap-tight md:justify-self-end">
             {!!user && (
               <span
                 role="status"
@@ -234,6 +247,16 @@ export default function DashboardLayout({
             </div>
           </div>
         </header>
+
+        {mobileSearchOpen && (
+          <div className="border-b border-outline-variant bg-card px-stack py-tight md:hidden">
+            <GlobalSearchInput
+              autoFocus
+              onNavigate={() => setMobileSearchOpen(false)}
+              className="w-full"
+            />
+          </div>
+        )}
 
         {/* F6: franja global de bloqueo por finalización de Sprint — fuera del
             área con scroll para que no desaparezca al desplazar la página,
