@@ -63,7 +63,7 @@ export function ProjectRoleManagementSection({
   const handleSalirDeRol = async (rol: { idRolProyecto: number; nombreRol: string }) => {
     const { isConfirmed } = await uvgSwal.fire({
       icon: 'warning',
-      title: `¿Salir del rol "${rol.nombreRol}"?`,
+      titleText: `¿Salir del rol "${rol.nombreRol}"?`,
       text: 'Dejarás de participar en este rol. Las tareas de este rol que tengas asignadas quedarán sin asignar; conservarás tus demás roles del proyecto.',
       showCancelButton: true,
       confirmButtonText: 'Sí, salir',
