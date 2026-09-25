@@ -15,6 +15,7 @@ import { BitacoraConsultaService } from '../../src/bitacora/bitacora-consulta.se
 import { TipoEventoBitacora } from '../../src/bitacora/tipos-evento-bitacora';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
+import { UserNameSearchService } from '../../src/common/search/user-name-search.service';
 
 /**
  * T-165 (bloque de tests bundlado por la HU junto al frontend, pero de
@@ -43,6 +44,7 @@ describeIntegration('Bitácora semántica de Sprint — PostgreSQL real (sin hu�
       prisma as unknown as PrismaService,
       context,
       new ProjectReadPolicyService(prisma as unknown as PrismaService),
+      new UserNameSearchService(prisma as unknown as PrismaService),
     );
     await prisma.$connect();
   });
@@ -307,5 +309,135 @@ describeIntegration('Bitácora semántica de Sprint — PostgreSQL real (sin hu�
     });
     expect(filtradoPorAdministrativo.data).toHaveLength(0);
     expect(filtradoPorAdministrativo.total).toBe(0);
+  });
+
+  /**
+   * T-243/T-245, de punta a punta: persona (tolerante a acentos/mayúsculas,
+   * vía UserNameSearchService) combinado con tipoEvento y rango de fechas en
+   * la misma consulta a Postgres real — no basta con que cada filtro
+   * funcione aislado, la combinación debe aplicar todas las condiciones a
+   * la vez sin colar el evento de otro actor.
+   */
+  it('filtros combinados: persona (sin acentos, mayúsculas) + tipoEvento + rango de fechas devuelve solo el evento que matchea los tres', async () => {
+    const leader = await createIntegrationUser(prisma);
+    const ana = await createIntegrationUser(prisma, { nombre: 'Ana', apellido: 'Hernández' });
+    const marcos = await createIntegrationUser(prisma, { nombre: 'Marcos', apellido: 'Aguilar' });
+    scope.userIds = [leader.idUsuario, ana.idUsuario, marcos.idUsuario];
+    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    scope.projectIds = [project.idProyecto];
+
+    const [filaAna, filaMarcos] = await prisma.$transaction(async (tx) => {
+      await bitacoraEventos.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_CREATED,
+        idActor: ana.idUsuario,
+        idProyecto: project.idProyecto,
+        tipoEntidad: 'TAREA',
+        idEntidad: 1,
+        valorNuevo: { marca: 'EVENTO-ANA' },
+      });
+      await bitacoraEventos.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_CREATED,
+        idActor: marcos.idUsuario,
+        idProyecto: project.idProyecto,
+        tipoEntidad: 'TAREA',
+        idEntidad: 2,
+        valorNuevo: { marca: 'EVENTO-MARCOS' },
+      });
+      const filaAna = await tx.bitacoraAuditoria.findFirstOrThrow({ where: { idUsuario: ana.idUsuario } });
+      const filaMarcos = await tx.bitacoraAuditoria.findFirstOrThrow({ where: { idUsuario: marcos.idUsuario } });
+      return [filaAna, filaMarcos];
+    });
+    auditoriaIds.push(filaAna.idAuditoria, filaMarcos.idAuditoria);
+
+    const desde = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const hasta = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const resultado = await bitacoraConsulta.listEventos(project.idProyecto, leader.idUsuario, {
+      page: 1,
+      limit: 20,
+      persona: 'HERNANDEZ', // sin acentos, en mayúsculas — debe encontrar a "Hernández"
+      tipoEvento: TipoEventoBitacora.TASK_CREATED,
+      desde,
+      hasta,
+    });
+
+    expect(resultado.data.map((e) => (e.valorNuevo as { marca: string }).marca)).toEqual(['EVENTO-ANA']);
+    expect(resultado.total).toBe(1);
+  });
+
+  /** T-244: una página más allá del total no debe fallar ni devolver filas de otra página — solo un array vacío. */
+  it('paginación: una página sin resultados devuelve data: [] con el total real (no un error)', async () => {
+    const leader = await createIntegrationUser(prisma);
+    scope.userIds = [leader.idUsuario];
+    const project = await createIntegrationProject(prisma, leader.idUsuario);
+    scope.projectIds = [project.idProyecto];
+
+    const fila = await prisma.$transaction(async (tx) => {
+      await bitacoraEventos.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_CREATED,
+        idActor: leader.idUsuario,
+        idProyecto: project.idProyecto,
+        tipoEntidad: 'TAREA',
+        idEntidad: 1,
+        valorNuevo: { tituloTarea: 'Único evento' },
+      });
+      return tx.bitacoraAuditoria.findFirst({ where: { idUsuario: leader.idUsuario } });
+    });
+    auditoriaIds.push(fila!.idAuditoria);
+
+    const resultado = await bitacoraConsulta.listEventos(project.idProyecto, leader.idUsuario, {
+      page: 5,
+      limit: 20,
+    });
+
+    expect(resultado.data).toEqual([]);
+    expect(resultado.total).toBe(1);
+    expect(resultado.page).toBe(5);
+    expect(resultado.totalPages).toBe(1);
+  });
+
+  /**
+   * Seguridad (T-243): UserNameSearchService busca por nombre en TODO
+   * `Usuario`, sin acotarse a un proyecto — si esa resolución de idUsuario
+   * fuera la única condición del filtro, un nombre que coincide con un
+   * actor de OTRO proyecto podría colar eventos ajenos. La condición
+   * `detalleJson.idProyecto` sigue siendo obligatoria en el mismo AND, así
+   * que ese cruce nunca debe filtrarse, sin importar qué devuelva la
+   * búsqueda de nombre.
+   */
+  it('seguridad: persona que matchea a un actor de OTRO proyecto no expone eventos de ese proyecto ajeno', async () => {
+    const leaderA = await createIntegrationUser(prisma);
+    const ana = await createIntegrationUser(prisma, { nombre: 'Ana', apellido: 'Hernández' });
+    scope.userIds = [leaderA.idUsuario, ana.idUsuario];
+    const projectA = await createIntegrationProject(prisma, leaderA.idUsuario);
+    const projectB = await createIntegrationProject(prisma, leaderA.idUsuario);
+    scope.projectIds = [projectA.idProyecto, projectB.idProyecto];
+
+    // Ana solo tiene un evento en el proyecto B; el proyecto A no tiene ningún evento suyo.
+    const filaAnaEnB = await prisma.$transaction(async (tx) => {
+      await bitacoraEventos.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.TASK_CREATED,
+        idActor: ana.idUsuario,
+        idProyecto: projectB.idProyecto,
+        tipoEntidad: 'TAREA',
+        idEntidad: 1,
+        valorNuevo: { marca: 'EVENTO-ANA-EN-B' },
+      });
+      return tx.bitacoraAuditoria.findFirstOrThrow({ where: { idUsuario: ana.idUsuario } });
+    });
+    auditoriaIds.push(filaAnaEnB.idAuditoria);
+
+    const resultadoEnA = await bitacoraConsulta.listEventos(projectA.idProyecto, leaderA.idUsuario, {
+      page: 1,
+      limit: 20,
+      persona: 'Hernandez',
+    });
+
+    expect(resultadoEnA.data).toEqual([]);
+    expect(resultadoEnA.total).toBe(0);
   });
 });
