@@ -11,7 +11,7 @@ import {
 import { getMyProjects, getContributorProjects, deleteProject } from '@/lib/services/projects';
 import { TIPO_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
-import uvgSwal, { swalCustomClass } from '@/lib/swal';
+import uvgSwal, { escapeHtml, swalCustomClass } from '@/lib/swal';
 import {
   Empty,
   EmptyContent,
@@ -85,7 +85,7 @@ export default function MyProjectsPage() {
     const result = await uvgSwal.fire({
       icon: 'warning',
       title: 'Eliminar proyecto',
-      html: `¿Estás seguro que deseas eliminar <strong>${proyecto.tituloProyecto}</strong>?<br/><br/>Esta acción no se puede deshacer.`,
+      html: `¿Estás seguro que deseas eliminar <strong>${escapeHtml(proyecto.tituloProyecto)}</strong>?<br/><br/>Esta acción no se puede deshacer.`,
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',

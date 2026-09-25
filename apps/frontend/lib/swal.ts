@@ -18,6 +18,21 @@ export const swalCustomClass = {
   icon: 'scale-75 mb-0', // Make the icon smaller and reduce margin
 };
 
+/**
+ * T-277: `html`, `title` y `footer` de SweetAlert2 se insertan como HTML
+ * (a diferencia de JSX, no se escapan). Todo dato de usuario que se
+ * interpole en `html` debe pasar por aquí; para un título sin formato,
+ * usar `titleText` en vez de `title`.
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const uvgSwal = Swal.mixin({
   customClass: swalCustomClass,
   buttonsStyling: false,
