@@ -18,6 +18,7 @@ import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateEstadoProyectoDto } from './dto/update-estado-proyecto.dto';
 import { CreateHitoDto } from './dto/create-hito.dto';
+import { AssignHitoTasksDto } from './dto/assign-hito-tasks.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
@@ -206,6 +207,19 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.createHito(id, user.userId, data);
+  }
+
+  @Post(':id/hitos/:idHito/tareas')
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_MILESTONE)
+  @HttpCode(HttpStatus.OK)
+  assignHitoTasks(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('idHito', ParseIntPipe) idHito: number,
+    @Body() data: AssignHitoTasksDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.assignHitoTasks(id, idHito, user.userId, data.idsTareas);
   }
 
   // ---------- POSTULACIONES DEL PROYECTO ----------

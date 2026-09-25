@@ -12,6 +12,7 @@ export interface IntegrationCleanupScope {
   assignmentIds?: number[];
   taskIds?: number[];
   sprintIds?: number[];
+  hitoIds?: number[];
   participationIds?: number[];
   roleIds?: number[];
   projectIds?: number[];
@@ -25,15 +26,18 @@ export async function cleanupIntegrationFixtures(
   const assignmentIds = scope.assignmentIds ?? [];
   const taskIds = scope.taskIds ?? [];
   const sprintIds = scope.sprintIds ?? [];
+  const hitoIds = scope.hitoIds ?? [];
   const participationIds = scope.participationIds ?? [];
   const roleIds = scope.roleIds ?? [];
   const projectIds = scope.projectIds ?? [];
   const userIds = scope.userIds ?? [];
 
   // Orden FK-safe: dependientes antes que padres.
-  // AsignacionTarea → (Tarea, Usuario); Tarea → (Proyecto, Usuario, Sprint);
-  // Sprint → Proyecto (FND-01, RESTRICT — debe borrarse después de Tarea,
-  // que es su único dependiente con FK RESTRICT, y antes de Proyecto);
+  // AsignacionTarea → (Tarea, Usuario); Tarea → (Proyecto, Usuario, Sprint,
+  // Hito opcional); Sprint → Proyecto (FND-01, RESTRICT — debe borrarse
+  // después de Tarea, que es su único dependiente con FK RESTRICT, y antes
+  // de Proyecto); Hito → Proyecto (RESTRICT — debe borrarse después de
+  // Tarea, que es su único dependiente, y antes de Proyecto);
   // ParticipacionProyecto → (Usuario, RolProyecto); RolProyecto → Proyecto;
   // Proyecto → Usuario.
   const operations: Prisma.PrismaPromise<Prisma.BatchPayload>[] = [];
@@ -49,6 +53,9 @@ export async function cleanupIntegrationFixtures(
   }
   if (sprintIds.length > 0) {
     operations.push(prisma.sprint.deleteMany({ where: { idSprint: { in: sprintIds } } }));
+  }
+  if (hitoIds.length > 0) {
+    operations.push(prisma.hito.deleteMany({ where: { idHito: { in: hitoIds } } }));
   }
   if (participationIds.length > 0) {
     operations.push(

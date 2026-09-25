@@ -131,6 +131,7 @@ describe('TasksService — instrumentación de bitácora (T-164)', () => {
       tituloTarea: 'Nueva tarea',
       fechaLimite: '2026-12-25',
       prioridad: Prioridad.MEDIA,
+      idHito: 4,
     });
 
     expect(bitacora.registrarEvento).toHaveBeenCalledWith(

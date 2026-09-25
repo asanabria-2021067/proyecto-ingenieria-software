@@ -60,10 +60,9 @@ export class CreateTaskDto {
   @Max(100)
   puntosHistoria?: number;
 
-  @ValidateIf((_object, value) => value !== undefined)
   @IsInt()
   @Min(1)
-  idHito?: number;
+  idHito!: number;
 
   @ValidateIf((_object, value) => value !== undefined)
   @IsInt()

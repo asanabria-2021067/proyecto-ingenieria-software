@@ -2,6 +2,15 @@ import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+// Mismo mock que task-form-dialog.spec.ts: evita ejercer el DOM real de
+// SweetAlert2 (toast de éxito, T-186) dentro de jsdom.
+vi.mock('@/lib/swal', () => ({
+  default: {
+    fire: vi.fn(),
+  },
+}));
+
 import { CreateMilestoneDialog } from '../components/projects/create-milestone-dialog';
 
 function mutationStub(overrides: Record<string, unknown> = {}) {

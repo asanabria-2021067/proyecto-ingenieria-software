@@ -1,5 +1,15 @@
 import { Transform } from 'class-transformer';
-import { IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsInt,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateHitoDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
@@ -23,4 +33,16 @@ export class CreateHitoDto {
     message: 'fechaLimite debe tener el formato YYYY-MM-DD',
   })
   fechaLimite?: string;
+
+  // T-186 (HU-147): asignación masiva opcional en la misma operación —
+  // permite crear el hito y aplicarlo de una vez a tareas existentes del
+  // proyecto (típicamente tareas antiguas sin hito, que T-185 dejó
+  // atrapadas sin poder pasar al tablero/sprint). Mismo patrón que
+  // idsEtiquetas en CreateTaskDto.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  idsTareas?: number[];
 }

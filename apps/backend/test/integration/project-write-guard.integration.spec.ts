@@ -13,6 +13,7 @@ import {
   createIntegrationSprint,
   createIntegrationTask,
   createIntegrationTaskAssignment,
+  createIntegrationHito,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { ProjectWriteGuard } from '../../src/common/guards/project-write.guard';
@@ -151,10 +152,15 @@ describeIntegration(
       scope.sprintIds = [];
       scope.taskIds = [];
 
+      // HU-147/T-185: CreateTaskDto.idHito ahora es obligatorio.
+      const hito = await createIntegrationHito(prisma, project.idProyecto);
+      scope.hitoIds = [hito.idHito];
+
       const dto: CreateTaskDto = {
         tituloTarea: 'Tarea A3 create',
         fechaLimite: '2099-01-01',
         prioridad: Prioridad.MEDIA,
+        idHito: hito.idHito,
       };
 
       // --- SIN SPRINT OPERABLE (ningún Sprint todavía) ---
