@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BitacoraContextService } from './bitacora-context.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { UserNameSearchService } from '../common/search/user-name-search.service';
 import { TipoEntidadBitacora, TipoEventoBitacora, TipoEventoBitacoraValor } from './tipos-evento-bitacora';
 import { BitacoraPaginadaDto, EventoBitacoraDto, FiltrosBitacoraInput } from './dto/bitacora-evento.dto';
 
@@ -39,6 +40,7 @@ export class BitacoraConsultaService {
     private readonly prisma: PrismaService,
     private readonly bitacoraContext: BitacoraContextService,
     private readonly readPolicy: ProjectReadPolicyService,
+    private readonly userNameSearch: UserNameSearchService,
   ) {}
 
   /**
@@ -62,7 +64,7 @@ export class BitacoraConsultaService {
       scope: 'bitacora',
     });
 
-    const { idSprint, idActor, tipoEvento, page, limit } = filtros;
+    const { idSprint, idActor, persona, tipoEvento, desde, hasta, page, limit } = filtros;
     const puedeVerAdministrativos = decision.profile === 'LIDER' || decision.profile === 'ADMIN';
     const tiposVisibles = this.tiposVisiblesPara(puedeVerAdministrativos);
 
@@ -76,6 +78,18 @@ export class BitacoraConsultaService {
     if (idActor !== undefined) {
       andConditions.push({ idUsuario: idActor });
     }
+    if (persona !== undefined) {
+      // T-245: resuelto en BD (nombre/apellido, tolerante a acentos y
+      // parcial) por el servicio reutilizable — nunca comparado en memoria.
+      const idsPersona = await this.userNameSearch.findMatchingUserIds(persona);
+      andConditions.push({ idUsuario: { in: idsPersona } });
+    }
+    if (desde !== undefined) {
+      andConditions.push({ fechaEvento: { gte: desde } });
+    }
+    if (hasta !== undefined) {
+      andConditions.push({ fechaEvento: { lte: hasta } });
+    }
 
     const where: Prisma.BitacoraAuditoriaWhereInput = { AND: andConditions };
     const skip = (page - 1) * limit;
@@ -83,7 +97,11 @@ export class BitacoraConsultaService {
     const [rows, total] = await Promise.all([
       this.prisma.bitacoraAuditoria.findMany({
         where,
-        orderBy: { fechaEvento: 'desc' },
+        // T-244: fechaEvento no es única (varios eventos pueden compartir el
+        // mismo instante) — idAuditoria (PK autoincremental) desempata para
+        // que el orden sea determinístico entre páginas, sin repetir ni
+        // saltar filas.
+        orderBy: [{ fechaEvento: 'desc' }, { idAuditoria: 'desc' }],
         take: limit,
         skip,
         include: { usuario: { select: ACTOR_SELECT } },

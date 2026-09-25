@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { EventoBitacoraDto } from '../lib/types/bitacora';
 
@@ -399,6 +399,171 @@ describe('BitacoraPage — paginación', () => {
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
     expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ page: 2 }));
+  });
+});
+
+describe('BitacoraPage — búsqueda por persona (T-246, debounce)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('escribir en el buscador no consulta de inmediato; espera a que el usuario deje de escribir', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    act(() => {
+      fireEvent.change(screen.getByLabelText('Buscar por persona'), { target: { value: 'saul' } });
+    });
+
+    let ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1].persona).toBeUndefined();
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ persona: 'saul', page: 1 }));
+  });
+
+  it('escribir varias veces seguidas solo consulta una vez, con el último valor', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    const campo = screen.getByLabelText('Buscar por persona');
+    act(() => {
+      fireEvent.change(campo, { target: { value: 's' } });
+      vi.advanceTimersByTime(100);
+      fireEvent.change(campo, { target: { value: 'sa' } });
+      vi.advanceTimersByTime(100);
+      fireEvent.change(campo, { target: { value: 'saul' } });
+      vi.advanceTimersByTime(400);
+    });
+
+    const llamadasConPersona = (useProjectBitacora as any).mock.calls.filter(
+      (llamada: any) => llamada[1].persona !== undefined,
+    );
+    expect(llamadasConPersona).toHaveLength(1);
+    expect(llamadasConPersona[0][1].persona).toBe('saul');
+  });
+});
+
+describe('BitacoraPage — rango de fechas (T-246)', () => {
+  it('cambiar "desde" y "hasta" se los pasa al hook y reinicia la página', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora({ totalPages: 2 });
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    fireEvent.change(screen.getByLabelText('Filtrar desde'), { target: { value: '2026-08-01' } });
+
+    let ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ desde: '2026-08-01', page: 1 }));
+
+    fireEvent.change(screen.getByLabelText('Filtrar hasta'), { target: { value: '2026-08-31' } });
+
+    ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(
+      expect.objectContaining({ desde: '2026-08-01', hasta: '2026-08-31', page: 1 }),
+    );
+  });
+});
+
+describe('BitacoraPage — pastillas de filtros activos (T-246)', () => {
+  it('sin ningún filtro activo, no muestra ninguna pastilla', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.queryByLabelText('Filtros aplicados')).not.toBeInTheDocument();
+  });
+
+  it('cada filtro activo aparece como su propia pastilla removible', () => {
+    mockLeader();
+    mockSprints([{ idSprint: 3, numero: 3 }]);
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filtrar por sprint'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
+      target: { value: 'SPRINT_STARTED' },
+    });
+
+    const contenedor = screen.getByLabelText('Filtros aplicados');
+    expect(within(contenedor).getByText('Sprint 3')).toBeInTheDocument();
+    expect(within(contenedor).getByText('Sprint iniciado')).toBeInTheDocument();
+  });
+
+  it('quitar una sola pastilla solo retira ese filtro y conserva los demás', () => {
+    mockLeader();
+    mockSprints([{ idSprint: 3, numero: 3 }]);
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filtrar por sprint'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
+      target: { value: 'SPRINT_STARTED' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro Sprint 3' }));
+
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(
+      expect.objectContaining({ idSprint: undefined, tipoEvento: 'SPRINT_STARTED' }),
+    );
+  });
+
+  it('"Limpiar todo" retira todos los filtros a la vez', () => {
+    mockLeader();
+    mockSprints([{ idSprint: 3, numero: 3 }]);
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filtrar por sprint'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
+      target: { value: 'SPRINT_STARTED' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar todo' }));
+
+    expect(screen.queryByLabelText('Filtros aplicados')).not.toBeInTheDocument();
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(
+      expect.objectContaining({ idSprint: undefined, tipoEvento: undefined, page: 1 }),
+    );
+  });
+});
+
+describe('BitacoraPage — vacío con filtros aplicados (T-246)', () => {
+  it('sin resultados y con un filtro activo, muestra el mensaje de "sin coincidencias", no el de bitácora vacía', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora({ eventos: [], total: 0 });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
+      target: { value: 'SPRINT_STARTED' },
+    });
+
+    expect(screen.getByText('Ningún evento coincide con estos filtros.')).toBeInTheDocument();
+    expect(screen.queryByText('Todavía no hay eventos registrados.')).not.toBeInTheDocument();
   });
 });
 
