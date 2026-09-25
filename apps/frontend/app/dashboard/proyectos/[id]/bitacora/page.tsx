@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -23,11 +23,13 @@ import {
   Pencil,
   Repeat,
   ScrollText,
+  Search,
   Trash2,
   Undo2,
   Upload,
   UserMinus,
   UserPlus,
+  X,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -49,6 +51,7 @@ import {
 import type { EventoBitacoraDto, TipoEventoBitacoraValor } from '@/lib/types/bitacora';
 
 const LIMITE_POR_PAGINA = 20;
+const DEBOUNCE_BUSQUEDA_MS = 400;
 
 /** Exhaustivo por diseño: un TipoEventoBitacoraValor nuevo en el backend rompe la compilación en vez de mostrarse en blanco. */
 interface EstiloEvento {
@@ -237,6 +240,18 @@ export default function BitacoraPage() {
   const [idSprintFiltro, setIdSprintFiltro] = useState<string>('');
   const [idActorFiltro, setIdActorFiltro] = useState<string>('');
   const [tipoEventoFiltro, setTipoEventoFiltro] = useState<string>('');
+  const [desdeFiltro, setDesdeFiltro] = useState<string>('');
+  const [hastaFiltro, setHastaFiltro] = useState<string>('');
+  const [personaInput, setPersonaInput] = useState<string>('');
+  const [personaFiltro, setPersonaFiltro] = useState<string>('');
+
+  useEffect(() => {
+    const identificador = setTimeout(() => {
+      setPersonaFiltro(personaInput.trim());
+      setPage(1);
+    }, DEBOUNCE_BUSQUEDA_MS);
+    return () => clearTimeout(identificador);
+  }, [personaInput]);
 
   const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
   const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
@@ -259,7 +274,10 @@ export default function BitacoraPage() {
   const filtros = {
     idSprint: idSprintFiltro ? Number(idSprintFiltro) : undefined,
     idActor: idActorFiltro ? Number(idActorFiltro) : undefined,
+    persona: personaFiltro ? personaFiltro : undefined,
     tipoEvento: tipoEventoFiltro ? (tipoEventoFiltro as TipoEventoBitacoraValor) : undefined,
+    desde: desdeFiltro ? desdeFiltro : undefined,
+    hasta: hastaFiltro ? hastaFiltro : undefined,
     page,
     limit: LIMITE_POR_PAGINA,
   };
@@ -274,7 +292,13 @@ export default function BitacoraPage() {
   );
 
   const cargando = isLoading || cargandoProyecto || cargandoUsuario;
-  const hayFiltrosActivos = idSprintFiltro !== '' || idActorFiltro !== '' || tipoEventoFiltro !== '';
+  const hayFiltrosActivos =
+    idSprintFiltro !== '' ||
+    idActorFiltro !== '' ||
+    personaFiltro !== '' ||
+    tipoEventoFiltro !== '' ||
+    desdeFiltro !== '' ||
+    hastaFiltro !== '';
 
   function actualizarFiltro(setter: (value: string) => void, value: string) {
     setter(value);
@@ -284,8 +308,63 @@ export default function BitacoraPage() {
   function limpiarFiltros() {
     setIdSprintFiltro('');
     setIdActorFiltro('');
+    setPersonaInput('');
+    setPersonaFiltro('');
     setTipoEventoFiltro('');
+    setDesdeFiltro('');
+    setHastaFiltro('');
     setPage(1);
+  }
+
+  const sprintSeleccionado = sprints.find((sprint) => String(sprint.idSprint) === idSprintFiltro);
+  const integranteSeleccionado = members.find((miembro) => String(miembro.idUsuario) === idActorFiltro);
+
+  const chipsActivos: { key: string; label: string; onQuitar: () => void }[] = [];
+  if (sprintSeleccionado) {
+    chipsActivos.push({
+      key: 'sprint',
+      label: `Sprint ${sprintSeleccionado.numero}`,
+      onQuitar: () => actualizarFiltro(setIdSprintFiltro, ''),
+    });
+  }
+  if (integranteSeleccionado) {
+    chipsActivos.push({
+      key: 'integrante',
+      label: `${integranteSeleccionado.nombre} ${integranteSeleccionado.apellido}`,
+      onQuitar: () => actualizarFiltro(setIdActorFiltro, ''),
+    });
+  }
+  if (personaFiltro !== '') {
+    chipsActivos.push({
+      key: 'persona',
+      label: `Buscando "${personaFiltro}"`,
+      onQuitar: () => {
+        setPersonaInput('');
+        setPersonaFiltro('');
+        setPage(1);
+      },
+    });
+  }
+  if (tipoEventoFiltro !== '') {
+    chipsActivos.push({
+      key: 'tipoEvento',
+      label: EVENTO_STYLE[tipoEventoFiltro as TipoEventoBitacoraValor]?.label ?? tipoEventoFiltro,
+      onQuitar: () => actualizarFiltro(setTipoEventoFiltro, ''),
+    });
+  }
+  if (desdeFiltro !== '') {
+    chipsActivos.push({
+      key: 'desde',
+      label: `Desde ${desdeFiltro}`,
+      onQuitar: () => actualizarFiltro(setDesdeFiltro, ''),
+    });
+  }
+  if (hastaFiltro !== '') {
+    chipsActivos.push({
+      key: 'hasta',
+      label: `Hasta ${hastaFiltro}`,
+      onQuitar: () => actualizarFiltro(setHastaFiltro, ''),
+    });
   }
 
   return (
@@ -320,7 +399,22 @@ export default function BitacoraPage() {
             </p>
           )}
 
-          <div className="mb-6 flex flex-wrap gap-3">
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <label className="relative">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary"
+              />
+              <input
+                type="text"
+                aria-label="Buscar por persona"
+                placeholder="Buscar por persona..."
+                value={personaInput}
+                onChange={(e) => setPersonaInput(e.target.value)}
+                className="rounded-lg border border-outline-variant bg-surface-container-lowest py-2 pl-9 pr-3 text-sm text-on-surface"
+              />
+            </label>
+
             <select
               aria-label="Filtrar por sprint"
               value={idSprintFiltro}
@@ -363,6 +457,30 @@ export default function BitacoraPage() {
               ))}
             </select>
 
+            <label className="flex items-center gap-1.5 text-sm text-tertiary">
+              Desde
+              <input
+                type="date"
+                aria-label="Filtrar desde"
+                value={desdeFiltro}
+                onChange={(e) => actualizarFiltro(setDesdeFiltro, e.target.value)}
+                max={hastaFiltro || undefined}
+                className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface"
+              />
+            </label>
+
+            <label className="flex items-center gap-1.5 text-sm text-tertiary">
+              Hasta
+              <input
+                type="date"
+                aria-label="Filtrar hasta"
+                value={hastaFiltro}
+                onChange={(e) => actualizarFiltro(setHastaFiltro, e.target.value)}
+                min={desdeFiltro || undefined}
+                className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface"
+              />
+            </label>
+
             {hayFiltrosActivos && (
               <Button
                 type="button"
@@ -371,10 +489,28 @@ export default function BitacoraPage() {
                 onClick={limpiarFiltros}
                 className="font-medium text-primary"
               >
-                Limpiar filtros
+                Limpiar todo
               </Button>
             )}
           </div>
+
+          {chipsActivos.length > 0 && (
+            <div className="-mt-3 mb-6 flex flex-wrap items-center gap-2" aria-label="Filtros aplicados">
+              {chipsActivos.map((chip) => (
+                <span key={chip.key} className="pill pill-accent inline-flex items-center gap-1 pr-1">
+                  {chip.label}
+                  <button
+                    type="button"
+                    aria-label={`Quitar filtro ${chip.label}`}
+                    onClick={chip.onQuitar}
+                    className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-black/10"
+                  >
+                    <X aria-hidden="true" className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Refleja si se está viendo todo o una parte filtrada — el
               usuario siempre sabe qué alcance tiene la lista de abajo. */}
@@ -419,7 +555,30 @@ export default function BitacoraPage() {
             </Empty>
           )}
 
-          {!cargando && !isError && eventos.length === 0 && (
+          {!cargando && !isError && eventos.length === 0 && hayFiltrosActivos && (
+            <Empty tone="muted" role="status">
+              <EmptyMedia variant="icon">
+                <Search aria-hidden="true" className="h-7 w-7" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>Ningún evento coincide con estos filtros.</EmptyTitle>
+                <EmptyDescription>
+                  Prueba a quitar alguno o usa "Limpiar todo" para ver la bitácora completa.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <button
+                  type="button"
+                  onClick={limpiarFiltros}
+                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                >
+                  Limpiar todo
+                </button>
+              </EmptyContent>
+            </Empty>
+          )}
+
+          {!cargando && !isError && eventos.length === 0 && !hayFiltrosActivos && (
             <Empty tone="muted" role="status">
               <EmptyMedia variant="icon">
                 <ScrollText aria-hidden="true" className="h-7 w-7" />
