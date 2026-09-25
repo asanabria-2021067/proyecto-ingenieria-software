@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildLoginUrl } from '@/lib/api/session';
 
 // Mismo criterio de sesión que el resto del frontend (apiFetch, useCurrentUser):
 // la cookie httpOnly access_token, nunca localStorage/JS-readable.
@@ -12,7 +13,9 @@ export function middleware(request: NextRequest) {
   const isProtectedRoute = pathname === PROTECTED_PREFIX || pathname.startsWith(`${PROTECTED_PREFIX}/`);
 
   if (!hasSession && isProtectedRoute) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    // T-221: conservar a dónde iba el usuario para volver tras el login.
+    const next = `${pathname}${request.nextUrl.search}`;
+    return NextResponse.redirect(new URL(buildLoginUrl(next), request.url));
   }
 
   if (hasSession && isAuthRoute) {

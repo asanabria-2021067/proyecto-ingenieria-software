@@ -7,6 +7,7 @@ import { getMe } from '@/lib/services/users';
 import { isAdminUser } from '@/hooks/use-current-user';
 import uvgSwal from '@/lib/swal';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { readNextFromLocation } from '@/lib/api/session';
 
 export function useLogin() {
   const router = useRouter();
@@ -15,7 +16,8 @@ export function useLogin() {
     mutationFn: (data: LoginPayload) => login(data),
     onSuccess: async () => {
       const user = await getMe().catch(() => null);
-      const destination = isAdminUser(user) ? '/dashboard/admin' : '/dashboard';
+      // T-221: volver a donde estaba el usuario si la sesión le había vencido.
+      const destination = readNextFromLocation() ?? (isAdminUser(user) ? '/dashboard/admin' : '/dashboard');
       uvgSwal.fire({
         icon: 'success',
         title: 'Bienvenido',

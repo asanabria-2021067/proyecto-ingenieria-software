@@ -8,6 +8,8 @@ import Image from 'next/image';
 import { useLogin } from '@/hooks/use-login';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { z } from 'zod';
+import { aviso } from '@/lib/mensajes';
+import { MOTIVO_SESION_EXPIRADA, readNextFromLocation } from '@/lib/api/session';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 import img from '@/public/login-foto.jpg'
@@ -36,9 +38,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isSuccess) {
-      router.replace(isAdminUser(user) ? '/dashboard/admin' : '/dashboard');
+      router.replace(readNextFromLocation() ?? (isAdminUser(user) ? '/dashboard/admin' : '/dashboard'));
     }
   }, [isSuccess, user, router]);
+
+  // T-221: `apiFetch` redirige aquí con `motivo` cuando la sesión venció.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('motivo') === MOTIVO_SESION_EXPIRADA) {
+      aviso.advertencia('Tu sesión expiró', 'Inicia sesión nuevamente para continuar donde te quedaste.');
+    }
+  }, []);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
