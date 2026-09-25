@@ -22,7 +22,8 @@ export type ReadScope =
   | 'horas'
   | 'bitacora'
   | 'liderazgo'
-  | 'historico';
+  | 'historico'
+  | 'exportacion';
 
 export type ReaderProfile =
   | 'LIDER'
@@ -81,6 +82,7 @@ const ALL_SCOPES: readonly ReadScope[] = [
   'bitacora',
   'liderazgo',
   'historico',
+  'exportacion',
 ];
 
 @Injectable()
@@ -178,6 +180,10 @@ export class ProjectReadPolicyService {
    * - participante retirado/completado: su contribución histórica en vivo, sin
    *   bitácora (HU-170 la reserva al participante actual); histórico completo
    *   —bitácora incluida— en CERRADO, igual que antes;
+   * - T-261: `exportacion` es la única excepción al atajo "todo en CERRADO" de
+   *   participante activo/histórico — la exportación de miembros y horas queda
+   *   exclusiva de líder y admin en CUALQUIER estado del proyecto, nunca se abre
+   *   a un participante por el solo hecho de que el proyecto ya cerró;
    * - exlíder sin participación: vista pública P/E y sus propios hechos de liderazgo;
    * - externo: nada por esta política (el GET público de proyecto queda fuera de ella).
    */
@@ -211,6 +217,11 @@ export class ProjectReadPolicyService {
         }
         return ALL_SCOPES.includes(scope) ? allow(ONLY_CLOSED) : deny();
       case 'PARTICIPANTE_ACTIVO':
+        // T-261: negado ANTES del atajo de CERRADO — exportar nunca se abre
+        // a un participante, ni siquiera cuando el proyecto ya cerró.
+        if (scope === 'exportacion') {
+          return deny();
+        }
         if (closed) {
           return allow(null);
         }
@@ -219,6 +230,10 @@ export class ProjectReadPolicyService {
         // (BitacoraConsultaService filtra esos antes de paginar).
         return scope === 'liderazgo' || scope === 'documentos' ? deny() : allow(null);
       case 'PARTICIPANTE_HISTORICO':
+        // T-261: mismo motivo que en PARTICIPANTE_ACTIVO arriba.
+        if (scope === 'exportacion') {
+          return deny();
+        }
         if (closed) {
           return allow(null);
         }

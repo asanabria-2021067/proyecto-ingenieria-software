@@ -51,6 +51,7 @@ import type { GrupoMiembroProyecto, MiembroProyectoResumenDTO } from '@/lib/dto/
 import type { PendingLeaderReviewDto } from '@/lib/types/exit-requests';
 import { PendingPostulationsCard } from '@/components/projects/pending-postulations-card';
 import { PendingExitRequestsCard } from '@/components/projects/pending-exit-requests-card';
+import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
@@ -430,9 +431,12 @@ export default function MiembrosProyectoPage() {
           )}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <PendingPostulationsCard idProyecto={idProyecto} />
-          <PendingExitRequestsCard idProyecto={idProyecto} />
+        <div className="flex flex-col items-end gap-3">
+          <ProjectExportButtons idProyecto={idProyecto} />
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <PendingPostulationsCard idProyecto={idProyecto} />
+            <PendingExitRequestsCard idProyecto={idProyecto} />
+          </div>
         </div>
       </div>
 

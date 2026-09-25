@@ -36,6 +36,15 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 
+// Mismo mock que task-form-dialog.spec.ts/create-milestone-dialog.spec.ts:
+// evita ejercer el DOM real de SweetAlert2 (toast de éxito al crear un
+// hito, T-186) dentro de jsdom.
+vi.mock('@/lib/swal', () => ({
+  default: {
+    fire: vi.fn(),
+  },
+}));
+
 import KanbanWorkspaceClient from '../app/dashboard/projects/[id]/kanban/kanban-workspace-client';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useProjectTasks } from '../hooks/use-project-tasks';

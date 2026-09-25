@@ -14,14 +14,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import uvgSwal from '@/lib/swal';
 import type { useProjectMilestones } from '@/hooks/use-project-milestones';
 
 type MilestonesHook = ReturnType<typeof useProjectMilestones>;
+
+export interface TareaSeleccionadaResumen {
+  idTarea: number;
+  tituloTarea: string;
+}
 
 export interface CreateMilestoneDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   crearHito: MilestonesHook['crearHito'];
+  /**
+   * T-186 (HU-147): tareas del backlog (sin hito) preseleccionadas desde
+   * «Tareas sin hito» — se les asigna el hito recién creado en la MISMA
+   * operación. Ausente/vacío = comportamiento original (solo crea el hito).
+   */
+  tareasSeleccionadas?: TareaSeleccionadaResumen[];
+  /** Se dispara tras una asignación masiva exitosa, para que el caller limpie la selección. */
+  onAsignado?: () => void;
 }
 
 interface FormState {
@@ -31,10 +45,18 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = { tituloHito: '', descripcionHito: '', fechaLimite: '' };
+const MAX_TAREAS_LISTADAS = 5;
 
-export function CreateMilestoneDialog({ open, onOpenChange, crearHito }: CreateMilestoneDialogProps) {
+export function CreateMilestoneDialog({
+  open,
+  onOpenChange,
+  crearHito,
+  tareasSeleccionadas = [],
+  onAsignado,
+}: CreateMilestoneDialogProps) {
   const [values, setValues] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
+  const hayAsignacionMasiva = tareasSeleccionadas.length > 0;
 
   const handleOpenChange = (next: boolean) => {
     if (!next) {
@@ -58,10 +80,25 @@ export function CreateMilestoneDialog({ open, onOpenChange, crearHito }: CreateM
         tituloHito,
         descripcionHito: values.descripcionHito.trim() || undefined,
         fechaLimite: values.fechaLimite || undefined,
+        idsTareas: hayAsignacionMasiva ? tareasSeleccionadas.map((t) => t.idTarea) : undefined,
       });
+      void uvgSwal.fire({
+        toast: true,
+        backdrop: false,
+        icon: 'success',
+        title: 'Hito creado',
+        text: hayAsignacionMasiva
+          ? `Se asignó a ${tareasSeleccionadas.length} ${tareasSeleccionadas.length === 1 ? 'tarea' : 'tareas'}.`
+          : 'El hito se agregó al proyecto.',
+        position: 'top-end',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+      });
+      if (hayAsignacionMasiva) onAsignado?.();
       handleOpenChange(false);
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError));
+      setError(getApiErrorMessage(submitError, 'task'));
     }
   };
 
@@ -72,11 +109,36 @@ export function CreateMilestoneDialog({ open, onOpenChange, crearHito }: CreateM
           <DialogHeader className="border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
             <DialogTitle className="text-xl font-bold text-on-surface">Agregar hito</DialogTitle>
             <DialogDescription className="text-sm text-on-surface-variant">
-              Define un nuevo hito para organizar las tareas de este proyecto.
+              {hayAsignacionMasiva
+                ? `Este hito se asignará de inmediato a ${tareasSeleccionadas.length} ${tareasSeleccionadas.length === 1 ? 'tarea seleccionada' : 'tareas seleccionadas'}.`
+                : 'Define un nuevo hito para organizar las tareas de este proyecto.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 px-6 py-5">
+            {hayAsignacionMasiva && (
+              <div
+                data-testid="hito-tareas-seleccionadas"
+                className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs text-on-surface"
+              >
+                <p className="font-semibold">
+                  {tareasSeleccionadas.length} {tareasSeleccionadas.length === 1 ? 'tarea seleccionada' : 'tareas seleccionadas'}
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-on-surface-variant">
+                  {tareasSeleccionadas.slice(0, MAX_TAREAS_LISTADAS).map((t) => (
+                    <li key={t.idTarea} className="truncate" title={t.tituloTarea}>
+                      {t.tituloTarea}
+                    </li>
+                  ))}
+                </ul>
+                {tareasSeleccionadas.length > MAX_TAREAS_LISTADAS && (
+                  <p className="mt-1 text-on-surface-variant">
+                    y {tareasSeleccionadas.length - MAX_TAREAS_LISTADAS} más…
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label htmlFor="hito-titulo" className="text-xs font-semibold text-on-surface">
                 Título
@@ -145,7 +207,11 @@ export function CreateMilestoneDialog({ open, onOpenChange, crearHito }: CreateM
               className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
             >
               {crearHito.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
-              {crearHito.isPending ? 'Creando...' : 'Crear hito'}
+              {crearHito.isPending
+                ? 'Creando...'
+                : hayAsignacionMasiva
+                  ? 'Crear y asignar'
+                  : 'Crear hito'}
             </Button>
           </DialogFooter>
         </form>

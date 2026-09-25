@@ -86,6 +86,11 @@ const BASE_DTO = {
   tituloTarea: 'Nueva tarea',
   fechaLimite: '2026-12-25',
   prioridad: Prioridad.MEDIA,
+  // HU-147/T-185: idHito es obligatorio en CreateTaskDto (solo a nivel de
+  // tipo/contrato). El valor persistido real en estos tests sigue viniendo
+  // de `relations.validateCreateTaskRelations` (mockeado), nunca de este
+  // campo crudo — ver tasks.service.ts#create (`recursos.hito?.idHito ?? null`).
+  idHito: 4,
 };
 
 function tareaRow(overrides: Record<string, unknown> = {}) {

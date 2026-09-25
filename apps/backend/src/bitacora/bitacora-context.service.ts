@@ -25,21 +25,13 @@ export class BitacoraContextService {
   }
 
   /**
-   * C048: la audiencia del lector la decide ahora `ProjectReadPolicyService`
-   * con scope `bitacora` (líder actual o administrador). Este helper se
-   * conserva como comprobación de liderazgo del módulo —no autoriza lecturas
-   * por sí solo— y sigue sin habilitar ninguna escritura.
-   *
-   * T-164: la bitácora es exclusiva del líder — a diferencia de tareas/tasks
-   * (líder o participante activo).
-   *
-   * Se mantiene esta validación en el backend a propósito: es la única
-   * capa que no se puede saltar (un cliente podría llamar al endpoint
-   * directamente sin pasar por el frontend). El frontend ya evita disparar
-   * la petición cuando el usuario identificado vía la cookie JWT no es
-   * líder (ver `useIsProjectLeader` + `useProjectBitacora`), lo que resuelve
-   * la carga innecesaria al backend sin depender únicamente del cliente
-   * para autorizar.
+   * C048/HU-170: la audiencia del lector la decide `ProjectReadPolicyService`
+   * con scope `bitacora` (líder, administrador o participante activo en
+   * solo lectura) — ver `BitacoraConsultaService.listEventos`, que es quien
+   * realmente autoriza cada GET. Este método ya no participa en esa
+   * decisión y ningún código de producción lo llama; se conserva por si un
+   * caller futuro necesita una comprobación de liderazgo puntual (mismo
+   * patrón que Tasks/Sprints), no porque siga gateando la bitácora.
    */
   async assertProjectLeader(projectId: number, userId: number): Promise<void> {
     const proyecto = await this.getProjectOrThrow(projectId);

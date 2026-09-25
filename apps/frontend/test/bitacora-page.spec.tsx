@@ -211,6 +211,28 @@ describe('BitacoraPage — autorización (HU-170: integrante en solo lectura)', 
     expect(screen.queryByRole('button', { name: /editar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /borrar|eliminar/i })).not.toBeInTheDocument();
   });
+
+  it('un integrante ve el aviso de que la vista es de solo lectura', () => {
+    mockLeader(false);
+    mockSprints();
+    mockMembers([{ idUsuario: 999, nombre: 'Carlos', apellido: 'Diaz' }]);
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.getByText(/modo solo lectura/i)).toBeInTheDocument();
+  });
+
+  it('el líder NO ve el aviso de solo lectura', () => {
+    mockLeader(true);
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.queryByText(/modo solo lectura/i)).not.toBeInTheDocument();
+  });
 });
 
 describe('BitacoraPage — loading', () => {

@@ -140,6 +140,23 @@ describe('ProjectSidebar', () => {
     expect(screen.queryByRole('link', { name: /miembros/i })).not.toBeInTheDocument();
   });
 
+  it('T-259/T-260: el líder ve el destino de Reportes', () => {
+    mockLeader();
+    renderSidebar();
+
+    expect(screen.getByRole('link', { name: /reportes/i })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/reportes',
+    );
+  });
+
+  it('T-259/T-260: un integrante (no líder) no ve «Reportes», igual que no ve «Miembros»/«Liderazgo»', () => {
+    mockParticipante();
+    renderSidebar();
+
+    expect(screen.queryByRole('link', { name: /reportes/i })).not.toBeInTheDocument();
+  });
+
   it('HU-170: el líder ve el destino de Bitácora', () => {
     mockLeader();
     renderSidebar();

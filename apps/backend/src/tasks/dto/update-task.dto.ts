@@ -23,7 +23,8 @@ import { IsFutureCalendarDate } from './validators/is-future-calendar-date.valid
 // `undefined` (omite la validación en ambos casos), lo que aceptaría `null`
 // silenciosamente en campos que deben rechazarlo. Se usa @ValidateIf en su
 // lugar para distinguir explícitamente omisión (undefined, válido siempre)
-// de envío explícito de `null` (inválido, salvo en idHito/idRolProyecto).
+// de envío explícito de `null` (inválido, salvo en idRolProyecto — idHito
+// dejó de admitirlo en HU-147/T-185).
 export class UpdateTaskDto {
   @ValidateIf((_object, value) => value !== undefined)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
@@ -65,12 +66,14 @@ export class UpdateTaskDto {
   @Max(100)
   puntosHistoria?: number;
 
-  // `null` retira la relación; `undefined` (campo omitido) la conserva;
-  // cualquier otro valor debe validarse como entero positivo.
-  @ValidateIf((_object, value) => value !== undefined && value !== null)
+  // HU-147/T-185: idHito ya no admite retirarse. `undefined` (campo
+  // omitido) conserva el valor almacenado; `null` se rechaza explícitamente
+  // igual que tituloTarea; cualquier otro valor se valida como entero
+  // positivo.
+  @ValidateIf((_object, value) => value !== undefined)
   @IsInt()
   @Min(1)
-  idHito?: number | null;
+  idHito?: number;
 
   @ValidateIf((_object, value) => value !== undefined && value !== null)
   @IsInt()
