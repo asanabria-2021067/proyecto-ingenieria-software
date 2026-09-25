@@ -15,6 +15,7 @@ import {
   Settings2,
   ScrollText,
   BarChart3,
+  FolderOutput,
 } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
@@ -123,6 +124,14 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         href: `/dashboard/proyectos/${idProyecto}/sprints`,
         label: 'Sprints',
         icon: Rocket,
+      },
+      // T-259/T-260 (HU-164): exclusivo del líder aquí, igual que
+      // Miembros/Liderazgo/Sprints — la administración exporta desde su
+      // propia vista de solo lectura, no desde este sidebar.
+      {
+        href: `/dashboard/proyectos/${idProyecto}/reportes`,
+        label: 'Reportes',
+        icon: FolderOutput,
       },
     );
   }
