@@ -5,6 +5,7 @@ import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
+import { XSS_COMBINADO, expectSinHtmlInyectado, instalarCentinelaXss } from './xss-payloads';
 
 beforeAll(() => {
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false;
@@ -414,5 +415,26 @@ describe('TaskDetailPage — HU-141 gestión colaborativa por rol', () => {
 
     expect(screen.getByRole('button', { name: 'Editar tarea Implementar login' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Más acciones de la tarea' })).toBeInTheDocument();
+  });
+});
+
+// T-277: título (h1 + breadcrumb) y descripción de la tarea llegan del API y
+// se pintan en JSX; deben verse literales y nunca crear elementos.
+describe('TaskDetailPage — XSS en título y descripción (T-277)', () => {
+  it('título y descripción con cargas XSS se muestran como texto', () => {
+    const centinela = instalarCentinelaXss();
+    mockTasks({ tasks: [tarea({ tituloTarea: XSS_COMBINADO, descripcionTarea: XSS_COMBINADO })] });
+    renderDetail();
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(XSS_COMBINADO);
+    const apariciones = screen.getAllByText(XSS_COMBINADO);
+    // h1, breadcrumb y descripción: todos como nodo de texto, sin hijos.
+    expect(apariciones.length).toBeGreaterThanOrEqual(3);
+    for (const el of apariciones) {
+      expect(el.textContent).toBe(XSS_COMBINADO);
+      expect(el.childElementCount).toBe(0);
+    }
+    expectSinHtmlInyectado(document.body);
+    expect(centinela).not.toHaveBeenCalled();
   });
 });

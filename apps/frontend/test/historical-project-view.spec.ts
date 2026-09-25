@@ -28,8 +28,9 @@ vi.mock('../hooks/use-exit-request', () => ({
   useCurrentExitRequest: () => ({ request: null }),
   useCreateExitRequest: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() }),
 }));
+const rolesState = vi.hoisted(() => ({ roles: [] as unknown[] }));
 vi.mock('../hooks/use-project-roles', () => ({
-  useProjectRoles: () => ({ roles: [], salirDeRol: { mutate: vi.fn(), isPending: false, variables: undefined } }),
+  useProjectRoles: () => ({ roles: rolesState.roles, salirDeRol: { mutate: vi.fn(), isPending: false, variables: undefined } }),
 }));
 vi.mock('../app/dashboard/projects/[id]/project-detail-client', () => ({
   default: () => createElement('div', { 'data-testid': 'leader-workspace' }, 'WORKSPACE'),
@@ -46,6 +47,8 @@ import { apiFetch } from '../lib/api/client';
 import { getHistoricalProject, type HistoricalProjectView } from '../lib/services/historical';
 import { useCurrentUser } from '../hooks/use-current-user';
 import { useProjectMembers } from '../hooks/use-project-members';
+import uvgSwal from '../lib/swal';
+import { XSS_COMBINADO, expectSinHtmlInyectado, instalarCentinelaXss } from './xss-payloads';
 
 const PROYECTO_PUBLICO = {
   idProyecto: 28,
@@ -134,6 +137,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  rolesState.roles = [];
 });
 
 describe('VIEW-02 — proyecto CERRADO / histórico (F007)', () => {
@@ -210,5 +214,62 @@ describe('VIEW-02 — proyecto CERRADO / histórico (F007)', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(getHistoricalProject).not.toHaveBeenCalled();
     expect(screen.queryByRole('tab', { name: /histórico/i })).not.toBeInTheDocument();
+  });
+});
+
+// T-277: la vista pública del proyecto (la que ven quienes no escribieron el
+// contenido) pinta título, descripción y objetivos en JSX; deben verse
+// literales y nunca crear elementos.
+describe('Detalle público del proyecto — XSS (T-277)', () => {
+  it('título, descripción y objetivos con cargas XSS se muestran como texto', async () => {
+    const centinela = instalarCentinelaXss();
+    mockApi((path) =>
+      path === '/proyectos/28'
+        ? {
+            ...PROYECTO_PUBLICO,
+            estadoProyecto: 'EN_PROGRESO',
+            tituloProyecto: XSS_COMBINADO,
+            descripcionProyecto: XSS_COMBINADO,
+            objetivosProyecto: XSS_COMBINADO,
+          }
+        : [],
+    );
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 }, isLoading: false });
+    (useProjectMembers as any).mockReturnValue({ members: [], isLoading: false });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(XSS_COMBINADO));
+    // h1, breadcrumb, resumen, descripción completa y el objetivo.
+    const apariciones = screen.getAllByText(XSS_COMBINADO);
+    expect(apariciones.length).toBeGreaterThanOrEqual(4);
+    for (const el of apariciones) {
+      expect(el.textContent).toBe(XSS_COMBINADO);
+      expect(el.childElementCount).toBe(0);
+    }
+    expectSinHtmlInyectado(document.body);
+    expect(centinela).not.toHaveBeenCalled();
+  });
+
+  it('«Salir de este rol» pasa el nombre del rol a SweetAlert como texto (titleText), nunca como HTML (title)', async () => {
+    rolesState.roles = [{ idRolProyecto: 5, isMine: true, canLeave: true }];
+    (uvgSwal.fire as any).mockResolvedValue({ isConfirmed: false });
+    mockApi((path) =>
+      path === '/proyectos/28'
+        ? {
+            ...PROYECTO_PUBLICO,
+            estadoProyecto: 'EN_PROGRESO',
+            roles: [{ ...PROYECTO_PUBLICO.roles[0], nombreRol: XSS_COMBINADO }],
+          }
+        : [],
+    );
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: `Salir del rol ${XSS_COMBINADO}` }));
+
+    await waitFor(() => expect(uvgSwal.fire).toHaveBeenCalled());
+    const opciones = (uvgSwal.fire as any).mock.calls[0][0];
+    expect(opciones.titleText).toBe(`¿Salir del rol "${XSS_COMBINADO}"?`);
+    expect(opciones).not.toHaveProperty('title');
+    expect(opciones).not.toHaveProperty('html');
   });
 });

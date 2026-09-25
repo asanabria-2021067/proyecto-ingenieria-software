@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TaskCard, type TaskCardProps } from '../components/projects/task-card';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
+import { XSS_COMBINADO, expectSinHtmlInyectado, instalarCentinelaXss } from './xss-payloads';
 
 // Radix DropdownMenu depende de APIs de puntero que jsdom no implementa; se
 // poliyfillan localmente (sin tocar vitest.config).
@@ -265,5 +266,23 @@ describe('TaskCard (compacta, Secciones 33-46)', () => {
       expect(onRegistrarCardRef).toHaveBeenCalledWith(9, expect.any(HTMLElement));
       expect(onRegistrarHandleRef).toHaveBeenCalledWith(9, expect.any(HTMLElement));
     });
+  });
+});
+
+// T-277: el título de la tarea se pinta en JSX (texto) y en atributos
+// title/aria-label; ninguno debe convertirse en HTML.
+describe('TaskCard — XSS en el título (T-277)', () => {
+  afterEach(() => cleanup());
+
+  it('un título con cargas XSS se muestra literal y no crea elementos', () => {
+    const centinela = instalarCentinelaXss();
+    renderCard({ tarea: tarea({ tituloTarea: XSS_COMBINADO }) });
+
+    const titulo = screen.getByText(XSS_COMBINADO);
+    expect(titulo.textContent).toBe(XSS_COMBINADO);
+    expect(titulo.childElementCount).toBe(0);
+    expect(screen.getByRole('button', { name: `Abrir detalles de "${XSS_COMBINADO}"` })).toHaveAttribute('title', XSS_COMBINADO);
+    expectSinHtmlInyectado(document.body);
+    expect(centinela).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatConversacion, ChatMensaje } from '@/lib/types/chat';
 import type { MiembroProyecto } from '@/hooks/use-project-members';
+import { XSS_PAYLOADS, expectSinHtmlInyectado, instalarCentinelaXss } from './xss-payloads';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -164,5 +165,23 @@ describe('ProjectChatPanel (T-204)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo crear el chat');
     expect(screen.getByText('Nuevo chat')).toBeInTheDocument();
+  });
+
+  // T-277: el contenido del mensaje llega del API/socket y se pinta con
+  // {m.contenido} en JSX; debe verse literal y nunca crear elementos.
+  it.each(XSS_PAYLOADS)('T-277: un mensaje con %s se muestra como texto y no inyecta HTML', async (payload) => {
+    const centinela = instalarCentinelaXss();
+    useConversationsMock.mockReturnValue({ conversations: [CONVERSACION], isLoading: false });
+    useMessagesMock.mockReturnValue({ messages: [{ ...MENSAJE, contenido: payload }], isLoading: false });
+
+    await renderPanel();
+    fireEvent.click(screen.getByText('Luis Gómez'));
+
+    const burbuja = await screen.findByText(payload);
+    expect(burbuja.tagName).toBe('P');
+    expect(burbuja.textContent).toBe(payload);
+    expect(burbuja.childElementCount).toBe(0);
+    expectSinHtmlInyectado(document.body);
+    expect(centinela).not.toHaveBeenCalled();
   });
 });

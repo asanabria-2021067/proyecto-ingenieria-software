@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { EventoBitacoraDto } from '../lib/types/bitacora';
+import { XSS_COMBINADO, XSS_IMG, expectSinHtmlInyectado, instalarCentinelaXss } from './xss-payloads';
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '42' }),
@@ -462,5 +463,34 @@ describe('BitacoraPage — eventos de Sprint 7', () => {
     const eventos = screen.getByRole('region', { name: 'Eventos de la bitácora' });
     expect(within(eventos).getByText('Tarea creada')).toBeInTheDocument();
     expect(within(eventos).getByText('Sprint cerrado')).toBeInTheDocument();
+  });
+});
+
+// T-277: describirEvento() arma un string con valorNuevo.tituloTarea (texto de
+// usuario guardado en la auditoría) y el nombre del actor; ambos se pintan en
+// JSX y deben verse literales.
+describe('BitacoraPage — XSS en entradas (T-277)', () => {
+  it('un título de tarea y un nombre de actor con cargas XSS se muestran como texto', () => {
+    const centinela = instalarCentinelaXss();
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora({
+      eventos: [
+        evento({
+          valorNuevo: { tituloTarea: XSS_COMBINADO },
+          actor: { idUsuario: 1, nombre: XSS_IMG, apellido: 'Lopez', fotoUrl: null },
+        }),
+      ],
+    });
+
+    renderPage();
+
+    const descripcion = screen.getByText(`"${XSS_COMBINADO}"`);
+    expect(descripcion.textContent).toBe(`"${XSS_COMBINADO}"`);
+    expect(descripcion.childElementCount).toBe(0);
+    expect(screen.getByText(`Por ${XSS_IMG} Lopez`).childElementCount).toBe(0);
+    expectSinHtmlInyectado(document.body);
+    expect(centinela).not.toHaveBeenCalled();
   });
 });
