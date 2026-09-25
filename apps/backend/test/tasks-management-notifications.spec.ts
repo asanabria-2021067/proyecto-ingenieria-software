@@ -213,6 +213,7 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
         tituloTarea: 'x',
         fechaLimite: '2026-12-25',
         prioridad: 'MEDIA',
+        idHito: 1,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
@@ -719,6 +720,7 @@ describe('TasksService — orden verificable: nunca se notifica mientras la tran
       tituloTarea: 'x',
       fechaLimite: '2026-12-25',
       prioridad: 'MEDIA',
+      idHito: 1,
       idRolProyecto: ROLE_ID,
     });
 

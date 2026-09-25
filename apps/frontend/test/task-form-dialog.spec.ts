@@ -122,6 +122,13 @@ async function llenarFecha(fecha: string) {
   fireEvent.change(input, { target: { value: fecha } });
 }
 
+/** HU-147/T-185: en creación, idHito ya es obligatorio — selecciona un hito real del combobox. */
+async function seleccionarHito(nombre: RegExp | string) {
+  const select = screen.getByRole('combobox', { name: 'Seleccionar hito' });
+  fireEvent.keyDown(select, { key: 'Enter' });
+  fireEvent.click(await screen.findByRole('option', { name: nombre }));
+}
+
 /** Abre el multiselect de etiquetas, alterna una opción por nombre y lo cierra. */
 async function alternarEtiqueta(nombre: RegExp) {
   fireEvent.click(screen.getByRole('button', { name: 'Seleccionar etiquetas' }));
@@ -189,6 +196,7 @@ describe('TaskFormDialog — creación', () => {
 
     await llenarTitulo('Nueva tarea de prueba');
     await llenarFecha('2027-01-01');
+    await seleccionarHito('Entrega 1');
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
 
     await waitFor(() => expect(crearTarea.mutateAsync).toHaveBeenCalledTimes(1));
@@ -197,6 +205,7 @@ describe('TaskFormDialog — creación', () => {
       tituloTarea: 'Nueva tarea de prueba',
       fechaLimite: '2027-01-01',
       prioridad: 'MEDIA',
+      idHito: 1,
     });
     expect(payload.idProyecto).toBeUndefined();
     expect(uvgSwal.fire).toHaveBeenCalledWith(
@@ -214,6 +223,7 @@ describe('TaskFormDialog — creación', () => {
 
     await llenarTitulo('Con asignado');
     await llenarFecha('2027-01-01');
+    await seleccionarHito('Entrega 1');
 
     const selectAsignado = screen.getByRole('combobox', { name: 'Seleccionar usuario asignado' });
     fireEvent.keyDown(selectAsignado, { key: 'Enter' });
@@ -294,6 +304,7 @@ describe('TaskFormDialog — creación', () => {
 
     await llenarTitulo('Con etiqueta');
     await llenarFecha('2027-01-01');
+    await seleccionarHito('Entrega 1');
     await alternarEtiqueta(/Urgente/i);
 
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
@@ -315,6 +326,7 @@ describe('TaskFormDialog — creación', () => {
 
     await llenarTitulo('Tarea exitosa');
     await llenarFecha('2027-01-01');
+    await seleccionarHito('Entrega 1');
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
@@ -327,11 +339,12 @@ describe('TaskFormDialog — creación', () => {
 
     await llenarTitulo('Tarea con error');
     await llenarFecha('2027-01-01');
+    await seleccionarHito('Entrega 1');
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Revisa los datos ingresados y las relaciones seleccionadas.',
-    );
+    // HU-147/T-185: el scope 'task' en 400 ahora muestra el mensaje real del
+    // backend (antes siempre caía en el genérico) — este error trae 'x'.
+    expect(await screen.findByRole('alert')).toHaveTextContent('x');
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 });

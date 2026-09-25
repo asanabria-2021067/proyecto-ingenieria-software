@@ -1,18 +1,18 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationsService } from '../notifications/notifications.service';
-import { canonicalDigest } from './closure-report-model';
-import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
-import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
+import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { canonicalDigest } from './closure-report-model';
+import type { ClosureResult, RequestCloseDto, ResubmitClosureDto } from './dto/closure.dto';
 import {
   ProjectCloseReadinessService,
   type ClosurePhase,
 } from './project-close-readiness.service';
-import type { ClosureResult, RequestCloseDto, ResubmitClosureDto } from './dto/closure.dto';
 
 /**
  * C127 (06 v2 §21/§24): orquestación del lado del LÍDER en el cierre.

@@ -18,6 +18,9 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
+import { AssignMilestoneDialog } from '@/components/projects/assign-milestone-dialog';
 import {
   ESTADO_COLUMNA_STYLE,
   ESTADO_LABEL,
@@ -35,11 +38,13 @@ import {
 } from '@/components/projects/task-board.utils';
 import type { MiembroProyecto } from '@/hooks/use-project-members';
 import type { useProjectTasks } from '@/hooks/use-project-tasks';
+import type { useProjectMilestones } from '@/hooks/use-project-milestones';
 import type { HitoDTO as Hito } from '@/lib/dto/project.dto';
 import type { LabelDTO } from '@/lib/services/labels';
 import type { EstadoTarea, TareaPublicaDTO } from '@/lib/types/tasks';
 
 type ProjectTasksHook = ReturnType<typeof useProjectTasks>;
+type MilestonesHook = ReturnType<typeof useProjectMilestones>;
 
 /** Sección enfocada al abrir la vista dedicada de la tarea. */
 type DetalleTab = 'detalles' | 'comentarios';
@@ -64,6 +69,15 @@ interface HitosSectionProps {
   milestones?: { idHito: number; tituloHito: string }[];
   members?: MiembroProyecto[];
   labels?: LabelDTO[];
+  /**
+   * T-186 (HU-147): líder o participante activo — habilita la selección
+   * múltiple y el botón "Crear hito y asignar" en «Tareas sin hito». Sin
+   * esto (o sin `crearHito`), esa sección queda solo de lectura, igual que
+   * antes de T-186.
+   */
+  puedeCrear?: boolean;
+  crearHito?: MilestonesHook['crearHito'];
+  asignarHitoTareas?: MilestonesHook['asignarHitoTareas'];
 }
 
 interface HitoStats {
@@ -148,11 +162,18 @@ function CompactTaskRow({
   showDate = false,
   onOpen,
   onOpenComments,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: {
   tarea: TareaPublicaDTO;
   showDate?: boolean;
   onOpen: (tarea: TareaPublicaDTO, tab: DetalleTab) => void;
   onOpenComments: (tarea: TareaPublicaDTO) => void;
+  /** T-186: muestra un checkbox de selección múltiple antes del estado. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (idTarea: number) => void;
 }) {
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad] ?? Minus;
   const asignado = tarea.asignacionActiva?.usuario ?? null;
@@ -171,8 +192,21 @@ function CompactTaskRow({
       onClick={() => onOpen(tarea, 'detalles')}
       onKeyDown={handleKeyDown}
       aria-label={`Abrir detalles de ${tarea.tituloTarea}`}
-      className="group grid min-h-11 cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-outline-variant/25 px-1 py-1.5 text-left outline-none transition-colors last:border-b-0 hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-primary/30 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]"
+      className={`group grid min-h-11 cursor-pointer items-center gap-2 border-b border-outline-variant/25 px-1 py-1.5 text-left outline-none transition-colors last:border-b-0 hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-primary/30 ${
+        selectable
+          ? 'grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]'
+          : 'grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]'
+      }`}
     >
+      {selectable && (
+        <Checkbox
+          checked={selected}
+          onCheckedChange={() => onToggleSelect?.(tarea.idTarea)}
+          onClick={(event) => event.stopPropagation()}
+          aria-label={`Seleccionar ${tarea.tituloTarea}`}
+          className="border-outline-variant data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-on-primary focus-visible:border-primary focus-visible:ring-primary/40"
+        />
+      )}
       {statusIcon(tarea.estadoTarea)}
       <div className="min-w-0">
         <p
@@ -358,38 +392,86 @@ function MilestoneCard({
 
 function UnassignedMilestoneTasksSection({
   tareas,
+  hitos,
   forcedVisible,
   onOpenTask,
   onOpenComments,
+  puedeCrear = false,
+  crearHito,
+  asignarHitoTareas,
 }: {
   tareas: TareaPublicaDTO[];
+  hitos: { idHito: number; tituloHito: string }[];
   forcedVisible: boolean;
   onOpenTask: (tarea: TareaPublicaDTO, tab: DetalleTab) => void;
   onOpenComments: (tarea: TareaPublicaDTO) => void;
+  /** T-186 (HU-147): habilita selección múltiple + "Crear hito y asignar". */
+  puedeCrear?: boolean;
+  crearHito?: MilestonesHook['crearHito'];
+  asignarHitoTareas?: MilestonesHook['asignarHitoTareas'];
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [seleccionadas, setSeleccionadas] = useState<number[]>([]);
+  const [dialogoAbierto, setDialogoAbierto] = useState(false);
   if (tareas.length === 0 && !forcedVisible) return null;
+
+  // T-186: la selección múltiple solo tiene sentido con permiso de crear
+  // hitos y con la mutation disponible (el caller la omite si no la tiene).
+  const seleccionHabilitada = puedeCrear && crearHito !== undefined && asignarHitoTareas !== undefined;
+  const tareasOrdenadas = ordenarTareas(tareas);
+  const idsVisibles = tareasOrdenadas.map((t) => t.idTarea);
+  const seleccionadasVisibles = seleccionadas.filter((id) => idsVisibles.includes(id));
+  const todasSeleccionadas = idsVisibles.length > 0 && seleccionadasVisibles.length === idsVisibles.length;
+  const algunaSeleccionada = seleccionadasVisibles.length > 0;
+
+  const alternarSeleccion = (idTarea: number) => {
+    setSeleccionadas((actual) =>
+      actual.includes(idTarea) ? actual.filter((id) => id !== idTarea) : [...actual, idTarea],
+    );
+  };
+
+  const alternarSeleccionarTodas = () => {
+    setSeleccionadas((actual) =>
+      todasSeleccionadas ? actual.filter((id) => !idsVisibles.includes(id)) : [...new Set([...actual, ...idsVisibles])],
+    );
+  };
+
+  const tareasSeleccionadasResumen = tareasOrdenadas
+    .filter((t) => seleccionadasVisibles.includes(t.idTarea))
+    .map((t) => ({ idTarea: t.idTarea, tituloTarea: t.tituloTarea }));
 
   return (
     <section
       data-testid="tareas-sin-hito"
       className="mt-4 rounded-[10px] border border-outline-variant/40 bg-surface-container-lowest p-4 shadow-sm"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-bold text-on-surface">Tareas sin hito</h3>
           <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-semibold text-tertiary">
             {tareas.length}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          aria-label={expanded ? 'Contraer tareas sin hito' : 'Expandir tareas sin hito'}
-          className="inline-flex size-9 items-center justify-center rounded-md text-tertiary hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-        >
-          {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {seleccionHabilitada && algunaSeleccionada && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setDialogoAbierto(true)}
+              className="h-8 gap-1.5 rounded-md bg-primary px-2.5 text-[11px] font-bold text-on-primary hover:bg-primary/90"
+            >
+              Asignar hito ({seleccionadasVisibles.length})
+            </Button>
+          )}
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-label={expanded ? 'Contraer tareas sin hito' : 'Expandir tareas sin hito'}
+            className="inline-flex size-9 items-center justify-center rounded-md text-tertiary hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          >
+            {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+          </button>
+        </div>
       </div>
 
       {expanded && (
@@ -399,17 +481,45 @@ function UnassignedMilestoneTasksSection({
               No hay tareas sin hito que coincidan con los filtros actuales.
             </p>
           ) : (
-            ordenarTareas(tareas).map((tarea) => (
-              <CompactTaskRow
-                key={tarea.idTarea}
-                tarea={tarea}
-                showDate
-                onOpen={onOpenTask}
-                onOpenComments={onOpenComments}
-              />
-            ))
+            <>
+              {seleccionHabilitada && (
+                <label className="mb-1.5 flex min-h-8 items-center gap-2 px-1 text-[11px] font-semibold text-on-surface-variant">
+                  <Checkbox
+                    checked={todasSeleccionadas}
+                    onCheckedChange={alternarSeleccionarTodas}
+                    aria-label="Seleccionar todas las tareas sin hito"
+                    className="border-outline-variant data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-on-primary focus-visible:border-primary focus-visible:ring-primary/40"
+                  />
+                  Seleccionar todas
+                </label>
+              )}
+              {tareasOrdenadas.map((tarea) => (
+                <CompactTaskRow
+                  key={tarea.idTarea}
+                  tarea={tarea}
+                  showDate
+                  onOpen={onOpenTask}
+                  onOpenComments={onOpenComments}
+                  selectable={seleccionHabilitada}
+                  selected={seleccionadasVisibles.includes(tarea.idTarea)}
+                  onToggleSelect={alternarSeleccion}
+                />
+              ))}
+            </>
           )}
         </div>
+      )}
+
+      {seleccionHabilitada && crearHito && (
+        <AssignMilestoneDialog
+          open={dialogoAbierto}
+          onOpenChange={setDialogoAbierto}
+          hitos={hitos}
+          crearHito={crearHito}
+          asignarHitoTareas={asignarHitoTareas}
+          tareasSeleccionadas={tareasSeleccionadasResumen}
+          onAsignado={() => setSeleccionadas([])}
+        />
       )}
     </section>
   );
@@ -423,6 +533,9 @@ export function HitosSection({
   filtroHito = FILTRO_TODOS,
   onLimpiarFiltros,
   onVerTodasLasTareas,
+  puedeCrear = false,
+  crearHito,
+  asignarHitoTareas,
 }: HitosSectionProps) {
   // El detalle de la tarea vive ahora en su propia ruta dedicada (Sección 10):
   // pulsar una tarea o sus comentarios navega hacia ella, no abre un Sheet.
@@ -530,9 +643,13 @@ export function HitosSection({
 
       <UnassignedMilestoneTasksSection
         tareas={tareasSinHitoVisibles}
+        hitos={hitosOrdenados}
         forcedVisible={filtroPorHitoSinHito}
         onOpenTask={abrirDetalle}
         onOpenComments={(tarea) => abrirDetalle(tarea, 'comentarios')}
+        puedeCrear={puedeCrear}
+        crearHito={crearHito}
+        asignarHitoTareas={asignarHitoTareas}
       />
     </div>
   );

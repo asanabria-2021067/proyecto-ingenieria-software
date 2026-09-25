@@ -47,6 +47,14 @@ export interface TaskFormFieldsProps {
   labels: LabelDTO[];
   /** Abre el gestor de etiquetas del proyecto sin perder el borrador (Sección 30). */
   onManageLabels?: () => void;
+  /**
+   * HU-147/T-185: en creación, "Sin hito" ya no es una opción válida (el
+   * backend lo exige); en edición, solo se oculta si la tarea YA tenía un
+   * hito (no se puede retirar). Por defecto 'edit', igual que el schema.
+   */
+  mode?: 'create' | 'edit';
+  /** Hito ya persistido de la tarea (null si nunca tuvo uno). Solo importa en modo 'edit'. */
+  hitoOriginal?: number | null;
 }
 
 /**
@@ -142,8 +150,22 @@ function LabelsControl({
   );
 }
 
-export function TaskFormFields({ roles, milestones, members, labels, onManageLabels }: TaskFormFieldsProps) {
+export function TaskFormFields({
+  roles,
+  milestones,
+  members,
+  labels,
+  onManageLabels,
+  mode = 'edit',
+  hitoOriginal = null,
+}: TaskFormFieldsProps) {
   const { control, watch, getValues, setValue } = useFormContext<TaskFormValues>();
+  // HU-147/T-185: "Sin hito" solo se ofrece cuando retirarlo/omitirlo sigue
+  // siendo una operación válida — creación siempre lo exige, y edición solo
+  // lo permite si la tarea nunca tuvo hito (no se puede quitar uno ya
+  // asignado).
+  const permiteSinHito = mode === 'edit' && hitoOriginal === null;
+  const sinHitosEnProyecto = mode === 'create' && milestones.length === 0;
   const rolSeleccionado = watch('idRolProyecto');
   const [cascadaMensaje, setCascadaMensaje] = useState<string | null>(null);
 
@@ -463,15 +485,17 @@ export function TaskFormFields({ roles, milestones, members, labels, onManageLab
             name="idHito"
             render={({ field }) => (
               <FormItem className="min-w-0">
-                <FormLabel>Hito</FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
+                <FormLabel>
+                  Hito {mode === 'create' && <span className="text-red-600">*</span>}
+                </FormLabel>
+                <Select value={field.value} onValueChange={field.onChange} disabled={sinHitosEnProyecto}>
                   <FormControl>
                     <SelectTrigger aria-label="Seleccionar hito" className={SELECT_TRIGGER_CLASS}>
                       <SelectValue />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value={SIN_HITO}>Sin hito</SelectItem>
+                    {permiteSinHito && <SelectItem value={SIN_HITO}>Sin hito</SelectItem>}
                     {milestones.map((hito) => (
                       <SelectItem key={hito.idHito} value={String(hito.idHito)}>
                         {hito.tituloHito}
@@ -479,7 +503,18 @@ export function TaskFormFields({ roles, milestones, members, labels, onManageLab
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription className="text-xs">Asocia la tarea a una etapa del proyecto.</FormDescription>
+                {sinHitosEnProyecto ? (
+                  <FormDescription className="text-xs text-red-600 dark:text-red-400">
+                    Este proyecto todavía no tiene hitos. Crea uno primero desde la pestaña «Hitos» para
+                    poder registrar tareas nuevas.
+                  </FormDescription>
+                ) : (
+                  <FormDescription className="text-xs">
+                    {mode === 'create'
+                      ? 'Toda tarea nueva necesita un hito para poder entrar al tablero.'
+                      : 'Asocia la tarea a una etapa del proyecto.'}
+                  </FormDescription>
+                )}
                 <FormMessage />
               </FormItem>
             )}

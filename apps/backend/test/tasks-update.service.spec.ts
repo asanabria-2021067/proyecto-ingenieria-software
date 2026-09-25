@@ -225,23 +225,11 @@ describe('TasksService.update', () => {
       expect(tx.tarea.update.mock.calls[0][0].data).not.toHaveProperty('idHito');
     });
 
-    it('idHito: null retira la relación', async () => {
-      const { tx, relations, service } = makeService({
-        relations: makeRelations({
-          validateRelatedResources: vi.fn().mockResolvedValue({
-            hito: null,
-            rolProyecto: undefined,
-            etiquetas: undefined,
-          }),
-        }),
-      });
-      tx.tarea.findFirst.mockResolvedValue(tareaRow({ idHito: null }));
-
-      await service.update(5, 42, 1, { idHito: null });
-
-      expect(relations.validateRelatedResources).toHaveBeenCalledWith(5, { idHito: null }, tx);
-      expect(tx.tarea.update.mock.calls[0][0].data.idHito).toBeNull();
-    });
+    // HU-147/T-185: `idHito: null` ya no es una entrada válida de
+    // UpdateTaskDto (ver update-task.dto.spec.ts) — quitaría el hito de una
+    // tarea que, al no existir backlog en este proyecto, ya está en el
+    // tablero/sprint. El test que cubría "idHito: null retira la relación"
+    // se removió: ese camino ya no es alcanzable desde el contrato público.
 
     it('idHito válido: usa el hito devuelto por la validación, no el ID crudo del DTO', async () => {
       const HITO_VALIDADO = { idHito: 4, idProyecto: 5, tituloHito: 'MVP' };
