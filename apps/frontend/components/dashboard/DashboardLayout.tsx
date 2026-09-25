@@ -130,7 +130,7 @@ export default function DashboardLayout({
       timer: 6000,
       timerProgressBar: true,
       icon: 'info',
-      title: latestNotification.tituloNotificacion,
+      titleText: latestNotification.tituloNotificacion,
       text: latestNotification.mensajeNotificacion,
       didOpen: (popup) => {
         if (!href) return;
