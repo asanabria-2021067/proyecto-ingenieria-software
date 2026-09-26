@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -15,12 +15,18 @@ if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = 
 if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
 
 vi.mock('../lib/swal', () => ({ default: { fire: vi.fn().mockResolvedValue({ isConfirmed: false }) }, swalCustomClass: {} }));
+const mensajesMock = vi.hoisted(() => ({
+  confirmar: vi.fn(),
+  aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
+}));
+vi.mock('@/lib/mensajes', () => mensajesMock);
 const getMyProjectsMock = vi.fn();
 const getContributorProjectsMock = vi.fn();
+const deleteProjectMock = vi.fn();
 vi.mock('../lib/services/projects', () => ({
   getMyProjects: () => getMyProjectsMock(),
   getContributorProjects: () => getContributorProjectsMock(),
-  deleteProject: vi.fn(),
+  deleteProject: (...args: unknown[]) => deleteProjectMock(...args),
 }));
 const apiFetchMock = vi.fn();
 vi.mock('../lib/api/client', () => ({
@@ -116,6 +122,40 @@ describe('VIEW-09 — proyectos cerrados en los listados (F019)', () => {
     // El cerrado va al final del listado.
     const cards = screen.getAllByTestId(/project-card-/);
     expect(cards[cards.length - 1]).toBe(cerrada);
+  });
+
+  it('eliminar un proyecto BORRADOR pide confirmación y avisa el resultado', async () => {
+    getMyProjectsMock.mockResolvedValue([
+      mio({ idProyecto: 8, tituloProyecto: 'Borrador vivo', estadoProyecto: 'BORRADOR' }),
+    ]);
+    deleteProjectMock.mockResolvedValue({ mensaje: 'ok' });
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
+    render(createElement(MyProjectsPage), { wrapper: wrapper() });
+
+    const abierta = await screen.findByTestId('project-card-8');
+    within(abierta).getByRole('button', { name: 'Eliminar proyecto Borrador vivo' }).click();
+
+    await waitFor(() =>
+      expect(mensajesMock.confirmar).toHaveBeenCalledWith(
+        expect.objectContaining({ textoAccion: 'Eliminar proyecto', destructiva: true }),
+      ),
+    );
+    await waitFor(() => expect(deleteProjectMock).toHaveBeenCalledWith(8));
+    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Proyecto eliminado', expect.any(String)));
+  });
+
+  it('cancelar la confirmación no elimina el proyecto', async () => {
+    getMyProjectsMock.mockResolvedValue([
+      mio({ idProyecto: 8, tituloProyecto: 'Borrador vivo', estadoProyecto: 'BORRADOR' }),
+    ]);
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
+    render(createElement(MyProjectsPage), { wrapper: wrapper() });
+
+    const abierta = await screen.findByTestId('project-card-8');
+    within(abierta).getByRole('button', { name: 'Eliminar proyecto Borrador vivo' }).click();
+
+    await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalled());
+    expect(deleteProjectMock).not.toHaveBeenCalled();
   });
 
   it('Listado público SSR: CERRADO se etiqueta legible, en tono neutro, y enlaza al histórico', () => {

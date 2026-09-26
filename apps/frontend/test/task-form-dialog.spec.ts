@@ -189,6 +189,19 @@ describe('TaskFormDialog — creación', () => {
     expect(screen.getByRole('combobox', { name: 'Seleccionar prioridad' })).toHaveTextContent('Media');
   });
 
+  it('muestra errores junto a los campos y mantiene habilitado el reintento', async () => {
+    const crearTarea = mutationStub();
+    renderDialog({ mode: 'create', task: null, crearTarea });
+
+    const crear = screen.getByRole('button', { name: 'Crear tarea' });
+    fireEvent.click(crear);
+
+    expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
+    expect(screen.getByText('Selecciona una fecha límite válida.')).toBeInTheDocument();
+    expect(crear).toBeEnabled();
+    expect(crearTarea.mutateAsync).not.toHaveBeenCalled();
+  });
+
   it('submit exacto: crearTarea recibe el payload construido, sin projectId', async () => {
     const crearTarea = mutationStub();
     const onOpenChange = vi.fn();

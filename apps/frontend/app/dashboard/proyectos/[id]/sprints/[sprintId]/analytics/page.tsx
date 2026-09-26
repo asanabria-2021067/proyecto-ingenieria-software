@@ -17,6 +17,7 @@ import { BurndownChart } from '@/components/projects/burndown-chart';
 import { ESTADO_LABEL, PRIORIDAD_LABEL } from '@/components/projects/task-board.utils';
 import type { EstadoHito, SprintAnalyticsDto } from '@/lib/types/sprints';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 /** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE`/`ESTADO_HITO_STYLE` de las páginas hermanas de Sprints. */
 const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string }> = {
@@ -189,9 +190,7 @@ function BurndownSection({ idProyecto, idSprint }: { idProyecto: number; idSprin
         </EmptyMedia>
         <EmptyHeader>
           <EmptyTitle>
-            {error instanceof Error && error.message
-              ? error.message
-              : 'No fue posible cargar el burndown de este Sprint.'}
+            {getApiErrorMessage(error, 'general', 'No fue posible cargar el burndown de este Sprint.')}
           </EmptyTitle>
         </EmptyHeader>
         <EmptyContent>
@@ -254,9 +253,7 @@ export default function SprintAnalyticsPage() {
           </EmptyMedia>
           <EmptyHeader>
             <EmptyTitle>
-              {error instanceof Error && error.message
-                ? error.message
-                : 'No fue posible cargar la analítica de este Sprint.'}
+              {getApiErrorMessage(error, 'general', 'No fue posible cargar la analítica de este Sprint.')}
             </EmptyTitle>
           </EmptyHeader>
           <EmptyContent>

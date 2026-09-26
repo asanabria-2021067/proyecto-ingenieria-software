@@ -13,6 +13,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   listPasswordResetRequests,
   generatePasswordResetLink,
@@ -183,7 +184,7 @@ export default function AdminSolicitudesRecuperacionPage() {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'No se pudo generar el enlace de recuperación.',
+        text: getApiErrorMessage(error, 'admin', 'No se pudo generar el enlace de recuperación.'),
       });
     },
   });

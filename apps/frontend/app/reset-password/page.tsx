@@ -10,6 +10,7 @@ import uvgSwal from '@/lib/swal';
 
 import logo from '@/public/logo.png';
 import img from '@/public/login-foto.jpg';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -66,7 +67,7 @@ function ResetPasswordForm() {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'No se pudo restablecer la contraseña. El token puede estar expirado.',
+        text: getApiErrorMessage(error, 'auth', 'No se pudo restablecer la contraseña. El token puede estar expirado.'),
       });
     } finally {
       setEnviando(false);

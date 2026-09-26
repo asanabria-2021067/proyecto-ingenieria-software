@@ -34,22 +34,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { TaskCard } from '@/components/projects/task-card';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import { TaskDragOverlayCard } from '@/components/projects/task-drag-overlay';
 import { MobileTaskStatusNav } from '@/components/projects/mobile-task-status-nav';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { aviso, confirmar } from '@/lib/mensajes';
 import {
   columnDropId,
   columnKeyboardCoordinateGetter,
@@ -296,7 +287,6 @@ export function TaskBoard({
   // (/dashboard/projects/:id/kanban/tasks/:taskId). El tablero solo navega hacia
   // ella (Sección 8).
   const router = useRouter();
-  const [tareaEliminar, setTareaEliminar] = useState<TareaPublicaDTO | null>(null);
   const [crearAbierto, setCrearAbierto] = useState(false);
   const [tareaEditar, setTareaEditar] = useState<TareaPublicaDTO | null>(null);
   const [etiquetasAbierto, setEtiquetasAbierto] = useState(false);
@@ -345,11 +335,20 @@ export function TaskBoard({
     router.push(tab === 'comentarios' ? `${base}?section=comments` : base);
   };
 
-  const handleConfirmarEliminar = () => {
-    if (!tareaEliminar) return;
+  const solicitarEliminar = async (tarea: TareaPublicaDTO) => {
+    const confirmado = await confirmar({
+      titulo: `¿Eliminar la tarea "${tarea.tituloTarea}"?`,
+      descripcion: 'La tarea sale del tablero y ya no se podrá editar ni asignar.',
+      textoAccion: 'Eliminar tarea',
+      destructiva: true,
+    });
+    if (!confirmado) return;
     eliminarTarea.mutate(
-      { taskId: tareaEliminar.idTarea },
-      { onSuccess: () => setTareaEliminar(null) },
+      { taskId: tarea.idTarea },
+      {
+        onSuccess: () => aviso.exito('Tarea eliminada', `"${tarea.tituloTarea}" ya no está en el tablero.`),
+        onError: (err) => aviso.error('No se pudo eliminar la tarea', getApiErrorMessage(err, 'task')),
+      },
     );
   };
 
@@ -393,7 +392,7 @@ export function TaskBoard({
         estadoPending={bloqueada}
         onAbrirDetalles={() => abrirDetalle(tarea, 'detalles')}
         onAbrirComentarios={() => abrirDetalle(tarea, 'comentarios')}
-        onSolicitarEliminar={() => setTareaEliminar(tarea)}
+        onSolicitarEliminar={() => void solicitarEliminar(tarea)}
         onEditar={() => setTareaEditar(tarea)}
         resaltada={focusTaskId === tarea.idTarea}
         onRegistrarCardRef={registrarCardRef}
@@ -758,43 +757,6 @@ export function TaskBoard({
           {dndAnnouncement ?? ''}
         </div>
 
-        {/* ELIMINACIÓN: confirmación única controlada por la tarea seleccionada */}
-        <AlertDialog
-          open={tareaEliminar !== null}
-          onOpenChange={(open) => {
-            if (!open) setTareaEliminar(null);
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Eliminar tarea</AlertDialogTitle>
-              <AlertDialogDescription>
-                {tareaEliminar
-                  ? `Esta acción eliminará la tarea "${tareaEliminar.tituloTarea}". Esta acción no se puede deshacer.`
-                  : ''}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            {eliminarTarea.isError && (
-              <p role="alert" className="text-xs text-red-600 dark:text-red-400">
-                {(eliminarTarea.error as Error | null)?.message ?? 'No se pudo eliminar la tarea.'}
-              </p>
-            )}
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={eliminarTarea.isPending}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={eliminarTarea.isPending}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleConfirmarEliminar();
-                }}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {eliminarTarea.isPending ? 'Eliminando...' : 'Confirmar'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
         {/* CREAR / EDITAR: única instancia reutilizada en ambos modos */}
         <TaskFormDialog
           open={crearAbierto || tareaEditar !== null}
@@ -816,7 +778,7 @@ export function TaskBoard({
               setTareaEditar(null);
             }
           }}
-          onRequestDelete={(tarea) => setTareaEliminar(tarea)}
+          onRequestDelete={(tarea) => void solicitarEliminar(tarea)}
           onManageLabels={isLeader ? () => setEtiquetasAbierto(true) : undefined}
         />
 

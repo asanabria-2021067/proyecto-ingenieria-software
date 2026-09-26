@@ -109,6 +109,11 @@ describe('buildTaskFormSchema — validación', () => {
     expect(result.success).toBe(false);
   });
 
+  it('valida la descripción después de recortar espacios igual que backend', () => {
+    const result = schema().safeParse(valores({ descripcionTarea: ` ${'a'.repeat(5000)} ` }));
+    expect(result.success).toBe(true);
+  });
+
   it('acepta las tres prioridades válidas', () => {
     for (const prioridad of ['ALTA', 'MEDIA', 'BAJA'] as const) {
       expect(schema().safeParse(valores({ prioridad })).success).toBe(true);
@@ -128,6 +133,18 @@ describe('buildTaskFormSchema — validación', () => {
   it('rechaza una fecha inválida (formato incorrecto)', () => {
     const result = schema().safeParse(valores({ fechaLimite: '16/06/2026' }));
     expect(result.success).toBe(false);
+  });
+
+  it('rechaza una fecha inexistente', () => {
+    const result = schema().safeParse(valores({ fechaLimite: '2026-06-31' }));
+    expect(result.success).toBe(false);
+  });
+
+  it('usa el día calendario de Guatemala', () => {
+    const result = schema({ ahora: new Date('2026-06-16T03:00:00.000Z') }).safeParse(
+      valores({ fechaLimite: '2026-06-16' }),
+    );
+    expect(result.success).toBe(true);
   });
 
   it('rechaza el día de hoy (debe ser estrictamente posterior)', () => {

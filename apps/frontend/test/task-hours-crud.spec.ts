@@ -155,8 +155,8 @@ describe('TaskHoursSection (VIEW-04 / F001)', () => {
 
     fireEvent.change(screen.getByLabelText('Horas'), { target: { value: '2' } });
     const justificacion = await screen.findByLabelText(/Justificación del exceso/);
-    expect(justificacion).toBeRequired();
-    expect(screen.getByRole('button', { name: 'Registrar' })).toBeDisabled();
+    expect(justificacion).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByRole('button', { name: 'Registrar' })).toBeEnabled();
 
     fireEvent.change(justificacion, { target: { value: 'Cambios de última hora' } });
     expect(screen.getByRole('button', { name: 'Registrar' })).not.toBeDisabled();
@@ -169,6 +169,23 @@ describe('TaskHoursSection (VIEW-04 / F001)', () => {
         expect.objectContaining({ horas: 2, justificacionExceso: 'Cambios de última hora' }),
       ),
     );
+  });
+
+  it('muestra errores junto a horas y fecha sin bloquear el reintento', async () => {
+    (getHorasTarea as any).mockResolvedValue([]);
+    (getTaskHoursSummary as any).mockResolvedValue(resumen());
+    renderSection();
+
+    await esperarCarga();
+    fireEvent.change(screen.getByLabelText('Horas'), { target: { value: '0.001' } });
+    fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '' } });
+    const registrar = screen.getByRole('button', { name: 'Registrar' });
+    fireEvent.click(registrar);
+
+    expect(await screen.findByText('Las horas deben ser un número mayor o igual a 0.01.')).toBeInTheDocument();
+    expect(screen.getByText('Selecciona una fecha válida.')).toBeInTheDocument();
+    expect(registrar).toBeEnabled();
+    expect(registrarHorasTarea).not.toHaveBeenCalled();
   });
 
   it('NO exige justificación al reducir horas aunque el total siga por encima de la estimación', async () => {

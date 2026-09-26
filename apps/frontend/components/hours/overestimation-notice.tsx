@@ -66,7 +66,6 @@ export function OverestimationNotice({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={2}
-          required
           maxLength={JUSTIFICACION_EXCESO_MAX}
           disabled={disabled}
           aria-required="true"

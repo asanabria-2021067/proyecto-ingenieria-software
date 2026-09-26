@@ -35,14 +35,21 @@ export function SprintCloseConfirmModal({
   onConfirm,
 }: SprintCloseConfirmModalProps) {
   const [destino, setDestino] = useState<DestinoArrastre | ''>('');
+  const [errorDestino, setErrorDestino] = useState<string | null>(null);
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) setDestino('');
+    if (!next) {
+      setDestino('');
+      setErrorDestino(null);
+    }
     onOpenChange(next);
   };
 
   const handleConfirm = () => {
-    if (!destino) return;
+    if (!destino) {
+      setErrorDestino('Selecciona el destino de las tareas pendientes.');
+      return;
+    }
     onConfirm(destino);
   };
 
@@ -74,8 +81,12 @@ export function SprintCloseConfirmModal({
 
           <RadioGroup
             value={destino}
-            onValueChange={(value) => setDestino(value as DestinoArrastre)}
+            onValueChange={(value) => {
+              setDestino(value as DestinoArrastre);
+              setErrorDestino(null);
+            }}
             disabled={isPending}
+            aria-invalid={errorDestino ? 'true' : undefined}
           >
             <label
               htmlFor="destino-siguiente-sprint"
@@ -92,6 +103,7 @@ export function SprintCloseConfirmModal({
               Mover al backlog
             </label>
           </RadioGroup>
+          {errorDestino && <p role="alert" className="text-xs text-error">{errorDestino}</p>}
         </div>
 
         <DialogFooter className="gap-2 border-t border-outline-variant/35 px-6 py-4 sm:justify-end">
@@ -106,7 +118,7 @@ export function SprintCloseConfirmModal({
           </Button>
           <Button
             type="button"
-            disabled={!destino || isPending}
+            disabled={isPending}
             onClick={handleConfirm}
             className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
           >

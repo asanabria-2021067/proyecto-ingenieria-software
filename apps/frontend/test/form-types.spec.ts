@@ -18,12 +18,12 @@ describe('form helpers', () => {
     expect(typeof newRol().id).toBe('string');
   });
 
-  it('step1Schema detecta fechas inválidas', () => {
+  it('step1Schema acepta fechas en cualquier orden igual que el backend', () => {
     const result = step1Schema.safeParse({
       tituloProyecto: 'Proyecto test',
       descripcionProyecto: 'Descripcion suficientemente larga para pasar',
       tipoProyecto: 'ACADEMICO_HORAS_BECA',
-      modalidadProyecto: 'REMOTO',
+      modalidadProyecto: 'VIRTUAL',
       objetivosProyecto: '',
       ubicacionProyecto: '',
       contextoAcademico: '',
@@ -32,8 +32,28 @@ describe('form helpers', () => {
       fechaFinEstimada: '2026-12-01',
       roles: [],
     });
+    expect(result.success).toBe(true);
+  });
+
+  it('step1Schema aplica los límites del DTO del backend', () => {
+    const result = step1Schema.safeParse({
+      tituloProyecto: 'x'.repeat(201),
+      descripcionProyecto: 'Descripcion suficientemente larga para pasar',
+      tipoProyecto: 'ACADEMICO_HORAS_BECA',
+      modalidadProyecto: 'REMOTO',
+      objetivosProyecto: '',
+      ubicacionProyecto: 'x'.repeat(256),
+      contextoAcademico: '',
+      urlRecursoExterno: '',
+      fechaInicio: '',
+      fechaFinEstimada: '',
+      roles: [],
+    });
     expect(result.success).toBe(false);
-    expect(zodToFieldErrors(result as any).fechaFinEstimada).toBeTruthy();
+    const errors = zodToFieldErrors(result as any);
+    expect(errors.tituloProyecto).toBeTruthy();
+    expect(errors.ubicacionProyecto).toBeTruthy();
+    expect(errors.modalidadProyecto).toBeTruthy();
   });
 
   it('formSchema valida rol', () => {
@@ -41,7 +61,7 @@ describe('form helpers', () => {
       tituloProyecto: 'Proyecto test',
       descripcionProyecto: 'Descripcion suficientemente larga para pasar',
       tipoProyecto: 'ACADEMICO_HORAS_BECA',
-      modalidadProyecto: 'REMOTO',
+      modalidadProyecto: 'VIRTUAL',
       objetivosProyecto: '',
       ubicacionProyecto: '',
       contextoAcademico: '',
@@ -61,6 +81,54 @@ describe('form helpers', () => {
       ],
     });
     expect(result.success).toBe(false);
+  });
+
+  it('formSchema valida habilidades incompletas junto a su campo', () => {
+    const result = formSchema.safeParse({
+      tituloProyecto: 'Proyecto test',
+      descripcionProyecto: 'Descripcion suficientemente larga para pasar',
+      tipoProyecto: 'ACADEMICO_HORAS_BECA',
+      modalidadProyecto: 'VIRTUAL',
+      objetivosProyecto: '',
+      ubicacionProyecto: '',
+      contextoAcademico: '',
+      urlRecursoExterno: '',
+      fechaInicio: '',
+      fechaFinEstimada: '',
+      roles: [
+        {
+          id: 'x',
+          nombreRol: 'Desarrollador',
+          descripcionRolProyecto: '',
+          idCarreraRequerida: null,
+          cupos: 1,
+          horasSemanalesEstimadas: '',
+          requisitos: [{ id: 'r', idHabilidad: null, nivelMinimo: '', obligatorio: false }],
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    const errors = zodToFieldErrors(result as any);
+    expect(errors['roles.0.requisitos.0.idHabilidad']).toBeTruthy();
+    expect(errors['roles.0.requisitos.0.nivelMinimo']).toBeTruthy();
+  });
+
+  it('step1Schema rechaza fechas inexistentes', () => {
+    const result = step1Schema.safeParse({
+      tituloProyecto: 'Proyecto test',
+      descripcionProyecto: 'Descripcion suficientemente larga para pasar',
+      tipoProyecto: 'ACADEMICO_HORAS_BECA',
+      modalidadProyecto: 'VIRTUAL',
+      objetivosProyecto: '',
+      ubicacionProyecto: '',
+      contextoAcademico: '',
+      urlRecursoExterno: '',
+      fechaInicio: '2026-02-30',
+      fechaFinEstimada: '',
+      roles: [],
+    });
+    expect(result.success).toBe(false);
+    expect(zodToFieldErrors(result as any).fechaInicio).toBeTruthy();
   });
 
   it('isProfileIncomplete detecta perfil incompleto', () => {

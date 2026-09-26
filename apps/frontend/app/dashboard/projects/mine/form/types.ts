@@ -36,9 +36,38 @@ export type FieldErrors = Record<string, string>;
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
+function fechaOpcionalValida(value: string): boolean {
+  if (value === '') return true;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const anio = Number(match[1]);
+  const mes = Number(match[2]);
+  const dia = Number(match[3]);
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  return (
+    fecha.getUTCFullYear() === anio &&
+    fecha.getUTCMonth() === mes - 1 &&
+    fecha.getUTCDate() === dia
+  );
+}
+
+export const requisitoSchema = z.object({
+  id: z.string(),
+  idHabilidad: z.number({
+    required_error: 'Debes seleccionar una habilidad.',
+    invalid_type_error: 'Debes seleccionar una habilidad.',
+  }).int('La habilidad seleccionada no es válida.'),
+  nivelMinimo: z.enum(['BASICO', 'INTERMEDIO', 'AVANZADO'], {
+    errorMap: () => ({ message: 'Debes seleccionar un nivel válido.' }),
+  }),
+  obligatorio: z.boolean(),
+});
+
 export const rolSchema = z.object({
   id: z.string(),
-  nombreRol: z.string().trim().min(1, 'El nombre del rol es obligatorio.'),
+  nombreRol: z.string()
+    .min(1, 'El nombre del rol es obligatorio.')
+    .max(255, 'El nombre del rol no puede superar 255 caracteres.'),
   descripcionRolProyecto: z.string(),
   idCarreraRequerida: z.number().nullable(),
   cupos: z.preprocess(
@@ -50,40 +79,53 @@ export const rolSchema = z.object({
   ),
   horasSemanalesEstimadas: z.preprocess(
     (v) => (v === '' ? undefined : Number(v)),
-    z.number().int().min(1).optional(),
+    z.number({ invalid_type_error: 'Las horas semanales deben ser un número.' })
+      .int('Las horas semanales deben ser un número entero.')
+      .min(1, 'Las horas semanales deben ser al menos 1.')
+      .optional(),
   ),
-  requisitos: z.array(z.any()),
+  requisitos: z.array(requisitoSchema),
 });
 
 export const step1Schema = z
   .object({
-    tituloProyecto: z.string().trim()
-      .min(1, 'El título del proyecto es obligatorio.')
-      .min(5, 'El título debe tener al menos 5 caracteres.'),
-    descripcionProyecto: z.string().trim()
-      .min(1, 'La descripción del proyecto es obligatoria.')
+    tituloProyecto: z.string()
+      .min(5, 'El título debe tener al menos 5 caracteres.')
+      .max(200, 'El título no puede superar 200 caracteres.'),
+    descripcionProyecto: z.string()
       .min(20, 'La descripción debe tener al menos 20 caracteres.'),
-    tipoProyecto: z.string().min(1, 'Debes seleccionar un tipo de proyecto.'),
-    modalidadProyecto: z.string().min(1, 'Debes seleccionar una modalidad.'),
+    tipoProyecto: z
+      .enum(['ACADEMICO_HORAS_BECA', 'ACADEMICO_EXPERIENCIA', 'EXTRACURRICULAR_EXTENSION'], {
+        errorMap: () => ({ message: 'Debes seleccionar un tipo de proyecto válido.' }),
+      })
+      .or(z.literal('').refine(() => false, 'Debes seleccionar un tipo de proyecto.')),
+    modalidadProyecto: z
+      .enum(['PRESENCIAL', 'VIRTUAL', 'MIXTA'], {
+        errorMap: () => ({ message: 'Debes seleccionar una modalidad válida.' }),
+      })
+      .or(z.literal('').refine(() => false, 'Debes seleccionar una modalidad.')),
     objetivosProyecto: z.string(),
-    ubicacionProyecto: z.string(),
-    contextoAcademico: z.string(),
-    urlRecursoExterno: z.string(),
-    fechaInicio: z.string(),
-    fechaFinEstimada: z.string(),
+    ubicacionProyecto: z.string().max(255, 'La ubicación no puede superar 255 caracteres.'),
+    contextoAcademico: z.string().max(255, 'El contexto académico no puede superar 255 caracteres.'),
+    urlRecursoExterno: z.string().max(255, 'La URL no puede superar 255 caracteres.'),
+    fechaInicio: z.string().refine(fechaOpcionalValida, 'Selecciona una fecha de inicio válida.'),
+    fechaFinEstimada: z.string().refine(fechaOpcionalValida, 'Selecciona una fecha de fin válida.'),
     roles: z.array(z.any()),
-  })
-  .refine(
-    (d) => !(d.fechaInicio && d.fechaFinEstimada && d.fechaFinEstimada < d.fechaInicio),
-    { message: 'La fecha de fin estimada no puede ser anterior a la fecha de inicio.', path: ['fechaFinEstimada'] },
-  );
+  });
 
-export const formSchema = step1Schema.innerType().extend({
+export const formSchema = step1Schema.extend({
   roles: z.array(rolSchema),
-}).refine(
-  (d) => !(d.fechaInicio && d.fechaFinEstimada && d.fechaFinEstimada < d.fechaInicio),
-  { message: 'La fecha de fin estimada no puede ser anterior a la fecha de inicio.', path: ['fechaFinEstimada'] },
-);
+});
+
+export const partialProjectSchema = step1Schema.pick({
+  tituloProyecto: true,
+  descripcionProyecto: true,
+  objetivosProyecto: true,
+  ubicacionProyecto: true,
+  contextoAcademico: true,
+  urlRecursoExterno: true,
+  fechaFinEstimada: true,
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
