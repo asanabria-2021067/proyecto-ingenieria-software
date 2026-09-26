@@ -120,6 +120,21 @@ async function ensureSprintS6(idProyecto: number, numero: number, estado: Estado
   return prisma.sprint.create({ data: { idProyecto, numero, estado, ...fechas } });
 }
 
+/** T-282: instantánea diaria de burndown (T-238/HU-160) — upsert por (idSprint, fecha). */
+async function ensureInstantaneaS6(
+  idSprint: number,
+  fecha: Date,
+  tareasPendientes: number,
+  tareasCompletadas: number,
+  puntosHistoriaRestantes: number,
+) {
+  await prisma.instantaneaSprint.upsert({
+    where: { idSprint_fecha: { idSprint, fecha } },
+    update: { tareasPendientes, tareasCompletadas, puntosHistoriaRestantes },
+    create: { idSprint, fecha, tareasPendientes, tareasCompletadas, puntosHistoriaRestantes },
+  });
+}
+
 async function ensureHitoS6(idProyecto: number, tituloHito: string, orden: number, fechaLimite: Date) {
   const existente = await prisma.hito.findFirst({ where: { idProyecto, tituloHito } });
   const data = { orden, fechaLimite };
@@ -297,15 +312,34 @@ async function seedSprint6Demo() {
   const h4 = await ensureHitoS6(p1.idProyecto, 'Evaluación y cierre del ciclo', 4, dateOnly(60));
 
   // Sprints
+  // T-282: snapshot congelado (T-239) con cumplimientos DISTINTOS entre sí
+  // (100% / 67%) para que la analítica comparativa de HU-160 no muestre lo
+  // mismo en todos los sprints cerrados de la demo.
   const s1 = await ensureSprintS6(p1.idProyecto, 1, EstadoSprint.CERRADO, {
     fechaInicio: ts(-70),
     fechaCierre: ts(-50),
     cerradoPor: lider.idUsuario,
+    tareasPlanificadasCierre: 3,
+    tareasCompletadasCierre: 3,
+    tareasArrastradasCierre: 0,
+    hitosTotalesCierre: 4,
+    hitosCompletadosCierre: 1,
+    porcentajeCumplimientoCierre: 100,
+    puntosHistoriaPlanificadosCierre: 8,
+    puntosHistoriaCompletadosCierre: 8,
   });
   const s2 = await ensureSprintS6(p1.idProyecto, 2, EstadoSprint.CERRADO, {
     fechaInicio: ts(-49),
     fechaCierre: ts(-25),
     cerradoPor: lider.idUsuario,
+    tareasPlanificadasCierre: 3,
+    tareasCompletadasCierre: 2,
+    tareasArrastradasCierre: 1,
+    hitosTotalesCierre: 4,
+    hitosCompletadosCierre: 1,
+    porcentajeCumplimientoCierre: 67,
+    puntosHistoriaPlanificadosCierre: 8,
+    puntosHistoriaCompletadosCierre: 5,
   });
   const s3 = await ensureSprintS6(p1.idProyecto, 3, EstadoSprint.ACTIVO, {
     fechaInicio: ts(-24),
@@ -315,17 +349,17 @@ async function seedSprint6Demo() {
   const t1_1 = await ensureTareaS6(p1.idProyecto, 'Diagnosticar necesidades de tutoría por facultad', {
     idSprint: s1.idSprint, idHito: h1.idHito, idRolProyecto: rCoord.idRolProyecto,
     descripcionTarea: 'Levantar un diagnóstico de necesidades de tutoría por facultad para priorizar cursos.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 6,
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 6, puntosHistoria: 3,
   }, lider.idUsuario);
   const t1_2 = await ensureTareaS6(p1.idProyecto, 'Elaborar plan de trabajo del programa de tutorías', {
     idSprint: s1.idSprint, idHito: h1.idHito, idRolProyecto: rCont.idRolProyecto,
     descripcionTarea: 'Definir responsables, cronograma y cursos piloto del primer ciclo.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 5,
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 5, puntosHistoria: 3,
   }, lider.idUsuario);
   const t1_3 = await ensureTareaS6(p1.idProyecto, 'Configurar catálogo inicial de cursos con tutoría', {
     idSprint: s1.idSprint, idHito: h1.idHito, idRolProyecto: rCoord.idRolProyecto,
     descripcionTarea: 'Cargar en la plataforma el catálogo de cursos habilitados para tutoría.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 7,
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 7, puntosHistoria: 2,
   }, lider.idUsuario);
   await setHitoEstadoS6(h1.idHito, 'COMPLETADO');
 
@@ -333,73 +367,166 @@ async function seedSprint6Demo() {
   const t2_1 = await ensureTareaS6(p1.idProyecto, 'Publicar guía de buenas prácticas para tutores', {
     idSprint: s2.idSprint, idHito: h2.idHito, idRolProyecto: rCoord.idRolProyecto,
     descripcionTarea: 'Redactar y publicar la guía de buenas prácticas para las sesiones de tutoría.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4,
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4, puntosHistoria: 2,
   }, lider.idUsuario);
   const t2_2 = await ensureTareaS6(p1.idProyecto, 'Revisar y consolidar retroalimentación de tutores', {
     idSprint: s2.idSprint, idHito: h2.idHito, idRolProyecto: rCont.idRolProyecto,
     descripcionTarea: 'Consolidar la retroalimentación del ciclo anterior para ajustar el programa.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 5,
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 5, puntosHistoria: 3,
   }, lider.idUsuario);
+  // T-282 (cierre Sprint 8): esta tarea queda pendiente al cerrar s2 y se
+  // arrastra de verdad al Sprint 3 (ya ACTIVO) — por eso su idSprint es el
+  // de s3, no el de s2, e igual que cualquier tarea arrastrada real no
+  // vuelve a tener destinoArrastre (ya se resolvió). El snapshot congelado
+  // de s2 (más abajo, en ensureSprintS6) es el único lugar que conserva que
+  // esta tarea estaba planificada en s2.
   const t2_3 = await ensureTareaS6(p1.idProyecto, 'Actualizar recursos de apoyo para primer parcial', {
-    idSprint: s2.idSprint, idHito: null, idRolProyecto: rPlat.idRolProyecto,
+    idSprint: s3.idSprint, idHito: null, idRolProyecto: rPlat.idRolProyecto,
     descripcionTarea: 'Actualizar los recursos de apoyo publicados antes del primer parcial.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.BAJA, tiempoEstimadoHoras: 6,
+    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.BAJA, tiempoEstimadoHoras: 6, puntosHistoria: 3,
   }, lider.idUsuario);
 
   // ── Tareas Sprint 3 (ACTIVO, 10 tareas distribuidas en el Kanban) ──────
   const t3_1 = await ensureTareaS6(p1.idProyecto, 'Publicar calendario de tutorías del próximo semestre', {
     idSprint: s3.idSprint, idHito: null, idRolProyecto: null,
     descripcionTarea: 'Publicar el calendario de sesiones del siguiente semestre académico.',
-    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(10),
+    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(10), puntosHistoria: 2,
   }, lider.idUsuario);
   const t3_2 = await ensureTareaS6(p1.idProyecto, 'Preparar taller de técnicas de estudio para tutores nuevos', {
     idSprint: s3.idSprint, idHito: null, idRolProyecto: rCont.idRolProyecto,
     descripcionTarea: 'Diseñar el taller de inducción para los tutores que se incorporan este semestre.',
-    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4, fechaLimite: dateOnly(12),
+    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4, fechaLimite: dateOnly(12), puntosHistoria: 3,
   }, lider.idUsuario);
   const t3_3 = await ensureTareaS6(p1.idProyecto, 'Actualizar banco de recursos de Cálculo I', {
     idSprint: s3.idSprint, idHito: null, idRolProyecto: rCont.idRolProyecto,
     descripcionTarea: 'Revisar y actualizar los materiales de apoyo del curso de Cálculo I.',
-    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.BAJA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(15),
+    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.BAJA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(15), puntosHistoria: 2,
   }, lider.idUsuario);
   const t3_4 = await ensureTareaS6(p1.idProyecto, 'Configurar agenda semanal de sesiones de tutoría', {
     idSprint: s3.idSprint, idHito: h3.idHito, idRolProyecto: rPlat.idRolProyecto,
     descripcionTarea: 'Configurar en la plataforma la agenda semanal de sesiones disponibles.',
-    estadoTarea: EstadoTarea.EN_PROGRESO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 6, fechaLimite: dateOnly(8),
+    estadoTarea: EstadoTarea.EN_PROGRESO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 6, fechaLimite: dateOnly(8), puntosHistoria: 5,
   }, lider.idUsuario);
   const t3_5 = await ensureTareaS6(p1.idProyecto, 'Elaborar guía de atención y derivación de casos', {
     idSprint: s3.idSprint, idHito: h2.idHito, idRolProyecto: rCont.idRolProyecto,
     descripcionTarea: 'Redactar la guía de atención y los criterios de derivación de casos complejos.',
-    estadoTarea: EstadoTarea.EN_PROGRESO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4, fechaLimite: dateOnly(9),
+    estadoTarea: EstadoTarea.EN_PROGRESO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4, fechaLimite: dateOnly(9), puntosHistoria: 3,
   }, lider.idUsuario);
   const t3_6 = await ensureTareaS6(p1.idProyecto, 'Revisar solicitudes de tutoría pendientes del semestre', {
     idSprint: s3.idSprint, idHito: null, idRolProyecto: null,
     descripcionTarea: 'Depurar y priorizar las solicitudes de tutoría recibidas este semestre.',
-    estadoTarea: EstadoTarea.EN_PROGRESO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(6),
+    estadoTarea: EstadoTarea.EN_PROGRESO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(6), puntosHistoria: 2,
   }, lider.idUsuario);
   const t3_7 = await ensureTareaS6(p1.idProyecto, 'Probar flujo de reserva de sesiones de tutoría', {
     idSprint: s3.idSprint, idHito: h3.idHito, idRolProyecto: rPlat.idRolProyecto,
     descripcionTarea: 'Ejecutar pruebas del flujo de reserva de sesiones de principio a fin.',
-    estadoTarea: EstadoTarea.EN_REVISION, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 4, fechaLimite: dateOnly(2),
+    estadoTarea: EstadoTarea.EN_REVISION, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 4, fechaLimite: dateOnly(2), puntosHistoria: 3,
   }, lider.idUsuario);
   const t3_8 = await ensureTareaS6(p1.idProyecto, 'Validar criterios de selección de nuevos tutores', {
     idSprint: s3.idSprint, idHito: null, idRolProyecto: rCoord.idRolProyecto,
     descripcionTarea: 'Validar los criterios y el proceso de selección de tutores nuevos.',
-    estadoTarea: EstadoTarea.EN_REVISION, prioridad: Prioridad.BAJA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(9),
+    estadoTarea: EstadoTarea.EN_REVISION, prioridad: Prioridad.BAJA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(9), puntosHistoria: 2,
   }, lider.idUsuario);
   const t3_9 = await ensureTareaS6(p1.idProyecto, 'Levantar necesidades de cursos prioritarios para el ciclo', {
     idSprint: s3.idSprint, idHito: h3.idHito, idRolProyecto: rCoord.idRolProyecto,
     descripcionTarea: 'Levantar la demanda de tutorías por curso para priorizar la oferta del ciclo.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(-2),
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(-2), puntosHistoria: 3,
   }, lider.idUsuario);
   const t3_10 = await ensureTareaS6(p1.idProyecto, 'Documentar protocolo de seguimiento académico', {
     idSprint: s3.idSprint, idHito: null, idRolProyecto: rCoord.idRolProyecto,
     descripcionTarea: 'Documentar el protocolo de seguimiento y sus indicadores.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(-5),
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 3, fechaLimite: dateOnly(-5), puntosHistoria: 2,
   }, lider.idUsuario);
   await setHitoEstadoS6(h2.idHito, 'EN_PROGRESO'); // 2/3 HECHO (t2_1,t2_2 HECHO + t3_5 EN_PROGRESO)
   await setHitoEstadoS6(h3.idHito, 'EN_PROGRESO'); // 1/3 HECHO (t3_4 EN_PROGRESO, t3_7 EN_REVISION, t3_9 HECHO)
   await setHitoEstadoS6(h4.idHito, 'PENDIENTE'); // sin tareas
+
+  // T-282: instantáneas diarias para que el burndown (T-238/HU-160) dibuje
+  // una curva real, no dos puntos — con bajada, un día plano y un hueco
+  // deliberado (el gráfico debe mostrarlo, nunca interpolarlo).
+  await Promise.all([
+    // Sprint 1 (CERRADO, 8 pts / 3 tareas planificadas)
+    ensureInstantaneaS6(s1.idSprint, dateOnly(-70), 3, 0, 8),
+    ensureInstantaneaS6(s1.idSprint, dateOnly(-67), 3, 0, 8), // día plano
+    ensureInstantaneaS6(s1.idSprint, dateOnly(-64), 2, 1, 6),
+    // dateOnly(-61): hueco deliberado, sin instantánea
+    ensureInstantaneaS6(s1.idSprint, dateOnly(-57), 1, 2, 3),
+    ensureInstantaneaS6(s1.idSprint, dateOnly(-54), 1, 2, 3), // día plano
+    ensureInstantaneaS6(s1.idSprint, dateOnly(-50), 0, 3, 0), // cierre
+    // Sprint 2 (CERRADO, 8 pts / 3 tareas planificadas, termina en 67%: 1 se arrastra)
+    ensureInstantaneaS6(s2.idSprint, dateOnly(-49), 3, 0, 8),
+    ensureInstantaneaS6(s2.idSprint, dateOnly(-45), 3, 0, 8), // día plano
+    ensureInstantaneaS6(s2.idSprint, dateOnly(-41), 2, 1, 5),
+    // dateOnly(-37): hueco deliberado, sin instantánea
+    ensureInstantaneaS6(s2.idSprint, dateOnly(-33), 2, 1, 5), // día plano
+    ensureInstantaneaS6(s2.idSprint, dateOnly(-29), 1, 2, 3),
+    ensureInstantaneaS6(s2.idSprint, dateOnly(-25), 1, 2, 3), // cierre, sin completar la tarea arrastrada
+    // Sprint 3 (ACTIVO, 30 pts / 11 tareas planificadas — incluye la arrastrada de s2)
+    ensureInstantaneaS6(s3.idSprint, dateOnly(-24), 11, 0, 30),
+    ensureInstantaneaS6(s3.idSprint, dateOnly(-19), 10, 1, 28),
+    ensureInstantaneaS6(s3.idSprint, dateOnly(-14), 10, 1, 28), // día plano
+    // dateOnly(-9): hueco deliberado, sin instantánea
+    ensureInstantaneaS6(s3.idSprint, dateOnly(-4), 9, 2, 25),
+    ensureInstantaneaS6(s3.idSprint, dateOnly(0), 9, 2, 25), // hoy, en curso
+  ]);
+
+  // T-282: volumen de bitácora (HU-161: T-243/T-247) — variedad de tipos de
+  // evento y de actores para que filtros y paginación tengan sentido, con
+  // algunos ADMINISTRATIVOS (LEADERSHIP_CHANGED, exports) que deben quedar
+  // ocultos en la vista de un integrante (ver TipoEventoBitacora.ADMINISTRATIVOS).
+  const bitacoraP1: Array<{
+    idUsuario: number;
+    accion: string;
+    tipoObjeto: string;
+    idObjeto: string;
+    idSprint: number | null;
+    fechaEvento: Date;
+  }> = [
+    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s1.idSprint), idSprint: s1.idSprint, fechaEvento: ts(-70) },
+    { idUsuario: lider.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t1_1.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-69) },
+    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_1.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-63) },
+    { idUsuario: lider.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t1_2.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-68) },
+    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_2.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-55) },
+    { idUsuario: u.diego.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_3.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-51) },
+    { idUsuario: lider.idUsuario, accion: 'SPRINT_CLOSED', tipoObjeto: 'SPRINT', idObjeto: String(s1.idSprint), idSprint: s1.idSprint, fechaEvento: ts(-50) },
+    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s2.idSprint), idSprint: s2.idSprint, fechaEvento: ts(-49) },
+    { idUsuario: u.estefania.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-48) },
+    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-47) },
+    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-40) },
+    { idUsuario: u.diego.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t2_2.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-30) },
+    { idUsuario: u.estefania.idUsuario, accion: 'TIME_RECORD_EDITED', tipoObjeto: 'REGISTRO_TIEMPO', idObjeto: String(t2_2.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-28) },
+    { idUsuario: lider.idUsuario, accion: 'SPRINT_CLOSED', tipoObjeto: 'SPRINT', idObjeto: String(s2.idSprint), idSprint: s2.idSprint, fechaEvento: ts(-25) },
+    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s3.idSprint), idSprint: s3.idSprint, fechaEvento: ts(-24) },
+    { idUsuario: lider.idUsuario, accion: 'TASK_REASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t2_3.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-24) },
+    { idUsuario: u.carlos.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t3_1.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-23) },
+    { idUsuario: u.estefania.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t3_4.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-20) },
+    { idUsuario: u.estefania.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_4.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-18) },
+    { idUsuario: u.diego.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t3_5.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-17) },
+    { idUsuario: u.diego.idUsuario, accion: 'TIME_RECORD_EDITED', tipoObjeto: 'REGISTRO_TIEMPO', idObjeto: String(t3_5.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-14) },
+    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_7.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-9) },
+    { idUsuario: lider.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_9.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-6) },
+    { idUsuario: lider.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_10.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-5) },
+    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_HOURS_LOGGED', tipoObjeto: 'REGISTRO_TIEMPO', idObjeto: String(t3_9.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-4) },
+    // ADMINISTRATIVOS (T-170/HU-170): ocultos en la vista de un integrante.
+    { idUsuario: lider.idUsuario, accion: 'LEADERSHIP_CHANGED', tipoObjeto: 'PROYECTO', idObjeto: String(p1.idProyecto), idSprint: null, fechaEvento: ts(-60) },
+    { idUsuario: lider.idUsuario, accion: 'PROJECT_EXPORT_CSV_GENERATED', tipoObjeto: 'PROYECTO', idObjeto: String(p1.idProyecto), idSprint: null, fechaEvento: ts(-12) },
+    { idUsuario: lider.idUsuario, accion: 'PROJECT_EXPORT_PDF_GENERATED', tipoObjeto: 'PROYECTO', idObjeto: String(p1.idProyecto), idSprint: null, fechaEvento: ts(-3) },
+  ];
+  // deleteMany + createMany (no hay llave natural en bitacora_auditoria):
+  // re-correr el seed no debe duplicar estas filas de demo.
+  await prisma.bitacoraAuditoria.deleteMany({
+    where: { detalleJson: { path: ['idProyecto'], equals: p1.idProyecto } },
+  });
+  await prisma.bitacoraAuditoria.createMany({
+    data: bitacoraP1.map((e) => ({
+      idUsuario: e.idUsuario,
+      accion: e.accion,
+      tipoObjeto: e.tipoObjeto,
+      idObjeto: e.idObjeto,
+      fechaEvento: e.fechaEvento,
+      detalleJson: { idProyecto: p1.idProyecto, idSprint: e.idSprint, valorAnterior: null, valorNuevo: null },
+    })),
+  });
 
   // Solicitudes de salida
   const solDiego = { idProyecto: p1.idProyecto, idUsuario: u.diego.idUsuario };
@@ -590,20 +717,35 @@ async function seedSprint6Demo() {
   });
   const rMentoria = await ensureRolS6(p4.idProyecto, 'Coordinación de mentorías', 2, 'Coordina la asignación de mentores a estudiantes de primer ingreso.');
   const partBeatrizP4 = await ensureParticipacionS6(u.beatriz.idUsuario, rMentoria.idRolProyecto, 'ACTIVO', dateOnly(-44), null);
+  // T-282: tercer sprint cerrado con un cumplimiento distinto (50%) a los de
+  // s1/s2 — la tarea pendiente se arrastra al backlog (no hay Sprint
+  // siguiente en este proyecto), no queda huérfana.
   const s1p4 = await ensureSprintS6(p4.idProyecto, 1, EstadoSprint.CERRADO, {
     fechaInicio: ts(-44),
     fechaCierre: ts(-16),
     cerradoPor: lider.idUsuario,
+    tareasPlanificadasCierre: 2,
+    tareasCompletadasCierre: 1,
+    tareasArrastradasCierre: 1,
+    hitosTotalesCierre: 0,
+    hitosCompletadosCierre: 0,
+    porcentajeCumplimientoCierre: 50,
+    puntosHistoriaPlanificadosCierre: 5,
+    puntosHistoriaCompletadosCierre: 3,
   });
   const tp4_1 = await ensureTareaS6(p4.idProyecto, 'Emparejar mentores con estudiantes de primer ingreso', {
     idSprint: s1p4.idSprint, idRolProyecto: rMentoria.idRolProyecto,
     descripcionTarea: 'Emparejar a cada estudiante de primer ingreso con un mentor de su misma carrera.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 6,
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 6, puntosHistoria: 3,
   }, lider.idUsuario);
+  // T-282: queda pendiente al cerrar el sprint — no hay Sprint siguiente en
+  // este proyecto, así que se arrastra al backlog (destinoArrastre BACKLOG),
+  // igual que permite closeSprint cuando no hay Sprint operable a donde mover.
   const tp4_2 = await ensureTareaS6(p4.idProyecto, 'Cerrar reporte final del ciclo de mentorías', {
-    idSprint: s1p4.idSprint, idRolProyecto: rMentoria.idRolProyecto,
+    idSprint: null, idRolProyecto: rMentoria.idRolProyecto,
     descripcionTarea: 'Consolidar el reporte final de participación del ciclo de mentorías.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4,
+    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4, puntosHistoria: 2,
+    destinoArrastre: 'BACKLOG',
   }, lider.idUsuario);
   await prisma.$transaction(async (tx) => {
     const ids = [tp4_1.idTarea, tp4_2.idTarea];
@@ -637,7 +779,7 @@ async function seedSprint6Demo() {
   const tp5_1 = await ensureTareaS6(p5.idProyecto, 'Publicar catálogo inicial de datasets abiertos', {
     idSprint: s1p5.idSprint, idRolProyecto: rCuraduria.idRolProyecto,
     descripcionTarea: 'Publicar el catálogo inicial de datasets abiertos disponibles para investigación.',
-    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 8,
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 8, puntosHistoria: 5,
   }, lider.idUsuario);
   await prisma.$transaction(async (tx) => {
     await tx.asignacionTarea.deleteMany({ where: { idTarea: tp5_1.idTarea } });
@@ -697,7 +839,9 @@ async function validarSprint6(idProyecto: number, u: Record<UserKey, { idUsuario
     _count: { idTarea: true },
   });
   const conteo = Object.fromEntries(porEstado.map((g) => [g.estadoTarea, g._count.idTarea]));
-  const esperado = { POR_HACER: 3, EN_PROGRESO: 3, EN_REVISION: 2, HECHO: 2 };
+  // T-282: Sprint 3 pasó de 3 a 4 tareas POR_HACER al sumar la tarea
+  // arrastrada de verdad desde Sprint 2 (11 tareas planificadas en total).
+  const esperado = { POR_HACER: 4, EN_PROGRESO: 3, EN_REVISION: 2, HECHO: 2 };
   for (const [estado, n] of Object.entries(esperado)) if ((conteo[estado] ?? 0) !== n) problemas.push(`Kanban Sprint activo ${estado}: ${conteo[estado] ?? 0} (esperado ${n})`);
 
   if (problemas.length) abort(`Validación fallida (Sprint 6 Demo):\n  - ${problemas.join('\n  - ')}`);
