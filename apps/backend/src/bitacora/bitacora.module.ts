@@ -4,9 +4,10 @@ import { BitacoraEventosService } from './bitacora-eventos.service';
 import { BitacoraContextService } from './bitacora-context.service';
 import { BitacoraConsultaService } from './bitacora-consulta.service';
 import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
+import { UserNameSearchModule } from '../common/search/user-name-search.module';
 
 @Module({
-  imports: [ProjectPolicyModule],
+  imports: [ProjectPolicyModule, UserNameSearchModule],
   controllers: [BitacoraController],
   providers: [BitacoraEventosService, BitacoraContextService, BitacoraConsultaService],
   exports: [BitacoraEventosService],

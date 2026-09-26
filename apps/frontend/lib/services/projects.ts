@@ -7,7 +7,9 @@ import type {
   RevisionProyectoDTO,
   CreateProjectPayload,
   CreateHitoPayload,
-  HitoDTO,
+  CreateHitoResult,
+  AssignHitoTasksPayload,
+  AssignHitoTasksResult,
   ResolverRevisionPayload,
 } from '@/lib/dto/project.dto';
 
@@ -151,9 +153,23 @@ export async function deleteProject(id: number): Promise<{ mensaje: string }> {
   return apiFetch(`/proyectos/${id}`, { method: 'DELETE' });
 }
 
-export async function createHito(idProyecto: number, payload: CreateHitoPayload): Promise<HitoDTO> {
-  return apiFetch<HitoDTO>(`/proyectos/${idProyecto}/hitos`, {
+export async function createHito(idProyecto: number, payload: CreateHitoPayload): Promise<CreateHitoResult> {
+  return apiFetch<CreateHitoResult>(`/proyectos/${idProyecto}/hitos`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function assignHitoTasks(
+  idProyecto: number,
+  idHito: number,
+  payload: AssignHitoTasksPayload,
+): Promise<AssignHitoTasksResult> {
+  return apiFetch<AssignHitoTasksResult>(
+    `/proyectos/${idProyecto}/hitos/${idHito}/tareas`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
 }

@@ -1331,6 +1331,14 @@ model RolPermiso {
   @@map("rol_permiso")
 }
 
+/// T-244: además de la PK, la migración `20260919011907_bitacora_id_proyecto_fecha_idx`
+/// crea el índice funcional `bitacora_auditoria_id_proyecto_fecha_idx` sobre
+/// `(detalle_json #> '{idProyecto}', fecha_evento DESC, id_auditoria DESC)` —
+/// Prisma no puede declarar índices funcionales en este bloque, por eso no
+/// aparece como `@@index` aquí. Sirve al filtro obligatorio de
+/// BitacoraConsultaService.listEventos (`detalleJson.idProyecto`) combinado
+/// con el orden estable de la paginación; medido ~9x más rápido con volumen
+/// realista (ver el comentario del propio archivo de migración).
 model BitacoraAuditoria {
   idAuditoria Int      @id @default(autoincrement()) @map("id_auditoria")
   idUsuario   Int?     @map("id_usuario")

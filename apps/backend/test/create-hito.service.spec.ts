@@ -11,14 +11,28 @@ import {
 type HitoTxOverrides = Partial<{
   findFirst: ReturnType<typeof vi.fn>;
   create: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
 }>;
 
-function makeTx(overrides: HitoTxOverrides = {}) {
+type TareaTxOverrides = Partial<{
+  findMany: ReturnType<typeof vi.fn>;
+  updateMany: ReturnType<typeof vi.fn>;
+}>;
+
+function makeTx(overrides: HitoTxOverrides = {}, tareaOverrides: TareaTxOverrides = {}) {
   return {
     hito: {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn(),
+      update: vi.fn(),
       ...overrides,
+    },
+    // T-186: solo se usan cuando el test envía idsTareas; el resto de los
+    // tests de este archivo (creación simple) nunca los toca.
+    tarea: {
+      findMany: vi.fn().mockResolvedValue([]),
+      updateMany: vi.fn(),
+      ...tareaOverrides,
     },
   };
 }
@@ -222,5 +236,111 @@ describe('ProjectsService.createHito', () => {
         orderBy: { orden: 'desc' },
       }),
     );
+  });
+
+  describe('T-186 — asignación masiva de tareas (idsTareas)', () => {
+    function setupBulk(overrides: {
+      tareasEncontradas?: { idTarea: number }[];
+      tareasParaEstado?: { estadoTarea: string }[];
+    } = {}) {
+      const tx = makeTx(
+        {},
+        {
+          findMany: vi.fn().mockResolvedValue(overrides.tareasEncontradas ?? [{ idTarea: 1 }, { idTarea: 2 }]),
+        },
+      );
+      const prisma = makePrisma(tx);
+      prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5, creadoPor: 1 });
+      tx.hito.create.mockResolvedValue(hitoRow());
+      const service = makeService(prisma);
+      return { tx, prisma, service };
+    }
+
+    it('idsTareas omitida: no consulta ni actualiza tareas, respuesta sin idsTareasAsignadas', async () => {
+      const { tx, service } = setupBulk();
+
+      const result = await service.createHito(5, 1, BASE_DTO);
+
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
+      expect(tx.tarea.updateMany).not.toHaveBeenCalled();
+      expect(result).not.toHaveProperty('idsTareasAsignadas');
+    });
+
+    it('idsTareas: [] no consulta ni actualiza tareas, respuesta con idsTareasAsignadas: []', async () => {
+      const { tx, service } = setupBulk();
+
+      const result = await service.createHito(5, 1, { ...BASE_DTO, idsTareas: [] });
+
+      expect(tx.tarea.findMany).not.toHaveBeenCalled();
+      expect(tx.tarea.updateMany).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ idsTareasAsignadas: [] });
+    });
+
+    it('asigna idHito a todas las tareas válidas del proyecto en una sola updateMany', async () => {
+      const { tx, service } = setupBulk({ tareasEncontradas: [{ idTarea: 1 }, { idTarea: 2 }] });
+
+      const result = await service.createHito(5, 1, { ...BASE_DTO, idsTareas: [1, 2] });
+
+      expect(tx.tarea.findMany).toHaveBeenCalledWith({
+        where: { idTarea: { in: [1, 2] }, idProyecto: 5, eliminadoEn: null },
+        select: { idTarea: true },
+      });
+      expect(tx.tarea.updateMany).toHaveBeenCalledTimes(1);
+      expect(tx.tarea.updateMany).toHaveBeenCalledWith({
+        where: { idTarea: { in: [1, 2] }, idProyecto: 5 },
+        data: { idHito: 10 },
+      });
+      expect(result).toMatchObject({ idsTareasAsignadas: [1, 2] });
+    });
+
+    it('tarea inexistente o de otro proyecto: NotFoundException, no actualiza ninguna tarea ni el hito', async () => {
+      const { tx, service } = setupBulk({ tareasEncontradas: [{ idTarea: 1 }] });
+
+      await expect(
+        service.createHito(5, 1, { ...BASE_DTO, idsTareas: [1, 999] }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(tx.tarea.updateMany).not.toHaveBeenCalled();
+      expect(tx.hito.update).not.toHaveBeenCalled();
+    });
+
+    it('todas las tareas inexistentes: NotFoundException nombra los ids inválidos', async () => {
+      const { service } = setupBulk({ tareasEncontradas: [] });
+
+      await expect(
+        service.createHito(5, 1, { ...BASE_DTO, idsTareas: [777, 888] }),
+      ).rejects.toThrow('777, 888');
+    });
+
+    it('sincroniza estadoHito del hito recién creado según las tareas ya asignadas (A12)', async () => {
+      const { tx, service } = setupBulk({ tareasEncontradas: [{ idTarea: 1 }, { idTarea: 2 }] });
+      tx.tarea.findMany.mockImplementation(
+        async (args: { where: { idHito?: number; idTarea?: unknown } }) =>
+          args.where.idHito === 10
+            ? [{ estadoTarea: 'HECHO' }, { estadoTarea: 'POR_HACER' }]
+            : [{ idTarea: 1 }, { idTarea: 2 }],
+      );
+
+      await service.createHito(5, 1, { ...BASE_DTO, idsTareas: [1, 2] });
+
+      expect(tx.hito.update).toHaveBeenCalledWith({
+        where: { idHito: 10 },
+        data: { estadoHito: 'EN_PROGRESO' },
+      });
+    });
+
+    it('no permite asignar tareas de OTRO proyecto (aislamiento entre proyectos)', async () => {
+      // La consulta de validación ya filtra por idProyecto: una tarea de
+      // otro proyecto simplemente no aparece entre las "válidas", así que
+      // cae en la misma rama de NotFoundException que un id inexistente.
+      const { tx, service } = setupBulk({ tareasEncontradas: [] });
+
+      await expect(
+        service.createHito(5, 1, { ...BASE_DTO, idsTareas: [42] }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(tx.tarea.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ idProyecto: 5 }) }),
+      );
+    });
   });
 });

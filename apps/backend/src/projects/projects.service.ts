@@ -1153,9 +1153,14 @@ export class ProjectsService {
    * calcula server-side dentro de la misma transacción como
    * (máximo orden existente para el proyecto) + 1, para no depender de un
    * valor enviado por el cliente que podría colisionar con hitos existentes.
+   *
+   * T-186 (HU-147): `dto.idsTareas` opcional permite, en la misma
+   * operación/transacción, asignar el hito recién creado a tareas ya
+   * existentes del proyecto (ver `_asignarHitoATareas`) — el flujo que
+   * rescata tareas legacy sin hito tras T-185, sin migraciones automáticas.
    */
   async createHito(idProyecto: number, userId: number, dto: CreateHitoDto) {
-    const hito = await this.projectTx.run(idProyecto, userId, 'projects.createHito', async (ctx) => {
+    const resultado = await this.projectTx.run(idProyecto, userId, 'projects.createHito', async (ctx) => {
       const { tx } = ctx;
       await this._requireActiveMember(idProyecto, userId, tx);
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'HITO_CREATE', userId);
@@ -1167,7 +1172,7 @@ export class ProjectsService {
       });
       const nuevoOrden = (ultimo?.orden ?? 0) + 1;
 
-      return tx.hito.create({
+      const hito = await tx.hito.create({
         data: {
           idProyecto,
           tituloHito: dto.tituloHito,
@@ -1185,9 +1190,129 @@ export class ProjectsService {
           orden: true,
         },
       });
+
+      // T-186: asignación masiva opcional, en la MISMA transacción que la
+      // creación — si alguna tarea seleccionada falla su validación, el
+      // rollback también revierte el hito recién creado (nunca queda un
+      // hito huérfano sin ninguna tarea asignada por un error a mitad de
+      // camino).
+      let idsTareasAsignadas: number[] | undefined;
+      if (dto.idsTareas !== undefined) {
+        idsTareasAsignadas = await this._asignarHitoATareas(tx, idProyecto, hito.idHito, dto.idsTareas);
+      }
+
+      return { hito, idsTareasAsignadas };
     });
 
-    return { ...hito, fechaLimite: toDateOnly(hito.fechaLimite) };
+    const publico = { ...resultado.hito, fechaLimite: toDateOnly(resultado.hito.fechaLimite) };
+    // El campo solo aparece en la respuesta cuando el cliente pidió
+    // asignación masiva: mantiene sin cambios la forma histórica de la
+    // respuesta para quien solo crea un hito (createHito original).
+    return resultado.idsTareasAsignadas !== undefined
+      ? { ...publico, idsTareasAsignadas: resultado.idsTareasAsignadas }
+      : publico;
+  }
+
+  /**
+   * T-186 (HU-147): asigna `idHito` a un conjunto de tareas del mismo
+   * proyecto en una sola operación — el mecanismo que evita que T-185 (hito
+   * obligatorio para tablero/sprint) deje atrapadas para siempre a las
+   * tareas existentes que hoy no tienen hito. No crea ni modifica hitos.
+   *
+   * Autorización: reutiliza la política HITO_CREATE ya evaluada por el
+   * caller (líder o participante activo), deliberadamente NO TAREA_WRITE —
+   * TAREA_WRITE exige que el Sprint de CADA tarea esté ACTIVO, y las tareas
+   * que este flujo debe poder rescatar son precisamente las que pueden
+   * pertenecer a un Sprint ya cerrado. Vincular una tarea a un hito no es
+   * una edición del tablero/sprint, es la relación que T-185 exige antes de
+   * que la tarea pueda volver a él.
+   *
+   * Valida existencia + pertenencia a `idProyecto` + no eliminada ANTES de
+   * escribir nada: si falta alguna tarea, lanza y no actualiza ninguna
+   * (todo o nada, igual que el resto de esta transacción).
+   */
+  async assignHitoTasks(
+    idProyecto: number,
+    idHito: number,
+    userId: number,
+    idsTareas: number[],
+  ) {
+    return this.projectTx.run(idProyecto, userId, 'projects.assignHitoTasks', async (ctx) => {
+      const { tx } = ctx;
+      await this._requireActiveMember(idProyecto, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'HITO_CREATE', userId);
+
+      const hito = await tx.hito.findFirst({
+        where: { idHito, idProyecto },
+        select: { idHito: true },
+      });
+
+      if (!hito) {
+        throw new NotFoundException(
+          `Hito con id ${idHito} no encontrado en el proyecto ${idProyecto}`,
+        );
+      }
+
+      const idsTareasAsignadas = await this._asignarHitoATareas(
+        tx,
+        idProyecto,
+        idHito,
+        idsTareas,
+      );
+
+      return { idHito, idsTareasAsignadas };
+    });
+  }
+
+  private async _asignarHitoATareas(
+    tx: Prisma.TransactionClient,
+    idProyecto: number,
+    idHito: number,
+    idsTareas: number[],
+  ): Promise<number[]> {
+    if (idsTareas.length === 0) {
+      return [];
+    }
+
+    const tareasValidas = await tx.tarea.findMany({
+      where: { idTarea: { in: idsTareas }, idProyecto, eliminadoEn: null },
+      select: { idTarea: true },
+    });
+    const idsValidos = new Set(tareasValidas.map((tarea) => tarea.idTarea));
+    const idsInvalidos = idsTareas.filter((idTarea) => !idsValidos.has(idTarea));
+    if (idsInvalidos.length > 0) {
+      throw new NotFoundException(
+        `Tarea(s) con id ${idsInvalidos.join(', ')} no encontrada(s) en el proyecto ${idProyecto}`,
+      );
+    }
+
+    await tx.tarea.updateMany({
+      where: { idTarea: { in: idsTareas }, idProyecto },
+      data: { idHito },
+    });
+
+    // A12: el hito recién creado gana tareas vigentes de golpe — su
+    // estadoHito persistido debe reflejarlo, misma fórmula única que
+    // TasksService#syncHitoEstado (calcularProgresoHito).
+    await this._sincronizarEstadoHito(tx, idHito);
+
+    return idsTareas;
+  }
+
+  /**
+   * A12: misma fórmula que TasksService#syncHitoEstado
+   * (src/common/hito-progreso.ts) — este es el otro write-path capaz de
+   * cambiar el conjunto de tareas vigentes de un Hito fuera de TasksService,
+   * así que reutiliza la única fórmula compartida en vez de definir una
+   * segunda.
+   */
+  private async _sincronizarEstadoHito(tx: Prisma.TransactionClient, idHito: number): Promise<void> {
+    const tareasHito = await tx.tarea.findMany({
+      where: { idHito, eliminadoEn: null },
+      select: { estadoTarea: true },
+    });
+    const { estadoHito } = calcularProgresoHito(tareasHito);
+    await tx.hito.update({ where: { idHito }, data: { estadoHito } });
   }
 
   async delete(id: number, userId: number) {

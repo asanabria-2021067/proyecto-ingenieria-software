@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, ArrowLeft, BarChart3, Repeat } from 'lucide-react';
 import { useSprintsAnalytics } from '@/hooks/use-project-sprints';
+import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -205,13 +206,18 @@ export default function SprintsAnalyticsPage() {
         Volver a Sprints
       </Link>
 
-      <div className="mb-8 flex items-center gap-2">
-        <BarChart3 className="h-6 w-6 text-primary" aria-hidden="true" />
-        <h1 className="font-headline text-3xl font-extrabold text-on-surface">Analítica comparativa</h1>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-6 w-6 text-primary" aria-hidden="true" />
+            <h1 className="font-headline text-3xl font-extrabold text-on-surface">Analítica comparativa</h1>
+          </div>
+          <p className="mt-2 text-sm text-tertiary">
+            Cumplimiento y progreso de cada Sprint del proyecto, para comparar cómo avanza el equipo.
+          </p>
+        </div>
+        <ProjectExportButtons idProyecto={idProyecto} />
       </div>
-      <p className="-mt-6 mb-8 text-sm text-tertiary">
-        Cumplimiento y progreso de cada Sprint del proyecto, para comparar cómo avanza el equipo.
-      </p>
 
       {isLoading && (
         <div className="space-y-4">

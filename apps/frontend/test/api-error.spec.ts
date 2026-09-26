@@ -6,8 +6,20 @@ function enrichedError(statusCode: number, message = 'detalle interno'): Error {
 }
 
 describe('getApiErrorMessage', () => {
-  it('400: mensaje fijo sobre datos/relaciones', () => {
-    expect(getApiErrorMessage(enrichedError(400), 'task')).toBe(
+  it('400 en contexto de tarea: usa el mensaje del backend si existe (HU-147/T-185: idHito obligatorio/no removible)', () => {
+    expect(
+      getApiErrorMessage(
+        enrichedError(
+          400,
+          'idHito es obligatorio: la tarea necesita un hito asignado antes de poder entrar al tablero o a un sprint',
+        ),
+        'task',
+      ),
+    ).toBe('idHito es obligatorio: la tarea necesita un hito asignado antes de poder entrar al tablero o a un sprint');
+  });
+
+  it('400 en contexto de tarea sin mensaje del backend: cae en el mensaje genérico sobre datos/relaciones', () => {
+    expect(getApiErrorMessage(Object.assign(new Error(), { statusCode: 400 }), 'task')).toBe(
       'Revisa los datos ingresados y las relaciones seleccionadas.',
     );
   });

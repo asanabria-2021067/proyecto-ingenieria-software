@@ -50,11 +50,18 @@ describe('getApiErrorMessage — Sprint 7 (scopes y estados 413/422/503)', () =>
     expect(leadership).toContain('liderazgo');
   });
 
-  it('400 en scopes S7 muestra el mensaje funcional del backend', () => {
+  it('400 en scopes S7 y task muestra el mensaje funcional del backend', () => {
     expect(
       getApiErrorMessage(enrichedError(400, 'se requiere justificacionExceso'), 'hours'),
     ).toBe('se requiere justificacionExceso');
-    expect(getApiErrorMessage(enrichedError(400, 'x'), 'task')).toBe(
+    // HU-147/T-185: 'task' se sumó a los scopes que muestran el mensaje real
+    // del backend en 400 (antes siempre caía en el genérico) — necesario
+    // para que el rechazo de idHito obligatorio/no removible llegue claro.
+    expect(getApiErrorMessage(enrichedError(400, 'x'), 'task')).toBe('x');
+  });
+
+  it('400 en task sin mensaje del backend: cae en el genérico sobre datos/relaciones', () => {
+    expect(getApiErrorMessage(Object.assign(new Error(), { statusCode: 400 }), 'task')).toBe(
       'Revisa los datos ingresados y las relaciones seleccionadas.',
     );
   });
