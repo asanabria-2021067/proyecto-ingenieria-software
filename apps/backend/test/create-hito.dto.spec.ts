@@ -82,4 +82,38 @@ describe('CreateHitoDto', () => {
   it('rechaza orden enviado por el cliente (no es whitelisteado)', async () => {
     await expect(parse(basePayload({ orden: 5 }))).rejects.toThrow(BadRequestException);
   });
+
+  describe('idsTareas (T-186)', () => {
+    it('idsTareas omitida queda undefined', async () => {
+      const dto = await parse(basePayload());
+      expect(dto.idsTareas).toBeUndefined();
+    });
+
+    it('acepta idsTareas con valores únicos, incluido un arreglo vacío', async () => {
+      const dto = await parse(basePayload({ idsTareas: [1, 2, 3] }));
+      expect(dto.idsTareas).toEqual([1, 2, 3]);
+
+      const dtoVacio = await parse(basePayload({ idsTareas: [] }));
+      expect(dtoVacio.idsTareas).toEqual([]);
+    });
+
+    it('rechaza idsTareas con valores duplicados', async () => {
+      await expect(parse(basePayload({ idsTareas: [1, 2, 1] }))).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rechaza idsTareas con valores cero o negativos', async () => {
+      await expect(parse(basePayload({ idsTareas: [0] }))).rejects.toThrow(BadRequestException);
+      await expect(parse(basePayload({ idsTareas: [-1] }))).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza una tarea individual fuera de un arreglo', async () => {
+      await expect(parse(basePayload({ idsTareas: 1 }))).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza idsTareas: null', async () => {
+      await expect(parse(basePayload({ idsTareas: null }))).rejects.toThrow(BadRequestException);
+    });
+  });
 });

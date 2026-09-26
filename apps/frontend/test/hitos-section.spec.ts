@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { HitoDTO } from '../lib/dto/project.dto';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
@@ -11,7 +11,39 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// Mismo mock que create-milestone-dialog.spec.ts/task-form-dialog.spec.ts:
+// evita ejercer el DOM real de SweetAlert2 dentro de jsdom.
+vi.mock('@/lib/swal', () => ({
+  default: {
+    fire: vi.fn(),
+  },
+}));
+
 import { HitosSection } from '../components/projects/hitos-section';
+
+function crearHitoStub(overrides: Record<string, unknown> = {}) {
+  return {
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ idHito: 42 }),
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+    ...overrides,
+  };
+}
+
+function asignarHitoTareasStub(overrides: Record<string, unknown> = {}) {
+  return {
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ idHito: 1, idsTareasAsignadas: [1] }),
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+    ...overrides,
+  };
+}
 
 function hito(overrides: Partial<HitoDTO> = {}): HitoDTO {
   return {
@@ -195,5 +227,127 @@ describe('HitosSection', () => {
     expect(screen.queryByText('Suelta')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Expandir tareas sin hito' }));
     expect(screen.getByText('Suelta')).toBeInTheDocument();
+  });
+
+  describe('T-186 — selección múltiple y asignación masiva desde "Tareas sin hito"', () => {
+    it('sin puedeCrear/crearHito: no muestra checkboxes ni botón de asignación masiva', () => {
+      render(
+        createElement(HitosSection, {
+          hitos: [],
+          tareas: [tarea({ idTarea: 1, tituloTarea: 'Suelta' })],
+          idProyecto: 10,
+        }),
+      );
+
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Asignar hito/)).not.toBeInTheDocument();
+    });
+
+    it('con permiso: muestra un checkbox por tarea sin hito y "Seleccionar todas"', () => {
+      render(
+        createElement(HitosSection, {
+          hitos: [],
+          tareas: [
+            tarea({ idTarea: 1, tituloTarea: 'Suelta A' }),
+            tarea({ idTarea: 2, tituloTarea: 'Suelta B' }),
+          ],
+          idProyecto: 10,
+          puedeCrear: true,
+          crearHito: crearHitoStub() as any,
+          asignarHitoTareas: asignarHitoTareasStub() as any,
+        }),
+      );
+
+      const seccion = screen.getByTestId('tareas-sin-hito');
+      expect(within(seccion).getByRole('checkbox', { name: 'Seleccionar todas las tareas sin hito' })).toBeInTheDocument();
+      expect(within(seccion).getByRole('checkbox', { name: 'Seleccionar Suelta A' })).toBeInTheDocument();
+      expect(within(seccion).getByRole('checkbox', { name: 'Seleccionar Suelta B' })).toBeInTheDocument();
+    });
+
+    it('seleccionar una tarea muestra el botón "Crear hito y asignar" con el conteo correcto', () => {
+      render(
+        createElement(HitosSection, {
+          hitos: [],
+          tareas: [
+            tarea({ idTarea: 1, tituloTarea: 'Suelta A' }),
+            tarea({ idTarea: 2, tituloTarea: 'Suelta B' }),
+          ],
+          idProyecto: 10,
+          puedeCrear: true,
+          crearHito: crearHitoStub() as any,
+          asignarHitoTareas: asignarHitoTareasStub() as any,
+        }),
+      );
+
+      expect(screen.queryByText(/Asignar hito/)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar Suelta A' }));
+      expect(screen.getByRole('button', { name: 'Asignar hito (1)' })).toBeInTheDocument();
+    });
+
+    it('marcar/desmarcar la fila no abre el detalle de la tarea (stopPropagation)', () => {
+      render(
+        createElement(HitosSection, {
+          hitos: [],
+          tareas: [tarea({ idTarea: 1, tituloTarea: 'Suelta A' })],
+          idProyecto: 10,
+          puedeCrear: true,
+          crearHito: crearHitoStub() as any,
+          asignarHitoTareas: asignarHitoTareasStub() as any,
+        }),
+      );
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar Suelta A' }));
+      expect(routerMock.push).not.toHaveBeenCalled();
+    });
+
+    it('"Seleccionar todas" selecciona y deselecciona todas las tareas visibles', () => {
+      render(
+        createElement(HitosSection, {
+          hitos: [],
+          tareas: [
+            tarea({ idTarea: 1, tituloTarea: 'Suelta A' }),
+            tarea({ idTarea: 2, tituloTarea: 'Suelta B' }),
+          ],
+          idProyecto: 10,
+          puedeCrear: true,
+          crearHito: crearHitoStub() as any,
+          asignarHitoTareas: asignarHitoTareasStub() as any,
+        }),
+      );
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar todas las tareas sin hito' }));
+      expect(screen.getByRole('button', { name: 'Asignar hito (2)' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar todas las tareas sin hito' }));
+      expect(screen.queryByText(/Asignar hito/)).not.toBeInTheDocument();
+    });
+
+    it('abre el flujo de asignacion con las tareas seleccionadas', () => {
+      const crearHito = crearHitoStub() as any;
+      const asignarHitoTareas = asignarHitoTareasStub() as any;
+
+      render(
+        createElement(HitosSection, {
+          hitos: [hito({ idHito: 7, tituloHito: 'Entrega existente' })],
+          tareas: [
+            tarea({ idTarea: 1, tituloTarea: 'Suelta A' }),
+            tarea({ idTarea: 2, tituloTarea: 'Suelta B' }),
+          ],
+          idProyecto: 10,
+          puedeCrear: true,
+          crearHito,
+          asignarHitoTareas,
+        }),
+      );
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar Suelta A' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Asignar hito (1)' }));
+
+      expect(screen.getByRole('heading', { name: 'Asignar hito' })).toBeInTheDocument();
+      expect(screen.getByText('1 tarea seleccionada')).toBeInTheDocument();
+      expect(screen.getAllByText('Suelta A')).toHaveLength(2);
+      expect(screen.getByRole('button', { name: 'Hito existente' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Nuevo hito' })).toBeInTheDocument();
+    });
   });
 });

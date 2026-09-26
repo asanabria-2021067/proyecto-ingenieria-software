@@ -16,6 +16,7 @@ import { BitacoraController } from '../../src/bitacora/bitacora.controller';
 import { TipoEventoBitacora } from '../../src/bitacora/tipos-evento-bitacora';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
+import { UserNameSearchService } from '../../src/common/search/user-name-search.service';
 
 /**
  * T-269 (HU-170), FASE 5 — flujo integral: en vez de repartir cada criterio
@@ -45,6 +46,7 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
       prisma as unknown as PrismaService,
       context,
       new ProjectReadPolicyService(prisma as unknown as PrismaService),
+      new UserNameSearchService(prisma as unknown as PrismaService),
     );
     // El controller real, no un stand-in: findAll es exactamente el método
     // que Nest invoca para GET /proyectos/:id/bitacora.
@@ -143,12 +145,18 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
           undefined,
           undefined,
           undefined,
+          undefined,
+          undefined,
+          undefined,
           '1',
           '2',
         );
         const paginaDos = await controller.findAll(
           project.idProyecto,
           { userId: member.idUsuario },
+          undefined,
+          undefined,
+          undefined,
           undefined,
           undefined,
           undefined,
@@ -171,6 +179,7 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
           { userId: member.idUsuario },
           undefined,
           undefined,
+          undefined,
           TipoEventoBitacora.TASK_CREATED,
         );
         expect(filtradoOperativo.total).toBe(3);
@@ -178,6 +187,7 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
         const filtradoAdministrativo = await controller.findAll(
           project.idProyecto,
           { userId: member.idUsuario },
+          undefined,
           undefined,
           undefined,
           TipoEventoBitacora.LEADERSHIP_CHANGED,
@@ -189,6 +199,7 @@ describeIntegration('HU-170/T-269 — flujo integral de la bitácora (PostgreSQL
         const filtradoAdministrativoComoLider = await controller.findAll(
           project.idProyecto,
           { userId: leader.idUsuario },
+          undefined,
           undefined,
           undefined,
           TipoEventoBitacora.LEADERSHIP_CHANGED,

@@ -19,7 +19,12 @@ vi.mock('../hooks/use-exit-request', () => ({
   useRejectExitRequest: vi.fn(),
 }));
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
-vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn(), useIsAdmin: vi.fn() }));
+// T-259/T-260 (HU-164): el botón de exportar tiene su propio spec
+// (project-export-buttons.spec.tsx); aquí solo se stubea para que esta
+// página siga probándose sin QueryClientProvider (useProjectExport usa
+// useMutation internamente).
+vi.mock('../hooks/use-project-export', () => ({ useProjectExport: vi.fn() }));
 // S7 (F008): la card de liderazgo tiene cobertura propia (leadership-card.spec.ts);
 // aquí se stubea para que esta página siga probándose sin QueryClientProvider.
 vi.mock('../hooks/use-leadership', () => ({
@@ -41,7 +46,8 @@ import {
   useRejectExitRequest,
 } from '../hooks/use-exit-request';
 import { useProjectDetail } from '../hooks/use-project-detail';
-import { useCurrentUser } from '../hooks/use-current-user';
+import { useCurrentUser, useIsAdmin } from '../hooks/use-current-user';
+import { useProjectExport } from '../hooks/use-project-export';
 import type { PendingLeaderReviewDto } from '../lib/types/exit-requests';
 
 const LIDER: LiderProyectoDTO = {
@@ -162,6 +168,11 @@ beforeEach(() => {
     isLoading: false,
   });
   (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 }, isLoading: false });
+  (useIsAdmin as any).mockReturnValue(false);
+  (useProjectExport as any).mockReturnValue({
+    exportCsv: { mutate: vi.fn(), isPending: false, isError: false },
+    exportPdf: { mutate: vi.fn(), isPending: false, isError: false },
+  });
 });
 
 afterEach(() => {

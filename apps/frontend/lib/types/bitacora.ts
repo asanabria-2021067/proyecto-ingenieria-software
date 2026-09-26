@@ -51,6 +51,8 @@ export class TipoEventoBitacora {
   static readonly PROJECT_CLOSE_RETURNED_TO_EXECUTION = 'PROJECT_CLOSE_RETURNED_TO_EXECUTION' as const;
   static readonly CLOSURE_STORAGE_SWEPT = 'CLOSURE_STORAGE_SWEPT' as const;
   static readonly LEGACY_HOURS_RECONCILED = 'LEGACY_HOURS_RECONCILED' as const;
+  static readonly PROJECT_EXPORT_CSV_GENERATED = 'PROJECT_EXPORT_CSV_GENERATED' as const;
+  static readonly PROJECT_EXPORT_PDF_GENERATED = 'PROJECT_EXPORT_PDF_GENERATED' as const;
 
   static readonly VALORES = [
     'TASK_CREATED',
@@ -88,6 +90,8 @@ export class TipoEventoBitacora {
     'PROJECT_CLOSE_RETURNED_TO_EXECUTION',
     'CLOSURE_STORAGE_SWEPT',
     'LEGACY_HOURS_RECONCILED',
+    'PROJECT_EXPORT_CSV_GENERATED',
+    'PROJECT_EXPORT_PDF_GENERATED',
   ] as const;
 }
 
@@ -141,7 +145,10 @@ export interface BitacoraPaginadaDto {
 export interface FiltrosBitacora {
   idSprint?: number;
   idActor?: number;
+  persona?: string;
   tipoEvento?: TipoEventoBitacoraValor;
+  desde?: string;
+  hasta?: string;
   page?: number;
   limit?: number;
 }

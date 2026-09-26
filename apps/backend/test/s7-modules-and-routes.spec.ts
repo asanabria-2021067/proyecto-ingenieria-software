@@ -632,14 +632,15 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
     const graph = await collectModuleGraph(AppModule as Type<unknown>);
     const routes = collectRoutes(graph.modules);
 
-    // ── El inventario de cobertura de §41: sesenta y seis usos explícitos.
+    // ── El inventario de cobertura de §41: sesenta y siete usos explícitos
+    //    (66 de Sprint 7 más POST /:id/hitos/:idHito/tareas, HU-147/T-185).
     //    Se cuenta sobre el código fuente, no sobre la metadata resuelta, para
     //    que el número describa decisiones escritas por alguien.
     const declaraciones = listTypeScriptFiles(SRC_ROOT).reduce((total, file) => {
       const matches = fs.readFileSync(file, 'utf8').match(/@ProjectWrite\(/g);
       return total + (matches?.length ?? 0);
     }, 0);
-    expect(declaraciones).toBe(66);
+    expect(declaraciones).toBe(67);
 
     // ── Ninguna ruta participante depende del default restrictivo.
     //

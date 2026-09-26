@@ -256,7 +256,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const esParticipante =
     !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeCrear = isLeader || esParticipante;
-  const { crearHito } = useProjectMilestones(idProyecto);
+  const { crearHito, asignarHitoTareas } = useProjectMilestones(idProyecto);
   const opcionesRol = useMemo(() => derivarOpcionesRol(tasks), [tasks]);
   const opcionesHito = useMemo(() => derivarOpcionesHito(tasks), [tasks]);
   const hayFiltrosActivos = filtroRol !== FILTRO_TODOS || filtroHito !== FILTRO_TODOS;
@@ -610,6 +610,9 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               milestones={proyecto.hitos}
               members={members}
               labels={labels}
+              puedeCrear={puedeCrear}
+              crearHito={crearHito}
+              asignarHitoTareas={asignarHitoTareas}
             />
           </TabsContent>
         </Tabs>

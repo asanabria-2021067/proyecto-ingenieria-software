@@ -29,6 +29,14 @@ vi.mock('../lib/services/leadership', () => ({
   createLeadershipAppeal: vi.fn(),
   cancelLeadershipAppeal: vi.fn(),
 }));
+// T-259/T-260/T-261 (HU-164): esta pantalla es de administración, así que
+// `useIsAdmin` siempre es true aquí — se fuerza para no depender de una
+// sesión real; el resto del módulo (useCurrentUser real) sigue intacto
+// porque otros hijos del árbol pueden necesitarlo.
+vi.mock('../hooks/use-current-user', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/use-current-user')>();
+  return { ...actual, useIsAdmin: () => true };
+});
 
 import AdminProjectDetailClient, { grupoDeEstado } from '../app/dashboard/admin/proyectos/[id]/admin-project-detail-client';
 import { getAdminProjectDetail } from '../lib/services/admin-projects';
@@ -131,7 +139,7 @@ describe('VIEW-16 — detalle administrativo (F013)', () => {
     expect(getAdminProjectDetail).toHaveBeenCalledWith(37);
   });
 
-  it('permisos en false → cero controles de escritura sobre tareas/Sprint/roles; la única acción es el botón general de liderazgo (F014)', async () => {
+  it('permisos en false → cero controles de escritura sobre tareas/Sprint/roles; la única acción de escritura es el botón general de liderazgo (F014)', async () => {
     renderPage();
     await screen.findByRole('heading', { level: 1 });
 
@@ -141,6 +149,14 @@ describe('VIEW-16 — detalle administrativo (F013)', () => {
     expect(screen.queryByRole('button', { name: /editar|eliminar|finalizar|cerrar sprint|iniciar|aprobar|rechazar|agregar/i })).not.toBeInTheDocument();
     // Un solo botón general, nunca uno por integrante.
     expect(screen.getAllByRole('button', { name: /cambiar liderazgo/i })).toHaveLength(1);
+  });
+
+  it('T-259/T-260/T-261: la administración también ve los botones de exportar del proyecto', async () => {
+    renderPage();
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.getByRole('button', { name: /exportar csv/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /exportar pdf/i })).toBeInTheDocument();
   });
 
   it('los cuatro tabs se montan y el breadcrumb vuelve a la bandeja con su grupo', async () => {

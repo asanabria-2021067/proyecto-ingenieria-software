@@ -66,9 +66,8 @@ describe('UpdateTaskDto', () => {
     await expect(parse({ tituloTarea: '   ' })).rejects.toThrow(BadRequestException);
   });
 
-  it('acepta idHito: null para retirar la relación', async () => {
-    const dto = await parse({ idHito: null });
-    expect(dto.idHito).toBeNull();
+  it('rechaza idHito: null (HU-147/T-185: ya no se admite quitar el hito)', async () => {
+    await expect(parse({ idHito: null })).rejects.toThrow(BadRequestException);
   });
 
   it('acepta idRolProyecto: null para retirar la relación', async () => {
@@ -76,7 +75,7 @@ describe('UpdateTaskDto', () => {
     expect(dto.idRolProyecto).toBeNull();
   });
 
-  it('valida idHito como entero positivo cuando no es null', async () => {
+  it('valida idHito como entero positivo cuando se envía', async () => {
     await expect(parse({ idHito: 0 })).rejects.toThrow(BadRequestException);
     await expect(parse({ idHito: -1 })).rejects.toThrow(BadRequestException);
     const dto = await parse({ idHito: 4 });
@@ -102,7 +101,7 @@ describe('UpdateTaskDto', () => {
     );
   });
 
-  describe('null explícito: solo idHito/idRolProyecto lo admiten (Tarea 11.B)', () => {
+  describe('null explícito: solo idRolProyecto lo admite (Tarea 11.B; idHito dejó de admitirlo en HU-147/T-185)', () => {
     it('acepta un payload vacío {}', async () => {
       const dto = await parse({});
       expect(dto).toEqual({});
@@ -110,6 +109,10 @@ describe('UpdateTaskDto', () => {
 
     it('rechaza tituloTarea: null', async () => {
       await expect(parse({ tituloTarea: null })).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza idHito: null', async () => {
+      await expect(parse({ idHito: null })).rejects.toThrow(BadRequestException);
     });
 
     it('rechaza descripcionTarea: null', async () => {
