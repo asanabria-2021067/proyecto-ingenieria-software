@@ -13,6 +13,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectPendingExitRequests } from '@/hooks/use-exit-request';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -152,9 +153,7 @@ export default function ProjectPendingExitRequestsPage() {
                 </EmptyMedia>
                 <EmptyHeader>
                   <EmptyTitle>
-                    {error instanceof Error && error.message
-                      ? error.message
-                      : 'No fue posible cargar las solicitudes de salida.'}
+                    {getApiErrorMessage(error, 'general', 'No fue posible cargar las solicitudes de salida.')}
                   </EmptyTitle>
                 </EmptyHeader>
                 <EmptyContent>

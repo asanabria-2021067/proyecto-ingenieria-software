@@ -102,8 +102,24 @@ describe('HourAdjustmentRow (VIEW-03 / F002)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Ajustar/ }));
     fireEvent.change(screen.getByLabelText('Horas aceptadas'), { target: { value: '9' } });
     const boton = screen.getByRole('button', { name: /Guardar ajuste/ });
-    expect(boton).toBeDisabled();
+    expect(boton).toBeEnabled();
     expect(screen.getByLabelText(/Justificación del líder/)).toBeRequired();
+    fireEvent.click(boton);
+    expect(screen.getByRole('alert')).toHaveTextContent('La justificación es obligatoria');
+    expect(boton).toBeEnabled();
+    expect(onUpsert).not.toHaveBeenCalled();
+  });
+
+  it('muestra el error junto a las horas aceptadas y permite corregirlo', () => {
+    const { onUpsert } = renderRow();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Ajustar/ }));
+    fireEvent.change(screen.getByLabelText('Horas aceptadas'), { target: { value: '-1' } });
+    const boton = screen.getByRole('button', { name: /Guardar ajuste/ });
+    fireEvent.click(boton);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Ingresa una cantidad de horas válida');
+    expect(boton).toBeEnabled();
     expect(onUpsert).not.toHaveBeenCalled();
   });
 

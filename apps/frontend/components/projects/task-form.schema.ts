@@ -8,22 +8,27 @@ export const SIN_ASIGNAR = 'sin-asignar';
 
 const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * Día calendario local (no UTC) — mismo criterio que
- * `task-board.utils.ts#estaVencida` (protegido en esta tarea; se repite
- * aquí en vez de importarlo porque ese archivo no lo exporta). El backend
- * (`IsFutureCalendarDateConstraint`,
- * apps/backend/src/tasks/dto/validators/is-future-calendar-date.validator.ts)
- * exige estrictamente posterior al día de hoy en America/Guatemala; esta es
- * una aproximación con la hora local del navegador — el backend sigue
- * siendo la autoridad final y puede rechazar un valor límite que el cliente
- * aceptó por una diferencia de huso horario.
- */
-function hoyLocalISO(ahora: Date): string {
-  const anio = ahora.getFullYear();
-  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-  const dia = String(ahora.getDate()).padStart(2, '0');
-  return `${anio}-${mes}-${dia}`;
+function hoyGuatemalaISO(ahora: Date): string {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(ahora);
+  const valor = (tipo: 'year' | 'month' | 'day') =>
+    partes.find((parte) => parte.type === tipo)?.value ?? '';
+  return `${valor('year')}-${valor('month')}-${valor('day')}`;
+}
+
+function fechaCalendarioValida(value: string): boolean {
+  if (!DATE_FORMAT.test(value)) return false;
+  const [anio, mes, dia] = value.split('-').map(Number);
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  return (
+    fecha.getUTCFullYear() === anio &&
+    fecha.getUTCMonth() === mes - 1 &&
+    fecha.getUTCDate() === dia
+  );
 }
 
 export interface BuildTaskFormSchemaOptions {
@@ -60,7 +65,7 @@ export function buildTaskFormSchema({
   mode = 'edit',
   hitoOriginal = null,
 }: BuildTaskFormSchemaOptions) {
-  const hoy = hoyLocalISO(ahora);
+  const hoy = hoyGuatemalaISO(ahora);
 
   return z
     .object({
@@ -69,11 +74,14 @@ export function buildTaskFormSchema({
         .trim()
         .min(1, 'El título no puede estar vacío.')
         .max(150, 'El título no puede exceder 150 caracteres.'),
-      descripcionTarea: z.string().max(5000, 'La descripción no puede exceder 5000 caracteres.'),
+      descripcionTarea: z.string().refine(
+        (value) => value.trim().length <= 5000,
+        'La descripción no puede exceder 5000 caracteres.',
+      ),
       prioridad: z.enum(['ALTA', 'MEDIA', 'BAJA'], {
         errorMap: () => ({ message: 'Selecciona una prioridad válida.' }),
       }),
-      fechaLimite: z.string().regex(DATE_FORMAT, 'Selecciona una fecha límite válida.'),
+      fechaLimite: z.string().refine(fechaCalendarioValida, 'Selecciona una fecha límite válida.'),
       tiempoEstimadoHoras: z.string(),
       puntosHistoria: z.string(),
       idRolProyecto: z.string().min(1),

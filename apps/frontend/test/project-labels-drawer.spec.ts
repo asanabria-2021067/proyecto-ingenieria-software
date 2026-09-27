@@ -2,6 +2,12 @@ import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+const mensajesMock = vi.hoisted(() => ({
+  confirmar: vi.fn(),
+  aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
+}));
+vi.mock('../lib/mensajes', () => mensajesMock);
+
 import { ProjectLabelsDrawer } from '../components/projects/project-labels-drawer';
 import type { LabelDTO } from '../lib/services/labels';
 
@@ -176,7 +182,8 @@ describe('ProjectLabelsDrawer', () => {
     expect(screen.getByText('Backend')).toBeInTheDocument();
   });
 
-  it('eliminar etiqueta requiere confirmación mediante AlertDialog', async () => {
+  it('eliminar etiqueta pide confirmación con el componente de mensajes', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
     const deleteLabel = mutationStub();
     renderDrawer({
       labels: [{ idEtiqueta: 5, nombreEtiqueta: 'Backend', color: '#112233' }],
@@ -184,15 +191,21 @@ describe('ProjectLabelsDrawer', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar etiqueta Backend' }));
-    expect(screen.getByText('¿Eliminar la etiqueta "Backend"?')).toBeInTheDocument();
-    expect(screen.getByText(/Las tareas no serán eliminadas/i)).toBeInTheDocument();
-    expect(deleteLabel.mutateAsync).not.toHaveBeenCalled();
+    expect(mensajesMock.confirmar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        titulo: '¿Eliminar la etiqueta "Backend"?',
+        descripcion: expect.stringMatching(/Las tareas no serán eliminadas/i),
+        textoAccion: 'Eliminar etiqueta',
+        destructiva: true,
+      }),
+    );
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Eliminar etiqueta' }).at(-1)!);
     await waitFor(() => expect(deleteLabel.mutateAsync).toHaveBeenCalledWith({ labelId: 5 }));
+    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Etiqueta eliminada', expect.any(String)));
   });
 
-  it('cancelar la eliminación no llama a la mutation', () => {
+  it('cancelar la eliminación no llama a la mutation', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
     const deleteLabel = mutationStub();
     renderDrawer({
       labels: [{ idEtiqueta: 5, nombreEtiqueta: 'Backend', color: '#112233' }],
@@ -200,7 +213,7 @@ describe('ProjectLabelsDrawer', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar etiqueta Backend' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalled());
     expect(deleteLabel.mutateAsync).not.toHaveBeenCalled();
   });
 
@@ -217,7 +230,8 @@ describe('ProjectLabelsDrawer', () => {
     expect(screen.getByLabelText('Nombre de la etiqueta')).toHaveValue('Dup');
   });
 
-  it('un 403 al eliminar muestra el mensaje de permisos y conserva la etiqueta', async () => {
+  it('un 403 al eliminar avisa el mensaje de permisos y conserva la etiqueta', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
     const deleteLabel = mutationStub({
       mutateAsync: vi.fn().mockRejectedValue(Object.assign(new Error('x'), { statusCode: 403 })),
     });
@@ -227,9 +241,13 @@ describe('ProjectLabelsDrawer', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar etiqueta Backend' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Eliminar etiqueta' }).at(-1)!);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('No tienes permisos para realizar esta acción.');
+    await waitFor(() =>
+      expect(mensajesMock.aviso.error).toHaveBeenCalledWith(
+        'No se pudo eliminar la etiqueta',
+        expect.stringMatching(/^No tienes permisos para realizar esta acción\./),
+      ),
+    );
     expect(screen.getByText('Backend')).toBeInTheDocument();
   });
 

@@ -45,7 +45,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import uvgSwal from '@/lib/swal';
+import { aviso } from '@/lib/mensajes';
 import { sprintClosingSummaryQueryKey } from '@/lib/query-keys/sprints';
 import type {
   SprintClosingMemberTotalsDto,
@@ -62,8 +62,7 @@ function getInitials(nombre: string, apellido: string): string {
 }
 
 function mensajeDeError(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return 'Ocurrio un error inesperado. Intenta nuevamente.';
+  return getApiErrorMessage(error, 'general');
 }
 
 function sumarDecimales(valores: string[]): string {
@@ -356,14 +355,7 @@ export default function SprintClosingPage() {
     try {
       await closeSprint.mutateAsync({ idSprint, destino });
       queryClient.invalidateQueries({ queryKey: sprintClosingSummaryQueryKey(idProyecto, idSprint) });
-      void uvgSwal.fire({
-        icon: 'success',
-        title: 'Sprint cerrado',
-        text: 'Las horas propuestas quedaron acreditadas y forman parte del historial del proyecto.',
-        timer: 2200,
-        timerProgressBar: true,
-        showConfirmButton: false,
-      });
+      aviso.exito('Sprint cerrado', 'Las horas propuestas quedaron acreditadas y forman parte del historial del proyecto.');
       router.push(`/dashboard/projects/${idProyecto}`);
     } catch (err) {
       const status = getApiErrorStatus(err);

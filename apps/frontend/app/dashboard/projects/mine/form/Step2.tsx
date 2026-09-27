@@ -13,7 +13,6 @@ type Props = {
   carreras: Carrera[];
   habilidades: Habilidad[];
   errors: Record<string, FieldErrors>;
-  noRolesError: boolean;
   onAddRol: () => void;
   onRemoveRol: (id: string) => void;
   onUpdateRol: (id: string, field: keyof Omit<RolFormItem, 'id' | 'requisitos'>, value: unknown) => void;
@@ -26,7 +25,7 @@ const ErrMsg = ({ msg }: { msg?: string }) =>
   msg ? <p className="text-xs text-error mt-1">{msg}</p> : null;
 
 export function Step2({
-  roles, carreras, habilidades, errors, noRolesError,
+  roles, carreras, habilidades, errors,
   onAddRol, onRemoveRol, onUpdateRol,
   onAddRequisito, onRemoveRequisito, onUpdateRequisito,
 }: Props) {
@@ -37,8 +36,8 @@ export function Step2({
       </p>
 
       {roles.length === 0 && (
-        <div className={`text-center py-10 text-sm border-2 border-dashed rounded-xl ${noRolesError ? 'border-error text-error' : 'border-outline-variant text-tertiary'}`}>
-          {noRolesError ? 'Debes agregar al menos un rol para enviar a revisión.' : 'No hay roles definidos aún.'}
+        <div className="text-center py-10 text-sm border-2 border-dashed rounded-xl border-outline-variant text-tertiary">
+          No hay roles definidos aún.
         </div>
       )}
 
@@ -57,6 +56,7 @@ export function Step2({
             <div>
               <label className={labelClass}>Nombre del rol <span className="text-error">*</span></label>
               <input
+                maxLength={255}
                 className={`${inputClass} ${rolErrors.nombreRol ? 'border-error focus:border-error focus:ring-error/20' : ''}`}
                 placeholder="ej. Desarrollador Frontend"
                 value={rol.nombreRol}
@@ -94,7 +94,8 @@ export function Step2({
             </div>
             <div className="w-40">
               <label className={labelClass}>Horas semanales</label>
-              <input type="number" min={1} className={inputClass} placeholder="ej. 10" value={rol.horasSemanalesEstimadas} onChange={(e) => onUpdateRol(rol.id, 'horasSemanalesEstimadas', e.target.value === '' ? '' : Number(e.target.value))} />
+              <input type="number" min={1} step={1} className={`${inputClass} ${rolErrors.horasSemanalesEstimadas ? 'border-error' : ''}`} placeholder="ej. 10" value={rol.horasSemanalesEstimadas} onChange={(e) => onUpdateRol(rol.id, 'horasSemanalesEstimadas', e.target.value === '' ? '' : Number(e.target.value))} />
+              <ErrMsg msg={rolErrors.horasSemanalesEstimadas} />
             </div>
           </div>
 
@@ -122,30 +123,36 @@ export function Step2({
             )}
 
             <div className="space-y-2">
-              {rol.requisitos.map((req) => (
-                <div key={req.id} className="grid grid-cols-[1fr_8rem_auto_auto] items-center gap-2">
-                  <Select value={req.idHabilidad ? String(req.idHabilidad) : '__NONE__'} onValueChange={(v) => onUpdateRequisito(rol.id, req.id, 'idHabilidad', v === '__NONE__' ? null : Number(v))}>
-                    <SelectTrigger className="h-auto py-2 rounded-lg border-outline-variant/30 bg-surface-container-low text-sm">
-                      <SelectValue placeholder="Seleccionar habilidad" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__NONE__">Seleccionar habilidad</SelectItem>
-                      {habilidades.map((h) => (
-                        <SelectItem key={h.idHabilidad} value={String(h.idHabilidad)}>{h.nombreHabilidad}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {rol.requisitos.map((req, reqIdx) => (
+                <div key={req.id} className="grid grid-cols-[1fr_8rem_auto_auto] items-start gap-2">
+                  <div>
+                    <Select value={req.idHabilidad ? String(req.idHabilidad) : '__NONE__'} onValueChange={(v) => onUpdateRequisito(rol.id, req.id, 'idHabilidad', v === '__NONE__' ? null : Number(v))}>
+                      <SelectTrigger className="h-auto py-2 rounded-lg border-outline-variant/30 bg-surface-container-low text-sm">
+                        <SelectValue placeholder="Seleccionar habilidad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__NONE__">Seleccionar habilidad</SelectItem>
+                        {habilidades.map((h) => (
+                          <SelectItem key={h.idHabilidad} value={String(h.idHabilidad)}>{h.nombreHabilidad}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <ErrMsg msg={rolErrors[`requisitos.${reqIdx}.idHabilidad`]} />
+                  </div>
 
-                  <Select value={req.nivelMinimo || '__NONE__'} onValueChange={(v) => onUpdateRequisito(rol.id, req.id, 'nivelMinimo', v === '__NONE__' ? '' : v)}>
-                    <SelectTrigger className="h-auto py-2 rounded-lg border-outline-variant/30 bg-surface-container-low text-sm">
-                      <SelectValue placeholder="Nivel" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(NIVEL_LABEL).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div>
+                    <Select value={req.nivelMinimo || '__NONE__'} onValueChange={(v) => onUpdateRequisito(rol.id, req.id, 'nivelMinimo', v === '__NONE__' ? '' : v)}>
+                      <SelectTrigger className="h-auto py-2 rounded-lg border-outline-variant/30 bg-surface-container-low text-sm">
+                        <SelectValue placeholder="Nivel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(NIVEL_LABEL).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <ErrMsg msg={rolErrors[`requisitos.${reqIdx}.nivelMinimo`]} />
+                  </div>
 
                   <label className="flex items-center gap-1.5 text-xs text-tertiary whitespace-nowrap cursor-pointer">
                     <input type="checkbox" checked={req.obligatorio} onChange={(e) => onUpdateRequisito(rol.id, req.id, 'obligatorio', e.target.checked)} className="accent-primary" />
