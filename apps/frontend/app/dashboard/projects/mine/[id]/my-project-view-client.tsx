@@ -79,7 +79,7 @@ function ProjectReadOnlyView({
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-10">
 
       {esObservado && (
-        <div className="rounded-2xl border border-status-warning bg-status-warning/20 px-5 py-4 flex items-start justify-between gap-4">
+        <div className="rounded-2xl border border-outline-variant bg-status-warning/20 px-5 py-4 flex items-start justify-between gap-4">
           <div>
             <p className="type-subtitle text-text-primary">
               Tu proyecto tiene observaciones del revisor
@@ -356,7 +356,7 @@ export default function MyProjectViewClient({ id }: Props) {
             </button>
             <div className="h-5 w-px bg-outline-variant/40" />
             <div className="flex-1 min-w-0">
-              <p className="type-meta font-black uppercase tracking-widest text-status-warning">
+              <p className="type-meta font-black uppercase tracking-widest text-text-primary">
                 Mis Proyectos · Editando correcciones
               </p>
               <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
@@ -789,10 +789,10 @@ export default function MyProjectViewClient({ id }: Props) {
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
                       Información general
                     </h2>
-                    <div className="rounded-xl border border-status-warning/30 bg-status-warning/10 p-4">
+                    <div className="rounded-xl border border-outline-variant bg-status-warning/10 p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <MessageSquare className="h-3.5 w-3.5 text-status-warning shrink-0" />
-                        <span className="type-meta font-black uppercase tracking-widest text-status-warning">
+                        <MessageSquare className="h-3.5 w-3.5 text-text-primary shrink-0" />
+                        <span className="type-meta font-black uppercase tracking-widest text-text-primary">
                           Comentarios del revisor
                         </span>
                       </div>
@@ -817,10 +817,10 @@ export default function MyProjectViewClient({ id }: Props) {
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
                       Roles y habilidades
                     </h2>
-                    <div className="rounded-xl border border-status-warning/30 bg-status-warning/10 p-4">
+                    <div className="rounded-xl border border-outline-variant bg-status-warning/10 p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <MessageSquare className="h-3.5 w-3.5 text-status-warning shrink-0" />
-                        <span className="type-meta font-black uppercase tracking-widest text-status-warning">
+                        <MessageSquare className="h-3.5 w-3.5 text-text-primary shrink-0" />
+                        <span className="type-meta font-black uppercase tracking-widest text-text-primary">
                           Comentarios del revisor
                         </span>
                       </div>
