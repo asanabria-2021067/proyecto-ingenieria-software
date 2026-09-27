@@ -9,7 +9,16 @@ on:
     branches: [main, develop]
   push:
     branches: [develop]
+  # G02 (OWASP25-C033 + FASE2-N06): quien reutiliza este workflow decide de
+  # forma explicita si corre el E2E. Dentro de un workflow_call,
+  # github.event_name es el evento del CALLER (p. ej. `push` a main), asi que
+  # no sirve para decidirlo.
   workflow_call:
+    inputs:
+      e2e:
+        description: "'run' ejecuta la suite E2E; 'skip' la omite"
+        type: string
+        required: true
   workflow_dispatch:
 
 # Si se empujan varios commits seguidos al mismo PR, cancela las corridas
@@ -168,13 +177,14 @@ jobs:
     # A diferencia de los jobs backend/frontend (que usan mocks), este job
     # necesita una base de datos y un Redis reales: arranca el backend de
     # verdad y navega la app de verdad con un navegador. Es lento (~10min+)
-    # aun con cache, asi que NO corre en cada push/PR a develop: solo en PR
-    # hacia main, manualmente (workflow_dispatch), o cuando deploy.yml
-    # reusa este workflow antes de desplegar (workflow_call).
+    # aun con cache, asi que NO corre en cada push/PR a develop.
+    # - Reutilizado (workflow_call): decide SOLO el input `e2e` del caller
+    #   (deploy.yml pide `run`).
+    # - Invocado directamente (sin input): PR hacia main o workflow_dispatch.
     if: >-
-      github.event_name == 'workflow_call' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.base_ref == 'main')
+      inputs.e2e == 'run' ||
+      (!inputs.e2e && (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')))
     services:
       postgres:
         image: postgres:17-alpine
