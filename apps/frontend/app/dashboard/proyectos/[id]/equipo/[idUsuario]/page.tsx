@@ -37,6 +37,7 @@ import { useHistoricalProject } from '@/hooks/use-historical-project';
 import { motivoInelegibilidadLabel, type LeadershipCandidateDto } from '@/lib/types/leadership';
 import type { HistoricalHorasUsuario } from '@/lib/services/historical';
 import type { EstadoSprint } from '@/lib/types/sprints';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 /**
  * Estilos de estado de Sprint (mismo criterio `statusConfig` manual que
@@ -165,7 +166,7 @@ export default function DetalleIntegranteProyectoPage() {
             <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-10 text-center">
               <ShieldAlert className="w-10 h-10 text-error mx-auto mb-3" />
               <p className="text-sm text-error">
-                {error instanceof Error ? error.message : 'No se pudo cargar el detalle del integrante.'}
+                {getApiErrorMessage(error, 'general', 'No se pudo cargar el detalle del integrante.')}
               </p>
             </div>
           )}

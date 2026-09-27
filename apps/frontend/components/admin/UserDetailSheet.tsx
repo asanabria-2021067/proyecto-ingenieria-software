@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   getAdminUserDetail,
   updateAdminUserStatus,
@@ -618,7 +619,7 @@ function DetailContent({
       uvgSwal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'No se pudo actualizar el estado del usuario.',
+        text: getApiErrorMessage(error, 'admin', 'No se pudo actualizar el estado del usuario.'),
       });
       setPendingAction(null);
     },
