@@ -112,7 +112,7 @@ describe('EventsReminderService.enviarRecordatoriosPendientes', () => {
     });
   });
 
-  it('la consulta de candidatos ya excluye eventos cancelados, ya enviados y pasados (where declarativo)', async () => {
+  it('la consulta de candidatos ya excluye eventos cancelados, ya enviados, pasados y de proyectos eliminados (where declarativo)', async () => {
     const prisma = makePrisma();
     prisma.eventoProyecto.findMany.mockResolvedValue([]);
     const notifications = makeNotifications();
@@ -126,7 +126,26 @@ describe('EventsReminderService.enviarRecordatoriosPendientes', () => {
           eliminadoEn: null,
           recordatorioEnviadoEn: null,
           fechaInicio: { gt: expect.any(Date) },
+          proyecto: { eliminadoEn: null },
         }),
+      }),
+    );
+  });
+
+  it('formatea fechaInicioTexto en America/Guatemala, sin depender de la TZ del proceso', async () => {
+    const prisma = makePrisma();
+    prisma.eventoProyecto.findMany.mockResolvedValue([evento()]);
+    const notifications = makeNotifications();
+    const service = new EventsReminderService(prisma, notifications);
+
+    await service.enviarRecordatoriosPendientes();
+
+    const payload = notifications.notifyFromTemplate.mock.calls[0][2];
+    expect(payload.fechaInicioTexto).toBe(
+      new Date('2026-10-01T15:00:00.000Z').toLocaleString('es-GT', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+        timeZone: 'America/Guatemala',
       }),
     );
   });
