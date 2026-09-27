@@ -1,5 +1,6 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { EstadoUsuario, type Prisma } from '@prisma/client';
+import { assertJwtSecret, JWT_SECRET_VARIABLE } from './jwt-secret';
 
 /**
  * Validador único y puro de environment (06 v2 §51.1 y §51.2). Conserva las
@@ -284,6 +285,8 @@ function deriveClosureAvailability(raw: RawEnvironment): ClosureAvailability {
 
 export function validateEnvironment(raw: RawEnvironment): ValidatedEnvironment {
   const app = deriveAppEnvironment(raw);
+  // G01 · OWASP25-C019: sin un JWT_SECRET válido el backend no arranca.
+  assertJwtSecret(raw[JWT_SECRET_VARIABLE]);
   const closure = deriveClosureAvailability(raw);
 
   if (!closure.disponible) {
