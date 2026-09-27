@@ -370,3 +370,74 @@ describe('ProjectDetailClient — responsable en la tarjeta compartida', () => {
     expect(within(card).queryByRole('button', { name: 'Chat' })).not.toBeInTheDocument();
   });
 });
+
+// ── HU-154 (T-216): esqueleto compartido del líder ───────────────────────
+describe('ProjectDetailClient — esqueleto 8/4 del líder', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: proyecto(), isLoading: false, error: null, refetch: vi.fn() });
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    (useProjectMembers as any).mockReturnValue({ members: [{ idUsuario: 1 }, { idUsuario: 5 }] });
+    mockRoles([rol({ isMine: true })]);
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function slot(container: HTMLElement, nombre: string) {
+    return container.querySelector(`[data-slot="${nombre}"]`) as HTMLElement;
+  }
+
+  it('usa la rejilla compartida: encabezado, principal y lateral, en ese orden', () => {
+    const { container } = renderPage();
+
+    const grid = slot(container, 'project-content-grid');
+    expect(grid).toBeInTheDocument();
+    expect(Array.from(grid.children).map((el) => el.getAttribute('data-slot'))).toEqual([
+      'project-grid-full',
+      'project-grid-main',
+      'project-grid-aside',
+    ]);
+    expect(grid.className).not.toContain('max-w-[1400px]');
+  });
+
+  it('encabezado a ancho completo con la ruta de vuelta a Mis proyectos', () => {
+    const { container } = renderPage();
+
+    const full = slot(container, 'project-grid-full');
+    expect(within(full).getByRole('heading', { level: 1, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    expect(within(full).getByRole('link', { name: 'Mis proyectos' })).toHaveAttribute('href', '/dashboard/projects/mine');
+  });
+
+  it('la columna principal tiene «Descripción y objetivos» y luego los roles', () => {
+    const { container } = renderPage();
+
+    const main = slot(container, 'project-grid-main');
+    const descripcion = within(main).getByRole('region', { name: 'Descripción y objetivos' });
+    expect(within(descripcion).getByText('Descripción real del proyecto.')).toBeInTheDocument();
+    expect(within(descripcion).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Objetivo uno', 'Objetivo dos']);
+    const rolesTitulo = within(main).getByText(/Roles del proyecto/);
+    // La descripción precede a los roles en el orden del documento.
+    expect(descripcion.compareDocumentPosition(rolesTitulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('la columna lateral reúne responsable, detalles y resumen del equipo', () => {
+    renderPage();
+
+    const aside = screen.getByRole('complementary', { name: 'Información del proyecto' });
+    expect(within(aside).getByRole('region', { name: 'Responsable del proyecto' })).toBeInTheDocument();
+    expect(within(aside).getByText('Detalles del proyecto')).toBeInTheDocument();
+    expect(within(aside).getByText('Resumen del equipo')).toBeInTheDocument();
+  });
+
+  it('?openRoles=1 sigue abriendo la gestión de roles y limpia la URL', () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('openRoles=1'));
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Gestionar roles' })).toBeInTheDocument();
+    expect(replaceMock).toHaveBeenCalledWith('/dashboard/projects/42');
+  });
+});
+
