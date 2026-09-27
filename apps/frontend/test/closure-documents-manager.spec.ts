@@ -108,11 +108,22 @@ describe('ClosureDocumentsManager (VIEW-13 / F005)', () => {
     expect(onUpload).toHaveBeenCalledWith(file);
   });
 
-  it('muestra «Evidencias — n de 10» y permite quitar', () => {
+  it('muestra «Evidencias — n de 10» y pide confirmación antes de quitar', () => {
     const { onDetach } = renderManager();
     expect(screen.getByText(`1 de ${MAX_EVIDENCIAS}`)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Quitar captura.pdf' }));
+    expect(onDetach).not.toHaveBeenCalled();
+
+    expect(screen.getByText(/tendrás que volver a subirlo/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, quitar archivo' }));
     expect(onDetach).toHaveBeenCalledWith(101);
+  });
+
+  it('cancelar la confirmación de quitar no llama a onDetach', () => {
+    const { onDetach } = renderManager();
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar captura.pdf' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onDetach).not.toHaveBeenCalled();
   });
 
   it('422 muestra el mensaje de PDF inválido', () => {

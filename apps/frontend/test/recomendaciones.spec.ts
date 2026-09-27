@@ -10,6 +10,7 @@ function candidato(overrides: Partial<UsuarioBusquedaDto> = {}): UsuarioBusqueda
     fotoUrl: null,
     esAmigo: false,
     solicitudPendiente: null,
+    idAmistad: null,
     loSigo: false,
     carrera: 'Ingeniería en Ciencias de la Computación',
     semestre: 5,

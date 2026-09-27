@@ -14,6 +14,14 @@ function enDias(n: number): Date {
   return fecha;
 }
 
+/** HU-169 (T-263): igual que enDias, pero conservando una hora concreta —
+ * EventoProyecto.fechaInicio/fechaFin son fecha+hora, no solo fecha. */
+function enDiasHora(n: number, hora: number, minuto = 0): Date {
+  const fecha = enDias(n);
+  fecha.setHours(hora, minuto, 0, 0);
+  return fecha;
+}
+
 async function main() {
   const PASSWORD_HASH = hashSync('Test1234!', 10);
 
@@ -615,6 +623,31 @@ async function main() {
     prisma.tarea.upsert({ where: { idTarea: 5 }, update: {}, create: { idTarea: 5, idProyecto: pNeural.idProyecto, idSprint: sprintNeural.idSprint, idHito: hitos[3].idHito, tituloTarea: 'Leer papers sobre transformers', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: luis.idUsuario } }),
     prisma.tarea.upsert({ where: { idTarea: 6 }, update: {}, create: { idTarea: 6, idProyecto: pEmpleo.idProyecto, idSprint: sprintEmpleo.idSprint, idHito: hitos[5].idHito, tituloTarea: 'Diseñar schema Prisma', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: carlos.idUsuario } }),
     prisma.tarea.upsert({ where: { idTarea: 7 }, update: {}, create: { idTarea: 7, idProyecto: pEmpleo.idProyecto, idSprint: sprintEmpleo.idSprint, tituloTarea: 'Implementar búsqueda de empleos', estadoTarea: 'EN_PROGRESO', prioridad: 'MEDIA', creadaPor: carlos.idUsuario } }),
+  ]);
+
+  // ─── Eventos de calendario (HU-169/T-263) ────────────────
+  // pTutorias: carlos es el líder (idCreador) y jose tiene participación
+  // ACTIVO (rolFrontend, ver Participaciones más abajo), así que ambos ven
+  // estos eventos en /dashboard/calendario junto a las tareas 2/3 de arriba.
+  await Promise.all([
+    prisma.eventoProyecto.upsert({
+      where: { idEvento: 1 },
+      update: { fechaInicio: enDiasHora(2, 10, 0), fechaFin: enDiasHora(2, 11, 0) },
+      create: {
+        idEvento: 1, idProyecto: pTutorias.idProyecto, idCreador: carlos.idUsuario,
+        tituloEvento: 'Reunión de seguimiento semanal', descripcionEvento: 'Revisión de avance del Sprint con el equipo.',
+        fechaInicio: enDiasHora(2, 10, 0), fechaFin: enDiasHora(2, 11, 0),
+      },
+    }),
+    prisma.eventoProyecto.upsert({
+      where: { idEvento: 2 },
+      update: { fechaInicio: enDiasHora(6, 15, 0), fechaFin: enDiasHora(6, 16, 30) },
+      create: {
+        idEvento: 2, idProyecto: pTutorias.idProyecto, idCreador: carlos.idUsuario,
+        tituloEvento: 'Demo de autenticación al equipo', descripcionEvento: 'Presentación del flujo de login implementado.',
+        fechaInicio: enDiasHora(6, 15, 0), fechaFin: enDiasHora(6, 16, 30), antelacionMinutos: 30,
+      },
+    }),
   ]);
 
   // ─── Asignaciones de tarea ──────────────────────────────

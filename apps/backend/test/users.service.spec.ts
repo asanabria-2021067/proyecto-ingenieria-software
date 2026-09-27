@@ -26,6 +26,7 @@ function prismaMock() {
     horasParticipacion: { aggregate: vi.fn() },
     participacionProyecto: { count: vi.fn() },
     postulacion: { findMany: vi.fn() },
+    tarea: { findMany: vi.fn() },
     $transaction: vi.fn(async (cb: (tx: typeof defaultTx) => unknown) => cb(defaultTx)),
   };
   return prisma as typeof prisma & PrismaService;
@@ -128,5 +129,25 @@ describe('UsersService', () => {
     expect(result.horasTotal).toBe(12);
     expect(result.horasBeca).toBe(5);
     expect(result.horasExtension).toBe(7);
+  });
+
+  // T-267: GET /usuarios/me/tareas no acepta ningún id externo (el DTO de
+  // query no declara ese campo y el ValidationPipe global lo rechazaría);
+  // esto verifica en el service, que es quien arma la consulta a Prisma,
+  // que el filtro de asignación siempre usa el userId de la sesión.
+  it('getMisTareas solo devuelve tareas asignadas al usuario de la sesión', async () => {
+    const prisma = prismaMock();
+    prisma.tarea.findMany.mockResolvedValue([]);
+    const service = new UsersService(prisma);
+
+    await service.getMisTareas(42, {});
+
+    expect(prisma.tarea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          asignaciones: { some: { idUsuario: 42 } },
+        }),
+      }),
+    );
   });
 });

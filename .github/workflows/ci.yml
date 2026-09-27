@@ -28,6 +28,10 @@ env:
   # AuthService falla al arrancar sin esto (ver auth.service.ts) - no tiene
   # valor por defecto a proposito, asi que CI debe proveerlo explicitamente.
   JWT_REFRESH_SECRET: ci-refresh-secret
+  # JwtStrategy y los gateways realtime exigen esto (T-210: sin valor por
+  # defecto a proposito) - sin declararlo aqui, cualquier spec nuevo que
+  # construya JwtStrategy o un JwtModule rompe CI sin aviso previo.
+  JWT_SECRET: ci-secret
 
 jobs:
   backend:

@@ -25,6 +25,7 @@ import {
   estadoBadgeStyle,
   getIniciales,
 } from '@/components/projects/available-project-card';
+import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { useAccionesAmistad, usePerfilUsuario } from '@/hooks/use-social';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 
@@ -55,8 +56,8 @@ export default function PerfilPersonaPage() {
   const params = useParams<{ id: string }>();
   const idUsuario = Number(params.id);
   const { perfil, isLoading, isError } = usePerfilUsuario(idUsuario);
-  const { amistad, seguimiento } = useAccionesAmistad(
-    perfil ?? { idUsuario, esAmigo: false, solicitudPendiente: null, loSigo: false },
+  const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(
+    perfil ?? { idUsuario, esAmigo: false, solicitudPendiente: null, idAmistad: null, loSigo: false },
   );
 
   if (isLoading) {
@@ -248,6 +249,8 @@ export default function PerfilPersonaPage() {
           </div>
         </aside>
       </div>
+
+      <ConfirmActionDialog {...confirmarEliminarAmistad} />
     </div>
   );
 }

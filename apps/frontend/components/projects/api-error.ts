@@ -19,7 +19,9 @@ export type ApiErrorScope =
   | 'hours'
   | 'closure'
   | 'leadership'
-  | 'admin';
+  | 'admin'
+  // HU-169 (T-263): eventos de calendario del proyecto.
+  | 'calendar';
 
 interface EnrichedError {
   statusCode?: number;
@@ -107,7 +109,8 @@ export function getApiErrorMessage(error: unknown, scope: ApiErrorScope = 'task'
         scope === 'hours' ||
         scope === 'closure' ||
         scope === 'leadership' ||
-        scope === 'admin'
+        scope === 'admin' ||
+        scope === 'calendar'
       ) {
         return backendMessage || 'Revisa los datos ingresados y las relaciones seleccionadas.';
       }
@@ -124,6 +127,9 @@ export function getApiErrorMessage(error: unknown, scope: ApiErrorScope = 'task'
       }
       if (scope === 'admin') {
         return 'Esta acción requiere permisos de administrador.';
+      }
+      if (scope === 'calendar') {
+        return 'No eres el líder de este proyecto.';
       }
       return 'No tienes permisos para realizar esta acción.';
     case 404:
@@ -161,6 +167,9 @@ export function getApiErrorMessage(error: unknown, scope: ApiErrorScope = 'task'
       }
       if (scope === 'admin') {
         return backendMessage || 'Otro administrador resolvió esto mientras trabajabas. Actualiza para ver el estado actual.';
+      }
+      if (scope === 'calendar') {
+        return backendMessage || 'No se puede crear un evento en un proyecto cerrado.';
       }
       return backendMessage || 'Ocurrió un conflicto al procesar la solicitud.';
     case 413:

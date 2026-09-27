@@ -22,6 +22,10 @@ export interface SolicitudAmistadPendienteDto {
 export interface UsuarioBusquedaDto extends UsuarioResumenDto {
   esAmigo: boolean;
   solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
+  /** Id de la fila de amistad cuando `esAmigo` o `solicitudPendiente` no son
+   * nulos: es lo que espera el backend para aceptar/rechazar/eliminar, no
+   * `idUsuario`. */
+  idAmistad: number | null;
   loSigo: boolean;
   carrera: string | null;
   semestre: number | null;
@@ -45,6 +49,7 @@ export interface UsuarioPerfilDto extends UsuarioResumenDto {
   correo: string;
   esAmigo: boolean;
   solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
+  idAmistad: number | null;
   loSigo: boolean;
   carrera: string | null;
   semestre: number | null;

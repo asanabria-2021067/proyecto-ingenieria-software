@@ -12,6 +12,14 @@ vi.mock('bcryptjs', () => ({
   hash: vi.fn(),
 }));
 
+// AuthService exige esta variable al construirse (ver auth.service.ts y
+// auth.service.spec.ts) - sin ella, "AuthService — contenido del payload
+// emitido" no puede instanciar el servicio cuando este archivo corre en un
+// worker de vitest que no cargó antes auth.service.spec.ts.
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-refresh-secret';
+// JwtStrategy exige JWT_SECRET al construirse (T-210: sin valor por defecto).
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
+
 /**
  * T-127 (IESUC-285). JwtStrategy es la implementación real de passport-jwt
  * usada por JwtAuthGuard en producción — se ejercita vía `.authenticate()`
@@ -20,7 +28,7 @@ vi.mock('bcryptjs', () => ({
  * asumida.
  */
 
-const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const SECRET = process.env.JWT_SECRET as string;
 
 function makeStrategy(usuario: { estado: string } | null = { estado: 'ACTIVO' }) {
   const prisma = { usuario: { findUnique: vi.fn().mockResolvedValue(usuario) } };
