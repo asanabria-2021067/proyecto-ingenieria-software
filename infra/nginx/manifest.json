@@ -1,0 +1,34 @@
+{
+  "gate": "G02-C16",
+  "control": "OWASP25-C047",
+  "description": "Baseline versionado del nginx de produccion de UVG Collab, sin cambios de comportamiento. P1 (location /socket.io/) NO esta incluido: pertenece a G04.",
+  "capture": {
+    "date": "2026-09-27",
+    "host": "uvg-collab-server",
+    "method": "lectura con claude-audit (solo lectura); hashes confirmados por el operador",
+    "vmCheckout": "main @ c8d70ac543d709d1b3d0f0dcfc2e993031ac6e96"
+  },
+  "files": [
+    {
+      "path": "nginx.conf",
+      "livePath": "/etc/nginx/nginx.conf",
+      "liveMode": "644 root:root",
+      "liveSha256": "48c6a4ec1e1fd28ccf968490f07e34a1d7f755793b2108a3ed8670b1ee2a0aa2",
+      "versionedSha256": "48c6a4ec1e1fd28ccf968490f07e34a1d7f755793b2108a3ed8670b1ee2a0aa2",
+      "mode": "verbatim",
+      "owner": "host compartido (configuracion global por defecto de la distro); referencia de solo lectura"
+    },
+    {
+      "path": "sites-enabled/uvg-collab",
+      "livePath": "/etc/nginx/sites-enabled/uvg-collab",
+      "liveMode": "644 root:root",
+      "liveSha256": "ea10d072d3bf5ea4710000d4cf311b7fcd4ed4b1b4dfeb055eb2c46733b80148",
+      "versionedSha256": "411e29e481ca4b52ab66494a0cbdc9a53a771420957612c33d1334a9525ea1ca",
+      "mode": "sanitized",
+      "owner": "UVG Collab (locations /, /api y /.well-known/acme-challenge/ del server compartido)",
+      "excludedLocations": ["/angel/", "/derek/", "/vernel/"],
+      "excludedComments": ["# Archivos estáticos de estudiantes"],
+      "sanitization": "Se reemplazan por un marcador los locations de estaticos de otros proyectos del host y su comentario; el resto es identico linea a linea. No habia secretos: el site solo referencia la RUTA del certificado y de su clave, nunca su contenido."
+    }
+  ]
+}
