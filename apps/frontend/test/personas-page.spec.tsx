@@ -34,6 +34,9 @@ vi.mock('@/lib/services/catalogs', () => ({
   getIntereses: () => Promise.resolve([{ idInteres: 1, nombreInteres: 'IA' }]),
 }));
 
+const swalFire = vi.fn();
+vi.mock('@/lib/swal', () => ({ default: { fire: (...args: unknown[]) => swalFire(...args) }, swalCustomClass: {} }));
+
 function usuario(overrides: Partial<UsuarioBusquedaDto> = {}): UsuarioBusquedaDto {
   return {
     idUsuario: 1,
@@ -42,6 +45,7 @@ function usuario(overrides: Partial<UsuarioBusquedaDto> = {}): UsuarioBusquedaDt
     fotoUrl: null,
     esAmigo: false,
     solicitudPendiente: null,
+    idAmistad: null,
     loSigo: false,
     carrera: null,
     semestre: null,
@@ -85,6 +89,7 @@ beforeEach(() => {
   getSolicitudesPendientesMock.mockResolvedValue([]);
   getAmigosMock.mockResolvedValue([]);
   buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
+  swalFire.mockClear();
 });
 
 describe('PersonasPage', () => {
@@ -257,14 +262,76 @@ describe('PersonasPage', () => {
     expect(await screen.findByRole('button', { name: 'Solicitud enviada' })).toBeDisabled();
   });
 
-  it('lista solicitudes pendientes y permite aceptarlas', async () => {
+  it('lista solicitudes pendientes y pide confirmación antes de aceptarlas', async () => {
     getSolicitudesPendientesMock.mockResolvedValue([solicitud()]);
     await renderPersonas();
 
     expect(await screen.findByText('Beto Gómez')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Aceptar/i }));
+    expect(aceptarSolicitudAmistadMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, aceptar solicitud' }));
 
     await waitFor(() => expect(aceptarSolicitudAmistadMock).toHaveBeenCalledWith(5));
+    await waitFor(() =>
+      expect(swalFire).toHaveBeenCalledWith(expect.objectContaining({ icon: 'success', title: 'Solicitud aceptada' })),
+    );
+  });
+
+  it('rechazar una solicitud pide confirmación y llama al servicio con el id de la amistad', async () => {
+    getSolicitudesPendientesMock.mockResolvedValue([solicitud()]);
+    await renderPersonas();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Rechazar/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, rechazar solicitud' }));
+
+    await waitFor(() => expect(rechazarSolicitudAmistadMock).toHaveBeenCalledWith(5));
+    await waitFor(() =>
+      expect(swalFire).toHaveBeenCalledWith(expect.objectContaining({ icon: 'success', title: 'Solicitud rechazada' })),
+    );
+  });
+
+  it('cancelar la confirmación no llama a ningún servicio', async () => {
+    getSolicitudesPendientesMock.mockResolvedValue([solicitud()]);
+    await renderPersonas();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Aceptar/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(aceptarSolicitudAmistadMock).not.toHaveBeenCalled();
+  });
+
+  // T-210: la tarjeta llamaba a aceptarSolicitud/eliminarAmistad con
+  // `idUsuario` en vez de `idAmistad`, que es lo que el backend espera.
+  it('aceptar solicitud desde la tarjeta usa idAmistad, no idUsuario', async () => {
+    buscarUsuariosMock.mockResolvedValue({
+      items: [usuario({ idUsuario: 10, idAmistad: 55, solicitudPendiente: { direccion: 'recibida' } })],
+      hasMore: false,
+    });
+    await renderPersonas();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Aceptar solicitud' }));
+
+    await waitFor(() => expect(aceptarSolicitudAmistadMock).toHaveBeenCalledWith(55));
+    expect(aceptarSolicitudAmistadMock).not.toHaveBeenCalledWith(10);
+  });
+
+  it('eliminar amistad desde la tarjeta pide confirmación, usa idAmistad y avisa el resultado', async () => {
+    buscarUsuariosMock.mockResolvedValue({
+      items: [usuario({ idUsuario: 10, idAmistad: 77, esAmigo: true })],
+      hasMore: false,
+    });
+    await renderPersonas();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Amigos' }));
+    expect(eliminarAmistadMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar amistad' }));
+
+    await waitFor(() => expect(eliminarAmistadMock).toHaveBeenCalledWith(77));
+    await waitFor(() =>
+      expect(swalFire).toHaveBeenCalledWith(expect.objectContaining({ icon: 'success', title: 'Amistad eliminada' })),
+    );
   });
 });

@@ -480,7 +480,7 @@ function TaskDetailView({
                   ESTADO_LABEL[tarea.estadoTarea]
                 )}
                 {estadoError && (
-                  <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  <p role="alert" className="mt-1 type-meta text-destructive">
                     {estadoError}
                   </p>
                 )}
@@ -523,7 +523,7 @@ function TaskDetailView({
               </DatoOrganizacion>
               <DatoOrganizacion icon={Calendar} label="Fecha límite">
                 {tarea.fechaLimite ? (
-                  <span className={vencida ? 'font-semibold text-red-600 dark:text-red-400' : undefined}>
+                  <span className={vencida ? 'font-semibold text-destructive' : undefined}>
                     {formatearFechaLimite(tarea.fechaLimite)}
                     {vencida && ' · Vencida'}
                   </span>

@@ -64,7 +64,7 @@ const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: stri
   ACTIVO: { label: 'ACTIVO', className: 'bg-primary-container text-on-primary-container' },
   EN_FINALIZACION: {
     label: 'EN FINALIZACIÓN',
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+    className: 'bg-status-warning text-on-status-warning',
   },
   CERRADO: { label: 'CERRADO', className: 'bg-surface-container-high text-tertiary' },
 };

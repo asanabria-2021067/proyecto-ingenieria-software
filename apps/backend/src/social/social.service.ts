@@ -312,6 +312,9 @@ export class SocialService {
         solicitudPendiente = { direccion: relacion.idUsuarioSolicitante === idUsuarioActual ? 'enviada' : 'recibida' };
       }
     }
+    // El front necesita este id (no el de ninguno de los dos usuarios) para
+    // aceptar/rechazar/eliminar la amistad desde este perfil.
+    const idAmistad = relacion?.idAmistad ?? null;
 
     const idsAmigosEnComun = idsAmigoObjetivo.filter((id) => idsAmigoActual.includes(id));
     const amigosEnComun =
@@ -330,6 +333,7 @@ export class SocialService {
       correo: usuario.correo,
       esAmigo,
       solicitudPendiente,
+      idAmistad,
       loSigo: siguiendo !== null,
       carrera: usuario.perfil?.carrera?.nombreCarrera ?? null,
       semestre: usuario.perfil?.semestre ?? null,
@@ -423,7 +427,7 @@ export class SocialService {
             { idUsuarioReceptor: idUsuario, idUsuarioSolicitante: { in: otrosIds } },
           ],
         },
-        select: { idUsuarioSolicitante: true, idUsuarioReceptor: true, estado: true },
+        select: { idAmistad: true, idUsuarioSolicitante: true, idUsuarioReceptor: true, estado: true },
       }),
       this.prisma.seguimiento.findMany({
         where: { idSeguidor: idUsuario, idSeguido: { in: otrosIds } },
@@ -482,6 +486,9 @@ export class SocialService {
         fotoUrl: usuario.fotoUrl,
         esAmigo,
         solicitudPendiente,
+        // El front necesita este id (no el de `usuario.idUsuario`) para
+        // aceptar/rechazar/eliminar la amistad desde la tarjeta.
+        idAmistad: relacion?.idAmistad ?? null,
         loSigo: seguidosSet.has(usuario.idUsuario),
         carrera: usuario.perfil?.carrera?.nombreCarrera ?? null,
         semestre: usuario.perfil?.semestre ?? null,

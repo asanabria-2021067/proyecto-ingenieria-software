@@ -202,7 +202,7 @@ describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
       renderExplorer();
 
       const encabezados = screen.getAllByRole('columnheader');
-      expect(encabezados.length).toBe(6);
+      expect(encabezados.length).toBe(7);
       encabezados.forEach((th) => expect(th).toHaveAttribute('scope', 'col'));
     });
 

@@ -316,13 +316,22 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
           )}
         </div>
 
-        {/* loading */}
+        {/* loading — skeleton con forma de fila (título + meta + pastillas), nunca spinner */}
         {isLoading && (
-          <div className="space-y-2 py-4" role="status" aria-label="Cargando tareas">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
+          <div className="space-y-inline py-inline" role="status" aria-label="Cargando tareas">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex items-center gap-inline rounded-card border border-outline-variant bg-card p-card shadow-card"
+              >
+                <div className="min-w-0 flex-1 space-y-tight">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+                <Skeleton className="h-6 w-20 shrink-0 rounded-control" />
+                <Skeleton className="h-6 w-20 shrink-0 rounded-control" />
+              </div>
+            ))}
           </div>
         )}
 
@@ -382,6 +391,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
               <TableHeader>
                 <TableRow>
                   <TableHead scope="col">Título</TableHead>
+                  <TableHead scope="col">Hito</TableHead>
                   <TableHead scope="col">Estado</TableHead>
                   <TableHead scope="col">Prioridad</TableHead>
                   <TableHead scope="col">Fecha límite</TableHead>
@@ -392,8 +402,11 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
               <TableBody>
                 {paginado.items.map((tarea) => (
                   <TableRow key={tarea.idTarea}>
-                    <TableCell className="max-w-sm whitespace-normal font-medium text-text-primary">
+                    <TableCell className="max-w-sm whitespace-normal type-subtitle text-text-primary">
                       {tarea.tituloTarea}
+                    </TableCell>
+                    <TableCell>
+                      <span className="type-meta">{tarea.hito?.tituloHito ?? 'Sin hito'}</span>
                     </TableCell>
                     <TableCell>
                       <EstadoBadge estado={tarea.estadoTarea} />
@@ -401,17 +414,21 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                     <TableCell>
                       <PrioridadBadge prioridad={tarea.prioridad} />
                     </TableCell>
-                    <TableCell className="text-text-secondary">{formatFecha(tarea.fechaLimite)}</TableCell>
-                    <TableCell className="text-text-secondary">
-                      {tarea.asignacionActiva
-                        ? `${tarea.asignacionActiva.usuario.nombre} ${tarea.asignacionActiva.usuario.apellido}`
-                        : 'Sin asignar'}
+                    <TableCell>
+                      <span className="type-meta">{formatFecha(tarea.fechaLimite)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="type-meta">
+                        {tarea.asignacionActiva
+                          ? `${tarea.asignacionActiva.usuario.nombre} ${tarea.asignacionActiva.usuario.apellido}`
+                          : 'Sin asignar'}
+                      </span>
                     </TableCell>
                     <TableCell>
                       {tarea.etiquetas.length === 0 ? (
-                        <span className="text-text-secondary">—</span>
+                        <span className="type-meta">—</span>
                       ) : (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-micro">
                           {tarea.etiquetas.map((etiqueta) => (
                             <span
                               key={etiqueta.idEtiqueta}

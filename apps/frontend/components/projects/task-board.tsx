@@ -515,7 +515,7 @@ export function TaskBoard({
           Tablero de tareas
         </h2>
         <div role="alert" className="text-center py-10 space-y-3">
-          <p className="text-red-600 font-medium text-sm">
+          <p className="text-destructive font-medium type-body">
             No se pudieron cargar las tareas. Intenta nuevamente.
           </p>
           <Button

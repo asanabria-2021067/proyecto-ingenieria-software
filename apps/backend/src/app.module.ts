@@ -40,6 +40,7 @@ import { ChatModule } from './chat/chat.module';
 import { BitacoraModule } from './bitacora/bitacora.module';
 import { GlobalSearchModule } from './search/global-search.module';
 import { ExportsModule } from './exports/exports.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -105,6 +106,7 @@ import { ExportsModule } from './exports/exports.module';
     BitacoraModule,
     GlobalSearchModule,
     ExportsModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [

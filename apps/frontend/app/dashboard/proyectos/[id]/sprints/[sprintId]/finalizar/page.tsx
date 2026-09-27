@@ -115,7 +115,7 @@ function Kpi({
     <div role="group" aria-label={label} className={`${CARD} flex items-center gap-3 p-4`}>
       <span
         className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
-          warning ? 'bg-amber-400/15 text-amber-700 dark:text-amber-300' : 'bg-primary/10 text-primary'
+          warning ? 'bg-status-warning/20 text-text-primary' : 'bg-primary/10 text-primary'
         }`}
         aria-hidden="true"
       >
@@ -123,7 +123,7 @@ function Kpi({
       </span>
       <div className="min-w-0">
         <p className="text-xs text-tertiary">{label}</p>
-        <p className={`text-xl font-bold leading-tight ${warning ? 'text-amber-700 dark:text-amber-300' : 'text-on-surface'}`}>
+        <p className={`text-xl font-bold leading-tight ${warning ? 'text-text-primary' : 'text-on-surface'}`}>
           {value}
         </p>
       </div>
@@ -483,7 +483,7 @@ export default function SprintClosingPage() {
                       className={
                         estadoSprint === 'CERRADO'
                           ? 'border-transparent bg-surface-container-high text-on-surface-variant'
-                          : 'border-transparent bg-amber-400/15 text-amber-800 dark:text-amber-200'
+                          : 'border-transparent bg-status-warning text-on-status-warning'
                       }
                     >
                       {estadoSprint === 'CERRADO'
@@ -516,7 +516,7 @@ export default function SprintClosingPage() {
               {blockers.length > 0 && (
                 <div
                   role="alert"
-                  className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-800 dark:text-amber-200"
+                  className="rounded-xl border border-outline-variant bg-status-warning/10 p-4 text-sm text-destructive"
                 >
                   <p className="flex items-center gap-2 font-semibold">
                     <AlertTriangle className="size-4" aria-hidden="true" />

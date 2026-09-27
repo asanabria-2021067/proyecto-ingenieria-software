@@ -53,27 +53,30 @@ interface Project {
 const statusConfig: Record<ProjectStatus, { label: string; className: string }> = {
   BORRADOR: {
     label: "Borrador",
-    className: "bg-gray-100 text-gray-700 border-gray-300",
+    className: "bg-surface-container-high text-text-secondary",
   },
   PUBLICADO: {
     label: "Publicado",
-    className: "bg-emerald-100 text-emerald-800 border-emerald-300",
+    className: "bg-status-success text-on-status-success",
   },
+  // El acento solo destaca una cosa por bloque (docs/design-system.md); no repetirlo
+  // por tarjeta. `--color-status-warning` == `--color-accent` en global.css, así
+  // que usarlo aquí lo volvería indistinguible de PAUSADO.
   EN_PROGRESO: {
     label: "En progreso",
-    className: "bg-teal-100 text-teal-800 border-teal-300",
+    className: "bg-surface-container-high text-text-secondary",
   },
   FINALIZADO: {
     label: "Finalizado",
-    className: "bg-slate-200 text-slate-700 border-slate-400",
+    className: "bg-surface-container-high text-text-secondary",
   },
   PAUSADO: {
     label: "Pausado",
-    className: "bg-amber-100 text-amber-800 border-amber-300",
+    className: "bg-status-warning text-on-status-warning",
   },
   CANCELADO: {
     label: "Cancelado",
-    className: "bg-red-100 text-red-700 border-red-300",
+    className: "bg-status-error text-on-status-error",
   },
 }
 
@@ -147,11 +150,13 @@ function SummaryCard({
   value,
   icon: Icon,
   iconBg,
+  iconFg = "text-primary-foreground",
 }: {
   title: string
   value: number
   icon: ElementType
   iconBg: string
+  iconFg?: string
 }) {
   return (
     <Card className="border shadow-sm transition-shadow hover:shadow-md">
@@ -164,7 +169,7 @@ function SummaryCard({
             <p className="mt-1 text-3xl font-bold text-foreground">{value}</p>
           </div>
           <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${iconBg}`}>
-            <Icon className="h-5 w-5 text-white" />
+            <Icon className={`h-5 w-5 ${iconFg}`} />
           </div>
         </div>
       </CardContent>
@@ -418,8 +423,8 @@ export default function MisProyectosPage() {
           <div
             className={`mb-6 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium ${
               notification.type === "success"
-                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                : "border-red-300 bg-red-50 text-red-800"
+                ? "border-outline-variant bg-status-success text-on-status-success"
+                : "border-outline-variant bg-status-error text-on-status-error"
             }`}
             role="alert"
           >
@@ -452,13 +457,15 @@ export default function MisProyectosPage() {
                   title="Proyectos activos"
                   value={summary.active}
                   icon={CheckCircle2}
-                  iconBg="bg-emerald-600"
+                  iconBg="bg-status-success"
+                  iconFg="text-on-status-success"
                 />
                 <SummaryCard
                   title="Postulaciones recibidas"
                   value={summary.applications}
                   icon={Users}
                   iconBg="bg-secondary"
+                  iconFg="text-secondary-foreground"
                 />
               </>
             )}

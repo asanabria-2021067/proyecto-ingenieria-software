@@ -25,6 +25,7 @@ function perfil(overrides: Partial<UsuarioPerfilDto> = {}): UsuarioPerfilDto {
     correo: 'carla@uvg.edu.gt',
     esAmigo: false,
     solicitudPendiente: null,
+    idAmistad: null,
     loSigo: false,
     carrera: 'Ingeniería',
     semestre: 5,
