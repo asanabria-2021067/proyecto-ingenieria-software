@@ -59,9 +59,12 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
     label: "Publicado",
     className: "bg-status-success text-on-status-success",
   },
+  // El acento solo destaca una cosa por bloque (docs/design-system.md); no repetirlo
+  // por tarjeta. `--color-status-warning` == `--color-accent` en global.css, así
+  // que usarlo aquí lo volvería indistinguible de PAUSADO.
   EN_PROGRESO: {
     label: "En progreso",
-    className: "bg-accent text-on-accent",
+    className: "bg-surface-container-high text-text-secondary",
   },
   FINALIZADO: {
     label: "Finalizado",
@@ -420,8 +423,8 @@ export default function MisProyectosPage() {
           <div
             className={`mb-6 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium ${
               notification.type === "success"
-                ? "border-status-success/30 bg-status-success/10 text-status-success"
-                : "border-status-error/30 bg-status-error/10 text-status-error"
+                ? "border-outline-variant bg-status-success text-on-status-success"
+                : "border-outline-variant bg-status-error text-on-status-error"
             }`}
             role="alert"
           >
