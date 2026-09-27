@@ -10,7 +10,21 @@ on:
       - '.github/workflows/deploy.yml'
       - '.github/workflows/ci.yml'
 
+  # G02 (FASE2-N07): `config-only` reaplica la configuracion runtime (.env y
+  # contenedores) con imagenes ya publicadas y probadas, sin reconstruir ni
+  # mover tags. `full` (por defecto, y siempre en push) construye y despliega.
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'full = build + deploy; config-only = solo configuracion runtime, sin build ni push'
+        type: choice
+        options: [full, config-only]
+        default: full
+      image_sha:
+        description: 'Solo config-only: SHA (40 hex) de imagenes ya publicadas a reutilizar; vacio = este commit'
+        type: string
+        required: false
+        default: ''
 
 # G02 (OWASP25-C044): permisos minimos por defecto; solo los jobs que publican
 # imagenes en GHCR suben a `packages: write` en su propio bloque.
@@ -44,12 +58,15 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
+        if: inputs.mode != 'config-only'
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
+        if: inputs.mode != 'config-only'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: inputs.mode != 'config-only'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -57,6 +74,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare image name
+        if: inputs.mode != 'config-only'
         id: vars
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
@@ -64,6 +82,7 @@ jobs:
           echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend" >> "$GITHUB_OUTPUT"
 
       - name: Build and push frontend image
+        if: inputs.mode != 'config-only'
         uses: docker/build-push-action@v5
         with:
           context: ./apps/frontend
@@ -89,12 +108,15 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
+        if: inputs.mode != 'config-only'
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
+        if: inputs.mode != 'config-only'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: inputs.mode != 'config-only'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -102,6 +124,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare image name
+        if: inputs.mode != 'config-only'
         id: vars
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
@@ -109,6 +132,7 @@ jobs:
           echo "backend_image=ghcr.io/${owner}/${repo_name}-backend" >> "$GITHUB_OUTPUT"
 
       - name: Build and push backend image
+        if: inputs.mode != 'config-only'
         uses: docker/build-push-action@v5
         with:
           context: ./apps/backend
@@ -124,14 +148,66 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: [test, build-frontend, build-backend]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
+      # G02 (FASE2-N07): en `full` siempre se despliega el commit recien
+      # construido; solo `config-only` puede reutilizar las imagenes de otro
+      # SHA ya publicado. Los inputs llegan por env y se validan (sin
+      # interpolarlos en el script).
       - name: Prepare image names
         id: vars
+        env:
+          DEPLOY_MODE: ${{ inputs.mode || 'full' }}
+          REQUESTED_IMAGE_SHA: ${{ inputs.image_sha }}
         run: |
+          set -euo pipefail
+          case "$DEPLOY_MODE" in
+            full|config-only) ;;
+            *) echo "Modo de deploy desconocido" >&2; exit 1 ;;
+          esac
+          image_sha="$GITHUB_SHA"
+          if [ -n "$REQUESTED_IMAGE_SHA" ]; then
+            if [ "$DEPLOY_MODE" != "config-only" ]; then
+              echo "image_sha solo se admite en modo config-only" >&2
+              exit 1
+            fi
+            image_sha="$REQUESTED_IMAGE_SHA"
+          fi
+          if ! printf '%s' "$image_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "image_sha debe ser un SHA de 40 caracteres hexadecimales" >&2
+            exit 1
+          fi
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${image_sha}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${image_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Antes de tocar la VM: las dos imagenes deben existir ya en GHCR (en
+      # config-only nada se construye; un SHA sin imagenes aborta aqui).
+      - name: Verificar que las imagenes a desplegar existen en GHCR
+        env:
+          FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
+          BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
+        run: |
+          set -euo pipefail
+          for image in "$FRONTEND_IMAGE" "$BACKEND_IMAGE"; do
+            if ! docker buildx imagetools inspect "$image" > /dev/null; then
+              echo "La imagen $image no existe en GHCR; no se despliega" >&2
+              exit 1
+            fi
+          done
 
       # G01 (FASE2-N01 + VM0-F012): el .env de produccion se arma en el runner a
       # partir de variables de entorno del paso (nunca interpoladas en el texto
@@ -277,9 +353,11 @@ jobs:
       packages: write
     steps:
       - name: Set up Docker Buildx
+        if: inputs.mode != 'config-only'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: inputs.mode != 'config-only'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -287,6 +365,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Re-etiquetar :<sha> como :latest
+        if: inputs.mode != 'config-only'
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
