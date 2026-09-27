@@ -62,20 +62,28 @@ describe('G02-C04: publicar solo tras tests verdes', () => {
 
   it('el grafo real no permite construir ni mover latest sin tests, builds y deploy verdes', () => {
     expect(publishGateFindings(deploy)).toEqual([]);
-    expect(needsOf(deploy, 'build-frontend')).toEqual(['test']);
+    expect(needsOf(deploy, 'build-frontend')).toContain('test');
     expect(needsOf(deploy, 'build-backend')).toEqual(['test']);
     expect([...upstreamJobs(deploy, 'promote-latest')].sort()).toEqual([
       'build-backend',
       'build-frontend',
       'deploy',
+      'frontend-variant',
       'test',
     ]);
   });
 
-  it('los builds publican únicamente el tag inmutable del commit', () => {
-    for (const id of ['build-frontend', 'build-backend']) {
+  it('los builds publican únicamente el tag inmutable del commit (G02-C07: derivado en el paso vars)', () => {
+    for (const [id, output] of [
+      ['build-frontend', 'frontend_tag'],
+      ['build-backend', 'backend_tag'],
+    ]) {
       const build = deploy.jobs[id].steps?.find((step) => step.uses?.startsWith(BUILD_ACTION));
-      expect(build?.with?.tags?.trim()).toMatch(/:\$\{\{ github\.sha \}\}$/);
+      expect(build?.with?.tags?.trim()).toBe(`\${{ steps.vars.outputs.${output} }}`);
+      const vars = deploy.jobs[id].steps?.find((step) => step.id === 'vars');
+      expect(vars?.run).toContain(`${output}=ghcr.io/`);
+      expect(vars?.run).toContain(':${GITHUB_SHA}');
+      expect(vars?.run).not.toContain('latest');
     }
   });
 

@@ -51,8 +51,9 @@ function prepareImagesRun(): string {
 
 const SHA_A = 'a'.repeat(40);
 const SHA_B = 'b'.repeat(40);
+const VARIANT = 'cfg-0123456789ab';
 
-function selectImages(mode: string, requested: string) {
+function selectImages(mode: string, requested: string, variant = VARIANT) {
   const dir = mkdtempSync(join(tmpdir(), 'g02-config-only-'));
   const output = join(dir, 'output');
   writeFileSync(output, '');
@@ -68,6 +69,7 @@ function selectImages(mode: string, requested: string) {
         GITHUB_REPOSITORY_OWNER: 'Org',
         DEPLOY_MODE: mode,
         REQUESTED_IMAGE_SHA: requested,
+        FRONTEND_VARIANT: variant,
       },
     });
     return { status: result.status, stderr: result.stderr, output: readFileSync(output, 'utf8') };
@@ -86,14 +88,14 @@ describe('G02-C06: modo config-only (contrato)', () => {
     expect(configOnlyFindings(deploy)).toEqual([]);
     for (const id of ['build-frontend', 'build-backend', 'promote-latest']) {
       for (const step of deploy.jobs[id].steps ?? []) {
-        expect((step as { if?: string }).if, `${id}/${step.name}`).toBe(CONFIG_ONLY_SKIP);
+        expect((step as { if?: string }).if, `${id}/${step.name}`).toContain(CONFIG_ONLY_SKIP);
       }
     }
   });
 
   it('los tests corren en ambos modos y el deploy sigue dependiendo de ellos y de main', () => {
     expect(deploy.jobs.test.if).toBe("github.ref == 'refs/heads/main'");
-    expect(deploy.jobs.deploy.needs).toEqual(['test', 'build-frontend', 'build-backend']);
+    expect(deploy.jobs.deploy.needs).toEqual(['test', 'frontend-variant', 'build-frontend', 'build-backend']);
   });
 
   it('el deploy verifica en GHCR las imágenes antes de conectar a la VM', () => {
@@ -125,14 +127,14 @@ describe('G02-C06: selección real de imágenes', () => {
     const result = selectImages('full', '');
     expect(result.status, result.stderr).toBe(0);
     expect(result.output).toBe(
-      `frontend_image=ghcr.io/org/repo-name-frontend:${SHA_A}\nbackend_image=ghcr.io/org/repo-name-backend:${SHA_A}\n`,
+      `frontend_image=ghcr.io/org/repo-name-frontend:${SHA_A}-${VARIANT}\nbackend_image=ghcr.io/org/repo-name-backend:${SHA_A}\n`,
     );
   });
 
   it('config-only reutiliza el SHA pedido', () => {
     const result = selectImages('config-only', SHA_B);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.output).toContain(`-frontend:${SHA_B}\n`);
+    expect(result.output).toContain(`-frontend:${SHA_B}-${VARIANT}\n`);
     expect(result.output).toContain(`-backend:${SHA_B}\n`);
   });
 
@@ -147,4 +149,13 @@ describe('G02-C06: selección real de imágenes', () => {
     expect(result.status).not.toBe(0);
     expect(result.output).toBe('');
   });
+
+  it.each([['ausente', ''], ['sin prefijo', '0123456789ab'], ['con inyección', 'cfg-0123456789ab; id']])(
+    'G02-C07: rechaza una variante de frontend %s',
+    (_caso, variant) => {
+      const result = selectImages('full', '', variant);
+      expect(result.status).not.toBe(0);
+      expect(result.output).toBe('');
+    },
+  );
 });

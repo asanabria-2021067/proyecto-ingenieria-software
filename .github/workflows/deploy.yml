@@ -46,12 +46,39 @@ jobs:
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
 
+  # G02 (FASE2-N07): cada combinacion de configuracion publica de build del
+  # frontend (NEXT_PUBLIC_*, horneada en el bundle) es una variante con tag
+  # propio `:<sha>-cfg-<12 hex>`. Activar o revertir un flag de build cambia de
+  # variante en vez de sobrescribir una imagen ya probada. Solo sale el hash,
+  # nunca los valores. Las expresiones deben coincidir con los build-args de
+  # build-frontend (lo exige g02-immutable-variants.spec.ts).
+  frontend-variant:
+    name: Calcular variante de build del frontend
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      variant: ${{ steps.variant.outputs.variant }}
+    steps:
+      - name: Derivar la variante de la configuracion publica de build
+        id: variant
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
+          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+        run: |
+          set -euo pipefail
+          digest=$(printf 'NEXT_PUBLIC_API_URL=%s\nNEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\nNEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\n' \
+            "$NEXT_PUBLIC_API_URL" "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME" "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET" \
+            | sha256sum | cut -c1-12)
+          echo "variant=cfg-${digest}" >> "$GITHUB_OUTPUT"
+
   build-frontend:
     name: Build y push imagen frontend
     # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
     if: github.ref == 'refs/heads/main'
     # G02 (OWASP25-C035): sin tests verdes no se construye ni publica nada.
-    needs: test
+    needs: [test, frontend-variant]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -76,19 +103,46 @@ jobs:
       - name: Prepare image name
         if: inputs.mode != 'config-only'
         id: vars
+        env:
+          FRONTEND_VARIANT: ${{ needs.frontend-variant.outputs.variant }}
         run: |
+          set -euo pipefail
+          if ! printf '%s' "$FRONTEND_VARIANT" | grep -Eq '^cfg-[0-9a-f]{12}$'; then
+            echo "Variante de frontend invalida o ausente" >&2
+            exit 1
+          fi
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend" >> "$GITHUB_OUTPUT"
+          echo "frontend_tag=ghcr.io/${owner}/${repo_name}-frontend:${GITHUB_SHA}-${FRONTEND_VARIANT}" >> "$GITHUB_OUTPUT"
+
+      # G02 (FASE2-N07): un tag ya publicado nunca se sobrescribe; si existe se
+      # reutiliza tal cual. Solo "not found" permite construir; cualquier otro
+      # error de GHCR aborta en vez de arriesgar una sobrescritura.
+      - name: Comprobar si el tag inmutable ya existe
+        if: inputs.mode != 'config-only'
+        id: existing
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.frontend_tag }}
+        run: |
+          set -uo pipefail
+          if inspect_output=$(docker buildx imagetools inspect "$IMAGE_TAG" 2>&1); then
+            echo "El tag ya existe; se reutiliza sin reconstruir"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$inspect_output" | grep -qi 'not found'; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No se pudo comprobar el tag en GHCR; se aborta sin publicar" >&2
+            exit 1
+          fi
 
       - name: Build and push frontend image
-        if: inputs.mode != 'config-only'
+        if: inputs.mode != 'config-only' && steps.existing.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
           context: ./apps/frontend
           push: true
           tags: |
-            ${{ steps.vars.outputs.frontend_image }}:${{ github.sha }}
+            ${{ steps.vars.outputs.frontend_tag }}
           build-args: |
             NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
@@ -129,16 +183,36 @@ jobs:
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend" >> "$GITHUB_OUTPUT"
+          echo "backend_tag=ghcr.io/${owner}/${repo_name}-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      # G02 (FASE2-N07): un tag ya publicado nunca se sobrescribe; si existe se
+      # reutiliza tal cual. Solo "not found" permite construir; cualquier otro
+      # error de GHCR aborta en vez de arriesgar una sobrescritura.
+      - name: Comprobar si el tag inmutable ya existe
+        if: inputs.mode != 'config-only'
+        id: existing
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.backend_tag }}
+        run: |
+          set -uo pipefail
+          if inspect_output=$(docker buildx imagetools inspect "$IMAGE_TAG" 2>&1); then
+            echo "El tag ya existe; se reutiliza sin reconstruir"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$inspect_output" | grep -qi 'not found'; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No se pudo comprobar el tag en GHCR; se aborta sin publicar" >&2
+            exit 1
+          fi
 
       - name: Build and push backend image
-        if: inputs.mode != 'config-only'
+        if: inputs.mode != 'config-only' && steps.existing.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
           context: ./apps/backend
           push: true
           tags: |
-            ${{ steps.vars.outputs.backend_image }}:${{ github.sha }}
+            ${{ steps.vars.outputs.backend_tag }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
 
@@ -146,7 +220,7 @@ jobs:
     name: Desplegar en la VM
     # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
     if: github.ref == 'refs/heads/main'
-    needs: [test, build-frontend, build-backend]
+    needs: [test, frontend-variant, build-frontend, build-backend]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -161,8 +235,13 @@ jobs:
         env:
           DEPLOY_MODE: ${{ inputs.mode || 'full' }}
           REQUESTED_IMAGE_SHA: ${{ inputs.image_sha }}
+          FRONTEND_VARIANT: ${{ needs.frontend-variant.outputs.variant }}
         run: |
           set -euo pipefail
+          if ! printf '%s' "$FRONTEND_VARIANT" | grep -Eq '^cfg-[0-9a-f]{12}$'; then
+            echo "Variante de frontend invalida o ausente" >&2
+            exit 1
+          fi
           case "$DEPLOY_MODE" in
             full|config-only) ;;
             *) echo "Modo de deploy desconocido" >&2; exit 1 ;;
@@ -181,7 +260,7 @@ jobs:
           fi
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${image_sha}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${image_sha}-${FRONTEND_VARIANT}" >> "$GITHUB_OUTPUT"
           echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${image_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
@@ -346,7 +425,7 @@ jobs:
     name: Promover imagenes probadas a latest
     # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
     if: github.ref == 'refs/heads/main'
-    needs: [test, build-frontend, build-backend, deploy]
+    needs: [test, frontend-variant, build-frontend, build-backend, deploy]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -364,12 +443,18 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Re-etiquetar :<sha> como :latest
+      - name: Re-etiquetar las imagenes desplegadas como :latest
         if: inputs.mode != 'config-only'
+        env:
+          FRONTEND_VARIANT: ${{ needs.frontend-variant.outputs.variant }}
         run: |
+          set -euo pipefail
+          if ! printf '%s' "$FRONTEND_VARIANT" | grep -Eq '^cfg-[0-9a-f]{12}$'; then
+            echo "Variante de frontend invalida o ausente" >&2
+            exit 1
+          fi
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          for app in frontend backend; do
-            image="ghcr.io/${owner}/${repo_name}-${app}"
-            docker buildx imagetools create --tag "${image}:latest" "${image}:${GITHUB_SHA}"
-          done
+          image="ghcr.io/${owner}/${repo_name}"
+          docker buildx imagetools create --tag "${image}-frontend:latest" "${image}-frontend:${GITHUB_SHA}-${FRONTEND_VARIANT}"
+          docker buildx imagetools create --tag "${image}-backend:latest" "${image}-backend:${GITHUB_SHA}"
