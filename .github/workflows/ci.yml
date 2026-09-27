@@ -48,6 +48,25 @@ env:
   JWT_SECRET: ci-synthetic-jwt-secret-not-for-production-0000
 
 jobs:
+  # G03 (OWASP25-C041): en todo PR se revisan SOLO las dependencias que el PR
+  # agrega o cambia (diff base..head del dependency graph) y se bloquea si
+  # alguna trae una vulnerabilidad high o critical. El backlog historico no se
+  # evalua aqui (lo reporta el audit informativo). Solo lectura del repo.
+  dependency-review:
+    name: Revision de dependencias del PR
+    if: github.event_name == 'pull_request' && !inputs.e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Revisar dependencias nuevas o cambiadas
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
   backend:
     name: Backend - lint y pruebas
     runs-on: ubuntu-latest
