@@ -12,6 +12,12 @@ vi.mock('bcryptjs', () => ({
   hash: vi.fn(),
 }));
 
+// AuthService exige esta variable al construirse (ver auth.service.ts y
+// auth.service.spec.ts) - sin ella, "AuthService — contenido del payload
+// emitido" no puede instanciar el servicio cuando este archivo corre en un
+// worker de vitest que no cargó antes auth.service.spec.ts.
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-refresh-secret';
+
 /**
  * T-127 (IESUC-285). JwtStrategy es la implementación real de passport-jwt
  * usada por JwtAuthGuard en producción — se ejercita vía `.authenticate()`
