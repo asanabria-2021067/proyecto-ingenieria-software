@@ -309,3 +309,44 @@ jobs:
           name: playwright-report
           path: apps/frontend/playwright-report/
           retention-days: 7
+
+  # G02 (D4 + OWASP25-C043/C044): arnes efimero de topologia (nginx versionado,
+  # TLS autofirmado, imagenes de los Dockerfiles productivos, PostgreSQL 17 y
+  # Redis 7) dentro del runner. Siempre en PR hacia main; en PR hacia develop
+  # solo si el PR toca realtime, nginx, cabeceras, topologia o el arnes
+  # (infra/staging/should-run.mjs); a mano con workflow_dispatch. Nunca dentro
+  # del workflow_call del deploy (el input `e2e` solo existe en esa llamada).
+  # Sin secretos, sin publicacion ni deploy: alcance a produccion NONE.
+  topology:
+    name: Topologia - arnes efimero (nginx + TLS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: >-
+      !inputs.e2e &&
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          # Merge commit del PR y su primer padre (punta de la base) para el filtro de rutas.
+          fetch-depth: 2
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Decidir si el arnes aplica a este cambio
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: node infra/staging/should-run.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Guard de representatividad (infra/staging vs infra/nginx)
+        if: steps.scope.outputs.run == 'true'
+        run: node infra/staging/check-representativity.mjs
+
+      - name: Arnes efimero - build, caracterizacion y destruccion
+        if: steps.scope.outputs.run == 'true'
+        run: infra/staging/run-harness.sh
