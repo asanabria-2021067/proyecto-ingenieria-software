@@ -44,18 +44,21 @@ export const ESTADO_COLUMNA_STYLE: Record<EstadoTarea, EstadoColumnaStyle> = {
     headerText: 'text-text-secondary',
     dot: 'bg-text-secondary',
   },
-  // En progreso = acento (única columna destacada del tablero, Sección 29);
-  // En revisión = warning (pendiente de acción) y Hecho = success. El color
-  // vive únicamente aquí (tokens de docs/design-system.md).
+  // En progreso = acento (única columna destacada del tablero, Sección 29).
+  // En revisión se queda en neutro: `--color-status-warning` y `--color-accent`
+  // apuntan al mismo valor en global.css (secondary-container), así que
+  // pintarla con status-warning la vuelve indistinguible de En progreso. El
+  // acento solo puede destacar una cosa por bloque (docs/design-system.md) y
+  // esa ya es En progreso. Hecho = success. El color vive únicamente aquí.
   EN_PROGRESO: {
     headerBg: 'bg-accent',
     headerText: 'text-on-accent',
     dot: 'bg-accent',
   },
   EN_REVISION: {
-    headerBg: 'bg-status-warning',
-    headerText: 'text-on-status-warning',
-    dot: 'bg-status-warning',
+    headerBg: 'bg-surface-container-high',
+    headerText: 'text-text-secondary',
+    dot: 'bg-text-secondary',
   },
   HECHO: {
     headerBg: 'bg-status-success',
@@ -81,9 +84,11 @@ export const PRIORIDAD_ICON: Record<Prioridad, typeof ArrowUp> = {
   BAJA: ArrowDown,
 };
 
+// status-* son tokens de relleno de pastilla, no de color de letra (docs/design-system.md):
+// como texto suelto (icono + label, sin fondo) usan text-destructive / text-text-primary.
 export const PRIORIDAD_COLOR: Record<Prioridad, string> = {
-  ALTA: 'text-status-error',
-  MEDIA: 'text-status-warning',
+  ALTA: 'text-destructive',
+  MEDIA: 'text-text-primary',
   BAJA: 'text-text-secondary',
 };
 
@@ -253,7 +258,7 @@ export function getProgressVisualState(percent: number): ProgressVisualState {
   if (p >= 67) {
     return {
       bar: 'bg-status-success',
-      text: 'text-status-success',
+      text: 'text-primary',
       track: 'bg-status-success/20',
       complete: false,
     };
@@ -261,14 +266,14 @@ export function getProgressVisualState(percent: number): ProgressVisualState {
   if (p >= 34) {
     return {
       bar: 'bg-status-warning',
-      text: 'text-status-warning',
+      text: 'text-text-primary',
       track: 'bg-status-warning/20',
       complete: false,
     };
   }
   return {
     bar: 'bg-status-error',
-    text: 'text-status-error',
+    text: 'text-destructive',
     track: 'bg-status-error/20',
     complete: false,
   };
