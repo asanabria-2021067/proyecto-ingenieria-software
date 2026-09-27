@@ -107,3 +107,33 @@ describe('G02-C10: typecheck explícito del frontend', () => {
     ]);
   });
 });
+
+/** Un build de CI solo recibe configuración sintética: sin secretos ni hosts productivos. */
+export function syntheticBuildEnvFindings(env: Record<string, string> | undefined): string[] {
+  return Object.entries(env ?? {})
+    .filter(([, value]) => /secrets\.|vars\.|158\.23\.57\.118|nip\.io/.test(String(value)))
+    .map(([name]) => `env-no-sintetico:${name}`);
+}
+
+describe('G02-C11: next build en todo evento', () => {
+  const build = () => findStep(ci.jobs.frontend, (step) => step.run === 'npm run build');
+
+  it('el job frontend construye en todo evento', () => {
+    expect(unconditionalGateFindings(ci.jobs.frontend, ['npm run typecheck', 'npm run build'])).toEqual([]);
+  });
+
+  it('el build usa solo configuración pública sintética', () => {
+    expect(syntheticBuildEnvFindings(build().env)).toEqual([]);
+    expect(build().env?.NEXT_PUBLIC_API_URL).toBe('http://localhost:3001');
+  });
+
+  it('fixture: un build alimentado con secretos o la URL productiva se detecta', () => {
+    expect(
+      syntheticBuildEnvFindings({
+        NEXT_PUBLIC_API_URL: 'http://158.23.57.118:3001',
+        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: '${{ secrets.CLOUDINARY_CLOUD_NAME }}',
+        NEXT_TELEMETRY_DISABLED: '1',
+      }),
+    ).toEqual(['env-no-sintetico:NEXT_PUBLIC_API_URL', 'env-no-sintetico:NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME']);
+  });
+});

@@ -137,6 +137,16 @@ jobs:
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck
 
+      # G02 (OWASP25-C043): build de produccion de Next en todo evento (PR,
+      # push, dispatch y workflow_call del deploy), con configuracion publica
+      # SINTETICA: nunca secretos ni la URL real de produccion.
+      - name: Build de produccion (next build)
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_API_PREFIX: /api
+
       # La cobertura es un gate obligatorio en Pull Requests.
       # Los umbrales se definen en apps/frontend/vitest.config.ts.
       # Si la cobertura cae por debajo del mínimo acordado, Vitest
