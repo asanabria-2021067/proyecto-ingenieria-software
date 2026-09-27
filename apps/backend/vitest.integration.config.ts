@@ -10,6 +10,8 @@ export default defineConfig({
     ],
     globals: true,
     clearMocks: true,
+    // G01 · OWASP25-C019: JWT_SECRET sintético para todas las suites.
+    setupFiles: ['test/helpers/synthetic-jwt-secret.setup.ts'],
     fileParallelism: false,
     testTimeout: 20000,
   },

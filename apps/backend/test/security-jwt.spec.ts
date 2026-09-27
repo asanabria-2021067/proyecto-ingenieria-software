@@ -6,6 +6,7 @@ import { AuthService } from '../src/auth/auth.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
+import { SYNTHETIC_JWT_SECRET } from './helpers/synthetic-jwt-secret';
 
 vi.mock('bcryptjs', () => ({
   compare: vi.fn(),
@@ -20,7 +21,8 @@ vi.mock('bcryptjs', () => ({
  * asumida.
  */
 
-const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+// G01 · OWASP25-C019: secreto sintético del setupFile; sin fallback predecible.
+const SECRET = SYNTHETIC_JWT_SECRET;
 
 function makeStrategy(usuario: { estado: string } | null = { estado: 'ACTIVO' }) {
   const prisma = { usuario: { findUnique: vi.fn().mockResolvedValue(usuario) } };

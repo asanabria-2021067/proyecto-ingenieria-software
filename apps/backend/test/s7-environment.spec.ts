@@ -28,6 +28,7 @@ import {
   buildReportContext,
   projectClosureModel,
 } from '../src/project-closure/closure-report-model';
+import { SYNTHETIC_JWT_SECRET } from './helpers/synthetic-jwt-secret';
 
 /**
  * TC03 — foundation única de environment (06 v2 §51.1 y §47). Cada caso usa
@@ -93,6 +94,7 @@ function completeClosureEnvironment(): Record<string, string> {
   return {
     NODE_ENV: 'development',
     FRONTEND_URL: 'http://localhost:3000',
+    JWT_SECRET: SYNTHETIC_JWT_SECRET,
     CLOUDINARY_CLOUD_NAME: 'demo-cloud',
     CLOUDINARY_API_KEY: '123456789012345',
     CLOUDINARY_API_SECRET: SYNTHETIC_API_SECRET,
@@ -439,7 +441,7 @@ describe('S7 environment foundation (TC03)', () => {
     // Arrange: un process.env mínimo válido antes del arranque; con NODE_ENV=test el .env real nunca se lee.
     process.env.NODE_ENV = 'test';
     process.env.FRONTEND_URL = 'http://localhost:3000';
-    process.env.JWT_SECRET = 'synthetic-jwt-secret-for-tests';
+    process.env.JWT_SECRET = 'synthetic-jwt-secret-for-tests-module-import';
     process.env.REDIS_HOST = 'redis.test.local';
     process.env.REDIS_PORT = '6380';
 
@@ -499,7 +501,7 @@ describe('S7 environment foundation (TC03)', () => {
     const validated = validateEnvironment({
       NODE_ENV: 'test',
       FRONTEND_URL: 'http://localhost:3000',
-      JWT_SECRET: 'validator-jwt-secret',
+      JWT_SECRET: 'validator-synthetic-jwt-secret-0000000000',
       REDIS_HOST: 'redis.validator.local',
       REDIS_PORT: '6390',
       PORT: '4100',
@@ -517,7 +519,7 @@ describe('S7 environment foundation (TC03)', () => {
       const provider = findAsyncOptionsProvider(hostModule, JwtModule, 'JWT_MODULE_OPTIONS');
       expect(provider.inject).toEqual([ConfigService]);
       expect(await provider.useFactory(configService)).toEqual({
-        secret: 'validator-jwt-secret',
+        secret: 'validator-synthetic-jwt-secret-0000000000',
         signOptions: { expiresIn },
       });
     }
@@ -563,6 +565,7 @@ describe('S7 environment foundation (TC03)', () => {
     // por el validador real a partir de un entorno sintético.
     const base = {
       FRONTEND_URL: 'http://localhost:3000',
+      JWT_SECRET: SYNTHETIC_JWT_SECRET,
       CLOUDINARY_CLOUD_NAME: 'cuenta',
       CLOUDINARY_API_KEY: '123456789012345',
       CLOUDINARY_API_SECRET: 'secreto-sintetico',
