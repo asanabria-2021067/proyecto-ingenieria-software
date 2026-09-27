@@ -1,5 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { EstadoHoras, EstadoProyecto, OrigenReporteTramo, Prisma } from '@prisma/client';
+import {
+  EstadoHoras,
+  EstadoParticipacion,
+  EstadoProyecto,
+  EstadoSprint,
+  EstadoTarea,
+  OrigenReporteTramo,
+  Prisma,
+  TipoProyecto,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -89,6 +98,64 @@ export interface SprintMemberDetailHours {
   }>;
 }
 
+/**
+ * HU-158 (T-231): desglose de las horas de UN usuario para «Mis Horas». Todos
+ * los importes son strings de dos decimales calculados aquí: el frontend los
+ * muestra, nunca los suma.
+ */
+export interface MisHorasTarea {
+  idTarea: number;
+  tituloTarea: string;
+  estadoTarea: EstadoTarea;
+  /** La tarea se eliminó; sus horas siguen contando. */
+  eliminada: boolean;
+  sprint: { idSprint: number; numero: number; estado: EstadoSprint } | null;
+  registradas: string;
+  legacy: string;
+}
+
+export interface MisHorasProyecto {
+  idProyecto: number;
+  tituloProyecto: string;
+  tipoProyecto: TipoProyecto;
+  estadoProyecto: EstadoProyecto;
+  abierto: boolean;
+  eliminado: boolean;
+  /** El líder no tiene participación: sin esta marca parecería retirado de su propio proyecto. */
+  esLider: boolean;
+  participacionActiva: boolean;
+  registradas: string;
+  legacy: string;
+  propuestasPendientes: string;
+  acreditadas: string;
+  tareasDistintas: number;
+  /** Vacío en los proyectos que no están abiertos. */
+  tareas: MisHorasTarea[];
+}
+
+export interface MisHorasPorTipo {
+  tipoProyecto: TipoProyecto;
+  registradasEnProyectosAbiertos: string;
+  propuestasPendientes: string;
+  acreditadas: string;
+}
+
+export interface MisHorasView {
+  idUsuario: number;
+  requisitos: { horasBecaRequeridas: number | null; horasExtensionRequeridas: number | null };
+  totales: {
+    /** Igual que `horasRegistradasEnProyectosAbiertos` del dashboard. */
+    registradasEnProyectosAbiertos: string;
+    legacyEnProyectosAbiertos: string;
+    propuestasPendientes: string;
+    /** Igual que `horasAcreditadas` del dashboard. */
+    acreditadas: string;
+  };
+  /** Siempre los tres tipos, en este orden. */
+  porTipo: MisHorasPorTipo[];
+  proyectos: MisHorasProyecto[];
+}
+
 type Db = Prisma.TransactionClient | PrismaService;
 
 const CERO = new Prisma.Decimal(0);
@@ -122,6 +189,27 @@ const propuestaDe = (fila: { estadoHoras: EstadoHoras; horasCalculadas: Prisma.D
 /** Horas que un administrador ya aprobó; lo rechazado no cuenta en ningún nivel. */
 const acreditadaDe = (fila: { estadoHoras: EstadoHoras; horasAprobadas: Prisma.Decimal | null }): Prisma.Decimal =>
   fila.estadoHoras === EstadoHoras.APROBADA ? (fila.horasAprobadas ?? CERO) : CERO;
+
+const esAbierto = (proyecto: { estadoProyecto: EstadoProyecto; eliminadoEn: Date | null }): boolean =>
+  proyecto.eliminadoEn === null && ESTADOS_PROYECTO_ABIERTO.includes(proyecto.estadoProyecto);
+
+/** Orden fijo de `porTipo` en Mis Horas. */
+const TIPOS_PROYECTO: TipoProyecto[] = [
+  TipoProyecto.ACADEMICO_HORAS_BECA,
+  TipoProyecto.EXTRACURRICULAR_EXTENSION,
+  TipoProyecto.ACADEMICO_EXPERIENCIA,
+];
+
+const PROYECTO_MIS_HORAS = {
+  idProyecto: true,
+  tituloProyecto: true,
+  tipoProyecto: true,
+  estadoProyecto: true,
+  creadoPor: true,
+  eliminadoEn: true,
+} satisfies Prisma.ProyectoSelect;
+
+type ProyectoMisHoras = Prisma.ProyectoGetPayload<{ select: typeof PROYECTO_MIS_HORAS }>;
 
 @Injectable()
 export class ProjectHoursSummaryService {
@@ -308,6 +396,191 @@ export class ProjectHoursSummaryService {
           legacy: dec2(valores.legacy),
         }))
         .sort((a, b) => a.projectId - b.projectId),
+    };
+  }
+
+  /**
+   * HU-158 (T-231): todas las horas de un usuario, por proyecto, tarea y tipo,
+   * con cuatro consultas fijas y sin ninguna consulta por proyecto o tarea.
+   * Las reglas son las mismas del dashboard, así que sus dos totales comunes
+   * (registradas en abiertos y acreditadas) coinciden siempre.
+   */
+  async forUserBreakdown(userId: number): Promise<MisHorasView> {
+    const [perfil, tramos, agregados, participacionesActivas] = await Promise.all([
+      this.prisma.perfilEstudiante.findUnique({
+        where: { idUsuario: userId },
+        select: { horasBecaRequeridas: true, horasExtensionRequeridas: true },
+      }),
+      // Todos los tramos del usuario, también los de participaciones retiradas
+      // y los de tareas eliminadas; los de proyectos eliminados no se leen.
+      this.prisma.asignacionTarea.findMany({
+        where: { idUsuario: userId, tarea: { proyecto: { eliminadoEn: null } } },
+        select: {
+          origenReporte: true,
+          horasReales: true,
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+          tarea: {
+            select: {
+              idTarea: true,
+              tituloTarea: true,
+              estadoTarea: true,
+              eliminadoEn: true,
+              sprint: { select: { idSprint: true, numero: true, estado: true } },
+              proyecto: { select: PROYECTO_MIS_HORAS },
+            },
+          },
+        },
+      }),
+      // Propuestas y acreditadas de cualquier proyecto, incluidos cerrados y
+      // eliminados, igual que el dashboard.
+      this.prisma.horasParticipacion.findMany({
+        where: { participacion: { idUsuario: userId } },
+        select: {
+          estadoHoras: true,
+          horasCalculadas: true,
+          horasAprobadas: true,
+          participacion: { select: { rolProyecto: { select: { proyecto: { select: PROYECTO_MIS_HORAS } } } } },
+        },
+      }),
+      this.prisma.participacionProyecto.findMany({
+        where: { idUsuario: userId, estadoParticipacion: EstadoParticipacion.ACTIVO },
+        select: { rolProyecto: { select: { proyecto: { select: PROYECTO_MIS_HORAS } } } },
+      }),
+    ]);
+
+    type TareaAcumulada = Omit<MisHorasTarea, 'registradas' | 'legacy'> & {
+      registradas: Prisma.Decimal;
+      legacy: Prisma.Decimal;
+    };
+    type ProyectoAcumulado = {
+      proyecto: ProyectoMisHoras;
+      registradas: Prisma.Decimal;
+      legacy: Prisma.Decimal;
+      propuestas: Prisma.Decimal;
+      acreditadas: Prisma.Decimal;
+      tareas: Map<number, TareaAcumulada>;
+    };
+    const proyectos = new Map<number, ProyectoAcumulado>();
+    const acumulado = (proyecto: ProyectoMisHoras): ProyectoAcumulado => {
+      const actual = proyectos.get(proyecto.idProyecto);
+      if (actual) return actual;
+      const nuevo = { proyecto, registradas: CERO, legacy: CERO, propuestas: CERO, acreditadas: CERO, tareas: new Map() };
+      proyectos.set(proyecto.idProyecto, nuevo);
+      return nuevo;
+    };
+
+    for (const tramo of tramos) {
+      const propias = sumarRegistros(tramo);
+      const legacyTramo = legacyDe(tramo);
+      const fila = acumulado(tramo.tarea.proyecto);
+      fila.registradas = fila.registradas.plus(propias);
+      fila.legacy = fila.legacy.plus(legacyTramo);
+      const tarea = fila.tareas.get(tramo.tarea.idTarea) ?? {
+        idTarea: tramo.tarea.idTarea,
+        tituloTarea: tramo.tarea.tituloTarea,
+        estadoTarea: tramo.tarea.estadoTarea,
+        eliminada: tramo.tarea.eliminadoEn !== null,
+        sprint: tramo.tarea.sprint,
+        registradas: CERO,
+        legacy: CERO,
+      };
+      tarea.registradas = tarea.registradas.plus(propias);
+      tarea.legacy = tarea.legacy.plus(legacyTramo);
+      fila.tareas.set(tarea.idTarea, tarea);
+    }
+
+    for (const agregado of agregados) {
+      const propuesta = propuestaDe(agregado);
+      const acreditada = acreditadaDe(agregado);
+      // Un agregado rechazado no aporta nada: no hace aparecer su proyecto.
+      if (propuesta.isZero() && acreditada.isZero()) continue;
+      const fila = acumulado(agregado.participacion.rolProyecto.proyecto);
+      fila.propuestas = fila.propuestas.plus(propuesta);
+      fila.acreditadas = fila.acreditadas.plus(acreditada);
+    }
+
+    // Un participante activo ve su proyecto aunque todavía no registre horas.
+    const activos = new Set<number>();
+    for (const { rolProyecto } of participacionesActivas) {
+      activos.add(rolProyecto.proyecto.idProyecto);
+      if (rolProyecto.proyecto.eliminadoEn === null) acumulado(rolProyecto.proyecto);
+    }
+
+    const totales = { registradas: CERO, legacy: CERO, propuestas: CERO, acreditadas: CERO };
+    const porTipo = new Map(
+      TIPOS_PROYECTO.map((tipo) => [tipo, { registradas: CERO, propuestas: CERO, acreditadas: CERO }]),
+    );
+    const vista: MisHorasProyecto[] = [];
+    for (const fila of proyectos.values()) {
+      const { proyecto } = fila;
+      const abierto = esAbierto(proyecto);
+      const tipo = porTipo.get(proyecto.tipoProyecto)!;
+      if (abierto) {
+        totales.registradas = totales.registradas.plus(fila.registradas);
+        totales.legacy = totales.legacy.plus(fila.legacy);
+        tipo.registradas = tipo.registradas.plus(fila.registradas);
+      }
+      totales.propuestas = totales.propuestas.plus(fila.propuestas);
+      totales.acreditadas = totales.acreditadas.plus(fila.acreditadas);
+      tipo.propuestas = tipo.propuestas.plus(fila.propuestas);
+      tipo.acreditadas = tipo.acreditadas.plus(fila.acreditadas);
+
+      vista.push({
+        idProyecto: proyecto.idProyecto,
+        tituloProyecto: proyecto.tituloProyecto,
+        tipoProyecto: proyecto.tipoProyecto,
+        estadoProyecto: proyecto.estadoProyecto,
+        abierto,
+        eliminado: proyecto.eliminadoEn !== null,
+        esLider: proyecto.creadoPor === userId,
+        participacionActiva: activos.has(proyecto.idProyecto),
+        registradas: dec2(fila.registradas),
+        legacy: dec2(fila.legacy),
+        propuestasPendientes: dec2(fila.propuestas),
+        acreditadas: dec2(fila.acreditadas),
+        tareasDistintas: fila.tareas.size,
+        tareas: abierto
+          ? [...fila.tareas.values()]
+              .sort(
+                (a, b) =>
+                  // Sprint más reciente primero; sin Sprint al final.
+                  (b.sprint?.numero ?? -1) - (a.sprint?.numero ?? -1) ||
+                  a.tituloTarea.localeCompare(b.tituloTarea, 'es') ||
+                  a.idTarea - b.idTarea,
+              )
+              .map((tarea) => ({ ...tarea, registradas: dec2(tarea.registradas), legacy: dec2(tarea.legacy) }))
+          : [],
+      });
+    }
+    vista.sort(
+      (a, b) =>
+        Number(b.abierto) - Number(a.abierto) ||
+        a.tituloProyecto.localeCompare(b.tituloProyecto, 'es') ||
+        a.idProyecto - b.idProyecto,
+    );
+
+    return {
+      idUsuario: userId,
+      requisitos: {
+        horasBecaRequeridas: perfil?.horasBecaRequeridas ?? null,
+        horasExtensionRequeridas: perfil?.horasExtensionRequeridas ?? null,
+      },
+      totales: {
+        registradasEnProyectosAbiertos: dec2(totales.registradas),
+        legacyEnProyectosAbiertos: dec2(totales.legacy),
+        propuestasPendientes: dec2(totales.propuestas),
+        acreditadas: dec2(totales.acreditadas),
+      },
+      porTipo: TIPOS_PROYECTO.map((tipoProyecto) => {
+        const tipo = porTipo.get(tipoProyecto)!;
+        return {
+          tipoProyecto,
+          registradasEnProyectosAbiertos: dec2(tipo.registradas),
+          propuestasPendientes: dec2(tipo.propuestas),
+          acreditadas: dec2(tipo.acreditadas),
+        };
+      }),
+      proyectos: vista,
     };
   }
 
