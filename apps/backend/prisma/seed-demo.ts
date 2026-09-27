@@ -135,6 +135,34 @@ async function ensureInstantaneaS6(
   });
 }
 
+/**
+ * T-282: genera una instantánea por cada día entre `inicioOffset` y
+ * `finOffset` (offsets en días respecto a NOW, ambos incluidos), saltando
+ * únicamente `huecoOffset` — un solo hueco deliberado, nunca interpolado.
+ * `pasos` define en qué día cambia el valor (se mantiene constante hasta el
+ * siguiente paso), lo que produce los días planos del burndown de forma
+ * natural. El llamador debe borrar las instantáneas previas del Sprint
+ * antes de llamar esta función (las fechas son relativas a NOW, así que un
+ * upsert por sí solo no limpia una corrida de un día distinto).
+ */
+async function ensureSerieInstantaneasS6(
+  idSprint: number,
+  inicioOffset: number,
+  finOffset: number,
+  huecoOffset: number,
+  pasos: Array<{ offset: number; pendientes: number; completadas: number; puntos: number }>,
+) {
+  let idx = 0;
+  const escrituras: Promise<unknown>[] = [];
+  for (let offset = inicioOffset; offset <= finOffset; offset++) {
+    if (offset === huecoOffset) continue;
+    while (idx + 1 < pasos.length && pasos[idx + 1].offset <= offset) idx++;
+    const paso = pasos[idx];
+    escrituras.push(ensureInstantaneaS6(idSprint, dateOnly(offset), paso.pendientes, paso.completadas, paso.puntos));
+  }
+  await Promise.all(escrituras);
+}
+
 async function ensureHitoS6(idProyecto: number, tituloHito: string, orden: number, fechaLimite: Date) {
   const existente = await prisma.hito.findFirst({ where: { idProyecto, tituloHito } });
   const data = { orden, fechaLimite };
@@ -322,7 +350,10 @@ async function seedSprint6Demo() {
     tareasPlanificadasCierre: 3,
     tareasCompletadasCierre: 3,
     tareasArrastradasCierre: 0,
-    hitosTotalesCierre: 4,
+    // T-282 (revisión): calcularCongeladoDeCierreTx cuenta los hitos
+    // DISTINTOS referenciados por las tareas DE ESTE sprint (no del
+    // proyecto) — t1_1/t1_2/t1_3 solo referencian h1, que queda COMPLETADO.
+    hitosTotalesCierre: 1,
     hitosCompletadosCierre: 1,
     porcentajeCumplimientoCierre: 100,
     puntosHistoriaPlanificadosCierre: 8,
@@ -335,8 +366,10 @@ async function seedSprint6Demo() {
     tareasPlanificadasCierre: 3,
     tareasCompletadasCierre: 2,
     tareasArrastradasCierre: 1,
-    hitosTotalesCierre: 4,
-    hitosCompletadosCierre: 1,
+    // T-282 (revisión): solo t2_1/t2_2 referencian h2 (t2_3 no tiene Hito),
+    // y h2 queda EN_PROGRESO (no COMPLETADO) al terminar el seed → 0/1.
+    hitosTotalesCierre: 1,
+    hitosCompletadosCierre: 0,
     porcentajeCumplimientoCierre: 67,
     puntosHistoriaPlanificadosCierre: 8,
     puntosHistoriaCompletadosCierre: 5,
@@ -441,39 +474,44 @@ async function seedSprint6Demo() {
   await setHitoEstadoS6(h3.idHito, 'EN_PROGRESO'); // 1/3 HECHO (t3_4 EN_PROGRESO, t3_7 EN_REVISION, t3_9 HECHO)
   await setHitoEstadoS6(h4.idHito, 'PENDIENTE'); // sin tareas
 
-  // T-282: instantáneas diarias para que el burndown (T-238/HU-160) dibuje
-  // una curva real, no dos puntos — con bajada, un día plano y un hueco
-  // deliberado (el gráfico debe mostrarlo, nunca interpolarlo).
-  await Promise.all([
+  // T-282 (revisión): el frontend dibuja un punto POR DÍA entre fechaInicio
+  // y fechaFin y usa connectNulls={false} en la línea "real" (burndown-chart.tsx)
+  // — con instantáneas cada 3-5 días el resultado eran puntos aislados, no
+  // una curva. `ensureSerieInstantaneasS6` genera una fila por cada día del
+  // rango (excepto un único día "hueco" deliberado) para que la curva baje
+  // de verdad, con varios días planos (mismo valor en días consecutivos) y
+  // un solo hueco visible y distinguible del resto.
+  await prisma.instantaneaSprint.deleteMany({ where: { idSprint: { in: [s1.idSprint, s2.idSprint, s3.idSprint] } } });
+  await ensureSerieInstantaneasS6(s1.idSprint, -70, -50, -61, [
     // Sprint 1 (CERRADO, 8 pts / 3 tareas planificadas)
-    ensureInstantaneaS6(s1.idSprint, dateOnly(-70), 3, 0, 8),
-    ensureInstantaneaS6(s1.idSprint, dateOnly(-67), 3, 0, 8), // día plano
-    ensureInstantaneaS6(s1.idSprint, dateOnly(-64), 2, 1, 6),
-    // dateOnly(-61): hueco deliberado, sin instantánea
-    ensureInstantaneaS6(s1.idSprint, dateOnly(-57), 1, 2, 3),
-    ensureInstantaneaS6(s1.idSprint, dateOnly(-54), 1, 2, 3), // día plano
-    ensureInstantaneaS6(s1.idSprint, dateOnly(-50), 0, 3, 0), // cierre
+    { offset: -70, pendientes: 3, completadas: 0, puntos: 8 },
+    { offset: -64, pendientes: 2, completadas: 1, puntos: 6 },
+    { offset: -57, pendientes: 1, completadas: 2, puntos: 3 },
+    { offset: -50, pendientes: 0, completadas: 3, puntos: 0 }, // cierre
+  ]);
+  await ensureSerieInstantaneasS6(s2.idSprint, -49, -25, -37, [
     // Sprint 2 (CERRADO, 8 pts / 3 tareas planificadas, termina en 67%: 1 se arrastra)
-    ensureInstantaneaS6(s2.idSprint, dateOnly(-49), 3, 0, 8),
-    ensureInstantaneaS6(s2.idSprint, dateOnly(-45), 3, 0, 8), // día plano
-    ensureInstantaneaS6(s2.idSprint, dateOnly(-41), 2, 1, 5),
-    // dateOnly(-37): hueco deliberado, sin instantánea
-    ensureInstantaneaS6(s2.idSprint, dateOnly(-33), 2, 1, 5), // día plano
-    ensureInstantaneaS6(s2.idSprint, dateOnly(-29), 1, 2, 3),
-    ensureInstantaneaS6(s2.idSprint, dateOnly(-25), 1, 2, 3), // cierre, sin completar la tarea arrastrada
+    { offset: -49, pendientes: 3, completadas: 0, puntos: 8 },
+    { offset: -41, pendientes: 2, completadas: 1, puntos: 5 },
+    { offset: -29, pendientes: 1, completadas: 2, puntos: 3 }, // cierre en -25, sin completar la tarea arrastrada
+  ]);
+  await ensureSerieInstantaneasS6(s3.idSprint, -24, 0, -9, [
     // Sprint 3 (ACTIVO, 30 pts / 11 tareas planificadas — incluye la arrastrada de s2)
-    ensureInstantaneaS6(s3.idSprint, dateOnly(-24), 11, 0, 30),
-    ensureInstantaneaS6(s3.idSprint, dateOnly(-19), 10, 1, 28),
-    ensureInstantaneaS6(s3.idSprint, dateOnly(-14), 10, 1, 28), // día plano
-    // dateOnly(-9): hueco deliberado, sin instantánea
-    ensureInstantaneaS6(s3.idSprint, dateOnly(-4), 9, 2, 25),
-    ensureInstantaneaS6(s3.idSprint, dateOnly(0), 9, 2, 25), // hoy, en curso
+    { offset: -24, pendientes: 11, completadas: 0, puntos: 30 },
+    { offset: -19, pendientes: 10, completadas: 1, puntos: 28 },
+    { offset: -4, pendientes: 9, completadas: 2, puntos: 25 }, // hoy, en curso
   ]);
 
   // T-282: volumen de bitácora (HU-161: T-243/T-247) — variedad de tipos de
   // evento y de actores para que filtros y paginación tengan sentido, con
   // algunos ADMINISTRATIVOS (LEADERSHIP_CHANGED, exports) que deben quedar
   // ocultos en la vista de un integrante (ver TipoEventoBitacora.ADMINISTRATIVOS).
+  // T-282 (revisión): BitacoraEventosService siempre escribe tipoObjeto
+  // 'TAREA' (idObjeto=idTarea) para TASK_*/TIME_RECORD_EDITED — nunca
+  // 'ASIGNACION' ni 'REGISTRO_TIEMPO' (ver tasks.service.ts / time-records.service.ts) —
+  // y `describirEvento` (bitacora/page.tsx) arma el texto SOLO desde
+  // valorAnterior/valorNuevo, así que cada fila lleva aquí exactamente las
+  // claves que ese switch lee (tituloTarea/estadoTarea/idUsuario/horasReales/numero).
   const bitacoraP1: Array<{
     idUsuario: number;
     accion: string;
@@ -481,41 +519,52 @@ async function seedSprint6Demo() {
     idObjeto: string;
     idSprint: number | null;
     fechaEvento: Date;
+    valorAnterior?: Prisma.InputJsonValue | null;
+    valorNuevo?: Prisma.InputJsonValue | null;
   }> = [
-    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s1.idSprint), idSprint: s1.idSprint, fechaEvento: ts(-70) },
-    { idUsuario: lider.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t1_1.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-69) },
-    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_1.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-63) },
-    { idUsuario: lider.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t1_2.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-68) },
-    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_2.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-55) },
-    { idUsuario: u.diego.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_3.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-51) },
+    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s1.idSprint), idSprint: s1.idSprint, fechaEvento: ts(-70), valorNuevo: { numero: s1.numero } },
+    { idUsuario: lider.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t1_1.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-69), valorNuevo: { tituloTarea: t1_1.tituloTarea, estadoTarea: 'POR_HACER', prioridad: t1_1.prioridad, idUsuarioAsignado: null } },
+    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_1.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-63), valorAnterior: { estadoTarea: 'POR_HACER' }, valorNuevo: { estadoTarea: 'EN_PROGRESO' } },
+    { idUsuario: lider.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'TAREA', idObjeto: String(t1_2.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-68), valorAnterior: { idUsuario: null }, valorNuevo: { idUsuario: u.fernando.idUsuario } },
+    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_2.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-55), valorAnterior: { estadoTarea: 'POR_HACER' }, valorNuevo: { estadoTarea: 'EN_PROGRESO' } },
+    { idUsuario: u.diego.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t1_3.idTarea), idSprint: s1.idSprint, fechaEvento: ts(-51), valorAnterior: { estadoTarea: 'POR_HACER' }, valorNuevo: { estadoTarea: 'HECHO' } },
     { idUsuario: lider.idUsuario, accion: 'SPRINT_CLOSED', tipoObjeto: 'SPRINT', idObjeto: String(s1.idSprint), idSprint: s1.idSprint, fechaEvento: ts(-50) },
-    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s2.idSprint), idSprint: s2.idSprint, fechaEvento: ts(-49) },
-    { idUsuario: u.estefania.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-48) },
-    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-47) },
-    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-40) },
-    { idUsuario: u.diego.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t2_2.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-30) },
-    { idUsuario: u.estefania.idUsuario, accion: 'TIME_RECORD_EDITED', tipoObjeto: 'REGISTRO_TIEMPO', idObjeto: String(t2_2.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-28) },
+    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s2.idSprint), idSprint: s2.idSprint, fechaEvento: ts(-49), valorNuevo: { numero: s2.numero } },
+    { idUsuario: u.estefania.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-48), valorNuevo: { tituloTarea: t2_1.tituloTarea, estadoTarea: 'POR_HACER', prioridad: t2_1.prioridad, idUsuarioAsignado: null } },
+    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'TAREA', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-47), valorAnterior: { idUsuario: null }, valorNuevo: { idUsuario: u.carlos.idUsuario } },
+    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t2_1.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-40), valorAnterior: { estadoTarea: 'POR_HACER' }, valorNuevo: { estadoTarea: 'HECHO' } },
+    { idUsuario: u.diego.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t2_2.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-30), valorAnterior: { estadoTarea: 'POR_HACER' }, valorNuevo: { estadoTarea: 'HECHO' } },
+    { idUsuario: u.estefania.idUsuario, accion: 'TIME_RECORD_EDITED', tipoObjeto: 'TAREA', idObjeto: String(t2_2.idTarea), idSprint: s2.idSprint, fechaEvento: ts(-28) },
     { idUsuario: lider.idUsuario, accion: 'SPRINT_CLOSED', tipoObjeto: 'SPRINT', idObjeto: String(s2.idSprint), idSprint: s2.idSprint, fechaEvento: ts(-25) },
-    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s3.idSprint), idSprint: s3.idSprint, fechaEvento: ts(-24) },
-    { idUsuario: lider.idUsuario, accion: 'TASK_REASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t2_3.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-24) },
-    { idUsuario: u.carlos.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t3_1.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-23) },
-    { idUsuario: u.estefania.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t3_4.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-20) },
-    { idUsuario: u.estefania.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_4.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-18) },
-    { idUsuario: u.diego.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'ASIGNACION', idObjeto: String(t3_5.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-17) },
-    { idUsuario: u.diego.idUsuario, accion: 'TIME_RECORD_EDITED', tipoObjeto: 'REGISTRO_TIEMPO', idObjeto: String(t3_5.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-14) },
-    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_7.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-9) },
-    { idUsuario: lider.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_9.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-6) },
-    { idUsuario: lider.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_10.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-5) },
-    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_HOURS_LOGGED', tipoObjeto: 'REGISTRO_TIEMPO', idObjeto: String(t3_9.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-4) },
+    { idUsuario: lider.idUsuario, accion: 'SPRINT_STARTED', tipoObjeto: 'SPRINT', idObjeto: String(s3.idSprint), idSprint: s3.idSprint, fechaEvento: ts(-24), valorNuevo: { numero: s3.numero } },
+    { idUsuario: lider.idUsuario, accion: 'TASK_REASSIGNED', tipoObjeto: 'TAREA', idObjeto: String(t2_3.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-24), valorAnterior: { idUsuario: u.estefania.idUsuario }, valorNuevo: { idUsuario: null } },
+    { idUsuario: u.carlos.idUsuario, accion: 'TASK_CREATED', tipoObjeto: 'TAREA', idObjeto: String(t3_1.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-23), valorNuevo: { tituloTarea: t3_1.tituloTarea, estadoTarea: 'POR_HACER', prioridad: t3_1.prioridad, idUsuarioAsignado: null } },
+    { idUsuario: u.estefania.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'TAREA', idObjeto: String(t3_4.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-20), valorAnterior: { idUsuario: null }, valorNuevo: { idUsuario: u.carlos.idUsuario } },
+    { idUsuario: u.estefania.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_4.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-18), valorAnterior: { estadoTarea: 'POR_HACER' }, valorNuevo: { estadoTarea: 'EN_PROGRESO' } },
+    { idUsuario: u.diego.idUsuario, accion: 'TASK_ASSIGNED', tipoObjeto: 'TAREA', idObjeto: String(t3_5.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-17), valorAnterior: { idUsuario: null }, valorNuevo: { idUsuario: u.diego.idUsuario } },
+    { idUsuario: u.diego.idUsuario, accion: 'TIME_RECORD_EDITED', tipoObjeto: 'TAREA', idObjeto: String(t3_5.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-14) },
+    { idUsuario: u.carlos.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_7.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-9), valorAnterior: { estadoTarea: 'EN_PROGRESO' }, valorNuevo: { estadoTarea: 'EN_REVISION' } },
+    { idUsuario: lider.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_9.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-6), valorAnterior: { estadoTarea: 'EN_PROGRESO' }, valorNuevo: { estadoTarea: 'HECHO' } },
+    { idUsuario: lider.idUsuario, accion: 'TASK_STATUS_CHANGED', tipoObjeto: 'TAREA', idObjeto: String(t3_10.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-5), valorAnterior: { estadoTarea: 'EN_PROGRESO' }, valorNuevo: { estadoTarea: 'HECHO' } },
+    { idUsuario: u.beatriz.idUsuario, accion: 'TASK_HOURS_LOGGED', tipoObjeto: 'TAREA', idObjeto: String(t3_9.idTarea), idSprint: s3.idSprint, fechaEvento: ts(-4), valorNuevo: { horasReales: 4 } },
     // ADMINISTRATIVOS (T-170/HU-170): ocultos en la vista de un integrante.
     { idUsuario: lider.idUsuario, accion: 'LEADERSHIP_CHANGED', tipoObjeto: 'PROYECTO', idObjeto: String(p1.idProyecto), idSprint: null, fechaEvento: ts(-60) },
     { idUsuario: lider.idUsuario, accion: 'PROJECT_EXPORT_CSV_GENERATED', tipoObjeto: 'PROYECTO', idObjeto: String(p1.idProyecto), idSprint: null, fechaEvento: ts(-12) },
     { idUsuario: lider.idUsuario, accion: 'PROJECT_EXPORT_PDF_GENERATED', tipoObjeto: 'PROYECTO', idObjeto: String(p1.idProyecto), idSprint: null, fechaEvento: ts(-3) },
   ];
   // deleteMany + createMany (no hay llave natural en bitacora_auditoria):
-  // re-correr el seed no debe duplicar estas filas de demo.
+  // re-correr el seed no debe duplicar estas filas de demo. Filtra por el
+  // marcador `seedDemo` (no solo por idProyecto): el proyecto demo también
+  // recibe bitácora REAL de la propia app (k6/scenarios/kanban-operations.js
+  // corre contra este mismo proyecto, más cualquier ensayo manual) — borrar
+  // por idProyecto a secas se llevaba esas filas también.
   await prisma.bitacoraAuditoria.deleteMany({
-    where: { detalleJson: { path: ['idProyecto'], equals: p1.idProyecto } },
+    where: {
+      AND: [
+        { detalleJson: { path: ['idProyecto'], equals: p1.idProyecto } },
+        { detalleJson: { path: ['seedDemo'], equals: true } },
+      ],
+    },
   });
   await prisma.bitacoraAuditoria.createMany({
     data: bitacoraP1.map((e) => ({
@@ -524,7 +573,13 @@ async function seedSprint6Demo() {
       tipoObjeto: e.tipoObjeto,
       idObjeto: e.idObjeto,
       fechaEvento: e.fechaEvento,
-      detalleJson: { idProyecto: p1.idProyecto, idSprint: e.idSprint, valorAnterior: null, valorNuevo: null },
+      detalleJson: {
+        idProyecto: p1.idProyecto,
+        idSprint: e.idSprint,
+        valorAnterior: e.valorAnterior ?? null,
+        valorNuevo: e.valorNuevo ?? null,
+        seedDemo: true,
+      } as Prisma.InputJsonValue,
     })),
   });
 
@@ -717,9 +772,12 @@ async function seedSprint6Demo() {
   });
   const rMentoria = await ensureRolS6(p4.idProyecto, 'Coordinación de mentorías', 2, 'Coordina la asignación de mentores a estudiantes de primer ingreso.');
   const partBeatrizP4 = await ensureParticipacionS6(u.beatriz.idUsuario, rMentoria.idRolProyecto, 'ACTIVO', dateOnly(-44), null);
-  // T-282: tercer sprint cerrado con un cumplimiento distinto (50%) a los de
-  // s1/s2 — la tarea pendiente se arrastra al backlog (no hay Sprint
-  // siguiente en este proyecto), no queda huérfana.
+  // T-282: sprint cerrado con un cumplimiento distinto (50%) a los de
+  // s1/s2 — SOLO en el snapshot congelado del cierre (tareasCompletadasCierre/
+  // tareasArrastradasCierre), un histórico independiente de la Tarea real
+  // (ver `tp4_2` más abajo: ambas tareas terminan HECHO, requisito de este
+  // proyecto para poder demostrar F16 — ProjectCloseReadinessService exige
+  // TODAS las tareas del PROYECTO en HECHO, sin importar el Sprint).
   const s1p4 = await ensureSprintS6(p4.idProyecto, 1, EstadoSprint.CERRADO, {
     fechaInicio: ts(-44),
     fechaCierre: ts(-16),
@@ -738,14 +796,16 @@ async function seedSprint6Demo() {
     descripcionTarea: 'Emparejar a cada estudiante de primer ingreso con un mentor de su misma carrera.',
     estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.ALTA, tiempoEstimadoHoras: 6, puntosHistoria: 3,
   }, lider.idUsuario);
-  // T-282: queda pendiente al cerrar el sprint — no hay Sprint siguiente en
-  // este proyecto, así que se arrastra al backlog (destinoArrastre BACKLOG),
-  // igual que permite closeSprint cuando no hay Sprint operable a donde mover.
+  // T-282 (revisión): debe quedar HECHO. ProjectCloseReadinessService
+  // bloquea con TAREAS_SIN_TERMINAR cualquier tarea != HECHO del PROYECTO
+  // (consulta por idProyecto, no por Sprint — project-close-readiness.service.ts),
+  // así que dejarla POR_HACER rompía el escenario declarado de este
+  // proyecto ("cierre de proyecto PERMITIDO"). El 50% de cumplimiento del
+  // Sprint vive solo en el snapshot congelado de arriba.
   const tp4_2 = await ensureTareaS6(p4.idProyecto, 'Cerrar reporte final del ciclo de mentorías', {
-    idSprint: null, idRolProyecto: rMentoria.idRolProyecto,
+    idSprint: s1p4.idSprint, idRolProyecto: rMentoria.idRolProyecto,
     descripcionTarea: 'Consolidar el reporte final de participación del ciclo de mentorías.',
-    estadoTarea: EstadoTarea.POR_HACER, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4, puntosHistoria: 2,
-    destinoArrastre: 'BACKLOG',
+    estadoTarea: EstadoTarea.HECHO, prioridad: Prioridad.MEDIA, tiempoEstimadoHoras: 4, puntosHistoria: 2,
   }, lider.idUsuario);
   await prisma.$transaction(async (tx) => {
     const ids = [tp4_1.idTarea, tp4_2.idTarea];
