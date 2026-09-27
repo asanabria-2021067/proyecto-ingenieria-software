@@ -30,6 +30,9 @@ const TOGGLE_CLASS =
  * sidebar global. Destinos y acciones salen del modelo compartido
  * (`project-nav-model`), así que expandida y colapsada ofrecen exactamente
  * lo mismo: colapsar solo cambia la presentación (iconos con tooltip).
+ *
+ * Visible desde lg: por debajo, la sidebar global (231 px) y esta dejarían
+ * sin espacio al contenido, y la sustituye ProjectMobileNav.
  */
 export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
   const pathname = usePathname() ?? '';
@@ -69,7 +72,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
     <aside
       data-state={collapsed ? 'collapsed' : 'expanded'}
       className={cn(
-        'hidden h-full shrink-0 flex-col border-r border-outline-variant bg-surface-container-low md:flex',
+        'hidden h-full shrink-0 flex-col border-r border-outline-variant bg-surface-container-low lg:flex',
         animar && 'transition-[width] duration-200 motion-reduce:transition-none',
         collapsed ? 'w-14' : 'w-64',
       )}

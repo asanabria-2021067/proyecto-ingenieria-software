@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { ProjectSidebar } from '@/components/projects/project-sidebar';
+import { ProjectMobileNav } from '@/components/projects/navigation/project-mobile-nav';
 import { ChatPanelProvider } from '@/components/projects/chat-panel-context';
 
 export default function ProyectoLayout({ children }: { children: React.ReactNode }) {
@@ -12,7 +13,11 @@ export default function ProyectoLayout({ children }: { children: React.ReactNode
     <ChatPanelProvider>
       <div className="flex h-[calc(100vh-4rem)] min-h-0">
         <ProjectSidebar idProyecto={idProyecto} />
-        <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          {/* HU-154: sin sidebar del proyecto por debajo de lg; esta barra la sustituye. */}
+          <ProjectMobileNav idProyecto={idProyecto} />
+          {children}
+        </div>
       </div>
     </ChatPanelProvider>
   );
