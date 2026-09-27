@@ -246,16 +246,34 @@ const estadoColors: Record<string, string> = {
   RECHAZADA: 'pill-error',
 };
 
+/**
+ * T-252: el motivo del orden ponderado se arma acá a partir de los datos
+ * estructurados del backend (`amigosParticipantes`, `mismaCarrera`) — el
+ * backend nunca manda el texto ya armado. Solo "Destacados" usa
+ * `ProyectoResumen`, que no trae estos campos, así que ahí no hay motivo.
+ */
+function motivoOrdenProyecto(project: ProyectoListItemDTO | ProyectoResumen): string | null {
+  if (!('amigosParticipantes' in project)) return null;
+  const partes: string[] = [];
+  const amigos = project.amigosParticipantes ?? 0;
+  if (amigos > 0) {
+    partes.push(`${amigos} ${amigos === 1 ? 'amigo participa' : 'amigos participan'}`);
+  }
+  if (project.mismaCarrera) partes.push('De tu carrera');
+  return partes.length > 0 ? partes.join(' · ') : null;
+}
+
 function DashboardProjectCard({
   project,
 }: {
   project: ProyectoListItemDTO | ProyectoResumen;
 }) {
+  const motivo = motivoOrdenProyecto(project);
   return (
     <article className="card-base group flex min-h-52 flex-col">
       <div className="mb-stack flex items-start justify-between gap-tight">
         <div className="flex flex-wrap items-center gap-tight">
-          <span className="pill pill-accent">
+          <span className="pill pill-neutral">
             {tipoBadgeLabel(project.tipoProyecto)}
           </span>
           <span className="pill pill-neutral">
@@ -267,6 +285,9 @@ function DashboardProjectCard({
       <h3 className="type-subtitle mb-tight text-text-primary">
         {project.tituloProyecto}
       </h3>
+      {motivo && (
+        <span className="pill pill-accent mb-tight w-fit">{motivo}</span>
+      )}
       <p className="type-body mb-card line-clamp-2 text-text-secondary">
         {project.descripcionProyecto || 'Sin descripción disponible.'}
       </p>

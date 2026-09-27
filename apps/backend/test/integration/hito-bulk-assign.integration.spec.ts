@@ -17,6 +17,7 @@ import { ProjectTransactionService } from '../../src/common/project-policy/proje
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
+import { SocialService } from '../../src/social/social.service';
 
 /**
  * Integración real T-186 (HU-147): `ProjectsService.createHito` con
@@ -47,6 +48,7 @@ describeIntegration('ProjectsService.createHito — asignación masiva (idsTarea
       new ProjectTransactionService(prisma as unknown as PrismaService),
       new ProjectPolicyService(new ProjectIdResolverService(prisma as unknown as PrismaService)),
       new ProjectReadPolicyService(prisma as unknown as PrismaService),
+      new SocialService(prisma as unknown as PrismaService, notifications),
     );
     await prisma.$connect();
   });
