@@ -111,10 +111,15 @@ jobs:
         if: github.event_name != 'pull_request'
         run: npm run test
 
+      # G02 (OWASP25-C034): las suites que exigen PostgreSQL real no se saltan en
+      # CI. Cada interruptor apunta SOLO al servicio efimero de este job; nunca a
+      # una base compartida ni productiva.
       - name: Pruebas de integracion en serie contra Postgres efimero (Vitest)
         run: npm run test:integration
         env:
           INTEGRATION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+          ROLES_IT_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+          RUN_REAL_DB_TESTS: '1'
 
   frontend:
     name: Frontend - lint y pruebas
