@@ -64,7 +64,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
               {unread > 0 && (
                 <span
                   aria-live="polite"
-                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low"
+                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-status-error text-on-status-error text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low"
                 >
                   {unread > 99 ? '99+' : unread}
                 </span>
@@ -86,7 +86,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
               {unread > 0 && (
                 <span
                   aria-live="polite"
-                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low"
+                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-status-error text-on-status-error text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low"
                 >
                   {unread > 99 ? '99+' : unread}
                 </span>
@@ -102,8 +102,8 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
         align="end"
         sideOffset={8}
         aria-label="Panel de notificaciones"
-        // z-[60]: Sheet/Dialog usan z-50 para su overlay de fondo
-        // (bg-black/50 fixed inset-0); si un Sheet queda montado a la vez
+        // z-[60]: Sheet/Dialog usan z-50 para su overlay de fondo oscuro
+        // semitransparente fijo a pantalla completa; si un Sheet queda montado a la vez
         // que este popover, ese overlay puede pintarse encima con el mismo
         // z-index y dejarlo atenuado e inclickeable ("Ver todas" no
         // respondía). Por encima de esa capa para no competir con ella.
