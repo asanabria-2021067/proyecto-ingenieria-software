@@ -110,6 +110,11 @@ const CONNECTED_EVENT = 'connected';
 export const options = {
   vus: 1,
   iterations: 1,
+  // Sin esto, un check() fallido no afecta el exit code de k6 (T-200): CI
+  // seguiría en verde aunque todos los checks fallaran.
+  thresholds: {
+    checks: ['rate==1.0'],
+  },
 };
 
 const TRIGGER_ENABLED = __ENV.K6_TRIGGER_SPRINT_FINALIZATION === 'true';
