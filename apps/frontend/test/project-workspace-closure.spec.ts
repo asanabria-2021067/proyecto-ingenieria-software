@@ -175,6 +175,23 @@ describe('VIEW-01 — workspace del líder y cierre (F006)', () => {
     expect(screen.getByRole('link', { name: /corregir documentos/i })).toHaveAttribute('href', '/dashboard/projects/42/cierre');
   });
 
+  it('HU-154: la corrección documental es un aviso con los tokens semánticos de advertencia', async () => {
+    mockProyecto('EN_SOLICITUD_CIERRE');
+    (getClosureRevisions as any).mockResolvedValue({
+      page: 1,
+      limit: 20,
+      total: 2,
+      items: [{ idRevisionCierre: 6, numeroRevision: 2, estadoRevision: 'BORRADOR', comentarioRevisor: 'Falta una evidencia', documentosEnviados: [], informeOficial: null, puedeEditar: true, puedeEnviar: true, puedeResolver: false }],
+    });
+    renderPage();
+
+    const texto = await screen.findByText(/solicitó una corrección documental/);
+    const aviso = texto.closest('.bg-status-warning') as HTMLElement;
+    expect(aviso).not.toBeNull();
+    expect(aviso).toHaveClass('text-on-status-warning');
+    expect(aviso.className).not.toMatch(/amber-/);
+  });
+
   it('CERRADO → ReadOnlyProjectBanner y ninguna acción de escritura', async () => {
     mockProyecto('CERRADO');
     renderPage();

@@ -54,6 +54,9 @@ const MIGRATED_FILES = [
   'components/projects/detail/project-my-roles-section.tsx',
   'components/projects/detail/project-role-management-section.tsx',
   'components/projects/role-admin-card.tsx',
+  'components/projects/closure-status-banner.tsx',
+  'components/projects/read-only-project-banner.tsx',
+  'components/projects/detail/exit-request-section.tsx',
 ];
 
 describe('Tokens de color (HU-163)', () => {

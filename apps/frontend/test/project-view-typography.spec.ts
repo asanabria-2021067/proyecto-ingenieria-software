@@ -33,6 +33,8 @@ const MIGRATED_FILES = [
   'components/projects/detail/project-role-management-section.tsx',
   'components/projects/detail/exit-request-section.tsx',
   'components/projects/role-admin-card.tsx',
+  'components/projects/closure-status-banner.tsx',
+  'components/projects/read-only-project-banner.tsx',
 ];
 
 const PARTICIPANT_PAGE = 'app/dashboard/proyectos/[id]/page.tsx';

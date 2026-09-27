@@ -440,4 +440,3 @@ describe('ProjectDetailClient — esqueleto 8/4 del líder', () => {
     expect(replaceMock).toHaveBeenCalledWith('/dashboard/projects/42');
   });
 });
-

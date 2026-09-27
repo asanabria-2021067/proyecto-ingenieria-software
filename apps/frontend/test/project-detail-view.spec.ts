@@ -337,4 +337,3 @@ describe('ProjectDetailClient — «Ver roles y postularme» (D-02)', () => {
     expect(full).toContainElement(screen.getByRole('heading', { level: 1, name: 'Proyecto de prueba' }));
   });
 });
-
