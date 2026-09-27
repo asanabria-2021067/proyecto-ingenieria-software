@@ -3,6 +3,7 @@ import { EstadoProyecto } from '@prisma/client';
 import type { Cache } from 'cache-manager';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { SocialService } from '../src/social/social.service';
 import { ProjectsController } from '../src/projects/projects.controller';
 import { ProjectsService } from '../src/projects/projects.service';
 import {
@@ -86,6 +87,7 @@ function makeController(dataset: ProyectoRow[]) {
     makeProjectTransactionDouble({ tx: {} }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
+    {} as unknown as SocialService,
   );
   return new ProjectsController(service);
 }
