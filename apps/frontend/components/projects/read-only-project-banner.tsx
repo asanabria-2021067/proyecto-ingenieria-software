@@ -36,7 +36,7 @@ export function ReadOnlyProjectBanner({
     <div
       role="status"
       aria-label="Proyecto cerrado: vista histórica de solo lectura"
-      className={`flex flex-col gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface sm:flex-row sm:items-center ${className}`}
+      className={`flex flex-col gap-inline rounded-card border border-outline-variant/40 bg-surface-container-low px-stack py-inline type-body sm:flex-row sm:items-center ${className}`}
     >
       <Lock className="size-5 shrink-0 text-primary" aria-hidden="true" />
       <p className="min-w-0 flex-1">

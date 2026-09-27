@@ -19,13 +19,13 @@ export function ExitRequestSection({ idProyecto, solicitud }: ExitRequestSection
   return (
     <div
       role="status"
-      className="mb-5 flex flex-col gap-3 rounded-xl border border-sky-400/40 bg-sky-400/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-sky-400/25"
+      className="flex flex-col gap-inline rounded-card border border-primary/30 bg-primary/5 px-card py-stack sm:flex-row sm:items-center sm:justify-between"
     >
-      <div className="flex items-start gap-3">
-        <Clock className="mt-0.5 size-5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true" />
+      <div className="flex items-start gap-inline">
+        <Clock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
         <div>
-          <p className="text-sm font-bold text-on-surface">Tienes una solicitud de salida en curso</p>
-          <p className="text-xs leading-relaxed text-on-surface-variant">
+          <p className="type-body font-bold">Tienes una solicitud de salida en curso</p>
+          <p className="type-meta">
             {enPreparacion
               ? 'Debes cerrar tus tramos de trabajo pendientes antes de continuar.'
               : 'Tu solicitud está esperando la revisión del líder del proyecto.'}
@@ -35,7 +35,7 @@ export function ExitRequestSection({ idProyecto, solicitud }: ExitRequestSection
       <Button
         asChild
         size="sm"
-        className="shrink-0 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
+        className="shrink-0 gap-micro bg-primary text-on-primary hover:bg-primary/90"
       >
         <Link href={`/dashboard/projects/${idProyecto}/salida/preparacion`}>Ver solicitud de salida</Link>
       </Button>
