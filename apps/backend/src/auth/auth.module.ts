@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { requireJwtSecret } from '../config/jwt-secret';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') || 'dev-secret-change-me',
+        secret: requireJwtSecret(config.get<string>('JWT_SECRET')),
         signOptions: { expiresIn: '24h' },
       }),
     }),
