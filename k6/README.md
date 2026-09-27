@@ -13,7 +13,9 @@ Tres escenarios contra el backend real (`apps/backend`), nunca contra mocks:
 ## Cómo correrlas
 
 Backend y Postgres arriba (`docker compose up -d postgres redis` o
-equivalente local), luego desde `apps/backend`:
+equivalente local) y `K6_FIXTURE_PASSWORD` en tu `.env` de la raíz (ver
+`.env.example`; el fixture no trae una contraseña por defecto), luego desde
+`apps/backend`:
 
 ```bash
 npm run k6:project-listing
