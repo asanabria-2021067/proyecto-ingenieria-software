@@ -6,6 +6,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { EstadoProyectoCreador } from '../src/projects/dto/update-estado-proyecto.dto';
 import { ProjectsService } from '../src/projects/projects.service';
+import { SocialService } from '../src/social/social.service';
 import {
   makeProjectPolicyDouble,
   makeProjectReadPolicyDouble,
@@ -73,13 +74,18 @@ function makeService(
   prisma: ReturnType<typeof makePrisma>,
   notifications: Partial<NotificationsService> | Record<string, unknown> = {},
 ) {
+  const notificationsDouble = makeNotifications(notifications as Record<string, unknown>) as unknown as NotificationsService;
   return new ProjectsService(
     prisma as unknown as PrismaService,
-    makeNotifications(notifications as Record<string, unknown>) as unknown as NotificationsService,
+    notificationsDouble,
     {} as unknown as Cache,
     makeProjectTransactionDouble({ tx: prisma }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
+    // SocialService real (no doble) para que las pruebas de orden ponderado
+    // (T-251) sigan ejerciendo `prisma.amistad.findMany` real, la misma
+    // fuente de amigos que usa el resto del producto (finding 5 de revisión).
+    new SocialService(prisma as unknown as PrismaService, notificationsDouble),
   );
 }
 
