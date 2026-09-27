@@ -3,14 +3,10 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardList,
-  Search,
-} from 'lucide-react';
+import { AlertCircle, AlertTriangle, ClipboardList, Search, SearchX } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -18,7 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Empty,
   EmptyContent,
@@ -27,9 +30,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import {
+  ESTADO_LABEL,
+  PRIORIDAD_ICON,
+  PRIORIDAD_LABEL,
+} from '@/components/projects/task-board.utils';
 import { getMisTareas, type MiTareaDTO } from '@/lib/services/users';
 import {
-  filterTasksByHito,
   filterTasksByPriority,
   filterTasksByStatus,
   paginateTasks,
@@ -40,43 +47,16 @@ import {
 } from '@/lib/tasks/filters';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 
-const ESTADO_TAREA_LABEL: Record<string, string> = {
-  POR_HACER: 'Por hacer',
-  EN_PROGRESO: 'En progreso',
-  EN_REVISION: 'En revisión',
-  HECHO: 'Hecho',
-};
-
-// mismos estilos que hitos-section.tsx, para que una tarea se vea igual en cualquier vista
-const TAREA_ESTADO_STYLES: Record<string, string> = {
-  POR_HACER: 'bg-surface-container-high text-on-surface-variant',
-  EN_PROGRESO: 'bg-blue-500/10 text-blue-500 dark:bg-blue-500/20 dark:text-blue-300',
-  EN_REVISION: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300',
-  HECHO: 'bg-secondary-container text-on-secondary-container font-semibold',
-};
-
-const PRIORIDAD_STYLES: Record<string, string> = {
-  ALTA: 'text-red-600 dark:text-red-400 font-semibold',
-  MEDIA: 'text-amber-600 dark:text-amber-400 font-semibold',
-  BAJA: 'text-blue-500 dark:text-blue-400 font-semibold',
-};
-
-const PRIORIDAD_TAREA_LABEL: Record<string, string> = {
-  ALTA: 'Alta',
-  MEDIA: 'Media',
-  BAJA: 'Baja',
-};
-
-// cuántas tareas (ya filtradas) se muestran por página
 const TAMANIO_PAGINA = 15;
-
-type Vencimiento = 'VENCIDA' | 'PROXIMA' | 'A_TIEMPO';
+const FILTRO_TODOS = 'TODOS';
 
 // una tarea "próxima a vencer" si le quedan 3 días o menos
 const DIAS_PROXIMA_A_VENCER = 3;
 
+type Vencimiento = 'VENCIDA' | 'PROXIMA' | null;
+
 function getVencimiento(tarea: MiTareaDTO): Vencimiento {
-  if (!tarea.fechaLimite || tarea.estadoTarea === 'HECHO') return 'A_TIEMPO';
+  if (!tarea.fechaLimite || tarea.estadoTarea === 'HECHO') return null;
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -85,31 +65,40 @@ function getVencimiento(tarea: MiTareaDTO): Vencimiento {
 
   if (diasRestantes < 0) return 'VENCIDA';
   if (diasRestantes <= DIAS_PROXIMA_A_VENCER) return 'PROXIMA';
-  return 'A_TIEMPO';
+  return null;
 }
 
+// icono + texto en cada pastilla: el vencimiento nunca depende solo del color
 const VENCIMIENTO_CONFIG: Record<
-  Vencimiento,
-  { label: string; icon: React.ElementType; className: string }
+  Exclude<Vencimiento, null>,
+  { label: string; icon: typeof AlertCircle; tone: string }
 > = {
-  VENCIDA: {
-    label: 'Vencida',
-    icon: AlertCircle,
-    className: 'bg-error-container text-error',
-  },
-  PROXIMA: {
-    label: 'Próxima a vencer',
-    icon: AlertTriangle,
-    className: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300',
-  },
-  A_TIEMPO: {
-    label: 'A tiempo',
-    icon: CheckCircle2,
-    className: 'bg-secondary-container text-on-secondary-container',
-  },
+  VENCIDA: { label: 'Vencida', icon: AlertCircle, tone: 'pill-error' },
+  PROXIMA: { label: 'Vence pronto', icon: AlertTriangle, tone: 'pill-warning' },
 };
 
-function formatFechaLimite(fecha: string): string {
+const ESTADO_TONE: Record<EstadoTarea, string> = {
+  POR_HACER: 'pill-neutral',
+  EN_PROGRESO: 'pill-warning',
+  EN_REVISION: 'pill-neutral',
+  HECHO: 'pill-success',
+};
+const PRIORIDAD_TONE: Record<Prioridad, string> = {
+  BAJA: 'pill-neutral',
+  MEDIA: 'pill-warning',
+  ALTA: 'pill-error',
+};
+
+const OPCIONES_ORDEN: { value: string; label: string; campo: CriterioOrdenTarea; direccion: DireccionOrden }[] = [
+  { value: 'fechaLimite:asc', label: 'Fecha límite: más próxima primero', campo: 'fechaLimite', direccion: 'asc' },
+  { value: 'fechaLimite:desc', label: 'Fecha límite: más lejana primero', campo: 'fechaLimite', direccion: 'desc' },
+  { value: 'prioridad:asc', label: 'Prioridad: alta primero', campo: 'prioridad', direccion: 'asc' },
+  { value: 'prioridad:desc', label: 'Prioridad: baja primero', campo: 'prioridad', direccion: 'desc' },
+  { value: 'estado:asc', label: 'Estado: flujo (por hacer → hecho)', campo: 'estado', direccion: 'asc' },
+];
+
+function formatFecha(fecha: string | null): string {
+  if (!fecha) return 'Sin fecha';
   return new Date(fecha).toLocaleDateString('es-GT', {
     day: 'numeric',
     month: 'short',
@@ -117,18 +106,23 @@ function formatFechaLimite(fecha: string): string {
   });
 }
 
-export default function MisTareasPage() {
-  const [busqueda, setBusqueda] = useState('');
-  const [estadoFiltro, setEstadoFiltro] = useState('TODOS');
-  const [prioridadFiltro, setPrioridadFiltro] = useState('TODAS');
-  const [hitoFiltro, setHitoFiltro] = useState('TODOS');
-  // valor combinado "criterio:direccion" (p. ej. "prioridad:desc")
-  const [orden, setOrden] = useState('fechaLimite:asc');
-  const [pagina, setPagina] = useState(1);
+function EstadoBadge({ estado }: { estado: EstadoTarea }) {
+  return <span className={`pill ${ESTADO_TONE[estado]}`}>{ESTADO_LABEL[estado]}</span>;
+}
 
-  // Se piden todas las tareas asignadas una sola vez al mismo endpoint
-  // /usuarios/me/tareas; el filtrado, la búsqueda, el orden y la paginación
-  // se resuelven en el cliente con las funciones puras de lib/tasks/filters.
+function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
+  const Icono = PRIORIDAD_ICON[prioridad];
+  return (
+    <span className={`pill ${PRIORIDAD_TONE[prioridad]}`}>
+      <Icono className="size-3.5" aria-hidden="true" />
+      {PRIORIDAD_LABEL[prioridad]}
+    </span>
+  );
+}
+
+export default function MisTareasPage() {
+  // GET /usuarios/me/tareas — siempre las tareas del usuario de la sesión
+  // (el backend resuelve el id desde el JWT, nunca desde un parámetro).
   const { data: tareas = [], isLoading, isError, refetch } = useQuery<MiTareaDTO[]>({
     queryKey: ['mis-tareas'],
     queryFn: () => getMisTareas(),
@@ -136,190 +130,222 @@ export default function MisTareasPage() {
     refetchOnWindowFocus: true,
   });
 
-  // Opciones de hito derivadas de las tareas ya cargadas. MiTareaDTO solo
-  // trae `idHito` (sin título), así que las opciones se etiquetan por id.
-  const opcionesHito = useMemo(() => {
-    const idsHito = new Set<number>();
-    let haySinHito = false;
-    for (const tarea of tareas) {
-      if (tarea.idHito == null) haySinHito = true;
-      else idsHito.add(tarea.idHito);
-    }
-    return { ids: [...idsHito].sort((a, b) => a - b), haySinHito };
+  const [busqueda, setBusqueda] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState(FILTRO_TODOS);
+  const [prioridadFiltro, setPrioridadFiltro] = useState(FILTRO_TODOS);
+  const [proyectoFiltro, setProyectoFiltro] = useState(FILTRO_TODOS);
+  const [ordenValor, setOrdenValor] = useState(OPCIONES_ORDEN[0].value);
+  const [page, setPage] = useState(1);
+
+  const ordenActivo = OPCIONES_ORDEN.find((o) => o.value === ordenValor) ?? OPCIONES_ORDEN[0];
+
+  // cualquier cambio de filtro/orden/búsqueda vuelve a la página 1
+  function actualizarBusqueda(valor: string) {
+    setBusqueda(valor);
+    setPage(1);
+  }
+  function actualizarEstado(valor: string) {
+    setEstadoFiltro(valor);
+    setPage(1);
+  }
+  function actualizarPrioridad(valor: string) {
+    setPrioridadFiltro(valor);
+    setPage(1);
+  }
+  function actualizarProyecto(valor: string) {
+    setProyectoFiltro(valor);
+    setPage(1);
+  }
+  function actualizarOrden(valor: string) {
+    setOrdenValor(valor);
+    setPage(1);
+  }
+
+  // opciones de proyecto derivadas de las tareas ya cargadas — MiTareaDTO
+  // trae el proyecto embebido, así que no hace falta pedirlo aparte.
+  const opcionesProyecto = useMemo(() => {
+    const porId = new Map<number, string>();
+    for (const tarea of tareas) porId.set(tarea.proyecto.idProyecto, tarea.proyecto.tituloProyecto);
+    return [...porId.entries()].sort((a, b) => a[1].localeCompare(b[1], 'es'));
   }, [tareas]);
 
   const tareasFiltradas = useMemo(() => {
-    const buscadas = searchTasks(tareas, busqueda);
+    const porTexto = searchTasks(tareas, busqueda);
     const porEstado = filterTasksByStatus(
-      buscadas,
-      estadoFiltro === 'TODOS' ? undefined : (estadoFiltro as EstadoTarea),
+      porTexto,
+      estadoFiltro === FILTRO_TODOS ? undefined : (estadoFiltro as EstadoTarea),
     );
     const porPrioridad = filterTasksByPriority(
       porEstado,
-      prioridadFiltro === 'TODAS' ? undefined : (prioridadFiltro as Prioridad),
+      prioridadFiltro === FILTRO_TODOS ? undefined : (prioridadFiltro as Prioridad),
     );
-    const porHito = filterTasksByHito(
-      porPrioridad,
-      hitoFiltro === 'TODOS'
-        ? undefined
-        : hitoFiltro === 'SIN_HITO'
-          ? null
-          : Number(hitoFiltro),
-    );
-    const [criterio, direccion] = orden.split(':') as [CriterioOrdenTarea, DireccionOrden];
-    return sortTasks(porHito, criterio, direccion);
-  }, [tareas, busqueda, estadoFiltro, prioridadFiltro, hitoFiltro, orden]);
+    const porProyecto =
+      proyectoFiltro === FILTRO_TODOS
+        ? porPrioridad
+        : porPrioridad.filter((tarea) => tarea.proyecto.idProyecto === Number(proyectoFiltro));
+    return sortTasks(porProyecto, ordenActivo.campo, ordenActivo.direccion);
+  }, [tareas, busqueda, estadoFiltro, prioridadFiltro, proyectoFiltro, ordenActivo]);
 
-  const totalPaginas = Math.max(1, Math.ceil(tareasFiltradas.length / TAMANIO_PAGINA));
-  const paginaActual = Math.min(Math.max(1, pagina), totalPaginas);
-  const paginacion = useMemo(
-    () => paginateTasks(tareasFiltradas, paginaActual, TAMANIO_PAGINA),
-    [tareasFiltradas, paginaActual],
+  const paginado = useMemo(
+    () => paginateTasks(tareasFiltradas, page, TAMANIO_PAGINA),
+    [tareasFiltradas, page],
   );
-
-  // cualquier cambio de filtro/orden/búsqueda vuelve a la primera página
-  const cambiarBusqueda = (valor: string) => {
-    setBusqueda(valor);
-    setPagina(1);
-  };
-  const cambiarEstado = (valor: string) => {
-    setEstadoFiltro(valor);
-    setPagina(1);
-  };
-  const cambiarPrioridad = (valor: string) => {
-    setPrioridadFiltro(valor);
-    setPagina(1);
-  };
-  const cambiarHito = (valor: string) => {
-    setHitoFiltro(valor);
-    setPagina(1);
-  };
-  const cambiarOrden = (valor: string) => {
-    setOrden(valor);
-    setPagina(1);
-  };
-
-  // se agrupa por proyecto solo la página visible (el resto de la vista igual)
-  const grupos = useMemo(() => {
-    const porProyecto = new Map<number, { proyecto: MiTareaDTO['proyecto']; tareas: MiTareaDTO[] }>();
-    for (const tarea of paginacion.items) {
-      const grupo = porProyecto.get(tarea.proyecto.idProyecto);
-      if (grupo) {
-        grupo.tareas.push(tarea);
-      } else {
-        porProyecto.set(tarea.proyecto.idProyecto, { proyecto: tarea.proyecto, tareas: [tarea] });
-      }
-    }
-    return Array.from(porProyecto.values());
-  }, [paginacion.items]);
 
   const hayFiltrosActivos =
     busqueda.trim() !== '' ||
-    estadoFiltro !== 'TODOS' ||
-    prioridadFiltro !== 'TODAS' ||
-    hitoFiltro !== 'TODOS';
+    estadoFiltro !== FILTRO_TODOS ||
+    prioridadFiltro !== FILTRO_TODOS ||
+    proyectoFiltro !== FILTRO_TODOS;
 
-  const limpiarFiltros = () => {
+  function limpiarFiltros() {
     setBusqueda('');
-    setEstadoFiltro('TODOS');
-    setPrioridadFiltro('TODAS');
-    setHitoFiltro('TODOS');
-    setPagina(1);
-  };
+    setEstadoFiltro(FILTRO_TODOS);
+    setPrioridadFiltro(FILTRO_TODOS);
+    setProyectoFiltro(FILTRO_TODOS);
+    setPage(1);
+  }
 
   return (
-      <div className="mx-auto max-w-[1400px] px-8 py-8">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
-              Mis Tareas
-            </h1>
-            <p className="text-tertiary text-sm">
-              Todas las tareas que tienes asignadas, agrupadas por proyecto.
-            </p>
+    <div className="mx-auto w-full max-w-content px-stack py-section md:px-section">
+      {/* encabezado */}
+      <div className="card-base mb-stack space-y-micro">
+        <h1 className="type-display">Mis Tareas</h1>
+        <p className="type-body text-text-secondary">
+          Todas las tareas que tienes asignadas en tus proyectos, ordenadas por lo que vence primero.
+        </p>
+      </div>
+
+      {/* toolbar + tabla + paginación */}
+      <div className="card-base min-h-0">
+        <div className="mb-stack flex flex-col gap-inline lg:flex-row lg:flex-wrap lg:items-center">
+          <div className="relative w-full lg:max-w-xs">
+            <Search
+              className="pointer-events-none absolute left-inline top-1/2 size-4 -translate-y-1/2 text-text-secondary"
+              aria-hidden="true"
+            />
+            <Input
+              value={busqueda}
+              onChange={(e) => actualizarBusqueda(e.target.value)}
+              placeholder="Buscar por título o descripción..."
+              aria-label="Buscar tareas por título o descripción"
+              className="rounded-control border-outline-variant bg-page pl-9 text-body"
+            />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-              <Input
-                value={busqueda}
-                onChange={(e) => cambiarBusqueda(e.target.value)}
-                placeholder="Buscar por título o descripción..."
-                aria-label="Buscar tareas"
-                className="w-64 pl-9 rounded-xl border-outline-variant/30 bg-surface-container-low"
-              />
-            </div>
+          <Select value={proyectoFiltro} onValueChange={actualizarProyecto}>
+            <SelectTrigger
+              aria-label="Filtrar por proyecto"
+              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-48"
+            >
+              <SelectValue placeholder="Proyecto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FILTRO_TODOS}>Todos los proyectos</SelectItem>
+              {opcionesProyecto.map(([idProyecto, tituloProyecto]) => (
+                <SelectItem key={idProyecto} value={String(idProyecto)}>
+                  {tituloProyecto}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={estadoFiltro} onValueChange={cambiarEstado}>
-              <SelectTrigger className="w-44 h-auto py-2 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="TODOS">Todos los estados</SelectItem>
-                {Object.entries(ESTADO_TAREA_LABEL).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Select value={estadoFiltro} onValueChange={actualizarEstado}>
+            <SelectTrigger
+              aria-label="Filtrar por estado"
+              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-44"
+            >
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FILTRO_TODOS}>Todos los estados</SelectItem>
+              {Object.entries(ESTADO_LABEL).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={prioridadFiltro} onValueChange={cambiarPrioridad}>
-              <SelectTrigger className="w-40 h-auto py-2 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm">
-                <SelectValue placeholder="Prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="TODAS">Todas las prioridades</SelectItem>
-                {Object.entries(PRIORIDAD_TAREA_LABEL).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Select value={prioridadFiltro} onValueChange={actualizarPrioridad}>
+            <SelectTrigger
+              aria-label="Filtrar por prioridad"
+              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-44"
+            >
+              <SelectValue placeholder="Prioridad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FILTRO_TODOS}>Todas las prioridades</SelectItem>
+              {Object.entries(PRIORIDAD_LABEL).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={hitoFiltro} onValueChange={cambiarHito}>
-              <SelectTrigger className="w-40 h-auto py-2 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm">
-                <SelectValue placeholder="Hito" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="TODOS">Todos los hitos</SelectItem>
-                {opcionesHito.haySinHito && <SelectItem value="SIN_HITO">Sin hito</SelectItem>}
-                {opcionesHito.ids.map((id) => (
-                  <SelectItem key={id} value={String(id)}>
-                    Hito #{id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Select value={ordenValor} onValueChange={actualizarOrden}>
+            <SelectTrigger
+              aria-label="Ordenar tareas"
+              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-64"
+            >
+              <SelectValue placeholder="Ordenar" />
+            </SelectTrigger>
+            <SelectContent>
+              {OPCIONES_ORDEN.map((opcion) => (
+                <SelectItem key={opcion.value} value={opcion.value}>
+                  {opcion.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={orden} onValueChange={cambiarOrden}>
-              <SelectTrigger className="w-60 h-auto py-2 rounded-xl border-outline-variant/30 bg-surface-container-low text-sm">
-                <SelectValue placeholder="Ordenar" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fechaLimite:asc">Fecha límite: más próxima primero</SelectItem>
-                <SelectItem value="fechaLimite:desc">Fecha límite: más lejana primero</SelectItem>
-                <SelectItem value="prioridad:asc">Prioridad: más alta primero</SelectItem>
-                <SelectItem value="prioridad:desc">Prioridad: más baja primero</SelectItem>
-                <SelectItem value="estado:asc">Estado: por hacer primero</SelectItem>
-                <SelectItem value="estado:desc">Estado: completadas primero</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {hayFiltrosActivos && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={limpiarFiltros}
+              className="font-medium text-primary lg:ml-auto"
+            >
+              Limpiar filtros
+            </Button>
+          )}
         </div>
 
+        {/* contador de resultados */}
+        <div className="mb-inline flex items-center gap-tight" aria-live="polite" role="status">
+          <span className="pill pill-accent">
+            {tareasFiltradas.length} {tareasFiltradas.length === 1 ? 'resultado' : 'resultados'}
+          </span>
+          {hayFiltrosActivos && (
+            <span className="type-meta">de {tareas.length} tareas en total</span>
+          )}
+        </div>
+
+        {/* loading — skeleton con forma de fila, nunca spinner */}
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm" role="status">
-            Cargando tus tareas...
+          <div className="space-y-inline py-inline" role="status" aria-label="Cargando tus tareas">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex items-center gap-inline rounded-card border border-outline-variant bg-card p-card shadow-card"
+              >
+                <div className="min-w-0 flex-1 space-y-tight">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+                <Skeleton className="h-6 w-20 shrink-0 rounded-control" />
+                <Skeleton className="h-6 w-20 shrink-0 rounded-control" />
+              </div>
+            ))}
           </div>
         )}
 
-        {isError && (
+        {/* error */}
+        {!isLoading && isError && (
           <Empty tone="danger" className="surface-enter" role="alert">
             <EmptyMedia variant="icon">
-              <AlertCircle aria-hidden="true" className="h-7 w-7" />
+              <AlertCircle aria-hidden="true" className="size-7" />
             </EmptyMedia>
             <EmptyHeader>
               <EmptyTitle>No se pudieron cargar tus tareas</EmptyTitle>
@@ -328,149 +354,138 @@ export default function MisTareasPage() {
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <button
-                type="button"
-                onClick={() => refetch()}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-              >
+              <Button type="button" size="sm" onClick={() => refetch()}>
                 Reintentar
-              </button>
+              </Button>
             </EmptyContent>
           </Empty>
         )}
 
+        {/* vacío: no hay ninguna tarea asignada */}
         {!isLoading && !isError && tareas.length === 0 && (
           <Empty className="surface-enter" aria-live="polite">
             <EmptyMedia variant="icon">
-              <ClipboardList aria-hidden="true" className="h-7 w-7" />
+              <ClipboardList aria-hidden="true" className="size-7" />
             </EmptyMedia>
             <EmptyHeader>
               <EmptyTitle>No tienes tareas asignadas</EmptyTitle>
               <EmptyDescription>
-                Cuando un proyecto te asigne una tarea, aparecerá aquí sin importar el estado del proyecto.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
-
-        {!isLoading && !isError && tareas.length > 0 && tareasFiltradas.length === 0 && (
-          <Empty className="surface-enter" aria-live="polite">
-            <EmptyMedia variant="icon">
-              <Search aria-hidden="true" className="h-7 w-7" />
-            </EmptyMedia>
-            <EmptyHeader>
-              <EmptyTitle>Ninguna tarea coincide con los filtros</EmptyTitle>
-              <EmptyDescription>
-                Prueba con otros términos de búsqueda o quita alguno de los filtros aplicados.
+                Cuando un proyecto te asigne una tarea, aparecerá aquí. Revisa tus proyectos para ver en qué estás participando.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <button
-                type="button"
-                onClick={limpiarFiltros}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-              >
-                Limpiar filtros
-              </button>
+              <Button asChild type="button" size="sm">
+                <Link href="/dashboard/projects/mine">Ir a mis proyectos</Link>
+              </Button>
             </EmptyContent>
           </Empty>
         )}
 
-        {!isLoading && !isError && tareasFiltradas.length > 0 && (
-          <p className="mb-4 text-sm text-tertiary" aria-live="polite">
-            {tareasFiltradas.length} {tareasFiltradas.length === 1 ? 'tarea' : 'tareas'}
-            {hayFiltrosActivos ? ' encontradas' : ''}
-            {totalPaginas > 1 ? ` · página ${paginacion.pagina} de ${totalPaginas}` : ''}
-          </p>
+        {/* sin coincidencias con los filtros */}
+        {!isLoading && !isError && tareas.length > 0 && tareasFiltradas.length === 0 && (
+          <Empty className="surface-enter" aria-live="polite">
+            <EmptyMedia variant="icon">
+              <SearchX aria-hidden="true" className="size-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>Sin coincidencias</EmptyTitle>
+              <EmptyDescription>
+                Ninguna tarea coincide con el texto o los filtros aplicados.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button type="button" variant="outline" size="sm" onClick={limpiarFiltros}>
+                Limpiar filtros
+              </Button>
+            </EmptyContent>
+          </Empty>
         )}
 
-        <div className="space-y-6">
-          {grupos.map(({ proyecto, tareas: tareasDelProyecto }, index) => (
-            <div
-              key={proyecto.idProyecto}
-              className="surface-enter bg-surface-container-lowest rounded-2xl border border-outline-variant p-6"
-              style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
-            >
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <h2 className="font-headline font-bold text-on-surface text-lg leading-tight">
-                  {proyecto.tituloProyecto}
-                </h2>
-                <span className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface text-xs font-bold">
-                  {tareasDelProyecto.length} {tareasDelProyecto.length === 1 ? 'tarea' : 'tareas'}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {tareasDelProyecto.map((tarea) => {
-                  const vencimiento = VENCIMIENTO_CONFIG[getVencimiento(tarea)];
-                  const VencimientoIcon = vencimiento.icon;
+        {!isLoading && !isError && paginado.items.length > 0 && (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">Título</TableHead>
+                  <TableHead scope="col">Proyecto</TableHead>
+                  <TableHead scope="col">Fecha límite</TableHead>
+                  <TableHead scope="col">Prioridad</TableHead>
+                  <TableHead scope="col">Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginado.items.map((tarea) => {
+                  const vencimiento = getVencimiento(tarea);
+                  const config = vencimiento ? VENCIMIENTO_CONFIG[vencimiento] : null;
+                  const VencimientoIcon = config?.icon;
                   return (
-                    <Link
-                      key={tarea.idTarea}
-                      href={`/dashboard/projects/${proyecto.idProyecto}/kanban/tasks/${tarea.idTarea}`}
-                      className="flex flex-wrap items-center gap-3 bg-surface-container-low rounded-xl px-4 py-3 hover:bg-surface-container transition-colors"
-                    >
-                      <span className="flex-1 min-w-[10rem] text-sm text-on-surface truncate">
-                        {tarea.tituloTarea}
-                      </span>
-
-                      {tarea.fechaLimite && (
-                        <span className="text-xs text-tertiary shrink-0">
-                          Vence: {formatFechaLimite(tarea.fechaLimite)}
-                        </span>
-                      )}
-
-                      <span className={`text-xs shrink-0 ${PRIORIDAD_STYLES[tarea.prioridad] ?? 'text-tertiary'}`}>
-                        {tarea.prioridad}
-                      </span>
-
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase shrink-0 ${
-                          TAREA_ESTADO_STYLES[tarea.estadoTarea] ?? 'bg-surface-container-high text-on-surface-variant'
-                        }`}
-                      >
-                        {ESTADO_TAREA_LABEL[tarea.estadoTarea] ?? tarea.estadoTarea}
-                      </span>
-
-                      <span
-                        className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${vencimiento.className}`}
-                      >
-                        <VencimientoIcon className="w-3 h-3" />
-                        {vencimiento.label}
-                      </span>
-
-                      <ChevronRight className="w-4 h-4 text-tertiary shrink-0" />
-                    </Link>
+                    <TableRow key={tarea.idTarea}>
+                      <TableCell className="max-w-sm whitespace-normal type-subtitle">
+                        <Link
+                          href={`/dashboard/projects/${tarea.proyecto.idProyecto}/kanban/tasks/${tarea.idTarea}`}
+                          className="hover:underline"
+                        >
+                          {tarea.tituloTarea}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <span className="type-meta">{tarea.proyecto.tituloProyecto}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-start gap-micro">
+                          <span className="type-meta">{formatFecha(tarea.fechaLimite)}</span>
+                          {config && VencimientoIcon && (
+                            <span className={`pill ${config.tone}`}>
+                              <VencimientoIcon className="size-3.5" aria-hidden="true" />
+                              {config.label}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <PrioridadBadge prioridad={tarea.prioridad} />
+                      </TableCell>
+                      <TableCell>
+                        <EstadoBadge estado={tarea.estadoTarea} />
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </div>
-            </div>
-          ))}
-        </div>
+              </TableBody>
+            </Table>
 
-        {!isLoading && !isError && totalPaginas > 1 && (
-          <div className="mt-8 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => setPagina(paginacion.pagina - 1)}
-              disabled={!paginacion.hayAnterior}
-              className="inline-flex items-center rounded-xl border border-outline-variant/40 px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-40"
+            {/* paginación */}
+            <nav
+              aria-label="Paginación de tareas"
+              className="mt-stack flex items-center justify-between gap-inline border-t border-outline-variant pt-inline"
             >
-              Anterior
-            </button>
-            <span className="text-sm text-tertiary">
-              Página {paginacion.pagina} de {totalPaginas}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPagina(paginacion.pagina + 1)}
-              disabled={!paginacion.haySiguiente}
-              className="inline-flex items-center rounded-xl border border-outline-variant/40 px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={paginado.pagina <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Página anterior"
+              >
+                Anterior
+              </Button>
+              <span className="type-meta font-medium" aria-live="polite">
+                Página {paginado.pagina} de {paginado.totalPaginas}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={paginado.pagina >= paginado.totalPaginas}
+                onClick={() => setPage((p) => Math.min(paginado.totalPaginas, p + 1))}
+                aria-label="Página siguiente"
+              >
+                Siguiente
+              </Button>
+            </nav>
+          </>
         )}
       </div>
+    </div>
   );
 }
