@@ -217,6 +217,7 @@ jobs:
       FRONTEND_URL: http://localhost:3000
       NEXT_PUBLIC_API_URL: http://localhost:3001
       PLAYWRIGHT_BASE_URL: http://localhost:3000
+      E2E_PRODUCTION_SERVER: '1'
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -234,10 +235,13 @@ jobs:
         working-directory: apps/backend
         run: npm ci
 
-      - name: Preparar base de datos (schema + seed)
+      # G02 (OWASP25-C033): el esquema se crea con las migraciones reales
+      # (`migrate deploy`, lo mismo que corre produccion al arrancar), nunca con
+      # `db push`, que ignora el historial de migraciones. Base efimera del job.
+      - name: Preparar base de datos (migraciones + seed)
         working-directory: apps/backend
         run: |
-          npx prisma db push
+          npx prisma migrate deploy
           npx prisma db seed
 
       - name: Compilar y levantar el backend en segundo plano
@@ -263,6 +267,14 @@ jobs:
       - name: Instalar dependencias del frontend
         working-directory: apps/frontend
         run: npm ci
+
+      # G02 (OWASP25-C033): el E2E navega el build de produccion (next build +
+      # next start via playwright.config.ts), no el dev server.
+      - name: Build de produccion del frontend para E2E
+        working-directory: apps/frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
 
       - name: Cache de navegadores de Playwright
         id: playwright-cache
