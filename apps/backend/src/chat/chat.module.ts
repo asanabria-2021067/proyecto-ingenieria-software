@@ -6,6 +6,7 @@ import { ChatArchivadoController } from './chat-archivado.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { PrismaModule } from '../prisma/prisma.module';
+import { requireJwtSecret } from '../config/jwt-secret';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') || 'dev-secret-change-me',
+        secret: requireJwtSecret(config.get<string>('JWT_SECRET')),
         signOptions: { expiresIn: '7d' },
       }),
     }),
