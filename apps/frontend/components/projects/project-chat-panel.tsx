@@ -96,7 +96,7 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
             role="status"
             title={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
             aria-label={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
-            className={`size-1.5 shrink-0 rounded-full ${isConnected ? 'bg-green-500' : 'animate-pulse bg-amber-500'}`}
+            className={`size-1.5 shrink-0 rounded-full ${isConnected ? 'bg-status-success' : 'animate-pulse bg-status-warning'}`}
           />
         </span>
         <button
@@ -251,7 +251,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
                 type="button"
                 size="sm"
                 variant={tipo === 'INDIVIDUAL' ? 'default' : 'outline'}
-                className={tipo === 'INDIVIDUAL' ? 'text-white hover:text-white' : ''}
+                className={tipo === 'INDIVIDUAL' ? 'text-primary-foreground hover:text-primary-foreground' : ''}
                 onClick={() => {
                   setTipo('INDIVIDUAL');
                   setSeleccionados((current) => current.slice(0, 1));
@@ -263,7 +263,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
                 type="button"
                 size="sm"
                 variant={tipo === 'GRUPAL' ? 'default' : 'outline'}
-                className={tipo === 'GRUPAL' ? 'text-white hover:text-white' : ''}
+                className={tipo === 'GRUPAL' ? 'text-primary-foreground hover:text-primary-foreground' : ''}
                 onClick={() => setTipo('GRUPAL')}
               >
                 Grupal
@@ -316,7 +316,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
             </div>
 
             {error && (
-              <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+              <p role="alert" className="type-meta text-status-error">
                 {error}
               </p>
             )}
@@ -335,7 +335,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
             <Button
               type="submit"
               disabled={crear.isPending}
-              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-white hover:bg-primary/90 hover:text-white"
+              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
             >
               {crear.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
               {crear.isPending ? 'Creando...' : 'Crear chat'}
@@ -410,7 +410,7 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
                 </Avatar>
                 <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
                   propio
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-surface-container-high text-on-surface'
                 }`}>
                   {!propio && (
@@ -419,7 +419,7 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
                     </p>
                   )}
                   <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
-                  <p className={`mt-0.5 text-[10px] ${propio ? 'text-white/70' : 'text-tertiary'}`}>
+                  <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>
                     {formatHora(m.enviadoEn)}
                   </p>
                 </div>
@@ -442,7 +442,7 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
               type="submit"
               size="icon"
               disabled={enviar.isPending || texto.trim().length === 0}
-              className="size-10 shrink-0 rounded-full bg-primary text-white hover:bg-primary/90 hover:text-white"
+              className="size-10 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
               aria-label="Enviar mensaje"
             >
               <Send className="size-4" aria-hidden="true" />
