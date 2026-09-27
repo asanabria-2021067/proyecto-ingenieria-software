@@ -19,7 +19,6 @@ import {
   GraduationCap,
   History,
   Layers,
-  LogOut,
   MapPin,
   MessageCircle,
   ShieldAlert,
@@ -47,7 +46,6 @@ import {
 } from '@/components/ui/empty';
 import ProjectDetailClient from '@/app/dashboard/projects/[id]/project-detail-client';
 import { ExitRequestSection } from '@/components/projects/detail/exit-request-section';
-import { LeaveProjectModal } from '@/components/projects/leave-project-modal';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useChatPanel } from '@/components/projects/chat-panel-context';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -75,7 +73,6 @@ const ULTIMO_ROL_MSG = 'No puedes abandonar tu último rol desde esta opción.';
 
 const TAB_BASE =
   'relative flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-1 text-[13px] font-bold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
-const TAB_ACTIVE = `${TAB_BASE} border-primary text-on-surface`;
 const TAB_INACTIVE = `${TAB_BASE} border-transparent text-tertiary hover:border-outline-variant hover:text-on-surface`;
 
 function formatCupos(n: number): string {
@@ -140,7 +137,6 @@ export default function ProyectoDetallePage() {
   // queda vacío y cada rol cae en el flujo de postulación de siempre.
   const { roles: rolesAdmin, salirDeRol } = useProjectRoles(projectId, { enabled: esParticipante });
   const { request: solicitudSalidaAbierta } = useCurrentExitRequest(projectId);
-  const [modalSalidaAbierto, setModalSalidaAbierto] = useState(false);
 
   const handleSalirDeRol = async (rol: Rol) => {
     const { isConfirmed } = await uvgSwal.fire({
@@ -361,48 +357,12 @@ export default function ProyectoDetallePage() {
               </CardShell>
             </div>
 
-            {/* Barra "Resumen / Solicitud de salida / Tablero": solo para un
-                participante activo (el líder ya se fue por ProjectDetailClient
-                arriba). Nunca incluye Miembros/Sprints/Editar Roles — esos son
-                exclusivos del líder. Misma posición que en el workspace del
-                líder: debajo de la fila principal, no antes. */}
-            {esParticipante && (
-              <div className="my-4.5 flex items-center gap-5 overflow-x-auto border-b border-outline-variant/50">
-                <span className={TAB_ACTIVE} aria-current="page">
-                  Resumen
-                </span>
-                {solicitudSalidaAbierta ? (
-                  <Link
-                    href={`/dashboard/projects/${projectId}/salida/preparacion`}
-                    className={TAB_INACTIVE}
-                  >
-                    <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-                    Solicitud de salida
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setModalSalidaAbierto(true)}
-                    className={TAB_INACTIVE}
-                  >
-                    <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-                    Solicitud de salida
-                  </button>
-                )}
-                <Link href={`/dashboard/projects/${projectId}/kanban`} className={TAB_INACTIVE}>
-                  Tablero
-                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </Link>
-              </div>
-            )}
+            {/* HU-154 (T-215): la barra local «Resumen / Solicitud de salida /
+                Tablero» se retiró. Los destinos están en la navegación
+                contextual (sidebar y ProjectMobileNav) y la salida es una
+                acción de su menú «Acciones del proyecto». */}
 
-            <LeaveProjectModal
-              open={modalSalidaAbierto}
-              onOpenChange={setModalSalidaAbierto}
-              idProyecto={projectId}
-            />
-
-          <div className={`grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px] lg:items-start ${esParticipante ? '' : 'mt-5'}`}>
+          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
             {/* ── Columna principal ─────────────────────────────────── */}
             <div className="min-w-0 space-y-4">
               {/* Descripción completa + Objetivos */}
