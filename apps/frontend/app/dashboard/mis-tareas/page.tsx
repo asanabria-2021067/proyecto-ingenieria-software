@@ -46,6 +46,7 @@ import {
   type DireccionOrden,
 } from '@/lib/tasks/filters';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
+import { parseFechaSolo } from '@/lib/calendar/utils';
 
 const TAMANIO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
@@ -58,10 +59,14 @@ type Vencimiento = 'VENCIDA' | 'PROXIMA' | null;
 function getVencimiento(tarea: MiTareaDTO): Vencimiento {
   if (!tarea.fechaLimite || tarea.estadoTarea === 'HECHO') return null;
 
+  // fechaLimite llega como YYYY-MM-DD o como instante UTC-medianoche
+  // ("2026-09-27T00:00:00.000Z"); parseFechaSolo interpreta ambos como el
+  // día calendario que son, sin desplazarlo por zona horaria (mismo criterio
+  // que el calendario, ver lib/calendar/agenda.ts).
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const limite = new Date(tarea.fechaLimite);
-  const diasRestantes = Math.ceil((limite.getTime() - hoy.getTime()) / 86_400_000);
+  const limite = parseFechaSolo(tarea.fechaLimite);
+  const diasRestantes = Math.round((limite.getTime() - hoy.getTime()) / 86_400_000);
 
   if (diasRestantes < 0) return 'VENCIDA';
   if (diasRestantes <= DIAS_PROXIMA_A_VENCER) return 'PROXIMA';
@@ -99,7 +104,7 @@ const OPCIONES_ORDEN: { value: string; label: string; campo: CriterioOrdenTarea;
 
 function formatFecha(fecha: string | null): string {
   if (!fecha) return 'Sin fecha';
-  return new Date(fecha).toLocaleDateString('es-GT', {
+  return parseFechaSolo(fecha).toLocaleDateString('es-GT', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -186,9 +191,15 @@ export default function MisTareasPage() {
     return sortTasks(porProyecto, ordenActivo.campo, ordenActivo.direccion);
   }, [tareas, busqueda, estadoFiltro, prioridadFiltro, proyectoFiltro, ordenActivo]);
 
+  // clamp defensivo: paginateTasks no recorta la página fuera de rango (por
+  // contrato, ver lib/tasks/filters.ts), y un refetch en foco puede reducir
+  // el total mientras el usuario está en una página que dejó de existir.
+  const totalPaginas = Math.max(1, Math.ceil(tareasFiltradas.length / TAMANIO_PAGINA));
+  const paginaActual = Math.min(Math.max(1, page), totalPaginas);
+
   const paginado = useMemo(
-    () => paginateTasks(tareasFiltradas, page, TAMANIO_PAGINA),
-    [tareasFiltradas, page],
+    () => paginateTasks(tareasFiltradas, paginaActual, TAMANIO_PAGINA),
+    [tareasFiltradas, paginaActual],
   );
 
   const hayFiltrosActivos =
@@ -314,7 +325,11 @@ export default function MisTareasPage() {
 
         {/* contador de resultados */}
         <div className="mb-inline flex items-center gap-tight" aria-live="polite" role="status">
-          <span className="pill pill-accent">
+          {/* pill-neutral, no pill-accent: --color-accent y --color-status-warning
+              comparten valor (app/global.css), y pill-warning ya se usa varias
+              veces en esta misma tabla (EN_PROGRESO, prioridad MEDIA, "Vence
+              pronto") — el acento debe destacar una sola cosa por bloque. */}
+          <span className="pill pill-neutral">
             {tareasFiltradas.length} {tareasFiltradas.length === 1 ? 'resultado' : 'resultados'}
           </span>
           {hayFiltrosActivos && (
