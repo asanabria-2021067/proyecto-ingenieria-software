@@ -58,7 +58,6 @@
     "pdf-lib": "^1.17.1",
     "prisma": "^6.19.2",
     "reflect-metadata": "^0.2.2",
-    "resend": "^6.12.3",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3"
   },
