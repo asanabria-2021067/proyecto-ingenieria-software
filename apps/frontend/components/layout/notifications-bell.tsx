@@ -64,7 +64,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
               {unread > 0 && (
                 <span
                   aria-live="polite"
-                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-status-error text-on-status-error text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low"
+                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low"
                 >
                   {unread > 99 ? '99+' : unread}
                 </span>
@@ -86,7 +86,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
               {unread > 0 && (
                 <span
                   aria-live="polite"
-                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-status-error text-on-status-error text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low"
+                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-surface-container-low"
                 >
                   {unread > 99 ? '99+' : unread}
                 </span>
