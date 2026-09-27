@@ -10,6 +10,11 @@ import { join } from 'node:path';
 const LITERAL_COLOR_CLASS =
   /\b(?:bg|text|border|ring|fill|stroke|from|via|to|shadow|outline|decoration|caret|accent|divide)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)(?:-\d{2,3})?(?:\/\d{1,3})?\b|\b(?:bg|text|border|ring|fill|stroke)-\[#[0-9a-fA-F]{3,8}\]/g;
 
+// Estilos inline con hex (`style={{ backgroundColor: '#...' }}`, `color: "#..."`,
+// etc.): mismo hallazgo que una clase de color literal, pero fuera del alcance
+// del regex de arriba (que solo mira nombres de clase Tailwind).
+const INLINE_HEX_STYLE = /(?:backgroundColor|color|borderColor|fill|stroke)\s*:\s*['"`]#[0-9a-fA-F]{3,8}['"`]/g;
+
 // Rutas relativas a apps/frontend de las pantallas/componentes ya migrados a
 // tokens (T-251/HU-163, cierre del Sprint 8). Cada nuevo archivo migrado debe
 // sumarse aquí para que la regresión quede cubierta.
@@ -43,6 +48,15 @@ describe('Tokens de color (HU-163)', () => {
     (relativePath) => {
       const source = readFileSync(join(__dirname, '..', relativePath), 'utf-8');
       const matches = source.match(LITERAL_COLOR_CLASS) ?? [];
+      expect(matches).toEqual([]);
+    },
+  );
+
+  it.each(MIGRATED_FILES)(
+    'no usa estilos inline con color hex en %s',
+    (relativePath) => {
+      const source = readFileSync(join(__dirname, '..', relativePath), 'utf-8');
+      const matches = source.match(INLINE_HEX_STYLE) ?? [];
       expect(matches).toEqual([]);
     },
   );
