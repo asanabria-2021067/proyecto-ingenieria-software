@@ -56,6 +56,11 @@ function dateOnly(days: number): Date {
   const d = ts(days);
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
+/** HU-169 (T-263): fecha/hora local para EventoProyecto.fechaInicio/fechaFin (a diferencia de dateOnly, conserva la hora). */
+function atHour(daysFromNow: number, hour: number, minute = 0): Date {
+  const d = ts(daysFromNow);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, minute, 0, 0);
+}
 const normalize = (name: string) => name.normalize('NFKC').trim().toLowerCase();
 
 const PASSWORD_HASH = hashSync('Test1234!', 10);
@@ -199,6 +204,18 @@ async function ensureTareaS6(
   const existente = await prisma.tarea.findFirst({ where: { idProyecto, tituloTarea } });
   if (existente) return prisma.tarea.update({ where: { idTarea: existente.idTarea }, data });
   return prisma.tarea.create({ data: { idProyecto, tituloTarea, creadaPor, ...data } });
+}
+
+/** HU-169 (T-263): evento de calendario del proyecto, para poblar la vista mensual/semanal de demo. */
+async function ensureEventoS6(
+  idProyecto: number,
+  tituloEvento: string,
+  data: Omit<Prisma.EventoProyectoUncheckedCreateInput, 'idProyecto' | 'tituloEvento' | 'idCreador'>,
+  idCreador: number,
+) {
+  const existente = await prisma.eventoProyecto.findFirst({ where: { idProyecto, tituloEvento } });
+  if (existente) return prisma.eventoProyecto.update({ where: { idEvento: existente.idEvento }, data });
+  return prisma.eventoProyecto.create({ data: { idProyecto, tituloEvento, idCreador, ...data } });
 }
 
 // ─── Textos de RegistroAvanceAsignacion (>=200 caracteres, contenido creíble) ──
@@ -479,6 +496,31 @@ async function seedSprint6Demo() {
     { timeout: 60_000 },
   );
 
+  // ── Eventos de calendario (HU-169/T-263), proyecto 1 (principal) ───────
+  // Mezcla pasado/futuro y una antelación distinta del default, para
+  // recorrer /dashboard/calendario en vista mensual y semanal.
+  await ensureEventoS6(p1.idProyecto, 'Reunión semanal de coordinación', {
+    descripcionEvento: 'Seguimiento semanal del Sprint activo con el equipo de coordinación.',
+    fechaInicio: atHour(2, 10, 0),
+    fechaFin: atHour(2, 11, 0),
+  }, lider.idUsuario);
+  await ensureEventoS6(p1.idProyecto, 'Entrega de reporte de avance del Sprint 3', {
+    descripcionEvento: 'Entrega del reporte de avance de mitad de Sprint al comité del programa.',
+    fechaInicio: atHour(8, 14, 0),
+    fechaFin: atHour(8, 15, 0),
+  }, lider.idUsuario);
+  await ensureEventoS6(p1.idProyecto, 'Taller de capacitación para nuevos tutores', {
+    descripcionEvento: 'Capacitación inicial para los tutores que se incorporan este ciclo.',
+    fechaInicio: atHour(15, 9, 0),
+    fechaFin: atHour(15, 12, 0),
+    antelacionMinutos: 1440, // recordatorio un día antes, para mostrar el campo configurable
+  }, lider.idUsuario);
+  await ensureEventoS6(p1.idProyecto, 'Cierre de convocatoria de tutores', {
+    descripcionEvento: 'Fecha límite para que los tutores confirmen su participación en el ciclo.',
+    fechaInicio: atHour(-4, 16, 0), // pasado: demuestra que un evento vencido sigue visible en el histórico
+    fechaFin: atHour(-4, 17, 0),
+  }, lider.idUsuario);
+
   // ══════════════════════════════════════════════════════════════════════
   // PROYECTO 2 — SIN Sprint activo (F2: empty state + "Iniciar Sprint")
   // ══════════════════════════════════════════════════════════════════════
@@ -652,7 +694,7 @@ async function seedSprint6Demo() {
   console.log(`Users: ${Object.keys(USERS).length}`);
   console.log('Projects: 5');
   console.log(`Demo projects:`);
-  console.log(`  #${p1.idProyecto} ${p1.tituloProyecto} (EN_PROGRESO, Sprint ACTIVO)`);
+  console.log(`  #${p1.idProyecto} ${p1.tituloProyecto} (EN_PROGRESO, Sprint ACTIVO, 4 eventos de calendario)`);
   console.log(`  #${p2.idProyecto} ${p2.tituloProyecto} (EN_PROGRESO, sin Sprint)`);
   console.log(`  #${p3.idProyecto} ${p3.tituloProyecto} (EN_PROGRESO, Sprint EN_FINALIZACION)`);
   console.log(`  #${p4.idProyecto} ${p4.tituloProyecto} (EN_PROGRESO, cierre permitido)`);
