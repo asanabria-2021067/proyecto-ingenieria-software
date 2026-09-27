@@ -74,3 +74,34 @@ export function formatMonthLabel(year: number, month: number): string {
   const label = MONTH_LABELS_ES[month];
   return `${label.charAt(0).toUpperCase()}${label.slice(1)} ${year}`;
 }
+
+/** T-264: los 7 días (lunes a domingo) de la semana que contiene `anchor`. */
+export function getWeekDays(anchor: Date): CalendarDay[] {
+  const weekday = (anchor.getDay() + 6) % 7; // lunes = 0
+  const start = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - weekday);
+
+  const days: CalendarDay[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    days.push({ date, key: toDateKey(date), inCurrentMonth: date.getMonth() === anchor.getMonth() });
+  }
+  return days;
+}
+
+export function addDays(date: Date, amount: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
+}
+
+/** Rango legible de una semana, p. ej. "22 sep – 28 sep 2026". */
+export function formatWeekRangeLabel(start: Date, end: Date): string {
+  const inicio = start.toLocaleDateString('es-GT', { day: 'numeric', month: 'short' });
+  const fin = end.toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${inicio} – ${fin}`;
+}
+
+// hour12: false explícito — sin esto, algunos entornos ICU devuelven
+// "09:00 a. m." para es-GT, lo que además rompe el orden lexicográfico usado
+// como sortKey (AgendaItem) entre eventos de la mañana y de la tarde.
+export function formatTime(date: Date): string {
+  return date.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
