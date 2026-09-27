@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?debes definir DB_PASSWORD, no tiene valor por defecto}
       POSTGRES_DB: ${DB_NAME:-uvg_collab}
     ports:
       - "127.0.0.1:${DB_PORT:-5432}:5432"
@@ -33,7 +33,10 @@ services:
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@uvg.edu.gt}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      # G01 (VM0-F022): sin contraseña por defecto. No se usa `:?` porque Compose
+      # interpola todos los servicios aunque el perfil `tools` no esté activo y
+      # eso rompería el arranque normal; pgAdmin se niega a iniciar sin ella.
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-}
       PGADMIN_LISTEN_PORT: 5050
     ports:
       - "127.0.0.1:5050:5050"
