@@ -106,10 +106,17 @@ export class EventsService {
     if (dto.fechaFin !== undefined) data.fechaFin = new Date(dto.fechaFin);
     // T-265: mover fechaInicio invalida el recordatorio ya agendado/enviado
     // contra la fecha vieja — se resetea para que EventsReminderService lo
-    // recalcule contra la fecha nueva, nunca reenvía el viejo.
+    // recalcule contra la fecha nueva, nunca reenvía el viejo. El diálogo del
+    // frontend manda fechaInicio en cada edición (también al solo cambiar el
+    // título), así que el reset debe comparar contra el valor real, no contra
+    // "vino en el DTO", o un recordatorio ya enviado se reenvía sin que la
+    // fecha haya cambiado.
     if (dto.fechaInicio !== undefined) {
-      data.fechaInicio = new Date(dto.fechaInicio);
-      data.recordatorioEnviadoEn = null;
+      const nuevaFechaInicio = new Date(dto.fechaInicio);
+      if (nuevaFechaInicio.getTime() !== actual.fechaInicio.getTime()) {
+        data.recordatorioEnviadoEn = null;
+      }
+      data.fechaInicio = nuevaFechaInicio;
     }
 
     return this.prisma.eventoProyecto.update({
