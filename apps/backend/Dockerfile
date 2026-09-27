@@ -36,4 +36,6 @@ COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
 
 USER nestjs
 EXPOSE 3001
-CMD npx prisma migrate deploy && (npx prisma db seed || echo "Seed skipped: data already exists") && node dist/main.js
+# G01 (OWASP25-C029): el arranque productivo solo migra y arranca; nunca siembra
+# datos demo ni silencia fallos. Si la migración falla, el contenedor no arranca.
+CMD npx prisma migrate deploy && node dist/main.js
