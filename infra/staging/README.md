@@ -25,6 +25,17 @@ Ejecuta el guard, genera el TLS, construye y levanta todo (`--wait`), corre `cha
 
 `characterize.mjs` fija el comportamiento **actual** (HARN-01…05: HSTS/Helmet en `/api`, 403 con `Accept: text/html`, `/socket.io` → 308 sin P1, `/` sin cabeceras de seguridad, HTTP sin redirección). Los gates que cambien ese comportamiento a propósito actualizan la expectativa en su propio commit. El script rechaza cualquier host que no sea local.
 
+## En CI (G02-C18)
+
+Job `topology` de `ci.yml` («Topologia - arnes efimero (nginx + TLS)»):
+
+| Disparo | ¿Corre? |
+|---|---|
+| PR → `main` | Siempre |
+| PR → `develop` | Solo si el PR toca realtime, nginx, cabeceras, Dockerfiles/compose o el propio arnés (`should-run.mjs`); si no puede calcular el diff, corre |
+| `workflow_dispatch` | Sí |
+| Push a `develop` / `workflow_call` del deploy | No |
+
 ## Alcance a producción
 
 **NONE**: sin hosts externos, sin secretos reales, sin publicación ni deploy.
