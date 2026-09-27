@@ -67,14 +67,17 @@ function generarCorreoSugerido(apellido: string, carne: string): string {
 }
 
 const selectClass =
-  'w-full rounded-control border border-outline-variant bg-card px-inline py-tight type-body outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30';
+  'w-full rounded-control border border-outline-variant bg-card px-inline py-tight type-body transition-colors focus-visible:border-primary';
 
+// T-274 (OWASP): mensaje neutro para cualquier fallo del backend. Antes se
+// mostraba error.message crudo (p. ej. "El correo ya esta registrado"), lo
+// que permitia enumerar cuentas existentes.
 function mensajeError(error: (Error & { statusCode?: number }) | null): string {
   if (!error) return '';
   if (error.statusCode === 429) {
     return 'Demasiados intentos. Espera un minuto antes de volver a intentarlo.';
   }
-  return error.message || 'No se pudo completar el registro. Intenta de nuevo.';
+  return 'No se pudo completar el registro. Intenta de nuevo.';
 }
 
 export default function RegistroPage() {
@@ -165,7 +168,7 @@ export default function RegistroPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-page p-stack sm:p-section">
+    <main className="relative flex min-h-screen items-center justify-center bg-page p-stack sm:p-section">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-card bg-card shadow-raised lg:grid-cols-2">
         {/* Branding panel: mismo patron que /login (bg-primary text-on-primary,
             foto del campus desvanecida detras via gradiente). */}
@@ -189,16 +192,16 @@ export default function RegistroPage() {
           </Link>
 
           <div className="relative z-10">
-            <span className="type-meta font-bold uppercase tracking-widest text-on-primary/70">
+            <span className="type-meta font-bold uppercase tracking-widest text-on-primary/80">
               Portal institucional · UVG
             </span>
-            <h1 className="type-display mt-tight text-on-primary">Comienza tu camino</h1>
+            <h2 className="type-display mt-tight text-on-primary">Comienza tu camino</h2>
             <p className="type-body mt-tight text-on-primary/85">
               Registrate y accede a oportunidades de beca, extension y experiencia academica.
             </p>
           </div>
 
-          <span className="relative z-10 type-meta text-on-primary/60">UVG 2025</span>
+          <span className="relative z-10 type-meta text-on-primary/80">UVG 2025</span>
         </div>
 
         {/* Form panel */}
@@ -217,7 +220,7 @@ export default function RegistroPage() {
 
           <div className="mb-stack">
             <Image src={logo} alt="UVGENIUS" className="mb-tight h-14 w-auto" />
-            <h2 className="type-section">Crear cuenta</h2>
+            <h1 className="type-section">Crear cuenta</h1>
             <p className="type-body mt-micro text-text-secondary">
               Usa tu correo institucional para registrarte
             </p>
@@ -240,8 +243,13 @@ export default function RegistroPage() {
                   }}
                   placeholder="Juan"
                   aria-invalid={errores.nombre ? 'true' : 'false'}
+                  aria-describedby={errores.nombre ? 'nombre-error' : undefined}
                 />
-                {errores.nombre && <p className="type-meta text-on-status-error">{errores.nombre}</p>}
+                {errores.nombre && (
+                  <p id="nombre-error" role="alert" className="type-meta text-on-status-error">
+                    {errores.nombre}
+                  </p>
+                )}
               </div>
               <div className="flex flex-col gap-tight">
                 <Label htmlFor="apellido" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
@@ -258,8 +266,13 @@ export default function RegistroPage() {
                   }}
                   placeholder="Perez"
                   aria-invalid={errores.apellido ? 'true' : 'false'}
+                  aria-describedby={errores.apellido ? 'apellido-error' : undefined}
                 />
-                {errores.apellido && <p className="type-meta text-on-status-error">{errores.apellido}</p>}
+                {errores.apellido && (
+                  <p id="apellido-error" role="alert" className="type-meta text-on-status-error">
+                    {errores.apellido}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -278,8 +291,13 @@ export default function RegistroPage() {
                 }}
                 placeholder="24000"
                 aria-invalid={errores.carne ? 'true' : 'false'}
+                aria-describedby={errores.carne ? 'carne-error' : undefined}
               />
-              {errores.carne && <p className="type-meta text-on-status-error">{errores.carne}</p>}
+              {errores.carne && (
+                <p id="carne-error" role="alert" className="type-meta text-on-status-error">
+                  {errores.carne}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-tight">
@@ -299,13 +317,18 @@ export default function RegistroPage() {
                 }}
                 placeholder="usuario@uvg.edu.gt"
                 aria-invalid={errores.correo ? 'true' : 'false'}
+                aria-describedby={errores.correo ? 'correo-error' : undefined}
               />
               {!correoEditadoManualmente && correo && (
-                <p className="type-meta text-on-status-success">
+                <p className="type-meta text-primary">
                   Correo generado automaticamente. Puedes editarlo si lo necesitas.
                 </p>
               )}
-              {errores.correo && <p className="type-meta text-on-status-error">{errores.correo}</p>}
+              {errores.correo && (
+                <p id="correo-error" role="alert" className="type-meta text-on-status-error">
+                  {errores.correo}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-tight md:grid-cols-3">
@@ -324,6 +347,8 @@ export default function RegistroPage() {
                     if (errores.idCarrera) setErrores((prev) => ({ ...prev, idCarrera: undefined }));
                   }}
                   className={selectClass}
+                  aria-invalid={errores.idCarrera ? 'true' : 'false'}
+                  aria-describedby={errores.idCarrera ? 'carrera-error' : undefined}
                 >
                   <option value={0}>Seleccionar...</option>
                   {carreras.map((c) => (
@@ -332,7 +357,11 @@ export default function RegistroPage() {
                     </option>
                   ))}
                 </select>
-                {errores.idCarrera && <p className="type-meta text-on-status-error">{errores.idCarrera}</p>}
+                {errores.idCarrera && (
+                  <p id="carrera-error" role="alert" className="type-meta text-on-status-error">
+                    {errores.idCarrera}
+                  </p>
+                )}
                 {selectedCarreraName && (
                   <p className="type-meta break-words leading-snug text-text-secondary">{selectedCarreraName}</p>
                 )}
@@ -351,6 +380,8 @@ export default function RegistroPage() {
                     if (errores.semestre) setErrores((prev) => ({ ...prev, semestre: undefined }));
                   }}
                   className={selectClass}
+                  aria-invalid={errores.semestre ? 'true' : 'false'}
+                  aria-describedby={errores.semestre ? 'semestre-error' : undefined}
                 >
                   {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => (
                     <option key={s} value={s}>
@@ -358,7 +389,11 @@ export default function RegistroPage() {
                     </option>
                   ))}
                 </select>
-                {errores.semestre && <p className="type-meta text-on-status-error">{errores.semestre}</p>}
+                {errores.semestre && (
+                  <p id="semestre-error" role="alert" className="type-meta text-on-status-error">
+                    {errores.semestre}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -378,6 +413,7 @@ export default function RegistroPage() {
                 }}
                 placeholder="Minimo 8 caracteres"
                 aria-invalid={errores.contrasena ? 'true' : 'false'}
+                aria-describedby={errores.contrasena ? 'contrasena-error' : undefined}
               />
               {passwordStrength && (
                 <div className="flex flex-col gap-micro">
@@ -389,27 +425,33 @@ export default function RegistroPage() {
                           ? 'text-on-status-error'
                           : passwordStrength.variant === 'warning'
                             ? 'text-on-status-warning'
-                            : 'text-on-status-success'
+                            : 'text-primary'
                       }
                     >
                       {passwordStrength.label}
                     </span>
                   </div>
+                  {/* T-251: relleno con los tokens vivos (no -container) de cada
+                      familia, que sí contrastan >=3:1 contra la pista en oscuro. */}
                   <div className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-container-highest">
                     <div
                       className={`h-full rounded-pill transition-all duration-500 ${
                         passwordStrength.variant === 'error'
-                          ? 'bg-status-error'
+                          ? 'bg-error'
                           : passwordStrength.variant === 'warning'
-                            ? 'bg-status-warning'
-                            : 'bg-status-success'
+                            ? 'bg-secondary'
+                            : 'bg-primary'
                       }`}
                       style={{ width: passwordStrength.width }}
                     />
                   </div>
                 </div>
               )}
-              {errores.contrasena && <p className="type-meta text-on-status-error">{errores.contrasena}</p>}
+              {errores.contrasena && (
+                <p id="contrasena-error" role="alert" className="type-meta text-on-status-error">
+                  {errores.contrasena}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-tight">
@@ -427,13 +469,18 @@ export default function RegistroPage() {
                 }}
                 placeholder="••••••••"
                 aria-invalid={errores.confirmar ? 'true' : 'false'}
+                aria-describedby={errores.confirmar ? 'confirmar-error' : undefined}
               />
               {confirmar && (
-                <p className={`type-meta font-semibold ${passwordsMatch ? 'text-on-status-success' : 'text-on-status-error'}`}>
+                <p className={`type-meta font-semibold ${passwordsMatch ? 'text-primary' : 'text-on-status-error'}`}>
                   {passwordsMatch ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden'}
                 </p>
               )}
-              {errores.confirmar && <p className="type-meta text-on-status-error">{errores.confirmar}</p>}
+              {errores.confirmar && (
+                <p id="confirmar-error" role="alert" className="type-meta text-on-status-error">
+                  {errores.confirmar}
+                </p>
+              )}
             </div>
 
             {/* T-219: un solo componente para carga/error/exito, sin popups. */}
@@ -463,6 +510,6 @@ export default function RegistroPage() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
