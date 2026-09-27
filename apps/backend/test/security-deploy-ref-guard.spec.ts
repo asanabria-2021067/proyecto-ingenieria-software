@@ -30,7 +30,13 @@ const workflowWith = (jobs: string) => parseWorkflow(`on: workflow_dispatch\njob
 describe('T23: deploy.yml solo corre desde main', () => {
   it('todos los jobs reales de deploy.yml llevan la guarda de main', () => {
     const workflow = loadWorkflow('deploy.yml');
-    expect(Object.keys(workflow.jobs).sort()).toEqual(['build-backend', 'build-frontend', 'deploy', 'test']);
+    expect(Object.keys(workflow.jobs).sort()).toEqual([
+      'build-backend',
+      'build-frontend',
+      'deploy',
+      'promote-latest',
+      'test',
+    ]);
     expect(deployRefGuardFindings(workflow)).toEqual([]);
   });
 

@@ -8,7 +8,7 @@ import { loadWorkflow, parseWorkflow, type Workflow, type WorkflowPermissions } 
  * un release en curso. Los fixtures prueban que el guard detecta excesos.
  */
 
-const PUBLISH_JOBS = ['build-frontend', 'build-backend'];
+const PUBLISH_JOBS = ['build-frontend', 'build-backend', 'promote-latest'];
 
 function writeScopes(permissions: WorkflowPermissions | undefined): string[] {
   if (permissions === undefined) {
