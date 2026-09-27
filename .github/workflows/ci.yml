@@ -132,6 +132,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # G02 (OWASP25-C043): errores de TypeScript (incluidos los tests) fallan
+      # en todo evento; no dependen de lo que `next build` decida comprobar.
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
       # La cobertura es un gate obligatorio en Pull Requests.
       # Los umbrales se definen en apps/frontend/vitest.config.ts.
       # Si la cobertura cae por debajo del mínimo acordado, Vitest
