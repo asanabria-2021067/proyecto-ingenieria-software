@@ -62,7 +62,9 @@ export function MonthView({
                 >
                   <span
                     className={`type-meta self-end rounded-pill px-1.5 ${
-                      isToday ? 'bg-accent font-bold text-on-accent' : ''
+                      // El acento queda reservado para el ícono de evento (una sola cosa
+                      // destacada por bloque): "hoy" se marca con borde, no relleno.
+                      isToday ? 'border border-outline-variant font-bold text-on-surface' : ''
                     }`}
                   >
                     {day.date.getDate()}
@@ -74,7 +76,7 @@ export function MonthView({
                         className="flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta"
                       >
                         {item.kind === 'evento' ? (
-                          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-accent text-on-accent">
+                          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent">
                             <Clock className="h-2.5 w-2.5" aria-hidden="true" />
                           </span>
                         ) : (
