@@ -80,10 +80,6 @@ const ESTADO_POSTULACION_LABEL: Record<string, string> = {
 
 const ULTIMO_ROL_MSG = 'No puedes abandonar tu último rol desde esta opción.';
 
-const TAB_BASE =
-  'relative flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-1 text-[13px] font-bold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
-const TAB_INACTIVE = `${TAB_BASE} border-transparent text-tertiary hover:border-outline-variant hover:text-on-surface`;
-
 function formatCupos(n: number): string {
   return n === 1 ? '1 cupo' : `${n} cupos`;
 }
@@ -186,7 +182,7 @@ export default function ProyectoDetallePage() {
 
   if (historicoHabilitado && historicoQuery.isPending) {
     return (
-      <div className="mx-auto max-w-[1400px] px-7 pt-6 pb-12">
+      <div className="mx-auto max-w-content px-stack py-section lg:px-section">
         <ProyectoDetalleSkeleton />
       </div>
     );
@@ -194,7 +190,7 @@ export default function ProyectoDetallePage() {
 
   if (isError && historicoHabilitado && historicoQuery.isError && getApiErrorStatus(historicoQuery.error) === 403) {
     return (
-      <div className="mx-auto max-w-[1400px] px-7 pt-6 pb-12">
+      <div className="mx-auto max-w-content px-stack py-section lg:px-section">
         <Empty tone="muted" className="surface-enter" role="status">
           <EmptyMedia variant="icon">
             <ShieldAlert aria-hidden="true" className="h-7 w-7" />
@@ -249,7 +245,7 @@ export default function ProyectoDetallePage() {
           )}
 
           <section aria-labelledby="proyecto-roles-titulo">
-            <h2 id="proyecto-roles-titulo" className="mb-3 text-[17px] font-bold text-on-surface">
+            <h2 id="proyecto-roles-titulo" className="type-section mb-inline">
               Roles disponibles ({totalRoles})
             </h2>
 
@@ -294,28 +290,28 @@ export default function ProyectoDetallePage() {
                 return (
                 <CardShell key={rol.idRolProyecto} className="flex flex-col p-4.5">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="min-w-0 flex-1 text-[16px] font-bold leading-5.5 text-on-surface line-clamp-2">
+                    <h3 className="type-subtitle min-w-0 flex-1 line-clamp-2">
                       {rol.nombreRol}
                     </h3>
                     <div className="flex shrink-0 items-center gap-1.5">
                       {esMiRol && (
-                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                        <span className="pill pill-success">
                           Mi rol
                         </span>
                       )}
                       {rol.cupos > 0 && (
-                        <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-on-accent">
+                        <span className="pill pill-accent">
                           Disponible
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <p className="mt-1.5 text-[12px] leading-4.25 text-on-surface-variant line-clamp-2">
+                  <p className="type-meta mt-micro line-clamp-2">
                     {rol.descripcionRolProyecto || 'Sin descripción disponible.'}
                   </p>
 
-                  <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px] text-on-surface-variant">
+                  <div className="type-meta mt-inline grid grid-cols-2 gap-x-inline gap-y-micro">
                     {rol.carreraRequerida && (
                       <span className="flex items-center gap-1.5 min-w-0">
                         <GraduationCap aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
@@ -339,11 +335,7 @@ export default function ProyectoDetallePage() {
                       {rol.requisitos.map((req) => (
                         <span
                           key={req.habilidad.nombreHabilidad}
-                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
-                            req.obligatorio
-                              ? 'bg-primary-container text-on-primary-container'
-                              : 'bg-surface-container-high text-on-surface-variant'
-                          }`}
+                          className={`pill ${req.obligatorio ? 'pill-success' : 'pill-neutral'}`}
                         >
                           {req.habilidad.nombreHabilidad} · {NIVEL_LABEL[req.nivelMinimo]}
                         </span>
@@ -359,7 +351,7 @@ export default function ProyectoDetallePage() {
                           onClick={() => handleSalirDeRol(rol)}
                           disabled={saliendo}
                           aria-label={`Salir del rol ${rol.nombreRol}`}
-                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-error px-4 text-[12px] font-semibold text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
+                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-error px-4 text-meta font-semibold text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
                         >
                           {saliendo ? 'Saliendo…' : 'Salir de este rol'}
                         </button>
@@ -370,7 +362,7 @@ export default function ProyectoDetallePage() {
                               <button
                                 type="button"
                                 disabled
-                                className="pointer-events-none inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-outline-variant px-4 text-[12px] font-semibold text-tertiary"
+                                className="pointer-events-none inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-outline-variant px-4 text-meta font-semibold text-text-disabled"
                               >
                                 Salir de este rol
                               </button>
@@ -383,7 +375,7 @@ export default function ProyectoDetallePage() {
                       <Link
                         href="/dashboard/mis-postulaciones"
                         aria-label={`Ver mi postulación para el rol ${rol.nombreRol}`}
-                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-outline-variant bg-surface-container-lowest px-4 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container"
+                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-outline-variant bg-surface-container-lowest px-4 text-meta font-semibold text-on-surface transition-colors hover:bg-surface-container"
                       >
                         Ver mi postulación
                       </Link>
@@ -391,7 +383,7 @@ export default function ProyectoDetallePage() {
                       <Link
                         href={`/dashboard/proyectos/${projectId}/postular/${rol.idRolProyecto}`}
                         aria-label={`Postularme al rol ${rol.nombreRol}`}
-                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-[12px] font-semibold text-on-primary transition-colors hover:opacity-90"
+                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-meta font-semibold text-on-primary transition-colors hover:opacity-90"
                       >
                         Postularme a este rol
                         <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
@@ -418,7 +410,7 @@ export default function ProyectoDetallePage() {
 
           {/* Detalles del proyecto */}
           <CardShell className="p-5">
-            <h2 className="mb-3 text-[14px] font-bold text-on-surface">
+            <h2 className="type-subtitle mb-inline">
               Detalles del proyecto
             </h2>
             <ul className="space-y-2.5">
@@ -443,7 +435,7 @@ export default function ProyectoDetallePage() {
 
           {/* Resumen de oportunidades */}
           <CardShell className="p-5">
-            <h2 className="mb-3 text-[14px] font-bold text-on-surface">
+            <h2 className="type-subtitle mb-inline">
               Resumen de oportunidades
             </h2>
             <ul className="space-y-2.5">
@@ -457,9 +449,9 @@ export default function ProyectoDetallePage() {
   }
 
   return (
-      <div className="mx-auto max-w-[1400px] px-7 pt-6 pb-12">
+      <div className="mx-auto max-w-content px-stack py-section lg:px-section">
         {/* Breadcrumb */}
-        <nav aria-label="Ruta de navegación" className="mb-4.5 flex items-center gap-2 text-[13px]">
+        <nav aria-label="Ruta de navegación" className="type-meta mb-stack flex items-center gap-tight">
           <Link
             href="/dashboard/proyectos"
             className="flex items-center gap-1 text-tertiary hover:text-primary transition-colors"
@@ -529,7 +521,7 @@ function DetalleRow({
   value: string;
 }) {
   return (
-    <li className="flex items-center justify-between gap-3 text-[12px]">
+    <li className="type-meta flex items-center justify-between gap-inline">
       <span className="flex items-center gap-2 text-on-surface-variant">
         <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" />
         {label}
@@ -573,6 +565,11 @@ function ProyectoDetalleSkeleton() {
 }
 
 // ─── S7 · VIEW-02 — vista histórica de un proyecto CERRADO ───────────────────
+
+// Pestañas del histórico: solo las usa HistoricalProjectPage (fuera del alcance de HU-154).
+const TAB_BASE =
+  'relative flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-1 text-[13px] font-bold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
+const TAB_INACTIVE = `${TAB_BASE} border-transparent text-tertiary hover:border-outline-variant hover:text-on-surface`;
 
 const ESTADO_REVISION_LABEL: Record<string, { label: string; className: string }> = {
   APROBADA: { label: 'Aprobado', className: 'bg-primary/10 text-primary' },
