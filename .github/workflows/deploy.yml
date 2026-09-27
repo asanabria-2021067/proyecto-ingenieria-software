@@ -17,10 +17,14 @@ jobs:
   # Reutiliza el workflow ci.yml, el mismo que corre en cada pull request.
   test:
     name: Pruebas antes de desplegar
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
 
   build-frontend:
     name: Build y push imagen frontend
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -63,6 +67,8 @@ jobs:
 
   build-backend:
     name: Build y push imagen backend
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -101,6 +107,8 @@ jobs:
 
   deploy:
     name: Desplegar en la VM
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
     needs: [test, build-frontend, build-backend]
     runs-on: ubuntu-latest
     steps:

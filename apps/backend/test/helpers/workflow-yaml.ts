@@ -29,6 +29,7 @@ export interface WorkflowStep {
 
 export interface WorkflowJob {
   name?: string;
+  if?: string;
   needs?: string | string[];
   uses?: string;
   env?: Record<string, string>;
