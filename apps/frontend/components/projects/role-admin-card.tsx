@@ -69,8 +69,10 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
     );
 
   return (
-    <div className="rounded-control border border-outline-variant/60 bg-card p-stack">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <div className="@container/role-card rounded-control border border-outline-variant/60 bg-card p-stack">
+      {/* Nombre y acciones en fila solo si la tarjeta mide al menos 28rem: en la
+          columna principal del proyecto la tarjeta puede quedar estrecha. */}
+      <div className="flex flex-col gap-tight @md/role-card:flex-row @md/role-card:items-start @md/role-card:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="type-subtitle">{role.nombreRol}</h3>
@@ -99,7 +101,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
         </div>
 
         {/* Acciones del líder (Sección 22 A-D) */}
-        <div className="flex shrink-0 flex-col items-stretch gap-1.5 sm:items-end">
+        <div className="flex shrink-0 flex-col items-stretch gap-micro @md/role-card:items-end">
           {!role.isMine ? (
             <Button
               type="button"

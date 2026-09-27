@@ -95,16 +95,20 @@ export function ProjectRoleManagementSection({
           {rolesAdmin.length === 0 ? (
             <p className="type-body text-text-secondary">No hay roles registrados.</p>
           ) : (
-            <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
-              {rolesAdmin.map((role) => (
-                <RoleAdminCard
-                  key={role.idRolProyecto}
-                  role={role}
-                  asignarmeRol={asignarmeRol}
-                  salirDeRol={salirDeRol}
-                  onEditar={() => abrirEditarRol(role)}
-                />
-              ))}
+            // Dos columnas según el ancho real de la lista, no de la ventana: en la
+            // columna principal 8/12 dos tarjetas por fila no caben hasta ~42rem.
+            <div className="@container/roles">
+              <div className="grid grid-cols-1 gap-inline @2xl/roles:grid-cols-2">
+                {rolesAdmin.map((role) => (
+                  <RoleAdminCard
+                    key={role.idRolProyecto}
+                    role={role}
+                    asignarmeRol={asignarmeRol}
+                    salirDeRol={salirDeRol}
+                    onEditar={() => abrirEditarRol(role)}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
