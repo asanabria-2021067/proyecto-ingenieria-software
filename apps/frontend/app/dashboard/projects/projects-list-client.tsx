@@ -27,9 +27,12 @@ interface Props {
   searchQuery?: string;
 }
 
+// El acento solo destaca una cosa por bloque (docs/design-system.md); no repetirlo
+// por tarjeta. `--color-status-warning` == `--color-accent` en global.css, así que
+// usarlo aquí lo volvería indistinguible de EN_REVISION/OBSERVADO/EN_SOLICITUD_CIERRE.
 const ESTADO_STYLES: Record<string, string> = {
   PUBLICADO:            'bg-status-success text-on-status-success',
-  EN_PROGRESO:          'bg-accent text-on-accent',
+  EN_PROGRESO:          'bg-surface-container-high text-text-secondary',
   BORRADOR:             'bg-surface-container-high text-text-secondary',
   EN_REVISION:          'bg-status-warning text-on-status-warning',
   OBSERVADO:            'bg-status-warning text-on-status-warning',
