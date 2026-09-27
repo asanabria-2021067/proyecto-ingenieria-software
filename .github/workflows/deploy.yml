@@ -12,6 +12,17 @@ on:
 
   workflow_dispatch:
 
+# G02 (OWASP25-C044): permisos minimos por defecto; solo los jobs que publican
+# imagenes en GHCR suben a `packages: write` en su propio bloque.
+permissions:
+  contents: read
+
+# Un deploy productivo a la vez; uno nuevo espera en cola y nunca cancela un
+# release que ya esta en curso (migraciones a medias, contenedores recreados).
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   # Ejecuta la suite completa de pruebas antes de construir y desplegar.
   # Reutiliza el workflow ci.yml, el mismo que corre en cada pull request.
