@@ -123,6 +123,9 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
   const queryClient = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
   const activeConversationIdRef = useRef<number | null>(activeConversationId);
+  // G02-C08 (OWASP25-C031): supresión puntual sin cambio de comportamiento;
+  // mover esta sincronización del ref queda para su owner (HU-159).
+  // eslint-disable-next-line react-hooks/refs
   activeConversationIdRef.current = activeConversationId;
   const [isConnected, setIsConnected] = useState(false);
 
