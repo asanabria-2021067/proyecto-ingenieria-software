@@ -96,7 +96,7 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
             role="status"
             title={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
             aria-label={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
-            className={`size-1.5 shrink-0 rounded-full ${isConnected ? 'bg-status-success' : 'animate-pulse bg-status-warning'}`}
+            className={`size-1.5 shrink-0 rounded-full ${isConnected ? 'bg-primary' : 'animate-pulse bg-destructive'}`}
           />
         </span>
         <button
@@ -316,7 +316,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
             </div>
 
             {error && (
-              <p role="alert" className="type-meta text-status-error">
+              <p role="alert" className="type-meta text-destructive">
                 {error}
               </p>
             )}
