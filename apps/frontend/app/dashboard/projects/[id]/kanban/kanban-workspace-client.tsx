@@ -500,7 +500,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               </div>
             ) : isErrorSprints ? (
               <div role="alert" className="space-y-3 py-10 text-center">
-                <p className="text-sm font-medium text-red-600">
+                <p className="type-body font-medium text-status-error">
                   No se pudo verificar el estado del Sprint. Intenta nuevamente.
                 </p>
                 <Button
@@ -669,7 +669,7 @@ export default function KanbanWorkspaceClient({ id }: Props) {
   if (error || !proyecto) {
     return (
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <p className="font-medium text-red-600">No se pudo cargar el proyecto. Intenta nuevamente.</p>
+          <p className="font-medium text-status-error">No se pudo cargar el proyecto. Intenta nuevamente.</p>
           <Button asChild variant="outline" size="sm" className="mt-4">
             <Link href="/dashboard/proyectos">Volver a mis proyectos</Link>
           </Button>
