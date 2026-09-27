@@ -42,6 +42,11 @@ vi.mock('../app/dashboard/projects/[id]/project-detail-client', () => ({
   default: () => createElement('div', { 'data-testid': 'leader-workspace' }),
 }));
 vi.mock('../lib/swal', () => ({ default: { fire: vi.fn() } }));
+const requestChatWith = vi.fn();
+vi.mock('../components/projects/chat-panel-context', () => ({
+  ChatPanelProvider: ({ children }: { children: ReactNode }) => children,
+  useChatPanel: () => ({ requestChatWith, pendingChatUserId: null, clearPendingChat: vi.fn() }),
+}));
 
 import ProyectoDetallePage from '../app/dashboard/proyectos/[id]/page';
 import ProyectoLayout from '../app/dashboard/proyectos/[id]/layout';
@@ -224,5 +229,100 @@ describe('La salida se ofrece desde la navegación contextual', () => {
     expect(nav.getByRole('link', { name: 'Resumen' })).toHaveAttribute('href', '/dashboard/proyectos/55');
     expect(nav.getByRole('link', { name: 'Tablero' })).toHaveAttribute('href', '/dashboard/projects/55/kanban');
     expect(screen.getByRole('button', { name: 'Secciones' })).toBeInTheDocument();
+  });
+});
+
+// ── HU-154 (T-216): esqueleto compartido en la vista del participante ────
+describe('Página del participante sobre el esqueleto compartido', () => {
+  function slot(nombre: string) {
+    return document.querySelector(`[data-slot="${nombre}"]`) as HTMLElement;
+  }
+
+  it('encabezado a ancho completo con la ruta de vuelta a Proyectos disponibles', async () => {
+    mockParticipante();
+    await renderPage();
+
+    const grid = slot('project-content-grid');
+    expect(Array.from(grid.children).map((el) => el.getAttribute('data-slot'))).toEqual([
+      'project-grid-full',
+      'project-grid-main',
+      'project-grid-aside',
+    ]);
+    const full = slot('project-grid-full');
+    expect(within(full).getByRole('heading', { level: 1, name: 'Portal de voluntariado UVG' })).toBeInTheDocument();
+    expect(within(full).getByRole('link', { name: 'Proyectos disponibles' })).toHaveAttribute('href', '/dashboard/proyectos');
+    expect(within(full).getByText('Extensión')).toHaveClass('pill');
+  });
+
+  it('principal: descripción y objetivos, banner de salida, aviso de postulaciones y roles, en ese orden', async () => {
+    mockParticipante({ solicitud: SOLICITUD });
+    await renderPage();
+
+    const main = slot('project-grid-main');
+    const descripcion = within(main).getByRole('region', { name: 'Descripción y objetivos' });
+    expect(within(descripcion).getByText('Portal interno de voluntariado.')).toBeInTheDocument();
+    expect(within(descripcion).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Centralizar la oferta de voluntariado',
+    ]);
+
+    const banner = within(main).getByRole('status');
+    const aviso = await within(main).findByText('Ya registraste una postulación para este proyecto.');
+    const roles = within(main).getByRole('region', { name: 'Roles disponibles (3)' });
+    const sigue = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(sigue(descripcion, banner)).toBe(true);
+    expect(sigue(banner, aviso)).toBe(true);
+    expect(sigue(aviso, within(roles).getByRole('heading', { name: 'Roles disponibles (3)' }))).toBe(false);
+    expect(roles).toContainElement(aviso);
+  });
+
+  it('lateral: responsable con chat, detalles y resumen de oportunidades', async () => {
+    mockParticipante();
+    await renderPage();
+
+    const aside = screen.getByRole('complementary', { name: 'Información del proyecto' });
+    const responsable = within(aside).getByRole('region', { name: 'Responsable del proyecto' });
+    expect(within(responsable).getByText('Valeria Ortiz')).toBeInTheDocument();
+    expect(within(responsable).getByText('s6.lider@uvg.edu.gt')).toBeInTheDocument();
+    fireEvent.click(within(responsable).getByRole('button', { name: 'Chat' }));
+    expect(requestChatWith).toHaveBeenCalledWith(1);
+
+    expect(within(aside).getByText('Detalles del proyecto')).toBeInTheDocument();
+    expect(within(aside).getByText('Modalidad')).toBeInTheDocument();
+    expect(within(aside).getByText('Resumen de oportunidades')).toBeInTheDocument();
+    expect(within(aside).getByText('3 roles')).toBeInTheDocument();
+    expect(within(aside).getByText('5 cupos')).toBeInTheDocument();
+  });
+
+  it('un visitante no recibe chat, ni banner de salida, y puede postularse a todos los roles', async () => {
+    mockParticipante();
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 9 }, isLoading: false });
+    (useProjectMembers as any).mockReturnValue({ members: [{ idUsuario: 2 }], isLoading: false });
+    (useProjectRoles as any).mockReturnValue({ roles: [], salirDeRol });
+    (apiFetch as any).mockImplementation((path: string) =>
+      Promise.resolve(path === '/proyectos/55' ? PROYECTO : []),
+    );
+    await renderPage();
+
+    expect(screen.queryByRole('button', { name: 'Chat' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    for (const rol of [ROL_MIO, ROL_POSTULADO, ROL_LIBRE]) {
+      expect(screen.getByRole('link', { name: `Postularme al rol ${rol.nombreRol}` })).toHaveAttribute(
+        'href',
+        `/dashboard/proyectos/55/postular/${rol.idRolProyecto}`,
+      );
+    }
+    expect(screen.queryByRole('button', { name: /salir del rol/i })).not.toBeInTheDocument();
+  });
+
+  it('«Salir de este rol» sigue deshabilitado con su explicación cuando es el último rol', async () => {
+    mockParticipante();
+    (useProjectRoles as any).mockReturnValue({
+      roles: [{ idRolProyecto: 1, isMine: true, canLeave: false }],
+      salirDeRol,
+    });
+    await renderPage();
+
+    expect(screen.getByLabelText('No puedes abandonar tu último rol desde esta opción.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salir de este rol' })).toBeDisabled();
   });
 });
