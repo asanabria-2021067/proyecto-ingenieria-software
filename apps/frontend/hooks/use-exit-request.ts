@@ -40,8 +40,12 @@ function isValidProjectId(idProyecto: number): boolean {
  * pertenecen exclusivamente a B6) ni de un `useState` poblado solo por la
  * respuesta de una mutation en la misma sesión.
  */
-export function useCurrentExitRequest(idProyecto: number) {
-  const enabled = isValidProjectId(idProyecto);
+export function useCurrentExitRequest(idProyecto: number, { habilitado = true }: { habilitado?: boolean } = {}) {
+  // HU-154: la navegación contextual solo necesita este estado para el
+  // participante; `habilitado` evita dispararlo para el líder y los
+  // visitantes en cada subvista. Por defecto `true`: los consumidores
+  // existentes no cambian.
+  const enabled = isValidProjectId(idProyecto) && habilitado;
 
   const query = useQuery<CurrentExitRequestDto>({
     queryKey: currentExitRequestQueryKey(idProyecto),
