@@ -8,6 +8,7 @@ import {
 } from './helpers/project-policy.double';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { SocialService } from '../src/social/social.service';
 
 /**
  * Tarea 23: las tareas con soft delete (Tarea 22, `eliminadoEn !== null`) no
@@ -81,6 +82,7 @@ function makeService(prisma: unknown) {
     makeProjectTransactionDouble({ tx: {} }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
+    {} as unknown as SocialService,
   );
 }
 
