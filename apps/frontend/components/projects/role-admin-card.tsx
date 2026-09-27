@@ -69,29 +69,29 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
     );
 
   return (
-    <div className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4">
+    <div className="rounded-control border border-outline-variant/60 bg-card p-stack">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-headline text-sm font-black text-on-surface">{role.nombreRol}</h3>
+            <h3 className="type-subtitle">{role.nombreRol}</h3>
             {role.isMine && (
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              <span className="pill pill-success">
                 Mi rol
               </span>
             )}
             {/* Disponibilidad real (Sección 19): solo si hay cupos disponibles. */}
             {role.cuposDisponibles > 0 ? (
-              <span className="inline-flex items-center rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-300">
+              <span className="pill pill-accent">
                 Disponible
               </span>
             ) : (
-              <span className="inline-flex items-center rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-medium text-tertiary">
+              <span className="pill pill-neutral">
                 Sin cupos
               </span>
             )}
           </div>
           {role.carreraRequerida && (
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-tertiary">
+            <p className="type-meta mt-micro flex items-center gap-micro">
               <GraduationCap className="size-3.5" aria-hidden="true" />
               {role.carreraRequerida.nombreCarrera}
             </p>
@@ -106,7 +106,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
               size="sm"
               onClick={handleAsignarme}
               disabled={asignandome}
-              className="gap-1.5 rounded-lg bg-primary text-xs font-bold text-on-primary hover:bg-primary/90 min-h-9"
+              className="min-h-9 gap-micro bg-primary text-on-primary hover:bg-primary/90"
             >
               {asignandome ? <Spinner className="size-3.5" /> : <UserPlus className="size-3.5" aria-hidden="true" />}
               Asignarme a este rol
@@ -117,7 +117,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
               size="sm"
               onClick={() => setConfirmarSalir(true)}
               disabled={saliendo}
-              className="gap-1.5 rounded-lg border-transparent bg-error text-xs font-bold text-white hover:bg-error/90 min-h-9"
+              className="min-h-9 gap-micro border-transparent bg-error text-on-error hover:bg-error/90"
             >
               {saliendo ? <Spinner className="size-3.5" /> : <LogOut className="size-3.5" aria-hidden="true" />}
               Salir de este rol
@@ -132,7 +132,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
                     size="sm"
                     variant="outline"
                     disabled
-                    className="pointer-events-none gap-1.5 rounded-lg border-outline-variant text-xs font-bold text-tertiary min-h-9"
+                    className="pointer-events-none min-h-9 gap-micro border-outline-variant text-text-disabled"
                   >
                     <LogOut className="size-3.5" aria-hidden="true" />
                     Salir de este rol
@@ -150,7 +150,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
               variant="ghost"
               onClick={onEditar}
               aria-label={`Editar rol ${role.nombreRol}`}
-              className="gap-1.5 rounded-lg text-xs font-bold text-on-surface-variant min-h-9"
+              className="min-h-9 gap-micro text-text-secondary"
             >
               <Pencil className="size-3.5" aria-hidden="true" />
               Editar rol
@@ -160,13 +160,13 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
       </div>
 
       {role.descripcionRolProyecto && (
-        <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+        <p className="type-meta mt-tight">
           {role.descripcionRolProyecto}
         </p>
       )}
 
       {/* Métricas del rol (Sección 22) */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-tertiary">
+      <div className="type-meta mt-inline flex flex-wrap items-center gap-x-stack gap-y-micro">
         <span className="inline-flex items-center gap-1.5">
           <Users className="size-3.5" aria-hidden="true" />
           {role.participantesActivos}/{role.cupos} ocupados
@@ -187,10 +187,10 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
           {role.requisitos.map((req) => (
             <span
               key={req.idHabilidad}
-              className="inline-flex items-center gap-1 rounded-lg bg-surface-container-high px-2 py-0.5 text-[11px] font-medium text-on-surface-variant"
+              className="pill pill-neutral"
             >
               {req.nombreHabilidad}
-              <span className="text-[10px] text-tertiary">
+              <span className="text-text-disabled">
                 · {NIVEL_LABEL_ROL[req.nivelMinimo] ?? req.nivelMinimo}
               </span>
             </span>
@@ -199,7 +199,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
       )}
 
       {(errorAsignar || errorSalir) && (
-        <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="type-meta mt-tight text-error">
           {errorAsignar ?? errorSalir}
         </p>
       )}
@@ -216,7 +216,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
             </AlertDialogDescription>
           </AlertDialogHeader>
           {errorSalir && (
-            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+            <p role="alert" className="type-meta text-error">
               {errorSalir}
             </p>
           )}
@@ -228,7 +228,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
                 e.preventDefault();
                 handleSalir();
               }}
-              className="bg-error text-white hover:bg-error/90"
+              className="bg-error text-on-error hover:bg-error/90"
             >
               {saliendo ? 'Saliendo…' : 'Salir del rol'}
             </AlertDialogAction>
