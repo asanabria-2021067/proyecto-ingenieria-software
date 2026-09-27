@@ -56,9 +56,6 @@ jobs:
             ${{ steps.vars.outputs.frontend_image }}:latest
           build-args: |
             NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
-            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-            MAIL_FROM=${{ secrets.MAIL_FROM }}
-            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
           cache-from: type=gha,scope=frontend
