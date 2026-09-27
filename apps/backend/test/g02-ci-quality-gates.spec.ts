@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findStep, loadWorkflow, parseWorkflow, type Workflow } from './helpers/workflow-yaml';
+import { findStep, loadWorkflow, parseWorkflow, readRepoFile, type Workflow, type WorkflowJob } from './helpers/workflow-yaml';
 
 /**
  * G02 · OWASP25-C031/C032/C043. Contrato de los gates de calidad de ci.yml:
@@ -29,6 +29,23 @@ export function silencedGateFindings(workflow: Workflow): string[] {
       if (/\|\|\s*(true|exit 0|:)\s*$/m.test(step.run ?? '') && /lint|test|build|tsc/.test(step.run ?? '')) {
         findings.push(`fallo-silenciado:${id}:${step.name ?? step.run}`);
       }
+    }
+  }
+  return findings;
+}
+
+/**
+ * Gates que deben correr en todo evento (PR, push, dispatch y workflow_call):
+ * cada comando exigido debe existir en el job y no estar condicionado.
+ */
+export function unconditionalGateFindings(job: WorkflowJob, commands: string[]): string[] {
+  const findings: string[] = [];
+  for (const command of commands) {
+    const steps = (job.steps ?? []).filter((step) => step.run?.trim() === command);
+    if (steps.length === 0) {
+      findings.push(`gate-ausente:${command}`);
+    } else if (steps.every((step) => (step as { if?: string }).if !== undefined)) {
+      findings.push(`gate-condicionado:${command}`);
     }
   }
   return findings;
@@ -66,5 +83,27 @@ describe('G02-C09: lint bloqueante en CI', () => {
         'fallo-silenciado:frontend:Lint',
       ]);
     });
+  });
+});
+
+describe('G02-C10: typecheck explícito del frontend', () => {
+  it('package.json define typecheck con tsc --noEmit', () => {
+    const scripts = (JSON.parse(readRepoFile('apps/frontend/package.json')) as { scripts: Record<string, string> })
+      .scripts;
+    expect(scripts.typecheck).toBe('tsc --noEmit');
+  });
+
+  it('el job frontend ejecuta typecheck en todo evento', () => {
+    expect(unconditionalGateFindings(ci.jobs.frontend, ['npm run lint', 'npm run typecheck'])).toEqual([]);
+  });
+
+  it('fixture: un typecheck limitado a PR o ausente se detecta', () => {
+    const job = parseWorkflow(
+      "on: push\njobs:\n  frontend:\n    runs-on: x\n    steps:\n      - run: npm run typecheck\n        if: github.event_name == 'pull_request'\n",
+    ).jobs.frontend;
+    expect(unconditionalGateFindings(job, ['npm run typecheck', 'npm run build'])).toEqual([
+      'gate-condicionado:npm run typecheck',
+      'gate-ausente:npm run build',
+    ]);
   });
 });

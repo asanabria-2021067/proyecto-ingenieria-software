@@ -3,7 +3,16 @@ import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import type { ProyectoDetalleDTO, RevisionProyectoDTO, RolProyectoDTO } from '../lib/dto/project.dto';
+import type {
+  HabilidadDTO,
+  ProyectoDetalleDTO,
+  RevisionProyectoDTO,
+  RolProyectoDTO,
+} from '../lib/dto/project.dto';
+
+// G02-C10: la API real puede enviar categoriaHabilidad = null aunque el DTO la
+// tipe como string; el fixture conserva ese null y solo lo declara.
+const CATEGORIA_NULA = null as unknown as string;
 
 /**
  * Cobertura de regresión dedicada a `my-project-view-client.tsx` (T21):
@@ -58,7 +67,8 @@ function rolActual(overrides: Partial<RolProyectoDTO> = {}): RolProyectoDTO {
         idHabilidad: 1,
         nivelMinimo: 'BASICO',
         obligatorio: true,
-        habilidad: { idHabilidad: 1, nombreHabilidad: 'React CURRENT', categoriaHabilidad: null },
+        // G02-C10: el fixture omite descripcionHabilidad (el componente no la usa).
+        habilidad: { idHabilidad: 1, nombreHabilidad: 'React CURRENT', categoriaHabilidad: CATEGORIA_NULA } as HabilidadDTO,
       },
     ],
     ...overrides,
@@ -84,7 +94,8 @@ function proyectoActual(overrides: Partial<ProyectoDetalleDTO> = {}): ProyectoDe
     roles: [rolActual()],
     hitos: [],
     ...overrides,
-  };
+    // G02-C10: el fixture omite `creador` a propósito (el componente no lo usa).
+  } as ProyectoDetalleDTO;
 }
 
 function snapshotRevision(overrides: Partial<RevisionProyectoDTO> = {}): RevisionProyectoDTO {
@@ -116,7 +127,7 @@ function snapshotRevision(overrides: Partial<RevisionProyectoDTO> = {}): Revisio
               idRequisitoHabilidad: 9,
               nivelMinimo: 'AVANZADO',
               obligatorio: false,
-              habilidad: { idHabilidad: 9, nombreHabilidad: 'Vue SNAPSHOT', categoriaHabilidad: null },
+              habilidad: { idHabilidad: 9, nombreHabilidad: 'Vue SNAPSHOT', categoriaHabilidad: CATEGORIA_NULA },
             },
           ],
         },
