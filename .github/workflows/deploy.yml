@@ -199,18 +199,21 @@ jobs:
 
             cd ~/proyecto-ingenieria-software
 
-            git checkout main
-            if ! git diff --quiet || ! git diff --cached --quiet; then
-              git stash push --include-untracked -m "auto-deploy-$(date +%Y%m%d-%H%M%S)" || true
+            # G02 (VM0-F020): la copia de produccion debe coincidir con un commit
+            # de main. Si alguien la modifico a mano (tracked o untracked, no
+            # ignorados), el deploy se aborta sin esconder nada en un stash ni
+            # descartarlo: el operador lo revisa y decide. Solo se listan
+            # nombres de archivo, nunca su contenido.
+            LOCAL_CHANGES=$(git status --porcelain --untracked-files=normal)
+            if [ -n "$LOCAL_CHANGES" ]; then
+              echo "Deploy abortado: la copia de produccion tiene cambios locales sin versionar:" >&2
+              printf '%s\n' "$LOCAL_CHANGES" | cut -c4- >&2
+              exit 1
             fi
+
+            git checkout main
             git fetch --depth=1 --prune origin main
             git reset --hard FETCH_HEAD
-            AUTO_STASHES=$(git stash list | grep "auto-deploy-" | tail -n +6 | cut -d: -f1 || true)
-            if [ -n "$AUTO_STASHES" ]; then
-              echo "$AUTO_STASHES" | while read -r STASH_REF; do
-                [ -n "$STASH_REF" ] && git stash drop "$STASH_REF" || true
-              done
-            fi
 
             # G01: el .env llego por stdin en el paso anterior (fuera del argv);
             # se instala con permisos 0600 y el temporal se elimina.
