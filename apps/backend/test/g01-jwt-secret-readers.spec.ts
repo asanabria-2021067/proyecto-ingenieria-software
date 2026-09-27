@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import * as bcrypt from 'bcryptjs';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DynamicModule, Type } from '@nestjs/common';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
+import { AdminModule } from '../src/admin/admin.module';
 import { AuthModule } from '../src/auth/auth.module';
+import { ChatModule } from '../src/chat/chat.module';
+import { NotificationsModule } from '../src/notifications/notifications.module';
 import { AuthService } from '../src/auth/auth.service';
 import { JwtStrategy } from '../src/auth/jwt.strategy';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -109,5 +112,69 @@ describe('G01-C03: Auth usa el proveedor JWT validado', () => {
     await expect(service.login({ correo: usuario.correo, contrasena: 'x' })).rejects.toThrow(REQUIRED);
     // Sin secreto no se persiste ningún refresh token nuevo.
     expect((prisma.tokenRefresco.create as Mock).mock.calls).toHaveLength(1);
+  });
+});
+
+const REALTIME_ADMIN_MODULES: Array<[string, Type<unknown>, string]> = [
+  ['admin/admin.module.ts', AdminModule, '24h'],
+  ['notifications/notifications.module.ts', NotificationsModule, '7d'],
+  ['chat/chat.module.ts', ChatModule, '7d'],
+];
+
+function listTypeScriptFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return listTypeScriptFiles(fullPath);
+    }
+    return entry.name.endsWith('.ts') ? [fullPath] : [];
+  });
+}
+
+describe('G01-C04: módulos realtime/admin usan el proveedor JWT validado', () => {
+  const originalJwtSecret = process.env.JWT_SECRET;
+
+  afterEach(() => {
+    process.env.JWT_SECRET = originalJwtSecret;
+  });
+
+  it.each(REALTIME_ADMIN_MODULES)('%s no contiene el fallback y conserva su expiración', (file, hostModule, expiresIn) => {
+    const source = readFileSync(join(SRC, file), 'utf8');
+    expect(source).not.toContain(PREDICTABLE_FALLBACK);
+    expect(source).toMatch(/from '\.\.\/config\/jwt-secret'/);
+
+    const factory = jwtOptionsFactory(hostModule);
+    delete process.env.JWT_SECRET;
+    expect(factory(new ConfigService({ JWT_SECRET: SYNTHETIC_JWT_SECRET }))).toEqual({
+      secret: SYNTHETIC_JWT_SECRET,
+      signOptions: { expiresIn },
+    });
+    expect(() => factory(new ConfigService({}))).toThrow(REQUIRED);
+  });
+
+  it('en src/ solo el proveedor conoce JWT_SECRET y ningún archivo conserva un fallback predecible', () => {
+    const provider = join(SRC, 'config/jwt-secret.ts');
+    const offenders: string[] = [];
+    for (const file of listTypeScriptFiles(SRC)) {
+      if (file === provider) {
+        continue;
+      }
+      const source = readFileSync(file, 'utf8');
+      if (
+        source.includes(PREDICTABLE_FALLBACK) ||
+        /process\.env\.JWT_SECRET|process\.env\[['"]JWT_SECRET['"]\]|get(?:<[^>]*>)?\(['"]JWT_SECRET['"]\)/.test(source)
+      ) {
+        offenders.push(file.slice(SRC.length + 1));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('los gateways no cambian: siguen verificando con el JwtService de su módulo', () => {
+    for (const gateway of ['notifications/notifications.gateway.ts', 'chat/chat.gateway.ts']) {
+      const source = readFileSync(join(SRC, gateway), 'utf8');
+      expect(source).toContain('this.jwtService.verifyAsync(token)');
+      expect(source).not.toContain('jwt-secret');
+    }
   });
 });
