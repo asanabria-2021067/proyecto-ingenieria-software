@@ -33,7 +33,7 @@ import {
   toDateKey,
 } from '@/lib/calendar/utils';
 import {
-  eventoToAgendaItem,
+  eventoToAgendaItems,
   groupAgendaItemsByDay,
   tareaToAgendaItem,
   type AgendaItem,
@@ -124,8 +124,11 @@ export default function CalendarioPage() {
   );
 
   const agendaItems = useMemo<AgendaItem[]>(
-    () => [...pendientes.map(tareaToAgendaItem), ...eventos.map(eventoToAgendaItem)],
-    [pendientes, eventos],
+    () => [
+      ...pendientes.map(tareaToAgendaItem),
+      ...eventos.flatMap((e) => eventoToAgendaItems(e, rango.desde, rango.hasta)),
+    ],
+    [pendientes, eventos, rango],
   );
   const itemsByDay = useMemo(() => groupAgendaItemsByDay(agendaItems), [agendaItems]);
 
@@ -197,7 +200,7 @@ export default function CalendarioPage() {
               Fecha límite de tarea
             </span>
             <span className="flex items-center gap-1 type-meta">
-              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-[3px] bg-accent text-on-accent">
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-control bg-accent text-on-accent">
                 <Clock className="h-2.5 w-2.5" aria-hidden="true" />
               </span>
               Evento
@@ -306,40 +309,43 @@ export default function CalendarioPage() {
             />
           )}
 
+          {/* T-264: un fetch fallido no puede verse igual que "sin actividad" en
+              ninguna vista — antes esto solo se mostraba en vista mensual y la
+              semanal quedaba mostrando "Sin actividad" en las 7 columnas. */}
+          {isLoading && (
+            <div className="py-16 text-center text-sm text-tertiary" role="status">
+              Cargando tu calendario...
+            </div>
+          )}
+
+          {isError && (
+            <Empty tone="danger" className="surface-enter" role="alert">
+              <EmptyMedia variant="icon">
+                <AlertCircle aria-hidden="true" className="h-7 w-7" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>No se pudo cargar tu calendario</EmptyTitle>
+                <EmptyDescription>
+                  Verifica que tu sesión siga activa o intenta actualizar.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void refetchTareas();
+                    void refetchEventos();
+                  }}
+                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                >
+                  Reintentar
+                </button>
+              </EmptyContent>
+            </Empty>
+          )}
+
           {vista === 'mes' && (
             <div className="space-y-section">
-              {isLoading && (
-                <div className="py-16 text-center text-sm text-tertiary" role="status">
-                  Cargando tu calendario...
-                </div>
-              )}
-
-              {isError && (
-                <Empty tone="danger" className="surface-enter" role="alert">
-                  <EmptyMedia variant="icon">
-                    <AlertCircle aria-hidden="true" className="h-7 w-7" />
-                  </EmptyMedia>
-                  <EmptyHeader>
-                    <EmptyTitle>No se pudo cargar tu calendario</EmptyTitle>
-                    <EmptyDescription>
-                      Verifica que tu sesión siga activa o intenta actualizar.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                  <EmptyContent>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void refetchTareas();
-                        void refetchEventos();
-                      }}
-                      className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-                    >
-                      Reintentar
-                    </button>
-                  </EmptyContent>
-                </Empty>
-              )}
-
               {!isLoading && !isError && agendaSeleccionada.length === 0 && (
                 <Empty className="surface-enter" aria-live="polite">
                   <EmptyMedia variant="icon">
@@ -362,7 +368,7 @@ export default function CalendarioPage() {
                 <div className="space-y-tight">
                   {agendaSeleccionada.map((item) => (
                     <AgendaItemRow
-                      key={`${item.kind}-${item.id}`}
+                      key={`${item.kind}-${item.id}-${item.key}`}
                       item={item}
                       editable={item.kind === 'evento' && isEventEditable(item.projectId)}
                       onEditEvento={handleEditEvento}
