@@ -38,7 +38,9 @@ export function WeekView({
           <div key={day.key} className="card-base flex flex-col gap-tight">
             <div
               className={`type-meta flex items-center justify-between rounded-control px-tight py-1 ${
-                isToday ? 'bg-accent font-bold text-on-accent' : ''
+                // El acento queda reservado para el ícono de evento (una sola cosa
+                // destacada por bloque): "hoy" se marca con borde, no relleno.
+                isToday ? 'border border-outline-variant font-bold text-on-surface' : ''
               }`}
             >
               <span className="capitalize">{day.date.toLocaleDateString('es-GT', { weekday: 'short' })}</span>
@@ -69,7 +71,7 @@ export function WeekView({
                     onClick={() => onEditEvento(item)}
                     className="flex items-start gap-1.5 rounded-control bg-surface-container-low px-1.5 py-1 text-left transition-colors hover:bg-surface-container"
                   >
-                    <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-accent text-on-accent">
+                    <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent">
                       <Clock className="h-2.5 w-2.5" aria-hidden="true" />
                     </span>
                     <span className="flex min-w-0 flex-col">
@@ -83,7 +85,7 @@ export function WeekView({
                     href={item.href}
                     className="flex items-start gap-1.5 rounded-control bg-surface-container-low px-1.5 py-1 transition-colors hover:bg-surface-container"
                   >
-                    <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-accent text-on-accent">
+                    <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent">
                       <Clock className="h-2.5 w-2.5" aria-hidden="true" />
                     </span>
                     <span className="flex min-w-0 flex-col">
