@@ -1,8 +1,10 @@
 /**
  * Fixture dedicado y aislado para los escenarios de carga en k6/. Nunca se
  * mezcla con el namespace `s6.*` de seed-demo.ts ni con datos reales: usa su
- * propio namespace `k6.*@uvg.edu.gt` con credenciales fijas y conocidas
- * (entorno de TESTING local, nunca producción).
+ * propio namespace `k6.*@uvg.edu.gt`. La contraseña se recibe por
+ * K6_FIXTURE_PASSWORD (nunca hardcodeada: este repo es público, y el
+ * workflow k6.yml corre este fixture contra el entorno desplegado, así que
+ * un literal aquí sería una credencial de producción publicada en el repo).
  *
  * A diferencia del resto de seeds (que nunca reactivan estado histórico),
  * este script SÍ resetea el Sprint a ACTIVO en cada corrida: es la única
@@ -16,14 +18,18 @@
  * los ids reales (Postgres los asigna, nunca se fijan a mano).
  *
  * Uso manual (debug):
- *   DATABASE_URL="..." npx tsx prisma/seed-k6-fixture.ts
+ *   DATABASE_URL="..." K6_FIXTURE_PASSWORD="..." npx tsx prisma/seed-k6-fixture.ts
  */
 import { hashSync } from 'bcryptjs';
 import { EstadoParticipacion, EstadoProyecto, EstadoSprint, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const PASSWORD = 'K6demo1234!';
+const PASSWORD = process.env.K6_FIXTURE_PASSWORD ?? '';
+if (!PASSWORD) {
+  console.error('[seed-k6-fixture] Falta K6_FIXTURE_PASSWORD. No se hardcodea: este repo es público.');
+  process.exit(1);
+}
 const PASSWORD_HASH = hashSync(PASSWORD, 10);
 
 const LIDER_EMAIL = 'k6.lider@uvg.edu.gt';
