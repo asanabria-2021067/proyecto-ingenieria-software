@@ -58,6 +58,11 @@ export class NotificationsGateway
       }
 
       const payload = await this.jwtService.verifyAsync(token);
+      if (payload.tipo !== 'access') {
+        this.logger.warn(`Client ${client.id} rejected: token type '${payload.tipo}' is not 'access'`);
+        client.disconnect();
+        return;
+      }
       const userId = payload.sub;
 
       client.data.userId = userId;
