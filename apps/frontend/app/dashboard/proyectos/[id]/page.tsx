@@ -708,7 +708,7 @@ function ProyectoDetalleSkeleton() {
 const ESTADO_REVISION_LABEL: Record<string, { label: string; className: string }> = {
   APROBADA: { label: 'Aprobado', className: 'bg-primary/10 text-primary' },
   DEVUELTA_A_EJECUCION: { label: 'Devuelta a ejecución', className: 'bg-error/10 text-error' },
-  CORRECCION_DOCUMENTAL: { label: 'Corrección documental', className: 'bg-status-warning/15 text-status-warning' },
+  CORRECCION_DOCUMENTAL: { label: 'Corrección documental', className: 'bg-status-warning text-on-status-warning' },
   ENVIADA: { label: 'Enviada', className: 'bg-surface-container-high text-on-surface-variant' },
   BORRADOR: { label: 'Borrador', className: 'bg-surface-container-high text-on-surface-variant' },
 };
