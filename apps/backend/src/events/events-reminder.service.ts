@@ -3,6 +3,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
+// Mismo huso que is-future-calendar-date.validator.ts: el contenedor corre en
+// UTC (sin TZ en docker-compose), así que sin esto el texto del recordatorio
+// sale desplazado respecto a la hora que el usuario ve en el calendario.
+const GUATEMALA_TIME_ZONE = 'America/Guatemala';
+
 /**
  * HU-169 (T-265): recordatorio de EventoProyecto emitido por el centro de
  * notificaciones de HU-157 — no se abre un segundo canal (eso es lo que
@@ -39,6 +44,7 @@ export class EventsReminderService {
         eliminadoEn: null,
         recordatorioEnviadoEn: null,
         fechaInicio: { gt: ahora },
+        proyecto: { eliminadoEn: null },
       },
       select: {
         idEvento: true,
@@ -78,6 +84,7 @@ export class EventsReminderService {
           fechaInicioTexto: evento.fechaInicio.toLocaleString('es-GT', {
             dateStyle: 'long',
             timeStyle: 'short',
+            timeZone: GUATEMALA_TIME_ZONE,
           }),
         });
       }
