@@ -1,5 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { RoleAdminCard } from '../components/projects/role-admin-card';
@@ -98,4 +100,45 @@ describe('RoleAdminCard (Sección 22)', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent(/participación activa/i);
   });
+});
+
+// ── HU-154: la tarjeta se adapta a su propio ancho, no al de la ventana ──
+// En la columna principal 8/12 del proyecto la tarjeta puede medir ~280px a
+// 1440px de ventana; con `sm:flex-row` (por viewport) el nombre del rol y
+// «Salir de este rol» se montaban uno sobre otro.
+describe('RoleAdminCard — disposición por contenedor', () => {
+  afterEach(() => cleanup());
+
+  it('la tarjeta es un contenedor y pone nombre y acciones en fila solo desde su propio ancho', () => {
+    renderCard(role({ isMine: true, canLeave: true }));
+
+    const titulo = screen.getByRole('heading', { level: 3, name: 'Frontend' });
+    const tarjeta = titulo.closest('[class*="@container/role-card"]') as HTMLElement;
+    expect(tarjeta).not.toBeNull();
+
+    const fila = tarjeta.firstElementChild as HTMLElement;
+    expect(fila).toContainElement(titulo);
+    expect(fila).toContainElement(screen.getByRole('button', { name: /salir de este rol/i }));
+    expect(fila).toHaveClass('flex-col', '@md/role-card:flex-row');
+    expect(fila.className).not.toMatch(/(^|\s)(sm|md|lg|xl):flex-row/);
+
+    const acciones = screen.getByRole('button', { name: /salir de este rol/i }).parentElement as HTMLElement;
+    expect(acciones).toHaveClass('@md/role-card:items-end');
+    expect(acciones.className).not.toMatch(/(^|\s)sm:items-end/);
+  });
+
+  it('Tailwind genera las variantes: tarjeta en fila desde 28rem y lista de roles a 2 columnas desde 42rem', async () => {
+    const postcss = (await import('postcss')).default;
+    const tailwind = (await import('@tailwindcss/postcss')).default;
+    const base = join(__dirname, '..');
+    const entrada = readFileSync(join(base, 'app/global.css'), 'utf-8');
+    const { css } = await postcss([tailwind({ base })]).process(entrada, { from: join(base, 'app/global.css') });
+
+    expect(css).toContain('container-name: role-card');
+    expect(css).toContain('container-name: roles');
+    const fila = css.slice(css.indexOf('.\\@md\\/role-card\\:flex-row'));
+    expect(fila.slice(0, 200)).toMatch(/@container role-card \(width >= 28rem\)/);
+    const columnas = css.slice(css.indexOf('.\\@2xl\\/roles\\:grid-cols-2'));
+    expect(columnas.slice(0, 200)).toMatch(/@container roles \(width >= 42rem\)/);
+  }, 60_000);
 });
