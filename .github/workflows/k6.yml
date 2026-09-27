@@ -1,0 +1,75 @@
+name: k6 - pruebas de carga
+
+# T-200: engancha k6/ a CI. Decision (documentada en el PR de T-200): NO corre
+# en cada PR -- las pruebas de carga van contra el entorno ya desplegado (VM
+# de 842 MiB compartida, rate limiter de 10 req/s por IP en ThrottlerModule,
+# ver apps/backend/src/app.module.ts), y un PR abierto no tiene ese entorno
+# disponible ni se le puede pedir que tolere carga real. Corre sola:
+# workflow_dispatch (bajo demanda) + un cron semanal, nunca bloquea un PR.
+#
+# El fixture de k6 (prisma/seed-k6-fixture.ts, namespace k6.*) escribe via
+# Prisma directo a Postgres, y Postgres de la VM solo escucha en
+# 127.0.0.1 (ver apps/backend/docker-compose.yml) -- no es alcanzable desde
+# un runner de GitHub. Se abre un tunel SSH (mismas credenciales que ya usa
+# deploy.yml: SERVER_IP/SERVER_USER/SSH_PRIVATE_KEY) que reenvia el puerto
+# de Postgres al runner; el trafico HTTP de k6 en cambio va directo a la URL
+# publica del backend, para medir la ruta real (rate limiter incluido).
+on:
+  workflow_dispatch:
+  schedule:
+    # Lunes 06:00 UTC (00:00 Guatemala). Ajustable si el equipo prefiere otra
+    # ventana; el objetivo es "una vez por semana", no un horario exacto.
+    - cron: '0 6 * * 1'
+
+concurrency:
+  group: k6-load
+  cancel-in-progress: false
+
+jobs:
+  k6:
+    name: Escenarios k6 contra el entorno desplegado
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    env:
+      DATABASE_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
+      DIRECT_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
+      K6_BASE_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/backend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar cliente Prisma
+        run: npx prisma generate
+
+      - name: Instalar k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Abrir tunel SSH hacia Postgres de la VM (127.0.0.1:5432 -> runner:5432)
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            -fNT -L 5432:127.0.0.1:5432 \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
+
+      - name: Listado de proyectos (read-only)
+        run: npm run k6:project-listing
+
+      - name: Operaciones de kanban (escribe en el proyecto k6.* aislado)
+        run: npm run k6:kanban
+
+      - name: Conexion Socket.IO
+        run: npm run k6:socket-io
