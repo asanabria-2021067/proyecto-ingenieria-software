@@ -85,9 +85,10 @@ jobs:
       - name: Compilar (nest build)
         run: npm run build
 
+      # G02 (OWASP25-C031): un error de lint hace fallar el job; nada lo
+      # convierte en exito.
       - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       # Cobertura completa solo en PR (gate antes de mergear); en push/deploy
       # (workflow_call) corren las pruebas sin instrumentar cobertura para
@@ -126,9 +127,10 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      # G02 (OWASP25-C031): un error de lint hace fallar el job; nada lo
+      # convierte en exito.
       - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       # La cobertura es un gate obligatorio en Pull Requests.
       # Los umbrales se definen en apps/frontend/vitest.config.ts.
