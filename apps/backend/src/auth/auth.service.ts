@@ -13,6 +13,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, REFRESH_TOKEN_MAX_AGE_MS } from "./cookie.util";
+import { getRequiredJwtSecret } from "../config/jwt-secret";
 
 interface ResetTokenPayload {
   tipo: string;
@@ -45,7 +46,7 @@ export class AuthService {
   private async issueTokens(usuario: { idUsuario: number; correo: string }) {
     const accessToken = this.jwtService.sign(
       { sub: usuario.idUsuario, correo: usuario.correo, tipo: "access" },
-      { secret: process.env.JWT_SECRET || "dev-secret-change-me", expiresIn: ACCESS_TOKEN_TTL },
+      { secret: getRequiredJwtSecret(), expiresIn: ACCESS_TOKEN_TTL },
     );
     const refreshToken = this.jwtService.sign(
       // jti: dos refresh tokens del mismo usuario firmados dentro del mismo
