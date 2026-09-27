@@ -74,7 +74,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-page p-stack sm:p-section">
+    <main className="relative flex min-h-screen items-center justify-center bg-page p-stack sm:p-section">
       <div className="grid w-full max-w-4xl overflow-hidden rounded-card bg-card shadow-raised lg:grid-cols-2">
         {/* Branding panel: mismo patron que el hero de /dashboard (bg-primary
             text-on-primary rounded-card shadow-card), con la foto del campus
@@ -99,16 +99,16 @@ export default function LoginPage() {
           </Link>
 
           <div className="relative z-10">
-            <span className="type-meta font-bold uppercase tracking-widest text-on-primary/70">
+            <span className="type-meta font-bold uppercase tracking-widest text-on-primary/80">
               Portal institucional · UVG
             </span>
-            <h1 className="type-display mt-tight text-on-primary">Excelencia que trasciende</h1>
+            <h2 className="type-display mt-tight text-on-primary">Excelencia que trasciende</h2>
             <p className="type-body mt-tight text-on-primary/85">
               Unete a la comunidad academica lider en ciencia y tecnologia de Guatemala.
             </p>
           </div>
 
-          <span className="relative z-10 type-meta text-on-primary/60">UVG 2025</span>
+          <span className="relative z-10 type-meta text-on-primary/80">UVG 2025</span>
         </div>
 
         {/* Form panel */}
@@ -127,7 +127,7 @@ export default function LoginPage() {
 
           <div className="mb-section">
             <Image src={logo} alt="UVGENIUS" className="mb-stack h-16 w-auto" />
-            <h2 className="type-section">Bienvenido de nuevo</h2>
+            <h1 className="type-section">Bienvenido de nuevo</h1>
             <p className="type-body mt-micro text-text-secondary">
               Inicia sesion con tu correo institucional
             </p>
@@ -247,6 +247,6 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
