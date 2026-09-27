@@ -55,7 +55,8 @@ describe('G02-C02: permisos mínimos y concurrencia', () => {
     for (const id of PUBLISH_JOBS) {
       expect(deploy.jobs[id].permissions).toEqual({ contents: 'read', packages: 'write' });
     }
-    expect(deploy.jobs.deploy.permissions).toBeUndefined();
+    // G02-C06: el deploy solo lee GHCR para verificar que las imágenes existen.
+    expect(deploy.jobs.deploy.permissions).toEqual({ contents: 'read', packages: 'read' });
   });
 
   it('CI cancela corridas obsoletas; el deploy productivo se serializa sin cancelar el que está en curso', () => {
