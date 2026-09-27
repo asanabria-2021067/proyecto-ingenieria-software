@@ -39,7 +39,7 @@ export function ClosureStatusBanner({
     return (
       <div
         role="status"
-        className={`flex flex-wrap items-center gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface ${className}`}
+        className={`flex flex-wrap items-center gap-inline rounded-card border border-outline-variant/40 bg-surface-container-low px-stack py-inline type-body ${className}`}
       >
         <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" />
         <p>
@@ -58,12 +58,12 @@ export function ClosureStatusBanner({
     return (
       <div
         role="status"
-        className={`flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 sm:flex-row sm:items-center ${className}`}
+        className={`flex flex-col gap-inline rounded-card border border-outline-variant/40 bg-status-warning px-stack py-inline type-body text-on-status-warning sm:flex-row sm:items-center ${className}`}
       >
-        <FileWarning className="size-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+        <FileWarning className="size-5 shrink-0 text-on-status-warning" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="font-semibold">Un administrador solicitó una corrección documental.</p>
-          {revision?.comentarioRevisor && <p className="mt-0.5 text-xs">{revision.comentarioRevisor}</p>}
+          {revision?.comentarioRevisor && <p className="mt-micro text-meta">{revision.comentarioRevisor}</p>}
         </div>
         {isLeader && (
           <Button asChild size="sm" className="h-9 rounded-md text-xs font-bold">
@@ -77,7 +77,7 @@ export function ClosureStatusBanner({
   return (
     <div
       role="status"
-      className={`flex flex-wrap items-center gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface ${className}`}
+      className={`flex flex-wrap items-center gap-inline rounded-card border border-outline-variant/40 bg-surface-container-low px-stack py-inline type-body ${className}`}
     >
       <ClipboardCheck className="size-5 shrink-0 text-primary" aria-hidden="true" />
       <p className="min-w-0 flex-1">
@@ -85,7 +85,7 @@ export function ClosureStatusBanner({
         {revision?.numeroRevision ? ` (entrega #${revision.numeroRevision})` : ''}. Un administrador la revisará; mientras
         tanto el proyecto no admite cambios.
       </p>
-      <Info className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
+      <Info className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
     </div>
   );
 }
