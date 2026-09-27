@@ -19,6 +19,7 @@ import {
 } from './dto/update-estado-proyecto.dto';
 import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SocialService } from '../social/social.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService, type ReadDecision } from '../common/project-policy/project-read-policy.service';
@@ -300,6 +301,7 @@ export class ProjectsService {
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly readPolicy: ProjectReadPolicyService,
+    private readonly social: SocialService,
   ) {}
 
   /**
@@ -363,6 +365,12 @@ export class ProjectsService {
    * (`userId`), T-252 reordena por afinidad SIN filtrar — mismo conjunto de
    * proyectos para todo el mundo, solo cambia el orden.
    *
+   * Esta misma ruta (sin `page`) también sirve al buscador global del header
+   * (`ProjectSearchInput` → `searchProjects(q)`): con `q` presente NO se
+   * pondera por afinidad, para no subir un proyecto peor emparejado con el
+   * texto buscado solo porque participa un amigo, y para no pagar las dos
+   * consultas extra en cada tecla del debounce.
+   *
    * NOTA CACHE: a diferencia de `findFeatured`, esta lista no se puede
    * cachear igual para todos los usuarios en cuanto el orden depende de
    * quién pregunta (sus amigos, su carrera). Hoy no está cacheada; si se le
@@ -386,7 +394,8 @@ export class ProjectsService {
       take: 20,
     });
 
-    if (!userId || proyectos.length === 0) {
+    const esBusqueda = !!filters.q && filters.q.trim().length > 0;
+    if (!userId || esBusqueda || proyectos.length === 0) {
       return proyectos;
     }
     return this._ordenarPorAfinidad(proyectos, userId);
@@ -407,8 +416,11 @@ export class ProjectsService {
   >(proyectos: T[], userId: number): Promise<Array<T & { amigosParticipantes: number; mismaCarrera: boolean }>> {
     const idsProyecto = proyectos.map((p) => p.idProyecto);
 
+    // Ids de amigos: misma fuente de verdad que el resto del producto
+    // (social-feed.service.ts ya la consume así), en vez de duplicar la
+    // consulta de amistades acá.
     const [amigoIds, perfil] = await Promise.all([
-      this._getAmigoIds(userId),
+      this.social.getAmigoIds(userId),
       this.prisma.perfilEstudiante.findUnique({
         where: { idUsuario: userId },
         select: { idCarrera: true },
@@ -422,24 +434,48 @@ export class ProjectsService {
       return proyectos.map((p) => ({ ...p, amigosParticipantes: 0, mismaCarrera: false }));
     }
 
+    const amigoParticipaCondicion =
+      amigoIds.length > 0 ? Prisma.sql`pp.id_usuario IN (${Prisma.join(amigoIds)})` : Prisma.sql`FALSE`;
+    const liderEsAmigoCondicion =
+      amigoIds.length > 0 ? Prisma.sql`p.creado_por IN (${Prisma.join(amigoIds)})` : Prisma.sql`FALSE`;
+
     // UNA sola consulta agregada para TODOS los proyectos listados (no una
     // por proyecto): cuenta, por proyecto, cuántos de los amigos del usuario
     // participan ACTIVOS en cualquiera de sus roles, y si algún rol pide la
-    // carrera del usuario.
+    // carrera del usuario. El líder de un proyecto NO tiene fila en
+    // `participacion_proyecto` (schema.prisma: "no existe una
+    // ParticipacionProyecto equivalente para el líder"), así que se cuenta
+    // aparte en la segunda rama del UNION cuando también es amigo — mismo
+    // criterio que ya usa `social-feed.service.ts`.
     const filas = await this.prisma.$queryRaw<
       { idProyecto: number; amigosParticipantes: number; mismaCarrera: boolean }[]
     >(Prisma.sql`
       SELECT
-        rp.id_proyecto AS "idProyecto",
-        COUNT(DISTINCT pp.id_usuario)::int AS "amigosParticipantes",
-        COALESCE(BOOL_OR(rp.id_carrera_requerida = ${carreraId}), FALSE) AS "mismaCarrera"
-      FROM rol_proyecto rp
-      LEFT JOIN participacion_proyecto pp
-        ON pp.id_rol_proyecto = rp.id_rol_proyecto
-        AND pp.estado_participacion = 'ACTIVO'
-        ${amigoIds.length > 0 ? Prisma.sql`AND pp.id_usuario IN (${Prisma.join(amigoIds)})` : Prisma.sql`AND FALSE`}
-      WHERE rp.id_proyecto IN (${Prisma.join(idsProyecto)})
-      GROUP BY rp.id_proyecto
+        x."idProyecto",
+        COUNT(DISTINCT x."idUsuarioAmigo")::int AS "amigosParticipantes",
+        COALESCE(BOOL_OR(x."mismaCarrera"), FALSE) AS "mismaCarrera"
+      FROM (
+        SELECT
+          rp.id_proyecto AS "idProyecto",
+          pp.id_usuario AS "idUsuarioAmigo",
+          (rp.id_carrera_requerida = ${carreraId}) AS "mismaCarrera"
+        FROM rol_proyecto rp
+        LEFT JOIN participacion_proyecto pp
+          ON pp.id_rol_proyecto = rp.id_rol_proyecto
+          AND pp.estado_participacion = 'ACTIVO'
+          AND ${amigoParticipaCondicion}
+        WHERE rp.id_proyecto IN (${Prisma.join(idsProyecto)})
+
+        UNION ALL
+
+        SELECT
+          p.id_proyecto AS "idProyecto",
+          CASE WHEN ${liderEsAmigoCondicion} THEN p.creado_por END AS "idUsuarioAmigo",
+          NULL::boolean AS "mismaCarrera"
+        FROM proyecto p
+        WHERE p.id_proyecto IN (${Prisma.join(idsProyecto)})
+      ) x
+      GROUP BY x."idProyecto"
     `);
     const afinidadPorProyecto = new Map(filas.map((f) => [f.idProyecto, f]));
 
@@ -461,20 +497,6 @@ export class ProjectsService {
     return (
       p.amigosParticipantes * PESOS_ORDEN_DISPONIBLES.amigoParticipante +
       (p.mismaCarrera ? PESOS_ORDEN_DISPONIBLES.mismaCarrera : 0)
-    );
-  }
-
-  /** Ids de amigos ACEPTADOS del usuario (relación simétrica solicitante/receptor). */
-  private async _getAmigoIds(userId: number): Promise<number[]> {
-    const amistades = await this.prisma.amistad.findMany({
-      where: {
-        estado: 'ACEPTADA',
-        OR: [{ idUsuarioSolicitante: userId }, { idUsuarioReceptor: userId }],
-      },
-      select: { idUsuarioSolicitante: true, idUsuarioReceptor: true },
-    });
-    return amistades.map((a) =>
-      a.idUsuarioSolicitante === userId ? a.idUsuarioReceptor : a.idUsuarioSolicitante,
     );
   }
 
