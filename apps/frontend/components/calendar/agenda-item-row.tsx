@@ -31,8 +31,9 @@ const PRIORIDAD_BORDE: Record<string, string> = {
  * HU-169 (T-264): una fila de agenda, tarea o evento. Tareas y eventos se
  * distinguen por forma (ícono en cuadro vs. punto de prioridad) y etiqueta
  * de texto ("Evento" vs. estado de la tarea), nunca solo por color. El
- * acento del sistema de diseño marca el ícono/pill del evento (fondo +
- * `on-accent`), nunca como color de letra.
+ * acento del sistema de diseño marca únicamente el ícono del evento (fondo +
+ * `on-accent`, la única cosa destacada del bloque); la pill "Evento" usa
+ * `pill-neutral`, nunca como color de letra.
  */
 export function AgendaItemRow({
   item,
@@ -71,7 +72,7 @@ export function AgendaItemRow({
         {item.horaInicio}–{item.horaFin}
       </span>
       <span className="shrink-0 text-xs text-tertiary">{item.projectTitle}</span>
-      <span className="pill pill-accent shrink-0">Evento</span>
+      <span className="pill pill-neutral shrink-0">Evento</span>
       <ChevronRight className="h-4 w-4 shrink-0 text-tertiary" aria-hidden="true" />
     </>
   );
