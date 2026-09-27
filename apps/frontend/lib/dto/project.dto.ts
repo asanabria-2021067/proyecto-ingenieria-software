@@ -107,6 +107,14 @@ export interface ProyectoListItemDTO {
   estadoProyecto: string;
   modalidadProyecto: string;
   descripcionProyecto: string | null;
+  /**
+   * T-251/T-252: solo presentes cuando el pedido tenía sesión — amigos
+   * ACTIVOS del usuario que participan en el proyecto y si alguno de sus
+   * roles pide la carrera del usuario. El backend nunca arma el texto del
+   * motivo, solo estos datos estructurados; el texto se arma en el frontend.
+   */
+  amigosParticipantes?: number;
+  mismaCarrera?: boolean;
 }
 
 export interface SnapshotRolDTO {
