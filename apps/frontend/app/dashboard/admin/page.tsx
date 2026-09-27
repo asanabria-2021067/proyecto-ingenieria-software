@@ -32,18 +32,15 @@ function timeAgo(dateStr: string | null): string {
   return `Hace ${Math.floor(diff / 86400)} d`;
 }
 
-function estadoBadgeStyle(estado: string): React.CSSProperties {
+function estadoBadgeClasses(estado: string): string {
   const e = estado.toUpperCase();
   if (e.includes('ACTIVO') || e.includes('PUBLICADO')) {
-    return { backgroundColor: '#E6F4EC', color: '#006735' };
+    return 'bg-status-success text-on-status-success';
   }
   if (e.includes('REVISION') || e.includes('REVISIÓN')) {
-    return { backgroundColor: '#FEF3C7', color: '#92400E' };
+    return 'bg-status-warning text-on-status-warning';
   }
-  if (e.includes('CIERRE') || e.includes('CERRADO')) {
-    return { backgroundColor: '#F3F4F6', color: '#6B7280' };
-  }
-  return { backgroundColor: '#F3F4F6', color: '#374151' };
+  return 'bg-surface-container-high text-text-secondary';
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -83,57 +80,53 @@ function StatCard({
   );
 }
 
+const ACTION_CARD_TONES = {
+  warning: {
+    card: 'border-outline-variant bg-status-warning/20',
+    icon: 'bg-status-warning text-on-status-warning',
+    badge: 'bg-status-warning text-on-status-warning',
+  },
+  error: {
+    card: 'border-outline-variant bg-status-error/10',
+    icon: 'bg-status-error text-on-status-error',
+    badge: 'bg-status-error text-on-status-error',
+  },
+} as const;
+
 function ActionCard({
   label,
   value,
   subtexto,
   badgeLabel,
-  badgeClasses,
   icon: Icon,
-  cardBg,
-  iconBg,
-  iconColor,
-  cardStyle,
-  iconStyle,
-  badgeStyle,
-  labelStyle,
-  valueStyle,
-  subtextoStyle,
+  tone,
 }: {
   label: string;
   value: number;
   subtexto: string;
   badgeLabel: string;
-  badgeClasses: string;
   icon: React.ElementType;
-  cardBg: string;
-  iconBg: string;
-  iconColor: string;
-  cardStyle?: React.CSSProperties;
-  iconStyle?: React.CSSProperties;
-  badgeStyle?: React.CSSProperties;
-  labelStyle?: React.CSSProperties;
-  valueStyle?: React.CSSProperties;
-  subtextoStyle?: React.CSSProperties;
+  tone: keyof typeof ACTION_CARD_TONES;
 }) {
+  const tones = ACTION_CARD_TONES[tone];
   return (
-    <div className={`flex flex-col gap-4 rounded-xl border p-6 ${cardBg}`} style={cardStyle}>
+    <div className={`flex flex-col gap-4 rounded-xl border p-6 ${tones.card}`}>
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-tertiary" style={labelStyle}>
+          <span className="type-meta font-black uppercase tracking-widest text-text-secondary">
             {label}
           </span>
-          <p className="mt-1 text-4xl font-black tracking-tighter text-on-surface" style={valueStyle}>
+          <p className="mt-1 text-4xl font-black tracking-tighter text-text-primary">
             {value}
           </p>
         </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`} style={iconStyle}>
-          <Icon className={`h-5 w-5 ${iconColor}`} style={iconStyle ? { color: iconStyle.color } : undefined} />
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tones.icon}`}>
+          <Icon className="h-5 w-5" />
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <p className="text-xs text-tertiary" style={subtextoStyle}>{subtexto}</p>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${badgeClasses}`} style={badgeStyle}>
+        <p className="type-meta text-text-secondary">{subtexto}</p>
+        <span className={`rounded-full px-2 py-0.5 type-meta font-black uppercase ${tones.badge}`}>
           {badgeLabel}
         </span>
       </div>
@@ -189,38 +182,31 @@ function AdminStatsSkeleton() {
 
 function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] }) {
   return (
-    <div
-      className="flex h-full flex-col gap-4 rounded-xl border p-6"
-      style={{ backgroundColor: '#FFFFFF', borderColor: '#C8D6C8' }}
-    >
+    <div className="flex h-full flex-col gap-4 rounded-xl border border-outline-variant bg-card p-6">
       <div className="flex items-center gap-3">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-          style={{ backgroundColor: '#E6F4EC' }}
-        >
-          <Activity className="h-5 w-5" style={{ color: '#006735' }} />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-status-success">
+          <Activity className="h-5 w-5 text-on-status-success" />
         </div>
-        <h3 className="font-headline text-base font-black tracking-tight" style={{ color: '#111827' }}>
+        <h3 className="type-subtitle font-headline font-black tracking-tight text-text-primary">
           Actividad reciente
         </h3>
       </div>
       {items.length === 0 ? (
-        <p className="text-sm" style={{ color: '#6B7280' }}>No hay actividad reciente</p>
+        <p className="type-body text-text-secondary">No hay actividad reciente</p>
       ) : (
-        <ul className="divide-y" style={{ borderColor: '#E5E7EB' }}>
+        <ul className="divide-y divide-outline-variant">
           {items.map((item) => (
             <li key={item.idProyecto} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold line-clamp-1" style={{ color: '#111827' }}>
+                <p className="type-body font-semibold line-clamp-1 text-text-primary">
                   {item.tituloProyecto}
                 </p>
-                <p className="mt-0.5 text-xs" style={{ color: '#6B7280' }}>
+                <p className="type-meta mt-0.5 text-text-secondary">
                   {timeAgo(item.fechaActualizacion)}
                 </p>
               </div>
               <span
-                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
-                style={estadoBadgeStyle(item.estadoProyecto)}
+                className={`shrink-0 rounded-full px-2 py-0.5 type-meta font-bold uppercase ${estadoBadgeClasses(item.estadoProyecto)}`}
               >
                 {item.estadoProyecto}
               </span>
@@ -242,48 +228,36 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
 
 function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) {
   return (
-    <div
-      className="flex h-full flex-col gap-4 rounded-xl border p-6"
-      style={{ backgroundColor: '#FFFFFF', borderColor: '#C8D6C8' }}
-    >
+    <div className="flex h-full flex-col gap-4 rounded-xl border border-outline-variant bg-card p-6">
       <div className="flex items-start gap-3">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-          style={{ backgroundColor: '#FEE2E2' }}
-        >
-          <GraduationCap className="h-5 w-5" style={{ color: '#DC2626' }} />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-status-error">
+          <GraduationCap className="h-5 w-5 text-on-status-error" />
         </div>
         <div>
-          <h3 className="font-headline text-base font-black tracking-tight" style={{ color: '#111827' }}>
+          <h3 className="type-subtitle font-headline font-black tracking-tight text-text-primary">
             Estudiantes en riesgo de horas
           </h3>
-          <p className="text-xs" style={{ color: '#6B7280' }}>
+          <p className="type-meta text-text-secondary">
             Estudiantes del semestre 7 en adelante con pocas horas acumuladas
           </p>
         </div>
       </div>
       {items.length === 0 ? (
-        <p className="text-sm" style={{ color: '#6B7280' }}>No hay estudiantes en riesgo</p>
+        <p className="type-body text-text-secondary">No hay estudiantes en riesgo</p>
       ) : (
         <>
-          <ul className="divide-y" style={{ borderColor: '#E5E7EB' }}>
+          <ul className="divide-y divide-outline-variant">
             {items.map((est) => (
               <li key={est.idUsuario} className="flex items-center py-3 first:pt-0 last:pb-0">
-                <p className="flex-1 text-sm font-medium" style={{ color: '#111827' }}>
+                <p className="type-body flex-1 font-medium text-text-primary">
                   {est.nombre} {est.apellido}
                 </p>
                 {est.semestre !== null && (
-                  <span
-                    className="w-16 text-center text-sm font-medium"
-                    style={{ color: '#525252' }}
-                  >
+                  <span className="type-body w-16 text-center font-medium text-text-secondary">
                     S{est.semestre}
                   </span>
                 )}
-                <span
-                  className="ml-3 shrink-0 rounded-full px-3 py-0.5 text-xs font-bold"
-                  style={{ backgroundColor: '#FEE2E2', color: '#DC2626' }}
-                >
+                <span className="ml-3 shrink-0 rounded-full bg-status-error px-3 py-0.5 type-meta font-bold text-on-status-error">
                   {est.horasExtension} / {est.horasExtensionRequeridas} hrs
                 </span>
               </li>
@@ -353,17 +327,8 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               value={stats.enRevision}
               subtexto="Proyectos pendientes de revisión"
               badgeLabel="Pendiente"
-              badgeClasses=""
               icon={ClipboardList}
-              cardBg="dark:bg-amber-900/10 dark:border-amber-900/30"
-              iconBg="dark:bg-amber-900/40"
-              iconColor="dark:text-amber-300"
-              cardStyle={{ backgroundColor: '#FCF8F4', borderColor: '#E6D6C3' }}
-              iconStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
-              badgeStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
-              labelStyle={{ color: '#6B6B6B' }}
-              valueStyle={{ color: '#1A1C1E' }}
-              subtextoStyle={{ color: '#6B6B6B' }}
+              tone="warning"
             />
             <Link
               href="/dashboard/admin/proyectos?grupo=cierres"
@@ -375,17 +340,8 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
                 value={stats.cierrePendiente}
                 subtexto="Solicitudes de cierre por aprobar"
                 badgeLabel="Acción requerida"
-                badgeClasses=""
                 icon={Clock}
-                cardBg="dark:bg-amber-900/10 dark:border-amber-900/30"
-                iconBg="dark:bg-amber-900/40"
-                iconColor="dark:text-amber-300"
-                cardStyle={{ backgroundColor: '#FCF8F4', borderColor: '#E6D6C3' }}
-                iconStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
-                badgeStyle={{ backgroundColor: '#F1E3D0', color: '#C07D2C' }}
-                labelStyle={{ color: '#6B6B6B' }}
-                valueStyle={{ color: '#1A1C1E' }}
-                subtextoStyle={{ color: '#6B6B6B' }}
+                tone="warning"
               />
             </Link>
             <ActionCard
@@ -393,17 +349,8 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               value={stats.usuariosBloqueados}
               subtexto="Usuarios con acceso restringido"
               badgeLabel="Revisar"
-              badgeClasses=""
               icon={AlertTriangle}
-              cardBg=""
-              iconBg=""
-              iconColor=""
-              cardStyle={{ backgroundColor: '#FCF3F4', borderColor: '#EACCD0' }}
-              iconStyle={{ backgroundColor: '#F4DADC', color: '#CC292B' }}
-              badgeStyle={{ backgroundColor: '#F4DADC', color: '#CC292B' }}
-              labelStyle={{ color: '#6B6B6B' }}
-              valueStyle={{ color: '#1A1C1E' }}
-              subtextoStyle={{ color: '#6B6B6B' }}
+              tone="error"
             />
           </div>
         </section>

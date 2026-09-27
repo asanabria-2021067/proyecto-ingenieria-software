@@ -192,7 +192,7 @@ export function TaskCard({
 
         <span className="ml-auto flex shrink-0 items-center gap-2.5">
           <span
-            className={`inline-flex items-center gap-1 ${vencida ? 'font-semibold text-red-600 dark:text-red-400' : 'text-tertiary'}`}
+            className={`inline-flex items-center gap-1 ${vencida ? 'font-semibold text-destructive' : 'text-tertiary'}`}
           >
             {vencida && <AlertTriangle className="size-3.5" aria-label="Vencida" />}
             <Calendar className="size-3.5 shrink-0" aria-hidden="true" />

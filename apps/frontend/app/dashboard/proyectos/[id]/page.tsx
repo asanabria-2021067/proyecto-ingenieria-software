@@ -63,7 +63,7 @@ import uvgSwal from '@/lib/swal';
 import type { Rol } from '@/types';
 import type { HistoricalProjectView, HistoricalRevision } from '@/lib/services/historical';
 
-const MODALIDAD_BADGE = 'bg-[#EEF1F5] text-[#48515C] dark:bg-surface-container-high dark:text-on-surface-variant';
+const MODALIDAD_BADGE = 'bg-surface-container-high text-on-surface-variant';
 
 const ESTADO_POSTULACION_LABEL: Record<string, string> = {
   PENDIENTE: 'Pendiente',
@@ -85,7 +85,7 @@ function formatCupos(n: number): string {
 function CardShell({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div
-      className={`rounded-[10px] border border-[#D3DDD3] dark:border-outline-variant bg-white dark:bg-surface-container-lowest shadow-[0_1px_4px_rgba(24,28,32,0.05)] ${className}`}
+      className={`rounded-card border border-outline-variant bg-surface-container-lowest shadow-card ${className}`}
     >
       {children}
     </div>
@@ -224,13 +224,13 @@ export default function ProyectoDetallePage() {
         <nav aria-label="Ruta de navegación" className="mb-4.5 flex items-center gap-2 text-[13px]">
           <Link
             href="/dashboard/proyectos"
-            className="flex items-center gap-1 text-[#626A73] dark:text-tertiary hover:text-primary transition-colors"
+            className="flex items-center gap-1 text-tertiary hover:text-primary transition-colors"
           >
             Proyectos disponibles
           </Link>
           {proyecto && (
             <>
-              <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-[#626A73] dark:text-tertiary" />
+              <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-tertiary" />
               <span className="truncate text-on-surface font-medium">{proyecto.tituloProyecto}</span>
             </>
           )}
@@ -315,7 +315,7 @@ export default function ProyectoDetallePage() {
                     {proyecto.intereses.map(({ interes }) => (
                       <span
                         key={interes.nombreInteres}
-                        className="rounded-md bg-[#F0F2F5] dark:bg-surface-container-high px-2.5 py-1.5 text-[11px] font-medium text-[#4D5661] dark:text-on-surface-variant"
+                        className="rounded-md bg-surface-container-high px-2.5 py-1.5 text-[11px] font-medium text-on-surface-variant"
                       >
                         {interes.nombreInteres}
                       </span>
@@ -326,11 +326,11 @@ export default function ProyectoDetallePage() {
 
               {/* Responsable */}
               <CardShell className="p-5">
-                <h2 className="mb-3 text-[14px] font-bold text-[#20262D] dark:text-on-surface">Responsable</h2>
+                <h2 className="mb-3 text-[14px] font-bold text-on-surface">Responsable</h2>
                 {proyecto.creador ? (
                   <div className="flex items-center gap-3">
                     <div
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#D7F2C3] dark:bg-[#1f3a0a] text-[15px] font-bold text-[#286327] dark:text-[#b8f27a]"
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-[15px] font-bold text-on-accent"
                       aria-hidden="true"
                     >
                       {getIniciales(proyecto.creador.nombre, proyecto.creador.apellido)}
@@ -408,25 +408,25 @@ export default function ProyectoDetallePage() {
               {/* Descripción completa + Objetivos */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-[58fr_42fr]">
                 <CardShell className="p-5">
-                  <h2 className="mb-3 text-[15px] font-bold text-[#20262D] dark:text-on-surface">
+                  <h2 className="mb-3 text-[15px] font-bold text-on-surface">
                     Descripción del proyecto
                   </h2>
-                  <p className="whitespace-pre-wrap text-[13px] leading-4.75 text-[#505861] dark:text-on-surface-variant">
+                  <p className="whitespace-pre-wrap text-[13px] leading-4.75 text-on-surface-variant">
                     {proyecto.descripcionProyecto || 'Sin descripción disponible.'}
                   </p>
                 </CardShell>
 
                 <CardShell className="p-5">
-                  <h2 className="mb-3 text-[15px] font-bold text-[#20262D] dark:text-on-surface">Objetivos</h2>
+                  <h2 className="mb-3 text-[15px] font-bold text-on-surface">Objetivos</h2>
                   {objetivos.length > 0 ? (
                     <ul className="space-y-2.5">
                       {objetivos.map((objetivo, i) => (
                         <li key={i} className="flex items-start gap-2">
                           <CheckCircle2
                             aria-hidden="true"
-                            className="mt-0.5 h-4 w-4 shrink-0 text-[#008542]"
+                            className="mt-0.5 h-4 w-4 shrink-0 text-primary"
                           />
-                          <span className="text-[13px] leading-4.5 text-[#424A53] dark:text-on-surface-variant">
+                          <span className="text-[13px] leading-4.5 text-on-surface-variant">
                             {objetivo}
                           </span>
                         </li>
@@ -442,7 +442,7 @@ export default function ProyectoDetallePage() {
 
               {/* Roles */}
               <div>
-                <h2 className="mt-4.5 mb-3 text-[17px] font-bold text-[#20262D] dark:text-on-surface">
+                <h2 className="mt-4.5 mb-3 text-[17px] font-bold text-on-surface">
                   Roles disponibles ({totalRoles})
                 </h2>
 
@@ -493,7 +493,7 @@ export default function ProyectoDetallePage() {
                       return (
                       <CardShell key={rol.idRolProyecto} className="flex flex-col p-4.5">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="min-w-0 flex-1 text-[16px] font-bold leading-5.5 text-[#20262D] dark:text-on-surface line-clamp-2">
+                          <h3 className="min-w-0 flex-1 text-[16px] font-bold leading-5.5 text-on-surface line-clamp-2">
                             {rol.nombreRol}
                           </h3>
                           <div className="flex shrink-0 items-center gap-1.5">
@@ -503,14 +503,14 @@ export default function ProyectoDetallePage() {
                               </span>
                             )}
                             {rol.cupos > 0 && (
-                              <span className="rounded-full bg-[#DCF6AE] dark:bg-[#1f3a0a] px-2.5 py-1 text-[11px] font-semibold text-[#397016] dark:text-[#b8f27a]">
+                              <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-on-accent">
                                 Disponible
                               </span>
                             )}
                           </div>
                         </div>
 
-                        <p className="mt-1.5 text-[12px] leading-4.25 text-[#565E67] dark:text-on-surface-variant line-clamp-2">
+                        <p className="mt-1.5 text-[12px] leading-4.25 text-on-surface-variant line-clamp-2">
                           {rol.descripcionRolProyecto || 'Sin descripción disponible.'}
                         </p>
 
@@ -558,7 +558,7 @@ export default function ProyectoDetallePage() {
                                 onClick={() => handleSalirDeRol(rol)}
                                 disabled={saliendo}
                                 aria-label={`Salir del rol ${rol.nombreRol}`}
-                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-error px-4 text-[12px] font-semibold text-white transition-colors hover:bg-error/90 disabled:opacity-60"
+                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-error px-4 text-[12px] font-semibold text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
                               >
                                 {saliendo ? 'Saliendo…' : 'Salir de este rol'}
                               </button>
@@ -582,7 +582,7 @@ export default function ProyectoDetallePage() {
                             <Link
                               href="/dashboard/mis-postulaciones"
                               aria-label={`Ver mi postulación para el rol ${rol.nombreRol}`}
-                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-outline-variant bg-white dark:bg-surface-container-lowest px-4 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container"
+                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-outline-variant bg-surface-container-lowest px-4 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container"
                             >
                               Ver mi postulación
                             </Link>
@@ -590,7 +590,7 @@ export default function ProyectoDetallePage() {
                             <Link
                               href={`/dashboard/proyectos/${projectId}/postular/${rol.idRolProyecto}`}
                               aria-label={`Postularme al rol ${rol.nombreRol}`}
-                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[#006735] px-4 text-[12px] font-semibold text-white transition-colors hover:bg-[#00582D]"
+                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-[12px] font-semibold text-on-primary transition-colors hover:opacity-90"
                             >
                               Postularme a este rol
                               <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
@@ -609,7 +609,7 @@ export default function ProyectoDetallePage() {
             <div className="space-y-4 lg:sticky lg:top-25">
               {/* Detalles del proyecto */}
               <CardShell className="p-5">
-                <h2 className="mb-3 text-[14px] font-bold text-[#20262D] dark:text-on-surface">
+                <h2 className="mb-3 text-[14px] font-bold text-on-surface">
                   Detalles del proyecto
                 </h2>
                 <ul className="space-y-2.5">
@@ -634,7 +634,7 @@ export default function ProyectoDetallePage() {
 
               {/* Resumen de oportunidades */}
               <CardShell className="p-5">
-                <h2 className="mb-3 text-[14px] font-bold text-[#20262D] dark:text-on-surface">
+                <h2 className="mb-3 text-[14px] font-bold text-on-surface">
                   Resumen de oportunidades
                 </h2>
                 <ul className="space-y-2.5">
@@ -674,7 +674,7 @@ function ProyectoDetalleSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
       <div className="space-y-4">
-        <div className="rounded-[10px] border border-outline-variant/40 bg-surface-container-lowest p-6">
+        <div className="rounded-card border border-outline-variant/40 bg-surface-container-lowest p-6">
           <div className="flex gap-2">
             <Skeleton className="h-6.5 w-20 rounded-full" />
             <Skeleton className="h-6.5 w-20 rounded-full" />
@@ -685,18 +685,18 @@ function ProyectoDetalleSkeleton() {
           <Skeleton className="mt-2 h-4 w-2/3" />
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[58fr_42fr]">
-          <Skeleton className="h-40 rounded-[10px]" />
-          <Skeleton className="h-40 rounded-[10px]" />
+          <Skeleton className="h-40 rounded-card" />
+          <Skeleton className="h-40 rounded-card" />
         </div>
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 rounded-[10px]" />
+            <Skeleton key={i} className="h-44 rounded-card" />
           ))}
         </div>
       </div>
       <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-32 rounded-[10px]" />
+          <Skeleton key={i} className="h-32 rounded-card" />
         ))}
       </div>
     </div>
@@ -708,7 +708,7 @@ function ProyectoDetalleSkeleton() {
 const ESTADO_REVISION_LABEL: Record<string, { label: string; className: string }> = {
   APROBADA: { label: 'Aprobado', className: 'bg-primary/10 text-primary' },
   DEVUELTA_A_EJECUCION: { label: 'Devuelta a ejecución', className: 'bg-error/10 text-error' },
-  CORRECCION_DOCUMENTAL: { label: 'Corrección documental', className: 'bg-amber-400/15 text-amber-800 dark:text-amber-200' },
+  CORRECCION_DOCUMENTAL: { label: 'Corrección documental', className: 'bg-status-warning text-on-status-warning' },
   ENVIADA: { label: 'Enviada', className: 'bg-surface-container-high text-on-surface-variant' },
   BORRADOR: { label: 'Borrador', className: 'bg-surface-container-high text-on-surface-variant' },
 };
@@ -777,10 +777,10 @@ function HistoricalProjectPage({
   return (
     <div className="mx-auto max-w-[1400px] px-7 pt-6 pb-12">
       <nav aria-label="Ruta de navegación" className="mb-4.5 flex items-center gap-2 text-[13px]">
-        <Link href="/dashboard/projects/mine" className="flex items-center gap-1 text-[#626A73] dark:text-tertiary hover:text-primary transition-colors">
+        <Link href="/dashboard/projects/mine" className="flex items-center gap-1 text-tertiary hover:text-primary transition-colors">
           Mis proyectos
         </Link>
-        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-[#626A73] dark:text-tertiary" />
+        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-tertiary" />
         <span className="truncate text-on-surface font-medium">{resumen.tituloProyecto}</span>
       </nav>
 
@@ -873,19 +873,19 @@ function HistoricalProjectPage({
         <TabsContent value="resumen" className="mt-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-[58fr_42fr]">
             <CardShell className="p-5">
-              <h2 className="mb-3 text-[15px] font-bold text-[#20262D] dark:text-on-surface">Descripción del proyecto</h2>
-              <p className="whitespace-pre-wrap text-[13px] leading-4.75 text-[#505861] dark:text-on-surface-variant">
+              <h2 className="mb-3 text-[15px] font-bold text-on-surface">Descripción del proyecto</h2>
+              <p className="whitespace-pre-wrap text-[13px] leading-4.75 text-on-surface-variant">
                 {resumen.descripcionProyecto || 'Sin descripción disponible.'}
               </p>
             </CardShell>
             <CardShell className="p-5">
-              <h2 className="mb-3 text-[15px] font-bold text-[#20262D] dark:text-on-surface">Objetivos</h2>
+              <h2 className="mb-3 text-[15px] font-bold text-on-surface">Objetivos</h2>
               {objetivos.length > 0 ? (
                 <ul className="space-y-2.5">
                   {objetivos.map((objetivo, i) => (
                     <li key={i} className="flex items-start gap-2">
-                      <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-[#008542]" />
-                      <span className="text-[13px] leading-4.5 text-[#424A53] dark:text-on-surface-variant">{objetivo}</span>
+                      <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="text-[13px] leading-4.5 text-on-surface-variant">{objetivo}</span>
                     </li>
                   ))}
                 </ul>

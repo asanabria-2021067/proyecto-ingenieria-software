@@ -516,7 +516,7 @@ export function TaskBoard({
           Tablero de tareas
         </h2>
         <div role="alert" className="text-center py-10 space-y-3">
-          <p className="text-red-600 font-medium text-sm">
+          <p className="text-destructive font-medium type-body">
             No se pudieron cargar las tareas. Intenta nuevamente.
           </p>
           <Button
@@ -775,7 +775,7 @@ export function TaskBoard({
               </AlertDialogDescription>
             </AlertDialogHeader>
             {eliminarTarea.isError && (
-              <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+              <p role="alert" className="type-meta text-destructive">
                 {(eliminarTarea.error as Error | null)?.message ?? 'No se pudo eliminar la tarea.'}
               </p>
             )}
@@ -787,7 +787,7 @@ export function TaskBoard({
                   e.preventDefault();
                   handleConfirmarEliminar();
                 }}
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-destructive text-destructive-foreground hover:opacity-90"
               >
                 {eliminarTarea.isPending ? 'Eliminando...' : 'Confirmar'}
               </AlertDialogAction>
