@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PDFDocument } from 'pdf-lib';
 import { EstadoParticipacion, EstadoProyecto, EstadoSprint, TipoProyecto } from '@prisma/client';
 import { renderProjectReportPdf } from '../src/exports/pdf-export.builder';
 import type { ProjectExportModel } from '../src/exports/dto/project-export.dto';
@@ -94,12 +95,15 @@ describe('portada del PDF', () => {
 });
 
 describe('renderProjectReportPdf (T-260)', () => {
-  it('genera un PDF con al menos una página', () => {
+  it('genera un PDF con al menos una página', async () => {
     const { pdf, resumen } = renderProjectReportPdf(makeModelo(), []);
 
     expect(pdf.length).toBeGreaterThan(0);
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     expect(resumen.paginas).toBeGreaterThanOrEqual(1);
+    // G03-C10: el artefacto es un PDF que otro lector abre, no solo una cabecera.
+    const documento = await PDFDocument.load(pdf);
+    expect(documento.getPageCount()).toBe(resumen.paginas);
   });
 
   it('incluye el nombre del proyecto y la fecha de generación en el encabezado', () => {
