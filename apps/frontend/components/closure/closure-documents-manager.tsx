@@ -320,12 +320,11 @@ export function ClosureDocumentsManager({
         title="Quitar evidencia"
         description={
           evidenciaAQuitar
-            ? `Se quitará el archivo "${evidenciaAQuitar.nombreArchivo}" de esta entrega. Esta acción no se puede deshacer.`
+            ? `Se quitará el archivo "${evidenciaAQuitar.nombreArchivo}" de esta entrega. Tendrás que volver a subirlo si quieres incluirlo de nuevo.`
             : ''
         }
         actionLabel="Sí, quitar archivo"
         variant="destructive"
-        isPending={detachingId === evidenciaAQuitar?.idDocumentoCierre}
         onConfirm={() => {
           if (!evidenciaAQuitar) return;
           onDetach?.(evidenciaAQuitar.idDocumentoCierre);
