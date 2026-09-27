@@ -1,6 +1,6 @@
 import type { MiTareaDTO } from '@/lib/services/users';
 import type { MiEventoDTO } from '@/lib/services/events';
-import { formatTime, parseFechaSolo, toDateKey } from './utils';
+import { addDays, formatTime, parseFechaSolo, toDateKey } from './utils';
 
 /**
  * HU-169 (T-264): un ítem unificado de agenda para un día del calendario —
@@ -69,6 +69,34 @@ export function eventoToAgendaItem(evento: MiEventoDTO): AgendaItem {
     fechaInicio,
     fechaFin,
   };
+}
+
+/**
+ * Igual que eventoToAgendaItem, pero devuelve un AgendaItem por cada día
+ * entre fechaInicio y fechaFin (recortado a [rangoDesde, rangoHasta)): nada
+ * en el modelo restringe un evento a un solo día, y la consulta del backend
+ * es por solapamiento, así que un evento que abarca varios días — o que
+ * arranca antes del rango visible y lo solapa — debe aparecer en cada día
+ * que toca, no solo en el de fechaInicio.
+ */
+export function eventoToAgendaItems(evento: MiEventoDTO, rangoDesde: Date, rangoHasta: Date): AgendaItem[] {
+  const base = eventoToAgendaItem(evento);
+  const fechaInicioEvento = new Date(evento.fechaInicio);
+  const fechaFinEvento = new Date(evento.fechaFin);
+  // rangoHasta es exclusivo (ver CalendarioPage): se resta un instante para
+  // obtener el último día real que sigue dentro del rango visible.
+  const finRangoInclusivo = new Date(rangoHasta.getTime() - 1);
+  const primerDia = fechaInicioEvento < rangoDesde ? rangoDesde : fechaInicioEvento;
+  const ultimoDia = fechaFinEvento < finRangoInclusivo ? fechaFinEvento : finRangoInclusivo;
+
+  const items: AgendaItem[] = [];
+  let cursor = new Date(primerDia.getFullYear(), primerDia.getMonth(), primerDia.getDate());
+  const limite = new Date(ultimoDia.getFullYear(), ultimoDia.getMonth(), ultimoDia.getDate());
+  while (cursor <= limite) {
+    items.push({ ...base, key: toDateKey(cursor) });
+    cursor = addDays(cursor, 1);
+  }
+  return items;
 }
 
 /** Agrupa items por día (yyyy-mm-dd) y los ordena por sortKey dentro de cada grupo. */
