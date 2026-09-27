@@ -482,7 +482,7 @@ function TaskDetailView({
                   ESTADO_LABEL[tarea.estadoTarea]
                 )}
                 {estadoError && (
-                  <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  <p role="alert" className="mt-1 type-meta text-destructive">
                     {estadoError}
                   </p>
                 )}
@@ -525,7 +525,7 @@ function TaskDetailView({
               </DatoOrganizacion>
               <DatoOrganizacion icon={Calendar} label="Fecha límite">
                 {tarea.fechaLimite ? (
-                  <span className={vencida ? 'font-semibold text-red-600 dark:text-red-400' : undefined}>
+                  <span className={vencida ? 'font-semibold text-destructive' : undefined}>
                     {formatearFechaLimite(tarea.fechaLimite)}
                     {vencida && ' · Vencida'}
                   </span>
@@ -638,7 +638,7 @@ function TaskDetailView({
             </AlertDialogDescription>
           </AlertDialogHeader>
           {eliminarTarea.isError && (
-            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+            <p role="alert" className="type-meta text-destructive">
               {getApiErrorMessage(eliminarTarea.error, 'task')}
             </p>
           )}
@@ -650,7 +650,7 @@ function TaskDetailView({
                 event.preventDefault();
                 confirmarEliminar();
               }}
-              className="bg-red-600 text-white hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:opacity-90"
             >
               {eliminarTarea.isPending ? 'Eliminando...' : 'Eliminar tarea'}
             </AlertDialogAction>
