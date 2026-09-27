@@ -15,6 +15,16 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 // Revisiones Pasadas) son acciones, no destinos: siguen disponibles con los
 // mismos enlaces, pero dentro del menú «Acciones del proyecto».
 
+// jsdom no implementa ResizeObserver y los tooltips de Radix del rail lo
+// usan al montarse (mismo polyfill que historical-project-view.spec.ts).
+if (typeof (globalThis as any).ResizeObserver === 'undefined') {
+  (globalThis as any).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 const pathnameMock = vi.fn(() => '/dashboard/projects/42');
 vi.mock('next/navigation', () => ({
   usePathname: () => pathnameMock(),
@@ -22,8 +32,11 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('@/hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
+// Doble mínimo: el panel real tiene su propio spec; aquí importa si está
+// montado y habilitado, no su contenido.
 vi.mock('@/components/projects/project-chat-panel', () => ({
-  ProjectChatPanel: () => null,
+  ProjectChatPanel: ({ habilitado }: { habilitado: boolean }) =>
+    habilitado ? createElement('section', { 'data-testid': 'project-chat-panel' }, 'Chats del proyecto') : null,
 }));
 vi.mock('@/hooks/use-exit-request', () => ({ useCurrentExitRequest: vi.fn(() => ({ request: null })) }));
 vi.mock('@/components/projects/leave-project-modal', () => ({ LeaveProjectModal: () => null }));
@@ -32,6 +45,10 @@ import { ProjectSidebar } from '@/components/projects/project-sidebar';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
+import {
+  buildProjectNavGroups,
+  flattenNavItems,
+} from '@/components/projects/navigation/project-nav-model';
 
 function mockLeader(overrides: Record<string, unknown> = {}) {
   (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
@@ -240,5 +257,190 @@ describe('ProjectSidebar', () => {
       '/dashboard/projects/42/tareas',
     );
     expect(screen.queryByRole('link', { name: /editar información/i })).not.toBeInTheDocument();
+  });
+});
+
+// ── HU-154 (T-215): agrupación, colapso y accesibilidad ──────────────────
+describe('ProjectSidebar — navegación agrupada y colapsable', () => {
+  const KEY = 'uvg-collab-project-sidebar';
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    pathnameMock.mockReturnValue('/dashboard/projects/42');
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  function aside() {
+    return document.querySelector('aside') as HTMLElement;
+  }
+
+  function hrefsDeLaNavegacion() {
+    const nav = screen.getByRole('navigation', { name: 'Navegación del proyecto' });
+    return within(nav)
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'));
+  }
+
+  function colapsar() {
+    fireEvent.click(screen.getByRole('button', { name: 'Contraer navegación del proyecto' }));
+  }
+
+  it('agrupa los destinos del líder bajo Trabajo, Equipo y Seguimiento', () => {
+    mockLeader({ estadoProyecto: 'EN_PROGRESO' });
+    renderSidebar();
+
+    const trabajo = screen.getByRole('group', { name: 'Trabajo' });
+    expect(within(trabajo).getAllByRole('link').map((l) => l.textContent)).toEqual([
+      'Tablero',
+      'Lista de tareas',
+      'Sprints',
+    ]);
+    expect(within(screen.getByRole('group', { name: 'Equipo' })).getAllByRole('link').map((l) => l.textContent)).toEqual(
+      ['Miembros', 'Liderazgo'],
+    );
+    expect(
+      within(screen.getByRole('group', { name: 'Seguimiento' }))
+        .getAllByRole('link')
+        .map((l) => l.textContent),
+    ).toEqual(['Bitácora', 'Analítica', 'Reportes', 'Cierre']);
+  });
+
+  it('el participante no recibe el grupo Equipo', () => {
+    mockParticipante();
+    renderSidebar();
+
+    expect(screen.getByRole('group', { name: 'Trabajo' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Equipo' })).not.toBeInTheDocument();
+  });
+
+  it('las acciones no aparecen como enlaces de navegación', () => {
+    mockLeader({ estadoProyecto: 'EN_PROGRESO' });
+    renderSidebar();
+
+    const hrefs = hrefsDeLaNavegacion();
+    expect(hrefs).not.toContain('/dashboard/projects/mine/form?id=42');
+    expect(hrefs).not.toContain('/dashboard/projects/42?openRoles=1');
+    expect(hrefs).not.toContain('/dashboard/projects/mine/42?returnTo=/dashboard/projects/42');
+  });
+
+  it.each([
+    ['líder', mockLeader, 'Líder'],
+    ['participante', mockParticipante, 'Participante'],
+  ])('muestra el chip de actor del %s', (_, mock, chip) => {
+    mock();
+    renderSidebar();
+    expect(screen.getByText(chip)).toHaveClass('pill');
+  });
+
+  it('un visitante solo ve «Resumen», sin chip ni menú de acciones', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    (useProjectDetail as any).mockReturnValue({
+      data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', creador: { idUsuario: 1 } },
+    });
+    (useProjectMembers as any).mockReturnValue({ members: [] });
+    renderSidebar();
+
+    expect(hrefsDeLaNavegacion()).toEqual(['/dashboard/proyectos/42']);
+    expect(screen.queryByText('Líder')).not.toBeInTheDocument();
+    expect(screen.queryByText('Participante')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Acciones del proyecto' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('project-chat-panel')).not.toBeInTheDocument();
+  });
+
+  it('arranca expandida (w-64) y el control anuncia aria-expanded y a qué lista controla', () => {
+    mockLeader();
+    renderSidebar();
+
+    expect(aside()).toHaveAttribute('data-state', 'expanded');
+    expect(aside()).toHaveClass('w-64');
+    const toggle = screen.getByRole('button', { name: 'Contraer navegación del proyecto' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-controls', 'project-nav-42');
+    expect(document.getElementById('project-nav-42')).toBeInTheDocument();
+  });
+
+  it('colapsada (w-14) conserva TODOS los destinos permitidos, con nombre accesible y en el mismo orden', () => {
+    mockLeader({ estadoProyecto: 'EN_PROGRESO' });
+    renderSidebar();
+    const esperados = flattenNavItems(
+      buildProjectNavGroups({ idProyecto: 42, actor: 'leader', estadoProyecto: 'EN_PROGRESO', tieneSolicitudSalida: false }),
+    );
+
+    colapsar();
+
+    expect(aside()).toHaveAttribute('data-state', 'collapsed');
+    expect(aside()).toHaveClass('w-14');
+    expect(hrefsDeLaNavegacion()).toEqual(esperados.map((item) => item.href));
+    for (const item of esperados) {
+      expect(screen.getByRole('link', { name: item.label })).toHaveAttribute('href', item.href);
+    }
+    // Sin encabezados de grupo en el rail: los separa una línea.
+    expect(screen.queryByRole('group', { name: 'Trabajo' })).not.toBeInTheDocument();
+    // El menú de acciones sigue disponible.
+    expect(screen.getByRole('button', { name: 'Acciones del proyecto' })).toBeInTheDocument();
+  });
+
+  it('en el rail cada icono muestra su etiqueta en un tooltip', async () => {
+    mockLeader();
+    renderSidebar();
+    colapsar();
+
+    fireEvent.focus(screen.getByRole('link', { name: 'Tablero' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Tablero');
+  });
+
+  it('en el rail el destino activo mantiene aria-current', () => {
+    mockLeader();
+    pathnameMock.mockReturnValue('/dashboard/projects/42/kanban/tasks/7');
+    renderSidebar();
+    colapsar();
+
+    const activos = enlacesActivos();
+    expect(activos).toHaveLength(1);
+    expect(activos[0]).toHaveAccessibleName('Tablero');
+  });
+
+  it('al colapsar y expandir el foco pasa al control opuesto y la preferencia se guarda', () => {
+    mockLeader();
+    renderSidebar();
+
+    colapsar();
+    const expandir = screen.getByRole('button', { name: 'Expandir navegación del proyecto' });
+    expect(expandir).toHaveFocus();
+    expect(expandir).toHaveAttribute('aria-expanded', 'false');
+    expect(window.localStorage.getItem(KEY)).toBe('collapsed');
+
+    fireEvent.click(expandir);
+    expect(screen.getByRole('button', { name: 'Contraer navegación del proyecto' })).toHaveFocus();
+    expect(aside()).toHaveAttribute('data-state', 'expanded');
+    expect(window.localStorage.getItem(KEY)).toBe('expanded');
+  });
+
+  it('restaura la preferencia colapsada guardada', () => {
+    window.localStorage.setItem(KEY, 'collapsed');
+    mockLeader();
+    renderSidebar();
+
+    expect(aside()).toHaveAttribute('data-state', 'collapsed');
+    expect(screen.getByRole('button', { name: 'Expandir navegación del proyecto' })).toBeInTheDocument();
+  });
+
+  it('colapsada, el panel de chat sigue montado (oculto) y el icono de chats expande la sidebar', () => {
+    mockParticipante();
+    renderSidebar();
+    colapsar();
+
+    const panel = screen.getByTestId('project-chat-panel');
+    expect(panel).toBeInTheDocument();
+    expect(panel.parentElement).toHaveClass('hidden');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar chats del proyecto' }));
+    expect(aside()).toHaveAttribute('data-state', 'expanded');
+    expect(screen.getByTestId('project-chat-panel').parentElement).not.toHaveClass('hidden');
   });
 });
