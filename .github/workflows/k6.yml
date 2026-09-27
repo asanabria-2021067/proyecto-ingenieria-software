@@ -2,10 +2,17 @@ name: k6 - pruebas de carga
 
 # T-200: engancha k6/ a CI. Decision (documentada en el PR de T-200): NO corre
 # en cada PR -- las pruebas de carga van contra el entorno ya desplegado (VM
-# de 842 MiB compartida, rate limiter de 10 req/s por IP en ThrottlerModule,
-# ver apps/backend/src/app.module.ts), y un PR abierto no tiene ese entorno
-# disponible ni se le puede pedir que tolere carga real. Corre sola:
-# workflow_dispatch (bajo demanda) + un cron semanal, nunca bloquea un PR.
+# de 842 MiB compartida, rate limiter en ThrottlerModule de 10 req/1s de
+# ráfaga pero 5 req/s sostenido -- 50 req/10s en el tier "medium", ver
+# apps/backend/src/app.module.ts -- así que escalar K6_VUS/K6_ITERATIONS por
+# encima de eso dispara 429s, no una regresión real), y un PR abierto no
+# tiene ese entorno disponible ni se le puede pedir que tolere carga real.
+# Corre sola: workflow_dispatch (bajo demanda) + un cron semanal, nunca
+# bloquea un PR.
+#
+# schedule y workflow_dispatch solo se activan cuando este archivo vive en
+# la rama por defecto del repo (hoy `main`, ver `gh repo view`): mientras
+# este workflow solo exista en `develop`, ninguno de los dos dispara nada.
 #
 # El fixture de k6 (prisma/seed-k6-fixture.ts, namespace k6.*) escribe via
 # Prisma directo a Postgres, y Postgres de la VM solo escucha en
@@ -36,6 +43,7 @@ jobs:
       DATABASE_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
       DIRECT_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
       K6_BASE_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
+      K6_FIXTURE_PASSWORD: ${{ secrets.K6_FIXTURE_PASSWORD }}
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -65,10 +73,16 @@ jobs:
             -fNT -L 5432:127.0.0.1:5432 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
 
-      - name: Listado de proyectos (read-only)
+      # Los tres pasos de k6 corren prisma/seed-k6-fixture.ts antes de cada
+      # `k6 run` (ver apps/backend/scripts/run-k6.js): ese fixture siempre
+      # escribe (upsert de usuarios, reset del Sprint #1 a ACTIVO), incluso
+      # antes del escenario de solo-lectura. Y GET /proyectos no tiene guard
+      # (k6/scenarios/project-listing.js), así que el proyecto fixture queda
+      # visible en el listado público de la app desplegada, no aislado.
+      - name: Listado de proyectos (HTTP solo GET; el fixture previo sí escribe)
         run: npm run k6:project-listing
 
-      - name: Operaciones de kanban (escribe en el proyecto k6.* aislado)
+      - name: Operaciones de kanban (escribe en el proyecto k6.*)
         run: npm run k6:kanban
 
       - name: Conexion Socket.IO
