@@ -112,6 +112,57 @@ jobs:
           echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
+      # G01 (FASE2-N01 + VM0-F012): el .env de produccion se arma en el runner a
+      # partir de variables de entorno del paso (nunca interpoladas en el texto
+      # de un comando) y viaja a la VM por stdin de SSH. El comando remoto es
+      # estatico, asi que ningun secreto queda en el argv ni en /proc de la VM.
+      - name: Transferir .env de produccion por stdin
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
+          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
+        run: |
+          set -euo pipefail
+          umask 077
+          work="$RUNNER_TEMP/deploy-env"
+          mkdir -p "$work"
+          trap 'rm -rf "$work"' EXIT
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$work/key"
+          {
+            printf 'NODE_ENV=production\n'
+            printf 'DB_USER=%s\n' "$DB_USER"
+            printf 'DB_PASSWORD=%s\n' "$DB_PASSWORD"
+            printf 'DB_NAME=uvg_collab\n'
+            printf 'DB_PORT=5432\n'
+            printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
+            printf 'JWT_REFRESH_SECRET=%s\n' "$JWT_REFRESH_SECRET"
+            printf 'NEXT_PUBLIC_API_URL=%s\n' "$NEXT_PUBLIC_API_URL"
+            printf 'NEXT_PUBLIC_API_PREFIX=/api\n'
+            printf 'NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\n' "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"
+            printf 'NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\n' "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"
+            printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY"
+            printf 'MAIL_FROM=%s\n' "$MAIL_FROM"
+            printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
+            printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
+            printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"
+          } > "$work/env"
+          ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$work/known_hosts" "$SERVER_USER@$SERVER_IP" \
+            'umask 077 && mkdir -p ~/.uvg-deploy && chmod 700 ~/.uvg-deploy && cat > ~/.uvg-deploy/env.incoming' \
+            < "$work/env"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -137,24 +188,11 @@ jobs:
               done
             fi
 
-            cat > .env <<'ENVEOF'
-            NODE_ENV=production
-            DB_USER=${{ secrets.DB_USER }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DB_NAME=uvg_collab
-            DB_PORT=5432
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-            NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
-            NEXT_PUBLIC_API_PREFIX=/api
-            NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
-            NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
-            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-            MAIL_FROM=${{ secrets.MAIL_FROM }}
-            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-            BACKEND_IMAGE=${{ steps.vars.outputs.backend_image }}
-            FRONTEND_IMAGE=${{ steps.vars.outputs.frontend_image }}
-            ENVEOF
+            # G01: el .env llego por stdin en el paso anterior (fuera del argv);
+            # se instala con permisos 0600 y el temporal se elimina.
+            test -s ~/.uvg-deploy/env.incoming
+            install -m 600 ~/.uvg-deploy/env.incoming .env
+            rm -f ~/.uvg-deploy/env.incoming
 
             # Solo backend/frontend viven en GHCR y cambian en cada deploy.
             # postgres/redis son imagenes fijas que ya estan en la VM: pedirlas
