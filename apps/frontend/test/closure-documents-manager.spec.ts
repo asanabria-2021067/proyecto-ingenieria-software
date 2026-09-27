@@ -114,7 +114,7 @@ describe('ClosureDocumentsManager (VIEW-13 / F005)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Quitar captura.pdf' }));
     expect(onDetach).not.toHaveBeenCalled();
 
-    expect(screen.getByText(/no se puede deshacer/i)).toBeInTheDocument();
+    expect(screen.getByText(/tendrás que volver a subirlo/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, quitar archivo' }));
     expect(onDetach).toHaveBeenCalledWith(101);
   });
