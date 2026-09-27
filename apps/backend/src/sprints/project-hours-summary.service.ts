@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EstadoHoras, EstadoProyecto, Prisma } from '@prisma/client';
+import { EstadoHoras, EstadoProyecto, OrigenReporteTramo, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -94,6 +94,35 @@ type Db = Prisma.TransactionClient | PrismaService;
 const CERO = new Prisma.Decimal(0);
 const dec2 = (value: Prisma.Decimal): string => value.toFixed(2);
 
+/**
+ * Reglas compartidas por todas las lecturas de horas (06 v2 §16/§46). Viven
+ * aquí, una sola vez, para que el dashboard, el proyecto, el Sprint y Mis
+ * Horas no puedan divergir en qué cuenta como abierto, legacy o acreditado.
+ */
+
+/** Un proyecto está abierto en estos estados (y además sin `eliminadoEn`). */
+const ESTADOS_PROYECTO_ABIERTO: EstadoProyecto[] = [
+  EstadoProyecto.PUBLICADO,
+  EstadoProyecto.EN_PROGRESO,
+  EstadoProyecto.EN_SOLICITUD_CIERRE,
+];
+
+/** Horas granulares de un tramo: sus registros efectivos (la consulta ya excluye los revocados). */
+const sumarRegistros = (tramo: { registrosTiempo: Array<{ horas: Prisma.Decimal }> }): Prisma.Decimal =>
+  tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), CERO);
+
+/** Importe histórico del tramo; solo existe en tramos LEGACY (POR_CONCILIAR no aporta). */
+const legacyDe = (tramo: { origenReporte: OrigenReporteTramo; horasReales: Prisma.Decimal | null }): Prisma.Decimal =>
+  tramo.origenReporte === OrigenReporteTramo.LEGACY ? (tramo.horasReales ?? CERO) : CERO;
+
+/** Horas reconocidas por una consolidación y todavía pendientes de aprobar. */
+const propuestaDe = (fila: { estadoHoras: EstadoHoras; horasCalculadas: Prisma.Decimal | null }): Prisma.Decimal =>
+  fila.estadoHoras === EstadoHoras.PENDIENTE ? (fila.horasCalculadas ?? CERO) : CERO;
+
+/** Horas que un administrador ya aprobó; lo rechazado no cuenta en ningún nivel. */
+const acreditadaDe = (fila: { estadoHoras: EstadoHoras; horasAprobadas: Prisma.Decimal | null }): Prisma.Decimal =>
+  fila.estadoHoras === EstadoHoras.APROBADA ? (fila.horasAprobadas ?? CERO) : CERO;
+
 @Injectable()
 export class ProjectHoursSummaryService {
   constructor(private readonly prisma: PrismaService) {}
@@ -141,8 +170,8 @@ export class ProjectHoursSummaryService {
     let legacy = CERO;
 
     for (const tramo of tramos) {
-      const propias = tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), CERO);
-      const legacyTramo = tramo.origenReporte === 'LEGACY' ? (tramo.horasReales ?? CERO) : CERO;
+      const propias = sumarRegistros(tramo);
+      const legacyTramo = legacyDe(tramo);
       reportadas = reportadas.plus(propias);
       legacy = legacy.plus(legacyTramo);
       tareasProyecto.add(tramo.idTarea);
@@ -188,8 +217,8 @@ export class ProjectHoursSummaryService {
     let pendientes = CERO;
     let acreditadas = CERO;
     for (const agregado of agregados) {
-      const propuesta = agregado.estadoHoras === EstadoHoras.PENDIENTE ? (agregado.horasCalculadas ?? CERO) : CERO;
-      const aprobada = agregado.estadoHoras === EstadoHoras.APROBADA ? (agregado.horasAprobadas ?? CERO) : CERO;
+      const propuesta = propuestaDe(agregado);
+      const aprobada = acreditadaDe(agregado);
       pendientes = pendientes.plus(propuesta);
       acreditadas = acreditadas.plus(aprobada);
 
@@ -234,13 +263,7 @@ export class ProjectHoursSummaryService {
         tarea: {
           proyecto: {
             eliminadoEn: null,
-            estadoProyecto: {
-              in: [
-                EstadoProyecto.PUBLICADO,
-                EstadoProyecto.EN_PROGRESO,
-                EstadoProyecto.EN_SOLICITUD_CIERRE,
-              ],
-            },
+            estadoProyecto: { in: ESTADOS_PROYECTO_ABIERTO },
           },
         },
       },
@@ -256,8 +279,8 @@ export class ProjectHoursSummaryService {
     let reportadas = CERO;
     let legacy = CERO;
     for (const tramo of tramos) {
-      const propias = tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), CERO);
-      const legacyTramo = tramo.origenReporte === 'LEGACY' ? (tramo.horasReales ?? CERO) : CERO;
+      const propias = sumarRegistros(tramo);
+      const legacyTramo = legacyDe(tramo);
       reportadas = reportadas.plus(propias);
       legacy = legacy.plus(legacyTramo);
       const actual = porProyecto.get(tramo.tarea.idProyecto) ?? { reportadas: CERO, legacy: CERO };
@@ -320,8 +343,8 @@ export class ProjectHoursSummaryService {
     let legacy = CERO;
     const tareas = new Set<number>();
     const proyeccion = tramos.map((tramo) => {
-      const propias = tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), CERO);
-      const legacyTramo = tramo.origenReporte === 'LEGACY' ? (tramo.horasReales ?? CERO) : CERO;
+      const propias = sumarRegistros(tramo);
+      const legacyTramo = legacyDe(tramo);
       reportadas = reportadas.plus(propias);
       legacy = legacy.plus(legacyTramo);
       tareas.add(tramo.idTarea);
@@ -346,16 +369,8 @@ export class ProjectHoursSummaryService {
       idUsuario: input.userId,
       reportadasGranulares: dec2(reportadas),
       legacy: dec2(legacy),
-      propuestasPendientes: dec2(
-        agregados
-          .filter((fila) => fila.estadoHoras === EstadoHoras.PENDIENTE)
-          .reduce((acc, fila) => acc.plus(fila.horasCalculadas ?? CERO), CERO),
-      ),
-      acreditadas: dec2(
-        agregados
-          .filter((fila) => fila.estadoHoras === EstadoHoras.APROBADA)
-          .reduce((acc, fila) => acc.plus(fila.horasAprobadas ?? CERO), CERO),
-      ),
+      propuestasPendientes: dec2(agregados.reduce((acc, fila) => acc.plus(propuestaDe(fila)), CERO)),
+      acreditadas: dec2(agregados.reduce((acc, fila) => acc.plus(acreditadaDe(fila)), CERO)),
       tareasDistintas: tareas.size,
       tramos: proyeccion,
     };
