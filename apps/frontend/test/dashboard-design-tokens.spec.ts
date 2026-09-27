@@ -40,6 +40,20 @@ const MIGRATED_FILES = [
   'components/projects/project-chat-panel.tsx',
   'components/layout/notifications-bell.tsx',
   'components/ui/toast.tsx',
+  // HU-154 (T-214/T-215/T-216): navegación contextual y detalle de proyecto.
+  'app/dashboard/projects/[id]/project-detail-client.tsx',
+  'components/projects/project-sidebar.tsx',
+  'components/projects/navigation/project-actions-menu.tsx',
+  'components/projects/navigation/project-mobile-nav.tsx',
+  'components/projects/navigation/project-nav-list.tsx',
+  'components/projects/detail/project-content-grid.tsx',
+  'components/projects/detail/project-header-card.tsx',
+  'components/projects/detail/project-description-card.tsx',
+  'components/projects/detail/project-owner-card.tsx',
+  'components/projects/detail/project-details-section.tsx',
+  'components/projects/detail/project-my-roles-section.tsx',
+  'components/projects/detail/project-role-management-section.tsx',
+  'components/projects/role-admin-card.tsx',
 ];
 
 describe('Tokens de color (HU-163)', () => {
