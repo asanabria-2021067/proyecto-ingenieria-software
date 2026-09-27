@@ -133,8 +133,8 @@ describe('Sistema de diseño HU-163', () => {
 
   it('define la rejilla 8 + 4 con quiebre a 1024 px', () => {
     expect(CSS).toMatch(/@media \(min-width:\s*64rem\)/);
-    expect(CSS).toMatch(/\.layout-main\s*\{[^}]*grid-column:\s*span 8/s);
-    expect(CSS).toMatch(/\.layout-aside\s*\{[^}]*grid-column:\s*span 4/s);
+    expect(CSS).toMatch(/\.layout-main\s*\{[^}]*grid-column:\s*span 8/);
+    expect(CSS).toMatch(/\.layout-aside\s*\{[^}]*grid-column:\s*span 4/);
   });
 
   it('documenta la prohibición de valores literales y el uso del acento', () => {
