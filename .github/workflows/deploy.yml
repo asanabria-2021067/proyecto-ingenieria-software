@@ -45,6 +45,9 @@ jobs:
     # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
+    # G02 (OWASP25-C033): todo deploy (push a main o dispatch) exige el E2E.
+    with:
+      e2e: run
 
   # G02 (FASE2-N07): cada combinacion de configuracion publica de build del
   # frontend (NEXT_PUBLIC_*, horneada en el bundle) es una variante con tag
