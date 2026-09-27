@@ -78,7 +78,7 @@ const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: stri
   ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
   EN_FINALIZACION: {
     label: 'En finalización',
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+    className: 'bg-status-warning text-on-status-warning',
   },
   CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
 };
@@ -87,7 +87,7 @@ const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string }
   PENDIENTE: { label: 'Pendiente', className: 'bg-surface-container-high text-tertiary' },
   EN_PROGRESO: {
     label: 'En progreso',
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+    className: 'bg-status-warning text-on-status-warning',
   },
   COMPLETADO: { label: 'Completado', className: 'bg-primary-container text-on-primary-container' },
 };
