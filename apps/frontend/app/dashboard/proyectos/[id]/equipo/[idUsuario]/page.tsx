@@ -48,7 +48,7 @@ const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: stri
   ACTIVO: { label: 'ACTIVO', className: 'bg-primary-container text-on-primary-container' },
   EN_FINALIZACION: {
     label: 'EN FINALIZACIÓN',
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+    className: 'bg-status-warning text-on-status-warning',
   },
   CERRADO: { label: 'CERRADO', className: 'bg-surface-container-high text-tertiary' },
 };
@@ -443,7 +443,7 @@ function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegrante
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+            <Clock className="w-4 h-4 text-status-warning shrink-0" aria-hidden="true" />
             <div>
               <p className="text-base font-bold text-on-surface leading-tight">
                 {formatearHoras(sprint.horasAprobadas)} h
@@ -466,7 +466,7 @@ function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegrante
               <li key={tarea.idTarea} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 {tarea.estadoTarea === 'HECHO' ? (
                   <CheckCircle2
-                    className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0"
+                    className="w-4 h-4 text-status-success shrink-0"
                     aria-hidden="true"
                   />
                 ) : (
