@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventoToAgendaItem, groupAgendaItemsByDay, tareaToAgendaItem } from '@/lib/calendar/agenda';
+import { eventoToAgendaItem, eventoToAgendaItems, groupAgendaItemsByDay, tareaToAgendaItem } from '@/lib/calendar/agenda';
 import type { MiTareaDTO } from '@/lib/services/users';
 import type { MiEventoDTO } from '@/lib/services/events';
 
@@ -47,6 +47,34 @@ describe('calendar/agenda — mapeo a AgendaItem', () => {
     // sortKey es la hora formateada (HH:mm), no "24:00"
     expect(item.sortKey).not.toBe('24:00');
     expect(item.sortKey).toMatch(/^\d{2}:\d{2}$/);
+  });
+});
+
+describe('calendar/agenda — eventoToAgendaItems (evento multi-día, T-264)', () => {
+  it('un evento de un solo día produce un único AgendaItem, en su día', () => {
+    const items = eventoToAgendaItems(evento(), new Date(2026, 8, 1), new Date(2026, 9, 1));
+    expect(items).toHaveLength(1);
+    expect(items[0].key).toBe('2026-09-23');
+  });
+
+  it('un evento que abarca varios días aparece en cada día que toca', () => {
+    const e = evento({
+      fechaInicio: '2026-09-23T15:00:00.000Z',
+      fechaFin: '2026-09-25T16:00:00.000Z',
+    });
+    const items = eventoToAgendaItems(e, new Date(2026, 8, 1), new Date(2026, 9, 1));
+    expect(items.map((i) => i.key)).toEqual(['2026-09-23', '2026-09-24', '2026-09-25']);
+  });
+
+  it('un evento que empieza antes del rango visible pero lo solapa se recorta al rango, no desaparece', () => {
+    const e = evento({
+      fechaInicio: '2026-08-28T15:00:00.000Z',
+      fechaFin: '2026-09-02T16:00:00.000Z',
+    });
+    const rangoDesde = new Date(2026, 8, 1); // 2026-09-01
+    const rangoHasta = new Date(2026, 8, 3); // exclusivo: hasta el 2026-09-02
+    const items = eventoToAgendaItems(e, rangoDesde, rangoHasta);
+    expect(items.map((i) => i.key)).toEqual(['2026-09-01', '2026-09-02']);
   });
 });
 
