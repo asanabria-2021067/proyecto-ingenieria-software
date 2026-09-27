@@ -5,6 +5,9 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { makeProjectTransactionDouble } from './helpers/project-policy.double';
 
+// JwtStrategy exige JWT_SECRET al construirse (T-210: sin valor por defecto).
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
+
 describe('Infra', () => {
   it('JwtStrategy validate mapea payload de usuario activo', async () => {
     const prisma = {
