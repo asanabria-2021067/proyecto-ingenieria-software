@@ -318,9 +318,9 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
 
         {/* loading — skeleton con forma de fila (título + meta + pastillas), nunca spinner */}
         {isLoading && (
-          <ul className="space-y-inline py-inline" role="status" aria-label="Cargando tareas">
+          <div className="space-y-inline py-inline" role="status" aria-label="Cargando tareas">
             {[0, 1, 2, 3].map((i) => (
-              <li
+              <div
                 key={i}
                 className="flex items-center gap-inline rounded-card border border-outline-variant bg-card p-card shadow-card"
               >
@@ -330,9 +330,9 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                 </div>
                 <Skeleton className="h-6 w-20 shrink-0 rounded-control" />
                 <Skeleton className="h-6 w-20 shrink-0 rounded-control" />
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
 
         {/* error */}
@@ -428,7 +428,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                       {tarea.etiquetas.length === 0 ? (
                         <span className="type-meta">—</span>
                       ) : (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-micro">
                           {tarea.etiquetas.map((etiqueta) => (
                             <span
                               key={etiqueta.idEtiqueta}
