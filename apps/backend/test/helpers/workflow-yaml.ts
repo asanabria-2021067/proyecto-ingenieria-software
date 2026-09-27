@@ -27,9 +27,18 @@ export interface WorkflowStep {
   with?: Record<string, string>;
 }
 
+export type WorkflowPermissions = string | Record<string, string>;
+
+export interface WorkflowConcurrency {
+  group?: string;
+  'cancel-in-progress'?: boolean | string;
+}
+
 export interface WorkflowJob {
   name?: string;
   if?: string;
+  permissions?: WorkflowPermissions;
+  concurrency?: string | WorkflowConcurrency;
   needs?: string | string[];
   uses?: string;
   env?: Record<string, string>;
@@ -38,6 +47,8 @@ export interface WorkflowJob {
 
 export interface Workflow {
   env?: Record<string, string>;
+  permissions?: WorkflowPermissions;
+  concurrency?: string | WorkflowConcurrency;
   jobs: Record<string, WorkflowJob>;
 }
 

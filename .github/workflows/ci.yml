@@ -18,6 +18,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# G02 (OWASP25-C044): el token de CI solo lee el repositorio. Ningun job de CI
+# publica ni despliega, asi que ninguno necesita permisos de escritura.
+permissions:
+  contents: read
+
 env:
   # Prisma exige que la variable exista para generar el cliente.
   # Apunta al servicio postgres efimero del job backend (ver abajo).
