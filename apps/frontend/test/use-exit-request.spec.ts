@@ -190,6 +190,45 @@ describe('useCurrentExitRequest', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(getCurrentExitRequest).not.toHaveBeenCalled();
   });
+
+  // HU-154: la navegación contextual lo apaga para el líder y los visitantes.
+  it('con habilitado=false no consulta y expone request null sin error', async () => {
+    (getCurrentExitRequest as any).mockResolvedValue({ solicitud: solicitudAbierta() });
+    const { queryClient, wrapper } = createWrapper();
+    const { result } = renderHook(() => useCurrentExitRequest(7, { habilitado: false }), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getCurrentExitRequest).not.toHaveBeenCalled();
+    expect(result.current.request).toBeNull();
+    expect(result.current.isError).toBe(false);
+    expect(queryClient.getQueryState(currentExitRequestQueryKey(7))?.fetchStatus).toBe('idle');
+  });
+
+  it('al pasar de habilitado=false a true consulta con la misma query key', async () => {
+    (getCurrentExitRequest as any).mockResolvedValue({ solicitud: solicitudAbierta() });
+    const { wrapper } = createWrapper();
+    const { result, rerender } = renderHook(
+      ({ habilitado }: { habilitado: boolean }) => useCurrentExitRequest(7, { habilitado }),
+      { wrapper, initialProps: { habilitado: false } },
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getCurrentExitRequest).not.toHaveBeenCalled();
+
+    rerender({ habilitado: true });
+    await waitFor(() => expect(result.current.request).toEqual(solicitudAbierta()));
+    expect(getCurrentExitRequest).toHaveBeenCalledTimes(1);
+    expect(getCurrentExitRequest).toHaveBeenCalledWith(7);
+  });
+
+  it('un projectId inválido no consulta aunque habilitado sea true', async () => {
+    (getCurrentExitRequest as any).mockResolvedValue({ solicitud: null });
+    const { wrapper } = createWrapper();
+    renderHook(() => useCurrentExitRequest(0, { habilitado: true }), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getCurrentExitRequest).not.toHaveBeenCalled();
+  });
 });
 
 describe('useProjectPendingExitRequests', () => {
