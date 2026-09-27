@@ -19,6 +19,7 @@ import {
 } from './dto/update-estado-proyecto.dto';
 import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SocialService } from '../social/social.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService, type ReadDecision } from '../common/project-policy/project-read-policy.service';
@@ -33,6 +34,17 @@ type Db = Prisma.TransactionClient | PrismaService;
 
 const FEATURED_CACHE_KEY = 'projects:featured';
 const FEATURED_CACHE_TTL = 300_000;
+
+/**
+ * T-252: único lugar donde viven los pesos del orden ponderado de
+ * "Proyectos Disponibles". `amigoParticipante` es por amigo (así que 2
+ * amigos ya superan `mismaCarrera`); `mismaCarrera` es fijo, aplica una
+ * sola vez por proyecto sin importar cuántos roles pidan esa carrera.
+ */
+export const PESOS_ORDEN_DISPONIBLES = {
+  amigoParticipante: 2,
+  mismaCarrera: 1,
+} as const;
 
 /** Estados que aparecen en el catálogo público y en destacados. */
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
@@ -289,6 +301,7 @@ export class ProjectsService {
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly readPolicy: ProjectReadPolicyService,
+    private readonly social: SocialService,
   ) {}
 
   /**
@@ -346,20 +359,145 @@ export class ProjectsService {
     return andConditions;
   }
 
-  async findAll(filters: {
-    q?: string;
-    tipoProyecto?: string;
-    modalidad?: string;
-    organizacionId?: number;
-    habilidadId?: number;
-  } = {}) {
+  /**
+   * T-251: catálogo corto ("Proyectos Disponibles" del dashboard). La base
+   * sigue siendo recencia (`orderBy fechaCreacion desc`); con sesión
+   * (`userId`), T-252 reordena por afinidad SIN filtrar — mismo conjunto de
+   * proyectos para todo el mundo, solo cambia el orden.
+   *
+   * Esta misma ruta (sin `page`) también sirve al buscador global del header
+   * (`ProjectSearchInput` → `searchProjects(q)`): con `q` presente NO se
+   * pondera por afinidad, para no subir un proyecto peor emparejado con el
+   * texto buscado solo porque participa un amigo, y para no pagar las dos
+   * consultas extra en cada tecla del debounce.
+   *
+   * NOTA CACHE: a diferencia de `findFeatured`, esta lista no se puede
+   * cachear igual para todos los usuarios en cuanto el orden depende de
+   * quién pregunta (sus amigos, su carrera). Hoy no está cacheada; si se le
+   * agrega cache más adelante, la key tiene que incluir el userId.
+   */
+  async findAll(
+    filters: {
+      q?: string;
+      tipoProyecto?: string;
+      modalidad?: string;
+      organizacionId?: number;
+      habilidadId?: number;
+    } = {},
+    userId?: number,
+  ) {
     const andConditions = this._buildListConditions(filters);
-    return this.prisma.proyecto.findMany({
+    const proyectos = await this.prisma.proyecto.findMany({
       where: { AND: andConditions },
       select: proyectoListSelect,
       orderBy: { fechaCreacion: 'desc' },
       take: 20,
     });
+
+    const esBusqueda = !!filters.q && filters.q.trim().length > 0;
+    if (!userId || esBusqueda || proyectos.length === 0) {
+      return proyectos;
+    }
+    return this._ordenarPorAfinidad(proyectos, userId);
+  }
+
+  /**
+   * T-252: agrega `amigosParticipantes`/`mismaCarrera` a cada proyecto y
+   * reordena por afinidad (ver `PESOS_ORDEN_DISPONIBLES`). El motivo textual
+   * ("2 amigos participan", "De tu carrera") se arma en el FRONTEND a partir
+   * de estos dos campos estructurados — acá nunca se manda texto armado.
+   *
+   * Dos consultas fijas además de la lista base (amigos del usuario + una
+   * consulta agregada para TODOS los proyectos a la vez), nunca una por
+   * proyecto: no escalan con la cantidad de proyectos mostrados.
+   */
+  private async _ordenarPorAfinidad<
+    T extends { idProyecto: number },
+  >(proyectos: T[], userId: number): Promise<Array<T & { amigosParticipantes: number; mismaCarrera: boolean }>> {
+    const idsProyecto = proyectos.map((p) => p.idProyecto);
+
+    // Ids de amigos: misma fuente de verdad que el resto del producto
+    // (social-feed.service.ts ya la consume así), en vez de duplicar la
+    // consulta de amistades acá.
+    const [amigoIds, perfil] = await Promise.all([
+      this.social.getAmigoIds(userId),
+      this.prisma.perfilEstudiante.findUnique({
+        where: { idUsuario: userId },
+        select: { idCarrera: true },
+      }),
+    ]);
+    const carreraId = perfil?.idCarrera ?? null;
+
+    // Ni amigos ni carrera registrada: nada que ponderar. Se evita la
+    // consulta agregada y se devuelve tal cual (orden por recencia de siempre).
+    if (amigoIds.length === 0 && carreraId === null) {
+      return proyectos.map((p) => ({ ...p, amigosParticipantes: 0, mismaCarrera: false }));
+    }
+
+    const amigoParticipaCondicion =
+      amigoIds.length > 0 ? Prisma.sql`pp.id_usuario IN (${Prisma.join(amigoIds)})` : Prisma.sql`FALSE`;
+    const liderEsAmigoCondicion =
+      amigoIds.length > 0 ? Prisma.sql`p.creado_por IN (${Prisma.join(amigoIds)})` : Prisma.sql`FALSE`;
+
+    // UNA sola consulta agregada para TODOS los proyectos listados (no una
+    // por proyecto): cuenta, por proyecto, cuántos de los amigos del usuario
+    // participan ACTIVOS en cualquiera de sus roles, y si algún rol pide la
+    // carrera del usuario. El líder de un proyecto NO tiene fila en
+    // `participacion_proyecto` (schema.prisma: "no existe una
+    // ParticipacionProyecto equivalente para el líder"), así que se cuenta
+    // aparte en la segunda rama del UNION cuando también es amigo — mismo
+    // criterio que ya usa `social-feed.service.ts`.
+    const filas = await this.prisma.$queryRaw<
+      { idProyecto: number; amigosParticipantes: number; mismaCarrera: boolean }[]
+    >(Prisma.sql`
+      SELECT
+        x."idProyecto",
+        COUNT(DISTINCT x."idUsuarioAmigo")::int AS "amigosParticipantes",
+        COALESCE(BOOL_OR(x."mismaCarrera"), FALSE) AS "mismaCarrera"
+      FROM (
+        SELECT
+          rp.id_proyecto AS "idProyecto",
+          pp.id_usuario AS "idUsuarioAmigo",
+          (rp.id_carrera_requerida = ${carreraId}) AS "mismaCarrera"
+        FROM rol_proyecto rp
+        LEFT JOIN participacion_proyecto pp
+          ON pp.id_rol_proyecto = rp.id_rol_proyecto
+          AND pp.estado_participacion = 'ACTIVO'
+          AND ${amigoParticipaCondicion}
+        WHERE rp.id_proyecto IN (${Prisma.join(idsProyecto)})
+
+        UNION ALL
+
+        SELECT
+          p.id_proyecto AS "idProyecto",
+          CASE WHEN ${liderEsAmigoCondicion} THEN p.creado_por END AS "idUsuarioAmigo",
+          NULL::boolean AS "mismaCarrera"
+        FROM proyecto p
+        WHERE p.id_proyecto IN (${Prisma.join(idsProyecto)})
+      ) x
+      GROUP BY x."idProyecto"
+    `);
+    const afinidadPorProyecto = new Map(filas.map((f) => [f.idProyecto, f]));
+
+    const enriquecidos = proyectos.map((p) => {
+      const fila = afinidadPorProyecto.get(p.idProyecto);
+      return {
+        ...p,
+        amigosParticipantes: fila?.amigosParticipantes ?? 0,
+        mismaCarrera: fila?.mismaCarrera ?? false,
+      };
+    });
+
+    // `proyectos` ya viene ordenado por recencia; Array.sort es estable, así
+    // que a igual score se conserva ese orden (la recencia como base, T-251).
+    return enriquecidos.sort((a, b) => this._scoreAfinidad(b) - this._scoreAfinidad(a));
+  }
+
+  private _scoreAfinidad(p: { amigosParticipantes: number; mismaCarrera: boolean }): number {
+    return (
+      p.amigosParticipantes * PESOS_ORDEN_DISPONIBLES.amigoParticipante +
+      (p.mismaCarrera ? PESOS_ORDEN_DISPONIBLES.mismaCarrera : 0)
+    );
   }
 
   async findAllPaginated(filters: {

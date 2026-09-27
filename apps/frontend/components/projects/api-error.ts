@@ -30,6 +30,8 @@ export type ApiErrorScope =
   // T-221: login/registro/recuperación. Aquí un 401 significa credenciales o
   // token de recuperación inválidos, no sesión vencida.
   | 'auth';
+  // HU-169 (T-263): eventos de calendario del proyecto.
+  | 'calendar';
 
 interface EnrichedError {
   statusCode?: number;
@@ -239,7 +241,8 @@ export function getApiErrorMessage(
         scope === 'hours' ||
         scope === 'closure' ||
         scope === 'leadership' ||
-        scope === 'admin'
+        scope === 'admin' ||
+        scope === 'calendar'
       ) {
         return backendMessage || 'Revisa los datos ingresados y las relaciones seleccionadas.';
       }

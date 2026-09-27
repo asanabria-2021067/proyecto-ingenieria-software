@@ -216,6 +216,17 @@ export interface NotificationTemplateData {
     projectId: number;
     horasAcreditadas: string;
   };
+
+  // HU-169 (T-265): recordatorio de un EventoProyecto próximo a iniciar,
+  // emitido por EventsReminderService a los integrantes del proyecto.
+  RECORDATORIO_EVENTO: {
+    eventTitle: string;
+    projectTitle: string;
+    projectId: number;
+    eventId: number;
+    /** Fecha/hora de inicio ya formateada por el emisor (es-GT), lista para mostrar. */
+    fechaInicioTexto: string;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -418,6 +429,12 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Horas acreditadas',
     message: (data: NotificationTemplateData['HORAS_ACREDITADAS']) =>
       `Se acreditaron ${data.horasAcreditadas} horas por tu participación en el proyecto "${data.projectTitle}".`,
+  },
+
+  RECORDATORIO_EVENTO: {
+    title: 'Recordatorio de evento',
+    message: (data: NotificationTemplateData['RECORDATORIO_EVENTO']) =>
+      `"${data.eventTitle}" en el proyecto "${data.projectTitle}" comienza el ${data.fechaInicioTexto}.`,
   },
 } as const;
 

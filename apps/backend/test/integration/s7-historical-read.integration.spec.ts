@@ -15,6 +15,7 @@ import {
   createIntegrationUser,
 } from './setup/fixtures';
 import { ProjectsService } from '../../src/projects/projects.service';
+import type { SocialService } from '../../src/social/social.service';
 import { UsersService } from '../../src/users/users.service';
 import { ProjectHoursSummaryService } from '../../src/sprints/project-hours-summary.service';
 import {
@@ -351,6 +352,7 @@ describeIntegration('S7 lectura histórica de proyectos', () => {
       new ProjectTransactionService(prisma),
       new ProjectPolicyService(new ProjectIdResolverService(prisma)),
       new ProjectReadPolicyService(prisma),
+      {} as unknown as SocialService,
     );
     expect((await projects.findOne(publicado.idProyecto)).idProyecto).toBe(publicado.idProyecto);
     // Solo CERRADO sale del detalle público (se lee como histórico por su
