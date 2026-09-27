@@ -273,7 +273,7 @@ function DashboardProjectCard({
     <article className="card-base group flex min-h-52 flex-col">
       <div className="mb-stack flex items-start justify-between gap-tight">
         <div className="flex flex-wrap items-center gap-tight">
-          <span className="pill pill-accent">
+          <span className="pill pill-neutral">
             {tipoBadgeLabel(project.tipoProyecto)}
           </span>
           <span className="pill pill-neutral">
