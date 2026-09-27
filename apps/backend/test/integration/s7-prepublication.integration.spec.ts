@@ -40,6 +40,7 @@ import { TimeRecordsController } from '../../src/time-records/time-records.contr
 import { TimeRecordsService } from '../../src/time-records/time-records.service';
 import { ProjectsController } from '../../src/projects/projects.controller';
 import { ProjectsService } from '../../src/projects/projects.service';
+import type { SocialService } from '../../src/social/social.service';
 import { calcularProgresoHito } from '../../src/common/hito-progreso';
 import { ComentariosController } from '../../src/comentarios/comentarios.controller';
 import { ComentariosService } from '../../src/comentarios/comentarios.service';
@@ -154,6 +155,7 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
         projectTx,
         policy,
         new ProjectReadPolicyService(prismaService),
+        {} as unknown as SocialService,
       ),
     );
 
