@@ -67,6 +67,28 @@ jobs:
         with:
           fail-on-severity: high
 
+  # G03 (OWASP25-C040): resumen INFORMATIVO del backlog de `npm audit
+  # --omit=dev` por app, desde el lockfile y sin instalar nada. El script solo
+  # publica conteos, paquetes e IDs GHSA saneados y siempre termina en 0; sin
+  # secretos ni credenciales de registry. No corre en el workflow_call del deploy.
+  dependency-audit:
+    name: Audit de dependencias (informativo)
+    if: ${{ !inputs.e2e }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resumen de npm audit (produccion)
+        run: node .github/scripts/npm-audit-summary.mjs apps/backend apps/frontend
+
   backend:
     name: Backend - lint y pruebas
     runs-on: ubuntu-latest
