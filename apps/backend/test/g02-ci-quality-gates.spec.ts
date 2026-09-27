@@ -137,3 +137,45 @@ describe('G02-C11: next build en todo evento', () => {
     ).toEqual(['env-no-sintetico:NEXT_PUBLIC_API_URL', 'env-no-sintetico:NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME']);
   });
 });
+
+/**
+ * Tests en todo evento: o un paso incondicional, o el par complementario
+ * cobertura-en-PR / sin-cobertura-fuera-de-PR.
+ */
+export function testsEveryEventFindings(job: WorkflowJob, withCoverage: string, withoutCoverage: string): string[] {
+  const steps = job.steps ?? [];
+  const find = (command: string) => steps.find((step) => step.run?.trim() === command) as
+    | { if?: string }
+    | undefined;
+  const coverage = find(withCoverage);
+  const plain = find(withoutCoverage);
+  if (plain && plain.if === undefined) {
+    return [];
+  }
+  const inPr = coverage?.if?.replace(/\s+/g, ' ') === "github.event_name == 'pull_request'";
+  const outsidePr = plain?.if?.replace(/\s+/g, ' ') === "github.event_name != 'pull_request'";
+  return inPr && outsidePr ? [] : ['tests-no-cubren-todo-evento'];
+}
+
+describe('G02-C12: tests del frontend en todo evento', () => {
+  it('frontend y backend cubren PR (con cobertura) y el resto de eventos (sin cobertura)', () => {
+    expect(testsEveryEventFindings(ci.jobs.frontend, 'npm run test:coverage', 'npm run test')).toEqual([]);
+    expect(testsEveryEventFindings(ci.jobs.backend, 'npm run test:coverage', 'npm run test')).toEqual([]);
+  });
+
+  it('los umbrales de cobertura del frontend no se tocan (55/60/60/55)', () => {
+    const config = readRepoFile('apps/frontend/vitest.config.ts');
+    for (const threshold of ['lines: 55', 'functions: 60', 'branches: 60', 'statements: 55']) {
+      expect(config).toContain(threshold);
+    }
+  });
+
+  it('fixture: tests solo en PR se detectan', () => {
+    const job = parseWorkflow(
+      "on: push\njobs:\n  frontend:\n    runs-on: x\n    steps:\n      - run: npm run test:coverage\n        if: github.event_name == 'pull_request'\n",
+    ).jobs.frontend;
+    expect(testsEveryEventFindings(job, 'npm run test:coverage', 'npm run test')).toEqual([
+      'tests-no-cubren-todo-evento',
+    ]);
+  });
+});

@@ -155,6 +155,13 @@ jobs:
         if: github.event_name == 'pull_request'
         run: npm run test:coverage
 
+      # G02 (OWASP25-C032): fuera de PR (push, dispatch y el workflow_call del
+      # deploy) las pruebas corren igual, sin instrumentar cobertura, como en
+      # el job backend: un deploy de main no puede saltarse estos tests.
+      - name: Pruebas unitarias (Vitest, sin cobertura)
+        if: github.event_name != 'pull_request'
+        run: npm run test
+
   e2e:
     name: E2E - suite de humo (Playwright)
     runs-on: ubuntu-latest
