@@ -14,6 +14,12 @@ import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-b
 import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
 import { ProjectRoleManagementSection } from '@/components/projects/detail/project-role-management-section';
 import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
+import {
+  ProjectContentGrid,
+  ProjectGridAside,
+  ProjectGridFull,
+  ProjectGridMain,
+} from '@/components/projects/detail/project-content-grid';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -29,23 +35,25 @@ interface Props {
 const MIS_PROYECTOS_HREF = '/dashboard/projects/mine';
 
 // ─── Skeleton de carga ────────────────────────────────────────────────────────
+// Misma geometría que la vista cargada (encabezado a ancho completo, 8/4 por
+// contenedor) para que no haya salto al terminar de cargar.
 function ProjectDetailSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 py-6 pb-12">
-      <Skeleton className="mb-5 h-4 w-56" />
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        <div className="w-full space-y-5 lg:flex-1">
-          <Skeleton className="h-44 w-full rounded-xl" />
-          <Skeleton className="h-28 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-        </div>
-        <div className="w-full space-y-4 lg:w-80">
-          <Skeleton className="h-28 w-full rounded-xl" />
-          <Skeleton className="h-56 w-full rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-xl" />
-        </div>
-      </div>
-    </div>
+    <ProjectContentGrid aria-busy="true" aria-label="Cargando proyecto">
+      <ProjectGridFull>
+        <Skeleton className="h-4 w-56" />
+        <Skeleton className="h-44 w-full rounded-card" />
+      </ProjectGridFull>
+      <ProjectGridMain>
+        <Skeleton className="h-28 w-full rounded-card" />
+        <Skeleton className="h-64 w-full rounded-card" />
+      </ProjectGridMain>
+      <ProjectGridAside>
+        <Skeleton className="h-28 w-full rounded-card" />
+        <Skeleton className="h-56 w-full rounded-card" />
+        <Skeleton className="h-40 w-full rounded-card" />
+      </ProjectGridAside>
+    </ProjectContentGrid>
   );
 }
 
