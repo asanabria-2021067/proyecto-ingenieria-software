@@ -173,6 +173,9 @@ export function GlobalSearchInput({
   );
 
   useEffect(() => {
+    // G02-C08 (OWASP25-C031): supresión puntual sin cambio de comportamiento;
+    // reescribir el reinicio del índice queda para su owner (HU-171).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveIndex(-1);
   }, [data, pestana]);
 
