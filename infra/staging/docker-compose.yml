@@ -1,0 +1,92 @@
+# Arnes efimero de topologia (G02-C17 · D4). Replica la estructura de
+# produccion (nginx delante de frontend y backend construidos con los
+# Dockerfiles productivos, PostgreSQL 17, Redis 7) en el runner o en local.
+# Nunca se usa en la VM. Solo datos y secretos SINTETICOS; sin seed (sin PII).
+# Solo nginx publica puertos y unicamente en 127.0.0.1. Lanzar siempre con
+# infra/staging/run-harness.sh (genera el TLS efimero y destruye todo al final).
+name: uvg-owasp-harness
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: harness
+      POSTGRES_PASSWORD: harness-synthetic-db-password
+      POSTGRES_DB: uvg_collab_harness
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U harness -d uvg_collab_harness"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ../../apps/backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: '3001'
+      DATABASE_URL: postgresql://harness:harness-synthetic-db-password@postgres:5432/uvg_collab_harness?schema=public
+      DIRECT_URL: postgresql://harness:harness-synthetic-db-password@postgres:5432/uvg_collab_harness?schema=public
+      JWT_SECRET: harness-synthetic-jwt-secret-not-for-production
+      JWT_REFRESH_SECRET: harness-synthetic-refresh-secret-not-for-production
+      FRONTEND_URL: https://localhost:${HARNESS_HTTPS_PORT:-8443}
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ../../apps/frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: harness-synthetic
+        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: harness-synthetic
+    environment:
+      NODE_ENV: production
+      API_URL_INTERNAL: http://backend:3001
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:${HARNESS_HTTP_PORT:-8080}:80"
+      - "127.0.0.1:${HARNESS_HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/sites-enabled:/etc/nginx/sites-enabled:ro
+      # conf.d vacio: la imagen trae un server por defecto que no existe en produccion.
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ${HARNESS_TLS_DIR:?genera el TLS efimero con run-harness.sh}:/etc/nginx/harness-tls:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy

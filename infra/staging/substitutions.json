@@ -1,0 +1,36 @@
+{
+  "gate": "G02-C17",
+  "description": "Unicas diferencias permitidas entre infra/staging/nginx (arnes efimero) e infra/nginx (baseline productivo). Cada sustitucion debe aparecer exactamente una vez; cualquier otra diferencia hace fallar check-representativity.mjs.",
+  "substitutions": [
+    {
+      "file": "nginx.conf",
+      "from": "user www-data;",
+      "to": "user nginx;",
+      "reason": "La imagen nginx:alpine no tiene el usuario www-data de Ubuntu."
+    },
+    {
+      "file": "sites-enabled/uvg-collab",
+      "from": "    ssl_certificate /etc/letsencrypt/live/158.23.57.118.nip.io/fullchain.pem;",
+      "to": "    ssl_certificate /etc/nginx/harness-tls/fullchain.pem;",
+      "reason": "Certificado autofirmado efimero del arnes en lugar del de Let's Encrypt."
+    },
+    {
+      "file": "sites-enabled/uvg-collab",
+      "from": "    ssl_certificate_key /etc/letsencrypt/live/158.23.57.118.nip.io/privkey.pem;",
+      "to": "    ssl_certificate_key /etc/nginx/harness-tls/privkey.pem;",
+      "reason": "Clave autofirmada efimera, generada en cada corrida fuera del repositorio."
+    },
+    {
+      "file": "sites-enabled/uvg-collab",
+      "from": "        proxy_pass http://localhost:3000;",
+      "to": "        proxy_pass http://frontend:3000;",
+      "reason": "En la VM nginx corre en el host y llega al contenedor por el puerto publicado; en el arnes llega por la red interna de compose."
+    },
+    {
+      "file": "sites-enabled/uvg-collab",
+      "from": "        proxy_pass http://localhost:3001;",
+      "to": "        proxy_pass http://backend:3001;",
+      "reason": "Igual que el frontend: upstream por la red interna del arnes."
+    }
+  ]
+}
