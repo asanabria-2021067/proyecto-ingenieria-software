@@ -79,18 +79,18 @@ function ProjectReadOnlyView({
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-10">
 
       {esObservado && (
-        <div className="rounded-2xl border border-amber-400 bg-amber-200 dark:bg-amber-500/25 dark:border-amber-500/60 px-5 py-4 flex items-start justify-between gap-4">
+        <div className="rounded-2xl border border-status-warning bg-status-warning/20 px-5 py-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-bold text-on-surface">
+            <p className="type-subtitle text-text-primary">
               Tu proyecto tiene observaciones del revisor
             </p>
-            <p className="text-xs mt-0.5 text-on-surface/70">
+            <p className="type-meta mt-0.5 text-text-secondary">
               Revisa los comentarios de cada sección y aplica las correcciones necesarias.
             </p>
           </div>
           <button
             onClick={onEdit}
-            className="shrink-0 flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors"
+            className="shrink-0 flex items-center gap-2 rounded-xl bg-status-warning px-4 py-2 type-meta font-bold text-on-status-warning hover:opacity-90 transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
             Editar y corregir
@@ -356,7 +356,7 @@ export default function MyProjectViewClient({ id }: Props) {
             </button>
             <div className="h-5 w-px bg-outline-variant/40" />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+              <p className="type-meta font-black uppercase tracking-widest text-status-warning">
                 Mis Proyectos · Editando correcciones
               </p>
               <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
@@ -715,7 +715,7 @@ export default function MyProjectViewClient({ id }: Props) {
             <button
               disabled={saving}
               onClick={() => void submit('EN_REVISION')}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-status-warning px-5 py-3 type-body font-bold text-on-status-warning transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="h-4 w-4" />
               {saving ? 'Enviando…' : 'Enviar correcciones'}
@@ -789,14 +789,14 @@ export default function MyProjectViewClient({ id }: Props) {
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
                       Información general
                     </h2>
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                    <div className="rounded-xl border border-status-warning/30 bg-status-warning/10 p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                        <MessageSquare className="h-3.5 w-3.5 text-status-warning shrink-0" />
+                        <span className="type-meta font-black uppercase tracking-widest text-status-warning">
                           Comentarios del revisor
                         </span>
                       </div>
-                      <p className="text-sm text-on-surface whitespace-pre-wrap">{c.general}</p>
+                      <p className="type-body text-text-primary whitespace-pre-wrap">{c.general}</p>
                     </div>
                   </section>
                 )}
@@ -817,14 +817,14 @@ export default function MyProjectViewClient({ id }: Props) {
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
                       Roles y habilidades
                     </h2>
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                    <div className="rounded-xl border border-status-warning/30 bg-status-warning/10 p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                        <MessageSquare className="h-3.5 w-3.5 text-status-warning shrink-0" />
+                        <span className="type-meta font-black uppercase tracking-widest text-status-warning">
                           Comentarios del revisor
                         </span>
                       </div>
-                      <p className="text-sm text-on-surface whitespace-pre-wrap">{c.roles}</p>
+                      <p className="type-body text-text-primary whitespace-pre-wrap">{c.roles}</p>
                     </div>
                   </section>
                 )}
