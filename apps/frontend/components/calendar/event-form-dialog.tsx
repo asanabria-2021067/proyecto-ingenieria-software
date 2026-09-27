@@ -166,6 +166,19 @@ export function EventFormDialog({
 
   const isPending = crear.isPending || editar.isPending || cancelar.isPending;
 
+  const confirmarCancelacion = async () => {
+    const { isConfirmed } = await uvgSwal.fire({
+      icon: 'warning',
+      title: '¿Cancelar este evento?',
+      text: 'Se eliminará del calendario del proyecto. Esta acción no se puede deshacer.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cancelar',
+      cancelButtonText: 'Volver',
+    });
+    if (!isConfirmed) return;
+    cancelar.mutate();
+  };
+
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (values.tituloEvento.trim().length === 0) {
@@ -312,7 +325,7 @@ export function EventFormDialog({
                 type="button"
                 variant="outline"
                 disabled={isPending}
-                onClick={() => cancelar.mutate()}
+                onClick={() => void confirmarCancelacion()}
                 className="h-10 gap-1.5 rounded-md border-outline-variant text-xs font-bold text-status-error"
               >
                 {cancelar.isPending ? (
