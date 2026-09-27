@@ -116,6 +116,13 @@ jobs:
       # partir de variables de entorno del paso (nunca interpoladas en el texto
       # de un comando) y viaja a la VM por stdin de SSH. El comando remoto es
       # estatico, asi que ningun secreto queda en el argv ni en /proc de la VM.
+      #
+      # Contrato de configuracion (G01-C08, OWASP25-C030 + VM0-F019): cada
+      # variable escrita aqui tiene un consumidor registrado en
+      # apps/backend/test/helpers/deploy-env-registry.ts. Un flag nuevo se
+      # declara SIEMPRE como `NOMBRE: ${{ vars.NOMBRE || '<default>' }}`, con un
+      # default que reproduce el comportamiento actual, de modo que el deploy
+      # funciona con cero GitHub Variables creadas.
       - name: Transferir .env de produccion por stdin
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -128,8 +135,6 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
@@ -152,8 +157,6 @@ jobs:
             printf 'NEXT_PUBLIC_API_PREFIX=/api\n'
             printf 'NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\n' "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"
             printf 'NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\n' "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"
-            printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY"
-            printf 'MAIL_FROM=%s\n' "$MAIL_FROM"
             printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
             printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"
