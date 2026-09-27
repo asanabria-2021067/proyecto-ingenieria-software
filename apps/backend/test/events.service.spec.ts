@@ -189,7 +189,25 @@ describe('EventsService — edición (PATCH, T-263/T-265)', () => {
     expect(data.recordatorioEnviadoEn).toBeUndefined();
   });
 
-  it('mover fechaInicio resetea recordatorioEnviadoEn a null (recalcular, no reenviar el viejo)', async () => {
+  it('editar el título mandando la misma fechaInicio (como hace el diálogo real) no resetea recordatorioEnviadoEn', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.eventoProyecto.findFirst.mockResolvedValue(eventoActual());
+    prisma.eventoProyecto.update.mockResolvedValue(eventoActual());
+    const service = new EventsService(prisma);
+
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, {
+      tituloEvento: 'Reunión final',
+      fechaInicio: eventoActual().fechaInicio.toISOString(),
+      fechaFin: eventoActual().fechaFin.toISOString(),
+      antelacionMinutos: 60,
+    });
+
+    const data = prisma.eventoProyecto.update.mock.calls[0][0].data;
+    expect(data.recordatorioEnviadoEn).toBeUndefined();
+  });
+
+  it('mover fechaInicio a un valor distinto resetea recordatorioEnviadoEn a null (recalcular, no reenviar el viejo)', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
     prisma.eventoProyecto.findFirst.mockResolvedValue(eventoActual());
