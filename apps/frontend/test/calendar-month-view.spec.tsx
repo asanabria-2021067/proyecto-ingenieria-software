@@ -18,7 +18,7 @@ function tarea(id: number, key: string, titulo: string): AgendaItem {
     projectTitle: 'Proyecto',
     href: `/dashboard/projects/1/kanban/tasks/${id}`,
     prioridad: 'MEDIA',
-    estado: 'PENDIENTE',
+    estado: 'POR_HACER',
   };
 }
 
