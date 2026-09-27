@@ -440,3 +440,30 @@ describe('ProjectDetailClient — esqueleto 8/4 del líder', () => {
     expect(replaceMock).toHaveBeenCalledWith('/dashboard/projects/42');
   });
 });
+
+// ── HU-154: la lista de roles del líder decide sus columnas por contenedor ──
+describe('ProjectDetailClient — lista de roles por contenedor', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: proyecto(), isLoading: false, error: null, refetch: vi.fn() });
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    (useProjectMembers as any).mockReturnValue({ members: [] });
+    mockRoles([rol(), rol({ idRolProyecto: 2, nombreRol: 'Backend' })]);
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('las tarjetas van en una rejilla de 2 columnas solo cuando la lista mide al menos 42rem', () => {
+    renderPage();
+
+    const tarjeta = screen.getByRole('heading', { level: 3, name: 'Frontend' });
+    const rejilla = tarjeta.closest('.grid') as HTMLElement;
+    expect(rejilla).toHaveClass('grid-cols-1', '@2xl/roles:grid-cols-2');
+    expect(rejilla.className).not.toMatch(/(^|\s)(sm|md|lg|xl):grid-cols-/);
+    expect(rejilla.parentElement).toHaveClass('@container/roles');
+    expect(within(rejilla).getByRole('heading', { level: 3, name: 'Backend' })).toBeInTheDocument();
+  });
+});
