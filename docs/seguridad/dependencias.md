@@ -5,27 +5,32 @@
 - Version declarada e instalada: `16.2.0`.
 - `npm audit` reporta una vulnerabilidad **critica** en `next` para el rango
   `9.3.4-canary.0 - 16.3.2`. El fix lo trae `16.3.6` (cambio menor dentro de
-  `16.x`, `isSemVerMajor: false`).
+  `16.x`, `isSemVerMajor: false`). La cadena de advisories que cubre incluye,
+  entre otros: RCE no autenticado en servidores hosteados en Windows (<16.3.3),
+  RCE no autenticado en la API de optimizacion de imagenes con archivos AVIF
+  (<16.3.3), varios bypass de middleware/proxy en App Router (este repo usa
+  middleware — `ƒ Proxy (Middleware)` aparece en el output de `npm run
+  build`), SSRF en Server Actions y rewrites, cache poisoning de respuestas
+  RSC, XSS via nonces de CSP, y divulgacion no autenticada de endpoints
+  internos de Server Functions.
 - Se probo el bump a `16.3.6`:
   - `npm install` resuelve limpio.
   - La suite de tests de frontend pasa completa (129 archivos, 1504 tests).
-  - `npm run build` **rompe** en el paso de chequeo de TypeScript, con
-    errores que no aparecen en `16.2.0`:
-    - `test/my-project-view.spec.tsx`: 3 errores `TS2322` (fixtures del test
-      con campos `null`/`undefined` que ya no son asignables a
-      `ProyectoDetalleDTO` / `SnapshotProyectoDTO`).
-    - `test/theme-tokens.spec.ts`: 2 errores `TS1501` (flag de regex `s`,
-      requiere `target` `es2018` o superior; el `tsconfig.json` del proyecto
-      usa `es2017`).
-  - Verificado con cache de TypeScript limpia (`.next/cache/.tsbuildinfo` y
-    `tsconfig.tsbuildinfo` borrados antes de cada corrida) en ambas
-    versiones, para descartar que fuera un cache viejo: con `16.2.0` el build
-    compila y tipa sin errores; con `16.3.6`, con el mismo codigo de la app
-    sin cambios, falla. El `tsconfig.json` tampoco cambio entre una corrida y
-    otra.
-- Decision: se revierte `next` a `16.2.0`. La vulnerabilidad critica queda
-  **sin mitigar** hasta que se corrijan esos 5 errores de tipos en los
-  archivos de test señalados y se reintente el bump a `16.3.6`.
+  - `npm run build` **rompe** en el paso de chequeo de TypeScript, porque a
+    partir de `16.3.6` el type-check de `next build` amplia su alcance e
+    incluye `test/**` (en `16.2.0` no lo hace). Los 5 errores que expone ya
+    existian antes del bump: son deuda de tipos preexistente en los archivos
+    de test, no una regresion introducida por `next`. Verificado con
+    `next@16.2.0` instalado corriendo `npx tsc --noEmit -p tsconfig.json`
+    directamente: devuelve los mismos 5 errores (`test/my-project-view.spec.tsx`
+    TS2322 en 61/69/95, `test/theme-tokens.spec.ts` TS1501 en 136/137). El
+    proyecto **no** tipaba limpio en `16.2.0`; el build simplemente no
+    miraba esos archivos.
+  - Codigo de aplicacion: sin cambios ni errores en ninguna de las dos
+    versiones. El bloqueo es exclusivamente en `test/**`.
+- Decision: se corrigieron los 5 errores de tipos en los archivos de test
+  (`test/my-project-view.spec.tsx`, `test/theme-tokens.spec.ts`) y se
+  actualizo `next` a `16.3.6`, cerrando la vulnerabilidad critica.
 
 ## jspdf: verificado, no representa un riesgo activo
 
