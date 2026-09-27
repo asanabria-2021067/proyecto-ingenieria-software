@@ -56,8 +56,10 @@ export function ProjectDetailsSection({
 }: ProjectDetailsSectionProps) {
   const organizacionPrincipal = proyecto.organizaciones[0] ?? null;
 
+  // Las tarjetas se apilan en la columna lateral del esqueleto compartido
+  // (ProjectGridAside), que ya da la separación entre ellas.
   return (
-    <div className="space-y-4 lg:sticky lg:top-22.5">
+    <>
       {/* Detalles del proyecto */}
       <div className={CARD}>
         <h2 className="mb-4 font-headline text-xs font-black uppercase tracking-widest text-tertiary">
@@ -110,6 +112,6 @@ export function ProjectDetailsSection({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -7,11 +7,13 @@ import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { type RolesSheetIntent } from '@/components/projects/project-roles-sheet';
-import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
+import { ProjectClosureAction, ProjectHeaderCard } from '@/components/projects/detail/project-header-card';
+import { ProjectDescriptionCard } from '@/components/projects/detail/project-description-card';
+import { ProjectOwnerCard } from '@/components/projects/detail/project-owner-card';
+import { parseObjetivos } from '@/components/projects/detail/parse-objetivos';
 import { ExitRequestSection } from '@/components/projects/detail/exit-request-section';
 import { ClosureStatusBanner } from '@/components/projects/closure-status-banner';
 import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-banner';
-import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
 import { ProjectRoleManagementSection } from '@/components/projects/detail/project-role-management-section';
 import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
 import {
@@ -176,69 +178,87 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const misRoles = rolesAdmin.filter((r) => r.isMine);
 
   // Objetivos: texto real, separado por líneas (Sección 16).
-  const objetivos = (proyecto.objetivosProyecto ?? '')
-    .split('\n')
-    .map((s) => s.replace(/^[-*•]\s*/, '').trim())
-    .filter(Boolean);
+  const objetivos = parseObjetivos(proyecto.objetivosProyecto);
+
+  // D-02: quien no participa (ni lidera ni administra) no tiene nada que
+  // hacer en este workspace salvo postularse, y los roles con postulación
+  // viven en la ruta pública del proyecto.
+  const mostrarPostularme = !isLeader && !puedeVerKanban && !isAdmin && !proyectoCerrado;
 
   if (debeRedirigir) {
     return <ProjectDetailSkeleton />;
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 pb-12 pt-6 md:px-8">
-      <ProjectSummarySection
-        proyecto={proyecto}
-        isLeader={isLeader}
-        isAdmin={isAdmin}
-        puedeVerKanban={puedeVerKanban}
-        closureAction={closureAction}
-        readOnly={proyectoCerrado}
-      >
-        {proyectoCerrado && (
-          <ReadOnlyProjectBanner fechaCierre={proyecto.fechaActualizacion} className="mb-5" />
-        )}
+    <ProjectContentGrid>
+      {/* Encabezado y estado del proyecto a ancho completo. La navegación
+          entre secciones (Tablero, Miembros, Sprints…) y las acciones
+          secundarias (editar, revisiones) viven en la navegación contextual. */}
+      <ProjectGridFull>
+        <ProjectHeaderCard
+          breadcrumb={{ href: MIS_PROYECTOS_HREF, label: 'Mis proyectos' }}
+          titulo={proyecto.tituloProyecto}
+          descripcion={proyecto.descripcionProyecto}
+          tipoProyecto={proyecto.tipoProyecto}
+          estadoProyecto={proyecto.estadoProyecto}
+          modalidadProyecto={proyecto.modalidadProyecto}
+          etiquetas={proyecto.intereses.map((pi) => pi.interes.nombreInteres)}
+          lider={isLeader ? proyecto.creador : null}
+          acciones={
+            mostrarPostularme || closureAction ? (
+              <>
+                {mostrarPostularme && (
+                  <Button asChild className="bg-primary text-on-primary hover:bg-primary/90">
+                    <Link href={`/dashboard/proyectos/${idProyecto}`}>Ver roles y postularme</Link>
+                  </Button>
+                )}
+                {closureAction && <ProjectClosureAction action={closureAction} />}
+              </>
+            ) : undefined
+          }
+        />
+        {proyectoCerrado && <ReadOnlyProjectBanner fechaCierre={proyecto.fechaActualizacion} />}
         {enSolicitudCierre && (
           <ClosureStatusBanner
             idProyecto={idProyecto}
             estadoProyecto={estadoProyecto}
             revision={ultimaRevision}
             isLeader={isLeader}
-            className="mb-5"
           />
         )}
+      </ProjectGridFull>
+
+      <ProjectGridMain>
+        <ProjectDescriptionCard descripcion={proyecto.descripcionProyecto} objetivos={objetivos} />
+
+        {/* Estado personal: junto a los roles, igual que en la vista del participante. */}
         {solicitudSalidaAbierta && !proyectoCerrado && (
           <ExitRequestSection idProyecto={idProyecto} solicitud={solicitudSalidaAbierta} />
         )}
-      </ProjectSummarySection>
 
-      {/* La navegación entre secciones del proyecto (Editar Información,
-          Revisiones Pasadas, Editar Roles, Miembros, Sprints, Tablero) vive
-          ahora únicamente en la sidebar del workspace (ProjectSidebar). */}
+        <ProjectRoleManagementSection
+          isLeader={puedeEscribir}
+          proyecto={proyecto}
+          rolesAdmin={rolesAdmin}
+          asignarmeRol={asignarmeRol}
+          salirDeRol={salirDeRol}
+          crearRol={crearRol}
+          editarRol={editarRol}
+          eliminarRol={eliminarRol}
+          abrirCrearRol={abrirCrearRol}
+          abrirEditarRol={abrirEditarRol}
+          rolesSheetAbierto={rolesSheetAbierto}
+          setRolesSheetAbierto={setRolesSheetAbierto}
+          rolesSheetIntent={rolesSheetIntent}
+        />
+      </ProjectGridMain>
 
-      {/* Fila 2: objetivos/roles · detalles/resumen sticky. */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
-        {/* FILA 2 · COL 1 — Objetivos + Roles */}
-        <div className="min-w-0 space-y-5">
-          <ProjectObjectivesSection objetivos={objetivos} />
-
-          <ProjectRoleManagementSection
-            isLeader={puedeEscribir}
-            proyecto={proyecto}
-            rolesAdmin={rolesAdmin}
-            asignarmeRol={asignarmeRol}
-            salirDeRol={salirDeRol}
-            crearRol={crearRol}
-            editarRol={editarRol}
-            eliminarRol={eliminarRol}
-            abrirCrearRol={abrirCrearRol}
-            abrirEditarRol={abrirEditarRol}
-            rolesSheetAbierto={rolesSheetAbierto}
-            setRolesSheetAbierto={setRolesSheetAbierto}
-            rolesSheetIntent={rolesSheetIntent}
-          />
-        </div>
-
+      <ProjectGridAside aria-label="Información del proyecto">
+        <ProjectOwnerCard
+          nombre={proyecto.creador.nombre}
+          apellido={proyecto.creador.apellido}
+          correo={proyecto.creador.correo}
+        />
         <ProjectDetailsSection
           proyecto={proyecto}
           isLeader={puedeEscribir}
@@ -247,8 +267,8 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           rolesDisponiblesCount={rolesDisponiblesCount}
           cuposTotales={cuposTotales}
         />
-      </div>
-    </div>
+      </ProjectGridAside>
+    </ProjectContentGrid>
   );
 }
 
