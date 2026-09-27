@@ -6,6 +6,7 @@ import { NotificationsService } from './notifications.service';
 import { NotificationsGateway } from './notifications.gateway';
 import { ApplicationNotificationListener } from './listeners/application-notification.listener';
 import { PrismaModule } from '../prisma/prisma.module';
+import { getJwtSecretFromConfig } from '../config/jwt-secret';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') || 'dev-secret-change-me',
+        secret: getJwtSecretFromConfig(config),
         signOptions: { expiresIn: '7d' },
       }),
     }),
