@@ -6,6 +6,7 @@ import { Send, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
+import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import {
   crearComentarioTarea,
@@ -14,6 +15,7 @@ import {
   type TareaComentario,
 } from '@/lib/services/task-comments';
 import { projectTasksQueryKey, taskCommentsQueryKey } from '@/lib/query-keys/tasks';
+import uvgSwal from '@/lib/swal';
 
 interface TaskCommentsPanelProps {
   idProyecto: number;
@@ -48,6 +50,7 @@ export function TaskCommentsPanel({ idProyecto, idTarea, enabled, scroll = true 
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const [contenido, setContenido] = useState('');
+  const [comentarioAEliminar, setComentarioAEliminar] = useState<TareaComentario | null>(null);
 
   // El proveedor de comentarios exige un `idTarea` numérico incluso mientras
   // no hay tarea seleccionada; la query real solo se dispara con `enabled`,
@@ -76,7 +79,15 @@ export function TaskCommentsPanel({ idProyecto, idTarea, enabled, scroll = true 
   const eliminarMutation = useMutation({
     mutationFn: (idComentario: number) =>
       eliminarComentarioTarea(idProyecto, idTarea as number, idComentario),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      setComentarioAEliminar(null);
+      uvgSwal.fire({ icon: 'success', title: 'Comentario eliminado', timer: 1800, showConfirmButton: false });
+    },
+    onError: (error: Error) => {
+      setComentarioAEliminar(null);
+      uvgSwal.fire({ icon: 'error', title: 'No se pudo eliminar el comentario', text: error.message });
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -124,7 +135,7 @@ export function TaskCommentsPanel({ idProyecto, idTarea, enabled, scroll = true 
                     {esAutor && (
                       <button
                         type="button"
-                        onClick={() => eliminarMutation.mutate(c.idComentario)}
+                        onClick={() => setComentarioAEliminar(c)}
                         disabled={eliminarMutation.isPending}
                         aria-label="Eliminar comentario"
                         title="Eliminar comentario"
@@ -181,6 +192,17 @@ export function TaskCommentsPanel({ idProyecto, idTarea, enabled, scroll = true 
       ) : (
         <div className="border-t border-outline-variant pt-4 mt-2">{lista}</div>
       )}
+
+      <ConfirmActionDialog
+        open={comentarioAEliminar !== null}
+        title="Eliminar comentario"
+        description="Este comentario se eliminará de la tarea de forma permanente. Esta acción no se puede deshacer."
+        actionLabel="Sí, eliminar comentario"
+        variant="destructive"
+        isPending={eliminarMutation.isPending}
+        onConfirm={() => comentarioAEliminar && eliminarMutation.mutate(comentarioAEliminar.idComentario)}
+        onCancel={() => setComentarioAEliminar(null)}
+      />
     </div>
   );
 }
