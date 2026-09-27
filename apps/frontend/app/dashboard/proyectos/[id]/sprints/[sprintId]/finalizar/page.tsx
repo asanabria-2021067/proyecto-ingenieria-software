@@ -116,7 +116,7 @@ function Kpi({
     <div role="group" aria-label={label} className={`${CARD} flex items-center gap-3 p-4`}>
       <span
         className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
-          warning ? 'bg-status-warning/20 text-status-warning' : 'bg-primary/10 text-primary'
+          warning ? 'bg-status-warning/20 text-text-primary' : 'bg-primary/10 text-primary'
         }`}
         aria-hidden="true"
       >
@@ -124,7 +124,7 @@ function Kpi({
       </span>
       <div className="min-w-0">
         <p className="text-xs text-tertiary">{label}</p>
-        <p className={`text-xl font-bold leading-tight ${warning ? 'text-status-warning' : 'text-on-surface'}`}>
+        <p className={`text-xl font-bold leading-tight ${warning ? 'text-text-primary' : 'text-on-surface'}`}>
           {value}
         </p>
       </div>
@@ -524,7 +524,7 @@ export default function SprintClosingPage() {
               {blockers.length > 0 && (
                 <div
                   role="alert"
-                  className="rounded-xl border border-status-warning/40 bg-status-warning/10 p-4 text-sm text-status-warning"
+                  className="rounded-xl border border-outline-variant bg-status-warning/10 p-4 text-sm text-destructive"
                 >
                   <p className="flex items-center gap-2 font-semibold">
                     <AlertTriangle className="size-4" aria-hidden="true" />
