@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ClosureDocumentViewer, formatearTamano } from '@/components/closure/closure-document-viewer';
+import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { validateClosurePdf } from '@/hooks/use-closure';
 import type { ClosureRevision, ClosureRevisionDocument, ClosureUploadEnCurso } from '@/lib/types/closure';
 
@@ -79,6 +80,7 @@ export function ClosureDocumentsManager({
   const inputRef = useRef<HTMLInputElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [visor, setVisor] = useState<ClosureRevisionDocument | null>(null);
+  const [evidenciaAQuitar, setEvidenciaAQuitar] = useState<ClosureRevisionDocument | null>(null);
 
   if (isLoading || revision === undefined) {
     return <Skeleton className="h-56 w-full rounded-xl" aria-busy="true" aria-label="Cargando documentos del cierre" />;
@@ -289,7 +291,7 @@ export function ClosureDocumentsManager({
                     variant="ghost"
                     size="sm"
                     disabled={detachingId === doc.idDocumentoCierre}
-                    onClick={() => onDetach?.(doc.idDocumentoCierre)}
+                    onClick={() => setEvidenciaAQuitar(doc)}
                     aria-label={`Quitar ${doc.nombreArchivo}`}
                     className="h-8 gap-1 text-xs font-semibold text-error hover:bg-error/10 hover:text-error"
                   >
@@ -312,6 +314,25 @@ export function ClosureDocumentsManager({
           {mensajeError}
         </p>
       )}
+
+      <ConfirmActionDialog
+        open={evidenciaAQuitar !== null}
+        title="Quitar evidencia"
+        description={
+          evidenciaAQuitar
+            ? `Se quitará el archivo "${evidenciaAQuitar.nombreArchivo}" de esta entrega. Esta acción no se puede deshacer.`
+            : ''
+        }
+        actionLabel="Sí, quitar archivo"
+        variant="destructive"
+        isPending={detachingId === evidenciaAQuitar?.idDocumentoCierre}
+        onConfirm={() => {
+          if (!evidenciaAQuitar) return;
+          onDetach?.(evidenciaAQuitar.idDocumentoCierre);
+          setEvidenciaAQuitar(null);
+        }}
+        onCancel={() => setEvidenciaAQuitar(null)}
+      />
 
       {visor && (
         <ClosureDocumentViewer
