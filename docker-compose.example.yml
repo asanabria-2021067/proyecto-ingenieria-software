@@ -18,7 +18,7 @@ services:
       - NODE_ENV=${NODE_ENV:-development}
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}
       - PORT=3001
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-me}
+      - JWT_SECRET=${JWT_SECRET:?debes definir JWT_SECRET, no tiene valor por defecto}
     depends_on:
       postgres:
         condition: service_healthy

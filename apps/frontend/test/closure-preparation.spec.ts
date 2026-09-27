@@ -59,6 +59,7 @@ import { useProjectDetail } from '../hooks/use-project-detail';
 import { useCurrentUser } from '../hooks/use-current-user';
 import { useIsProjectLeader } from '../hooks/use-is-project-leader';
 import {
+  detachClosureDocument,
   getCloseReadiness,
   getClosureRevision,
   getClosureRevisions,
@@ -235,6 +236,35 @@ describe('ClosurePreparationClient (VIEW-13 / F005)', () => {
 
     await waitFor(() => expect(resubmitClosure).toHaveBeenCalledWith(7, { revisionId: 6, confirmado: true, expectedFingerprint: FINGERPRINT }));
     expect(requestClose).not.toHaveBeenCalled();
+  });
+
+  // T-210: quitar tenía aviso de fallo pero no de éxito, a diferencia de
+  // eliminar un comentario de tarea agregado en el mismo paso (HU-155).
+  it('quitar una evidencia y confirmar muestra un aviso de éxito', async () => {
+    (getClosureRevision as any).mockResolvedValue({
+      idRevisionCierre: 5,
+      idProyecto: 7,
+      numeroRevision: 1,
+      estadoRevision: 'BORRADOR',
+      documentosEnviados: [
+        { idDocumentoCierre: 101, tipoDocumento: 'EVIDENCIA_LIDER', nombreArchivo: 'captura.pdf', tamanoBytes: 500_000, checksumSha256: 'b'.repeat(64), orden: 1 },
+      ],
+      informeOficial: null,
+      puedeEditar: true,
+      puedeEnviar: true,
+      puedeResolver: false,
+      comentarioRevisor: null,
+    });
+    (detachClosureDocument as any).mockResolvedValue(undefined);
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Quitar captura.pdf' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, quitar archivo' }));
+
+    await waitFor(() => expect(detachClosureDocument).toHaveBeenCalledWith(7, 101, 5));
+    await waitFor(() =>
+      expect(swalFire).toHaveBeenCalledWith(expect.objectContaining({ icon: 'success', title: 'Evidencia quitada' })),
+    );
   });
 
   it('un no líder ve el aviso de líder y no se prepara ningún borrador', async () => {

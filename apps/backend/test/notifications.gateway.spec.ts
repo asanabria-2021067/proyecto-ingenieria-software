@@ -12,7 +12,61 @@ function makeGateway() {
   return { gateway, to, emit };
 }
 
+function makeSocket(overrides: Partial<{ auth: Record<string, unknown> }> = {}) {
+  return {
+    id: 'socket-1',
+    handshake: { auth: overrides.auth ?? {}, headers: {} },
+    data: {} as Record<string, unknown>,
+    join: vi.fn(),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+  };
+}
+
 describe('NotificationsGateway', () => {
+  describe('handleConnection', () => {
+    it('rechaza (desconecta) un cliente sin token', async () => {
+      const gateway = new NotificationsGateway({ verifyAsync: vi.fn() } as any);
+      const socket = makeSocket();
+
+      await gateway.handleConnection(socket as any);
+
+      expect(socket.disconnect).toHaveBeenCalled();
+      expect(socket.join).not.toHaveBeenCalled();
+    });
+
+    /**
+     * T-210 (revisión cruzada): el token de recuperación de contraseña
+     * (`tipo: 'reset'`) se firma con el mismo JWT_SECRET que el access
+     * token y verifica igual con `verifyAsync` — sin este chequeo, quien
+     * tuviera un enlace de recuperación abría un socket autenticado como
+     * esa persona y recibía sus notificaciones.
+     */
+    it('rechaza (desconecta) un token que no es de tipo "access" (p. ej. el de recuperación de contraseña)', async () => {
+      const verifyAsync = vi.fn().mockResolvedValue({ sub: 1, correo: 'a@uvg.edu.gt', tipo: 'reset' });
+      const gateway = new NotificationsGateway({ verifyAsync } as any);
+      const socket = makeSocket({ auth: { token: 'token-de-reset' } });
+
+      await gateway.handleConnection(socket as any);
+
+      expect(socket.disconnect).toHaveBeenCalled();
+      expect(socket.join).not.toHaveBeenCalled();
+    });
+
+    it('con un access token válido, une al cliente a su room user:{id} y confirma la conexión', async () => {
+      const verifyAsync = vi.fn().mockResolvedValue({ sub: 7, correo: 'a@uvg.edu.gt', tipo: 'access' });
+      const gateway = new NotificationsGateway({ verifyAsync } as any);
+      const socket = makeSocket({ auth: { token: 'token-valido' } });
+
+      await gateway.handleConnection(socket as any);
+
+      expect(socket.disconnect).not.toHaveBeenCalled();
+      expect(socket.join).toHaveBeenCalledWith('user:7');
+      expect(socket.data.userId).toBe(7);
+      expect(socket.emit).toHaveBeenCalledWith('connected', { userId: 7 });
+    });
+  });
+
   describe('notifyUsers (evento genérico existente)', () => {
     it('emite "notification" a la room user:{idUsuario} de cada destinatario', async () => {
       const { gateway, to, emit } = makeGateway();

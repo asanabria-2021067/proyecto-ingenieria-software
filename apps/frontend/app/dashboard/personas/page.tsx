@@ -37,6 +37,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -66,7 +67,8 @@ import {
 import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import { formatMotivoRecomendacion } from '@/lib/social/recomendaciones';
-import type { SemestreRango, UsuarioBusquedaDto } from '@/lib/types/social';
+import uvgSwal from '@/lib/swal';
+import type { SemestreRango, SolicitudAmistadPendienteDto, UsuarioBusquedaDto } from '@/lib/types/social';
 
 type PestanaId = 'todos' | 'amigos-de-amigos' | 'mi-carrera' | 'mis-amigos';
 type VistaId = 'tarjetas' | 'lista';
@@ -101,12 +103,13 @@ function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
  * botón de amistad); "Ver perfil" lleva a la página de detalle, no a un panel
  * lateral, para poder mostrar ahí el perfil completo (incluye amigos en común). */
 function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
-  const { amistad, seguimiento } = useAccionesAmistad(usuario);
+  const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(usuario);
   const motivo = textoMotivo(usuario);
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
 
   return (
     <article className="card-base group relative flex flex-col gap-tight transition-shadow hover:shadow-raised">
+      <ConfirmActionDialog {...confirmarEliminarAmistad} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -178,12 +181,13 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
 
 /** Misma info que `PersonaCard`, en una fila horizontal para la vista de lista. */
 function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
-  const { amistad, seguimiento } = useAccionesAmistad(usuario);
+  const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(usuario);
   const motivo = textoMotivo(usuario);
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
 
   return (
     <article className="card-base flex items-center gap-tight py-tight transition-shadow hover:shadow-raised">
+      <ConfirmActionDialog {...confirmarEliminarAmistad} />
       <Avatar className="size-11 shrink-0">
         {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
         <AvatarFallback className="type-body font-medium text-text-secondary">
@@ -339,8 +343,42 @@ export default function PersonasPage() {
   const { recomendaciones, isLoading: isLoadingRecomendaciones } = useRecomendaciones();
   const aceptarSolicitud = useAceptarSolicitudAmistad();
   const rechazarSolicitud = useRechazarSolicitudAmistad();
+  const [confirmSolicitud, setConfirmSolicitud] = useState<{
+    solicitud: SolicitudAmistadPendienteDto;
+    accion: 'aceptar' | 'rechazar';
+  } | null>(null);
 
   const totalFiltros = habilidadesSel.length + interesesSel.length + (semestreRango ? 1 : 0);
+
+  function pedirConfirmacionSolicitud(solicitud: SolicitudAmistadPendienteDto, accion: 'aceptar' | 'rechazar') {
+    setConfirmSolicitud({ solicitud, accion });
+  }
+
+  function cancelarConfirmacionSolicitud() {
+    if (aceptarSolicitud.isPending || rechazarSolicitud.isPending) return;
+    setConfirmSolicitud(null);
+  }
+
+  function confirmarSolicitud() {
+    if (!confirmSolicitud) return;
+    const { solicitud, accion } = confirmSolicitud;
+    const mutacion = accion === 'aceptar' ? aceptarSolicitud : rechazarSolicitud;
+    mutacion.mutate(solicitud.idAmistad, {
+      onSuccess: () => {
+        setConfirmSolicitud(null);
+        uvgSwal.fire({
+          icon: 'success',
+          title: accion === 'aceptar' ? 'Solicitud aceptada' : 'Solicitud rechazada',
+          timer: 1800,
+          showConfirmButton: false,
+        });
+      },
+      onError: (error: Error) => {
+        setConfirmSolicitud(null);
+        uvgSwal.fire({ icon: 'error', title: 'No se pudo resolver la solicitud', text: error.message });
+      },
+    });
+  }
 
   function toggleHabilidad(id: number) {
     setHabilidadesSel((prev) => (prev.includes(id) ? prev.filter((h) => h !== id) : [...prev, id]));
@@ -381,10 +419,10 @@ export default function PersonasPage() {
                   </p>
                 </div>
                 <div className="flex gap-tight">
-                  <Button size="sm" onClick={() => aceptarSolicitud.mutate(s.idAmistad)}>
+                  <Button size="sm" onClick={() => pedirConfirmacionSolicitud(s, 'aceptar')}>
                     <UserCheck className="size-4" aria-hidden="true" /> Aceptar
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => rechazarSolicitud.mutate(s.idAmistad)}>
+                  <Button variant="outline" size="sm" onClick={() => pedirConfirmacionSolicitud(s, 'rechazar')}>
                     <UserX className="size-4" aria-hidden="true" /> Rechazar
                   </Button>
                 </div>
@@ -599,6 +637,21 @@ export default function PersonasPage() {
           </Tabs>
         </main>
       </div>
+
+      <ConfirmActionDialog
+        open={confirmSolicitud !== null}
+        title={confirmSolicitud?.accion === 'aceptar' ? 'Aceptar solicitud' : 'Rechazar solicitud'}
+        description={
+          confirmSolicitud
+            ? `¿Confirmas que deseas ${confirmSolicitud.accion === 'aceptar' ? 'aceptar' : 'rechazar'} la solicitud de ${confirmSolicitud.solicitud.solicitante.nombre} ${confirmSolicitud.solicitud.solicitante.apellido}?`
+            : ''
+        }
+        actionLabel={confirmSolicitud?.accion === 'aceptar' ? 'Sí, aceptar solicitud' : 'Sí, rechazar solicitud'}
+        variant={confirmSolicitud?.accion === 'rechazar' ? 'destructive' : 'default'}
+        isPending={aceptarSolicitud.isPending || rechazarSolicitud.isPending}
+        onConfirm={confirmarSolicitud}
+        onCancel={cancelarConfirmacionSolicitud}
+      />
     </div>
   );
 }

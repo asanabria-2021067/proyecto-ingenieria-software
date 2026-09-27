@@ -153,7 +153,13 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
     setDetachingId(documentId);
     detach.mutate(
       { documentId, revisionId: draft.idRevisionCierre },
-      { onError: (err) => manejarErrorDocs(err, 'quitar'), onSettled: () => setDetachingId(null) },
+      {
+        onSuccess: () => {
+          uvgSwal.fire({ icon: 'success', title: 'Evidencia quitada', timer: 1800, showConfirmButton: false });
+        },
+        onError: (err) => manejarErrorDocs(err, 'quitar'),
+        onSettled: () => setDetachingId(null),
+      },
     );
   };
 
