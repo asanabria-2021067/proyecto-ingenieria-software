@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 // La sidebar del workspace de proyecto reemplazó a la navegación por tabs
 // (commit 4f482be): debe exponer TODOS los destinos que antes vivían en la
@@ -10,6 +10,10 @@ import { cleanup, render, screen } from '@testing-library/react';
 // NavItem cuya ruta calza de forma más específica con la URL actual — un
 // bug reportado hacía que, al entrar al tablero (ruta anidada bajo
 // Resumen), "Resumen" y "Tablero" quedaran marcados activos a la vez.
+//
+// HU-154 (T-215): las ediciones (Editar Información, Editar Roles,
+// Revisiones Pasadas) son acciones, no destinos: siguen disponibles con los
+// mismos enlaces, pero dentro del menú «Acciones del proyecto».
 
 const pathnameMock = vi.fn(() => '/dashboard/projects/42');
 vi.mock('next/navigation', () => ({
@@ -21,6 +25,8 @@ vi.mock('@/hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
 vi.mock('@/components/projects/project-chat-panel', () => ({
   ProjectChatPanel: () => null,
 }));
+vi.mock('@/hooks/use-exit-request', () => ({ useCurrentExitRequest: vi.fn(() => ({ request: null })) }));
+vi.mock('@/components/projects/leave-project-modal', () => ({ LeaveProjectModal: () => null }));
 
 import { ProjectSidebar } from '@/components/projects/project-sidebar';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -47,6 +53,17 @@ function renderSidebar() {
   return render(createElement(ProjectSidebar, { idProyecto: 42 }));
 }
 
+async function abrirAcciones() {
+  const trigger = screen.getByRole('button', { name: 'Acciones del proyecto' });
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+  return within(await screen.findByRole('menu'));
+}
+
+function enlacesActivos() {
+  return screen.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page');
+}
+
 describe('ProjectSidebar', () => {
   beforeEach(() => {
     pathnameMock.mockReturnValue('/dashboard/projects/42');
@@ -57,25 +74,13 @@ describe('ProjectSidebar', () => {
     vi.clearAllMocks();
   });
 
-  it('el líder ve todos los destinos que antes exponía la barra de tabs', () => {
+  it('el líder ve todos los destinos que antes exponía la barra de tabs (las ediciones, en el menú de acciones)', async () => {
     mockLeader();
     renderSidebar();
 
     expect(screen.getByRole('link', { name: /resumen/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/42',
-    );
-    expect(screen.getByRole('link', { name: /editar información/i })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/mine/form?id=42',
-    );
-    expect(screen.getByRole('link', { name: /revisiones pasadas/i })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/mine/42?returnTo=/dashboard/projects/42',
-    );
-    expect(screen.getByRole('link', { name: /editar roles/i })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/42?openRoles=1',
     );
     expect(screen.getByRole('link', { name: /miembros/i })).toHaveAttribute(
       'href',
@@ -93,6 +98,20 @@ describe('ProjectSidebar', () => {
       'href',
       '/dashboard/projects/42/tareas',
     );
+
+    const menu = await abrirAcciones();
+    expect(menu.getByRole('menuitem', { name: /editar información/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/mine/form?id=42',
+    );
+    expect(menu.getByRole('menuitem', { name: /revisiones pasadas/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/mine/42?returnTo=/dashboard/projects/42',
+    );
+    expect(menu.getByRole('menuitem', { name: /editar roles/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/42?openRoles=1',
+    );
   });
 
   /**
@@ -103,23 +122,25 @@ describe('ProjectSidebar', () => {
    */
   it.each(['EN_SOLICITUD_CIERRE', 'CERRADO'])(
     'en «%s» no ofrece editar información ni roles',
-    (estadoProyecto) => {
+    async (estadoProyecto) => {
       mockLeader({ estadoProyecto });
       renderSidebar();
 
-      expect(screen.queryByRole('link', { name: /editar información/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: /editar roles/i })).not.toBeInTheDocument();
+      const menu = await abrirAcciones();
+      expect(menu.queryByRole('menuitem', { name: /editar información/i })).not.toBeInTheDocument();
+      expect(menu.queryByRole('menuitem', { name: /editar roles/i })).not.toBeInTheDocument();
       // Lo que sí es de solo lectura sigue disponible.
-      expect(screen.getByRole('link', { name: /revisiones pasadas/i })).toBeInTheDocument();
+      expect(menu.getByRole('menuitem', { name: /revisiones pasadas/i })).toBeInTheDocument();
     },
   );
 
-  it('con el proyecto en progreso la edición sigue ofreciéndose', () => {
+  it('con el proyecto en progreso la edición sigue ofreciéndose', async () => {
     mockLeader({ estadoProyecto: 'EN_PROGRESO' });
     renderSidebar();
 
-    expect(screen.getByRole('link', { name: /editar información/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /editar roles/i })).toBeInTheDocument();
+    const menu = await abrirAcciones();
+    expect(menu.getByRole('menuitem', { name: /editar información/i })).toBeInTheDocument();
+    expect(menu.getByRole('menuitem', { name: /editar roles/i })).toBeInTheDocument();
   });
 
   it('el liderazgo tiene su propio destino, separado de «Miembros» (S7 VIEW-06)', () => {
@@ -194,7 +215,7 @@ describe('ProjectSidebar', () => {
     pathnameMock.mockReturnValue('/dashboard/projects/42/kanban');
     renderSidebar();
 
-    const activos = screen.getAllByRole('link').filter((link) => link.className.includes('text-primary'));
+    const activos = enlacesActivos();
     expect(activos).toHaveLength(1);
     expect(activos[0]).toHaveAccessibleName(/tablero/i);
   });
@@ -204,7 +225,7 @@ describe('ProjectSidebar', () => {
     pathnameMock.mockReturnValue('/dashboard/projects/42/kanban/tasks/7');
     renderSidebar();
 
-    const activos = screen.getAllByRole('link').filter((link) => link.className.includes('text-primary'));
+    const activos = enlacesActivos();
     expect(activos).toHaveLength(1);
     expect(activos[0]).toHaveAccessibleName(/tablero/i);
   });
