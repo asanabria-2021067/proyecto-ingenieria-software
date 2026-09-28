@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface HoursKpiCardProps {
   icon: LucideIcon;
@@ -16,13 +17,25 @@ interface HoursKpiCardProps {
    * texto en tonos neutros (Mis Horas).
    */
   variante?: 'caja' | 'en-linea';
+  /** Solo `en-linea`: mientras carga, un esqueleto ocupa el lugar de la cifra. */
+  isLoading?: boolean;
 }
 
 /**
- * HU-158 (T-232): KPI de horas compartido por la vista del integrante y Mis
- * Horas. Extraído sin cambios de apariencia de `equipo/[idUsuario]`.
+ * HU-158 (T-232): KPI compartido por la vista del integrante y Mis Horas.
+ * Extraído sin cambios de apariencia de `equipo/[idUsuario]`. La variante
+ * `en-linea` es también la de las métricas de Miembros, Postulaciones
+ * pendientes y Solicitudes de salida.
  */
-export function HoursKpiCard({ icon: Icon, label, value, note, destacado = false, variante = 'caja' }: HoursKpiCardProps) {
+export function HoursKpiCard({
+  icon: Icon,
+  label,
+  value,
+  note,
+  destacado = false,
+  variante = 'caja',
+  isLoading = false,
+}: HoursKpiCardProps) {
   if (variante === 'en-linea') {
     return (
       <div
@@ -38,7 +51,11 @@ export function HoursKpiCard({ icon: Icon, label, value, note, destacado = false
         {/* Cifra y nota alineadas con el texto de la etiqueta, no con el
             icono: pl-7 = icono (size-5) + gap-tight. */}
         <div className="pl-7">
-          <p className="mt-tight font-headline text-3xl font-bold text-text-primary">{value}</p>
+          {isLoading ? (
+            <Skeleton data-slot="kpi-cargando" className="mt-tight h-9 w-16" />
+          ) : (
+            <p className="mt-tight font-headline text-3xl font-bold text-text-primary">{value}</p>
+          )}
           {note && <p className="type-meta mt-micro">{note}</p>}
         </div>
       </div>
