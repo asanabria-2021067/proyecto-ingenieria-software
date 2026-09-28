@@ -603,6 +603,18 @@ export class AdminService {
       },
     });
 
+    // G05 (OWASP25-C037): cambio privilegiado de estado de cuenta. Solo actor,
+    // cuenta y transición; el log técnico de AuditInterceptor no guarda el
+    // estado anterior. Sin cambio real (mismo estado) no hay evento.
+    if (user.estado !== updated.estado) {
+      await this.securityEvents.record({
+        tipo: TipoEventoSeguridad.USER_STATUS_CHANGED,
+        idActor: callerId,
+        idUsuarioAfectado: targetId,
+        detalle: { estadoAnterior: user.estado, estadoNuevo: updated.estado },
+      });
+    }
+
     return {
       idUsuario: updated.idUsuario,
       nombre: updated.nombre,
