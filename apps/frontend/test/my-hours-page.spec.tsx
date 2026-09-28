@@ -332,16 +332,25 @@ describe('MisHorasPage — iconos y colores neutros', () => {
     expect(within(encabezado).getByText('Tus horas registradas, propuestas y acreditadas en todos tus proyectos.')).toBeInTheDocument();
   });
 
-  it('los tres KPI usan la variante en línea: icono negro junto a la etiqueta y sin fondo', () => {
+  it('los tres KPI usan la variante en línea: icono de fondo translúcido y texto neutro después de él', () => {
     mockEstado({ data: vista() });
     render(<MisHorasPage />);
 
     for (const nombre of ['Registradas en proyectos abiertos', 'Propuestas para acreditación', 'Acreditadas']) {
       const grupo = kpi(nombre);
-      const icono = grupo.querySelector('svg')!;
-      expect(within(grupo).getByText(nombre)).toContainElement(icono as unknown as HTMLElement);
-      expect(icono).toHaveClass('text-text-primary');
+      expect(grupo.querySelector('[data-slot="kpi-icono-fondo"]'), nombre).toHaveClass('opacity-15', '-translate-x-1/2');
+      expect(within(grupo).getByText(nombre)).toHaveClass('text-text-primary');
+      expect(grupo, nombre).toHaveClass('pl-24');
       expect(grupo.innerHTML, nombre).not.toMatch(/bg-primary/);
     }
+  });
+
+  it('las barras de progreso usan el verde fluorescente del sistema (secondary-fixed)', () => {
+    mockEstado({ data: vista() });
+    render(<MisHorasPage />);
+
+    const barra = screen.getByRole('progressbar', { name: 'Progreso de horas beca' });
+    expect(barra).toHaveClass('bg-secondary-fixed/25', '[&_[data-slot=progress-indicator]]:bg-secondary-fixed');
+    expect(barra).not.toHaveClass('bg-primary/20');
   });
 });
