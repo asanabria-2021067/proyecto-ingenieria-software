@@ -5,9 +5,9 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
-import { extractCookie, getFrontendUrl } from '../common/utils/cookie';
+import { getFrontendUrl } from '../common/utils/cookie';
+import { WsAuthService } from '../ws-auth/ws-auth.service';
 
 /**
  * Sprint 7 (06 v2 §45): nombres de los cuatro eventos realtime de dominio
@@ -42,23 +42,20 @@ export class NotificationsGateway
 
   private readonly logger = new Logger(NotificationsGateway.name);
 
-  constructor(private jwtService: JwtService) {}
+  constructor(private readonly wsAuth: WsAuthService) {}
 
   async handleConnection(client: Socket) {
     try {
-      const token =
-        client.handshake.auth.token ||
-        client.handshake.headers.authorization?.replace('Bearer ', '') ||
-        extractCookie(client.handshake.headers.cookie, 'access_token');
-
-      if (!token) {
-        this.logger.warn(`Client ${client.id} rejected: no token`);
+      // G07 (OWASP25-C025): la misma regla que HTTP. Una firma válida ya no
+      // basta: el token debe ser de acceso y la cuenta estar ACTIVO.
+      const auth = await this.wsAuth.authenticate(client.handshake);
+      if (!auth.ok) {
+        this.logger.warn(`Client ${client.id} rejected: ${auth.motivo}`);
         client.disconnect();
         return;
       }
 
-      const payload = await this.jwtService.verifyAsync(token);
-      const userId = payload.sub;
+      const userId = auth.userId;
 
       client.data.userId = userId;
       client.join(`user:${userId}`);

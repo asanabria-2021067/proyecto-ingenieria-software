@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { GATEWAY_OPTIONS } from '@nestjs/websockets/constants';
 import { JwtService } from '@nestjs/jwt';
 import { NotificationsGateway } from '../src/notifications/notifications.gateway';
+import { WsAuthService } from '../src/ws-auth/ws-auth.service';
 import { getFrontendUrl } from '../src/common/utils/cookie';
+import type { PrismaService } from '../src/prisma/prisma.service';
 
 function makeGateway() {
-  const gateway = new NotificationsGateway(new JwtService());
+  const gateway = new NotificationsGateway(new WsAuthService(new JwtService(), {} as PrismaService));
   const emit = vi.fn();
   const to = vi.fn(() => ({ emit }));
   Reflect.set(gateway, 'server', { to });
