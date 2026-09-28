@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { useIsAdmin } from '@/hooks/use-current-user';
 import { useProjectExport } from '@/hooks/use-project-export';
@@ -74,32 +76,24 @@ export function ProjectExportButtons({ idProyecto }: ProjectExportButtonsProps) 
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div className="flex flex-wrap gap-2">
-        <button
+        <Button
           type="button"
           onClick={() => setFormatoAbierto('csv')}
           disabled={exportCsv.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
+          className={PROJECT_ACTION_BUTTON_CLASS}
         >
-          {exportCsv.isPending ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-          ) : (
-            <FileSpreadsheet className="size-3.5" aria-hidden="true" />
-          )}
+          {exportCsv.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
           {exportCsv.isPending ? 'Exportando…' : 'Exportar CSV'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => setFormatoAbierto('pdf')}
           disabled={exportPdf.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
+          className={PROJECT_ACTION_BUTTON_CLASS}
         >
-          {exportPdf.isPending ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-          ) : (
-            <FileText className="size-3.5" aria-hidden="true" />
-          )}
+          {exportPdf.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
           {exportPdf.isPending ? 'Generando…' : 'Exportar PDF'}
-        </button>
+        </Button>
       </div>
       {formatoAbierto && (
         <DialogoConectado

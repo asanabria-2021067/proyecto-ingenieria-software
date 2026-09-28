@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Blend, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Trash2, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MODALIDAD_LABEL, TIPO_LABEL } from '@/types';
 import type { ModalidadProyecto, ProyectoResumen, TipoProyecto } from '@/types';
@@ -397,7 +398,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
     footerAction = (
       <Button
         asChild
-        className="h-9.5 w-30 shrink-0 rounded-md bg-action px-4.5 text-[13px] font-semibold text-on-action shadow-none hover:bg-action/90"
+        className={`w-30 shrink-0 ${PROJECT_ACTION_BUTTON_CLASS}`}
       >
         <Link href={`/dashboard/proyectos/${idProyecto}`}>Ver proyecto</Link>
       </Button>

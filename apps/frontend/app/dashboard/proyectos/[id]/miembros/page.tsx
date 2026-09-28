@@ -417,7 +417,7 @@ export default function MiembrosProyectoPage() {
         actions={
           <div className="flex flex-col items-start gap-3 @3xl/project:items-end">
             <ProjectExportButtons idProyecto={idProyecto} />
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-wrap gap-2">
               <PendingPostulationsCard idProyecto={idProyecto} />
               <PendingExitRequestsCard idProyecto={idProyecto} />
             </div>
