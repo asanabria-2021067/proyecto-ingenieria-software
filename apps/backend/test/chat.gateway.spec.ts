@@ -161,4 +161,39 @@ describe('ChatGateway', () => {
       expect(socket.leave).toHaveBeenCalledWith('conversation:3');
     });
   });
+
+  describe('T-237: un chat archivado no recibe mensajes por socket', () => {
+    // El rechazo de mensajes en un chat archivado vive en
+    // ChatService.createMessage (cubierto en chat.service.spec.ts). Eso solo
+    // alcanza si el socket no tiene un camino propio para crear mensajes que
+    // se salte ese chequeo: estas pruebas fijan que el gateway únicamente
+    // escucha unirse/salir de una sala, así que un cliente que emita
+    // directamente un evento de envío no tiene handler que lo procese.
+    // Claves de metadata que registra @SubscribeMessage en @nestjs/websockets.
+    // Si Nest las cambiara, la primera prueba falla (lista vacía) en vez de
+    // pasar en falso.
+    const MESSAGE_MAPPING_METADATA = 'websockets:message_mapping';
+    const MESSAGE_METADATA = 'message';
+
+    function eventosEscuchados(): string[] {
+      const prototipo = ChatGateway.prototype as unknown as Record<string, unknown>;
+      return Object.getOwnPropertyNames(prototipo)
+        .map((nombre) => prototipo[nombre])
+        .filter((metodo): metodo is (...args: unknown[]) => unknown => typeof metodo === 'function')
+        .filter((metodo) => Reflect.getMetadata(MESSAGE_MAPPING_METADATA, metodo) === true)
+        .map((metodo) => Reflect.getMetadata(MESSAGE_METADATA, metodo) as string)
+        .sort();
+    }
+
+    it('el gateway solo escucha joinConversation y leaveConversation', () => {
+      expect(eventosEscuchados()).toEqual(['joinConversation', 'leaveConversation']);
+    });
+
+    it('no escucha ningún evento de envío de mensajes (sendMessage, newMessage, mensaje)', () => {
+      const eventos = eventosEscuchados();
+      for (const evento of ['sendMessage', 'newMessage', 'mensaje', 'message']) {
+        expect(eventos).not.toContain(evento);
+      }
+    });
+  });
 });
