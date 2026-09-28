@@ -1,4 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ExecutionContext } from '@nestjs/common';
+import {
+  CUSTOM_ROUTE_ARGS_METADATA,
+  GUARDS_METADATA,
+  METHOD_METADATA,
+  PATH_METADATA,
+  ROUTE_ARGS_METADATA,
+} from '@nestjs/common/constants';
+import { RequestMethod } from '@nestjs/common';
+import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { AppController } from '../src/app.controller';
 import { ApplicationsController } from '../src/applications/applications.controller';
 import { AuthController } from '../src/auth/auth.controller';
@@ -202,5 +212,57 @@ describe('Controllers and basic services', () => {
     expect(validation.findAll()).toEqual({ message: 'Not implemented yet' });
     expect(validation.create({})).toEqual({ message: 'Not implemented yet' });
 
+  });
+});
+
+// HU-158 (T-231): GET /usuarios/me/horas solo conoce al usuario del token.
+describe('UsersController GET me/horas', () => {
+  it('es un GET a usuarios/me/horas protegido por el guard JWT del controller', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, UsersController)).toBe('usuarios');
+    expect(Reflect.getMetadata(PATH_METADATA, UsersController.prototype.getMisHoras)).toBe('me/horas');
+    expect(Reflect.getMetadata(METHOD_METADATA, UsersController.prototype.getMisHoras)).toBe(RequestMethod.GET);
+    expect(Reflect.getMetadata(GUARDS_METADATA, UsersController)).toContain(JwtAuthGuard);
+  });
+
+  it('su único argumento es @CurrentUser: no declara @Param, @Query ni @Body', () => {
+    const argumentos = Reflect.getMetadata(ROUTE_ARGS_METADATA, UsersController, 'getMisHoras') as Record<
+      string,
+      { index: number; factory?: (data: unknown, ctx: ExecutionContext) => unknown }
+    >;
+    const claves = Object.keys(argumentos);
+    expect(claves).toHaveLength(1);
+    expect(claves[0]).toContain(CUSTOM_ROUTE_ARGS_METADATA);
+    expect(UsersController.prototype.getMisHoras).toHaveLength(1);
+
+    // La fábrica de @CurrentUser toma el usuario del token e ignora cualquier id
+    // que el cliente intente colar por query, params o body.
+    const request = {
+      user: { userId: 7 },
+      query: { idUsuario: '99' },
+      params: { idUsuario: '99' },
+      body: { idUsuario: 99 },
+    };
+    const ctx = { switchToHttp: () => ({ getRequest: () => request }) } as unknown as ExecutionContext;
+    expect(argumentos[claves[0]].factory!(undefined, ctx)).toEqual({ userId: 7 });
+  });
+
+  it('delega en UsersService.getMisHoras con el userId de la sesión y devuelve su respuesta tal cual', async () => {
+    const respuesta = { idUsuario: 7, proyectos: [] };
+    const usersSvc = { getMisHoras: vi.fn().mockResolvedValue(respuesta), getDashboard: vi.fn() };
+    const users = new UsersController(usersSvc as unknown as ConstructorParameters<typeof UsersController>[0]);
+
+    await expect(users.getMisHoras({ userId: 7 })).resolves.toBe(respuesta);
+    expect(usersSvc.getMisHoras).toHaveBeenCalledTimes(1);
+    expect(usersSvc.getMisHoras).toHaveBeenCalledWith(7);
+    expect(usersSvc.getDashboard).not.toHaveBeenCalled();
+  });
+
+  it('el dashboard conserva su ruta y su delegación', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, UsersController.prototype.getDashboard)).toBe('me/dashboard');
+    const usersSvc = { getDashboard: vi.fn(), getMisHoras: vi.fn() };
+    const users = new UsersController(usersSvc as unknown as ConstructorParameters<typeof UsersController>[0]);
+    users.getDashboard({ userId: 3 });
+    expect(usersSvc.getDashboard).toHaveBeenCalledWith(3);
+    expect(usersSvc.getMisHoras).not.toHaveBeenCalled();
   });
 });
