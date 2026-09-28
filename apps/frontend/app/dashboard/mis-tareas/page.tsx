@@ -47,6 +47,7 @@ import {
 } from '@/lib/tasks/filters';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 import { parseFechaSolo } from '@/lib/calendar/utils';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 const TAMANIO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
@@ -217,7 +218,7 @@ export default function MisTareasPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-content px-stack py-section md:px-section">
+    <div className={dashboardPage('py-section')}>
       {/* encabezado */}
       <div className="card-base mb-stack space-y-micro">
         <h1 className="type-display">Mis Tareas</h1>

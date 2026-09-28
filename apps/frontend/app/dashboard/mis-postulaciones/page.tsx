@@ -17,6 +17,7 @@ import {
   EmptySteps,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 const ESTADO_CONFIG: Record<
   EstadoPostulacion,
@@ -87,7 +88,7 @@ export default function MisPostulacionesPage() {
   };
 
   return (
-      <div className="mx-auto max-w-[1400px] px-8 py-8">
+      <div className={dashboardPage('py-8')}>
         <div className="mb-8">
           <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
             Mis Postulaciones

@@ -36,6 +36,7 @@ import { getMessages } from '@/lib/services/chat';
 import { useQuery } from '@tanstack/react-query';
 import type { ArchivedConversacion } from '@/lib/types/chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 function nombreConversacion(conversacion: ArchivedConversacion, currentUserId: number | null): string {
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
@@ -68,7 +69,7 @@ export default function ChatsArchivadosPage() {
   const { conversaciones, hasMore, isLoading, cargarMas, cargandoMas } = useArchivedConversations(q);
 
   return (
-    <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
+    <div className={dashboardPage('py-section lg:py-page')}>
       <header className="mb-section flex items-center gap-tight">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
           <Archive className="size-5" aria-hidden="true" />

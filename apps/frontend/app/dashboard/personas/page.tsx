@@ -69,6 +69,7 @@ import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badg
 import { formatMotivoRecomendacion } from '@/lib/social/recomendaciones';
 import uvgSwal from '@/lib/swal';
 import type { SemestreRango, SolicitudAmistadPendienteDto, UsuarioBusquedaDto } from '@/lib/types/social';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 type PestanaId = 'todos' | 'amigos-de-amigos' | 'mi-carrera' | 'mis-amigos';
 type VistaId = 'tarjetas' | 'lista';
@@ -391,8 +392,8 @@ export default function PersonasPage() {
   const vacio = mensajeVacio(pestana, amigos.length > 0, totalFiltros > 0);
 
   return (
-    <div className="px-section py-page">
-      <header className="mx-auto mb-section max-w-content">
+    <div className={dashboardPage('py-page')}>
+      <header className="mb-section">
         <h1 className="type-display text-text-primary">Personas</h1>
         <p className="type-body mt-tight text-text-secondary">
           Busca compañeros, sigue su actividad y hazte amigo.
@@ -400,7 +401,7 @@ export default function PersonasPage() {
       </header>
 
       {solicitudes.length > 0 && (
-        <section className="mx-auto mb-section max-w-content">
+        <section className="mb-section">
           <h2 className="type-section mb-card">Solicitudes pendientes</h2>
           <div className="flex flex-col gap-tight">
             {solicitudes.map((s) => (
@@ -433,7 +434,7 @@ export default function PersonasPage() {
       )}
 
       {!isLoadingRecomendaciones && (
-        <section className="mx-auto mb-section max-w-content">
+        <section className="mb-section">
           <h2 className="type-section mb-card">Personas que quizás conozcas</h2>
           {recomendaciones.length > 0 ? (
             <div className="grid gap-tight sm:grid-cols-2 xl:grid-cols-3">
@@ -457,7 +458,7 @@ export default function PersonasPage() {
         </section>
       )}
 
-      <div className="mx-auto max-w-content">
+      <div>
         <main>
           <div className="flex items-center gap-inline">
             <div className="relative flex-1">
