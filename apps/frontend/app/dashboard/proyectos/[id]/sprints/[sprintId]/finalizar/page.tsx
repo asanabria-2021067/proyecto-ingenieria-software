@@ -7,7 +7,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
   BarChart3,
   ClipboardList,
   Clock,
@@ -22,21 +21,15 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { SprintCloseConfirmModal } from '@/components/projects/sprint-close-confirm-modal';
 import { HourAdjustmentRow, formatearDecimal } from '@/components/hours/hour-adjustment-row';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 import { getApiErrorMessage, getApiErrorStatus, isProyectoOcupado } from '@/components/projects/api-error';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import {
   Empty,
   EmptyContent,
@@ -53,9 +46,25 @@ import type {
   SprintClosingTramoDto,
   UpsertHourAdjustmentInput,
   DestinoArrastre,
+  EstadoSprint,
 } from '@/lib/types/sprints';
 
-const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
+/** Mismo pill de estado que el detalle y la lista de Sprints. */
+const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
+  ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
+  EN_FINALIZACION: { label: 'En finalización', className: 'bg-status-warning text-on-status-warning' },
+  CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
+};
+
+/**
+ * Columnas de la revisión por integrante: el encabezado y cada fila usan la
+ * misma rejilla, así Reportadas y Propuestas quedan alineadas entre filas.
+ */
+const COLUMNAS_INTEGRANTE =
+  'grid grid-cols-2 items-center gap-x-4 gap-y-2 @3xl/project:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_7rem_7rem]';
+
+/** Encabezado de columna, igual que las tablas de Miembros. */
+const COLUMNA_TITULO = 'text-[10px] font-black uppercase tracking-widest text-tertiary';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -87,46 +96,13 @@ const SIN_TOTALES: SprintClosingMemberTotalsDto = {
 function ClosingSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true">
-      <Skeleton className="h-24 w-full rounded-xl" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-20 rounded-xl" />
-        <Skeleton className="h-20 rounded-xl" />
-        <Skeleton className="h-20 rounded-xl" />
-        <Skeleton className="h-20 rounded-xl" />
+      <div className="grid grid-cols-2 gap-4 @3xl/project:grid-cols-4">
+        <Skeleton className="h-28 rounded-card" />
+        <Skeleton className="h-28 rounded-card" />
+        <Skeleton className="h-28 rounded-card" />
+        <Skeleton className="h-28 rounded-card" />
       </div>
       <Skeleton className="h-72 w-full rounded-xl" />
-    </div>
-  );
-}
-
-function Kpi({
-  icon: Icon,
-  label,
-  value,
-  tone = 'default',
-}: {
-  icon: typeof Clock;
-  label: string;
-  value: string;
-  tone?: 'default' | 'warning';
-}) {
-  const warning = tone === 'warning';
-  return (
-    <div role="group" aria-label={label} className={`${CARD} flex items-center gap-3 p-4`}>
-      <span
-        className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
-          warning ? 'bg-status-warning/20 text-text-primary' : 'bg-primary/10 text-primary'
-        }`}
-        aria-hidden="true"
-      >
-        <Icon className="size-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs text-tertiary">{label}</p>
-        <p className={`text-xl font-bold leading-tight ${warning ? 'text-text-primary' : 'text-on-surface'}`}>
-          {value}
-        </p>
-      </div>
     </div>
   );
 }
@@ -173,40 +149,47 @@ function MemberItem({
   const nombre = `${participante.nombre} ${participante.apellido}`;
 
   return (
-    <AccordionItem value={String(participante.idUsuario)} className={`${CARD} mb-3 border-b p-0`}>
-      <AccordionTrigger className="px-5 py-4 hover:no-underline" aria-label={`Desglose de ${nombre}`}>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-          <Avatar className="size-9 shrink-0">
-            {participante.fotoUrl && <AvatarImage src={participante.fotoUrl} alt="" />}
-            <AvatarFallback className="bg-primary text-xs font-bold text-on-primary">
-              {getInitials(participante.nombre, participante.apellido)}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-base font-bold text-on-surface">{nombre}</span>
-          <span className="flex flex-wrap gap-1">
+    <AccordionItem value={String(participante.idUsuario)} className="border-outline-variant/40">
+      <AccordionTrigger
+        className="items-center rounded-none px-4 py-3 transition-colors hover:bg-surface-container-low hover:no-underline"
+        aria-label={`Desglose de ${nombre}`}
+      >
+        <div className={`${COLUMNAS_INTEGRANTE} min-w-0 flex-1`}>
+          <span className="col-span-2 flex min-w-0 items-center gap-3 @3xl/project:col-span-1">
+            <Avatar className="size-8 shrink-0">
+              {participante.fotoUrl && <AvatarImage src={participante.fotoUrl} alt="" />}
+              <AvatarFallback className="bg-primary-container text-xs font-bold text-on-primary-container">
+                {getInitials(participante.nombre, participante.apellido)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="truncate text-sm font-medium text-on-surface">{nombre}</span>
+          </span>
+          <span className="col-span-2 flex flex-wrap gap-1 @3xl/project:col-span-1">
             {participante.roles.map((rol) => (
-              <Badge key={rol.idRolProyecto} className="border-transparent bg-primary/10 text-[11px] font-semibold text-primary">
+              <span
+                key={rol.idRolProyecto}
+                className="inline-flex items-center rounded-full bg-secondary-container/30 px-2 py-0.5 text-xs font-bold text-secondary"
+              >
                 {rol.nombreRol}
-              </Badge>
+              </span>
             ))}
           </span>
-          <span className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-tertiary">
-            <span>
-              Total reportadas{' '}
-              <Badge variant="outline" className="ml-1 text-xs font-bold text-on-surface">
-                {formatearDecimal(totales.reportadas)} h
-              </Badge>
+          <span className="flex flex-col">
+            {/* En escritorio el encabezado de la tabla ya nombra la columna. */}
+            <span className={`${COLUMNA_TITULO} @3xl/project:hidden`}>Reportadas</span>
+            <span className="text-sm font-semibold tabular-nums text-on-surface">
+              {formatearDecimal(totales.reportadas)} h
             </span>
-            <span>
-              Total propuestas{' '}
-              <Badge className="ml-1 border-transparent bg-primary/10 text-xs font-bold text-primary">
-                {formatearDecimal(totales.propuestas)} h
-              </Badge>
+          </span>
+          <span className="flex flex-col">
+            <span className={`${COLUMNA_TITULO} @3xl/project:hidden`}>Propuestas</span>
+            <span className="text-sm font-semibold tabular-nums text-primary">
+              {formatearDecimal(totales.propuestas)} h
             </span>
           </span>
         </div>
       </AccordionTrigger>
-      <AccordionContent className="px-5 pb-5">
+      <AccordionContent className="px-4 pb-5 pt-1">
         {totales.tramos.length === 0 ? (
           <p className="text-sm italic text-tertiary">Este integrante no tiene tramos de horas en el Sprint.</p>
         ) : (
@@ -395,134 +378,99 @@ export default function SprintClosingPage() {
       type="button"
       onClick={handleClickCerrar}
       disabled={!puedeCerrar}
-      className="h-10 w-full gap-1.5 rounded-lg bg-primary px-6 text-sm font-bold text-on-primary hover:bg-primary/90 sm:w-auto"
+      className="h-10 w-full gap-1.5 rounded-lg bg-primary px-6 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:bg-surface-container-high disabled:text-text-secondary disabled:opacity-100 sm:w-auto"
     >
       {closing && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
       {closing ? 'Confirmando cierre...' : 'Confirmar cierre del Sprint'}
     </Button>
   );
 
-  return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-28 pt-6 md:px-8">
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList className="text-[13px]">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard/projects/mine" className="text-tertiary hover:text-on-surface">
-                Mis proyectos
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={volverHref} className="max-w-56 truncate text-tertiary hover:text-on-surface">
-                {proyecto?.tituloProyecto ?? 'Proyecto'}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={`/dashboard/proyectos/${id}/sprints`} className="text-tertiary hover:text-on-surface">
-                Sprints
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="font-medium text-on-surface">
-              {sprint ? `Sprint ${sprint.numero}` : 'Sprint'} - Finalizar
-            </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+  // Igual que antes: cualquier estado que no sea cierre ni finalización se muestra como «Activo».
+  const estiloEstado = estadoSprint
+    ? (ESTADO_SPRINT_STYLE[estadoSprint as EstadoSprint] ?? ESTADO_SPRINT_STYLE.ACTIVO)
+    : null;
+  const hayExceso = Number(kpis.exceso) > 0;
 
-      <Link
-        href={volverHref}
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Volver al proyecto
-      </Link>
-
-      {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
+  if (!cargandoProyecto && !cargandoUsuario && !isLeader) {
+    return (
+      <ProjectPageShell>
+        <ProjectBackLink href={volverHref} label="Volver al proyecto" className="mb-card" />
         <LeaderOnlyNotice description="No puedes acceder al cierre de este Sprint." />
-      ) : (
+      </ProjectPageShell>
+    );
+  }
+
+  return (
+    <ProjectPageShell>
+      <ProjectPageHeader
+        back={{ href: `/dashboard/proyectos/${id}/sprints`, label: 'Volver a Sprints' }}
+        title={sprint ? `Cerrar Sprint ${sprint.numero}` : 'Cierre de Sprint'}
+        description={
+          readOnly && estadoSprint === 'CERRADO'
+            ? 'Este Sprint ya fue cerrado: las horas acreditadas se muestran en solo lectura.'
+            : 'Revisión final de horas y contribuciones antes de confirmar el cierre.'
+        }
+        actions={
+          estiloEstado && (
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
+            >
+              {estiloEstado.label}
+            </span>
+          )
+        }
+      />
+
+      {isLoading && <ClosingSkeleton />}
+
+      {!isLoading && isError && (
+        <Empty tone="danger" role="alert">
+          <EmptyMedia variant="icon">
+            <AlertCircle aria-hidden="true" className="h-7 w-7" />
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle>{mensajeDeError(error) || 'No fue posible cargar el resumen de cierre.'}</EmptyTitle>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button type="button" onClick={() => refetch()} className="rounded-xl px-5 text-sm font-bold">
+              Reintentar
+            </Button>
+          </EmptyContent>
+        </Empty>
+      )}
+
+      {!isLoading && !isError && summary && (
         <>
-          {isLoading && <ClosingSkeleton />}
+          <div className="space-y-section">
+            <div data-slot="closing-kpis" className="grid grid-cols-2 gap-4 @3xl/project:grid-cols-4">
+              <HoursKpiCard variante="en-linea" icon={ClipboardList} label="Tareas distintas" value={String(kpis.tareasDistintas)} />
+              <HoursKpiCard
+                variante="en-linea"
+                icon={Clock}
+                label="Horas reportadas"
+                value={`${formatearDecimal(kpis.reportadas)} h`}
+              />
+              <HoursKpiCard
+                variante="en-linea"
+                icon={AlertTriangle}
+                label="Exceso sobre estimación"
+                value={`${formatearDecimal(kpis.exceso)} h`}
+                tono={hayExceso ? 'atencion' : 'neutro'}
+              />
+              <HoursKpiCard
+                variante="en-linea"
+                icon={BarChart3}
+                label="Horas propuestas"
+                value={`${formatearDecimal(kpis.propuestas)} h`}
+              />
+            </div>
 
-          {!isLoading && isError && (
-            <Empty tone="danger" role="alert">
-              <EmptyMedia variant="icon">
-                <AlertCircle aria-hidden="true" className="h-7 w-7" />
-              </EmptyMedia>
-              <EmptyHeader>
-                <EmptyTitle>{mensajeDeError(error) || 'No fue posible cargar el resumen de cierre.'}</EmptyTitle>
-              </EmptyHeader>
-              <EmptyContent>
-                <Button type="button" onClick={() => refetch()} className="rounded-xl px-5 text-sm font-bold">
-                  Reintentar
-                </Button>
-              </EmptyContent>
-            </Empty>
-          )}
-
-          {!isLoading && !isError && summary && (
-            <div className="space-y-5">
-              <div className={CARD}>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                    <Flag className="h-5 w-5 text-primary" aria-hidden="true" />
-                  </span>
-                  <h1 className="font-headline text-2xl font-extrabold text-on-surface md:text-3xl">
-                    {sprint ? `Cerrar Sprint ${sprint.numero}` : 'Cierre de Sprint'}
-                  </h1>
-                  {estadoSprint && (
-                    <Badge
-                      className={
-                        estadoSprint === 'CERRADO'
-                          ? 'border-transparent bg-surface-container-high text-on-surface-variant'
-                          : 'border-transparent bg-status-warning text-on-status-warning'
-                      }
-                    >
-                      {estadoSprint === 'CERRADO'
-                        ? 'Cerrado'
-                        : estadoSprint === 'EN_FINALIZACION'
-                          ? 'En finalización'
-                          : 'Activo'}
-                    </Badge>
-                  )}
-                </div>
-                <p className="mt-2 text-sm text-tertiary">
-                  {readOnly && estadoSprint === 'CERRADO'
-                    ? 'Este Sprint ya fue cerrado: las horas acreditadas se muestran en solo lectura.'
-                    : 'Revisión final de horas y contribuciones antes de confirmar el cierre.'}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Kpi icon={ClipboardList} label="Tareas distintas" value={String(kpis.tareasDistintas)} />
-                <Kpi icon={Clock} label="Horas reportadas" value={`${formatearDecimal(kpis.reportadas)} h`} />
-                <Kpi
-                  icon={AlertTriangle}
-                  label="Exceso sobre estimación"
-                  value={`${formatearDecimal(kpis.exceso)} h`}
-                  tone="warning"
-                />
-                <Kpi icon={BarChart3} label="Horas propuestas" value={`${formatearDecimal(kpis.propuestas)} h`} />
-              </div>
-
-              {blockers.length > 0 && (
-                <div
-                  role="alert"
-                  className="rounded-xl border border-outline-variant bg-status-warning/10 p-4 text-sm text-destructive"
-                >
-                  <p className="flex items-center gap-2 font-semibold">
-                    <AlertTriangle className="size-4" aria-hidden="true" />
-                    El Sprint aun no puede cerrarse
-                  </p>
-                  <ul className="mt-2 list-disc space-y-1 pl-6">
+            {blockers.length > 0 && (
+              <Alert variant="attention">
+                <AlertTriangle aria-hidden="true" />
+                <AlertTitle>El Sprint aún no puede cerrarse</AlertTitle>
+                <AlertDescription className="text-text-primary">
+                  <ul className="list-disc space-y-1 pl-5">
                     {blockers.map((b) => (
                       <li key={b.code}>
                         {b.message}
@@ -530,19 +478,28 @@ export default function SprintClosingPage() {
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
+                </AlertDescription>
+              </Alert>
+            )}
 
-              {globalError && (
-                <p role="alert" className="text-sm font-medium text-error">
-                  {globalError.message}{' '}
-                  {globalError.conflict && (
-                    <button type="button" onClick={actualizar} className="font-bold underline underline-offset-2">
-                      Actualizar
-                    </button>
-                  )}
-                </p>
-              )}
+            {globalError && (
+              <p role="alert" className="text-sm font-medium text-error">
+                {globalError.message}{' '}
+                {globalError.conflict && (
+                  <button type="button" onClick={actualizar} className="font-bold underline underline-offset-2">
+                    Actualizar
+                  </button>
+                )}
+              </p>
+            )}
+
+            <section aria-labelledby="revision-integrantes">
+              <h2 id="revision-integrantes" className="type-section">
+                Revisión por integrante
+              </h2>
+              <p className="type-body mt-micro mb-stack text-text-secondary">
+                Revisa las horas reportadas y propuestas de cada integrante antes de confirmar el cierre.
+              </p>
 
               {summary.participantes.length === 0 ? (
                 <Empty tone="muted" role="status">
@@ -557,64 +514,78 @@ export default function SprintClosingPage() {
                   </EmptyHeader>
                 </Empty>
               ) : (
-                <Accordion type="multiple" className="space-y-0">
-                  {summary.participantes.map((participante) => (
-                    <MemberItem
-                      key={participante.idUsuario}
-                      participante={participante}
-                      readOnly={readOnly}
-                      pendingId={pendingId}
-                      errors={rowErrors}
-                      onUpsert={onUpsert}
-                      onRevert={onRevert}
-                      onLoadHistory={onLoadHistory}
-                    />
-                  ))}
-                </Accordion>
+                <div
+                  data-slot="revision-integrantes"
+                  className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest"
+                >
+                  {/* pr-12: deja el hueco del chevron (gap-4 + size-4) de cada fila. */}
+                  <div
+                    aria-hidden="true"
+                    className={`${COLUMNAS_INTEGRANTE} hidden border-b border-outline-variant/40 bg-surface-container-low py-3 pl-4 pr-12 @3xl/project:grid`}
+                  >
+                    <span className={COLUMNA_TITULO}>Integrante</span>
+                    <span className={COLUMNA_TITULO}>Rol</span>
+                    <span className={COLUMNA_TITULO}>Reportadas</span>
+                    <span className={COLUMNA_TITULO}>Propuestas</span>
+                  </div>
+                  <Accordion type="multiple">
+                    {summary.participantes.map((participante) => (
+                      <MemberItem
+                        key={participante.idUsuario}
+                        participante={participante}
+                        readOnly={readOnly}
+                        pendingId={pendingId}
+                        errors={rowErrors}
+                        onUpsert={onUpsert}
+                        onRevert={onRevert}
+                        onLoadHistory={onLoadHistory}
+                      />
+                    ))}
+                  </Accordion>
+                </div>
               )}
+            </section>
 
-              {closeError && (
-                <p role="alert" className="text-sm font-medium text-error">
-                  {closeError}
-                </p>
-              )}
-            </div>
-          )}
+            {closeError && (
+              <p role="alert" className="text-sm font-medium text-error">
+                {closeError}
+              </p>
+            )}
+          </div>
 
-          {!isLoading && !isError && summary && (
-            <div className="fixed inset-x-0 bottom-0 z-30 border-t border-outline-variant/40 bg-surface-container-lowest/95 px-4 py-3 backdrop-blur pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8">
-              <div className="mx-auto flex max-w-[1400px] flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <Button asChild variant="outline" className="h-10 w-full rounded-lg border-outline-variant text-sm font-semibold sm:w-auto">
-                  <Link href={volverHref}>Cancelar</Link>
-                </Button>
-                {puedeCerrar ? (
-                  botonCerrar
-                ) : (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span tabIndex={0} className="inline-flex w-full rounded-lg sm:w-auto">
-                        {botonCerrar}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">{motivoNoCerrar}</TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            </div>
-          )}
-
-          <SprintCloseConfirmModal
-            open={showCloseModal}
-            onOpenChange={setShowCloseModal}
-            tareasPendientes={tareasPendientes.map((t) => ({ idTarea: t.idTarea, tituloTarea: t.tituloTarea }))}
-            isPending={closing}
-            onConfirm={(destino) => {
-              setShowCloseModal(false);
-              void ejecutarCierre(destino);
-            }}
-          />
+          <div
+            data-slot="closing-actions"
+            className="mt-section flex flex-col-reverse gap-2 border-t border-outline-variant/40 pt-card sm:flex-row sm:items-center sm:justify-between"
+          >
+            <Button asChild variant="outline" className="h-10 w-full rounded-lg border-outline-variant text-sm font-semibold sm:w-auto">
+              <Link href={volverHref}>Cancelar</Link>
+            </Button>
+            {puedeCerrar ? (
+              botonCerrar
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0} className="inline-flex w-full cursor-not-allowed rounded-lg sm:w-auto">
+                    {botonCerrar}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">{motivoNoCerrar}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </>
       )}
-    </div>
+
+      <SprintCloseConfirmModal
+        open={showCloseModal}
+        onOpenChange={setShowCloseModal}
+        tareasPendientes={tareasPendientes.map((t) => ({ idTarea: t.idTarea, tituloTarea: t.tituloTarea }))}
+        isPending={closing}
+        onConfirm={(destino) => {
+          setShowCloseModal(false);
+          void ejecutarCierre(destino);
+        }}
+      />
+    </ProjectPageShell>
   );
 }
