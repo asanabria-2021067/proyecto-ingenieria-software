@@ -54,6 +54,9 @@ const navEntries: NavEntry[] = [
         href: '/dashboard/proyectos',
         label: 'Explorar Proyectos',
         icon: FolderOpen,
+        // Solo la lista: las vistas de un proyecto (/dashboard/proyectos/:id/…)
+        // tienen su propia sidebar y no son «Explorar».
+        exact: true,
       },
       {
         href: '/dashboard/projects/mine',

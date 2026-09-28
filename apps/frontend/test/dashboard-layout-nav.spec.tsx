@@ -107,3 +107,30 @@ describe('DashboardLayout — «Mis Horas» en «Mi trabajo»', () => {
     expect(within(movil).getByRole('link', { name: 'Chats archivados' })).toHaveAttribute('href', '/dashboard/chats/archivados');
   });
 });
+
+describe('DashboardLayout — «Explorar Proyectos» solo en su lista', () => {
+  afterEach(() => cleanup());
+
+  it('queda marcado en /dashboard/proyectos', () => {
+    const { escritorio } = renderLayout('/dashboard/proyectos');
+    expect(within(escritorio).getByRole('link', { name: 'Explorar Proyectos' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it.each([
+    '/dashboard/proyectos/28',
+    '/dashboard/proyectos/28/sprints',
+    '/dashboard/proyectos/28/miembros',
+    '/dashboard/proyectos/28/liderazgo',
+    '/dashboard/proyectos/28/bitacora',
+    '/dashboard/proyectos/28/sprints/analytics',
+    '/dashboard/proyectos/28/reportes',
+  ])('no se marca dentro de un proyecto (%s)', (ruta) => {
+    const { escritorio, movil } = renderLayout(ruta);
+    for (const nav of [escritorio, movil]) {
+      for (const enlace of within(nav).queryAllByRole('link', { name: 'Explorar Proyectos' })) {
+        expect(enlace).not.toHaveAttribute('aria-current');
+      }
+    }
+    expect(escritorio.querySelector('[aria-current="page"]')).toBeNull();
+  });
+});
