@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { AlertCircle, ArrowLeft, BriefcaseBusiness, Calendar, Clock3, UserRoundPlus, Users } from 'lucide-react';
+import { AlertCircle, BriefcaseBusiness, Calendar, Clock3, UserRoundPlus, Users } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +13,7 @@ import { useProjectPendingPostulations, useResolvePostulacion } from '@/hooks/us
 import { aviso, confirmar } from '@/lib/mensajes';
 import type { PostulacionRecibida } from '@/types';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 type Accion = 'ACEPTADA' | 'RECHAZADA';
 
@@ -132,30 +132,20 @@ export default function ProjectPendingPostulationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverAMiembrosHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver a miembros
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoPermisos && !isLeader ? (
-        <LeaderOnlyNotice description="No puedes acceder a las postulaciones pendientes de este proyecto." />
+        <>
+          <ProjectBackLink href={volverAMiembrosHref} label="Volver a miembros" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a las postulaciones pendientes de este proyecto." />
+        </>
       ) : (
         <>
-          <header className="mb-8">
-            <div className="mb-2 flex items-center gap-3">
-              <UserRoundPlus aria-hidden="true" className="h-7 w-7 text-primary" />
-              <h1 className="font-headline text-3xl font-extrabold text-on-surface">
-                Postulaciones pendientes
-              </h1>
-            </div>
-            <p className="max-w-3xl text-sm text-tertiary">
-              Personas que han solicitado unirse a roles de este proyecto y están esperando una resolución.
-            </p>
-          </header>
+          <ProjectPageHeader
+            back={{ href: volverAMiembrosHref, label: 'Volver a miembros' }}
+            icon={UserRoundPlus}
+            title="Postulaciones pendientes"
+            description="Personas que han solicitado unirse a roles de este proyecto y están esperando una resolución."
+          />
 
           <section aria-label="Resumen de postulaciones" className="mb-6 grid gap-4 md:grid-cols-3">
             <MetricCard
@@ -293,6 +283,6 @@ export default function ProjectPendingPostulationsPage() {
         </>
       )}
 
-    </div>
+    </ProjectPageShell>
   );
 }

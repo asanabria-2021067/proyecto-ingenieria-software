@@ -6,7 +6,6 @@ import Link from 'next/link';
 import {
   AlertCircle,
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
   ArrowUpDown,
   CheckCircle2,
@@ -53,6 +52,7 @@ import { PendingPostulationsCard } from '@/components/projects/pending-postulati
 import { PendingExitRequestsCard } from '@/components/projects/pending-exit-requests-card';
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'nombre', label: 'Integrante' },
@@ -402,43 +402,35 @@ export default function MiembrosProyectoPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverAlProyectoHref}
-        className="inline-flex items-center gap-1.5 text-sm text-tertiary hover:text-primary mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Volver al proyecto
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoPermisos && !isLeader ? (
-        <LeaderOnlyNotice description="No puedes acceder a los miembros de este proyecto." />
+        <>
+          <ProjectBackLink href={volverAlProyectoHref} label="Volver al proyecto" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a los miembros de este proyecto." />
+        </>
       ) : (
         <>
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-6 h-6 text-primary" />
-            <h1 className="font-headline font-extrabold text-3xl text-on-surface">Miembros</h1>
+      <ProjectPageHeader
+        back={{ href: volverAlProyectoHref, label: 'Volver al proyecto' }}
+        icon={Users}
+        title="Miembros"
+        description="Integrantes del proyecto organizados por su estado y contribución."
+        actions={
+          <div className="flex flex-col items-start gap-3 @3xl/project:items-end">
+            <ProjectExportButtons idProyecto={idProyecto} />
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <PendingPostulationsCard idProyecto={idProyecto} />
+              <PendingExitRequestsCard idProyecto={idProyecto} />
+            </div>
           </div>
-          <p className="text-tertiary text-sm">
-            Integrantes del proyecto organizados por su estado y contribución.
+        }
+      >
+        {lider && (
+          <p className="type-body mt-micro text-text-secondary">
+            Líder: <span className="font-medium text-text-primary">{lider.nombre} {lider.apellido}</span>
           </p>
-          {lider && (
-            <p className="text-tertiary text-sm mt-1">
-              Líder: <span className="font-medium text-on-surface">{lider.nombre} {lider.apellido}</span>
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-col items-end gap-3">
-          <ProjectExportButtons idProyecto={idProyecto} />
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <PendingPostulationsCard idProyecto={idProyecto} />
-            <PendingExitRequestsCard idProyecto={idProyecto} />
-          </div>
-        </div>
-      </div>
+        )}
+      </ProjectPageHeader>
 
       {isExitRequestsError && (
         <div
@@ -575,6 +567,6 @@ export default function MiembrosProyectoPage() {
       )}
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }

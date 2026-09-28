@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom/vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { Users } from 'lucide-react';
@@ -81,5 +83,34 @@ describe('ProjectPageShell / ProjectPageHeader', () => {
     const vuelta = screen.getByRole('link', { name: 'Volver a Sprints' });
     expect(vuelta).toHaveClass('text-text-secondary', 'hover:text-primary');
     expect(vuelta.querySelector('svg')).toHaveClass('size-4');
+  });
+});
+
+// Vistas internas del proyecto que ya usan el shell y el encabezado compartidos.
+const VISTAS_MIGRADAS = [
+  'app/dashboard/proyectos/[id]/sprints/page.tsx',
+  'app/dashboard/proyectos/[id]/sprints/analytics/page.tsx',
+  'app/dashboard/proyectos/[id]/sprints/[sprintId]/analytics/page.tsx',
+  'app/dashboard/proyectos/[id]/miembros/page.tsx',
+  'app/dashboard/proyectos/[id]/miembros/postulaciones/page.tsx',
+  'app/dashboard/proyectos/[id]/miembros/solicitudes-salida/page.tsx',
+  'app/dashboard/proyectos/[id]/liderazgo/page.tsx',
+  'app/dashboard/proyectos/[id]/bitacora/page.tsx',
+];
+
+const leer = (ruta: string) => readFileSync(join(__dirname, '..', ruta), 'utf-8');
+
+describe('Vistas del proyecto sobre el shell compartido', () => {
+  it.each(VISTAS_MIGRADAS)('%s usa ProjectPageShell y ProjectPageHeader', (ruta) => {
+    const fuente = leer(ruta);
+    expect(fuente).toMatch(/<ProjectPageShell>/);
+    expect(fuente).toMatch(/<ProjectPageHeader\b/);
+  });
+
+  it.each(VISTAS_MIGRADAS)('%s no vuelve a fijar su propio ancho, gutter ni vuelta', (ruta) => {
+    const fuente = leer(ruta);
+    expect(fuente).not.toMatch(/max-w-\[1400px\]|max-w-\[900px\]/);
+    expect(fuente).not.toMatch(/px-4 pb-12 pt-8 md:px-8/);
+    expect(fuente).not.toMatch(/<ArrowLeft\b/);
   });
 });

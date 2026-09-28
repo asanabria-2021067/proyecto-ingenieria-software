@@ -4,7 +4,6 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
-  ArrowLeft,
   BarChart3,
   Calendar,
   Clock,
@@ -32,6 +31,7 @@ import {
 } from '@/components/ui/empty';
 import type { EstadoSprint, SprintDto } from '@/lib/types/sprints';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 function formatearFechaHora(iso: string): string {
   return new Date(iso).toLocaleDateString('es-GT', {
@@ -230,36 +230,32 @@ export default function SprintListPage() {
   const proyectoReadOnly = proyectoEsReadOnly(proyecto?.estadoProyecto);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverAlProyectoHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al proyecto
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
-        <LeaderOnlyNotice description="No puedes acceder a los Sprints de este proyecto." />
+        <>
+          <ProjectBackLink href={volverAlProyectoHref} label="Volver al proyecto" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a los Sprints de este proyecto." />
+        </>
       ) : (
         <>
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <History className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h1 className="font-headline text-3xl font-extrabold text-on-surface">Sprints</h1>
-        </div>
-        <Button
-          asChild
-          variant="outline"
-          className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-        >
-          <Link href={`/dashboard/proyectos/${idProyecto}/sprints/analytics`}>
-            <BarChart3 className="size-3.5" aria-hidden="true" />
-            Analítica comparativa
-          </Link>
-        </Button>
-      </div>
-      <p className="-mt-6 mb-8 text-sm text-tertiary">Resumen de los sprints del proyecto y su progreso.</p>
+      <ProjectPageHeader
+        back={{ href: volverAlProyectoHref, label: 'Volver al proyecto' }}
+        icon={History}
+        title="Sprints"
+        description="Resumen de los sprints del proyecto y su progreso."
+        actions={
+          <Button
+            asChild
+            variant="outline"
+            className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
+          >
+            <Link href={`/dashboard/proyectos/${idProyecto}/sprints/analytics`}>
+              <BarChart3 className="size-3.5" aria-hidden="true" />
+              Analítica comparativa
+            </Link>
+          </Button>
+        }
+      />
 
       {proyectoReadOnly && (
         <p
@@ -333,6 +329,6 @@ export default function SprintListPage() {
       )}
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }

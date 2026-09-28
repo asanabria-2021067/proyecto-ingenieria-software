@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { AlertCircle, ArrowLeft, Calendar, Clock3, UserRoundX, Users } from 'lucide-react';
+import { AlertCircle, Calendar, Clock3, UserRoundX, Users } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +13,7 @@ import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectPendingExitRequests } from '@/hooks/use-exit-request';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -96,30 +96,20 @@ export default function ProjectPendingExitRequestsPage() {
   const cargandoDatos = isLoading || cargandoPermisos;
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverAMiembrosHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver a miembros
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoPermisos && !isLeader ? (
-        <LeaderOnlyNotice description="No puedes acceder a las solicitudes de salida de este proyecto." />
+        <>
+          <ProjectBackLink href={volverAMiembrosHref} label="Volver a miembros" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a las solicitudes de salida de este proyecto." />
+        </>
       ) : (
         <>
-          <header className="mb-8">
-            <div className="mb-2 flex items-center gap-3">
-              <UserRoundX aria-hidden="true" className="h-7 w-7 text-primary" />
-              <h1 className="font-headline text-3xl font-extrabold text-on-surface">
-                Solicitudes de salida
-              </h1>
-            </div>
-            <p className="max-w-3xl text-sm text-tertiary">
-              Integrantes que solicitaron salir del proyecto y están esperando tu revisión.
-            </p>
-          </header>
+          <ProjectPageHeader
+            back={{ href: volverAMiembrosHref, label: 'Volver a miembros' }}
+            icon={UserRoundX}
+            title="Solicitudes de salida"
+            description="Integrantes que solicitaron salir del proyecto y están esperando tu revisión."
+          />
 
           <section aria-label="Resumen de solicitudes de salida" className="mb-6 grid gap-4 md:grid-cols-2">
             <MetricCard
@@ -231,6 +221,6 @@ export default function ProjectPendingExitRequestsPage() {
           </section>
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }

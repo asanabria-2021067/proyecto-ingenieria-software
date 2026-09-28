@@ -1,8 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { AlertCircle, ArrowLeft, BarChart3, CheckCircle2, Clock, Flag, ListChecks } from 'lucide-react';
+import { AlertCircle, BarChart3, CheckCircle2, Clock, Flag, ListChecks } from 'lucide-react';
 import { useSprintAnalytics, useSprintBurndown } from '@/hooks/use-project-sprints';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -18,6 +17,7 @@ import { ESTADO_LABEL, PRIORIDAD_LABEL } from '@/components/projects/task-board.
 import type { EstadoHito, SprintAnalyticsDto } from '@/lib/types/sprints';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 /** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE`/`ESTADO_HITO_STYLE` de las páginas hermanas de Sprints. */
 const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string }> = {
@@ -219,24 +219,13 @@ export default function SprintAnalyticsPage() {
   const { analytics, isLoading, isError, error, refetch } = useSprintAnalytics(idProyecto, idSprint);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={`/dashboard/proyectos/${id}/sprints/${sprintId}`}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al Sprint
-      </Link>
-
-      <div className="mb-8 flex items-center gap-2">
-        <BarChart3 className="h-6 w-6 text-primary" aria-hidden="true" />
-        <h1 className="font-headline text-3xl font-extrabold text-on-surface">
-          {analytics ? `Analítica del Sprint ${analytics.numero}` : 'Analítica del Sprint'}
-        </h1>
-      </div>
-      <p className="-mt-6 mb-8 text-sm text-tertiary">
-        Cumplimiento y progreso de este Sprint: tareas, prioridades y hitos.
-      </p>
+    <ProjectPageShell>
+      <ProjectPageHeader
+        back={{ href: `/dashboard/proyectos/${id}/sprints/${sprintId}`, label: 'Volver al Sprint' }}
+        icon={BarChart3}
+        title={analytics ? `Analítica del Sprint ${analytics.numero}` : 'Analítica del Sprint'}
+        description="Cumplimiento y progreso de este Sprint: tareas, prioridades y hitos."
+      />
 
       {isLoading && (
         <div className="space-y-4">
@@ -276,6 +265,6 @@ export default function SprintAnalyticsPage() {
           </div>
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }
