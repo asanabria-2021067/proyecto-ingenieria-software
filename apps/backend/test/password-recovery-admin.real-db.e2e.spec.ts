@@ -159,6 +159,28 @@ describe.skipIf(!process.env.RUN_REAL_DB_TESTS)('HU-14 contra Postgres real (loc
     );
   });
 
+  it('G05-C06: emisión y reset completado dejan un evento cada uno en bitacora_auditoria, sin token ni URL', async () => {
+    await authService.forgotPassword(CARNE, CORREO_INSTITUCIONAL);
+    const pendientes = await adminService.getSolicitudesRecuperacionPendientes(adminId);
+    const { resetToken, resetUrl } = await adminService.generarEnlaceRecuperacion(adminId, pendientes[0].idSolicitud);
+    await authService.resetPassword(resetToken, 'ClaveEventos123');
+    await expect(authService.resetPassword(resetToken, 'OtraClave123')).rejects.toBeInstanceOf(BadRequestException);
+
+    const eventos = await prisma.bitacoraAuditoria.findMany({
+      where: { idObjeto: String(studentId), accion: { in: ['PASSWORD_RESET_ISSUED', 'PASSWORD_RESET_COMPLETED'] } },
+      orderBy: { idAuditoria: 'asc' },
+    });
+    expect(eventos.map((e) => [e.accion, e.idUsuario])).toEqual([
+      ['PASSWORD_RESET_ISSUED', adminId],
+      ['PASSWORD_RESET_COMPLETED', studentId],
+    ]);
+    const serialized = JSON.stringify(eventos);
+    expect(serialized).not.toContain(resetToken);
+    expect(serialized).not.toContain(resetUrl);
+    expect(serialized).not.toContain('ClaveEventos123');
+    await prisma.bitacoraAuditoria.deleteMany({ where: { idObjeto: String(studentId) } });
+  });
+
   it('niega acceso a un usuario sin rol admin contra Postgres real', async () => {
     await expect(adminService.getSolicitudesRecuperacionPendientes(studentId)).rejects.toBeInstanceOf(
       ForbiddenException,
