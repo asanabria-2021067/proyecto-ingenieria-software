@@ -7,6 +7,7 @@ import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { PrismaModule } from '../prisma/prisma.module';
 import { getJwtSecretFromConfig } from '../config/jwt-secret';
+import { WsAuthService } from '../ws-auth/ws-auth.service';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { getJwtSecretFromConfig } from '../config/jwt-secret';
     }),
   ],
   controllers: [ChatController, ChatArchivadoController],
-  providers: [ChatService, ChatGateway],
+  // G07 (OWASP25-C025): política del handshake con el JwtService de este módulo.
+  providers: [ChatService, ChatGateway, WsAuthService],
 })
 export class ChatModule {}
