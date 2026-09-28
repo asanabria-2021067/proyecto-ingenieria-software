@@ -10,6 +10,70 @@ import { tap } from 'rxjs/operators';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
+/**
+ * G05 (OWASP25-C026): redacción del detalle de auditoría. Recorre objetos y
+ * arrays a cualquier profundidad y compara claves NORMALIZADAS (minúsculas,
+ * sin acentos ni separadores): `Contraseña`, `NUEVA_CONTRASENA`,
+ * `refreshToken` o `x-api-key` se reconocen igual. El valor se reemplaza
+ * por un marcador fijo: nunca se guarda el original ni un hash suyo.
+ */
+export const REDACTED = '***REDACTED***';
+
+/** Fragmentos de clave normalizada que marcan un campo sensible. */
+export const SENSITIVE_KEY_FRAGMENTS = [
+  'password',
+  'contrasena',
+  'passwd',
+  'token',
+  'secret',
+  'reseturl',
+  'authorization',
+  'cookie',
+  'apikey',
+  'privatekey',
+  'credential',
+  'credencial',
+] as const;
+
+const MAX_DEPTH = 20;
+
+export function normalizeAuditKey(key: string): string {
+  return key
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+export function isSensitiveAuditKey(key: string): boolean {
+  const normalized = normalizeAuditKey(key);
+  return SENSITIVE_KEY_FRAGMENTS.some((fragment) => normalized.includes(fragment));
+}
+
+export function redactAuditValue(value: unknown, depth = 0, seen: WeakSet<object> = new WeakSet()): unknown {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (depth >= MAX_DEPTH) {
+    return '[profundidad-maxima]';
+  }
+  if (seen.has(value)) {
+    return '[circular]';
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => redactAuditValue(item, depth + 1, seen));
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    result[key] = isSensitiveAuditKey(key) ? REDACTED : redactAuditValue(item, depth + 1, seen);
+  }
+  return result;
+}
+
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
   private readonly logger = new Logger(AuditInterceptor.name);
@@ -40,8 +104,8 @@ export class AuditInterceptor implements NestInterceptor {
               detalleJson: {
                 method,
                 url,
-                body: this.sanitizeResponse(body),
-                response: this.sanitizeResponse(data),
+                body: redactAuditValue(body ?? null),
+                response: redactAuditValue(data ?? null),
               } as Prisma.InputJsonValue,
               ipOrigen: ip || request.headers['x-forwarded-for'] || 'unknown',
             },
@@ -73,30 +137,5 @@ export class AuditInterceptor implements NestInterceptor {
     }
 
     return null;
-  }
-
-  private sanitizeResponse(data: unknown): unknown {
-    if (!data) return null;
-    if (typeof data !== 'object') return data;
-
-    const sensitiveFields = [
-      'contrasena',
-      'nuevaContrasena',
-      'password',
-      'token',
-      'resetToken',
-      'resetUrl',
-      'secret',
-    ];
-
-    const sanitized = { ...data } as Record<string, unknown>;
-
-    for (const field of sensitiveFields) {
-      if (sanitized[field]) {
-        sanitized[field] = '***REDACTED***';
-      }
-    }
-
-    return sanitized;
   }
 }
