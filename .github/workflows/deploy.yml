@@ -338,6 +338,9 @@ jobs:
           # G06 (OWASP25-C049 parcial): 'false' reproduce las cookies actuales.
           # 'true' (Secure) solo cuando todo el trafico sea HTTPS: Gate Admin.
           COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'false' }}
+          # G05 (OWASP25-C038): 'false' deja las alertas de seguridad inertes;
+          # activarlas es decision del administrador.
+          SECURITY_ALERTS_ENABLED: ${{ vars.SECURITY_ALERTS_ENABLED || 'false' }}
         run: |
           set -euo pipefail
           umask 077
@@ -355,6 +358,10 @@ jobs:
               *) echo "BACKEND_BIND/FRONTEND_BIND solo admiten 0.0.0.0 o 127.0.0.1" >&2; exit 1 ;;
             esac
           done
+          case "$SECURITY_ALERTS_ENABLED" in
+            true|false) ;;
+            *) echo "SECURITY_ALERTS_ENABLED solo admite true o false" >&2; exit 1 ;;
+          esac
           work="$RUNNER_TEMP/deploy-env"
           mkdir -p "$work"
           trap 'rm -rf "$work"' EXIT
@@ -378,6 +385,7 @@ jobs:
             printf 'BACKEND_BIND=%s\n' "$BACKEND_BIND"
             printf 'FRONTEND_BIND=%s\n' "$FRONTEND_BIND"
             printf 'COOKIE_SECURE=%s\n' "$COOKIE_SECURE"
+            printf 'SECURITY_ALERTS_ENABLED=%s\n' "$SECURITY_ALERTS_ENABLED"
           } > "$work/env"
           ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             -o UserKnownHostsFile="$work/known_hosts" "$SERVER_USER@$SERVER_IP" \

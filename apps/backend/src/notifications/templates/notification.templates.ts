@@ -121,6 +121,13 @@ export interface NotificationTemplateData {
     solicitudId: number;
   };
 
+  // G05-C12 (OWASP25-C038): ráfaga de eventos de seguridad. Solo conteos:
+  // nunca IPs, correos, cuentas ni tokens.
+  ALERTA_SEGURIDAD: {
+    eventos: number;
+    ventanaMinutos: number;
+  };
+
   // T-113 (HU-125, salida completa del proyecto): notifica al solicitante la
   // resolución de su SolicitudSalidaProyecto. Reutiliza
   // TipoNotificacion.PARTICIPACION_ACTUALIZADA — existe en el schema desde la
@@ -320,6 +327,12 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Un rol fue actualizado',
     message: (data: NotificationTemplateData['ROL_ACTUALIZADO']) =>
       `El rol "${data.roleName}" del proyecto "${data.projectTitle}" fue actualizado.`,
+  },
+
+  ALERTA_SEGURIDAD: {
+    title: 'Alerta de seguridad',
+    message: (data: NotificationTemplateData['ALERTA_SEGURIDAD']) =>
+      `Se registraron ${data.eventos} intentos de acceso fallidos o bloqueos de cuenta en los últimos ${data.ventanaMinutos} minutos. Revisa los eventos de seguridad y el estado de las cuentas.`,
   },
 
   SOLICITUD_RECUPERACION_CONTRASENA: {

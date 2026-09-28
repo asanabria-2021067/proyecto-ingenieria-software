@@ -85,6 +85,8 @@ export interface AppEnvironment {
   redis: RedisEnvironment;
   /** G04 (OWASP25-C021 + D2): saltos de proxy confiables; 0 = no confiar en X-Forwarded-For. */
   trustProxyHops: number;
+  /** G05 (OWASP25-C038): alertas de ráfaga a admins; false = inertes. */
+  securityAlertsEnabled: boolean;
 }
 
 export interface ValidatedEnvironment extends Record<string, unknown> {
@@ -177,6 +179,19 @@ export function parseCookieSecure(value: string | undefined): boolean {
   throw new Error(`${COOKIE_SECURE_VARIABLE} must be true or false`);
 }
 
+export const SECURITY_ALERTS_ENABLED_VARIABLE = 'SECURITY_ALERTS_ENABLED';
+
+/** G05 (OWASP25-C038): solo `true` o `false` (ausente o vacío = false); otro valor falla el arranque. */
+export function parseSecurityAlertsEnabled(value: string | undefined): boolean {
+  if (value === undefined || value === '') {
+    return false;
+  }
+  if (value === 'true' || value === 'false') {
+    return value === 'true';
+  }
+  throw new Error(`${SECURITY_ALERTS_ENABLED_VARIABLE} must be true or false`);
+}
+
 function deriveAppEnvironment(raw: RawEnvironment): AppEnvironment {
   return {
     nodeEnv: readString(raw, 'NODE_ENV') ?? 'development',
@@ -188,6 +203,7 @@ function deriveAppEnvironment(raw: RawEnvironment): AppEnvironment {
       port: parsePort(raw, 'REDIS_PORT', 6379),
     },
     trustProxyHops: parseTrustProxyHops(readString(raw, TRUST_PROXY_HOPS_VARIABLE)),
+    securityAlertsEnabled: parseSecurityAlertsEnabled(readString(raw, SECURITY_ALERTS_ENABLED_VARIABLE)),
   };
 }
 

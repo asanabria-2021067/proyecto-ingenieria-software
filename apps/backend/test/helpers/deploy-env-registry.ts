@@ -42,6 +42,12 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   FRONTEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '0.0.0.0' },
   // G06-C07 (OWASP25-C049 parcial): false = cookies actuales; true añade Secure.
   COOKIE_SECURE: { kind: 'flag', consumer: 'apps/backend/src/auth/cookie.util.ts', defaultValue: 'false' },
+  // G05-C12 (OWASP25-C038): false = alertas de ráfaga inertes.
+  SECURITY_ALERTS_ENABLED: {
+    kind: 'flag',
+    consumer: 'apps/backend/src/config/environment.validation.ts',
+    defaultValue: 'false',
+  },
 };
 
 /** Variables del paso de transferencia que solo sirven para la conexión SSH (no van al .env). */
