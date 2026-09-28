@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { redactAuditValue } from '../common/interceptors/audit.interceptor';
 import { TIPO_OBJETO_SEGURIDAD, TipoEventoSeguridadValor } from './tipos-evento-seguridad';
+import type { SecurityRequestContext } from './request-context';
 
 export interface SecurityEventInput {
   tipo: TipoEventoSeguridadValor;
@@ -12,6 +13,8 @@ export interface SecurityEventInput {
   idUsuarioAfectado?: number | null;
   /** Detalle mínimo. Se redacta igual que el log técnico; nunca incluir tokens ni contraseñas. */
   detalle?: Record<string, unknown>;
+  /** Origen de la petición (req.ip + si la IP proviene de un proxy confiable). */
+  origen?: SecurityRequestContext;
 }
 
 /**
@@ -39,7 +42,11 @@ export class SecurityEventsService {
           accion: input.tipo,
           tipoObjeto: TIPO_OBJETO_SEGURIDAD,
           idObjeto: input.idUsuarioAfectado != null ? String(input.idUsuarioAfectado) : null,
-          detalleJson: redactAuditValue(input.detalle ?? {}) as Prisma.InputJsonValue,
+          detalleJson: redactAuditValue({
+            ...(input.detalle ?? {}),
+            ...(input.origen ? { ipTrusted: input.origen.ipTrusted } : {}),
+          }) as Prisma.InputJsonValue,
+          ...(input.origen ? { ipOrigen: input.origen.ip } : {}),
         },
       });
       return true;

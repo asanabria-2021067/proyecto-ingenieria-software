@@ -18,6 +18,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { SecurityEventsService } from '../security-events/security-events.service';
 import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
+import type { SecurityRequestContext } from '../security-events/request-context';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 
 const RESET_TOKEN_TTL = '1h';
@@ -558,7 +559,7 @@ export class AdminService {
 
   // ─── Cambio de estado de usuario (T-89) ───────────────────────────────────────
 
-  async updateUsuarioEstado(callerId: number, targetId: number, estado: EstadoUsuario) {
+  async updateUsuarioEstado(callerId: number, targetId: number, estado: EstadoUsuario, origen?: SecurityRequestContext) {
     await this.requireAdmin(callerId);
 
     if (callerId === targetId) {
@@ -609,6 +610,7 @@ export class AdminService {
     if (user.estado !== updated.estado) {
       await this.securityEvents.record({
         tipo: TipoEventoSeguridad.USER_STATUS_CHANGED,
+        origen,
         idActor: callerId,
         idUsuarioAfectado: targetId,
         detalle: { estadoAnterior: user.estado, estadoNuevo: updated.estado },
@@ -656,7 +658,7 @@ export class AdminService {
     }));
   }
 
-  async generarEnlaceRecuperacion(callerId: number, idSolicitud: number) {
+  async generarEnlaceRecuperacion(callerId: number, idSolicitud: number, origen?: SecurityRequestContext) {
     await this.requireAdmin(callerId);
 
     const solicitud = await this.prisma.solicitudRecuperacion.findUnique({
@@ -708,6 +710,7 @@ export class AdminService {
     // Solo IDs y vencimiento: nunca el token ni la URL.
     await this.securityEvents.record({
       tipo: TipoEventoSeguridad.PASSWORD_RESET_ISSUED,
+      origen,
       idActor: callerId,
       idUsuarioAfectado: solicitud.usuario.idUsuario,
       detalle: { idSolicitud, expiraEn },
