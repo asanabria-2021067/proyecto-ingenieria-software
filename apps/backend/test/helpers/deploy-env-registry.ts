@@ -40,6 +40,8 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   // G04-C10 (OWASP25-C021 + P5/T19): 0.0.0.0 = exposición actual; 127.0.0.1 = solo detrás de nginx.
   BACKEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '0.0.0.0' },
   FRONTEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '0.0.0.0' },
+  // G06-C07 (OWASP25-C049 parcial): false = cookies actuales; true añade Secure.
+  COOKIE_SECURE: { kind: 'flag', consumer: 'apps/backend/src/auth/cookie.util.ts', defaultValue: 'false' },
 };
 
 /** Variables del paso de transferencia que solo sirven para la conexión SSH (no van al .env). */
