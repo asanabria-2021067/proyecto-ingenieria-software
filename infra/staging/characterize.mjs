@@ -7,6 +7,7 @@
  * Solo acepta hosts locales: el arnes nunca apunta a produccion.
  * Uso: HARNESS_HTTP_PORT=8080 HARNESS_HTTPS_PORT=8443 node infra/staging/characterize.mjs
  */
+import { randomBytes } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +83,86 @@ export const CHECKS = [
   },
 ];
 
+/**
+ * T13 (G04-C12 · P1): Socket.IO por nginx. El polling debe llegar al backend
+ * (200, paquete OPEN de Engine.IO con `sid`) y ese mismo `sid` debe poder
+ * pasar a WebSocket (101). Sin la ruta /socket.io/ ambas fallan (el frontend
+ * responde 308), que es exactamente lo que prueba el fixture negativo.
+ */
+export const SOCKET_POLLING_PATH = '/socket.io/?EIO=4&transport=polling';
+
+export function verifyPolling(response) {
+  const sid = /^0\{.*"sid":"([^"]+)"/.exec(response.body ?? '')?.[1];
+  return {
+    sid: sid ?? null,
+    failures: [
+      response.status === 200 || `status ${response.status} != 200`,
+      sid !== undefined || 'sin paquete OPEN con sid (no llegó a Engine.IO)',
+    ].filter((outcome) => outcome !== true),
+  };
+}
+
+export function verifyUpgrade(status) {
+  return [status === 101 || `upgrade ${status} != 101`].filter((outcome) => outcome !== true);
+}
+
+function fetchBody({ host, port, path }) {
+  assertLocalHost(host);
+  return new Promise((resolve, reject) => {
+    const req = https.request({ host, port, path, rejectUnauthorized: false, timeout: 15000 }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => (body += chunk));
+      res.on('end', () => resolve({ status: res.statusCode, body }));
+    });
+    req.on('timeout', () => req.destroy(new Error(`timeout ${path}`)));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function upgradeStatus({ host, port, path }) {
+  assertLocalHost(host);
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      host,
+      port,
+      path,
+      rejectUnauthorized: false,
+      timeout: 15000,
+      headers: {
+        Connection: 'Upgrade',
+        Upgrade: 'websocket',
+        'Sec-WebSocket-Version': '13',
+        'Sec-WebSocket-Key': randomBytes(16).toString('base64'),
+      },
+    });
+    req.on('upgrade', (res, socket) => {
+      socket.destroy();
+      resolve(res.statusCode);
+    });
+    req.on('response', (res) => {
+      res.resume();
+      resolve(res.statusCode);
+    });
+    req.on('timeout', () => req.destroy(new Error(`timeout ${path}`)));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+export async function characterizeSocket({ host = '127.0.0.1', httpsPort }) {
+  const polling = verifyPolling(await fetchBody({ host, port: httpsPort, path: SOCKET_POLLING_PATH }));
+  const results = [{ id: 'T13-01', title: 'polling Socket.IO via nginx: 200 con sid', failures: polling.failures }];
+  const upgrade = polling.sid
+    ? verifyUpgrade(
+        await upgradeStatus({ host, port: httpsPort, path: `/socket.io/?EIO=4&transport=websocket&sid=${encodeURIComponent(polling.sid)}` }),
+      )
+    : ['sin sid del polling: no se puede intentar el upgrade'];
+  results.push({ id: 'T13-02', title: 'upgrade WebSocket via nginx con el sid del polling: 101', failures: upgrade });
+  return results;
+}
+
 export async function characterize({ host = '127.0.0.1', httpPort, httpsPort }) {
   const results = [];
   for (const check of CHECKS) {
@@ -103,5 +184,13 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.log(`${result.failures.length === 0 ? 'PASS' : 'FAIL'} ${result.id} (${result.status}) ${result.title}`);
     result.failures.forEach((failure) => console.log(`  - ${failure}`));
   }
-  process.exitCode = results.every((result) => result.failures.length === 0) ? 0 : 1;
+  const socket = await characterizeSocket({
+    host: process.env.HARNESS_HOST ?? '127.0.0.1',
+    httpsPort: Number(process.env.HARNESS_HTTPS_PORT ?? 8443),
+  });
+  for (const result of socket) {
+    console.log(`${result.failures.length === 0 ? 'PASS' : 'FAIL'} ${result.id} ${result.title}`);
+    result.failures.forEach((failure) => console.log(`  - ${failure}`));
+  }
+  process.exitCode = [...results, ...socket].every((result) => result.failures.length === 0) ? 0 : 1;
 }
