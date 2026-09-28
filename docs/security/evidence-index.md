@@ -144,7 +144,8 @@ Cadena auditable de la workstream OWASP de la Fase 2 (Vernel): **control → gat
 | G08-C05 | `2c31875a` | OWASP25-C048 (A01–A10) | A01/A10 | `g08-evidence-index.spec.ts` | `cd apps/backend && npx vitest run test/g08-evidence-index.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
 | G08-C06 | `7bebb355` | OWASP25-C048 + pruebas negativas (A01–A10) | A01/A10 | `g08-negative-controls.spec.ts` | `cd apps/backend && npx vitest run test/g08-negative-controls.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
 | G08-C07 | `35cb9cd8` | OWASP25-C048 (A01–A10) | A01/A10 | `g08-evidence-index.spec.ts` | `cd apps/backend && npx vitest run test/g08-evidence-index.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
-| G08-C08 | este commit | OWASP25-C048 | A01–A10 | `g08-admin-handoff.spec.ts` | `cd apps/backend && npx vitest run test/g08-admin-handoff.spec.ts` | PASS | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | IMPLEMENTED |
+| G08-C08 | `785ad988` | OWASP25-C048 (A01–A10) | A01/A10 | `g08-admin-handoff.spec.ts` | `cd apps/backend && npx vitest run test/g08-admin-handoff.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
+| G08-C09 | este commit | OWASP25-C048 | A01–A10 | `g08-final-matrix.spec.ts` | `cd apps/backend && npx vitest run test/g08-final-matrix.spec.ts` | PASS | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | IMPLEMENTED |
 
 ## Baseline de código G01/G02 (G08-C07)
 
