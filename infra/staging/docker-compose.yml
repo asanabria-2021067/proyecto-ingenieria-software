@@ -44,6 +44,8 @@ services:
       # G04-C13 (T16): un salto confiable (el nginx del arnés), como en la
       # topología objetivo. Prueba que un X-Forwarded-For falso no elige el cubo.
       TRUST_PROXY_HOPS: '1'
+      # G06-C08 (T18): el arnes ya es HTTPS; las cookies de sesion llevan Secure.
+      COOKIE_SECURE: 'true'
     depends_on:
       postgres:
         condition: service_healthy

@@ -39,3 +39,11 @@ Job `topology` de `ci.yml` («Topologia - arnes efimero (nginx + TLS)»):
 ## Alcance a producción
 
 **NONE**: sin hosts externos, sin secretos reales, sin publicación ni deploy.
+
+## T17 / T18 / T21 (G06-C08)
+
+Sobre HTTPS local (certificado autofirmado efímero):
+
+- **T17**: `/` y `/login` llevan exactamente las cabeceras base del frontend (nosniff, `X-Frame-Options: DENY`, Referrer-Policy, Permissions-Policy, CSP `frame-ancestors 'none'`), la CSP Report-Only con sus directivas clave, sin `X-Powered-By` y sin HSTS.
+- **T21**: `/api` y `/api/proyectos` devuelven exactamente `max-age=31536000; includeSubDomains`, nunca `preload`.
+- **T18**: el backend del arnés corre con `COOKIE_SECURE=true`. `run-harness.sh` inserta **una** carrera sintética en la base efímera y un registro vía nginx debe devolver `access_token` y `refresh_token` con `Secure`, `HttpOnly`, `SameSite=Lax` y `Path=/`. Solo se reportan atributos, nunca valores.

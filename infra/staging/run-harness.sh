@@ -31,4 +31,9 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=localhost' \
 docker compose -p "$PROJECT" -f docker-compose.yml up -d --build --wait --wait-timeout 900
 # G04-C11: la configuración (con P1) debe validar con el nginx real del arnés.
 docker compose -p "$PROJECT" -f docker-compose.yml exec -T nginx nginx -t
+# G06-C08 (T18): una sola carrera SINTETICA para que el registro emita cookies
+# de sesion; vive en la base efimera y se destruye con ella.
+HARNESS_T18_CARRERA_ID="$(docker compose -p "$PROJECT" -f docker-compose.yml exec -T postgres \
+  psql -U harness -d uvg_collab_harness -qtAc "INSERT INTO carrera (nombre_carrera) VALUES ('Carrera sintetica T18') RETURNING id_carrera" | tr -d '[:space:]')"
+export HARNESS_T18_CARRERA_ID
 node characterize.mjs
