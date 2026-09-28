@@ -76,6 +76,8 @@ export const CHECKS = [
       r.headers['x-frame-options'] === 'DENY' || `X-Frame-Options=${r.headers['x-frame-options']}`,
       r.headers['x-content-type-options'] === 'nosniff' || 'falta nosniff en /',
       r.headers['content-security-policy'] === "frame-ancestors 'none'" || `CSP=${r.headers['content-security-policy']}`,
+      // G06-C03: Next ya no divulga el framework.
+      r.headers['x-powered-by'] === undefined || 'x-powered-by presente en /',
     ],
   },
   {

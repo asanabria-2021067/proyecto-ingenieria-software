@@ -125,3 +125,26 @@ describe('G06-C02: cabeceras base de seguridad en next.config', () => {
     ]);
   });
 });
+
+describe('G06-C03: sin X-Powered-By', () => {
+  it('next.config desactiva la cabecera del framework', () => {
+    expect(nextConfig.poweredByHeader).toBe(false);
+  });
+
+  it('ninguna regla de headers() la reintroduce en páginas', async () => {
+    for (const pathname of ['/', '/login', '/dashboard']) {
+      expect(headerContractFindings(await headersFor(nextConfig, pathname), { absent: ['X-Powered-By'] })).toEqual([]);
+    }
+  });
+
+  it('fixture negativo: una regla que la agrega hace fallar el contrato', async () => {
+    const conPoweredBy: NextConfig = {
+      async headers() {
+        return [{ source: '/:path*', headers: [{ key: 'X-Powered-By', value: 'Next.js' }] }];
+      },
+    };
+    expect(headerContractFindings(await headersFor(conPoweredBy, '/'), { absent: ['X-Powered-By'] })).toEqual([
+      'sobra X-Powered-By',
+    ]);
+  });
+});
