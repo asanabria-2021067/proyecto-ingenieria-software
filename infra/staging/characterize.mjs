@@ -65,14 +65,17 @@ export const CHECKS = [
     verify: (r) => [r.status === 200 || `status ${r.status} != 200`],
   },
   {
+    // G06-C02: antes / no traía ninguna cabecera de seguridad; ahora trae las
+    // cabeceras base del frontend. HSTS sigue siendo solo del backend (/api).
     id: 'HARN-04',
-    title: '/ por HTTPS sin cabeceras de seguridad del backend',
+    title: '/ por HTTPS con las cabeceras base del frontend (G06) y sin HSTS',
     request: { path: '/', secure: true, headers: { Accept: 'text/html' } },
     verify: (r) => [
       r.status < 500 || `status ${r.status}`,
       r.headers['strict-transport-security'] === undefined || 'HSTS en /',
-      r.headers['content-security-policy'] === undefined || 'CSP en /',
-      r.headers['x-frame-options'] === undefined || 'X-Frame-Options en /',
+      r.headers['x-frame-options'] === 'DENY' || `X-Frame-Options=${r.headers['x-frame-options']}`,
+      r.headers['x-content-type-options'] === 'nosniff' || 'falta nosniff en /',
+      r.headers['content-security-policy'] === "frame-ancestors 'none'" || `CSP=${r.headers['content-security-policy']}`,
     ],
   },
   {
