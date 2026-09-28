@@ -280,9 +280,39 @@ describe('MisTareasPage — resumen, grupos y filas compactas', () => {
     const filtros = screen.getByRole('region', { name: 'Filtros de tareas' });
     expect(filtros).not.toContainElement(total);
     expect(total.compareDocumentPosition(filtros) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(filtros).toHaveClass('card-base');
     expect(within(filtros).getAllByRole('combobox')).toHaveLength(4);
     expect(within(filtros).getByLabelText('Buscar tareas por título o descripción')).toBeInTheDocument();
+  });
+
+  it('la barra de búsqueda y filtros es la de Mis Proyectos: sin tarjeta, buscador ancho y selects blancos', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    const filtros = screen.getByRole('region', { name: 'Filtros de tareas' });
+    expect(filtros).not.toHaveClass('card-base');
+    const buscador = within(filtros).getByRole('textbox', { name: 'Buscar tareas por título o descripción' });
+    expect(buscador).toHaveClass('h-11.5', 'rounded-lg', 'bg-surface-container-lowest');
+    expect(buscador).toHaveAttribute('placeholder', 'Buscar tarea...');
+    // ancho: fila propia hasta 80rem de contenido; desde ahí, se estira junto a los selects
+    expect(buscador.parentElement).toHaveClass('@4xl/mis-tareas:col-span-4', '@7xl/mis-tareas:flex-1');
+    for (const select of within(filtros).getAllByRole('combobox')) {
+      expect(select).toHaveClass('rounded-lg', 'border-outline-variant', 'bg-surface-container-lowest', 'focus:ring-primary');
+      expect(select).not.toHaveClass('bg-page');
+    }
+  });
+
+  it('el buscador sigue filtrando por título mientras escribes', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar tareas por título o descripción' }), {
+      target: { value: 'sin fecha' },
+    });
+    expect(screen.getByText('Tarea sin fecha')).toBeInTheDocument();
+    expect(screen.queryByText('Tarea vencida')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Total de tareas: 4 · 1 coincide con los filtros');
   });
 
   it('con muchas completadas en la página, su grupo empieza plegado y se puede desplegar', async () => {

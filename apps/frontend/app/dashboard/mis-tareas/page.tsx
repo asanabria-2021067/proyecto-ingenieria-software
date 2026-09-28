@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, AlertTriangle, ClipboardList, SearchX } from 'lucide-react';
-import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -157,7 +157,15 @@ const COLUMNAS_CORTAS = '@md/grupo:grid-cols-[7.5rem_6rem_7rem]';
 const CELDA_ANCHA = 'basis-full @md/grupo:col-span-3 @2xl/grupo:col-span-1';
 const CELDA_CORTA = 'mt-micro @2xl/grupo:mt-0';
 
-const CONTROL_FILTRO = 'h-10 w-full rounded-control border-outline-variant bg-page text-body';
+/**
+ * Barra de búsqueda y filtros igual a la de Mis Proyectos: buscador ancho y
+ * selects blancos sobre el fondo de la página, sin tarjeta. Con cuatro
+ * selects (Mis Proyectos tiene dos) va en una sola fila solo desde 80rem de
+ * contenido; antes, el buscador ocupa su propia fila y los selects van debajo.
+ */
+const BARRA_FILTROS =
+  'grid grid-cols-1 gap-4 @xl/mis-tareas:grid-cols-2 @4xl/mis-tareas:grid-cols-4 @7xl/mis-tareas:flex';
+const FILTRO_TRIGGER = `w-full ${DASHBOARD_FILTER_TRIGGER_CLASS}`;
 
 function PuntoGrupo({ className }: { className: string }) {
   return <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${className}`} />;
@@ -454,71 +462,69 @@ export default function MisTareasPage() {
         )}
 
         {/* filtros */}
-        <section aria-label="Filtros de tareas" className="card-base @container/filtros">
-          <div className="grid grid-cols-1 gap-inline @xl/filtros:grid-cols-2 @4xl/filtros:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_minmax(0,1.4fr)]">
-            <DashboardSearchField
-              containerClassName="@xl/filtros:col-span-2 @4xl/filtros:col-span-1"
-              value={busqueda}
-              onChange={(e) => actualizarBusqueda(e.target.value)}
-              placeholder="Buscar tarea..."
-              aria-label="Buscar tareas por título o descripción"
-            />
+        <section aria-label="Filtros de tareas" className={BARRA_FILTROS}>
+          <DashboardSearchField
+            containerClassName="@xl/mis-tareas:col-span-2 @4xl/mis-tareas:col-span-4 @7xl/mis-tareas:flex-1"
+            value={busqueda}
+            onChange={(e) => actualizarBusqueda(e.target.value)}
+            placeholder="Buscar tarea..."
+            aria-label="Buscar tareas por título o descripción"
+          />
 
-            <Select value={proyectoFiltro} onValueChange={actualizarProyecto}>
-              <SelectTrigger aria-label="Filtrar por proyecto" className={`${CONTROL_FILTRO} data-[size=default]:h-10`}>
-                <SelectValue placeholder="Proyecto" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={FILTRO_TODOS}>Todos los proyectos</SelectItem>
-                {opcionesProyecto.map(([idProyecto, tituloProyecto]) => (
-                  <SelectItem key={idProyecto} value={String(idProyecto)}>
-                    {tituloProyecto}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Select value={proyectoFiltro} onValueChange={actualizarProyecto}>
+            <SelectTrigger aria-label="Filtrar por proyecto" className={`${FILTRO_TRIGGER} @7xl/mis-tareas:w-50`}>
+              <SelectValue placeholder="Proyecto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FILTRO_TODOS}>Todos los proyectos</SelectItem>
+              {opcionesProyecto.map(([idProyecto, tituloProyecto]) => (
+                <SelectItem key={idProyecto} value={String(idProyecto)}>
+                  {tituloProyecto}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={estadoFiltro} onValueChange={actualizarEstado}>
-              <SelectTrigger aria-label="Filtrar por estado" className={`${CONTROL_FILTRO} data-[size=default]:h-10`}>
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={FILTRO_TODOS}>Todos los estados</SelectItem>
-                {Object.entries(ESTADO_LABEL).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Select value={estadoFiltro} onValueChange={actualizarEstado}>
+            <SelectTrigger aria-label="Filtrar por estado" className={`${FILTRO_TRIGGER} @7xl/mis-tareas:w-44`}>
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FILTRO_TODOS}>Todos los estados</SelectItem>
+              {Object.entries(ESTADO_LABEL).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={prioridadFiltro} onValueChange={actualizarPrioridad}>
-              <SelectTrigger aria-label="Filtrar por prioridad" className={`${CONTROL_FILTRO} data-[size=default]:h-10`}>
-                <SelectValue placeholder="Prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={FILTRO_TODOS}>Todas las prioridades</SelectItem>
-                {Object.entries(PRIORIDAD_LABEL).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Select value={prioridadFiltro} onValueChange={actualizarPrioridad}>
+            <SelectTrigger aria-label="Filtrar por prioridad" className={`${FILTRO_TRIGGER} @7xl/mis-tareas:w-44`}>
+              <SelectValue placeholder="Prioridad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FILTRO_TODOS}>Todas las prioridades</SelectItem>
+              {Object.entries(PRIORIDAD_LABEL).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={ordenValor} onValueChange={actualizarOrden}>
-              <SelectTrigger aria-label="Ordenar tareas" className={`${CONTROL_FILTRO} data-[size=default]:h-10`}>
-                <SelectValue placeholder="Ordenar" />
-              </SelectTrigger>
-              <SelectContent>
-                {OPCIONES_ORDEN.map((opcion) => (
-                  <SelectItem key={opcion.value} value={opcion.value}>
-                    {opcion.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={ordenValor} onValueChange={actualizarOrden}>
+            <SelectTrigger aria-label="Ordenar tareas" className={`${FILTRO_TRIGGER} @7xl/mis-tareas:w-60`}>
+              <SelectValue placeholder="Ordenar" />
+            </SelectTrigger>
+            <SelectContent>
+              {OPCIONES_ORDEN.map((opcion) => (
+                <SelectItem key={opcion.value} value={opcion.value}>
+                  {opcion.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </section>
 
         {/* loading — skeleton con forma de grupo y filas, nunca spinner */}
