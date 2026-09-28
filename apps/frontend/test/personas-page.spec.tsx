@@ -361,3 +361,42 @@ describe('PersonasPage — radio de los botones de acción', () => {
     }
   });
 });
+
+// Pestañas con radio medio (no cápsula) y estados vacíos en tarjeta blanca,
+// con el mismo criterio que Chats archivados.
+describe('PersonasPage — pestañas y estados vacíos', () => {
+  beforeEach(() => {
+    getSolicitudesPendientesMock.mockResolvedValue([]);
+    getAmigosMock.mockResolvedValue([]);
+    buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
+  });
+
+  it('las cuatro pestañas usan radio medio y el activo conserva verde con texto blanco', async () => {
+    await renderPersonas();
+
+    const pestanas = screen.getAllByRole('tab');
+    expect(pestanas.map((t) => t.textContent)).toEqual(['Todos', 'Amigos de amigos', 'Mi carrera', 'Mis amigos']);
+    for (const t of pestanas) {
+      expect(t).toHaveClass('rounded-md', 'data-[state=active]:bg-primary', 'data-[state=active]:text-on-primary');
+      expect(t).not.toHaveClass('rounded-pill');
+    }
+  });
+
+  it.each([
+    ['Mis amigos', 'Todavía no tenés amigos', 'Buscá compañeros en la pestaña Todos y agregalos.'],
+    ['Amigos de amigos', 'Agregá a tu primer amigo', 'Cuando tengas amigos vas a empezar a ver también a los suyos acá.'],
+  ])('en «%s» el vacío es una tarjeta blanca con sus textos intactos y sin acción nueva', async (pestana, titulo, descripcion) => {
+    await renderPersonas();
+    clickTab(pestana);
+
+    const tituloEl = await screen.findByText(titulo);
+    const tarjeta = tituloEl.closest('[data-slot="empty"]') as HTMLElement;
+    expect(tarjeta).toHaveClass('bg-surface-container-lowest', 'border-outline-variant/70', 'rounded-2xl', 'shadow-sm');
+    expect(tarjeta).not.toHaveClass('border-dashed');
+    expect(tarjeta).not.toHaveClass('bg-surface-container-low');
+    expect(within(tarjeta).getByText(descripcion)).toBeInTheDocument();
+    expect(within(tarjeta).queryByRole('button')).not.toBeInTheDocument();
+    const icono = tarjeta.querySelector('[data-slot="empty-icon"]') as HTMLElement;
+    expect(icono).toHaveClass('text-text-secondary', 'border-transparent');
+  });
+});

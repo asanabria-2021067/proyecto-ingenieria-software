@@ -568,7 +568,7 @@ export default function PersonasPage() {
                 <TabsTrigger
                   key={p.id}
                   value={p.id}
-                  className="rounded-pill text-text-primary data-[state=active]:bg-primary data-[state=active]:text-on-primary data-[state=active]:shadow-none"
+                  className="rounded-md text-text-primary data-[state=active]:bg-primary data-[state=active]:text-on-primary data-[state=active]:shadow-none"
                 >
                   {p.label}
                 </TabsTrigger>
@@ -579,9 +579,14 @@ export default function PersonasPage() {
               {isLoading ? (
                 <ListaSkeleton />
               ) : resultados.length === 0 ? (
-                <Empty tone="muted" aria-live="polite">
-                  <EmptyMedia variant="compact">
-                    <Users aria-hidden="true" className="size-6" />
+                // Mismo criterio que Chats archivados: tarjeta blanca (tono por
+                // defecto de Empty) con el icono pequeño y neutro.
+                <Empty className="surface-enter" aria-live="polite">
+                  <EmptyMedia
+                    variant="compact"
+                    className="size-10 rounded-control border-transparent text-text-secondary"
+                  >
+                    <Users aria-hidden="true" className="size-5" />
                   </EmptyMedia>
                   <EmptyHeader>
                     <EmptyTitle className="type-subtitle">{vacio.titulo}</EmptyTitle>
