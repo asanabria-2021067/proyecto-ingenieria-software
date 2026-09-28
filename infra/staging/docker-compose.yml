@@ -63,7 +63,10 @@ services:
       context: ../../apps/frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3001
+        # G07-C12 (T14 · P2): variante same-origin, la misma que hornea
+        # PUBLIC_API_URL=same-origin en deploy.yml. HTTP y Socket.IO van por
+        # el origen de la pagina (nginx), nunca por :3001.
+        NEXT_PUBLIC_API_URL: ''
         NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: harness-synthetic
         NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: harness-synthetic
     environment:
