@@ -4,6 +4,9 @@ import type { TipoProyecto, ModalidadProyecto } from '@/types';
 
 const labelClass = 'block text-[10px] font-black uppercase tracking-widest text-tertiary mb-1.5';
 
+/** Tarjeta que agrupa campos de solo lectura; la comparten Información general y cada rol. */
+export const READONLY_CARD_CLASS = 'rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4';
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   try {
@@ -94,7 +97,7 @@ export function ProjectGeneralInfoSection({
       <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
         Información general
       </h2>
-      <div className="space-y-4">
+      <div data-slot="readonly-card" className={READONLY_CARD_CLASS}>
         <ReadonlyField label="Título del proyecto" value={tituloProyecto} />
         <ReadonlyField label="Descripción" value={descripcionProyecto} />
         <div className="grid grid-cols-2 gap-4">
