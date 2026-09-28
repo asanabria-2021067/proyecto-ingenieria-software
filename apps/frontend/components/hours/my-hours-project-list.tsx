@@ -111,9 +111,11 @@ function TablaTareas({ proyecto }: { proyecto: MisHorasProyecto }) {
 
 function ProyectoAbierto({ proyecto }: { proyecto: MisHorasProyecto }) {
   return (
-    <AccordionItem value={String(proyecto.idProyecto)} className="card-base last:border-b">
+    <AccordionItem value={String(proyecto.idProyecto)} className="@container/proyecto card-base last:border-b">
       <AccordionTrigger className="items-center py-0 hover:no-underline">
-        <span className="flex min-w-0 flex-1 flex-col gap-inline md:flex-row md:items-center">
+        {/* Título y cifras en fila solo si la tarjeta mide al menos 42rem; si
+            no, las cifras bajan y el título conserva el ancho. */}
+        <span className="flex min-w-0 flex-1 flex-col gap-inline @2xl/proyecto:flex-row @2xl/proyecto:items-center">
           <span className="flex min-w-0 flex-1 items-start gap-inline">
             <IconoTipo tipo={proyecto.tipoProyecto} />
             <span className="flex min-w-0 flex-col gap-micro">
@@ -127,7 +129,7 @@ function ProyectoAbierto({ proyecto }: { proyecto: MisHorasProyecto }) {
               </span>
             </span>
           </span>
-          <span className="grid shrink-0 grid-cols-3 gap-inline md:w-80">
+          <span className="grid shrink-0 grid-cols-3 gap-inline @2xl/proyecto:w-80">
             <Cifra etiqueta="Registradas" valor={proyecto.registradas} />
             <Cifra etiqueta="Propuestas" valor={proyecto.propuestasPendientes} />
             <Cifra etiqueta="Acreditadas" valor={proyecto.acreditadas} />

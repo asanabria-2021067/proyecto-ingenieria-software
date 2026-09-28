@@ -39,7 +39,7 @@ function Encabezado() {
 function MisHorasSkeleton() {
   return (
     <div aria-busy="true" aria-label="Cargando tus horas" className="flex flex-col gap-section">
-      <div className="grid gap-grid sm:grid-cols-3">
+      <div className="grid gap-grid @2xl/mis-horas:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-24 rounded-2xl" />
         ))}
@@ -104,7 +104,9 @@ function Contenido({ vista }: { vista: MisHorasView }) {
 
   return (
     <>
-      <section aria-label="Resumen de horas" className="grid gap-grid sm:grid-cols-3">
+      {/* Tres KPI por fila solo si el contenido mide al menos 42rem: con la
+          sidebar global abierta, a 768 px quedan ~500 px y no caben. */}
+      <section aria-label="Resumen de horas" className="grid gap-grid @2xl/mis-horas:grid-cols-3">
         <HoursKpiCard
           icon={Clock}
           label="Registradas en proyectos abiertos"
@@ -140,7 +142,7 @@ export default function MisHorasPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useMisHoras();
 
   return (
-    <div className="mx-auto flex max-w-content flex-col gap-section px-stack py-section lg:px-section lg:py-page">
+    <div className="@container/mis-horas mx-auto flex max-w-content flex-col gap-section px-stack py-section lg:px-section lg:py-page">
       <Encabezado />
       {isLoading ? (
         <MisHorasSkeleton />
