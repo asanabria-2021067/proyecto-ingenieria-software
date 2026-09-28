@@ -222,12 +222,28 @@ describe('MisHorasPage', () => {
     mockEstado({ data: vista({ proyectos: [proyecto({ idProyecto: 6, esLider: true, participacionActiva: false, tareas: [tarea({ idTarea: 601 })] })] }) });
     render(<MisHorasPage />);
 
-    expect(screen.getByText('Líder')).toHaveClass('pill-accent');
+    // Rol en tono suave (pizarra), no el lima del acento.
+    expect(screen.getByText('Líder')).toHaveClass('pill');
+    expect(screen.getByText('Líder')).not.toHaveClass('pill-accent');
     fireEvent.click(screen.getByRole('button', { name: /Tutorías/ }));
     expect(within(screen.getByRole('table')).getByRole('link', { name: 'Diseñar sesiones' })).toHaveAttribute(
       'href',
       '/dashboard/projects/6/kanban/tasks/601',
     );
+  });
+
+  it('tabla de tareas: separadores tenues dentro de la tarjeta y título del proyecto en semibold', () => {
+    mockEstado({ data: vista({ proyectos: [proyecto({ idProyecto: 6, esLider: true, tareas: [tarea({ idTarea: 601 })] })] }) });
+    render(<MisHorasPage />);
+
+    expect(screen.getByText('Tutorías', { exact: false })).toHaveClass('font-semibold');
+    fireEvent.click(screen.getByRole('button', { name: /Tutorías/ }));
+    const tabla = screen.getByRole('table');
+    // Sin color explícito, `border-b` hereda el color del texto (casi negro).
+    for (const fila of within(tabla).getAllByRole('row')) {
+      expect(fila).toHaveClass('border-outline-variant/50');
+    }
+    expect(tabla.closest('.border-t')).toHaveClass('border-outline-variant/50');
   });
 
   it('tarea eliminada: se ve con su pill y sus horas, sin enlace', () => {
@@ -373,7 +389,7 @@ describe('MisHorasPage — KPI limpias y barras institucionales', () => {
     render(<MisHorasPage />);
 
     const barra = screen.getByRole('progressbar', { name: 'Progreso de horas beca' });
-    expect(barra).toHaveClass('bg-primary/20');
+    expect(barra).toHaveClass('h-1.5', 'bg-primary/10');
     expect(barra.className).not.toMatch(/secondary-fixed/);
     expect(barra.querySelector('[data-slot="progress-indicator"]')).toHaveClass('bg-primary');
   });
