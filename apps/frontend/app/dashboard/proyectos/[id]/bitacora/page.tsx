@@ -30,7 +30,14 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
@@ -54,6 +61,14 @@ import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/componen
 
 const LIMITE_POR_PAGINA = 20;
 const DEBOUNCE_BUSQUEDA_MS = 400;
+
+/** Valor de «Todos» en los Select (Radix no admite ''); el filtro guarda ''. */
+const TODOS = '__ALL__';
+/** Opción resaltada igual que en los filtros de Mis Proyectos. */
+const ITEM_CLASS = 'focus:bg-primary focus:text-on-primary';
+/** Fechas con la misma caja que el buscador y los selects de la barra. */
+const FECHA_CLASS =
+  'h-11.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-3.5 text-sm text-on-surface outline-none transition-[border-color,box-shadow] hover:border-outline focus:ring-2 focus:ring-primary';
 
 /** Exhaustivo por diseño: un TipoEventoBitacoraValor nuevo en el backend rompe la compilación en vez de mostrarse en blanco. */
 interface EstiloEvento {
@@ -395,94 +410,118 @@ export default function BitacoraPage() {
             )}
           </ProjectPageHeader>
 
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <DashboardSearchField
-              containerClassName="w-full sm:w-64"
-              aria-label="Buscar por persona"
-              placeholder="Buscar por persona..."
-              value={personaInput}
-              onChange={(e) => setPersonaInput(e.target.value)}
-            />
-
-            <select
-              aria-label="Filtrar por sprint"
-              value={idSprintFiltro}
-              onChange={(e) => actualizarFiltro(setIdSprintFiltro, e.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface"
-            >
-              <option value="">Todos los sprints</option>
-              {sprints.map((sprint) => (
-                <option key={sprint.idSprint} value={sprint.idSprint}>
-                  Sprint {sprint.numero}
-                </option>
-              ))}
-            </select>
-
-            <select
-              aria-label="Filtrar por integrante"
-              value={idActorFiltro}
-              onChange={(e) => actualizarFiltro(setIdActorFiltro, e.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface"
-            >
-              <option value="">Todos los integrantes</option>
-              {members.map((miembro) => (
-                <option key={miembro.idUsuario} value={miembro.idUsuario}>
-                  {miembro.nombre} {miembro.apellido}
-                </option>
-              ))}
-            </select>
-
-            <select
-              aria-label="Filtrar por tipo de evento"
-              value={tipoEventoFiltro}
-              onChange={(e) => actualizarFiltro(setTipoEventoFiltro, e.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface"
-            >
-              <option value="">Todos los tipos</option>
-              {(Object.keys(EVENTO_STYLE) as TipoEventoBitacoraValor[]).map((tipo) => (
-                <option key={tipo} value={tipo}>
-                  {EVENTO_STYLE[tipo].label}
-                </option>
-              ))}
-            </select>
-
-            <div data-slot="rango-fechas" className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-1.5 text-sm text-tertiary">
-              Desde
-              <input
-                type="date"
-                aria-label="Filtrar desde"
-                value={desdeFiltro}
-                onChange={(e) => actualizarFiltro(setDesdeFiltro, e.target.value)}
-                max={hastaFiltro || undefined}
-                className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface"
+          {/* Misma barra que Mis Proyectos: buscador del dashboard que ocupa el
+              espacio libre y los selects del sistema con su disparador común.
+              Mide el contenedor del proyecto (hay dos sidebars): en fila desde
+              48rem y, si no caben todos, los selects bajan a la línea siguiente. */}
+          <div data-slot="bitacora-filtros" className="mb-6 flex flex-col gap-4">
+            <div className="flex flex-col gap-4 @3xl/project:flex-row @3xl/project:flex-wrap">
+              <DashboardSearchField
+                containerClassName="flex-1 @3xl/project:min-w-52"
+                aria-label="Buscar por persona"
+                placeholder="Buscar por persona..."
+                value={personaInput}
+                onChange={(e) => setPersonaInput(e.target.value)}
               />
-            </label>
 
-            <label className="flex items-center gap-1.5 text-sm text-tertiary">
-              Hasta
-              <input
-                type="date"
-                aria-label="Filtrar hasta"
-                value={hastaFiltro}
-                onChange={(e) => actualizarFiltro(setHastaFiltro, e.target.value)}
-                min={desdeFiltro || undefined}
-                className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface"
-              />
-            </label>
+              <Select
+                value={idSprintFiltro || TODOS}
+                onValueChange={(v) => actualizarFiltro(setIdSprintFiltro, v === TODOS ? '' : v)}
+              >
+                <SelectTrigger
+                  aria-label="Filtrar por sprint"
+                  className={`w-full @3xl/project:w-44 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-9999">
+                  <SelectItem value={TODOS} className={ITEM_CLASS}>Todos los sprints</SelectItem>
+                  {sprints.map((sprint) => (
+                    <SelectItem key={sprint.idSprint} value={String(sprint.idSprint)} className={ITEM_CLASS}>
+                      Sprint {sprint.numero}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={idActorFiltro || TODOS}
+                onValueChange={(v) => actualizarFiltro(setIdActorFiltro, v === TODOS ? '' : v)}
+              >
+                <SelectTrigger
+                  aria-label="Filtrar por integrante"
+                  className={`w-full @3xl/project:w-52 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-9999">
+                  <SelectItem value={TODOS} className={ITEM_CLASS}>Todos los integrantes</SelectItem>
+                  {members.map((miembro) => (
+                    <SelectItem key={miembro.idUsuario} value={String(miembro.idUsuario)} className={ITEM_CLASS}>
+                      {miembro.nombre} {miembro.apellido}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={tipoEventoFiltro || TODOS}
+                onValueChange={(v) => actualizarFiltro(setTipoEventoFiltro, v === TODOS ? '' : v)}
+              >
+                <SelectTrigger
+                  aria-label="Filtrar por tipo de evento"
+                  className={`w-full @3xl/project:w-40 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-9999">
+                  <SelectItem value={TODOS} className={ITEM_CLASS}>Todos los tipos</SelectItem>
+                  {(Object.keys(EVENTO_STYLE) as TipoEventoBitacoraValor[]).map((tipo) => (
+                    <SelectItem key={tipo} value={tipo} className={ITEM_CLASS}>
+                      {EVENTO_STYLE[tipo].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {hayFiltrosActivos && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={limpiarFiltros}
-                className="font-medium text-primary"
-              >
-                Limpiar todo
-              </Button>
-            )}
+            <div data-slot="rango-fechas" className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-tight text-sm text-text-secondary">
+                Desde
+                <input
+                  type="date"
+                  aria-label="Filtrar desde"
+                  value={desdeFiltro}
+                  onChange={(e) => actualizarFiltro(setDesdeFiltro, e.target.value)}
+                  max={hastaFiltro || undefined}
+                  className={FECHA_CLASS}
+                />
+              </label>
+
+              <label className="flex items-center gap-tight text-sm text-text-secondary">
+                Hasta
+                <input
+                  type="date"
+                  aria-label="Filtrar hasta"
+                  value={hastaFiltro}
+                  onChange={(e) => actualizarFiltro(setHastaFiltro, e.target.value)}
+                  min={desdeFiltro || undefined}
+                  className={FECHA_CLASS}
+                />
+              </label>
+
+              {hayFiltrosActivos && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={limpiarFiltros}
+                  className="font-medium text-primary"
+                >
+                  Limpiar todo
+                </Button>
+              )}
+            </div>
           </div>
 
           {chipsActivos.length > 0 && (
