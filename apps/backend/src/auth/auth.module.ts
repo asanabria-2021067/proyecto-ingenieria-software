@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AccountAttemptsService } from './account-attempts.service';
 import { JwtStrategy } from './jwt.strategy';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { getJwtSecretFromConfig } from '../config/jwt-secret';
@@ -21,7 +22,12 @@ import { getJwtSecretFromConfig } from '../config/jwt-secret';
     NotificationsModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    // G04 (OWASP25-C036): una sola instancia por proceso con la política base.
+    { provide: AccountAttemptsService, useFactory: () => new AccountAttemptsService() },
+  ],
   exports: [JwtModule],
 })
 export class AuthModule {}
