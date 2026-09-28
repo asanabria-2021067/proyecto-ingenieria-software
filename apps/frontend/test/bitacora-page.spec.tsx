@@ -125,6 +125,26 @@ describe('BitacoraPage — autorización (exclusiva del líder)', () => {
     expect(screen.getByRole('heading', { name: 'Bitácora' })).toBeInTheDocument();
   });
 
+  it('los iconos de evento son neutros y sin fondo, al par del título (como en Mis Horas)', () => {
+    mockLeader(true);
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    const iconos = document.querySelectorAll('[data-slot="icono-evento"]');
+    expect(iconos.length).toBeGreaterThan(0);
+    for (const icono of iconos) {
+      expect(icono).toHaveClass('size-5', 'text-text-primary');
+      expect(icono).not.toHaveClass('text-primary');
+      // sin caja de color alrededor: comparte fila con la categoría y el título
+      expect(icono.parentElement).toHaveClass('flex', 'items-center');
+      expect(icono.parentElement!.className).not.toMatch(/bg-primary/);
+      expect(icono.nextElementSibling).toHaveClass('pill');
+    }
+  });
+
   it('un no-líder NUNCA dispara la petición al backend (useProjectBitacora recibe habilitado=false)', () => {
     mockLeader(false);
     mockSprints();

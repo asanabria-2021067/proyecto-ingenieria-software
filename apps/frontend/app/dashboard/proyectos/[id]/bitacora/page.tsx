@@ -215,11 +215,10 @@ function BitacoraItem({ evento, miembros }: { evento: EventoBitacoraDto; miembro
 
   return (
     <div className="flex gap-inline rounded-card border border-outline-variant bg-surface-container-lowest p-card shadow-card">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary/10">
-        <Icon className="size-5 text-primary" aria-hidden="true" />
-      </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-tight">
+          {/* Icono neutro y sin fondo, al par del título (mismo criterio que Mis Horas). */}
+          <Icon data-slot="icono-evento" className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
           {/* Pastilla por tipoEntidad: color con texto oscuro sobre fondo
               sólido (nunca texto de color a secas), contraste AA heredado de
               los mismos tonos ya usados para estados de tarea/prioridad. */}
