@@ -195,31 +195,30 @@ function KanbanColumn({
       ref={setNodeRef}
       aria-labelledby={`columna-${estado}-heading`}
       data-column-estado={estado}
-      className={`flex min-h-0 min-w-0 flex-col gap-2.5 rounded-xl border p-3 transition-all duration-150 ${
-        isOver
-          ? 'border-primary bg-primary/5 ring-2 ring-inset ring-primary/25'
-          : 'border-outline-variant/40 bg-surface-container-low'
-      }`}
+      className="flex min-h-0 min-w-0 flex-col gap-2.5"
     >
-      {/* Encabezado: indicador circular + nombre + contador (Sección 33) */}
-      <div
-        className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 ${estilo.headerBg}`}
-      >
+      {/* Encabezado fuera del contenedor: punto de color + nombre + contador (Sección 33) */}
+      <div data-slot="kanban-column-header" className="flex items-center justify-between gap-2 px-1">
         <h3
           id={`columna-${estado}-heading`}
-          className={`flex items-center gap-2 text-[13px] font-bold ${estilo.headerText}`}
+          className="flex items-center gap-2 text-sm font-semibold text-text-primary"
         >
-          <span className={`inline-block size-2 rounded-full ${estilo.dot}`} aria-hidden="true" />
+          <span className={`inline-block size-2 shrink-0 rounded-full ${estilo.columnDot}`} aria-hidden="true" />
           {titulo}
         </h3>
-        <span
-          className={`inline-flex min-h-[22px] min-w-[22px] items-center justify-center rounded-full bg-surface-container-highest px-1.5 text-xs font-semibold ${estilo.headerText}`}
-        >
+        <span className="pill pill-neutral min-w-6 justify-center font-semibold tabular-nums">
           {tareasColumna.length}
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2.5 pr-1">
+      <div
+        data-slot="kanban-column-body"
+        className={`flex flex-1 flex-col gap-2.5 rounded-xl border p-3 transition-all duration-150 ${
+          isOver
+            ? 'border-primary bg-primary/5 ring-2 ring-inset ring-primary/25'
+            : 'border-outline-variant/40 bg-surface-container-low'
+        }`}
+      >
         {tareasColumna.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-8 text-center">
             <span className={`inline-block size-2.5 rounded-full ${estilo.dot} opacity-40`} aria-hidden="true" />
