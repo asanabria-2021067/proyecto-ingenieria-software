@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   UnauthorizedException,
   ConflictException,
@@ -15,7 +16,11 @@ import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, REFRESH_TOKEN_MAX_AGE_MS } from "./cookie.util";
 import { getJwtSecret } from "../config/jwt-secret";
-import { AccountAttemptsService } from "./account-attempts.service";
+import {
+  AccountAttemptsService,
+  RECOVERY_ATTEMPTS,
+  RECOVERY_ATTEMPT_POLICY,
+} from "./account-attempts.service";
 
 /**
  * G04 (OWASP25-C023): hash bcrypt (cost 10, el mismo de registro y reset) de
@@ -51,6 +56,8 @@ export class AuthService {
     private notificationsService: NotificationsService,
     // El default solo aplica a instancias manuales (tests); Nest inyecta el provider de AuthModule.
     private readonly attempts: AccountAttemptsService = new AccountAttemptsService(),
+    @Inject(RECOVERY_ATTEMPTS)
+    private readonly recoveryAttempts: AccountAttemptsService = new AccountAttemptsService(RECOVERY_ATTEMPT_POLICY),
   ) {
     const refreshSecret = process.env.JWT_REFRESH_SECRET;
     if (!refreshSecret) {
@@ -166,6 +173,15 @@ export class AuthService {
       mensaje:
         "Si los datos son correctos, tu solicitud fue registrada y un administrador se pondrá en contacto contigo",
     };
+
+    // G04 (OWASP25-C036/C014): acota las solicitudes por carné. Pasado el
+    // límite no se crea registro ni se notifica a los administradores, y la
+    // respuesta pública es exactamente la misma (no revela nada del carné).
+    const cuenta = `recuperacion:${carne.trim().toLowerCase()}`;
+    if (this.recoveryAttempts.lockedUntil(cuenta) !== null) {
+      return genericResponse;
+    }
+    this.recoveryAttempts.recordFailure(cuenta);
 
     const perfil = await this.prisma.perfilEstudiante.findUnique({
       where: { carne },
