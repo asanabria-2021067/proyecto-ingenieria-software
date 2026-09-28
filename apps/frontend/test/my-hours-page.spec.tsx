@@ -1,5 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { MisHorasProyecto, MisHorasTarea, MisHorasView } from '../lib/services/users';
 
@@ -264,4 +266,51 @@ describe('MisHorasPage', () => {
     expect(screen.getByRole('progressbar', { name: 'Progreso de horas beca' })).toHaveAttribute('aria-valuenow', '100');
     expect(screen.getByText('Meta cumplida')).toHaveClass('pill-success');
   });
+});
+
+// HU-158 (G02-X01): con la sidebar global abierta, a 768 px el contenido mide
+// ~500 px; los KPI deciden sus columnas por ese ancho, no por la ventana.
+describe('MisHorasPage — disposición por contenedor', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('la página es un contenedor y los KPI pasan a tres columnas solo desde su propio ancho', () => {
+    mockEstado({ data: vista() });
+    render(<MisHorasPage />);
+
+    const encabezado = screen.getByRole('heading', { level: 1, name: 'Mis Horas' });
+    const pagina = encabezado.closest('[class*="@container/mis-horas"]') as HTMLElement;
+    expect(pagina).not.toBeNull();
+
+    const kpis = screen.getByRole('region', { name: 'Resumen de horas' });
+    expect(pagina).toContainElement(kpis);
+    expect(kpis).toHaveClass('grid', '@2xl/mis-horas:grid-cols-3');
+    expect(kpis.className).not.toMatch(/(^|\s)(sm|md|lg|xl):grid-cols-/);
+  });
+
+  it('el esqueleto de carga usa la misma regla de columnas que los KPI', () => {
+    mockEstado({ isLoading: true });
+    render(<MisHorasPage />);
+
+    const esqueleto = screen.getByLabelText('Cargando tus horas');
+    expect(esqueleto.firstElementChild).toHaveClass('@2xl/mis-horas:grid-cols-3');
+    expect(esqueleto.closest('[class*="@container/mis-horas"]')).not.toBeNull();
+  });
+
+  it('Tailwind genera las variantes: tres KPI y cabecera de proyecto en fila desde 42rem de su contenedor', async () => {
+    const postcss = (await import('postcss')).default;
+    const tailwind = (await import('@tailwindcss/postcss')).default;
+    const base = join(__dirname, '..');
+    const entrada = readFileSync(join(base, 'app/global.css'), 'utf-8');
+    const { css } = await postcss([tailwind({ base })]).process(entrada, { from: join(base, 'app/global.css') });
+
+    expect(css).toContain('container-name: mis-horas');
+    expect(css).toContain('container-name: proyecto');
+    const regla = (selector: string) => css.slice(css.indexOf(selector)).slice(0, 200);
+    expect(regla('.\\@2xl\\/mis-horas\\:grid-cols-3')).toMatch(/@container mis-horas \(width >= 42rem\)/);
+    expect(regla('.\\@2xl\\/proyecto\\:flex-row')).toMatch(/@container proyecto \(width >= 42rem\)/);
+    expect(regla('.\\@2xl\\/proyecto\\:w-80')).toMatch(/@container proyecto \(width >= 42rem\)/);
+  }, 60_000);
 });
