@@ -26,6 +26,7 @@ import {
   SectionCommentReadonly,
 } from '@/components/projects/detail/project-general-info-section';
 import { ProjectRolesSkillsSection } from '@/components/projects/detail/project-roles-skills-section';
+import { normalizeUrlInput } from '@/lib/security/safe-url';
 
 interface Props { id: number; }
 
@@ -250,7 +251,7 @@ export default function MyProjectViewClient({ id }: Props) {
     objetivosProyecto: form.objetivosProyecto || undefined,
     ubicacionProyecto: form.ubicacionProyecto || undefined,
     contextoAcademico: form.contextoAcademico || undefined,
-    urlRecursoExterno: form.urlRecursoExterno || undefined,
+    urlRecursoExterno: normalizeUrlInput(form.urlRecursoExterno),
     fechaInicio: form.fechaInicio || undefined,
     fechaFinEstimada: form.fechaFinEstimada || undefined,
     roles: form.roles.length > 0
