@@ -6,8 +6,10 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { getFrontendUrl } from '../common/utils/cookie';
 import { WsAuthService } from '../ws-auth/ws-auth.service';
+import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from '../ws-auth/account-access.events';
 
 /**
  * Sprint 7 (06 v2 §45): nombres de los cuatro eventos realtime de dominio
@@ -71,6 +73,12 @@ export class NotificationsGateway
   handleDisconnect(client: Socket) {
     const userId = client.data.userId;
     this.logger.log(`Client ${client.id} (user ${userId}) disconnected`);
+  }
+
+  /** G07 (OWASP25-C025): una cuenta bloqueada o inactivada pierde al instante sus sockets abiertos. */
+  @OnEvent(ACCOUNT_ACCESS_REVOKED)
+  disconnectAccount({ idUsuario }: AccountAccessRevokedEvent) {
+    this.server.in(`user:${idUsuario}`).disconnectSockets(true);
   }
 
   async notifyUser(userId: number, notification: unknown) {
