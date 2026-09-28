@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
+import { PROJECT_PAGE_CLASS } from '@/components/projects/detail/project-page-shell';
 
 /**
  * HU-154 (T-216): rejilla de 12 columnas del detalle de proyecto con columna
@@ -13,15 +14,16 @@ import { cn } from '@/lib/utils';
  * ~150 px. Con la consulta por contenedor el 8/4 aparece solo cuando el
  * contenido tiene al menos 56rem, y por debajo todo va en una columna.
  *
- * Mismos tokens que el sistema de diseño: `max-w-content`, `gap-grid` y el
- * espaciado de página de las vistas ya migradas.
+ * Misma geometría de página que `ProjectPageShell` (PROJECT_PAGE_CLASS):
+ * `max-w-content`, gutter y aire vertical compartidos por todo el proyecto.
  */
 export function ProjectContentGrid({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
       data-slot="project-content-grid"
       className={cn(
-        'mx-auto grid w-full max-w-content grid-cols-1 gap-grid px-stack py-section lg:px-section @4xl/project:grid-cols-12',
+        PROJECT_PAGE_CLASS,
+        'grid grid-cols-1 gap-grid @4xl/project:grid-cols-12',
         className,
       )}
       {...props}
