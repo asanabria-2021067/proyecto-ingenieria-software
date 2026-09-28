@@ -23,7 +23,7 @@ infra/staging/run-harness.sh
 
 Ejecuta el guard, genera el TLS, construye y levanta todo (`--wait`), corre `characterize.mjs` y destruye contenedores, volúmenes, imágenes locales del proyecto y el TLS, también si algo falla. Puertos: `127.0.0.1:${HARNESS_HTTP_PORT:-8080}` y `127.0.0.1:${HARNESS_HTTPS_PORT:-8443}`.
 
-`characterize.mjs` fija el comportamiento **actual** (HARN-01…05: HSTS/Helmet en `/api`, 403 con `Accept: text/html`, `/socket.io` → backend con P1 (G04-C11; antes 308 del frontend), `/` sin cabeceras de seguridad, HTTP sin redirección). Los gates que cambien ese comportamiento a propósito actualizan la expectativa en su propio commit. Además, T13 (G04-C12) exige que Socket.IO atraviese nginx: el polling responde 200 con el paquete OPEN y su `sid` (T13-01) y ese `sid` pasa a WebSocket con 101 (T13-02). El script rechaza cualquier host que no sea local.
+`characterize.mjs` fija el comportamiento **actual** (HARN-01…05: HSTS/Helmet en `/api`, 403 con `Accept: text/html`, `/socket.io` → backend con P1 (G04-C11; antes 308 del frontend), `/` sin cabeceras de seguridad, HTTP sin redirección). Los gates que cambien ese comportamiento a propósito actualizan la expectativa en su propio commit. Además, T13 (G04-C12) exige que Socket.IO atraviese nginx: el polling responde 200 con el paquete OPEN y su `sid` (T13-01) y ese `sid` pasa a WebSocket con 101 (T13-02). T16 (G04-C13): el backend del arnés corre con `TRUST_PROXY_HOPS=1` y seis logins con un `X-Forwarded-For` falso distinto cada uno siguen recibiendo 429 en el sexto (T16-01); solo se imprimen códigos HTTP. El script rechaza cualquier host que no sea local.
 
 ## En CI (G02-C18)
 
