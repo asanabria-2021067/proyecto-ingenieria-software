@@ -70,16 +70,11 @@ export default function ChatsArchivadosPage() {
 
   return (
     <div className={dashboardPage('py-section lg:py-page')}>
-      <header className="mb-section flex items-center gap-tight">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
-          <Archive className="size-5" aria-hidden="true" />
-        </div>
-        <div>
-          <h1 className="type-display text-text-primary">Chats archivados</h1>
-          <p className="type-body mt-tight text-text-secondary">
-            Conversaciones de proyectos que ya cerraron, en solo lectura.
-          </p>
-        </div>
+      <header className="mb-section">
+        <h1 className="type-display text-text-primary">Chats archivados</h1>
+        <p className="type-body mt-tight text-text-secondary">
+          Conversaciones de proyectos que ya cerraron, en solo lectura.
+        </p>
       </header>
 
       <div className="relative mb-card max-w-md">
@@ -96,9 +91,14 @@ export default function ChatsArchivadosPage() {
       {isLoading ? (
         <ListaSkeleton />
       ) : conversaciones.length === 0 ? (
-        <Empty tone="muted" aria-live="polite">
-          <EmptyMedia variant="compact">
-            <Archive aria-hidden="true" className="size-6" />
+        // Misma superficie que el estado vacío de Mis Postulaciones (tono por
+        // defecto: tarjeta blanca); el icono va pequeño y neutro.
+        <Empty className="surface-enter" aria-live="polite">
+          <EmptyMedia
+            variant="compact"
+            className="size-10 rounded-control border-transparent text-text-secondary"
+          >
+            <Archive aria-hidden="true" className="size-5" />
           </EmptyMedia>
           <EmptyHeader>
             <EmptyTitle className="type-subtitle">
