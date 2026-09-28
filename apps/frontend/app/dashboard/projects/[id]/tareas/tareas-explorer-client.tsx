@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { AlertCircle, ArrowLeft, ClipboardList, SearchX } from 'lucide-react';
+import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
 import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
@@ -23,14 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import {
   Empty,
   EmptyContent,
@@ -54,6 +45,7 @@ import {
   type DireccionOrden,
 } from '@/lib/tasks/filters';
 import type { EstadoTarea, Prioridad, TareaPublicaDTO } from '@/lib/types/tasks';
+import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 interface Props {
   idProyecto: number;
@@ -169,62 +161,21 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-content px-stack py-section md:px-section">
-      {/* breadcrumb */}
-      <Breadcrumb className="mb-stack">
-        <BreadcrumbList className="type-meta">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard/projects/mine" className="text-text-secondary hover:text-text-primary">
-                Mis proyectos
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link
-                href={`/dashboard/projects/${idProyecto}/kanban`}
-                className="max-w-64 truncate text-text-secondary hover:text-text-primary"
-              >
-                {proyecto?.tituloProyecto ?? 'Proyecto'}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="font-medium text-text-primary">Lista de tareas</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      {/* encabezado */}
-      <div className="card-base mb-stack flex flex-col gap-stack md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0 space-y-micro">
-          {isLoadingProyecto ? (
-            <Skeleton className="h-8 w-64" />
-          ) : (
-            <h1 className="type-display line-clamp-2 text-text-primary">
-              {proyecto?.tituloProyecto ?? 'Proyecto'}
-            </h1>
-          )}
-          <p className="type-body text-text-secondary">
-            Vista de solo lectura de todas las tareas del proyecto. Para editar, abre el Kanban.
+    <ProjectPageShell>
+      {/* encabezado fuera de las tarjetas; la vuelta lleva al Tablero, como el breadcrumb anterior */}
+      <ProjectPageHeader
+        back={{ href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Volver al Tablero' }}
+        title="Lista de tareas"
+        description="Vista de solo lectura de todas las tareas del proyecto. Para editar, abre el Kanban."
+      >
+        {isLoadingProyecto ? (
+          <Skeleton className="mt-tight h-4 w-48" />
+        ) : (
+          <p className="type-meta mt-tight">
+            Proyecto: <span className="font-medium text-text-primary">{proyecto?.tituloProyecto ?? 'Proyecto'}</span>
           </p>
-        </div>
-
-        <Button
-          asChild
-          variant="outline"
-          size="sm"
-          className="shrink-0 border-outline-variant"
-        >
-          <Link href={`/dashboard/projects/${idProyecto}/kanban`}>
-            <ArrowLeft className="size-3.5" aria-hidden="true" />
-            Ir al Kanban
-          </Link>
-        </Button>
-      </div>
+        )}
+      </ProjectPageHeader>
 
       {/* toolbar + tabla + paginación */}
       <div className="card-base min-h-0">
@@ -471,6 +422,6 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
           </>
         )}
       </div>
-    </div>
+    </ProjectPageShell>
   );
 }

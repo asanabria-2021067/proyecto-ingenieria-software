@@ -158,7 +158,7 @@ describe('ProjectDetailClient — vista administrativa (Sección 19/21)', () => 
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
     // HU-154: la descripción completa vive en su tarjeta (el encabezado solo muestra un resumen recortado).
     expect(
       within(screen.getByRole('region', { name: 'Descripción y objetivos' })).getByText(
@@ -334,6 +334,6 @@ describe('ProjectDetailClient — «Ver roles y postularme» (D-02)', () => {
     const banner = await screen.findByText(/Solicitud de cierre en revisión/);
     const full = container.querySelector('[data-slot="project-grid-full"]') as HTMLElement;
     expect(full).toContainElement(banner);
-    expect(full).toContainElement(screen.getByRole('heading', { level: 1, name: 'Proyecto de prueba' }));
+    expect(full).toContainElement(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' }));
   });
 });

@@ -246,17 +246,20 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     );
   });
 
-  it('el breadcrumb enlaza a Mis proyectos y al detalle real; muestra estado/tipo/modalidad', () => {
+  it('el encabezado «Tablero» va fuera de la tarjeta, con la vuelta al detalle real; la tarjeta muestra estado/tipo/modalidad', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks();
 
     renderWorkspace();
 
-    expect(screen.getByRole('link', { name: 'Mis proyectos' })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/mine',
-    );
-    expect(screen.getByRole('link', { name: 'Proyecto de prueba' })).toHaveAttribute(
+    const titulo = screen.getByRole('heading', { level: 1, name: 'Tablero' });
+    expect(titulo.closest('[data-slot="project-page-header"]')).not.toBeNull();
+    expect(screen.getByText('Workspace del proyecto').closest('[data-slot="project-page-header"]')).not.toBeNull();
+    // el nombre del proyecto es contenido de la tarjeta resumen, no el título de la página
+    expect(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    // una sola vuelta al proyecto (ya no hay botón duplicado dentro de la tarjeta)
+    expect(screen.getAllByRole('link', { name: /volver al proyecto/i })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/42',
     );

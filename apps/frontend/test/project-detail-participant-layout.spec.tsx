@@ -117,12 +117,12 @@ function wrapper({ children }: { children: ReactNode }) {
 
 async function renderPage() {
   render(createElement(ProyectoDetallePage), { wrapper });
-  await screen.findByRole('heading', { level: 1, name: 'Portal de voluntariado UVG' });
+  await screen.findByRole('heading', { level: 2, name: 'Portal de voluntariado UVG' });
 }
 
 async function renderPageEnLayout() {
   render(createElement(ProyectoLayout, null, createElement(ProyectoDetallePage)), { wrapper });
-  await screen.findByRole('heading', { level: 1, name: 'Portal de voluntariado UVG' });
+  await screen.findByRole('heading', { level: 2, name: 'Portal de voluntariado UVG' });
 }
 
 async function abrirPrimerMenuDeAcciones() {
@@ -149,9 +149,10 @@ describe('Página del participante sin barra de pestañas local', () => {
     expect(screen.queryByRole('link', { name: /tablero/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /solicitud de salida/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /solicitud de salida/i })).not.toBeInTheDocument();
-    // Sin la pestaña «Resumen» marcada como actual (el breadcrumb sí marca el título, y es correcto).
-    expect(screen.queryByText('Resumen')).not.toBeInTheDocument();
-    expect(document.querySelector('[aria-current="page"]')).toHaveTextContent('Portal de voluntariado UVG');
+    // Sin barra de pestañas local: «Resumen» solo existe como título de la página (encabezado estándar).
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /resumen/i })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Resumen')).toEqual([screen.getByRole('heading', { level: 1, name: 'Resumen' })]);
   });
 
   it('la página no monta su propio modal de salida', async () => {
@@ -249,8 +250,9 @@ describe('Página del participante sobre el esqueleto compartido', () => {
       'project-grid-aside',
     ]);
     const full = slot('project-grid-full');
-    expect(within(full).getByRole('heading', { level: 1, name: 'Portal de voluntariado UVG' })).toBeInTheDocument();
-    expect(within(full).getByRole('link', { name: 'Proyectos disponibles' })).toHaveAttribute('href', '/dashboard/proyectos');
+    expect(within(full).getByRole('heading', { level: 2, name: 'Portal de voluntariado UVG' })).toBeInTheDocument();
+    expect(within(full).getByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument();
+    expect(within(full).getByRole('link', { name: 'Volver a Proyectos disponibles' })).toHaveAttribute('href', '/dashboard/proyectos');
     expect(within(full).getByText('Extensión')).toHaveClass('pill');
   });
 
