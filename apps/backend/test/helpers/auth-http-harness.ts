@@ -46,6 +46,8 @@ export interface HarnessOptions {
   controllers?: Type<unknown>[];
   /** Hook sobre la app Express antes de escuchar (p. ej. trust proxy). */
   configure?: (app: INestApplication) => void;
+  /** Fixture negativo: sin el ThrottlerGuard global (throttling desactivado). */
+  withoutThrottlerGuard?: boolean;
 }
 
 export async function startAuthHarness(options: HarnessOptions): Promise<HarnessApp> {
@@ -61,7 +63,7 @@ export async function startAuthHarness(options: HarnessOptions): Promise<Harness
     controllers,
     providers: [
       { provide: AuthService, useValue: options.authService },
-      { provide: APP_GUARD, useClass: ThrottlerGuard },
+      ...(options.withoutThrottlerGuard ? [] : [{ provide: APP_GUARD, useClass: ThrottlerGuard }]),
     ],
   })
   class AuthHarnessModule {}
