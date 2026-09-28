@@ -91,6 +91,7 @@ const VISTAS_MIGRADAS = [
   'app/dashboard/proyectos/[id]/sprints/page.tsx',
   'app/dashboard/proyectos/[id]/sprints/analytics/page.tsx',
   'app/dashboard/proyectos/[id]/sprints/[sprintId]/analytics/page.tsx',
+  'app/dashboard/proyectos/[id]/sprints/[sprintId]/page.tsx',
   'app/dashboard/proyectos/[id]/miembros/page.tsx',
   'app/dashboard/proyectos/[id]/miembros/postulaciones/page.tsx',
   'app/dashboard/proyectos/[id]/miembros/solicitudes-salida/page.tsx',
@@ -130,5 +131,18 @@ describe('Vistas del proyecto sobre el shell compartido', () => {
     expect(fuente).not.toMatch(/max-w-\[1400px\]|max-w-\[900px\]/);
     expect(fuente).not.toMatch(/px-4 pb-12 pt-8 md:px-8/);
     expect(fuente).not.toMatch(/<ArrowLeft\b/);
+  });
+});
+
+describe('Sin encabezados principales dentro de tarjetas ni envoltorios propios', () => {
+  it.each([
+    ...VISTAS_MIGRADAS,
+    'app/dashboard/projects/[id]/kanban/kanban-workspace-client.tsx',
+    'app/dashboard/projects/[id]/tareas/tareas-explorer-client.tsx',
+    'app/dashboard/projects/[id]/project-detail-client.tsx',
+  ])('%s no tiene h1 propio (lo pone ProjectPageHeader) ni wrapper de página centrado', (ruta) => {
+    const fuente = leer(ruta);
+    expect(fuente).not.toMatch(/<h1\b/);
+    expect(fuente).not.toMatch(/className="mx-auto (?:w-full )?max-w-(?:2xl|\[\d+px\]) px-/);
   });
 });

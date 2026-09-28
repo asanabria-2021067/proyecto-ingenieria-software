@@ -69,6 +69,7 @@ import { getApiErrorStatus } from '@/components/projects/api-error';
 import uvgSwal from '@/lib/swal';
 import type { Rol } from '@/types';
 import type { HistoricalProjectView, HistoricalRevision } from '@/lib/services/historical';
+import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 const MODALIDAD_BADGE = 'bg-surface-container-high text-on-surface-variant';
 
@@ -182,15 +183,15 @@ export default function ProyectoDetallePage() {
 
   if (historicoHabilitado && historicoQuery.isPending) {
     return (
-      <div className="mx-auto max-w-content px-stack py-section lg:px-section">
+      <ProjectPageShell>
         <ProyectoDetalleSkeleton />
-      </div>
+      </ProjectPageShell>
     );
   }
 
   if (isError && historicoHabilitado && historicoQuery.isError && getApiErrorStatus(historicoQuery.error) === 403) {
     return (
-      <div className="mx-auto max-w-content px-stack py-section lg:px-section">
+      <ProjectPageShell>
         <Empty tone="muted" className="surface-enter" role="status">
           <EmptyMedia variant="icon">
             <ShieldAlert aria-hidden="true" className="h-7 w-7" />
@@ -208,7 +209,7 @@ export default function ProyectoDetallePage() {
             </Link>
           </EmptyContent>
         </Empty>
-      </div>
+      </ProjectPageShell>
     );
   }
 
@@ -449,7 +450,7 @@ export default function ProyectoDetallePage() {
   }
 
   return (
-      <div className="mx-auto max-w-content px-stack py-section lg:px-section">
+      <ProjectPageShell>
         {/* Breadcrumb */}
         <nav aria-label="Ruta de navegación" className="type-meta mb-stack flex items-center gap-tight">
           <Link
@@ -507,7 +508,7 @@ export default function ProyectoDetallePage() {
             </EmptyContent>
           </Empty>
         )}
-      </div>
+      </ProjectPageShell>
   );
 }
 

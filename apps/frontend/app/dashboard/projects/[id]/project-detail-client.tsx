@@ -29,6 +29,7 @@ import { useCurrentExitRequest } from '@/hooks/use-exit-request';
 import { useCloseReadiness, useClosureRevisions } from '@/hooks/use-closure';
 import { countPassedChecks, TOTAL_CLOSURE_CHECKS } from '@/components/closure/closure-readiness-panel';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
+import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 interface Props {
   id: number;
@@ -284,26 +285,28 @@ export default function ProjectDetailClient({ id }: Props) {
     const status = (error as { statusCode?: number } | null)?.statusCode;
     const noEncontrado = status === 404;
     return (
-        <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <h2 className="text-lg font-bold text-on-surface">
-            {noEncontrado ? 'Proyecto no encontrado' : 'No fue posible cargar la información del proyecto.'}
-          </h2>
-          <p className="mt-2 text-sm text-on-surface-variant">
-            {noEncontrado
-              ? 'El proyecto que buscas no existe o ya no está disponible.'
-              : 'Ocurrió un problema al cargar el proyecto.'}
-          </p>
-          <div className="mt-5 flex justify-center gap-2">
-            {!noEncontrado && (
-              <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Reintentar
+        <ProjectPageShell>
+          <div className="mx-auto max-w-prose py-16 text-center">
+            <h2 className="text-lg font-bold text-on-surface">
+              {noEncontrado ? 'Proyecto no encontrado' : 'No fue posible cargar la información del proyecto.'}
+            </h2>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              {noEncontrado
+                ? 'El proyecto que buscas no existe o ya no está disponible.'
+                : 'Ocurrió un problema al cargar el proyecto.'}
+            </p>
+            <div className="mt-5 flex justify-center gap-2">
+              {!noEncontrado && (
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  Reintentar
+                </Button>
+              )}
+              <Button asChild size="sm" className="bg-primary text-on-primary hover:bg-primary/90">
+                <Link href={MIS_PROYECTOS_HREF}>Volver a Mis Proyectos</Link>
               </Button>
-            )}
-            <Button asChild size="sm" className="bg-primary text-on-primary hover:bg-primary/90">
-              <Link href={MIS_PROYECTOS_HREF}>Volver a Mis Proyectos</Link>
-            </Button>
+            </div>
           </div>
-        </div>
+        </ProjectPageShell>
     );
   }
 
