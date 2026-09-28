@@ -18,7 +18,10 @@ process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
 describe('AuthService', () => {
   it('login retorna token cuando credenciales son validas', async () => {
     const prisma = {
-      usuario: { findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', contrasena: 'hash' }) },
+      usuario: {
+        findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', contrasena: 'hash', estado: 'ACTIVO' }),
+        update: vi.fn().mockResolvedValue({}),
+      },
       tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     };
     const jwtService = { sign: vi.fn().mockReturnValue('jwt-token') };
@@ -116,6 +119,10 @@ describe('AuthService', () => {
         sign: vi.fn().mockReturnValue('token-nuevo'),
       };
       const prisma = {
+        // G04-C03: el refresh relee el estado del usuario antes de renovar.
+        usuario: {
+          findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', estado: 'ACTIVO' }),
+        },
         tokenRefresco: {
           findUnique: vi.fn().mockResolvedValue(opts.registro ?? null),
           update: vi.fn().mockResolvedValue({}),

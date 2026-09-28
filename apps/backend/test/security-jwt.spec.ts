@@ -169,7 +169,8 @@ describe('AuthService — contenido del payload emitido', () => {
       usuario: {
         findUnique: vi
           .fn()
-          .mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu.gt', contrasena: 'hash-secreto' }),
+          .mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu.gt', contrasena: 'hash-secreto', estado: 'ACTIVO' }),
+        update: vi.fn().mockResolvedValue({}),
       },
       tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     };
