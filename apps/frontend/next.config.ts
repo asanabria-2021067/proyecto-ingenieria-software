@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { buildContentSecurityPolicy } from './lib/security/csp';
 
 /**
  * G06 (OWASP25-C039): rutas de páginas y estáticos del frontend. Excluye
@@ -22,12 +23,22 @@ const BASELINE_SECURITY_HEADERS = [
   { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
 ];
 
+/**
+ * G06 (OWASP25-C039): CSP completa en modo Report-Only (sin endpoint de
+ * reportes: las violaciones se ven en la consola y las captura el E2E). Se
+ * hornea en el build con la URL pública de la API.
+ */
+const CSP_REPORT_ONLY_HEADER = {
+  key: 'Content-Security-Policy-Report-Only',
+  value: buildContentSecurityPolicy(process.env.NEXT_PUBLIC_API_URL),
+};
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   // G06 (OWASP25-C039): sin `X-Powered-By: Next.js` (divulgación del framework).
   poweredByHeader: false,
   async headers() {
-    return [{ source: FRONTEND_ROUTES, headers: BASELINE_SECURITY_HEADERS }];
+    return [{ source: FRONTEND_ROUTES, headers: [...BASELINE_SECURITY_HEADERS, CSP_REPORT_ONLY_HEADER] }];
   },
   images: {
     remotePatterns: [
