@@ -96,7 +96,9 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
       </div>
 
       {/* Acciones del líder (Sección 22 A-D): la principal y, al lado, Editar
-          rol con menos peso visual. */}
+          rol con menos peso visual. `type-meta` fija el tamaño: tailwind-merge
+          confunde el `text-body` del botón con un color y lo descarta al
+          recibir `text-on-primary`, y el texto heredaría 16 px. */}
       <div className="flex flex-wrap items-center gap-tight">
         {!role.isMine ? (
           <Button
@@ -104,7 +106,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
             size="sm"
             onClick={handleAsignarme}
             disabled={asignandome}
-            className="min-h-9 gap-micro bg-primary text-on-primary hover:bg-primary/90"
+            className="type-meta min-h-9 gap-micro bg-primary text-on-primary hover:bg-primary/90"
           >
             {asignandome ? <Spinner className="size-3.5" /> : <UserPlus className="size-3.5" aria-hidden="true" />}
             Asignarme a este rol
@@ -115,7 +117,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
             size="sm"
             onClick={() => setConfirmarSalir(true)}
             disabled={saliendo}
-            className="min-h-9 gap-micro border-transparent bg-error text-on-error hover:bg-error/90"
+            className="type-meta min-h-9 gap-micro border-transparent bg-error text-on-error hover:bg-error/90"
           >
             {saliendo ? <Spinner className="size-3.5" /> : <LogOut className="size-3.5" aria-hidden="true" />}
             Salir de este rol
@@ -130,7 +132,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
                   size="sm"
                   variant="outline"
                   disabled
-                  className="pointer-events-none min-h-9 gap-micro border-outline-variant text-text-disabled"
+                  className="type-meta pointer-events-none min-h-9 gap-micro border-outline-variant text-text-disabled"
                 >
                   <LogOut className="size-3.5" aria-hidden="true" />
                   Salir de este rol
@@ -148,7 +150,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
             variant="ghost"
             onClick={onEditar}
             aria-label={`Editar rol ${role.nombreRol}`}
-            className="min-h-9 gap-micro text-text-secondary hover:text-text-primary"
+            className="type-meta min-h-9 gap-micro text-text-secondary hover:text-text-primary"
           >
             <Pencil className="size-3.5" aria-hidden="true" />
             Editar rol
