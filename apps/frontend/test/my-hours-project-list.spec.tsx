@@ -130,7 +130,7 @@ describe('MyHoursProjectList', () => {
     render(<MyHoursProjectList proyectos={[proyecto({ esLider: true, participacionActiva: false })]} />);
 
     const cabecera = screen.getByRole('button', { name: /Tutorías/ });
-    expect(within(cabecera).getByText('Líder')).toHaveClass('pill', 'pill-accent');
+    expect(within(cabecera).getByText('Líder')).toHaveClass('pill', 'bg-[#E2E9F7]');
     expect(within(cabecera).queryByText('Participación finalizada')).not.toBeInTheDocument();
     expect(within(abrir('Tutorías')).getByRole('link', { name: 'Diseñar sesiones' })).toBeInTheDocument();
   });

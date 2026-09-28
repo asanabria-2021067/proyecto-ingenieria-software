@@ -108,7 +108,7 @@ describe('HoursKpiCard — sin icono de marca de agua', () => {
     expect(grupo).not.toHaveClass('overflow-hidden', 'pl-24', 'min-h-32');
   });
 
-  it('icono de 20 px en fila con la etiqueta (flex, items-center, gap de 0.5rem), valor y nota debajo', () => {
+  it('icono de 20 px en fila con la etiqueta (flex, items-center, gap de 0.5rem), valor y nota debajo alineados con el texto', () => {
     render(<HoursKpiCard variante="en-linea" icon={Clock} label="Registradas" value="75 h" note="Nota" />);
 
     const grupo = screen.getByRole('group', { name: 'Registradas' });
@@ -116,10 +116,22 @@ describe('HoursKpiCard — sin icono de marca de agua', () => {
     expect(fila).toHaveClass('flex', 'items-center', 'gap-tight');
     expect(fila.firstElementChild).toBe(grupo.querySelector('svg'));
     expect(grupo.querySelector('svg')).toHaveClass('size-5', 'text-text-primary');
-    const [etiqueta, valor, nota] = Array.from(grupo.children);
+    const [etiqueta, cuerpo] = Array.from(grupo.children);
     expect(etiqueta).toBe(fila);
+    expect(fila).toHaveClass('font-semibold', 'uppercase');
+    // pl-7 = icono (size-5) + gap-tight: la cifra arranca donde arranca el texto de la etiqueta.
+    expect(cuerpo).toHaveClass('pl-7');
+    const [valor, nota] = Array.from(cuerpo.children);
     expect(valor).toHaveTextContent('75 h');
+    expect(valor).toHaveClass('text-3xl', 'font-bold', 'text-text-primary');
     expect(nota).toHaveTextContent('Nota');
-    expect(grupo).toHaveClass('p-5');
+  });
+
+  it('usa la carcasa de tarjeta del sistema de diseño (card-base)', () => {
+    render(<HoursKpiCard variante="en-linea" icon={Clock} label="Registradas" value="75 h" />);
+
+    const grupo = screen.getByRole('group', { name: 'Registradas' });
+    expect(grupo).toHaveClass('card-base');
+    expect(grupo.className).not.toMatch(/\b(rounded-2xl|p-5|border-outline-variant)\b/);
   });
 });
