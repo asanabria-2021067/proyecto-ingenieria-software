@@ -38,6 +38,7 @@ import { motivoInelegibilidadLabel, type LeadershipCandidateDto } from '@/lib/ty
 import type { HistoricalHorasUsuario } from '@/lib/services/historical';
 import type { EstadoSprint } from '@/lib/types/sprints';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 
 /**
  * Estilos de estado de Sprint (mismo criterio `statusConfig` manual que
@@ -291,10 +292,10 @@ function DetalleIntegranteContent({
           Horas del integrante por nivel
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <HorasKpi icon={Clock} label="Horas registradas" value={registradas != null ? `${formatearDecimal(registradas)} h` : '—'} />
-          <HorasKpi icon={History} label="Horas legacy" value={legacy != null ? `${formatearDecimal(legacy)} h` : '—'} />
-          <HorasKpi icon={Calendar} label="Horas propuestas" value={`${formatearDecimal(propuestas)} h`} />
-          <HorasKpi icon={CheckCircle2} label="Horas acreditadas" value={`${formatearDecimal(acreditadas)} h`} destacado />
+          <HoursKpiCard icon={Clock} label="Horas registradas" value={registradas != null ? `${formatearDecimal(registradas)} h` : '—'} />
+          <HoursKpiCard icon={History} label="Horas legacy" value={legacy != null ? `${formatearDecimal(legacy)} h` : '—'} />
+          <HoursKpiCard icon={Calendar} label="Horas propuestas" value={`${formatearDecimal(propuestas)} h`} />
+          <HoursKpiCard icon={CheckCircle2} label="Horas acreditadas" value={`${formatearDecimal(acreditadas)} h`} destacado />
         </div>
         <p className="text-xs text-tertiary">
           Registradas y legacy provienen del servidor por integrante; propuestas y acreditadas se consolidan por Sprint. Los
@@ -367,34 +368,6 @@ function DetalleIntegranteContent({
         {sprintsOrdenados.map((sprint) => (
           <MemberSprintHistoryCard key={sprint.idSprint} sprint={sprint} />
         ))}
-      </div>
-    </div>
-  );
-}
-
-function HorasKpi({
-  icon: Icon,
-  label,
-  value,
-  destacado = false,
-}: {
-  icon: typeof Clock;
-  label: string;
-  value: string;
-  destacado?: boolean;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={label}
-      className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
-    >
-      <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${destacado ? 'bg-primary/15' : 'bg-primary/10'}`}>
-        <Icon className="size-5 text-primary" aria-hidden="true" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-wide text-tertiary">{label}</p>
-        <p className="font-headline text-2xl font-extrabold text-on-surface">{value}</p>
       </div>
     </div>
   );
