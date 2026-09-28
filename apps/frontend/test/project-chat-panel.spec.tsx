@@ -166,3 +166,18 @@ describe('ProjectChatPanel (T-204)', () => {
     expect(screen.getByText('Nuevo chat')).toBeInTheDocument();
   });
 });
+// El chat es una sección propia y fija abajo en la sidebar del proyecto.
+describe('ProjectChatPanel — sección «Chat del proyecto»', () => {
+  it('se titula «Chat del proyecto», conserva el estado de conexión y separa su bloque del menú', async () => {
+    useConversationsMock.mockReturnValue({ conversations: [CONVERSACION], isLoading: false });
+    await renderPanel(MEMBERS);
+
+    const seccion = screen.getByRole('region', { name: /Chat del proyecto/ });
+    expect(seccion).toHaveClass('shrink-0', 'border-t', 'pt-stack');
+    expect(screen.queryByText(/^Chats$/)).not.toBeInTheDocument();
+    expect(within(seccion).getByRole('status', { name: 'Chat en vivo conectado' })).toBeInTheDocument();
+    // El contador de no leídos es el real de la conversación.
+    const fila = within(seccion).getByRole('button', { name: /Luis Gómez/ });
+    expect(within(fila).getByText('2')).toBeInTheDocument();
+  });
+});

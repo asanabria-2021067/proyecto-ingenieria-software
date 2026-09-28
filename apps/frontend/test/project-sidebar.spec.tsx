@@ -444,3 +444,81 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
     expect(screen.getByTestId('project-chat-panel').parentElement).not.toHaveClass('hidden');
   });
 });
+// Sidebar del proyecto como navegación secundaria: fondo propio, encabezado
+// «Proyecto actual», grupos con aire, activo neutro y el chat abajo.
+describe('ProjectSidebar — identidad de navegación del proyecto', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    pathnameMock.mockReturnValue('/dashboard/projects/42/kanban');
+    mockLeader();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  const aside = () => document.querySelector('aside') as HTMLElement;
+
+  it('usa un fondo gris propio, distinto del blanco de la sidebar global', () => {
+    renderSidebar();
+
+    expect(aside()).toHaveClass('bg-surface-container', 'border-r');
+    expect(aside()).not.toHaveClass('bg-card');
+  });
+
+  it('el encabezado dice «Proyecto actual» sobre el nombre, que admite dos líneas', () => {
+    renderSidebar();
+
+    const etiqueta = within(aside()).getByText('Proyecto actual');
+    expect(etiqueta).toHaveClass('uppercase', 'text-xs', 'text-text-secondary');
+    const nombre = within(aside()).getByText('Proyecto de prueba');
+    expect(nombre).toHaveClass('line-clamp-2', 'font-semibold', 'text-text-primary');
+    expect(nombre).toHaveAttribute('title', 'Proyecto de prueba');
+    expect(etiqueta.compareDocumentPosition(nombre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(aside()).getByText('Líder')).toHaveClass('pill');
+  });
+
+  it('los grupos se separan con aire y sus títulos son encabezados discretos, sin iconos', () => {
+    renderSidebar();
+
+    const lista = document.getElementById('project-nav-42')!;
+    expect(lista).toHaveClass('gap-card');
+    for (const nombre of ['Trabajo', 'Equipo', 'Seguimiento']) {
+      const titulo = within(lista).getByText(nombre);
+      expect(titulo).toHaveClass('uppercase', 'text-xs', 'text-text-secondary');
+      expect(titulo.querySelector('svg')).toBeNull();
+    }
+  });
+
+  it('el destino activo se marca con fondo neutro y seminegrita, sin verde', () => {
+    renderSidebar();
+
+    const [activo] = enlacesActivos();
+    expect(activo).toHaveTextContent('Tablero');
+    expect(activo).toHaveClass('bg-on-surface/8', 'font-semibold', 'text-text-primary');
+    expect(activo.className).not.toMatch(/(?<![\w-])(bg-primary|text-primary)\b/);
+    const inactivo = within(aside()).getByRole('link', { name: 'Sprints' });
+    expect(inactivo).toHaveClass('font-medium', 'text-text-secondary');
+  });
+
+  it('el menú ocupa el espacio libre y el chat del proyecto queda al final de la sidebar', () => {
+    renderSidebar();
+
+    const nav = within(aside()).getByRole('navigation', { name: 'Navegación del proyecto' });
+    expect(nav).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto');
+    const chat = screen.getByTestId('project-chat-panel');
+    expect(nav.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(aside().lastElementChild).toContainElement(chat);
+  });
+
+  it('colapsada, el botón de chat se anuncia como «Chat del proyecto»', async () => {
+    window.localStorage.setItem('uvg-collab-project-sidebar', 'collapsed');
+    renderSidebar();
+
+    const boton = screen.getByRole('button', { name: 'Mostrar chats del proyecto' });
+    fireEvent.focus(boton);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Chat del proyecto');
+  });
+});
