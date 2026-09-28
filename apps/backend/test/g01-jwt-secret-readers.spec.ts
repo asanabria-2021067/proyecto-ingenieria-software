@@ -170,18 +170,16 @@ describe('G01-C04: módulos realtime/admin usan el proveedor JWT validado', () =
     expect(offenders).toEqual([]);
   });
 
-  // Tipo B (G07-C02 · OWASP25-C025): G01 fijaba que los gateways verificaban
-  // solo la firma con el JwtService de su módulo; eso aceptaba tokens de reset
-  // y cuentas bloqueadas. El de notificaciones pasa a la política compartida
+  // Tipo B (G07-C02/C03 · OWASP25-C025): G01 fijaba que los gateways
+  // verificaban solo la firma con el JwtService de su módulo; eso aceptaba
+  // tokens de reset y cuentas bloqueadas. Ambos pasan a la política compartida
   // (ws-auth), que usa ese MISMO JwtService. Se conserva lo que G01 protege:
   // ningún gateway lee el secreto por su cuenta.
-  it('el gateway de notificaciones usa la política compartida; el de chat aún verifica con su JwtService', () => {
-    const notifications = readFileSync(join(SRC, 'notifications/notifications.gateway.ts'), 'utf8');
-    expect(notifications).toContain('this.wsAuth.authenticate(client.handshake)');
-    expect(notifications).not.toContain('verifyAsync');
-    const chat = readFileSync(join(SRC, 'chat/chat.gateway.ts'), 'utf8');
-    expect(chat).toContain('this.jwtService.verifyAsync(token)');
-    for (const source of [notifications, chat]) {
+  it('los gateways usan la política compartida, que verifica con el JwtService de su módulo', () => {
+    for (const gateway of ['notifications/notifications.gateway.ts', 'chat/chat.gateway.ts']) {
+      const source = readFileSync(join(SRC, gateway), 'utf8');
+      expect(source).toContain('this.wsAuth.authenticate(client.handshake)');
+      expect(source).not.toContain('verifyAsync');
       expect(source).not.toContain('jwt-secret');
     }
   });
