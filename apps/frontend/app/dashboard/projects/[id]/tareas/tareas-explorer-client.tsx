@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
-import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,15 @@ import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detai
 interface Props {
   idProyecto: number;
 }
+
+/**
+ * Barra de búsqueda y filtros como la de Mis Tareas: fuera de la tarjeta,
+ * buscador ancho y selects blancos. Mide el ancho del área del proyecto:
+ * una sola fila desde 64rem; antes, el buscador va en su propia fila.
+ */
+const BARRA_FILTROS =
+  'grid grid-cols-1 gap-4 @xl/project:grid-cols-2 @3xl/project:grid-cols-3 @5xl/project:flex';
+const FILTRO_TRIGGER = `w-full ${DASHBOARD_FILTER_TRIGGER_CLASS}`;
 
 const TAMANO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
@@ -177,89 +186,79 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
         )}
       </ProjectPageHeader>
 
-      {/* toolbar + tabla + paginación */}
+      {/* resultados + limpiar, sobre la barra (mismo criterio que Mis Tareas) */}
+      <div className="mb-stack flex min-h-8 flex-wrap items-center justify-between gap-inline">
+        <p className="type-body text-text-secondary" aria-live="polite" role="status">
+          Resultados: <span className="font-semibold tabular-nums text-text-primary">{tareasFiltradas.length}</span>
+          {hayFiltrosActivos && ` de ${tasks.length} tareas en total`}
+        </p>
+        {hayFiltrosActivos && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={limpiarFiltros}
+            className="font-medium text-primary"
+          >
+            Limpiar filtros
+          </Button>
+        )}
+      </div>
+
+      {/* barra de búsqueda y filtros sobre el fondo, fuera de la tarjeta */}
+      <section aria-label="Filtros de tareas" className={`mb-stack ${BARRA_FILTROS}`}>
+        <DashboardSearchField
+          containerClassName="@xl/project:col-span-2 @3xl/project:col-span-3 @5xl/project:flex-1"
+          value={busqueda}
+          onChange={(e) => actualizarBusqueda(e.target.value)}
+          placeholder="Buscar por título o descripción..."
+          aria-label="Buscar tareas por título o descripción"
+        />
+
+        <Select value={estadoFiltro} onValueChange={actualizarEstado}>
+          <SelectTrigger aria-label="Filtrar por estado" className={`${FILTRO_TRIGGER} @5xl/project:w-44`}>
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={FILTRO_TODOS}>Todos los estados</SelectItem>
+            {Object.entries(ESTADO_LABEL).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={prioridadFiltro} onValueChange={actualizarPrioridad}>
+          <SelectTrigger aria-label="Filtrar por prioridad" className={`${FILTRO_TRIGGER} @5xl/project:w-44`}>
+            <SelectValue placeholder="Prioridad" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={FILTRO_TODOS}>Todas las prioridades</SelectItem>
+            {Object.entries(PRIORIDAD_LABEL).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={ordenValor} onValueChange={actualizarOrden}>
+          <SelectTrigger aria-label="Ordenar tareas" className={`${FILTRO_TRIGGER} @5xl/project:w-60`}>
+            <SelectValue placeholder="Ordenar" />
+          </SelectTrigger>
+          <SelectContent>
+            {OPCIONES_ORDEN.map((opcion) => (
+              <SelectItem key={opcion.value} value={opcion.value}>
+                {opcion.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </section>
+
+      {/* tabla + paginación */}
       <div className="card-base min-h-0">
-        <div className="mb-stack flex flex-col gap-inline lg:flex-row lg:flex-wrap lg:items-center">
-          <DashboardSearchField
-            containerClassName="w-full lg:max-w-xs"
-            value={busqueda}
-            onChange={(e) => actualizarBusqueda(e.target.value)}
-            placeholder="Buscar por título o descripción..."
-            aria-label="Buscar tareas por título o descripción"
-          />
-
-          <Select value={estadoFiltro} onValueChange={actualizarEstado}>
-            <SelectTrigger
-              aria-label="Filtrar por estado"
-              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-44"
-            >
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={FILTRO_TODOS}>Todos los estados</SelectItem>
-              {Object.entries(ESTADO_LABEL).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={prioridadFiltro} onValueChange={actualizarPrioridad}>
-            <SelectTrigger
-              aria-label="Filtrar por prioridad"
-              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-44"
-            >
-              <SelectValue placeholder="Prioridad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={FILTRO_TODOS}>Todas las prioridades</SelectItem>
-              {Object.entries(PRIORIDAD_LABEL).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={ordenValor} onValueChange={actualizarOrden}>
-            <SelectTrigger
-              aria-label="Ordenar tareas"
-              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-64"
-            >
-              <SelectValue placeholder="Ordenar" />
-            </SelectTrigger>
-            <SelectContent>
-              {OPCIONES_ORDEN.map((opcion) => (
-                <SelectItem key={opcion.value} value={opcion.value}>
-                  {opcion.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {hayFiltrosActivos && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={limpiarFiltros}
-              className="font-medium text-primary lg:ml-auto"
-            >
-              Limpiar filtros
-            </Button>
-          )}
-        </div>
-
-        {/* contador de resultados */}
-        <div className="mb-inline flex items-center gap-tight" aria-live="polite" role="status">
-          <span className="pill pill-accent">
-            {tareasFiltradas.length} {tareasFiltradas.length === 1 ? 'resultado' : 'resultados'}
-          </span>
-          {hayFiltrosActivos && (
-            <span className="type-meta">de {tasks.length} tareas en total</span>
-          )}
-        </div>
 
         {/* loading — skeleton con forma de fila (título + meta + pastillas), nunca spinner */}
         {isLoading && (
