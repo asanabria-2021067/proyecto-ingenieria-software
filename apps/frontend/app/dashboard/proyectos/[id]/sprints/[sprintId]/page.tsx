@@ -4,7 +4,6 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
-  BarChart3,
   Calendar,
   CheckCircle2,
   Clock,
@@ -355,30 +354,18 @@ function SprintDetailContent({
             : 'Resumen histórico del trabajo, las contribuciones y los hitos de este Sprint.'
         }
         actions={
-          <>
-            {cerrado && (
-              <Button
-                asChild
-                variant="outline"
-                className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-              >
-                <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/finalizar`}>
-                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  Horas acreditadas
-                </Link>
-              </Button>
-            )}
+          cerrado && (
             <Button
               asChild
               variant="outline"
               className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
             >
-              <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/analytics`}>
-                <BarChart3 className="size-3.5" aria-hidden="true" />
-                Ver analítica
+              <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/finalizar`}>
+                <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                Horas acreditadas
               </Link>
             </Button>
-          </>
+          )
         }
       >
         <div className="mt-tight flex flex-wrap items-center gap-x-inline gap-y-micro">
