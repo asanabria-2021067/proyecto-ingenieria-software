@@ -57,10 +57,11 @@ export const CHECKS = [
     verify: (r) => [r.status === 403 || `status ${r.status} != 403`],
   },
   {
+    // G04-C11 (P1): antes caía en el frontend (308); ahora llega al backend.
     id: 'HARN-03',
-    title: '/socket.io/ via nginx cae en el frontend y responde 308 (sin P1)',
+    title: '/socket.io/ via nginx llega al backend (P1): el polling responde 200',
     request: { path: '/socket.io/?EIO=4&transport=polling', secure: true },
-    verify: (r) => [r.status === 308 || `status ${r.status} != 308`],
+    verify: (r) => [r.status === 200 || `status ${r.status} != 200`],
   },
   {
     id: 'HARN-04',

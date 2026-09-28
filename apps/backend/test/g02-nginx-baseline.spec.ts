@@ -67,19 +67,42 @@ describe('G02-C16: baseline nginx versionado', () => {
 
   it('el site versionado contiene solo los locations del proyecto y ninguno ajeno', () => {
     const locations = [...SITE.matchAll(/^\s*location\s+(\S+)\s*\{/gm)].map((match) => match[1]);
-    expect(locations).toEqual(['/.well-known/acme-challenge/', '/', '/api']);
+    // G04-C11 añade /socket.io/ (P1).
+    expect(locations).toEqual(['/.well-known/acme-challenge/', '/', '/socket.io/', '/api']);
     for (const excluded of exclusions.excludedLocations) {
       expect(SITE).not.toContain(`location ${excluded}`);
     }
     expect(SITE).toContain(`${EXCLUSION_MARKER} ${exclusions.excludedLocations.join(' ')}`);
   });
 
-  it('refleja el comportamiento actual sin adelantar P1', () => {
-    expect(SITE).not.toMatch(/socket\.io/);
-    expect(SITE).toContain('proxy_pass http://localhost:3000;');
-    expect(SITE).toContain('proxy_pass http://localhost:3001;');
+  /**
+   * Prueba tipo B (G04-C11 · P1/T13). Antes exigía que el site NO tuviera
+   * /socket.io/ y que los upstreams fueran `localhost`: era el contrato de
+   * "baseline sin adelantar P1" de G02. G04 versiona P1 a propósito; lo que
+   * sigue exigiéndose es que P1 sea aditivo (sin redirect, HSTS ni cambios de
+   * TLS) y que el manifiesto declare que aún no está aplicado en la VM.
+   */
+  it('G04-C11: P1 versionado y aditivo, pendiente de aplicar en producción', () => {
+    const socket = /location \/socket\.io\/ \{([\s\S]*?)\n {4}\}/.exec(SITE)?.[1] ?? '';
+    expect(socket).toContain('proxy_pass http://127.0.0.1:3001;');
+    expect(socket).toContain('proxy_set_header Upgrade $http_upgrade;');
+    expect(socket).toContain("proxy_set_header Connection 'upgrade';");
+    expect(Number(/proxy_read_timeout (\d+)s;/.exec(socket)?.[1])).toBeGreaterThanOrEqual(60);
+    expect(SITE).toContain('proxy_pass http://127.0.0.1:3000;');
+    expect(SITE).not.toContain('proxy_pass http://localhost');
     expect(SITE).toContain('listen 443 ssl;');
     expect(SITE).not.toMatch(/add_header|return 301/);
+    const pending = (manifest as unknown as { pendingLiveChanges?: Array<{ gate: string; appliedInProduction: boolean }> })
+      .pendingLiveChanges;
+    expect(pending).toEqual([expect.objectContaining({ gate: 'G04-C11', appliedInProduction: false })]);
+  });
+
+  it('G04-C11: contra la configuración viva previa a P1, el comparador reporta la diferencia (no la esconde)', () => {
+    const prePrevio = liveFixture(SITE)
+      .replace(/\n {4}# \[G04-C11\][\s\S]*?location \/socket\.io\/ \{[\s\S]*?\n {4}\}\n/, '\n')
+      .replaceAll('http://127.0.0.1:', 'http://localhost:');
+    expect(prePrevio).not.toContain('socket.io');
+    expect(compareSite(prePrevio, SITE, exclusions).length).toBeGreaterThan(0);
   });
 
   it('el comparador acepta un site vivo que solo difiere por las exclusiones declaradas', () => {
@@ -93,11 +116,11 @@ describe('G02-C16: baseline nginx versionado', () => {
     });
 
     it('un upstream cambiado', () => {
-      const live = liveFixture(SITE).replace('proxy_pass http://localhost:3001;', 'proxy_pass http://127.0.0.1:3001;');
+      const live = liveFixture(SITE).replace('proxy_pass http://127.0.0.1:3001;', 'proxy_pass http://localhost:3001;');
       expect(compareSite(live, SITE, exclusions).length).toBeGreaterThan(0);
     });
 
-    it('P1 aplicado en vivo sin versionar', () => {
+    it('un segundo /socket.io/ aplicado en vivo sin versionar', () => {
       const live = liveFixture(SITE).replace(
         '    # Backend API',
         '    location /socket.io/ {\n        proxy_pass http://localhost:3001;\n    }\n\n    # Backend API',
