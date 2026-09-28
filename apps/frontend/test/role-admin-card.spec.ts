@@ -237,4 +237,3 @@ describe('RoleAdminCard — tamaño de las acciones', () => {
     }
   });
 });
-
