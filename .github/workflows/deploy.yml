@@ -69,10 +69,18 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+          # G06 (OWASP25-C039): modo de la CSP (build-time). 'report-only' es el
+          # comportamiento actual; 'enforce' lo activa el administrador y produce
+          # otra variante inmutable.
+          CSP_MODE: ${{ vars.CSP_MODE || 'report-only' }}
         run: |
           set -euo pipefail
-          digest=$(printf 'NEXT_PUBLIC_API_URL=%s\nNEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\nNEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\n' \
-            "$NEXT_PUBLIC_API_URL" "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME" "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET" \
+          case "$CSP_MODE" in
+            report-only|enforce) ;;
+            *) echo "CSP_MODE solo admite report-only o enforce" >&2; exit 1 ;;
+          esac
+          digest=$(printf 'NEXT_PUBLIC_API_URL=%s\nNEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\nNEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\nCSP_MODE=%s\n' \
+            "$NEXT_PUBLIC_API_URL" "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME" "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET" "$CSP_MODE" \
             | sha256sum | cut -c1-12)
           echo "variant=cfg-${digest}" >> "$GITHUB_OUTPUT"
 
@@ -150,6 +158,7 @@ jobs:
             NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+            CSP_MODE=${{ vars.CSP_MODE || 'report-only' }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
 

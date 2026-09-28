@@ -54,3 +54,35 @@ export function buildContentSecurityPolicy(apiUrl: string | undefined): string {
     .map(([name, sources]) => `${name} ${sources.join(' ')}`)
     .join('; ');
 }
+
+/**
+ * G06 (OWASP25-C039): modo de la CSP, fijado en el BUILD (las cabeceras de
+ * next.config quedan en routes-manifest). `report-only` (default) aplica solo
+ * frame-ancestors y deja la política completa en Report-Only; `enforce` aplica
+ * la política completa. Un valor inválido hace fallar el build.
+ */
+export const CSP_MODES = ['report-only', 'enforce'] as const;
+export type CspMode = (typeof CSP_MODES)[number];
+
+export function parseCspMode(value: string | undefined): CspMode {
+  const mode = value?.trim();
+  if (!mode) {
+    return 'report-only';
+  }
+  if ((CSP_MODES as readonly string[]).includes(mode)) {
+    return mode as CspMode;
+  }
+  throw new Error(`CSP_MODE debe ser ${CSP_MODES.join(' o ')}`);
+}
+
+export function cspResponseHeaders(mode: CspMode, apiUrl: string | undefined): Array<{ key: string; value: string }> {
+  const policy = buildContentSecurityPolicy(apiUrl);
+  if (mode === 'enforce') {
+    return [{ key: 'Content-Security-Policy', value: policy }];
+  }
+  return [
+    // frame-ancestors solo se respeta en una CSP aplicada.
+    { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+    { key: 'Content-Security-Policy-Report-Only', value: policy },
+  ];
+}

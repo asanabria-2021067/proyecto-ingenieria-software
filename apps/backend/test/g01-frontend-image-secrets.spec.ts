@@ -8,7 +8,8 @@ import { findStep, loadWorkflow, readRepoFile } from './helpers/workflow-yaml';
  * El guard se prueba contra fixtures para demostrar que falla cuando debe.
  */
 
-const PUBLIC_BUILD_CONFIG = new Set(['NEXT_TELEMETRY_DISABLED', 'NODE_OPTIONS', 'NODE_ENV', 'PORT', 'HOSTNAME']);
+// G06-C05: CSP_MODE es configuración pública de build (report-only | enforce), no un secreto.
+const PUBLIC_BUILD_CONFIG = new Set(['NEXT_TELEMETRY_DISABLED', 'NODE_OPTIONS', 'NODE_ENV', 'PORT', 'HOSTNAME', 'CSP_MODE']);
 
 const SERVER_ONLY_SECRETS = [
   'RESEND_API_KEY',
