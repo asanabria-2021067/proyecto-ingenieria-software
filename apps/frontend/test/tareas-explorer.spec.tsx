@@ -227,6 +227,37 @@ describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
       encabezados.forEach((th) => expect(th).toHaveAttribute('scope', 'col'));
     });
 
+    it('la tabla usa el formato de Mis Tareas sin cambiar sus columnas', () => {
+      mockTareas({ tasks: TAREAS_FIXTURE });
+      renderExplorer();
+
+      const tabla = screen.getByRole('table');
+      const encabezados = screen.getAllByRole('columnheader');
+      // mismo contenido: las 7 columnas de siempre, en el mismo orden
+      expect(encabezados.map((th) => th.textContent)).toEqual([
+        'Título',
+        'Hito',
+        'Estado',
+        'Prioridad',
+        'Fecha límite',
+        'Asignado a',
+        'Etiquetas',
+      ]);
+      // franja guía gris verdosa con etiquetas pequeñas en seminegrita
+      const filaGuia = encabezados[0].closest('tr')!;
+      expect(filaGuia).toHaveClass('bg-surface-container-low', 'border-outline-variant/50');
+      for (const th of encabezados) expect(th).toHaveClass('text-xs', 'font-semibold', 'text-text-secondary');
+      // filas con divisor tenue y hover suave; título en seminegrita charcoal
+      const [, primeraFila] = within(tabla).getAllByRole('row');
+      expect(primeraFila).toHaveClass('border-outline-variant/50', 'hover:bg-surface-container-low');
+      expect(within(primeraFila).getAllByRole('cell')[0]).toHaveClass('font-semibold', 'text-text-primary');
+      // la tabla llega al borde de su tarjeta y la paginación va en su propia tarjeta
+      expect(tabla.closest('.card-base')).toHaveClass('p-0', 'overflow-hidden');
+      const paginacion = screen.getByRole('navigation', { name: 'Paginación de tareas' });
+      expect(paginacion).toHaveClass('card-base');
+      expect(tabla.closest('.card-base')).not.toContainElement(paginacion);
+    });
+
     it('el contador de resultados es una región aria-live para lectores de pantalla', () => {
       mockTareas({ tasks: TAREAS_FIXTURE });
       renderExplorer();
