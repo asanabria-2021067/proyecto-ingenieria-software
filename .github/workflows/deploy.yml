@@ -335,6 +335,9 @@ jobs:
           # loopback que activa el administrador (solo esos dos valores).
           BACKEND_BIND: ${{ vars.BACKEND_BIND || '0.0.0.0' }}
           FRONTEND_BIND: ${{ vars.FRONTEND_BIND || '0.0.0.0' }}
+          # G06 (OWASP25-C049 parcial): 'false' reproduce las cookies actuales.
+          # 'true' (Secure) solo cuando todo el trafico sea HTTPS: Gate Admin.
+          COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'false' }}
         run: |
           set -euo pipefail
           umask 077
@@ -342,6 +345,10 @@ jobs:
             echo "TRUST_PROXY_HOPS debe ser un entero >= 0" >&2
             exit 1
           fi
+          case "$COOKIE_SECURE" in
+            true|false) ;;
+            *) echo "COOKIE_SECURE solo admite true o false" >&2; exit 1 ;;
+          esac
           for bind in "$BACKEND_BIND" "$FRONTEND_BIND"; do
             case "$bind" in
               0.0.0.0|127.0.0.1) ;;
@@ -370,6 +377,7 @@ jobs:
             printf 'TRUST_PROXY_HOPS=%s\n' "$TRUST_PROXY_HOPS"
             printf 'BACKEND_BIND=%s\n' "$BACKEND_BIND"
             printf 'FRONTEND_BIND=%s\n' "$FRONTEND_BIND"
+            printf 'COOKIE_SECURE=%s\n' "$COOKIE_SECURE"
           } > "$work/env"
           ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             -o UserKnownHostsFile="$work/known_hosts" "$SERVER_USER@$SERVER_IP" \

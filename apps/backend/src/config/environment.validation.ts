@@ -160,12 +160,29 @@ export function parseTrustProxyHops(value: string | undefined): number {
   return Number(value);
 }
 
+export const COOKIE_SECURE_VARIABLE = 'COOKIE_SECURE';
+
+/**
+ * G06 (OWASP25-C049 parcial): contrato de COOKIE_SECURE. Solo `true` o `false`
+ * (ausente o vacío = false, comportamiento actual). Cualquier otro valor falla
+ * el arranque en lugar de dejar cookies sin Secure en silencio.
+ */
+export function parseCookieSecure(value: string | undefined): boolean {
+  if (value === undefined || value === '') {
+    return false;
+  }
+  if (value === 'true' || value === 'false') {
+    return value === 'true';
+  }
+  throw new Error(`${COOKIE_SECURE_VARIABLE} must be true or false`);
+}
+
 function deriveAppEnvironment(raw: RawEnvironment): AppEnvironment {
   return {
     nodeEnv: readString(raw, 'NODE_ENV') ?? 'development',
     port: parsePort(raw, 'PORT', 3001),
     frontendUrl: assertFrontendUrl(readString(raw, 'FRONTEND_URL')),
-    cookieSecure: readString(raw, 'COOKIE_SECURE') === 'true',
+    cookieSecure: parseCookieSecure(readString(raw, COOKIE_SECURE_VARIABLE)),
     redis: {
       host: readString(raw, 'REDIS_HOST') ?? 'localhost',
       port: parsePort(raw, 'REDIS_PORT', 6379),

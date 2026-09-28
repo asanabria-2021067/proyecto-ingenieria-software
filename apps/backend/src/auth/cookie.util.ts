@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { parseCookieSecure } from '../config/environment.validation';
 
 export const ACCESS_TOKEN_TTL = '1h';
 export const REFRESH_TOKEN_TTL = '30d';
@@ -9,10 +10,11 @@ function cookieOptions(maxAge: number) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
-    // Deploy actual sirve por HTTP plano (sin TLS); una cookie `secure` en ese
-    // caso el navegador la descarta silenciosamente y la sesión nunca prende.
-    // Activar con COOKIE_SECURE=true cuando el despliegue tenga HTTPS.
-    secure: process.env.COOKIE_SECURE === 'true',
+    // Deploy actual sirve también por HTTP plano; una cookie `secure` en ese
+    // caso el navegador la descarta y la sesión nunca prende. Activar con
+    // COOKIE_SECURE=true cuando todo el tráfico sea HTTPS (Gate Admin).
+    // G06: mismo parser estricto que el validador del arranque.
+    secure: parseCookieSecure(process.env.COOKIE_SECURE?.trim()),
     path: '/',
     maxAge,
   };

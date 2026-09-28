@@ -171,7 +171,8 @@ describe('G04-C10: binds de backend/frontend parametrizados', () => {
         for (const key of Object.keys(step?.env ?? {})) {
           env[key] = `synthetic-${key.toLowerCase()}`;
         }
-        Object.assign(env, { TRUST_PROXY_HOPS: '0', BACKEND_BIND: '0.0.0.0', FRONTEND_BIND: '0.0.0.0', [name]: value });
+        // G06-C07: COOKIE_SECURE también se valida en el paso; recibe su default.
+        Object.assign(env, { TRUST_PROXY_HOPS: '0', COOKIE_SECURE: 'false', BACKEND_BIND: '0.0.0.0', FRONTEND_BIND: '0.0.0.0', [name]: value });
         const result = spawnSync('bash', ['-c', step?.run ?? 'exit 99'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
         expect(result.status).toBe(1);
         expect(result.stderr).toContain('solo admiten 0.0.0.0 o 127.0.0.1');
