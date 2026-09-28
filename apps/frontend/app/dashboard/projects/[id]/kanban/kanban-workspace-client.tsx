@@ -282,7 +282,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
       />
 
       {/* TARJETA RESUMEN DEL PROYECTO (Secciones 10-15): contenido, no encabezado de página */}
-      <div className="mb-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:p-6">
+      <div className="card-base mb-grid">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
             <h2 className="type-section line-clamp-2 text-text-primary">{proyecto.tituloProyecto}</h2>
@@ -327,7 +327,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
       {/* TARJETA PRINCIPAL: pestañas + barra de herramientas + contenido (Sección 10-11).
           Una sola tarjeta blanca envuelve Tablero e Hitos; el scroll horizontal
           del tablero pertenece al área interna del board, no a la página. */}
-      <div className="min-h-0 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm md:p-5">
+      <div className="card-base min-h-0 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 gap-0">
           <TabsList className="mb-7 h-9 w-full justify-start gap-0 rounded-none border-b border-outline-variant/40 bg-transparent p-0">
             <TabsTrigger
@@ -628,12 +628,14 @@ export default function KanbanWorkspaceClient({ id }: Props) {
 
   if (error || !proyecto) {
     return (
-        <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <p className="font-medium text-destructive">No se pudo cargar el proyecto. Intenta nuevamente.</p>
-          <Button asChild variant="outline" size="sm" className="mt-4">
-            <Link href="/dashboard/proyectos">Volver a mis proyectos</Link>
-          </Button>
-        </div>
+        <ProjectPageShell>
+          <div className="mx-auto max-w-prose py-16 text-center">
+            <p className="font-medium text-destructive">No se pudo cargar el proyecto. Intenta nuevamente.</p>
+            <Button asChild variant="outline" size="sm" className="mt-4">
+              <Link href="/dashboard/proyectos">Volver a mis proyectos</Link>
+            </Button>
+          </div>
+        </ProjectPageShell>
     );
   }
 
