@@ -107,6 +107,23 @@ describe('Vistas del proyecto sobre el shell compartido', () => {
     expect(fuente).toMatch(/<ProjectPageHeader\b/);
   });
 
+  it.each([
+    'app/dashboard/projects/[id]/kanban/kanban-workspace-client.tsx',
+    'app/dashboard/projects/[id]/tareas/tareas-explorer-client.tsx',
+  ])('%s usa el shell y deja su título fuera de las tarjetas', (ruta) => {
+    const fuente = leer(ruta);
+    expect(fuente).toMatch(/<ProjectPageShell>/);
+    expect(fuente).toMatch(/<ProjectPageHeader\b/);
+    expect(fuente).not.toMatch(/<h1\b/);
+    expect(fuente).not.toMatch(/max-w-\[1600px\]|<Breadcrumb\b/);
+  });
+
+  it('el Resumen (líder y participante) titula la página fuera de la tarjeta del proyecto', () => {
+    const tarjeta = leer('components/projects/detail/project-header-card.tsx');
+    expect(tarjeta).toMatch(/<ProjectPageHeader\b[^>]*title="Resumen"/);
+    expect(tarjeta).not.toMatch(/<h1\b/);
+  });
+
   it.each(VISTAS_MIGRADAS)('%s no vuelve a fijar su propio ancho, gutter ni vuelta', (ruta) => {
     const fuente = leer(ruta);
     expect(fuente).not.toMatch(/max-w-\[1400px\]|max-w-\[900px\]/);

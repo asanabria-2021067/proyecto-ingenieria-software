@@ -2,14 +2,6 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ClipboardCheck, Lock, MapPin, Tag } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -20,6 +12,7 @@ import {
   tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { MODALIDAD_LABEL, type ModalidadProyecto } from '@/types';
+import { ProjectPageHeader } from '@/components/projects/detail/project-page-shell';
 
 /**
  * S7 (VIEW-01): la acción de cierre es un ENLACE a la preparación del cierre
@@ -85,10 +78,12 @@ interface ProjectHeaderCardProps {
 }
 
 /**
- * HU-154 (T-214/T-216): encabezado compartido del detalle de proyecto para
- * líder y participante: ruta de vuelta, etiquetas de estado/tipo/modalidad,
- * título, descripción corta y la acción principal. Las etiquetas de tipo y
- * estado usan el mapeo central de available-project-card.
+ * HU-154 (T-214/T-216): encabezado compartido del Resumen del proyecto para
+ * líder y participante. La página se identifica con el encabezado estándar
+ * del proyecto («Resumen» + vuelta al listado de origen) directo sobre el
+ * fondo; la tarjeta es contenido: etiquetas de estado/tipo/modalidad, nombre
+ * del proyecto (h2), descripción corta y la acción principal. Las etiquetas
+ * de tipo y estado usan el mapeo central de available-project-card.
  */
 export function ProjectHeaderCard({
   breadcrumb,
@@ -104,22 +99,8 @@ export function ProjectHeaderCard({
   const ModalidadIcon = MODALIDAD_ICON[modalidadProyecto as ModalidadProyecto] ?? MapPin;
 
   return (
-    <div className="flex flex-col gap-inline">
-      <Breadcrumb>
-        <BreadcrumbList className="type-meta">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={breadcrumb.href} className="text-text-secondary transition-colors hover:text-text-primary">
-                {breadcrumb.label}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="max-w-xs truncate font-medium text-text-primary">{titulo}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className="flex flex-col">
+      <ProjectPageHeader back={{ href: breadcrumb.href, label: `Volver a ${breadcrumb.label}` }} title="Resumen" />
 
       <section aria-label="Resumen del proyecto" className="card-base">
         <div className="flex flex-col gap-stack @2xl/project:flex-row @2xl/project:items-start @2xl/project:justify-between">
@@ -134,7 +115,7 @@ export function ProjectHeaderCard({
               </span>
             </div>
 
-            <h1 className="type-display line-clamp-2">{titulo}</h1>
+            <h2 className="type-section line-clamp-2 text-text-primary">{titulo}</h2>
             <p className="type-body line-clamp-2 max-w-prose text-text-secondary">
               {descripcion || 'Sin descripción disponible.'}
             </p>

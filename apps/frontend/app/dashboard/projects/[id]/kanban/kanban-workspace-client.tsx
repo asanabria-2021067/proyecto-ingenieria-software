@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Kanban, Plus, Tags } from 'lucide-react';
+import { Kanban, Plus, Tags } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
@@ -22,14 +22,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskBoard } from '@/components/projects/task-board';
 import { StartSprintButton } from '@/components/projects/start-sprint-button';
@@ -61,6 +53,7 @@ import {
 import { MODALIDAD_LABEL } from '@/types';
 import type { AvanceProyectoDTO, ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import type { TareaPublicaDTO } from '@/lib/types/tasks';
+import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 interface Props {
   id: number;
@@ -164,7 +157,7 @@ function WorkspaceProgress({
 // ─── Skeleton ──────────────────────────────────────────────────────────────
 function WorkspaceSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-5 py-6 md:px-7">
+    <ProjectPageShell>
       <Skeleton className="mb-4 h-4 w-72" />
       <Skeleton className="mb-6 h-16 w-full max-w-xl rounded-xl" />
       <Skeleton className="mb-4 h-9 w-48" />
@@ -173,7 +166,7 @@ function WorkspaceSkeleton() {
           <Skeleton key={i} className="h-[480px] w-[300px] shrink-0 rounded-xl" />
         ))}
       </div>
-    </div>
+    </ProjectPageShell>
   );
 }
 
@@ -276,43 +269,23 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   }, [currentUser, members, proyecto.roles]);
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-5 pb-10 pt-5 md:px-7">
-      {/* BREADCRUMB (Sección 26) */}
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList className="text-[13px]">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard/projects/mine" className="text-tertiary hover:text-on-surface">
-                Mis proyectos
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link
-                href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}
-                className="max-w-[16rem] truncate text-tertiary hover:text-on-surface"
-              >
-                {proyecto.tituloProyecto}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="font-medium text-on-surface">Kanban</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <ProjectPageShell>
+      {/* Identidad de la página fuera de las tarjetas: la vuelta al proyecto
+          (antes breadcrumb + botón dentro de la tarjeta) va en el encabezado. */}
+      <ProjectPageHeader
+        back={{
+          href: isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`,
+          label: 'Volver al proyecto',
+        }}
+        title="Tablero"
+        description="Workspace del proyecto"
+      />
 
-      {/* TARJETA RESUMEN DEL PROYECTO (Secciones 10-15) */}
+      {/* TARJETA RESUMEN DEL PROYECTO (Secciones 10-15): contenido, no encabezado de página */}
       <div className="mb-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
-            <h1 className="line-clamp-2 text-2xl font-bold leading-tight text-on-surface md:text-[28px]">
-              {proyecto.tituloProyecto}
-            </h1>
-            <p className="text-sm text-tertiary">Workspace del proyecto</p>
+            <h2 className="type-section line-clamp-2 text-text-primary">{proyecto.tituloProyecto}</h2>
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}
@@ -342,20 +315,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </span>
               ))}
             </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-            >
-              <Link href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}>
-                <ArrowLeft className="size-3.5" aria-hidden="true" />
-                Volver al proyecto
-              </Link>
-            </Button>
           </div>
         </div>
 
@@ -655,7 +614,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           />
         )}
       </div>
-    </div>
+    </ProjectPageShell>
   );
 }
 

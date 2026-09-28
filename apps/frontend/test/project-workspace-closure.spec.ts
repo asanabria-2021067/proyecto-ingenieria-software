@@ -140,7 +140,8 @@ describe('VIEW-01 — workspace del líder y cierre (F006)', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByLabelText(/No se pudo comprobar el estado del cierre/)).toBeInTheDocument());
-    expect(screen.getByRole('heading', { level: 1, name: 'Sistema de Tutorías' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sistema de Tutorías' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /preparar cierre del proyecto/i })).toBeDisabled();
   });
 

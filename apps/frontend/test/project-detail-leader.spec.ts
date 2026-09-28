@@ -259,8 +259,9 @@ describe('Tarjetas compartidas del detalle de proyecto', () => {
   it('ProjectHeaderCard: ruta de vuelta, título h1, descripción y etiquetas de estado/tipo/modalidad', () => {
     renderHeader({ etiquetas: ['Salud', 'Deporte'] });
 
-    expect(screen.getByRole('link', { name: 'Mis proyectos' })).toHaveAttribute('href', '/dashboard/projects/mine');
-    expect(screen.getByRole('heading', { level: 1, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Volver a Mis proyectos' })).toHaveAttribute('href', '/dashboard/projects/mine');
+    expect(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
     expect(screen.getByText('Descripción corta.')).toBeInTheDocument();
     const resumen = screen.getByRole('region', { name: 'Resumen del proyecto' });
     expect(within(resumen).getByText('En progreso')).toHaveClass('pill');
@@ -407,8 +408,8 @@ describe('ProjectDetailClient — esqueleto 8/4 del líder', () => {
     const { container } = renderPage();
 
     const full = slot(container, 'project-grid-full');
-    expect(within(full).getByRole('heading', { level: 1, name: 'Proyecto de prueba' })).toBeInTheDocument();
-    expect(within(full).getByRole('link', { name: 'Mis proyectos' })).toHaveAttribute('href', '/dashboard/projects/mine');
+    expect(within(full).getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    expect(within(full).getByRole('link', { name: 'Volver a Mis proyectos' })).toHaveAttribute('href', '/dashboard/projects/mine');
   });
 
   it('la columna principal tiene «Descripción y objetivos» y luego los roles', () => {

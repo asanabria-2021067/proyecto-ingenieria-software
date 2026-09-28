@@ -72,7 +72,13 @@ describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
       mockTareas({ tasks: TAREAS_FIXTURE });
       renderExplorer();
 
-      expect(screen.getByRole('heading', { name: 'UVG Collab' })).toBeInTheDocument();
+      // encabezado de página fuera de tarjetas; el proyecto es contexto
+      expect(screen.getByRole('heading', { level: 1, name: 'Lista de tareas' })).toBeInTheDocument();
+      expect(screen.getByText('UVG Collab')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Volver al Tablero' })).toHaveAttribute(
+        'href',
+        expect.stringMatching(/\/kanban$/),
+      );
       expect(screen.getByRole('table')).toBeInTheDocument();
       expect(
         screen.getByText(`${TAREAS_FIXTURE.length} resultados`),
