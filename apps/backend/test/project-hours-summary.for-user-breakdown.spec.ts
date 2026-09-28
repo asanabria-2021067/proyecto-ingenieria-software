@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import { ProjectHoursSummaryService } from '../src/sprints/project-hours-summary.service';
+import type { MisHorasView } from '../src/sprints/project-hours-summary.service';
 
 /**
  * HU-158 (T-231): lecturas de horas de UN usuario sobre un mundo en memoria.
@@ -208,7 +209,7 @@ function prismaDe(mundo: Mundo) {
         return mundo.participaciones
           .filter((p) => where.idUsuario === undefined || p.idUsuario === where.idUsuario)
           .filter((p) => where.estadoParticipacion === undefined || p.estadoParticipacion === where.estadoParticipacion)
-          .map((p) => ({ rolProyecto: { idProyecto: p.idProyecto } }));
+          .map((p) => ({ rolProyecto: { proyecto: proyectoFila(proyecto(p.idProyecto)) } }));
       },
     },
     perfilEstudiante: {
@@ -371,5 +372,395 @@ describe('ProjectHoursSummaryService.forUserOpenProjects — regresión', () => 
     for (const valor of [resultado.reportadasGranulares, resultado.legacy, resultado.acreditadas]) {
       expect(valor).toMatch(/^\d+\.\d{2}$/);
     }
+  });
+});
+
+// ─── forUserBreakdown (Mis Horas) ─────────────────────────────────────────
+
+const servicio = (mundo: Mundo) => new ProjectHoursSummaryService(prismaDe(mundo).prisma);
+const proyectoDe = (vista: MisHorasView, id: number) => vista.proyectos.find((p) => p.idProyecto === id)!;
+const suma = (valores: string[]) => valores.reduce((acc, v) => acc.plus(v), new Prisma.Decimal(0)).toFixed(2);
+
+/** Invariantes de consistencia entre niveles (INV-H03…H06, H12) para cualquier respuesta. */
+function expectInvariantes(vista: MisHorasView) {
+  const abiertos = vista.proyectos.filter((p) => p.abierto);
+  // INV-H03: los proyectos abiertos componen las registradas y el legacy abiertos.
+  expect(suma(abiertos.map((p) => p.registradas))).toBe(vista.totales.registradasEnProyectosAbiertos);
+  expect(suma(abiertos.map((p) => p.legacy))).toBe(vista.totales.legacyEnProyectosAbiertos);
+  // INV-H04: todos los proyectos componen propuestas y acreditadas.
+  expect(suma(vista.proyectos.map((p) => p.propuestasPendientes))).toBe(vista.totales.propuestasPendientes);
+  expect(suma(vista.proyectos.map((p) => p.acreditadas))).toBe(vista.totales.acreditadas);
+  // INV-H05: en cada proyecto abierto, sus tareas componen sus registradas y su legacy.
+  for (const p of abiertos) {
+    expect(suma(p.tareas.map((t) => t.registradas)), `registradas de ${p.tituloProyecto}`).toBe(p.registradas);
+    expect(suma(p.tareas.map((t) => t.legacy)), `legacy de ${p.tituloProyecto}`).toBe(p.legacy);
+  }
+  // INV-H06 / INV-H12: porTipo trae siempre los tres tipos, en orden, y compone los totales.
+  expect(vista.porTipo.map((t) => t.tipoProyecto)).toEqual([
+    'ACADEMICO_HORAS_BECA',
+    'EXTRACURRICULAR_EXTENSION',
+    'ACADEMICO_EXPERIENCIA',
+  ]);
+  expect(suma(vista.porTipo.map((t) => t.registradasEnProyectosAbiertos))).toBe(vista.totales.registradasEnProyectosAbiertos);
+  expect(suma(vista.porTipo.map((t) => t.propuestasPendientes))).toBe(vista.totales.propuestasPendientes);
+  expect(suma(vista.porTipo.map((t) => t.acreditadas))).toBe(vista.totales.acreditadas);
+  // Los proyectos que no están abiertos no exponen tareas.
+  for (const p of vista.proyectos.filter((x) => !x.abierto)) expect(p.tareas).toEqual([]);
+}
+
+/** Todos los importes de la respuesta, con su ruta, para validar el formato. */
+function importes(vista: MisHorasView): Array<[string, string]> {
+  const out: Array<[string, string]> = Object.entries(vista.totales).map(([k, v]) => [`totales.${k}`, v]);
+  for (const t of vista.porTipo) {
+    out.push([`porTipo.${t.tipoProyecto}.registradas`, t.registradasEnProyectosAbiertos]);
+    out.push([`porTipo.${t.tipoProyecto}.propuestas`, t.propuestasPendientes]);
+    out.push([`porTipo.${t.tipoProyecto}.acreditadas`, t.acreditadas]);
+  }
+  for (const p of vista.proyectos) {
+    for (const k of ['registradas', 'legacy', 'propuestasPendientes', 'acreditadas'] as const) {
+      out.push([`proyecto ${p.idProyecto}.${k}`, p[k]]);
+    }
+    for (const t of p.tareas) {
+      out.push([`tarea ${t.idTarea}.registradas`, t.registradas]);
+      out.push([`tarea ${t.idTarea}.legacy`, t.legacy]);
+    }
+  }
+  return out;
+}
+
+describe('ProjectHoursSummaryService.forUserBreakdown', () => {
+  it('usuario sin datos: ceros como "0.00", tres tipos, sin proyectos y sin metas', async () => {
+    const vista = await servicio(mundoVacio()).forUserBreakdown(ESTUDIANTE);
+
+    expect(vista).toEqual({
+      idUsuario: ESTUDIANTE,
+      requisitos: { horasBecaRequeridas: null, horasExtensionRequeridas: null },
+      totales: {
+        registradasEnProyectosAbiertos: '0.00',
+        legacyEnProyectosAbiertos: '0.00',
+        propuestasPendientes: '0.00',
+        acreditadas: '0.00',
+      },
+      porTipo: [
+        { tipoProyecto: 'ACADEMICO_HORAS_BECA', registradasEnProyectosAbiertos: '0.00', propuestasPendientes: '0.00', acreditadas: '0.00' },
+        { tipoProyecto: 'EXTRACURRICULAR_EXTENSION', registradasEnProyectosAbiertos: '0.00', propuestasPendientes: '0.00', acreditadas: '0.00' },
+        { tipoProyecto: 'ACADEMICO_EXPERIENCIA', registradasEnProyectosAbiertos: '0.00', propuestasPendientes: '0.00', acreditadas: '0.00' },
+      ],
+      proyectos: [],
+    });
+  });
+
+  it('totales, metas y desglose por tipo del mundo base', async () => {
+    const vista = await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE);
+
+    expect(vista.requisitos).toEqual({ horasBecaRequeridas: 40, horasExtensionRequeridas: 20 });
+    expect(vista.totales).toEqual({
+      // 5.50 Tutorías + 1.25 Huerto + 0.75 Radio (retirado); sin Archivo (cerrado) ni Borrado (eliminado).
+      registradasEnProyectosAbiertos: '7.50',
+      legacyEnProyectosAbiertos: '2.00',
+      // Solo la PENDIENTE de Tutorías; la RECHAZADA no suma.
+      propuestasPendientes: '4.00',
+      // Archivo (cerrado) + Borrado (eliminado).
+      acreditadas: '7.50',
+    });
+    expect(vista.porTipo).toEqual([
+      { tipoProyecto: 'ACADEMICO_HORAS_BECA', registradasEnProyectosAbiertos: '5.50', propuestasPendientes: '4.00', acreditadas: '6.00' },
+      { tipoProyecto: 'EXTRACURRICULAR_EXTENSION', registradasEnProyectosAbiertos: '2.00', propuestasPendientes: '0.00', acreditadas: '1.50' },
+      { tipoProyecto: 'ACADEMICO_EXPERIENCIA', registradasEnProyectosAbiertos: '0.00', propuestasPendientes: '0.00', acreditadas: '0.00' },
+    ]);
+    expectInvariantes(vista);
+  });
+
+  it('coincide con el dashboard en registradas abiertas y acreditadas para el mismo usuario (INV-H07)', async () => {
+    const mundo = mundoBase();
+    const [vista, dashboard] = await Promise.all([
+      servicio(mundo).forUserBreakdown(ESTUDIANTE),
+      servicio(mundo).forUserOpenProjects(ESTUDIANTE),
+    ]);
+
+    expect(vista.totales.registradasEnProyectosAbiertos).toBe(dashboard.reportadasGranulares);
+    expect(vista.totales.acreditadas).toBe(dashboard.acreditadas);
+    expect(vista.totales.legacyEnProyectosAbiertos).toBe(dashboard.legacy);
+  });
+
+  it('granular: suma los registros efectivos de la tarea y excluye los revocados', async () => {
+    const tutorias = proyectoDe(await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE), 1);
+
+    const disenar = tutorias.tareas.find((t) => t.idTarea === 101)!;
+    // 3.50 + 2.00; las 5.00 revocadas no cuentan y el caché horasReales tampoco se usa.
+    expect(disenar.registradas).toBe('5.50');
+    expect(disenar.legacy).toBe('0.00');
+    // Las 9.00 de OTRO en la misma tarea no son del estudiante.
+    expect(tutorias.registradas).toBe('5.50');
+  });
+
+  it('legacy: se informa aparte y nunca se suma a las registradas', async () => {
+    const tutorias = proyectoDe(await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE), 1);
+
+    const agenda = tutorias.tareas.find((t) => t.idTarea === 102)!;
+    expect(agenda).toMatchObject({ registradas: '0.00', legacy: '2.00' });
+    expect(tutorias).toMatchObject({ registradas: '5.50', legacy: '2.00' });
+  });
+
+  it('POR_CONCILIAR: aporta sus registros pero no genera legacy', async () => {
+    const huerto = proyectoDe(await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE), 2);
+
+    expect(huerto).toMatchObject({ registradas: '1.25', legacy: '0.00' });
+    expect(huerto.tareas).toEqual([
+      { idTarea: 201, tituloTarea: 'Riego', estadoTarea: 'POR_HACER', eliminada: false, sprint: null, registradas: '1.25', legacy: '0.00' },
+    ]);
+  });
+
+  it('propuesta, acreditada y rechazada quedan separadas por proyecto', async () => {
+    const vista = await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE);
+
+    expect(proyectoDe(vista, 1)).toMatchObject({ propuestasPendientes: '4.00', acreditadas: '0.00' });
+    expect(proyectoDe(vista, 3)).toMatchObject({ propuestasPendientes: '0.00', acreditadas: '6.00' });
+  });
+
+  it('proyecto abierto frente a cerrado: el cerrado conserva sus cifras y cuenta tareas, pero no las lista', async () => {
+    const vista = await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE);
+
+    expect(proyectoDe(vista, 1)).toMatchObject({ abierto: true, estadoProyecto: 'EN_PROGRESO', tareasDistintas: 2 });
+    expect(proyectoDe(vista, 5)).toMatchObject({ abierto: true, estadoProyecto: 'EN_SOLICITUD_CIERRE' });
+    expect(proyectoDe(vista, 3)).toEqual({
+      idProyecto: 3,
+      tituloProyecto: 'Archivo',
+      tipoProyecto: 'ACADEMICO_HORAS_BECA',
+      estadoProyecto: 'CERRADO',
+      abierto: false,
+      eliminado: false,
+      esLider: false,
+      participacionActiva: false,
+      registradas: '6.00',
+      legacy: '0.00',
+      propuestasPendientes: '0.00',
+      acreditadas: '6.00',
+      tareasDistintas: 1,
+      tareas: [],
+    });
+  });
+
+  it('retirado: sus tramos en un proyecto abierto siguen contando, con la participación marcada como no activa', async () => {
+    const radio = proyectoDe(await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE), 5);
+
+    expect(radio).toMatchObject({ abierto: true, participacionActiva: false, esLider: false, registradas: '0.75' });
+    expect(radio.tareas.map((t) => t.idTarea)).toEqual([501]);
+  });
+
+  it('líder sin participación: su proyecto aparece con esLider y sus horas cuentan', async () => {
+    const mundo = mundoBase();
+    mundo.proyectos.push({ idProyecto: 6, tituloProyecto: 'Mentorías', tipoProyecto: 'ACADEMICO_EXPERIENCIA', estadoProyecto: 'EN_PROGRESO', creadoPor: ESTUDIANTE });
+    mundo.tareas.push({ idTarea: 601, idProyecto: 6, idSprint: null, tituloTarea: 'Plan', estadoTarea: 'EN_PROGRESO' });
+    mundo.tramos.push({ idAsignacion: 1601, idTarea: 601, idUsuario: ESTUDIANTE, origenReporte: 'GRANULAR', horasReales: '2.00', registros: [{ horas: '2.00' }] });
+
+    const vista = await servicio(mundo).forUserBreakdown(ESTUDIANTE);
+
+    expect(proyectoDe(vista, 6)).toMatchObject({ esLider: true, participacionActiva: false, registradas: '2.00' });
+    // Experiencia también acumula en su tipo, aunque no tenga meta.
+    expect(vista.porTipo[2]).toEqual({
+      tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+      registradasEnProyectosAbiertos: '2.00',
+      propuestasPendientes: '0.00',
+      acreditadas: '0.00',
+    });
+    expect(vista.totales.registradasEnProyectosAbiertos).toBe('9.50');
+    expectInvariantes(vista);
+  });
+
+  it('tarea eliminada: sus horas siguen contando y la tarea queda marcada', async () => {
+    const mundo = mundoBase();
+    mundo.tareas.push({ idTarea: 103, idProyecto: 1, idSprint: 11, tituloTarea: 'Borrador', estadoTarea: 'POR_HACER', eliminada: true });
+    mundo.tramos.push({ idAsignacion: 1103, idTarea: 103, idUsuario: ESTUDIANTE, origenReporte: 'GRANULAR', horasReales: '1.00', registros: [{ horas: '1.00' }] });
+
+    const vista = await servicio(mundo).forUserBreakdown(ESTUDIANTE);
+    const tutorias = proyectoDe(vista, 1);
+
+    expect(tutorias.tareas.find((t) => t.idTarea === 103)).toMatchObject({ eliminada: true, registradas: '1.00' });
+    expect(tutorias.registradas).toBe('6.50');
+    expect(tutorias.tareasDistintas).toBe(3);
+    expect(vista.totales.registradasEnProyectosAbiertos).toBe('8.50');
+    expectInvariantes(vista);
+  });
+
+  it('proyecto eliminado con acreditadas: sigue representado y marcado como eliminado', async () => {
+    const vista = await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE);
+
+    expect(proyectoDe(vista, 4)).toMatchObject({
+      tituloProyecto: 'Borrado',
+      eliminado: true,
+      abierto: false,
+      // Sus tramos no se leen: solo cuenta lo acreditado.
+      registradas: '0.00',
+      acreditadas: '1.50',
+      tareas: [],
+    });
+  });
+
+  it('participante activo sin horas ve su proyecto en cero; un proyecto solo con horas rechazadas no aparece', async () => {
+    const mundo = mundoBase();
+    mundo.proyectos.push(
+      { idProyecto: 7, tituloProyecto: 'Nuevo', tipoProyecto: 'ACADEMICO_HORAS_BECA', estadoProyecto: 'PUBLICADO', creadoPor: LIDER_AJENO },
+      { idProyecto: 8, tituloProyecto: 'Rechazos', tipoProyecto: 'ACADEMICO_HORAS_BECA', estadoProyecto: 'CERRADO', creadoPor: LIDER_AJENO },
+    );
+    mundo.participaciones.push(
+      { idParticipacion: 97, idUsuario: ESTUDIANTE, idProyecto: 7, estadoParticipacion: 'ACTIVO' },
+      { idParticipacion: 98, idUsuario: ESTUDIANTE, idProyecto: 8, estadoParticipacion: 'COMPLETADO' },
+    );
+    mundo.horas.push({ idHorasParticipacion: 6, idParticipacion: 98, estadoHoras: 'RECHAZADA', horasCalculadas: '5.00', horasAprobadas: null });
+
+    const vista = await servicio(mundo).forUserBreakdown(ESTUDIANTE);
+
+    expect(proyectoDe(vista, 7)).toMatchObject({
+      abierto: true,
+      participacionActiva: true,
+      registradas: '0.00',
+      legacy: '0.00',
+      propuestasPendientes: '0.00',
+      acreditadas: '0.00',
+      tareasDistintas: 0,
+      tareas: [],
+    });
+    expect(vista.proyectos.map((p) => p.idProyecto)).not.toContain(8);
+    expectInvariantes(vista);
+  });
+
+  it('ordena los proyectos: abiertos primero, luego por título en español y por id', async () => {
+    const vista = await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE);
+    expect(vista.proyectos.map((p) => p.tituloProyecto)).toEqual(['Huerto', 'Radio', 'Tutorías', 'Archivo', 'Borrado']);
+
+    const mundo = mundoVacio();
+    const abierto = (idProyecto: number, tituloProyecto: string) => {
+      mundo.proyectos.push({ idProyecto, tituloProyecto, tipoProyecto: 'ACADEMICO_HORAS_BECA', estadoProyecto: 'EN_PROGRESO', creadoPor: LIDER_AJENO });
+      mundo.participaciones.push({ idParticipacion: 900 + idProyecto, idUsuario: ESTUDIANTE, idProyecto, estadoParticipacion: 'ACTIVO' });
+    };
+    abierto(1, 'Zoología');
+    abierto(2, 'árboles');
+    abierto(3, 'Biblioteca');
+    abierto(5, 'Árboles');
+    abierto(4, 'Árboles');
+    const orden = await servicio(mundo).forUserBreakdown(ESTUDIANTE);
+    // La tilde no manda la palabra al final (localeCompare 'es'); empate de título → idProyecto.
+    expect(orden.proyectos.map((p) => `${p.tituloProyecto}#${p.idProyecto}`)).toEqual([
+      'árboles#2',
+      'Árboles#4',
+      'Árboles#5',
+      'Biblioteca#3',
+      'Zoología#1',
+    ]);
+  });
+
+  it('ordena las tareas: Sprint más reciente primero, sin Sprint al final y luego por título', async () => {
+    const mundo = mundoBase();
+    mundo.tareas.push(
+      { idTarea: 104, idProyecto: 1, idSprint: 12, tituloTarea: 'Alertas', estadoTarea: 'POR_HACER' },
+      { idTarea: 105, idProyecto: 1, idSprint: null, tituloTarea: 'Backlog', estadoTarea: 'POR_HACER' },
+      { idTarea: 106, idProyecto: 1, idSprint: null, tituloTarea: 'Ámbito', estadoTarea: 'POR_HACER' },
+    );
+    for (const idTarea of [104, 105, 106]) {
+      mundo.tramos.push({ idAsignacion: 2000 + idTarea, idTarea, idUsuario: ESTUDIANTE, origenReporte: 'GRANULAR', horasReales: '0.50', registros: [{ horas: '0.50' }] });
+    }
+
+    const tutorias = proyectoDe(await servicio(mundo).forUserBreakdown(ESTUDIANTE), 1);
+
+    expect(tutorias.tareas.map((t) => `${t.sprint?.numero ?? '-'} ${t.tituloTarea}`)).toEqual([
+      '2 Agenda',
+      '2 Alertas',
+      '1 Diseñar sesiones',
+      '- Ámbito',
+      '- Backlog',
+    ]);
+    expect(tutorias.tareas[0].sprint).toEqual({ idSprint: 12, numero: 2, estado: 'ACTIVO' });
+  });
+
+  it('agrupa varios tramos de la misma tarea en una sola fila', async () => {
+    const mundo = mundoBase();
+    // Reasignación: segundo tramo del estudiante sobre la misma tarea 101.
+    mundo.tramos.push({ idAsignacion: 1010, idTarea: 101, idUsuario: ESTUDIANTE, origenReporte: 'GRANULAR', horasReales: '1.50', registros: [{ horas: '1.50' }] });
+
+    const tutorias = proyectoDe(await servicio(mundo).forUserBreakdown(ESTUDIANTE), 1);
+
+    expect(tutorias.tareas.filter((t) => t.idTarea === 101)).toHaveLength(1);
+    expect(tutorias.tareas.find((t) => t.idTarea === 101)!.registradas).toBe('7.00');
+    expect(tutorias.tareasDistintas).toBe(2);
+  });
+
+  it('todos los importes son strings con dos decimales y sin error de coma flotante (INV-H10)', async () => {
+    const mundo = mundoBase();
+    mundo.tramos.push({ idAsignacion: 1100, idTarea: 102, idUsuario: ESTUDIANTE, origenReporte: 'GRANULAR', horasReales: '0.30', registros: [{ horas: '0.10' }, { horas: '0.20' }] });
+
+    const vista = await servicio(mundo).forUserBreakdown(ESTUDIANTE);
+
+    expect(proyectoDe(vista, 1).tareas.find((t) => t.idTarea === 102)!.registradas).toBe('0.30');
+    for (const [ruta, valor] of importes(vista)) {
+      expect(typeof valor, ruta).toBe('string');
+      expect(valor, ruta).toMatch(/^\d+\.\d{2}$/);
+    }
+    expectInvariantes(vista);
+  });
+
+  it('hace exactamente cuatro consultas fijas con el usuario autenticado, sin importar cuántos proyectos y tareas haya (INV-H09)', async () => {
+    const mundo = mundoBase();
+    for (let p = 0; p < 25; p += 1) {
+      const idProyecto = 100 + p;
+      mundo.proyectos.push({ idProyecto, tituloProyecto: `Proyecto ${p}`, tipoProyecto: 'EXTRACURRICULAR_EXTENSION', estadoProyecto: 'EN_PROGRESO', creadoPor: LIDER_AJENO });
+      for (let t = 0; t < 6; t += 1) {
+        const idTarea = idProyecto * 100 + t;
+        mundo.tareas.push({ idTarea, idProyecto, idSprint: null, tituloTarea: `Tarea ${t}`, estadoTarea: 'HECHO' });
+        mundo.tramos.push({ idAsignacion: idTarea, idTarea, idUsuario: ESTUDIANTE, origenReporte: 'GRANULAR', horasReales: '1.00', registros: [{ horas: '1.00' }] });
+      }
+    }
+    const { prisma, llamadas } = prismaDe(mundo);
+
+    const vista = await new ProjectHoursSummaryService(prisma).forUserBreakdown(ESTUDIANTE);
+
+    expect(vista.proyectos).toHaveLength(30);
+    expect(llamadas.map((l) => l.modelo).sort()).toEqual([
+      'asignacionTarea.findMany',
+      'horasParticipacion.findMany',
+      'participacionProyecto.findMany',
+      'perfilEstudiante.findUnique',
+    ]);
+    const where = Object.fromEntries(llamadas.map((l) => [l.modelo, l.args.where]));
+    expect(where).toEqual({
+      'perfilEstudiante.findUnique': { idUsuario: ESTUDIANTE },
+      'asignacionTarea.findMany': { idUsuario: ESTUDIANTE, tarea: { proyecto: { eliminadoEn: null } } },
+      'horasParticipacion.findMany': { participacion: { idUsuario: ESTUDIANTE } },
+      'participacionProyecto.findMany': { idUsuario: ESTUDIANTE, estadoParticipacion: 'ACTIVO' },
+    });
+    // El líder se deduce de `creadoPor`, así que las tres lecturas de proyecto lo seleccionan.
+    expect(JSON.stringify(llamadas.find((l) => l.modelo === 'asignacionTarea.findMany')!.args.select)).toContain('"creadoPor":true');
+    expect(JSON.stringify(llamadas.find((l) => l.modelo === 'horasParticipacion.findMany')!.args.select)).toContain('"creadoPor":true');
+    expect(JSON.stringify(llamadas.find((l) => l.modelo === 'participacionProyecto.findMany')!.args.select)).toContain('"creadoPor":true');
+  });
+
+  it('lanza las cuatro consultas a la vez, sin esperar ninguna antes de pedir la siguiente', async () => {
+    const { prisma, llamadas } = prismaDe(mundoBase());
+    let liberar!: () => void;
+    const barrera = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    // Cada consulta queda bloqueada hasta liberar la barrera.
+    const retenido = prisma as unknown as Record<string, Record<string, (args: unknown) => Promise<unknown>>>;
+    for (const [modelo, metodo] of [
+      ['perfilEstudiante', 'findUnique'],
+      ['asignacionTarea', 'findMany'],
+      ['horasParticipacion', 'findMany'],
+      ['participacionProyecto', 'findMany'],
+    ]) {
+      const original = retenido[modelo][metodo];
+      retenido[modelo][metodo] = async (args) => {
+        const resultado = original(args);
+        await barrera;
+        return resultado;
+      };
+    }
+
+    const pendiente = new ProjectHoursSummaryService(prisma).forUserBreakdown(ESTUDIANTE);
+    await Promise.resolve();
+    expect(llamadas).toHaveLength(4);
+    liberar();
+    await expect(pendiente).resolves.toMatchObject({ idUsuario: ESTUDIANTE });
+    expect(llamadas).toHaveLength(4);
   });
 });
