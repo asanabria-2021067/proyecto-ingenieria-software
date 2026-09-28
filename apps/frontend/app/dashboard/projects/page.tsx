@@ -35,13 +35,13 @@ export default async function ProjectsPage({ searchParams }: Props) {
   const result = await getProjectsPage(q);
 
   return (
-    <main className="min-h-screen bg-gray-50 px-8 py-10">
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">Proyectos</h1>
-      <p className="mb-8 text-sm text-gray-500">
+    <main className="min-h-screen bg-page px-8 py-10">
+      <h1 className="type-display text-text-primary">Proyectos</h1>
+      <p className="mt-2 mb-8 type-body text-text-secondary">
         Explora los proyectos universitarios disponibles y encuentra oportunidades de colaboración.
       </p>
       {result.total > 0 && (
-        <p className="mb-4 text-xs text-gray-400">
+        <p className="mb-4 type-meta text-text-secondary">
           {result.total} proyecto{result.total !== 1 ? 's' : ''} encontrado{result.total !== 1 ? 's' : ''}
         </p>
       )}

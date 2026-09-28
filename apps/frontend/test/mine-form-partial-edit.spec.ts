@@ -106,11 +106,21 @@ describe('Formulario de edición — modo parcial (proyecto PUBLICADO)', () => {
     expect(payload).not.toHaveProperty('organizacionesIds');
   });
 
+  it('muestra la validación junto al campo y permite volver a intentar', async () => {
+    getMyProjectByIdMock.mockResolvedValue(proyectoPublicado());
+    renderForm();
+
+    await screen.findByRole('heading', { name: 'Editar información' });
+    fireEvent.change(screen.getByLabelText('Título del proyecto', { exact: false }), { target: { value: 'abc' } });
+    const guardar = screen.getByRole('button', { name: /guardar cambios/i });
+    fireEvent.click(guardar);
+
+    expect(await screen.findByText('El título debe tener al menos 5 caracteres.')).toBeInTheDocument();
+    expect(guardar).toBeEnabled();
+    expect(updateProjectMock).not.toHaveBeenCalled();
+  });
+
   it('no truena al cargar un proyecto PUBLICADO con roles reales cuando crypto.randomUUID no está disponible (despliegue por HTTP)', async () => {
-    // En producción vía HTTP plano (sin TLS) `crypto.randomUUID` es `undefined`;
-    // un proyecto PUBLICADO real siempre trae roles (Step2 exige roles.length > 0
-    // para publicar), así que el efecto que puebla el formulario SÍ recorre roles
-    // y disparaba el TypeError reportado por el usuario.
     vi.stubGlobal('crypto', {});
     getMyProjectByIdMock.mockResolvedValue(
       proyectoPublicado([

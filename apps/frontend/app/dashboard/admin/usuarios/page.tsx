@@ -32,6 +32,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   listAdminUsers,
   updateAdminUserStatus,
@@ -207,7 +208,7 @@ export default function AdminUsuariosPage() {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'No se pudo actualizar el estado del usuario.',
+        text: getApiErrorMessage(error, 'admin', 'No se pudo actualizar el estado del usuario.'),
       });
       setPendingAction(null);
     },

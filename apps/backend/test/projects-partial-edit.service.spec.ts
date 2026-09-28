@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { SocialService } from '../src/social/social.service';
 import type { UpdateProjectDto } from '../src/projects/dto/update-project.dto';
 import { ProjectsService } from '../src/projects/projects.service';
 import {
@@ -33,6 +34,7 @@ function makeService(prisma: ReturnType<typeof makePrisma>) {
     makeProjectTransactionDouble({ tx: prisma }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
+    {} as unknown as SocialService,
   );
 }
 

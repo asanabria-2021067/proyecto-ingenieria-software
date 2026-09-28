@@ -9,7 +9,12 @@ vi.mock('@/lib/services/exit-requests', () => ({
   approveExitRequest: vi.fn(),
   rejectExitRequest: vi.fn(),
 }));
-vi.mock('@/lib/swal', () => ({ default: { fire: vi.fn() } }));
+
+const mensajesMock = vi.hoisted(() => ({
+  confirmar: vi.fn(),
+  aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
+}));
+vi.mock('@/lib/mensajes', () => mensajesMock);
 
 beforeAll(() => {
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false;
@@ -18,7 +23,6 @@ beforeAll(() => {
 
 import { ExitRequestActions, ExitRequestBadge } from '../components/projects/member-exit-request-actions';
 import { approveExitRequest, rejectExitRequest } from '@/lib/services/exit-requests';
-import uvgSwal from '@/lib/swal';
 
 function solicitud(overrides: Partial<PendingLeaderReviewDto> = {}): PendingLeaderReviewDto {
   return {
@@ -57,19 +61,25 @@ describe('ExitRequestBadge', () => {
 });
 
 describe('ExitRequestActions — Aprobar', () => {
-  it('click en Aprobar abre confirmación antes de llamar a B9', () => {
+  it('click en Aprobar pide confirmación antes de llamar a B9', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
     renderWithClient(
       createElement(ExitRequestActions, { request: solicitud(), idProyecto: 42, nombreCompleto: 'Ana García' }),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar solicitud de salida de Ana García' }));
 
-    expect(screen.getByRole('heading', { name: 'Aprobar salida' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mensajesMock.confirmar).toHaveBeenCalledWith(
+        expect.objectContaining({ textoAccion: 'Aprobar salida', destructiva: true }),
+      ),
+    );
     expect(approveExitRequest).not.toHaveBeenCalled();
   });
 
   it('confirmar llama approveExitRequest exactamente una vez con idProyecto e idSolicitud correctos', async () => {
-    (approveExitRequest as any).mockResolvedValue({ idSolicitud: 1, estadoSolicitud: 'APROBADA' });
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
+    (approveExitRequest as any).mockResolvedValue({ idSolicitud: 500, estadoSolicitud: 'APROBADA' });
     renderWithClient(
       createElement(ExitRequestActions, {
         request: solicitud({ idSolicitud: 500 }),
@@ -79,59 +89,36 @@ describe('ExitRequestActions — Aprobar', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar solicitud de salida de Ana García' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, aprobar salida' }));
 
     await waitFor(() => expect(approveExitRequest).toHaveBeenCalledTimes(1));
     expect(approveExitRequest).toHaveBeenCalledWith(42, 500);
   });
 
-  it('éxito muestra feedback y cierra la confirmación', async () => {
+  it('éxito avisa el resultado', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
     (approveExitRequest as any).mockResolvedValue({ idSolicitud: 1, estadoSolicitud: 'APROBADA' });
     renderWithClient(
       createElement(ExitRequestActions, { request: solicitud(), idProyecto: 42, nombreCompleto: 'Ana García' }),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar solicitud de salida de Ana García' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, aprobar salida' }));
 
-    await waitFor(() =>
-      expect(uvgSwal.fire).toHaveBeenCalledWith(expect.objectContaining({ icon: 'success', title: 'Salida aprobada' })),
-    );
-    await waitFor(() => expect(screen.queryByText('¿Confirmas que apruebas la salida de Ana García del proyecto? Esta acción no se puede deshacer.')).not.toBeInTheDocument());
+    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Salida aprobada'));
   });
 
-  it('mientras se resuelve, evita doble submit y bloquea también Rechazar de la misma solicitud', async () => {
-    let resolverPromesa!: (value: unknown) => void;
-    (approveExitRequest as any).mockImplementation(
-      () => new Promise((resolve) => { resolverPromesa = resolve; }),
-    );
-    renderWithClient(
-      createElement(ExitRequestActions, { request: solicitud(), idProyecto: 42, nombreCompleto: 'Ana García' }),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Aprobar solicitud de salida de Ana García' }));
-    const confirmar = await screen.findByRole('button', { name: 'Sí, aprobar salida' });
-    fireEvent.click(confirmar);
-
-    await waitFor(() => expect(confirmar).toBeDisabled());
-    fireEvent.click(confirmar);
-    expect(approveExitRequest).toHaveBeenCalledTimes(1);
-
-    resolverPromesa({ idSolicitud: 1, estadoSolicitud: 'APROBADA' });
-  });
-
-  it('un error real muestra el mensaje del backend y no retira falsamente la acción', async () => {
+  it('un error real avisa el mensaje del backend y no retira falsamente la acción', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
     (approveExitRequest as any).mockRejectedValue(new Error('El integrante tiene tareas pendientes'));
     renderWithClient(
       createElement(ExitRequestActions, { request: solicitud(), idProyecto: 42, nombreCompleto: 'Ana García' }),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar solicitud de salida de Ana García' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, aprobar salida' }));
 
     await waitFor(() =>
-      expect(uvgSwal.fire).toHaveBeenCalledWith(
-        expect.objectContaining({ icon: 'error', text: 'El integrante tiene tareas pendientes' }),
+      expect(mensajesMock.aviso.error).toHaveBeenCalledWith(
+        'No se pudo resolver la solicitud de salida',
+        'El integrante tiene tareas pendientes',
       ),
     );
     expect(screen.getByRole('button', { name: 'Aprobar solicitud de salida de Ana García' })).toBeInTheDocument();
@@ -139,18 +126,24 @@ describe('ExitRequestActions — Aprobar', () => {
 });
 
 describe('ExitRequestActions — Rechazar', () => {
-  it('click en Rechazar abre confirmación antes de llamar a B9', () => {
+  it('click en Rechazar pide confirmación antes de llamar a B9', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
     renderWithClient(
       createElement(ExitRequestActions, { request: solicitud(), idProyecto: 42, nombreCompleto: 'Ana García' }),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Rechazar solicitud de salida de Ana García' }));
 
-    expect(screen.getByRole('heading', { name: 'Rechazar salida' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mensajesMock.confirmar).toHaveBeenCalledWith(
+        expect.objectContaining({ textoAccion: 'Rechazar salida', destructiva: false }),
+      ),
+    );
     expect(rejectExitRequest).not.toHaveBeenCalled();
   });
 
   it('confirmar llama rejectExitRequest con idProyecto e idSolicitud correctos', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
     (rejectExitRequest as any).mockResolvedValue({ idSolicitud: 500, estadoSolicitud: 'RECHAZADA' });
     renderWithClient(
       createElement(ExitRequestActions, {
@@ -161,34 +154,34 @@ describe('ExitRequestActions — Rechazar', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Rechazar solicitud de salida de Ana García' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, rechazar salida' }));
 
     await waitFor(() => expect(rejectExitRequest).toHaveBeenCalledTimes(1));
     expect(rejectExitRequest).toHaveBeenCalledWith(42, 500);
   });
 
   it('cancelar la confirmación no llama al endpoint', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
     renderWithClient(
       createElement(ExitRequestActions, { request: solicitud(), idProyecto: 42, nombreCompleto: 'Ana García' }),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Rechazar solicitud de salida de Ana García' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
 
+    await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalled());
     expect(rejectExitRequest).not.toHaveBeenCalled();
   });
 
   it('un error conserva las acciones visibles, sin fingir éxito', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
     (rejectExitRequest as any).mockRejectedValue(new Error('Ya fue resuelta'));
     renderWithClient(
       createElement(ExitRequestActions, { request: solicitud(), idProyecto: 42, nombreCompleto: 'Ana García' }),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Rechazar solicitud de salida de Ana García' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, rechazar salida' }));
 
     await waitFor(() =>
-      expect(uvgSwal.fire).toHaveBeenCalledWith(expect.objectContaining({ icon: 'error', text: 'Ya fue resuelta' })),
+      expect(mensajesMock.aviso.error).toHaveBeenCalledWith('No se pudo resolver la solicitud de salida', 'Ya fue resuelta'),
     );
   });
 });

@@ -243,6 +243,8 @@ enum TipoNotificacion {
   HORAS_ACREDITADAS
   // G05-C11 (OWASP25-C038): alerta de seguridad a administradores (emitida solo con SECURITY_ALERTS_ENABLED=true).
   ALERTA_SEGURIDAD
+  // HU-169 (T-265): recordatorio de un EventoProyecto próximo a iniciar.
+  RECORDATORIO_EVENTO
 }
 
 enum EstadoAmistad {
@@ -304,6 +306,7 @@ model Usuario {
   postulacionesResueltas           Postulacion[]              @relation("PostulacionResolutor")
   participaciones                  ParticipacionProyecto[]
   tareasCreadas                    Tarea[]
+  eventosCreados                   EventoProyecto[]
   tareasAsignadas                  AsignacionTarea[]          @relation("TareaAsignada")
   tareasQueAsigno                  AsignacionTarea[]          @relation("TareaAsignador")
   evidenciasCargadas               Evidencia[]
@@ -599,8 +602,42 @@ model Proyecto {
   historialLiderazgo   HistorialLiderazgo[]
   revisionesCierre     RevisionCierreProyecto[]
   documentosCierre     DocumentoCierre[]
+  eventos              EventoProyecto[]
 
   @@map("proyecto")
+}
+
+/// HU-169 (T-263): evento de calendario de un proyecto (reunión, entrega,
+/// hito con fecha), distinto de `Tarea.fechaLimite`. Solo el líder
+/// (`Proyecto.creadoPor`) crea/edita/cancela; los integrantes con
+/// participación ACTIVO solo ven. `antelacionMinutos` controla cuándo
+/// T-265 dispara el recordatorio (`recordatorioEnviadoEn`) antes de
+/// `fechaInicio`; se resetea a null al mover la fecha para que el
+/// recordatorio se recalcule contra la fecha nueva, y un `eliminadoEn` (=
+/// evento cancelado) excluye el evento de cualquier envío pendiente.
+model EventoProyecto {
+  idEvento              Int       @id @default(autoincrement()) @map("id_evento")
+  idProyecto            Int       @map("id_proyecto")
+  idCreador             Int       @map("id_creador")
+  tituloEvento          String    @map("titulo_evento") @db.VarChar(200)
+  descripcionEvento     String?   @map("descripcion_evento") @db.Text
+  fechaInicio           DateTime  @map("fecha_inicio")
+  fechaFin              DateTime  @map("fecha_fin")
+  /// Minutos de antelación respecto a fechaInicio para disparar el
+  /// recordatorio. Default documentado en T-265: 60 minutos (1 hora antes).
+  antelacionMinutos     Int       @default(60) @map("antelacion_minutos")
+  recordatorioEnviadoEn DateTime? @map("recordatorio_enviado_en")
+  creadoEn              DateTime  @default(now()) @map("creado_en")
+  actualizadoEn         DateTime? @map("actualizado_en")
+  eliminadoEn           DateTime? @map("eliminado_en")
+
+  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
+  creador  Usuario  @relation(fields: [idCreador], references: [idUsuario])
+
+  @@index([idProyecto, eliminadoEn])
+  @@index([fechaInicio])
+  @@index([eliminadoEn, recordatorioEnviadoEn, fechaInicio])
+  @@map("evento_proyecto")
 }
 
 model RevisionProyecto {

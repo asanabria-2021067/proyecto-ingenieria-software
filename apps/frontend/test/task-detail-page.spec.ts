@@ -43,6 +43,12 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsState.current,
 }));
 
+const mensajesMock = vi.hoisted(() => ({
+  confirmar: vi.fn(),
+  aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
+}));
+vi.mock('../lib/mensajes', () => mensajesMock);
+
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('../hooks/use-project-tasks', () => ({ useProjectTasks: vi.fn() }));
 vi.mock('../hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
@@ -305,7 +311,8 @@ describe('TaskDetailPage — acciones y permisos', () => {
     expect(screen.queryByRole('button', { name: /Cerrar tramo/ })).not.toBeInTheDocument();
   });
 
-  it('eliminar tarea confirma, llama a la mutation y vuelve al tablero', async () => {
+  it('eliminar tarea confirma, llama a la mutation, avisa y vuelve al tablero', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
     const mutate = vi.fn((_vars, opts) => opts?.onSuccess?.());
     mockTasks({ eliminarTarea: mutationStub({ mutate }) });
     renderDetail();
@@ -314,11 +321,28 @@ describe('TaskDetailPage — acciones y permisos', () => {
     mas.focus();
     fireEvent.keyDown(mas, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Eliminar tarea Implementar login' }));
-    expect(await screen.findByText('¿Eliminar esta tarea?')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea' }));
-    expect(mutate).toHaveBeenCalledWith({ taskId: 5 }, expect.anything());
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith({ taskId: 5 }, expect.anything()));
+    expect(mensajesMock.confirmar).toHaveBeenCalledWith(
+      expect.objectContaining({ textoAccion: 'Eliminar tarea', destructiva: true }),
+    );
+    expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Tarea eliminada', expect.any(String));
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith('/dashboard/projects/42/kanban'));
+  });
+
+  it('si se cancela la confirmación no elimina la tarea', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
+    const mutate = vi.fn();
+    mockTasks({ eliminarTarea: mutationStub({ mutate }) });
+    renderDetail();
+
+    const mas = screen.getByRole('button', { name: 'Más acciones de la tarea' });
+    mas.focus();
+    fireEvent.keyDown(mas, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Eliminar tarea Implementar login' }));
+
+    await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalled());
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it('un usuario sin permiso no ve Editar ni Más, ni el selector de estado', () => {
