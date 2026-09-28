@@ -3,7 +3,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import {
   EstadoHoras,
@@ -19,6 +21,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SecurityEventsService } from '../security-events/security-events.service';
 import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
 import type { SecurityRequestContext } from '../security-events/request-context';
+import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from '../ws-auth/account-access.events';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 
 const RESET_TOKEN_TTL = '1h';
@@ -30,6 +33,8 @@ export class AdminService {
     private jwtService: JwtService,
     // G05: writer best-effort de eventos de seguridad; el default (tests) usa el mismo PrismaService.
     private readonly securityEvents: SecurityEventsService = new SecurityEventsService(prisma),
+    // G07: EventEmitter global de la app; ausente en instancias manuales (tests).
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   // ─── Guards ──────────────────────────────────────────────────────────────────
@@ -615,6 +620,14 @@ export class AdminService {
         idUsuarioAfectado: targetId,
         detalle: { estadoAnterior: user.estado, estadoNuevo: updated.estado },
       });
+    }
+
+    // G07 (OWASP25-C025): al dejar de estar ACTIVO se cierran sus sockets
+    // abiertos (los gateways escuchan el evento; este servicio no los conoce).
+    // Las conexiones nuevas ya las rechaza la política del handshake.
+    if (user.estado !== updated.estado && updated.estado !== EstadoUsuario.ACTIVO) {
+      const revoked: AccountAccessRevokedEvent = { idUsuario: targetId };
+      this.events?.emit(ACCOUNT_ACCESS_REVOKED, revoked);
     }
 
     return {
