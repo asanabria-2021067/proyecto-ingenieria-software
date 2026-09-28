@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { SprintDto } from '../lib/types/sprints';
 
@@ -125,10 +125,12 @@ describe('SprintListPage — render dinámico con datos del fixture A10.1', () =
     renderPage();
 
     expect(screen.getByText('Sprint 7')).toBeInTheDocument();
-    expect(screen.getByText('31 ago 2026')).toBeInTheDocument();
-    expect(screen.getByText('23')).toBeInTheDocument();
-    expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('128 h')).toBeInTheDocument();
+    // Las cifras del Sprint viven en sus mini-tarjetas (el resumen superior suma todos los Sprints).
+    const tarjeta = screen.getByRole('article', { name: 'Sprint 7' });
+    expect(within(tarjeta).getByText('31 ago 2026')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('23')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('4')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('128 h')).toBeInTheDocument();
     // Ninguno de estos valores viene de la maqueta de referencia (Pantalla2).
     expect(screen.queryByText('Sprint 1')).not.toBeInTheDocument();
     expect(screen.queryByText('96 h')).not.toBeInTheDocument();
@@ -384,5 +386,72 @@ describe('SprintListPage — sin cálculos auxiliares', () => {
     // Únicas dependencias de datos usadas por esta pantalla.
     expect(useProjectSprints).toHaveBeenCalledWith(42);
     expect(useProjectDetail).toHaveBeenCalledWith(42);
+  });
+});
+
+describe('SprintListPage — rediseño: resumen, Sprint en curso e historial', () => {
+  it('el resumen superior se deriva de la lista: total, en curso, cerrados y horas estimadas sumadas', () => {
+    mockLeader(true);
+    mockSprints({
+      sprints: [
+        sprint({ idSprint: 3, numero: 3, estado: 'ACTIVO', horasEstimadas: 10 }),
+        sprint({ idSprint: 2, numero: 2, estado: 'CERRADO', horasEstimadas: 20.5 }),
+        sprint({ idSprint: 1, numero: 1, estado: 'CERRADO', horasEstimadas: 5 }),
+      ],
+    });
+    mockFinalize();
+
+    renderPage();
+
+    const resumen = screen.getByRole('region', { name: 'Resumen de Sprints' });
+    expect(within(resumen).getByRole('group', { name: 'Sprints' })).toHaveTextContent('3');
+    expect(within(resumen).getByRole('group', { name: 'En curso' })).toHaveTextContent('1');
+    expect(within(resumen).getByRole('group', { name: 'Sprints cerrados' })).toHaveTextContent('2');
+    expect(within(resumen).getByRole('group', { name: 'Horas estimadas' })).toHaveTextContent('35.5 h');
+  });
+
+  it('el Sprint en curso es el bloque principal (acciones a la derecha, 4 mini-métricas) y los cerrados van al historial', () => {
+    mockLeader(true);
+    mockSprints({
+      sprints: [
+        sprint({ idSprint: 3, numero: 3, estado: 'ACTIVO' }),
+        sprint({ idSprint: 2, numero: 2, estado: 'CERRADO' }),
+      ],
+    });
+    mockFinalize();
+
+    renderPage();
+
+    const enCurso = screen.getByRole('region', { name: 'Sprint en curso' });
+    const tarjeta = within(enCurso).getByRole('article', { name: 'Sprint 3' });
+    expect(tarjeta).toHaveClass('card-base');
+    expect(tarjeta.querySelectorAll('[data-slot="sprint-metric"]')).toHaveLength(4);
+    const acciones = tarjeta.querySelector('[data-slot="sprint-actions"]') as HTMLElement;
+    expect(Array.from(acciones.querySelectorAll('a, button')).map((el) => el.textContent?.trim())).toEqual([
+      'Ver detalles',
+      'Analítica',
+      'Finalizar',
+    ]);
+
+    const historial = screen.getByRole('region', { name: 'Historial de Sprints' });
+    expect(within(historial).getByText('Sprint 2')).toBeInTheDocument();
+    expect(within(historial).queryByText('Sprint 3')).not.toBeInTheDocument();
+    expect(within(historial).getByRole('link', { name: 'Ver detalles' })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/sprints/2',
+    );
+  });
+
+  it('sin Sprint en curso lo dice en su sección y el historial sigue visible', () => {
+    mockLeader(true);
+    mockSprints({ sprints: [sprint({ idSprint: 2, numero: 2, estado: 'CERRADO' })] });
+    mockFinalize();
+
+    renderPage();
+
+    expect(
+      within(screen.getByRole('region', { name: 'Sprint en curso' })).getByText('No hay un Sprint en curso.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Historial de Sprints' })).toBeInTheDocument();
   });
 });
