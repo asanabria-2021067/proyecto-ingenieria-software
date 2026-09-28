@@ -58,37 +58,22 @@ describe('HoursKpiCard', () => {
   });
 });
 
-// Mis Horas usa la variante en línea: el icono es un fondo decorativo que
-// ocupa el alto de la tarjeta, asoma solo su mitad desde el borde izquierdo
-// y es translúcido; el texto, en tonos neutros, empieza después de esa
-// mitad. La vista del integrante sigue con la variante por defecto (caja).
+// Mis Horas usa la variante en línea: icono neutro al par de la etiqueta,
+// sin caja de color, y todo el texto en tonos neutros. La vista del
+// integrante sigue con la variante por defecto (caja).
 describe('HoursKpiCard — variante en línea', () => {
   afterEach(() => cleanup());
 
-  it('el icono es un fondo del alto de la tarjeta, asomado a la mitad, translúcido y difuminado', () => {
+  it('pone el icono dentro de la fila de la etiqueta, sin caja de fondo', () => {
     render(<HoursKpiCard variante="en-linea" icon={Clock} label="Registradas" value="75 h" />);
 
     const grupo = screen.getByRole('group', { name: 'Registradas' });
-    const icono = grupo.querySelector('[data-slot="kpi-icono-fondo"]')!;
-    // Todo el alto de la tarjeta, cuadrado y centrado en su borde izquierdo:
-    // la tarjeta recorta la mitad exterior.
-    expect(icono).toHaveClass('absolute', 'inset-y-0', 'left-0', 'h-full', 'aspect-square', '-translate-x-1/2');
-    expect(icono).toHaveClass('opacity-15', 'blur-[1px]', 'pointer-events-none', 'text-text-primary');
+    const etiqueta = within(grupo).getByText('Registradas');
+    const icono = grupo.querySelector('svg')!;
+    expect(etiqueta).toContainElement(icono as unknown as HTMLElement);
+    expect(icono).toHaveClass('size-5', 'text-text-primary');
     expect(icono).toHaveAttribute('aria-hidden', 'true');
-    expect(grupo).toHaveClass('relative', 'overflow-hidden', 'min-h-32');
     expect(grupo.innerHTML).not.toMatch(/bg-primary/);
-  });
-
-  it('el texto empieza después de la mitad visible del icono', () => {
-    render(<HoursKpiCard variante="en-linea" icon={Clock} label="Registradas" value="75 h" note="Nota" />);
-
-    const grupo = screen.getByRole('group', { name: 'Registradas' });
-    // La mitad visible del icono mide la mitad del alto (64 px en una tarjeta
-    // de 128 px); pl-24 = 96 px deja el texto después de ella.
-    expect(grupo).toHaveClass('pl-24');
-    expect(within(grupo).getByText('Registradas').querySelector('svg')).toBeNull();
-    expect(within(grupo).getByText('75 h')).toBeInTheDocument();
-    expect(within(grupo).getByText('Nota')).toBeInTheDocument();
   });
 
   it('etiqueta y valor en tono neutro, sin verdes', () => {
@@ -105,5 +90,36 @@ describe('HoursKpiCard — variante en línea', () => {
     render(<HoursKpiCard icon={Clock} label="Registradas" value="75 h" />);
 
     expect(screen.getByRole('group', { name: 'Registradas' }).firstElementChild).toHaveClass('bg-primary/10');
+  });
+});
+
+// Mis Horas descartó el icono de fondo tipo marca de agua: el icono es
+// pequeño, está en flujo y va inmediatamente antes de la etiqueta.
+describe('HoursKpiCard — sin icono de marca de agua', () => {
+  afterEach(() => cleanup());
+
+  it('no hay icono absoluto, translúcido, difuminado ni gigante', () => {
+    render(<HoursKpiCard variante="en-linea" icon={Clock} label="Registradas" value="75 h" note="Nota" />);
+
+    const grupo = screen.getByRole('group', { name: 'Registradas' });
+    expect(grupo.querySelectorAll('svg')).toHaveLength(1);
+    expect(grupo.querySelector('[data-slot="kpi-icono-fondo"]')).toBeNull();
+    expect(grupo.innerHTML).not.toMatch(/\b(absolute|opacity-\d+|blur-|size-32|h-full|-translate-x-)/);
+    expect(grupo).not.toHaveClass('overflow-hidden', 'pl-24', 'min-h-32');
+  });
+
+  it('icono de 20 px en fila con la etiqueta (flex, items-center, gap de 0.5rem), valor y nota debajo', () => {
+    render(<HoursKpiCard variante="en-linea" icon={Clock} label="Registradas" value="75 h" note="Nota" />);
+
+    const grupo = screen.getByRole('group', { name: 'Registradas' });
+    const fila = within(grupo).getByText('Registradas');
+    expect(fila).toHaveClass('flex', 'items-center', 'gap-tight');
+    expect(fila.firstElementChild).toBe(grupo.querySelector('svg'));
+    expect(grupo.querySelector('svg')).toHaveClass('size-5', 'text-text-primary');
+    const [etiqueta, valor, nota] = Array.from(grupo.children);
+    expect(etiqueta).toBe(fila);
+    expect(valor).toHaveTextContent('75 h');
+    expect(nota).toHaveTextContent('Nota');
+    expect(grupo).toHaveClass('p-5');
   });
 });
