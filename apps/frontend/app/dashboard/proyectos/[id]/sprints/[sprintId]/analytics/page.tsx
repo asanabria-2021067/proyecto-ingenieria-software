@@ -222,7 +222,6 @@ export default function SprintAnalyticsPage() {
     <ProjectPageShell>
       <ProjectPageHeader
         back={{ href: `/dashboard/proyectos/${id}/sprints/${sprintId}`, label: 'Volver al Sprint' }}
-        icon={BarChart3}
         title={analytics ? `Analítica del Sprint ${analytics.numero}` : 'Analítica del Sprint'}
         description="Cumplimiento y progreso de este Sprint: tareas, prioridades y hitos."
       />

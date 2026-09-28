@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { AlertCircle, BarChart3, Repeat } from 'lucide-react';
+import { AlertCircle, Repeat } from 'lucide-react';
 import { useSprintsAnalytics } from '@/hooks/use-project-sprints';
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -200,7 +200,6 @@ export default function SprintsAnalyticsPage() {
     <ProjectPageShell>
       <ProjectPageHeader
         back={{ href: `/dashboard/proyectos/${id}/sprints`, label: 'Volver a Sprints' }}
-        icon={BarChart3}
         title="Analítica comparativa"
         description="Cumplimiento y progreso de cada Sprint del proyecto, para comparar cómo avanza el equipo."
         actions={<ProjectExportButtons idProyecto={idProyecto} />}

@@ -106,7 +106,6 @@ export default function ProjectPendingExitRequestsPage() {
         <>
           <ProjectPageHeader
             back={{ href: volverAMiembrosHref, label: 'Volver a miembros' }}
-            icon={UserRoundX}
             title="Solicitudes de salida"
             description="Integrantes que solicitaron salir del proyecto y están esperando tu revisión."
           />

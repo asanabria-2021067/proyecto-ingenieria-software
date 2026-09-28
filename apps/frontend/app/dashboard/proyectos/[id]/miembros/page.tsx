@@ -412,7 +412,6 @@ export default function MiembrosProyectoPage() {
         <>
       <ProjectPageHeader
         back={{ href: volverAlProyectoHref, label: 'Volver al proyecto' }}
-        icon={Users}
         title="Miembros"
         description="Integrantes del proyecto organizados por su estado y contribución."
         actions={

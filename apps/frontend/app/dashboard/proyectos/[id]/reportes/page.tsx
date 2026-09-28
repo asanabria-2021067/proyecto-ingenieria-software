@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { FileSpreadsheet, FileText, FolderOutput } from 'lucide-react';
+import { FileSpreadsheet, FileText } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
@@ -38,7 +38,6 @@ export default function ReportesProyectoPage() {
           {/* Una sola ubicación para exportar: las acciones del encabezado. */}
           <ProjectPageHeader
             back={{ href: `/dashboard/projects/${id}`, label: 'Volver al proyecto' }}
-            icon={FolderOutput}
             title="Reportes"
             description={
               <>

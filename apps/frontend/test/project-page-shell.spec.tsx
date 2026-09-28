@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { Users } from 'lucide-react';
 import {
   PROJECT_PAGE_CLASS,
   ProjectBackLink,
@@ -49,7 +48,6 @@ describe('ProjectPageShell / ProjectPageHeader', () => {
         back={{ href: '/dashboard/projects/7', label: 'Volver al proyecto' }}
         title="Miembros"
         description="Integrantes del proyecto."
-        icon={Users}
         actions={<button type="button">Exportar CSV</button>}
       >
         <p>Líder: Ana</p>
@@ -68,7 +66,10 @@ describe('ProjectPageShell / ProjectPageHeader', () => {
     expect(acciones).toHaveAttribute('data-slot', 'project-page-actions');
     // a la derecha cuando el contenedor del proyecto tiene ancho; debajo si no
     expect(acciones.parentElement).toHaveClass('flex-col', '@3xl/project:flex-row', '@3xl/project:justify-between');
-    expect(encabezado.querySelector('h1')!.previousElementSibling).toHaveClass('size-6', 'text-primary');
+    // Sin icono de sección junto al título: el único icono es la flecha de «Volver».
+    expect(titulo.previousElementSibling).toBeNull();
+    expect(encabezado.querySelectorAll('svg')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Volver al proyecto' }).querySelector('svg')).not.toBeNull();
   });
 
   it('sin vuelta, descripción ni acciones solo queda el título', () => {

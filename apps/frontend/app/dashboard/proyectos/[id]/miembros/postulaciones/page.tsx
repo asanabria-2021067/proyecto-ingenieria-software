@@ -142,7 +142,6 @@ export default function ProjectPendingPostulationsPage() {
         <>
           <ProjectPageHeader
             back={{ href: volverAMiembrosHref, label: 'Volver a miembros' }}
-            icon={UserRoundPlus}
             title="Postulaciones pendientes"
             description="Personas que han solicitado unirse a roles de este proyecto y están esperando una resolución."
           />

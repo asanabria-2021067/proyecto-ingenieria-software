@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { Crown } from 'lucide-react';
+import {  } from 'lucide-react';
 import { LeadershipSection } from '@/components/leadership/leadership-section';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -36,7 +36,6 @@ export default function LiderazgoProyectoPage() {
         <>
           <ProjectPageHeader
             back={{ href: volverAlProyectoHref, label: 'Volver al proyecto' }}
-            icon={Crown}
             title="Liderazgo"
             description="Quién lidera el proyecto, cómo ha cambiado y el estado de las apelaciones."
           />
