@@ -466,6 +466,23 @@ describe('ExitPreparationWorkspaceClient (F9 + F11/F11.1)', () => {
       expect(screen.getByText('Listo para cierre')).toBeInTheDocument();
       expect(screen.getByText('Cerrado')).toBeInTheDocument();
 
+      // Mismo marco de columna que el Kanban: encabezado fuera del contenedor,
+      // punto semántico y contador compacto neutro.
+      const puntos: Record<string, string> = {
+        'Por preparar': 'bg-outline',
+        'En preparación': 'bg-accent',
+        'Listo para cierre': 'bg-attention',
+        Cerrado: 'bg-primary',
+      };
+      for (const [nombre, punto] of Object.entries(puntos)) {
+        const titulo = screen.getByRole('heading', { level: 3, name: nombre });
+        expect(titulo.querySelector('span[aria-hidden="true"]')).toHaveClass(punto);
+        const encabezado = titulo.parentElement as HTMLElement;
+        expect(encabezado).toHaveAttribute('data-slot', 'kanban-column-header');
+        expect(encabezado.querySelector('.pill')).toHaveClass('pill-neutral');
+        expect(encabezado.nextElementSibling).toHaveAttribute('data-slot', 'kanban-column-body');
+      }
+
       expect(screen.queryByText('Nueva responsabilidad')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /nueva responsabilidad/i })).not.toBeInTheDocument();
     });
