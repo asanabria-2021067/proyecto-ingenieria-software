@@ -224,6 +224,121 @@ export async function characterizeSpoofing({ host = '127.0.0.1', httpsPort }) {
   return [{ id: 'T16-01', title: `XFF falso rotativo no evade el limite de login (${statuses.join(',')})`, failures: verifySpoofResistance(statuses) }];
 }
 
+/**
+ * T17/T18/T21 (G06-C08): contratos de navegador a través de nginx con TLS.
+ * T17: cabeceras exactas del frontend (G06-C02/C03/C04). T21: HSTS exacto de
+ * la API, sin preload, y ausente en el frontend. T18: con COOKIE_SECURE=true
+ * las cookies de sesión llevan Secure, HttpOnly y SameSite=Lax. Solo se
+ * reportan nombres de cabeceras y atributos, nunca valores de cookies.
+ */
+export const EXPECTED_FRONTEND_HEADERS = {
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  'content-security-policy': "frame-ancestors 'none'",
+};
+export const REQUIRED_REPORT_ONLY_DIRECTIVES = ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'"];
+
+export function verifyFrontendHeaders(headers) {
+  const failures = [];
+  for (const [name, expected] of Object.entries(EXPECTED_FRONTEND_HEADERS)) {
+    if (headers[name] !== expected) {
+      failures.push(`${name}=${headers[name] ?? 'ausente'}`);
+    }
+  }
+  const reportOnly = (headers['content-security-policy-report-only'] ?? '').split(';').map((d) => d.trim());
+  for (const directive of REQUIRED_REPORT_ONLY_DIRECTIVES) {
+    if (!reportOnly.includes(directive)) {
+      failures.push(`report-only sin ${directive}`);
+    }
+  }
+  for (const name of ['x-powered-by', 'strict-transport-security']) {
+    if (headers[name] !== undefined) {
+      failures.push(`${name} presente`);
+    }
+  }
+  return failures;
+}
+
+export function verifyHsts(headers) {
+  const value = headers['strict-transport-security'];
+  return [
+    value === EXPECTED_HSTS || `HSTS=${value ?? 'ausente'}`,
+    !/preload/i.test(value ?? '') || 'HSTS con preload',
+  ].filter((outcome) => outcome !== true);
+}
+
+export function verifyAuthCookies(setCookies) {
+  const failures = [];
+  const byName = new Map(setCookies.map((cookie) => [cookie.split('=')[0], cookie]));
+  for (const name of ['access_token', 'refresh_token']) {
+    const cookie = byName.get(name);
+    if (!cookie) {
+      failures.push(`falta cookie ${name}`);
+      continue;
+    }
+    const attributes = cookie.split(';').slice(1).map((part) => part.trim().toLowerCase());
+    for (const required of ['secure', 'httponly', 'samesite=lax', 'path=/']) {
+      if (!attributes.includes(required)) {
+        failures.push(`${name} sin ${required}`);
+      }
+    }
+  }
+  return failures;
+}
+
+function send({ host, port, path, method = 'GET', headers = {}, body }) {
+  assertLocalHost(host);
+  return new Promise((resolve, reject) => {
+    const req = https.request({ host, port, path, method, headers, rejectUnauthorized: false, timeout: 15000 }, (res) => {
+      res.resume();
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers }));
+    });
+    req.on('timeout', () => req.destroy(new Error(`timeout ${path}`)));
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+export async function characterizeTls({ host = '127.0.0.1', httpsPort, carreraId }) {
+  const results = [];
+  for (const path of ['/', '/login']) {
+    const page = await send({ host, port: httpsPort, path, headers: { Accept: 'text/html' } });
+    results.push({ id: 'T17', title: `cabeceras del frontend en ${path} (${page.status})`, failures: verifyFrontendHeaders(page.headers) });
+  }
+  for (const path of ['/api', '/api/proyectos']) {
+    const api = await send({ host, port: httpsPort, path, headers: { Accept: 'application/json' } });
+    results.push({ id: 'T21', title: `HSTS exacto sin preload en ${path} (${api.status})`, failures: verifyHsts(api.headers) });
+  }
+  const suffix = randomBytes(4).toString('hex');
+  const body = JSON.stringify({
+    correo: `t18-${suffix}@uvg.edu.gt`,
+    contrasena: `T18-sintetica-${suffix}`,
+    nombre: 'Sintetico',
+    apellido: 'T18',
+    carne: `T18${suffix}`,
+    idCarrera: Number(carreraId),
+    semestre: 1,
+  });
+  const registro = await send({
+    host,
+    port: httpsPort,
+    path: '/api/auth/register',
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    body,
+  });
+  results.push({
+    id: 'T18',
+    title: `cookies de sesion con Secure/HttpOnly/SameSite=Lax (registro ${registro.status})`,
+    failures: [registro.status === 201 || `status ${registro.status} != 201`, ...verifyAuthCookies(registro.headers['set-cookie'] ?? [])].filter(
+      (outcome) => outcome !== true,
+    ),
+  });
+  return results;
+}
+
 export async function characterize({ host = '127.0.0.1', httpPort, httpsPort }) {
   const results = [];
   for (const check of CHECKS) {
@@ -246,7 +361,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     result.failures.forEach((failure) => console.log(`  - ${failure}`));
   }
   const target = { host: process.env.HARNESS_HOST ?? '127.0.0.1', httpsPort: Number(process.env.HARNESS_HTTPS_PORT ?? 8443) };
-  const socket = [...(await characterizeSocket(target)), ...(await characterizeSpoofing(target))];
+  const socket = [
+    ...(await characterizeSocket(target)),
+    ...(await characterizeTls({ ...target, carreraId: process.env.HARNESS_T18_CARRERA_ID })),
+    ...(await characterizeSpoofing(target)),
+  ];
   for (const result of socket) {
     console.log(`${result.failures.length === 0 ? 'PASS' : 'FAIL'} ${result.id} ${result.title}`);
     result.failures.forEach((failure) => console.log(`  - ${failure}`));
