@@ -1,6 +1,6 @@
 {
   "gate": "G02-C17",
-  "description": "Unicas diferencias permitidas entre infra/staging/nginx (arnes efimero) e infra/nginx (baseline productivo). Cada sustitucion debe aparecer exactamente una vez; cualquier otra diferencia hace fallar check-representativity.mjs.",
+  "description": "Unicas diferencias permitidas entre infra/staging/nginx (arnes efimero) e infra/nginx (baseline productivo). Cada sustitucion debe aparecer exactamente las veces declaradas (`occurrences`, por defecto 1); cualquier otra diferencia hace fallar check-representativity.mjs.",
   "substitutions": [
     {
       "file": "nginx.conf",
@@ -22,15 +22,16 @@
     },
     {
       "file": "sites-enabled/uvg-collab",
-      "from": "        proxy_pass http://localhost:3000;",
+      "from": "        proxy_pass http://127.0.0.1:3000;",
       "to": "        proxy_pass http://frontend:3000;",
       "reason": "En la VM nginx corre en el host y llega al contenedor por el puerto publicado; en el arnes llega por la red interna de compose."
     },
     {
       "file": "sites-enabled/uvg-collab",
-      "from": "        proxy_pass http://localhost:3001;",
+      "from": "        proxy_pass http://127.0.0.1:3001;",
       "to": "        proxy_pass http://backend:3001;",
-      "reason": "Igual que el frontend: upstream por la red interna del arnes."
+      "reason": "Igual que el frontend: upstream por la red interna del arnes. Aparece dos veces desde G04-C11 (/socket.io/ y /api).",
+      "occurrences": 2
     }
   ]
 }

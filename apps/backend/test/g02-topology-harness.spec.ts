@@ -60,6 +60,11 @@ describe('G02-C17: guard de representatividad', () => {
       expect(check(drifted).length).toBeGreaterThan(0);
     });
 
+    it('G04-C11: una sustitución declarada dos veces que el arnés aplica solo una', () => {
+      const once = harness.replace('proxy_pass http://backend:3001;', 'proxy_pass http://127.0.0.1:3001;');
+      expect(check(once)).toEqual(expect.arrayContaining([expect.stringContaining('sustitucion no aplicada')]));
+    });
+
     it('una sustitución que no se aplicó (upstream productivo en el arnés)', () => {
       expect(check(harness.replace('http://backend:3001', 'http://localhost:3001'))).toEqual(
         expect.arrayContaining([expect.stringContaining('sustitucion no aplicada')]),

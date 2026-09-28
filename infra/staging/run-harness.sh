@@ -29,4 +29,6 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=localhost' \
   -keyout "$HARNESS_TLS_DIR/privkey.pem" -out "$HARNESS_TLS_DIR/fullchain.pem" 2>/dev/null
 
 docker compose -p "$PROJECT" -f docker-compose.yml up -d --build --wait --wait-timeout 900
+# G04-C11: la configuración (con P1) debe validar con el nginx real del arnés.
+docker compose -p "$PROJECT" -f docker-compose.yml exec -T nginx nginx -t
 node characterize.mjs

@@ -4,7 +4,9 @@
  *
  * La configuración nginx del arnés (infra/staging/nginx) solo puede diferir
  * del baseline productivo versionado (infra/nginx) por las sustituciones
- * declaradas en substitutions.json, cada una aplicada exactamente una vez.
+ * declaradas en substitutions.json, cada una aplicada exactamente las veces
+ * declaradas (`occurrences`, por defecto 1; G04-C11: el upstream del backend
+ * aparece en /socket.io/ y en /api).
  * Cualquier otra diferencia (una cabecera, un location, un upstream) falla.
  *
  * Uso: node infra/staging/check-representativity.mjs   (sale con 0 o 1)
@@ -34,13 +36,14 @@ export function representativityFindings(file, harnessText, baselineText, substi
   const findings = [];
   let restored = harnessText;
   for (const substitution of substitutions.filter((s) => s.file === file)) {
+    const expected = substitution.occurrences ?? 1;
     const inHarness = countOccurrences(restored, substitution.to);
     const inBaseline = countOccurrences(baselineText, substitution.from);
-    if (inHarness !== 1 || inBaseline !== 1) {
-      findings.push(`${file}: sustitucion no aplicada exactamente una vez (${JSON.stringify(substitution.from)})`);
+    if (inHarness !== expected || inBaseline !== expected) {
+      findings.push(`${file}: sustitucion no aplicada exactamente ${expected} vez/veces (${JSON.stringify(substitution.from)})`);
       continue;
     }
-    restored = restored.replace(substitution.to, substitution.from);
+    restored = restored.split(substitution.to).join(substitution.from);
   }
   const restoredLines = restored.split('\n');
   const baselineLines = baselineText.split('\n');

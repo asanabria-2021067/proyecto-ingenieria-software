@@ -13,7 +13,7 @@ Staging de la Fase 2: **efímero**, en el runner de GitHub o en local, **nunca**
 
 ## Representatividad
 
-`infra/staging/nginx` solo puede diferir de `infra/nginx` por las sustituciones de `substitutions.json` (usuario de la imagen, rutas del certificado y upstreams por la red interna). `check-representativity.mjs` deshace esas sustituciones y exige igualdad exacta: cualquier otra diferencia falla. Si un gate cambia `infra/nginx` (p. ej. P1 en G04), la copia del arnés se actualiza en el mismo commit.
+`infra/staging/nginx` solo puede diferir de `infra/nginx` por las sustituciones de `substitutions.json` (usuario de la imagen, rutas del certificado y upstreams por la red interna), cada una tantas veces como declara (`occurrences`, por defecto 1). `check-representativity.mjs` deshace esas sustituciones y exige igualdad exacta: cualquier otra diferencia falla. Si un gate cambia `infra/nginx` (p. ej. P1 en G04), la copia del arnés se actualiza en el mismo commit.
 
 ## Uso
 
@@ -23,7 +23,7 @@ infra/staging/run-harness.sh
 
 Ejecuta el guard, genera el TLS, construye y levanta todo (`--wait`), corre `characterize.mjs` y destruye contenedores, volúmenes, imágenes locales del proyecto y el TLS, también si algo falla. Puertos: `127.0.0.1:${HARNESS_HTTP_PORT:-8080}` y `127.0.0.1:${HARNESS_HTTPS_PORT:-8443}`.
 
-`characterize.mjs` fija el comportamiento **actual** (HARN-01…05: HSTS/Helmet en `/api`, 403 con `Accept: text/html`, `/socket.io` → 308 sin P1, `/` sin cabeceras de seguridad, HTTP sin redirección). Los gates que cambien ese comportamiento a propósito actualizan la expectativa en su propio commit. El script rechaza cualquier host que no sea local.
+`characterize.mjs` fija el comportamiento **actual** (HARN-01…05: HSTS/Helmet en `/api`, 403 con `Accept: text/html`, `/socket.io` → backend con P1 (G04-C11; antes 308 del frontend), `/` sin cabeceras de seguridad, HTTP sin redirección). Los gates que cambien ese comportamiento a propósito actualizan la expectativa en su propio commit. El script rechaza cualquier host que no sea local.
 
 ## En CI (G02-C18)
 
