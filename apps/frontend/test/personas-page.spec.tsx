@@ -335,3 +335,29 @@ describe('PersonasPage', () => {
     );
   });
 });
+
+// Regla de radios: los botones de acción usan el radio medio de «Ver
+// proyecto» (rounded-md); las etiquetas informativas siguen como pill.
+describe('PersonasPage — radio de los botones de acción', () => {
+  beforeEach(() => {
+    getSolicitudesPendientesMock.mockResolvedValue([]);
+    getAmigosMock.mockResolvedValue([]);
+  });
+
+  it('«Agregar como amigo» y «Solicitud enviada» usan radio medio, no cápsula', async () => {
+    buscarUsuariosMock.mockResolvedValue({
+      items: [
+        usuario({ idUsuario: 10, nombre: 'Carla', mismaCarrera: true, semestre: 6 }),
+        usuario({ idUsuario: 11, nombre: 'Diego', solicitudPendiente: { direccion: 'enviada' } }),
+      ],
+      hasMore: false,
+    });
+    await renderPersonas();
+
+    for (const nombre of ['Agregar como amigo', 'Solicitud enviada']) {
+      const boton = await screen.findByRole('button', { name: nombre });
+      expect(boton, nombre).toHaveClass('rounded-md');
+      expect(boton, nombre).not.toHaveClass('rounded-pill');
+    }
+  });
+});
