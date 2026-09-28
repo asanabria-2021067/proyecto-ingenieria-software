@@ -21,6 +21,9 @@ import {
   RECOVERY_ATTEMPTS,
   RECOVERY_ATTEMPT_POLICY,
 } from "./account-attempts.service";
+import { SecurityEventsService } from "../security-events/security-events.service";
+import { TipoEventoSeguridad } from "../security-events/tipos-evento-seguridad";
+import { accountReference } from "../security-events/account-reference";
 
 /**
  * G04 (OWASP25-C023): hash bcrypt (cost 10, el mismo de registro y reset) de
@@ -58,6 +61,8 @@ export class AuthService {
     private readonly attempts: AccountAttemptsService = new AccountAttemptsService(),
     @Inject(RECOVERY_ATTEMPTS)
     private readonly recoveryAttempts: AccountAttemptsService = new AccountAttemptsService(RECOVERY_ATTEMPT_POLICY),
+    // G05: writer best-effort; el default (tests) usa el mismo PrismaService.
+    private readonly securityEvents: SecurityEventsService = new SecurityEventsService(prisma),
   ) {
     const refreshSecret = process.env.JWT_REFRESH_SECRET;
     if (!refreshSecret) {
@@ -118,6 +123,22 @@ export class AuthService {
       if (!bloqueada && (!usuario || !contrasenaValida)) {
         this.attempts.recordFailure(cuenta);
       }
+      // G05 (OWASP25-C037): un evento por intento, tras conocer el resultado.
+      // Una cuenta inexistente se identifica solo con una referencia
+      // seudónima: nunca el correo en claro. La respuesta externa no cambia.
+      await this.securityEvents.record({
+        tipo: TipoEventoSeguridad.LOGIN_FAILED,
+        idUsuarioAfectado: usuario?.idUsuario ?? null,
+        detalle: {
+          motivo: bloqueada
+            ? "BLOQUEO_TEMPORAL"
+            : !usuario || !contrasenaValida
+              ? "CREDENCIALES"
+              : "CUENTA_NO_ACTIVA",
+          cuentaConocida: Boolean(usuario),
+          ...(usuario ? {} : { cuentaRef: accountReference(loginDto.correo) }),
+        },
+      });
       throw new UnauthorizedException("Credenciales invalidas");
     }
 
@@ -129,7 +150,14 @@ export class AuthService {
       data: { fechaUltimaSesion: new Date() },
     });
 
-    return this.issueTokens(usuario);
+    const tokens = await this.issueTokens(usuario);
+    // G05: el éxito se registra cuando los tokens ya existen (resultado real).
+    await this.securityEvents.record({
+      tipo: TipoEventoSeguridad.LOGIN_SUCCEEDED,
+      idActor: usuario.idUsuario,
+      idUsuarioAfectado: usuario.idUsuario,
+    });
+    return tokens;
   }
 
   async register(registerDto: RegisterDto) {
