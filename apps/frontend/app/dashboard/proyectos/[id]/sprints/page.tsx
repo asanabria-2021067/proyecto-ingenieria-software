@@ -136,7 +136,15 @@ function SprintCard({
           </span>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* El detalle es accesible en cualquier estado del Sprint (antes solo al cerrarse). */}
+          <Button
+            asChild
+            variant="outline"
+            className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
+          >
+            <Link href={`/dashboard/proyectos/${idProyecto}/sprints/${sprint.idSprint}`}>Ver detalles</Link>
+          </Button>
           <Button
             asChild
             variant="outline"
@@ -177,15 +185,6 @@ function SprintCard({
               <Link href={`/dashboard/proyectos/${idProyecto}/sprints/${sprint.idSprint}/finalizar`}>
                 Continuar cierre
               </Link>
-            </Button>
-          )}
-          {cerrado && (
-            <Button
-              asChild
-              variant="outline"
-              className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-            >
-              <Link href={`/dashboard/proyectos/${idProyecto}/sprints/${sprint.idSprint}`}>Ver Detalles</Link>
             </Button>
           )}
         </div>
@@ -241,18 +240,6 @@ export default function SprintListPage() {
         back={{ href: volverAlProyectoHref, label: 'Volver al proyecto' }}
         title="Sprints"
         description="Resumen de los sprints del proyecto y su progreso."
-        actions={
-          <Button
-            asChild
-            variant="outline"
-            className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-          >
-            <Link href={`/dashboard/proyectos/${idProyecto}/sprints/analytics`}>
-              <BarChart3 className="size-3.5" aria-hidden="true" />
-              Analítica comparativa
-            </Link>
-          </Button>
-        }
       />
 
       {proyectoReadOnly && (
