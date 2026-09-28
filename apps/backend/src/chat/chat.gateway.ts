@@ -8,10 +8,10 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { extractCookie, getFrontendUrl } from '../common/utils/cookie';
+import { getFrontendUrl } from '../common/utils/cookie';
+import { WsAuthService } from '../ws-auth/ws-auth.service';
 
 @WebSocketGateway({
   cors: {
@@ -27,25 +27,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ChatGateway.name);
 
   constructor(
-    private jwtService: JwtService,
+    private readonly wsAuth: WsAuthService,
     private prisma: PrismaService,
   ) {}
 
   async handleConnection(client: Socket) {
     try {
-      const token =
-        client.handshake.auth.token ||
-        client.handshake.headers.authorization?.replace('Bearer ', '') ||
-        extractCookie(client.handshake.headers.cookie, 'access_token');
-
-      if (!token) {
-        this.logger.warn(`Client ${client.id} rejected: no token`);
+      // G07 (OWASP25-C025): misma política que notificaciones y HTTP. La
+      // autorización por conversación (joinConversation) no cambia.
+      const auth = await this.wsAuth.authenticate(client.handshake);
+      if (!auth.ok) {
+        this.logger.warn(`Client ${client.id} rejected: ${auth.motivo}`);
         client.disconnect();
         return;
       }
 
-      const payload = await this.jwtService.verifyAsync(token);
-      const userId = payload.sub;
+      const userId = auth.userId;
 
       client.data.userId = userId;
       client.join(`user:${userId}`);
