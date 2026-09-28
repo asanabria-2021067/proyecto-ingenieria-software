@@ -19,6 +19,7 @@ import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useMisHoras } from '@/hooks/use-my-hours';
 import { formatearHoras } from '@/lib/hours/format';
 import type { MisHorasView } from '@/lib/services/users';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 function Encabezado() {
   return (
@@ -142,7 +143,7 @@ export default function MisHorasPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useMisHoras();
 
   return (
-    <div className="@container/mis-horas mx-auto flex max-w-content flex-col gap-section px-stack py-section lg:px-section lg:py-page">
+    <div className={dashboardPage('@container/mis-horas flex flex-col gap-section py-section lg:py-page')}>
       <Encabezado />
       {isLoading ? (
         <MisHorasSkeleton />

@@ -25,6 +25,7 @@ import { TIPO_LABEL } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, FolderOpen, Search, SearchX } from 'lucide-react';
 import { useState } from 'react';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 type OrganizacionFiltro = {
   idOrganizacion: number;
@@ -86,7 +87,7 @@ export default function ProyectosPage() {
   };
 
   return (
-      <div className="mx-auto max-w-[1400px] px-8 pt-7 pb-10">
+      <div className={dashboardPage('pt-7 pb-10')}>
         {/* Encabezado */}
         <div className="mb-4.5">
           <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">
