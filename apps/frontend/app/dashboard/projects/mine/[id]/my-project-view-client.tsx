@@ -426,7 +426,8 @@ export default function MyProjectViewClient({ id }: Props) {
               <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
                 Información general
               </h2>
-              <div className="space-y-5">
+              {/* Misma tarjeta que cada rol en edición: los dos bloques se leen igual. */}
+              <div data-slot="edit-card" className="rounded-xl border border-outline-variant bg-surface-container-low p-5 space-y-5">
                 <div>
                   <label className={labelClass}>Título del proyecto <span className="text-error">*</span></label>
                   <input
@@ -538,7 +539,7 @@ export default function MyProjectViewClient({ id }: Props) {
                 {form.roles.map((rol, rolIdx) => {
                   const rolErrs = rolErrorsMap[rol.id] ?? {};
                   return (
-                    <div key={rol.id} className="rounded-xl border border-outline-variant bg-surface-container-low p-5 space-y-4">
+                    <div key={rol.id} data-slot="edit-card" className="rounded-xl border border-outline-variant bg-surface-container-low p-5 space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-on-surface">Rol {rolIdx + 1}</span>
                         <button onClick={() => removeRol(rol.id)} className="text-tertiary hover:text-error transition-colors">
