@@ -8,6 +8,46 @@ Cadena auditable de la workstream OWASP de la Fase 2 (Vernel): **control → gat
 - «Auditoría» nombra la auditoría del gate (documento externo al repositorio, no versionado).
 - Estados: ver `owasp-top10-2025.md`. Lo que requiere administración figura como `OUT_OF_SCOPE_ADMIN_HANDOFF`.
 
+## G01 — Secrets & Configuration Fail-Closed
+
+| ID | SHA | Control | OWASP | Tests / evidencia | Comando local | Resultado | Auditoría | Rollback | Estado |
+|---|---|---|---|---|---|---|---|---|---|
+| G01-C01 | `79230ea7` | OWASP25-C019 | A07 | `g01-synthetic-jwt-environment.spec.ts`, `s7-cloudinary-adapter.spec.ts`, `s7-environment.spec.ts`, `security-jwt.spec.ts` | `cd apps/backend && npx vitest run test/g01-synthetic-jwt-environment.spec.ts test/s7-cloudinary-adapter.spec.ts test/s7-environment.spec.ts test/security-jwt.spec.ts` | PASS · 23 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C02 | `f5826dd6` | OWASP25-C019 | A07 | `jwt-secret-config.spec.ts` | `cd apps/backend && npx vitest run test/jwt-secret-config.spec.ts` | PASS · 18 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C03 | `f58300b7` | OWASP25-C019 + conserva C003 | A07 | `g01-jwt-secret-readers.spec.ts` | `cd apps/backend && npx vitest run test/g01-jwt-secret-readers.spec.ts` | PASS · 11 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C04 | `d312b5c0` | OWASP25-C019 | A07 | `g01-jwt-secret-readers.spec.ts` | `cd apps/backend && npx vitest run test/g01-jwt-secret-readers.spec.ts` | PASS · 11 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C05 | `c15edfef` | OWASP25-C019 + VM0-F018/F022 | A02/A08 | `g01-compose-contract.spec.ts` | `cd apps/backend && npx vitest run test/g01-compose-contract.spec.ts` | PASS · 10 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C06 | `5824450a` | OWASP25-C020 | A02/A08 | `g01-frontend-image-secrets.spec.ts` | `cd apps/backend && npx vitest run test/g01-frontend-image-secrets.spec.ts` | PASS · 7 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C07 | `90398db6` | FASE2-N01 + VM0-F012 + C030 | A02/A08 | `g01-deploy-env-transport.spec.ts` | `cd apps/backend && npx vitest run test/g01-deploy-env-transport.spec.ts` | PASS · 6 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C08 | `a5408ae3` | OWASP25-C030 + VM0-F019 | A04/A08 | `g01-deploy-config-contract.spec.ts` | `cd apps/backend && npx vitest run test/g01-deploy-config-contract.spec.ts` | PASS · 25 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C09 | `910308d8` | OWASP25-C029 | A04/A08 | `g01-backend-startup.spec.ts` | `cd apps/backend && npx vitest run test/g01-backend-startup.spec.ts` | PASS · 3 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C10 | `b7ddad18` | OWASP25-C030 | A04 | `controllers-and-basic.spec.ts` | `cd apps/backend && npx vitest run test/controllers-and-basic.spec.ts` | PASS · 4 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C11 | `6363063a` | FASE2-N08 | A02/A08 | `g01-gitignore-contract.spec.ts` | `cd apps/backend && npx vitest run test/g01-gitignore-contract.spec.ts` | PASS · 19 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+| G01-C12 | `1542a18d` | OWASP25-C019/C030 + FASE2-N13 | A02/A04 | `g01-env-example-contract.spec.ts` | `cd apps/backend && npx vitest run test/g01-env-example-contract.spec.ts` | PASS · 7 tests | auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md §12 | RB-CODE | PASS |
+
+## G02 — CI/CD Integrity (alcance v2)
+
+| ID | SHA | Control | OWASP | Tests / evidencia | Comando local | Resultado | Auditoría | Rollback | Estado |
+|---|---|---|---|---|---|---|---|---|---|
+| G02-C01 | `31093340` | OWASP25-C044/C045 + N-03/T23 | A08 | `security-deploy-ref-guard.spec.ts` | `cd apps/backend && npx vitest run test/security-deploy-ref-guard.spec.ts` | PASS · 4 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C02 | `615349a0` | OWASP25-C044 | A08 | `g02-workflow-permissions.spec.ts` | `cd apps/backend && npx vitest run test/g02-workflow-permissions.spec.ts` | PASS · 6 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C03 | — | OWASP25-C045 + FASE2-N14 | A08 | No ejecutada por Vernel: vincular el job productivo al environment `production` requiere GitHub Admin | — | — | auditoria_gate_G02_cicd_integrity.md §5 | — | OUT_OF_SCOPE_ADMIN_HANDOFF |
+| G02-C04 | `3aac8d12` | OWASP25-C035 | A08 | `g02-publish-gate.spec.ts`, `g02-workflow-permissions.spec.ts`, `security-deploy-ref-guard.spec.ts` | `cd apps/backend && npx vitest run test/g02-publish-gate.spec.ts test/g02-workflow-permissions.spec.ts test/security-deploy-ref-guard.spec.ts` | PASS · 15 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C05 | `24d732fa` | VM0-F020 | A08 | `g02-deploy-dirty-checkout.spec.ts` | `cd apps/backend && npx vitest run test/g02-deploy-dirty-checkout.spec.ts` | PASS · 4 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C06 | `3acd03ec` | FASE2-N07 | A08 | `g02-deploy-config-only.spec.ts`, `g02-workflow-permissions.spec.ts` | `cd apps/backend && npx vitest run test/g02-deploy-config-only.spec.ts test/g02-workflow-permissions.spec.ts` | PASS · 22 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C07 | `3eef682a` | FASE2-N07 | A08 | `g02-deploy-config-only.spec.ts`, `g02-immutable-variants.spec.ts`, `g02-publish-gate.spec.ts`, `security-deploy-ref-guard.spec.ts` | `cd apps/backend && npx vitest run test/g02-deploy-config-only.spec.ts test/g02-immutable-variants.spec.ts test/g02-publish-gate.spec.ts test/security-deploy-ref-guard.spec.ts` | PASS · 37 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C08 | `5339b893` | OWASP25-C031 + FASE2-N05 | A08 | lint del frontend 4 → 0 errores | `cd apps/frontend && npm run lint` | PASS | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C09 | `22a9da35` | OWASP25-C031 | A08 | `g02-ci-quality-gates.spec.ts` | `cd apps/backend && npx vitest run test/g02-ci-quality-gates.spec.ts` | PASS · 15 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C10 | `dbec7418` | OWASP25-C043 | A08 | `g02-ci-quality-gates.spec.ts`, `my-project-view.spec.tsx`, `theme-tokens.spec.ts` | `cd apps/backend && npx vitest run test/g02-ci-quality-gates.spec.ts`<br>`cd apps/frontend && npx vitest run test/my-project-view.spec.tsx test/theme-tokens.spec.ts` | PASS · 30 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C11 | `57e58a2a` | OWASP25-C043 | A08 | `g02-ci-quality-gates.spec.ts` | `cd apps/backend && npx vitest run test/g02-ci-quality-gates.spec.ts` | PASS · 15 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C12 | `d50349d1` | OWASP25-C032 | A08 | `g02-ci-quality-gates.spec.ts` | `cd apps/backend && npx vitest run test/g02-ci-quality-gates.spec.ts` | PASS · 15 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C13 | `eed73d2b` | OWASP25-C033 + FASE2-N06 | A08 | `g02-e2e-trigger-contract.spec.ts` | `cd apps/backend && npx vitest run test/g02-e2e-trigger-contract.spec.ts` | PASS · 12 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C14 | `f0df7445` | OWASP25-C033 | A08 | `g02-e2e-production-like.spec.ts` | `cd apps/backend && npx vitest run test/g02-e2e-production-like.spec.ts` | PASS · 4 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C15 | `ea72f90d` | OWASP25-C034 | A08 | `g02-real-db-integration.spec.ts` | `cd apps/backend && npm run test:integration` (PostgreSQL desechable) | PASS · 5 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C16 | `7d4a338c` | OWASP25-C047 | A02/A08 | `g02-nginx-baseline.spec.ts` | `cd apps/backend && npx vitest run test/g02-nginx-baseline.spec.ts` | PASS · 10 tests | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C17 | `4436aba6` | D4 + OWASP25-C043/C047 | A08 | `g02-topology-harness.spec.ts` + arnés | `cd apps/backend && npx vitest run test/g02-topology-harness.spec.ts`<br>`infra/staging/run-harness.sh` | PASS · 12 tests + arnés | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+| G02-C18 | `da63a766` | OWASP25-C043/C044 + D4 | A08 | `g02-topology-ci.spec.ts` + arnés | `cd apps/backend && npx vitest run test/g02-topology-ci.spec.ts`<br>`infra/staging/run-harness.sh` | PASS · 22 tests + arnés | auditoria_gate_G02_cicd_integrity.md §4 | RB-CODE | PASS |
+
 ## G03 — Supply Chain & Dependency Security
 
 | ID | SHA | Control | OWASP | Tests / evidencia | Comando local | Resultado | Auditoría | Rollback | Estado |
@@ -102,4 +142,24 @@ Cadena auditable de la workstream OWASP de la Fase 2 (Vernel): **control → gat
 | G08-C03 | `3358ec48` | OWASP25-C048 | A08 | `g08-owasp-delta-verifier.spec.ts` | `cd apps/backend && npx vitest run test/g08-owasp-delta-verifier.spec.ts` | PASS · 25 tests | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
 | G08-C04 | `0bfddb57` | OWASP25-C048 | A08 | `g08-ci-delta.spec.ts` | `cd apps/backend && npx vitest run test/g08-ci-delta.spec.ts` | PASS · 12 tests | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
 | G08-C05 | `2c31875a` | OWASP25-C048 (A01–A10) | A01/A10 | `g08-evidence-index.spec.ts` | `cd apps/backend && npx vitest run test/g08-evidence-index.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
-| G08-C06 | este commit | OWASP25-C048 | A01–A10 | `g08-negative-controls.spec.ts` | `cd apps/backend && npx vitest run test/g08-negative-controls.spec.ts` | PASS | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | IMPLEMENTED |
+| G08-C06 | `7bebb355` | OWASP25-C048 + pruebas negativas (A01–A10) | A01/A10 | `g08-negative-controls.spec.ts` | `cd apps/backend && npx vitest run test/g08-negative-controls.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
+| G08-C07 | este commit | OWASP25-C048 | A01–A10 | `g08-evidence-index.spec.ts` | `cd apps/backend && npx vitest run test/g08-evidence-index.spec.ts` | PASS | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | IMPLEMENTED |
+
+## Baseline de código G01/G02 (G08-C07)
+
+| Gate | Estado de código | Commits en el historial | Detalle |
+|---|---|---|---|
+| G01 | PASS | 12 | G01-C01…C12: las 12 propiedades implementadas y auditadas (`auditoria_gate_G01_secrets_configuration_fail_closed_CORREGIDA.md`) |
+| G02 | PASS_SCOPE_V2 | 17 | G02-C01, C02 y C04–C18 ejecutadas; **G02-C03 NO fue ejecutada por Vernel** y pasa al Gate Admin (plan maestro v2 §5). La auditoría intermedia de G02 registró `PENDING_C03_BY_LEADER_DECISION` antes de esa revisión |
+
+## HU-159 (E2E) — PREEXISTING_HU159_E2E_FAILURE
+
+- **Tests afectados:** `chat-individual-navegacion.spec.ts`, los casos «concurrencia» y «navegación» (HU-159, chat individual; owner: Angel).
+- **Firma estable:** `element(s) not found`, `toBeVisible` y timeout de `fill`, sin cambios desde G02.
+- **Antes de G02-C16:**
+  - la auditoría de G02 (§10–§11) documenta los mismos 2 fallos, con la misma firma, en tres corridas;
+  - también fallan con el servidor de desarrollo sobre una base recién sembrada;
+  - pasan con conversaciones ya existentes, así que el defecto está en crear un chat individual sobre una base limpia.
+- **Hasta la baseline de G08:** la baseline y la regresión final de cada gate (G03–G07) y la baseline de G08 reproducen exactamente los mismos 2 fallos: 5 PASS / 2 FAIL.
+- **Chat en navegador:** `chat-mensajeria.spec.ts` pasa y los sockets aceptados en el E2E no cambian (28/0).
+- **Clasificación:** riesgo preexistente de integración, no regresión de ningún gate. Ningún gate lo corrigió ni lo ocultó: no hubo `skip`, reintentos extra, timeouts más largos ni cambios en el seed.
