@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { redactAuditValue } from '../common/interceptors/audit.interceptor';
 import { TIPO_OBJETO_SEGURIDAD, TipoEventoSeguridadValor } from './tipos-evento-seguridad';
 import type { SecurityRequestContext } from './request-context';
+import { SecurityAlertsService } from './security-alerts.service';
 
 export interface SecurityEventInput {
   tipo: TipoEventoSeguridadValor;
@@ -32,7 +33,11 @@ export interface SecurityEventInput {
 export class SecurityEventsService {
   private readonly logger = new Logger(SecurityEventsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // G05 (OWASP25-C038): alertas de ráfaga; inertes salvo SECURITY_ALERTS_ENABLED=true.
+    @Optional() private readonly alerts?: SecurityAlertsService,
+  ) {}
 
   async record(input: SecurityEventInput): Promise<boolean> {
     try {
@@ -49,11 +54,17 @@ export class SecurityEventsService {
           ...(input.origen ? { ipOrigen: input.origen.ip } : {}),
         },
       });
-      return true;
     } catch (error) {
       const kind = error instanceof Error ? error.name : typeof error;
       this.logger.warn(`Evento de seguridad no registrado (${input.tipo}): ${kind}`);
       return false;
     }
+    try {
+      await this.alerts?.evaluate(input.tipo);
+    } catch (error) {
+      const kind = error instanceof Error ? error.name : typeof error;
+      this.logger.warn(`Alerta de seguridad no evaluada (${input.tipo}): ${kind}`);
+    }
+    return true;
   }
 }
