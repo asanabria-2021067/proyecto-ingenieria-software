@@ -103,7 +103,7 @@ export function ProjectsListClient({ initialData, initialTotalPages, searchQuery
           <Link
             key={project.idProyecto}
             href={`/dashboard/proyectos/${project.idProyecto}`}
-            className="surface-enter interactive-lift group block rounded-2xl bg-card p-6 shadow-card hover:shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="card-base surface-enter interactive-lift group block hover:shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
           >
             <div className="flex items-start justify-between gap-3 mb-3">

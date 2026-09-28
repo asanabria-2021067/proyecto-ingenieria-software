@@ -248,6 +248,20 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
   }
 }
 
+/**
+ * Carcasa compartida de las tarjetas de "Explorar Proyectos" y "Mis
+ * Proyectos": parte de `.card-base` (radio `card`, sombra `card`, borde
+ * tenue y relleno `card` del sistema de diseño) y solo le añade la altura
+ * mínima y el realce al pasar el cursor. Tarjeta y skeleton la reutilizan.
+ */
+const PROJECT_CARD_SHELL = 'card-base flex min-h-56 flex-col';
+
+/**
+ * Grilla de ambas vistas. Dos columnas desde `lg`: con la sidebar visible,
+ * a 768 px cada columna quedaba más angosta que el footer de la tarjeta.
+ */
+export const PROJECT_CARD_GRID = 'grid grid-cols-1 gap-grid lg:grid-cols-2';
+
 export type AvailableProjectCardProps =
   | { context?: 'explore'; proyecto: ProyectoDisponibleResumen }
   | { context: 'mine'; proyecto: MiProyectoListItemDTO; onDelete?: () => void };
@@ -302,7 +316,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
       <>
         <Button
           asChild
-          className={`h-9.5 w-56 shrink-0 gap-1.5 rounded-md px-4.5 text-[13px] font-semibold shadow-none ${
+          className={`h-9.5 w-56 min-w-0 shrink gap-1.5 rounded-md px-4.5 text-[13px] font-semibold shadow-none ${
             cfg.buttonAnimated ? 'blink-gold-gray' : cfg.buttonClassName
           }`}
         >
@@ -393,7 +407,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
   return (
     <div
       data-testid={`project-card-${idProyecto}`}
-      className="@container flex flex-col bg-surface-container-lowest border border-[#D3DDD3] dark:border-outline-variant hover:border-[#A9BFAE] dark:hover:border-primary/50 rounded-[10px] p-4.5 min-h-47 shadow-[0_1px_3px_rgba(24,28,32,0.05)] hover:shadow-[0_2px_5px_rgba(24,28,32,0.08)] transition-[border-color,box-shadow] duration-180 ease-out"
+      className={`@container ${PROJECT_CARD_SHELL} hover:border-outline-variant hover:shadow-raised transition-[border-color,box-shadow] duration-180 ease-out`}
     >
       {/* Encabezado: nombre + etiquetas */}
       <div className="flex items-start justify-between gap-2">
@@ -421,12 +435,12 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
       </div>
 
       {/* Descripción */}
-      <p className="mt-2 text-[13px] leading-4.5 font-normal text-on-surface-variant line-clamp-3">
+      <p className="mt-inline text-[13px] leading-4.5 font-normal text-on-surface-variant line-clamp-3">
         {descripcionProyecto || 'Sin descripción disponible.'}
       </p>
 
       {/* Metadatos */}
-      <div className="mt-[14px] flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
+      <div className="mt-stack flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px]">
         <span className="flex items-center gap-1">
           <ModalidadIcon size={17} className="shrink-0 text-on-surface-variant" />
           <span className="text-on-surface-variant">
@@ -436,13 +450,16 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
         {metadataExtra}
       </div>
 
-      {/* Línea divisoria */}
-      <div className="mt-[13px] mb-[10px] border-t border-outline-variant/40" />
-
-      {/* Footer */}
-      <div className={`mt-auto flex items-center gap-2.5 ${footerLeft ? 'justify-between' : 'justify-end'}`}>
-        {footerLeft}
-        <div className="flex items-center gap-2.5">{footerAction}</div>
+      {/* Footer: línea divisoria + acciones, anclados al borde inferior. */}
+      <div className="mt-auto pt-card">
+        <div
+          className={`flex flex-wrap items-center gap-x-inline gap-y-tight border-t border-outline-variant/40 pt-stack ${
+            footerLeft ? 'justify-between' : 'justify-end'
+          }`}
+        >
+          {footerLeft}
+          <div className="flex min-w-0 items-center gap-2.5">{footerAction}</div>
+        </div>
       </div>
     </div>
   );
@@ -450,7 +467,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
 
 export function AvailableProjectCardSkeleton() {
   return (
-    <div className="flex flex-col bg-surface-container-lowest border border-[#D3DDD3] dark:border-outline-variant rounded-[10px] p-4.5 min-h-47 shadow-[0_1px_3px_rgba(24,28,32,0.05)]">
+    <div className={PROJECT_CARD_SHELL}>
       <div className="flex items-start justify-between gap-2">
         <Skeleton className="h-[22px] w-3/5" />
         <div className="flex shrink-0 gap-2">
@@ -458,20 +475,21 @@ export function AvailableProjectCardSkeleton() {
           <Skeleton className="h-6.25 w-16 rounded-[7px]" />
         </div>
       </div>
-      <div className="mt-2 space-y-1.5">
+      <div className="mt-inline space-y-1.5">
         <Skeleton className="h-[13px] w-full" />
         <Skeleton className="h-[13px] w-11/12" />
         <Skeleton className="h-[13px] w-2/3" />
       </div>
-      <div className="mt-[14px] flex items-center gap-4">
+      <div className="mt-stack flex items-center gap-4">
         <Skeleton className="h-[14px] w-16" />
         <Skeleton className="h-[14px] w-14" />
         <Skeleton className="h-[26px] w-28 rounded-full" />
       </div>
-      <div className="mt-[13px] mb-[10px] border-t border-outline-variant/40" />
-      <div className="mt-auto flex items-center justify-between gap-3">
-        <Skeleton className="h-[13px] w-28" />
-        <Skeleton className="h-9.5 w-30 rounded-md" />
+      <div className="mt-auto pt-card">
+        <div className="flex items-center justify-between gap-inline border-t border-outline-variant/40 pt-stack">
+          <Skeleton className="h-[13px] w-28" />
+          <Skeleton className="h-9.5 w-30 rounded-md" />
+        </div>
       </div>
     </div>
   );

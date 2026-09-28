@@ -7,6 +7,7 @@ import { AlertCircle, FolderPlus, Plus, Search, SearchX } from 'lucide-react';
 import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
+  PROJECT_CARD_GRID,
 } from '@/components/projects/available-project-card';
 import { getMyProjects, getContributorProjects, deleteProject } from '@/lib/services/projects';
 import { TIPO_LABEL } from '@/types';
@@ -186,7 +187,7 @@ export default function MyProjectsPage() {
         </div>
 
         {isLoading && (
-          <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2" role="status" aria-label="Cargando proyectos">
+          <div className={PROJECT_CARD_GRID} role="status" aria-label="Cargando proyectos">
             {Array.from({ length: 6 }).map((_, i) => (
               <AvailableProjectCardSkeleton key={i} />
             ))}
@@ -277,7 +278,7 @@ export default function MyProjectsPage() {
         )}
 
         {!isLoading && !isError && filtrados.length > 0 && (
-          <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+          <div className={PROJECT_CARD_GRID}>
             {filtrados.map((proyecto) => (
               <AvailableProjectCard
                 key={proyecto.idProyecto}
@@ -294,7 +295,7 @@ export default function MyProjectsPage() {
             <h2 className="mb-3 text-[19px] font-bold text-on-surface">
               Proyectos donde participo
             </h2>
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+            <div className={PROJECT_CARD_GRID}>
               {participoFiltrados.map((proyecto) => (
                 <AvailableProjectCard key={proyecto.idProyecto} context="mine" proyecto={proyecto} />
               ))}
