@@ -145,6 +145,18 @@ const GRUPOS: { id: GrupoTarea; label: string; punto: string }[] = [
 /** Con más completadas que esto en la página, su grupo empieza plegado. */
 const UMBRAL_COMPLETADAS_PLEGADAS = 5;
 
+/**
+ * Columnas de la lista. Desde 42rem de tarjeta: Tarea | Proyecto | Fecha
+ * límite | Prioridad | Estado, compartidas por la guía y cada fila. Entre
+ * 28rem y 42rem, Tarea y Proyecto ocupan todo el ancho y las tres columnas
+ * cortas conservan su ancho fijo debajo; por debajo, las celdas fluyen.
+ * Anchos fijos = las pastillas caen siempre sobre la misma guía vertical.
+ */
+const COLUMNAS_LISTA = '@2xl/grupo:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_7.5rem_6rem_7rem]';
+const COLUMNAS_CORTAS = '@md/grupo:grid-cols-[7.5rem_6rem_7rem]';
+const CELDA_ANCHA = 'basis-full @md/grupo:col-span-3 @2xl/grupo:col-span-1';
+const CELDA_CORTA = 'mt-micro @2xl/grupo:mt-0';
+
 const CONTROL_FILTRO = 'h-10 w-full rounded-control border-outline-variant bg-page text-body';
 
 function PuntoGrupo({ className }: { className: string }) {
@@ -173,13 +185,15 @@ function ResumenKpi({
   );
 }
 
-function FilaTarea({ tarea, mostrarFecha }: { tarea: MiTareaDTO; mostrarFecha: boolean }) {
+function FilaTarea({ tarea }: { tarea: MiTareaDTO }) {
   const vencimiento = getVencimiento(tarea);
   const config = vencimiento ? VENCIMIENTO_CONFIG[vencimiento] : null;
   const VencimientoIcon = config?.icon;
   return (
-    <li className="relative flex flex-col gap-tight px-card py-inline transition-colors hover:bg-surface-container-low @2xl/grupo:flex-row @2xl/grupo:items-center @2xl/grupo:gap-stack">
-      <div className="min-w-0 flex-1">
+    <li
+      className={`relative flex flex-wrap items-center gap-x-inline gap-y-micro px-card py-inline transition-colors hover:bg-surface-container-low @md/grupo:grid ${COLUMNAS_CORTAS} ${COLUMNAS_LISTA}`}
+    >
+      <div className={`min-w-0 ${CELDA_ANCHA}`}>
         {/* El enlace del título se estira sobre toda la fila (after:inset-0):
             misma navegación de siempre, sin botón «Ver» por fila. */}
         <Link
@@ -188,12 +202,12 @@ function FilaTarea({ tarea, mostrarFecha }: { tarea: MiTareaDTO; mostrarFecha: b
         >
           {tarea.tituloTarea}
         </Link>
-        <p className="type-meta truncate">{tarea.proyecto.tituloProyecto}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-tight @2xl/grupo:w-104 @2xl/grupo:shrink-0">
-        {/* En «Sin fecha» el grupo ya lo dice: la fila no repite «Sin fecha». */}
-        {mostrarFecha && tarea.fechaLimite && (
-          <span className="type-meta w-24 shrink-0 tabular-nums text-text-secondary">{formatFecha(tarea.fechaLimite)}</span>
+      <p className={`type-meta min-w-0 line-clamp-2 ${CELDA_ANCHA}`}>{tarea.proyecto.tituloProyecto}</p>
+      {/* Sin fecha la celda queda vacía (el grupo ya lo dice) pero conserva su columna. */}
+      <div className={`flex min-w-0 flex-col items-start gap-micro ${CELDA_CORTA}`}>
+        {tarea.fechaLimite && (
+          <span className="type-meta tabular-nums text-text-secondary">{formatFecha(tarea.fechaLimite)}</span>
         )}
         {config && VencimientoIcon && (
           <span className={`pill ${config.tone}`}>
@@ -201,7 +215,11 @@ function FilaTarea({ tarea, mostrarFecha }: { tarea: MiTareaDTO; mostrarFecha: b
             {config.label}
           </span>
         )}
+      </div>
+      <div className={CELDA_CORTA}>
         <PrioridadBadge prioridad={tarea.prioridad} />
+      </div>
+      <div className={CELDA_CORTA}>
         <EstadoBadge estado={tarea.estadoTarea} />
       </div>
     </li>
@@ -250,11 +268,25 @@ function GrupoTareas({
         </div>
       </header>
       {visible && (
-        <ul id={idLista} className="divide-y divide-outline-variant/50">
-          {tareas.map((tarea) => (
-            <FilaTarea key={tarea.idTarea} tarea={tarea} mostrarFecha={grupo.id !== 'SIN_FECHA'} />
-          ))}
-        </ul>
+        <>
+          {/* Guía de columnas: solo cuando las filas van en columnas; es
+              visual (cada pastilla ya dice qué es), por eso aria-hidden. */}
+          <div
+            aria-hidden="true"
+            className={`hidden gap-x-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold text-text-secondary @2xl/grupo:grid ${COLUMNAS_LISTA}`}
+          >
+            <span>Tarea</span>
+            <span>Proyecto</span>
+            <span>Fecha límite</span>
+            <span>Prioridad</span>
+            <span>Estado</span>
+          </div>
+          <ul id={idLista} className="divide-y divide-outline-variant/50">
+            {tareas.map((tarea) => (
+              <FilaTarea key={tarea.idTarea} tarea={tarea} />
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
@@ -399,8 +431,30 @@ export default function MisTareasPage() {
       )}
 
       <div className="flex flex-col gap-stack">
+        {/* total real de tareas (+ cuántas pasan los filtros) y limpiar, sobre la tarjeta de filtros */}
+        {!isLoading && !isError && (
+          <div className="flex min-h-8 flex-wrap items-center justify-between gap-inline">
+            <p className="type-body text-text-secondary" aria-live="polite" role="status">
+              Total de tareas: <span className="font-semibold text-text-primary tabular-nums">{tareas.length}</span>
+              {hayFiltrosActivos &&
+                ` · ${tareasFiltradas.length} ${tareasFiltradas.length === 1 ? 'coincide' : 'coinciden'} con los filtros`}
+            </p>
+            {hayFiltrosActivos && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={limpiarFiltros}
+                className="font-medium text-primary"
+              >
+                Limpiar filtros
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* filtros */}
-        <section aria-label="Filtros de tareas" className="card-base @container/filtros flex flex-col gap-stack">
+        <section aria-label="Filtros de tareas" className="card-base @container/filtros">
           <div className="grid grid-cols-1 gap-inline @xl/filtros:grid-cols-2 @4xl/filtros:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_minmax(0,1.4fr)]">
             <div className="relative @xl/filtros:col-span-2 @4xl/filtros:col-span-1">
               <Search
@@ -470,25 +524,6 @@ export default function MisTareasPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          {/* contador de resultados + limpiar */}
-          <div className="flex min-h-8 flex-wrap items-center justify-between gap-inline">
-            <p className="type-meta" aria-live="polite" role="status">
-              {contarTareas(tareasFiltradas.length)}
-              {hayFiltrosActivos && ` de ${tareas.length} en total`}
-            </p>
-            {hayFiltrosActivos && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={limpiarFiltros}
-                className="font-medium text-primary"
-              >
-                Limpiar filtros
-              </Button>
-            )}
           </div>
         </section>
 
