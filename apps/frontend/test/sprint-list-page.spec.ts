@@ -202,7 +202,38 @@ describe('SprintListPage — los tres estados', () => {
     expect(screen.getByText('CERRADO')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Finalizar' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /continuar cierre/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /ver detalles/i })).toBeInTheDocument();
+    // «Ver detalles» existe en los tres estados, cada uno hacia su propio Sprint
+    expect(screen.getAllByRole('link', { name: /ver detalles/i }).map((a) => a.getAttribute('href'))).toEqual([
+      '/dashboard/proyectos/42/sprints/1',
+      '/dashboard/proyectos/42/sprints/2',
+      '/dashboard/proyectos/42/sprints/3',
+    ]);
+  });
+
+  it.each(['ACTIVO', 'EN_FINALIZACION'] as const)(
+    '%s: el detalle del Sprint es accesible con «Ver detalles», justo a la izquierda de «Analítica»',
+    (estado) => {
+      mockLeader(true);
+      mockSprints({ sprints: [sprint({ estado, idSprint: 23 })] });
+      mockFinalize();
+
+      renderPage();
+
+      const detalles = screen.getByRole('link', { name: 'Ver detalles' });
+      expect(detalles).toHaveAttribute('href', '/dashboard/proyectos/42/sprints/23');
+      const analitica = screen.getByRole('link', { name: /^analítica$/i });
+      expect(detalles.nextElementSibling).toBe(analitica);
+    },
+  );
+
+  it('la cabecera ya no ofrece «Analítica comparativa» (sigue en la navegación del proyecto)', () => {
+    mockLeader(true);
+    mockSprints({ sprints: [sprint({ estado: 'ACTIVO' })] });
+    mockFinalize();
+
+    renderPage();
+
+    expect(screen.queryByRole('link', { name: /analítica comparativa/i })).not.toBeInTheDocument();
   });
 });
 
