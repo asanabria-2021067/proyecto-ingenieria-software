@@ -1,4 +1,4 @@
-import { ForbiddenException, BadRequestException } from '@nestjs/common';
+import { ForbiddenException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -106,6 +106,56 @@ describe.skipIf(!process.env.RUN_REAL_DB_TESTS)('HU-14 contra Postgres real (loc
 
     await expect(authService.resetPassword(resetToken, 'SegundaClave456')).rejects.toBeInstanceOf(
       BadRequestException,
+    );
+  });
+
+  async function enlaceDeReset(): Promise<string> {
+    await authService.forgotPassword(CARNE, CORREO_INSTITUCIONAL);
+    const pendientes = await adminService.getSolicitudesRecuperacionPendientes(adminId);
+    return (await adminService.generarEnlaceRecuperacion(adminId, pendientes[0].idSolicitud)).resetToken;
+  }
+
+  it('G04-C04: dos resets concurrentes del mismo token: exactamente uno gana', async () => {
+    const resetToken = await enlaceDeReset();
+
+    const resultados = await Promise.allSettled([
+      authService.resetPassword(resetToken, 'ClaveCarreraA1'),
+      authService.resetPassword(resetToken, 'ClaveCarreraB2'),
+    ]);
+
+    const ganadores = resultados.filter((r) => r.status === 'fulfilled');
+    const perdedores = resultados.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(ganadores).toHaveLength(1);
+    expect(perdedores).toHaveLength(1);
+    expect(perdedores[0].reason).toBeInstanceOf(BadRequestException);
+
+    // La contraseña final es la del único ganador, nunca una mezcla ni la del perdedor.
+    const ganadora = resultados[0].status === 'fulfilled' ? 'ClaveCarreraA1' : 'ClaveCarreraB2';
+    const perdedora = ganadora === 'ClaveCarreraA1' ? 'ClaveCarreraB2' : 'ClaveCarreraA1';
+    const usuario = await prisma.usuario.findUniqueOrThrow({ where: { idUsuario: studentId } });
+    expect(await bcrypt.compare(ganadora, usuario.contrasena)).toBe(true);
+    expect(await bcrypt.compare(perdedora, usuario.contrasena)).toBe(false);
+  });
+
+  it('G04-C04: el reset revoca las sesiones previas y la clave anterior deja de servir', async () => {
+    await prisma.usuario.update({
+      where: { idUsuario: studentId },
+      data: { contrasena: bcrypt.hashSync('ClaveAnterior1', 4) },
+    });
+    const sesionPrevia = await authService.login({ correo: CORREO_INSTITUCIONAL, contrasena: 'ClaveAnterior1' });
+    const otraSesion = await authService.login({ correo: CORREO_INSTITUCIONAL, contrasena: 'ClaveAnterior1' });
+
+    await authService.resetPassword(await enlaceDeReset(), 'ClaveNueva123');
+
+    const vigentes = await prisma.tokenRefresco.count({ where: { idUsuario: studentId, revocadoEn: null } });
+    expect(vigentes).toBe(0);
+    await expect(authService.refreshToken(sesionPrevia.refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(authService.refreshToken(otraSesion.refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(
+      authService.login({ correo: CORREO_INSTITUCIONAL, contrasena: 'ClaveAnterior1' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(authService.login({ correo: CORREO_INSTITUCIONAL, contrasena: 'ClaveNueva123' })).resolves.toHaveProperty(
+      'refreshToken',
     );
   });
 
