@@ -450,18 +450,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               )}
 
-              {puedeCrear && activeTab === 'hitos' && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setCrearHitoAbierto(true)}
-                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
-                >
-                  <Plus className="size-3.5" aria-hidden="true" />
-                  Agregar hito
-                </Button>
-              )}
-
               {isLeader && (
                 <Button
                   type="button"
@@ -472,6 +460,19 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 >
                   <Tags className="size-3.5" aria-hidden="true" />
                   Gestionar etiquetas
+                </Button>
+              )}
+              {/* Acciones de creación juntas: «Agregar hito» va pegado a
+                  «Nueva tarea», con el mismo gap del grupo. */}
+              {puedeCrear && activeTab === 'hitos' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setCrearHitoAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Agregar hito
                 </Button>
               )}
               {/* Sin Sprint de trabajo (F2), la creación de tareas queda

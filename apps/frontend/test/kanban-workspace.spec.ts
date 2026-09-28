@@ -406,6 +406,21 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     expect(screen.queryByRole('button', { name: /agregar hito/i })).not.toBeInTheDocument();
   });
 
+  it('en Hitos, las acciones de creación van juntas: «Gestionar etiquetas», «Agregar hito» y «Nueva tarea» contiguos', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    renderWorkspace();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
+
+    const etiquetas = screen.getByRole('button', { name: /gestionar etiquetas/i });
+    const hito = screen.getByRole('button', { name: /agregar hito/i });
+    const tarea = screen.getByRole('button', { name: /nueva tarea/i });
+    expect(etiquetas.nextElementSibling).toBe(hito);
+    expect(hito.nextElementSibling).toBe(tarea);
+    expect(hito.parentElement).toHaveClass('gap-2');
+  });
+
   it('"Agregar hito" no se muestra en la pestaña Tablero', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks();
