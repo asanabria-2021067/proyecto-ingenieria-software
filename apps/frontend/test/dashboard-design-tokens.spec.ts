@@ -57,6 +57,11 @@ const MIGRATED_FILES = [
   'components/projects/closure-status-banner.tsx',
   'components/projects/read-only-project-banner.tsx',
   'components/projects/detail/exit-request-section.tsx',
+  // HU-158 (T-232): Mis Horas.
+  'app/dashboard/mis-horas/page.tsx',
+  'components/hours/hours-kpi-card.tsx',
+  'components/hours/my-hours-requirements.tsx',
+  'components/hours/my-hours-project-list.tsx',
 ];
 
 describe('Tokens de color (HU-163)', () => {
