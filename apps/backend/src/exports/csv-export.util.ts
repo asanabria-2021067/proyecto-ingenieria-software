@@ -15,6 +15,18 @@ const CSV_SEPARATOR = ';';
 const CSV_BOM = '﻿';
 const CSV_LINE_BREAK = '\r\n';
 
+/**
+ * G07 (VM1-N06 · OWASP A04/A05:2025): Excel y LibreOffice ejecutan como
+ * fórmula una celda que empieza con =, +, -, @, TAB o CR (inyección CSV:
+ * HYPERLINK, DDE). Un apóstrofo delante la deja como texto; se aplica a las
+ * celdas de texto ANTES del escape CSV. Los números (horas) no cambian.
+ */
+const FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r'];
+
+export function neutralizeCsvFormula(value: string): string {
+  return FORMULA_PREFIXES.some((prefix) => value.startsWith(prefix)) ? `'${value}` : value;
+}
+
 function escapeCsvField(value: string): string {
   if (value.includes('"') || value.includes(CSV_SEPARATOR) || value.includes('\n') || value.includes('\r')) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -22,9 +34,11 @@ function escapeCsvField(value: string): string {
   return value;
 }
 
-/** Serializa filas ya completas (sin distinguir cabecera): cada una se escapa igual. */
+/** Serializa filas ya completas (sin distinguir cabecera): cada una se neutraliza y se escapa igual. */
 export function buildCsvFromRows(rows: ReadonlyArray<ReadonlyArray<string | number>>): string {
-  const lineas = rows.map((fila) => fila.map((celda) => escapeCsvField(String(celda))).join(CSV_SEPARATOR));
+  const lineas = rows.map((fila) =>
+    fila.map((celda) => escapeCsvField(typeof celda === 'string' ? neutralizeCsvFormula(celda) : String(celda))).join(CSV_SEPARATOR),
+  );
   return CSV_BOM + lineas.join(CSV_LINE_BREAK) + CSV_LINE_BREAK;
 }
 
