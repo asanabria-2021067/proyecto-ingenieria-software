@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { readRepoFile } from './helpers/workflow-yaml';
-import { STATES, TRACE, citedSpecs, git, gitAvailable, historyCommitIds, specExists } from './helpers/owasp-evidence';
+import { STATES, TRACE, citedSpecs, git, gitAvailable, historyCommitIds, specExists, tableRows } from './helpers/owasp-evidence';
 
 /**
  * G08-C05 · OWASP25-C048 (A01–A10). Índice durable control → gate/commit →
  * test → evidencia. Cada fila usa el ID estable `Gxx-Cnn` y el SHA REAL del
  * historial local; todo commit trazable de los gates indexados tiene fila, los
  * tests citados existen y ninguna fila de código depende de evidencia
- * productiva o remota.
+ * productiva o remota. G08-C07 ancla G01 (PASS) y G02 (PASS_SCOPE_V2, sin
+ * G02-C03) como baseline de código y clasifica HU-159 como preexistente.
  */
 
-export const INDEXED_GATES = ['G03', 'G04', 'G06', 'G05', 'G07', 'G08'];
+// G08-C07: G01 y G02 se anclan como baseline de código; desde aquí se indexa toda la workstream.
+export const INDEXED_GATES = ['G01', 'G02', 'G03', 'G04', 'G06', 'G05', 'G07', 'G08'];
 const index = readRepoFile('docs/security/evidence-index.md');
+const allowlist = JSON.parse(readRepoFile('docs/security/owasp-delta-allowlist.json')) as { notExecuted: Array<{ id: string }> };
+const NOT_EXECUTED = allowlist.notExecuted.map((entry) => entry.id);
 
 export interface IndexRow {
   id: string;
@@ -42,7 +46,7 @@ describe('G08-C05: índice de evidencia', () => {
   it('cada fila tiene un ID único, un estado del catálogo y todos los campos', () => {
     const ids = rows.map((row) => row.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const row of rows) {
+    for (const row of rows.filter((entry) => entry.state !== 'OUT_OF_SCOPE_ADMIN_HANDOFF')) {
       expect(STATES, row.id).toContain(row.state);
       for (const field of [row.control, row.owasp, row.tests, row.command, row.result, row.audit, row.rollback]) {
         expect(field.length, row.id).toBeGreaterThan(0);
@@ -72,8 +76,17 @@ describe('G08-C05: índice de evidencia', () => {
     expect(citedSpecs(index).filter((name) => !specExists(name))).toEqual([]);
   });
 
+  it('las operaciones no ejecutadas figuran como handoff, sin SHA ni tests', () => {
+    const handoff = rows.filter((row) => row.state === 'OUT_OF_SCOPE_ADMIN_HANDOFF');
+    expect(handoff.map((row) => row.id)).toEqual(NOT_EXECUTED);
+    for (const row of handoff) {
+      expect(row.sha, row.id).toBe('—');
+      expect(row.result, row.id).toBe('—');
+    }
+  });
+
   it('solo la fila de G08 en curso puede no tener SHA todavía', () => {
-    const pending = rows.filter((row) => !/^[0-9a-f]{8}$/.test(row.sha));
+    const pending = rows.filter((row) => row.state !== 'OUT_OF_SCOPE_ADMIN_HANDOFF' && !/^[0-9a-f]{8}$/.test(row.sha));
     expect(pending.length).toBeLessThanOrEqual(1);
     for (const row of pending) {
       expect(row.id).toMatch(/^G08-/);
@@ -98,6 +111,29 @@ describe('G08-C05: índice de evidencia', () => {
     const pending = rows.find((row) => row.sha === 'este commit');
     if (pending && history.has(pending.id)) {
       expect(pending.id).toBe(headId);
+    }
+  });
+
+  it('G01 y G02 quedan anclados como baseline de código y HU-159 con su clasificación factual', () => {
+    const baseline = tableRows(index, 'Baseline de código G01/G02');
+    expect(baseline.map((row) => [row[0], row[1]])).toEqual([
+      ['G01', 'PASS'],
+      ['G02', 'PASS_SCOPE_V2'],
+    ]);
+    expect(baseline[1][3]).toMatch(/G02-C03 NO fue ejecutada/);
+    expect(index).toMatch(/^## HU-159 \(E2E\) — PREEXISTING_HU159_E2E_FAILURE$/m);
+  });
+
+  it.runIf(gitAvailable())('los conteos de G01/G02 salen del historial y G02-C03 no existe como commit', () => {
+    const history = historyCommitIds();
+    const baseline = tableRows(index, 'Baseline de código G01/G02');
+    for (const [gate, , count] of baseline) {
+      expect(Number(count), gate).toBe([...history.keys()].filter((id) => id.startsWith(`${gate}-`)).length);
+    }
+    expect(Number(baseline[0][2])).toBe(12);
+    expect(Number(baseline[1][2])).toBe(17);
+    for (const id of NOT_EXECUTED) {
+      expect(history.has(id), id).toBe(false);
     }
   });
 });

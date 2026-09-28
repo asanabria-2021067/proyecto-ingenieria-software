@@ -39,6 +39,15 @@ No contiene secretos, valores de cookies, tokens, direcciones IP, datos personal
 | A09 Security Logging & Alerting Failures | C026, C037, C038, C016 | IMPLEMENTED | G05 |
 | A10 Mishandling of Exceptional Conditions | C021 (confianza de proxy), P1/P2 (tiempo real por nginx), C040/C041 (errores de dependencias visibles) | IMPLEMENTED | G03, G04, G07 |
 
+## Baseline de código G01/G02
+
+| Gate | Estado | Commits | Nota |
+|---|---|---|---|
+| G01 Secrets & Configuration Fail-Closed | PASS | 12 (G01-C01…C12) | Código completo y auditado |
+| G02 CI/CD Integrity | PASS_SCOPE_V2 | 17 (G02-C01, C02, C04–C18) | **G02-C03 no fue ejecutada por Vernel**: exige el environment `production` de GitHub y queda como `OUT_OF_SCOPE_ADMIN_HANDOFF` |
+
+**HU-159 (E2E del chat individual):** `PREEXISTING_HU159_E2E_FAILURE`. Existía antes de G02-C16, con la misma firma, y se mantiene idéntica hasta G08. No es una regresión de ningún gate. El detalle está en `evidence-index.md`.
+
 ## Controles de la Fase 2
 
 | Control | Qué cubre | OWASP | Gate | Commits | Evidencia (tests) | Estado | Handoff externo |
