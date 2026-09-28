@@ -28,8 +28,9 @@ const TOGGLE_CLASS =
 /**
  * HU-154 (T-215): sidebar contextual del proyecto, independiente de la
  * sidebar global. Se lee como navegación secundaria: fondo gris claro frente
- * al blanco de la global, encabezado «Proyecto actual» y el chat del
- * proyecto fijo abajo, separado del menú. Destinos y acciones salen del modelo compartido
+ * al blanco de la global, una cabecera ligera (rol + acciones + contraer;
+ * el nombre ya está en el breadcrumb y el título) y el chat del proyecto
+ * fijo abajo, separado del menú. Destinos y acciones salen del modelo compartido
  * (`project-nav-model`), así que expandida y colapsada ofrecen exactamente
  * lo mismo: colapsar solo cambia la presentación (iconos con tooltip).
  *
@@ -100,17 +101,12 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
           <ProjectActionsMenu idProyecto={idProyecto} actions={actions} side="right" align="start" />
         </div>
       ) : (
-        <div className="border-b border-outline-variant px-stack py-stack">
-          <div className="flex items-start gap-tight">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Proyecto actual</p>
-              <p
-                className="mt-micro line-clamp-2 text-sm font-semibold leading-snug text-text-primary"
-                title={nav.tituloProyecto ?? undefined}
-              >
-                {nav.tituloProyecto ?? 'Proyecto'}
-              </p>
-            </div>
+        <div className="flex items-center gap-tight border-b border-outline-variant px-stack py-inline">
+          {nav.actor !== 'visitor' && (
+            <span className="pill pill-accent px-inline font-semibold">{ACTOR_LABEL[nav.actor]}</span>
+          )}
+          <div className="ml-auto flex items-center gap-micro">
+            <ProjectActionsMenu idProyecto={idProyecto} actions={actions} align="start" />
             <button
               ref={toggleRef}
               type="button"
@@ -123,12 +119,6 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
               <PanelLeftClose className="size-4" aria-hidden="true" />
             </button>
           </div>
-          {(nav.actor !== 'visitor' || actions.length > 0) && (
-            <div className="mt-inline flex items-center justify-between gap-tight">
-              {nav.actor !== 'visitor' ? <span className="pill pill-accent">{ACTOR_LABEL[nav.actor]}</span> : <span />}
-              <ProjectActionsMenu idProyecto={idProyecto} actions={actions} align="start" />
-            </div>
-          )}
         </div>
       )}
 
