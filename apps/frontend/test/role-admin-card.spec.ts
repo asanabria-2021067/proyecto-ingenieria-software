@@ -216,3 +216,25 @@ describe('RoleAdminCard — diseño de la tarjeta', () => {
     expect(columnas.slice(0, 200)).toMatch(/@container roles \(width >= 42rem\)/);
   }, 60_000);
 });
+
+// Las acciones usan la escala secundaria (13 px), por debajo del título.
+describe('RoleAdminCard — tamaño de las acciones', () => {
+  afterEach(() => cleanup());
+
+  it.each([
+    ['Asignarme a este rol', role({ isMine: false })],
+    ['Salir de este rol', role({ isMine: true, canLeave: true })],
+    ['Salir de este rol', role({ isMine: true, canLeave: false })],
+  ])('«%s» y «Editar rol» usan type-meta y conservan su color', (nombre, r) => {
+    render(createElement(RoleAdminCard, { role: r, asignarmeRol: mutationStub(), salirDeRol: mutationStub(), onEditar: () => {} } as any));
+
+    const principal = screen.getByRole('button', { name: new RegExp(nombre, 'i') });
+    const editar = screen.getByRole('button', { name: /editar rol/i });
+    for (const boton of [principal, editar]) {
+      expect(boton).toHaveClass('type-meta');
+      // tailwind-merge no debe haber descartado el color propio del botón.
+      expect(boton.className).toMatch(/(?<![\w-])text-(on-primary|on-error|text-disabled|text-secondary)\b/);
+    }
+  });
+});
+
