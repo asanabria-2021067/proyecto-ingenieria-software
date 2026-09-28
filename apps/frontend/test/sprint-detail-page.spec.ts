@@ -174,6 +174,16 @@ describe('SprintDetailPage — solo lectura', () => {
       expect(screen.queryByRole('button', { name: nombre })).not.toBeInTheDocument();
     }
   });
+
+  it('no enlaza a la analítica del Sprint desde el encabezado', () => {
+    for (const estado of ['ACTIVO', 'CERRADO'] as const) {
+      mockDetail({ detail: sprintDetail({ estado, fechaCierre: estado === 'CERRADO' ? '2026-08-25T00:00:00.000Z' : null }) });
+      renderPage();
+      expect(screen.queryByRole('link', { name: /ver analítica/i })).not.toBeInTheDocument();
+      expect(document.querySelector('a[href$="/analytics"]')).toBeNull();
+      cleanup();
+    }
+  });
 });
 
 describe('SprintDetailPage — los tres estados de Sprint', () => {
