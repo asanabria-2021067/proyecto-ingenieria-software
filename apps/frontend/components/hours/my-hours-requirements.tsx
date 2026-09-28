@@ -67,7 +67,7 @@ export function MyHoursRequirements({ requisitos, porTipo }: MyHoursRequirements
                     value={porcentaje}
                     aria-label={`Progreso de ${etiqueta.toLowerCase()}`}
                     aria-valuenow={porcentaje}
-                    className="flex-1 bg-secondary-fixed/25 [&_[data-slot=progress-indicator]]:bg-secondary-fixed"
+                    className="flex-1"
                   />
                   <span className="type-meta w-12 shrink-0 text-right tabular-nums">{porcentaje} %</span>
                   {porcentaje === 100 && <span className="pill pill-success shrink-0">Meta cumplida</span>}
