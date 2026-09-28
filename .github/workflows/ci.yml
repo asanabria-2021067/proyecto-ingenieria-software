@@ -133,6 +133,34 @@ jobs:
         if: github.event_name == 'pull_request'
         run: npm run test:coverage
 
+  dependencias:
+    name: Dependencias - vulnerabilidades conocidas (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [backend, frontend]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Reporte completo (bajas y medias como advertencia)
+        run: |
+          if ! npm audit; then
+            echo "::warning title=npm audit (${{ matrix.app }})::Hay vulnerabilidades reportadas. Las altas y criticas se validan en el paso siguiente; revisar este log para las bajas y medias."
+          fi
+
+      - name: Bloquear vulnerabilidades altas y criticas
+        run: npm audit --audit-level=high
+
   e2e:
     name: E2E - suite de humo (Playwright)
     runs-on: ubuntu-latest

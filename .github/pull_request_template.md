@@ -34,6 +34,7 @@
 - [ ] He agregado/actualizado migraciones de Prisma si modifique el schema
 - [ ] No hay errores en consola
 - [ ] He actualizado la documentacion si es necesario
+- [ ] Si silencie o pospuse una alerta de `npm audit`, deje la justificacion en este PR y en `docs/seguridad/dependencias.md`
 
 ## Screenshots (si aplica)
 
