@@ -134,7 +134,25 @@ function createFakePrisma() {
         Object.assign(row, data);
         return { ...row };
       },
+      // G04-C04: consumo condicional del token (UPDATE ... WHERE token_utilizado_en IS NULL).
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { idSolicitud: number; idUsuario: number; tokenUtilizadoEn: null };
+        data: Partial<SolicitudRow>;
+      }) => {
+        const row = solicitudes.get(where.idSolicitud);
+        if (!row || row.idUsuario !== where.idUsuario || row.tokenUtilizadoEn !== null) return { count: 0 };
+        Object.assign(row, data);
+        return { count: 1 };
+      },
     },
+    // G04-C04: el reset revoca los refresh del usuario dentro de la transacción.
+    tokenRefresco: {
+      updateMany: async () => ({ count: 0 }),
+    },
+    $transaction: async <T>(callback: (tx: unknown) => Promise<T>): Promise<T> => callback(prisma),
     notificacion: {
       createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
         notificaciones.push(...data);

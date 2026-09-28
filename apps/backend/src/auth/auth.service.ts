@@ -188,14 +188,6 @@ export class AuthService {
       throw new BadRequestException("Token no válido para esta operación");
     }
 
-    const solicitud = await this.prisma.solicitudRecuperacion.findUnique({
-      where: { idSolicitud: payload.idSolicitud },
-    });
-
-    if (!solicitud || solicitud.tokenUtilizadoEn) {
-      throw new BadRequestException("Token inválido o ya utilizado");
-    }
-
     const usuario = await this.prisma.usuario.findUnique({
       where: { idUsuario: payload.sub },
     });
@@ -206,14 +198,30 @@ export class AuthService {
 
     const contrasenaHash = await bcrypt.hash(nuevaContrasena, 10);
 
-    await this.prisma.usuario.update({
-      where: { idUsuario: usuario.idUsuario },
-      data: { contrasena: contrasenaHash },
-    });
+    // G04 (OWASP25-C024): consumir el token, cambiar la contraseña y revocar
+    // TODAS las sesiones de refresh es una sola transacción. El consumo es un
+    // UPDATE condicional (`tokenUtilizadoEn IS NULL`): con dos resets
+    // simultáneos del mismo token, PostgreSQL deja ganar exactamente a uno y
+    // el otro ve 0 filas y falla sin tocar la contraseña.
+    await this.prisma.$transaction(async (tx) => {
+      const ahora = new Date();
+      const consumo = await tx.solicitudRecuperacion.updateMany({
+        where: { idSolicitud: payload.idSolicitud, idUsuario: usuario.idUsuario, tokenUtilizadoEn: null },
+        data: { tokenUtilizadoEn: ahora },
+      });
+      if (consumo.count !== 1) {
+        throw new BadRequestException("Token inválido o ya utilizado");
+      }
 
-    await this.prisma.solicitudRecuperacion.update({
-      where: { idSolicitud: solicitud.idSolicitud },
-      data: { tokenUtilizadoEn: new Date() },
+      await tx.usuario.update({
+        where: { idUsuario: usuario.idUsuario },
+        data: { contrasena: contrasenaHash },
+      });
+
+      await tx.tokenRefresco.updateMany({
+        where: { idUsuario: usuario.idUsuario, revocadoEn: null },
+        data: { revocadoEn: ahora },
+      });
     });
 
     return { mensaje: "Contraseña actualizada exitosamente" };
