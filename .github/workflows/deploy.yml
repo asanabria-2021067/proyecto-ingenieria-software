@@ -317,9 +317,17 @@ jobs:
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
+          # G04 (OWASP25-C021 + D2): '0' reproduce el comportamiento actual. Subirlo
+          # a 1 (nginx del host) es una decision del administrador tras cerrar
+          # los puertos publicos 3000/3001.
+          TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '0' }}
         run: |
           set -euo pipefail
           umask 077
+          if ! printf '%s' "$TRUST_PROXY_HOPS" | grep -Eq '^[0-9]+$'; then
+            echo "TRUST_PROXY_HOPS debe ser un entero >= 0" >&2
+            exit 1
+          fi
           work="$RUNNER_TEMP/deploy-env"
           mkdir -p "$work"
           trap 'rm -rf "$work"' EXIT
@@ -339,6 +347,7 @@ jobs:
             printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
             printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"
+            printf 'TRUST_PROXY_HOPS=%s\n' "$TRUST_PROXY_HOPS"
           } > "$work/env"
           ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             -o UserKnownHostsFile="$work/known_hosts" "$SERVER_USER@$SERVER_IP" \

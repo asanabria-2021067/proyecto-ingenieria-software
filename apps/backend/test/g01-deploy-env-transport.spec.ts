@@ -4,6 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writ
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadWorkflow, parseWorkflow, type Workflow, type WorkflowStep } from './helpers/workflow-yaml';
+import { DEPLOY_ENV_REGISTRY } from './helpers/deploy-env-registry';
 
 /**
  * G01-C07 · FASE2-N01 + VM0-F012 + C030. El .env de producción no viaja dentro
@@ -137,8 +138,11 @@ describe.skipIf(!hasBash)('G01-C07: ejecución real del paso con un ssh falso', 
       PATH: `${bin}:${process.env.PATH ?? ''}`,
       RUNNER_TEMP: runnerTemp,
     };
+    // Los flags (G04+) se validan en el propio paso: reciben su default versionado.
+    // No son secretos, así que quedan fuera de la comprobación de argv.
+    const flags = new Set(Object.keys(DEPLOY_ENV_REGISTRY).filter((name) => DEPLOY_ENV_REGISTRY[name].kind === 'flag'));
     for (const name of Object.keys(step.env)) {
-      env[name] = `synthetic-${name.toLowerCase()}-value`;
+      env[name] = flags.has(name) ? DEPLOY_ENV_REGISTRY[name].defaultValue ?? '' : `synthetic-${name.toLowerCase()}-value`;
     }
     // stdin a /dev/null: con un socket como stdin, bash lo trata como sesión remota y carga ~/.bashrc.
     const result = spawnSync('bash', ['-c', step.run], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -146,7 +150,7 @@ describe.skipIf(!hasBash)('G01-C07: ejecución real del paso con un ssh falso', 
 
     const argv = readFileSync(argvLog, 'utf8');
     for (const [name, value] of Object.entries(env)) {
-      if (name !== 'PATH' && name !== 'RUNNER_TEMP' && !['SERVER_IP', 'SERVER_USER'].includes(name)) {
+      if (name !== 'PATH' && name !== 'RUNNER_TEMP' && !['SERVER_IP', 'SERVER_USER'].includes(name) && !flags.has(name)) {
         expect(argv, `${name} apareció en argv`).not.toContain(value);
       }
     }

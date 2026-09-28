@@ -83,6 +83,8 @@ export interface AppEnvironment {
   frontendUrl: string;
   cookieSecure: boolean;
   redis: RedisEnvironment;
+  /** G04 (OWASP25-C021 + D2): saltos de proxy confiables; 0 = no confiar en X-Forwarded-For. */
+  trustProxyHops: number;
 }
 
 export interface ValidatedEnvironment extends Record<string, unknown> {
@@ -139,6 +141,25 @@ function parsePort(raw: RawEnvironment, name: string, fallback: number): number 
   return port;
 }
 
+export const TRUST_PROXY_HOPS_VARIABLE = 'TRUST_PROXY_HOPS';
+/** Tope de cordura: más saltos que esto es un error de configuración, no una topología real. */
+export const MAX_TRUST_PROXY_HOPS = 10;
+
+/**
+ * G04 (OWASP25-C021 + D2): contrato de TRUST_PROXY_HOPS. Entero >= 0, default
+ * 0 (comportamiento actual: Express no confía en X-Forwarded-For). Un valor
+ * inválido falla el arranque en lugar de caer en un default silencioso.
+ */
+export function parseTrustProxyHops(value: string | undefined): number {
+  if (value === undefined) {
+    return 0;
+  }
+  if (!/^\d+$/.test(value) || Number(value) > MAX_TRUST_PROXY_HOPS) {
+    throw new Error(`${TRUST_PROXY_HOPS_VARIABLE} must be an integer between 0 and ${MAX_TRUST_PROXY_HOPS}`);
+  }
+  return Number(value);
+}
+
 function deriveAppEnvironment(raw: RawEnvironment): AppEnvironment {
   return {
     nodeEnv: readString(raw, 'NODE_ENV') ?? 'development',
@@ -149,6 +170,7 @@ function deriveAppEnvironment(raw: RawEnvironment): AppEnvironment {
       host: readString(raw, 'REDIS_HOST') ?? 'localhost',
       port: parsePort(raw, 'REDIS_PORT', 6379),
     },
+    trustProxyHops: parseTrustProxyHops(readString(raw, TRUST_PROXY_HOPS_VARIABLE)),
   };
 }
 
