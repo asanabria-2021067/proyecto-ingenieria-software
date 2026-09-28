@@ -41,6 +41,9 @@ services:
       FRONTEND_URL: https://localhost:${HARNESS_HTTPS_PORT:-8443}
       REDIS_HOST: redis
       REDIS_PORT: '6379'
+      # G04-C13 (T16): un salto confiable (el nginx del arnés), como en la
+      # topología objetivo. Prueba que un X-Forwarded-For falso no elige el cubo.
+      TRUST_PROXY_HOPS: '1'
     depends_on:
       postgres:
         condition: service_healthy

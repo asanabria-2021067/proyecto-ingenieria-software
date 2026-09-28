@@ -163,6 +163,62 @@ export async function characterizeSocket({ host = '127.0.0.1', httpsPort }) {
   return results;
 }
 
+/**
+ * T16 (G04-C13 · OWASP25-C021): con TRUST_PROXY_HOPS=1 detrás del nginx del
+ * arnés, un cliente que envía un X-Forwarded-For falso distinto en cada
+ * intento NO elige su cubo de rate limiting: nginx agrega la dirección real al
+ * final y Express solo confía en ese último salto. Login permite 5 intentos
+ * por minuto; el sexto debe recibir 429 aunque cada uno "venga" de otra IP.
+ * Solo se reportan códigos HTTP, nunca direcciones.
+ */
+export const SPOOF_LOGIN_LIMIT = 5;
+
+export function verifySpoofResistance(statuses) {
+  const index = statuses.indexOf(429);
+  return [
+    index === SPOOF_LOGIN_LIMIT || `429 esperado en el intento ${SPOOF_LOGIN_LIMIT + 1}, obtenido ${index === -1 ? 'nunca' : `en el ${index + 1}`}`,
+  ].filter((outcome) => outcome !== true);
+}
+
+function postLogin({ host, port, index }) {
+  assertLocalHost(host);
+  const body = JSON.stringify({ correo: `t16-${index}@uvg.edu.gt`, contrasena: 'Intento-T16' });
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        host,
+        port,
+        path: '/api/auth/login',
+        method: 'POST',
+        rejectUnauthorized: false,
+        timeout: 15000,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+          // Direcciones de documentación (RFC 5737): nunca reales.
+          'X-Forwarded-For': `203.0.113.${index + 1}`,
+        },
+      },
+      (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      },
+    );
+    req.on('timeout', () => req.destroy(new Error('timeout login')));
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+export async function characterizeSpoofing({ host = '127.0.0.1', httpsPort }) {
+  const statuses = [];
+  for (let index = 0; index <= SPOOF_LOGIN_LIMIT; index += 1) {
+    statuses.push(await postLogin({ host, port: httpsPort, index }));
+  }
+  return [{ id: 'T16-01', title: `XFF falso rotativo no evade el limite de login (${statuses.join(',')})`, failures: verifySpoofResistance(statuses) }];
+}
+
 export async function characterize({ host = '127.0.0.1', httpPort, httpsPort }) {
   const results = [];
   for (const check of CHECKS) {
@@ -184,10 +240,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.log(`${result.failures.length === 0 ? 'PASS' : 'FAIL'} ${result.id} (${result.status}) ${result.title}`);
     result.failures.forEach((failure) => console.log(`  - ${failure}`));
   }
-  const socket = await characterizeSocket({
-    host: process.env.HARNESS_HOST ?? '127.0.0.1',
-    httpsPort: Number(process.env.HARNESS_HTTPS_PORT ?? 8443),
-  });
+  const target = { host: process.env.HARNESS_HOST ?? '127.0.0.1', httpsPort: Number(process.env.HARNESS_HTTPS_PORT ?? 8443) };
+  const socket = [...(await characterizeSocket(target)), ...(await characterizeSpoofing(target))];
   for (const result of socket) {
     console.log(`${result.failures.length === 0 ? 'PASS' : 'FAIL'} ${result.id} ${result.title}`);
     result.failures.forEach((failure) => console.log(`  - ${failure}`));
