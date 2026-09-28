@@ -219,6 +219,29 @@ describe('MyProjectViewClient — vista actual vs panel histórico', () => {
     expect(screen.getByText('Comentario actual roles.')).toBeInTheDocument();
   });
 
+  it('observado: aviso del revisor y «Enviar correcciones» usan el naranja de atención, no el lima', async () => {
+    getMyProjectByIdMock.mockResolvedValue(proyectoActual({ estadoProyecto: 'OBSERVADO' }));
+    getProjectRevisionsMock.mockResolvedValue([]);
+    renderPage();
+
+    const titulo = await screen.findByText('Tu proyecto tiene observaciones del revisor');
+    const aviso = titulo.closest('[data-slot="aviso-observado"]') as HTMLElement;
+    expect(aviso).toHaveClass('bg-attention-strong', 'border-attention');
+    expect(titulo).toHaveClass('text-on-attention');
+    expect(
+      within(aviso).getByText('Revisa los comentarios de cada sección y aplica las correcciones necesarias.'),
+    ).toHaveClass('text-on-attention/85');
+    expect(aviso.className).not.toMatch(/status-warning/);
+
+    const corregir = within(aviso).getByRole('button', { name: /editar y corregir/i });
+    expect(corregir).toHaveClass('bg-on-attention', 'text-attention-strong');
+
+    fireEvent.click(corregir);
+    const enviar = await screen.findByRole('button', { name: /enviar correcciones/i });
+    expect(enviar).toHaveClass('bg-attention', 'text-on-attention', 'hover:bg-attention-strong');
+    expect(enviar.className).not.toMatch(/status-warning/);
+  });
+
   it('panel histórico con snapshot: datos y comentarios aislados, sin contaminación en ninguna dirección', async () => {
     getMyProjectByIdMock.mockResolvedValue(proyectoActual());
     getProjectRevisionsMock.mockResolvedValue([

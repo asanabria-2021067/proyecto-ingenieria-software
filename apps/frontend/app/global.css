@@ -239,6 +239,12 @@
   --color-on-status-warning: var(--color-on-secondary-fixed);
   --color-status-error: var(--color-error-container);
   --color-on-status-error: var(--color-error);
+
+  /* Atención / corrección requerida (proyecto observado): el mismo naranja
+     que `amber-600` / `amber-700` del botón «Editar» en Mis Proyectos. */
+  --color-attention: oklch(66.6% 0.179 58.318);
+  --color-attention-strong: oklch(55.5% 0.163 48.998);
+  --color-on-attention: #ffffff;
 }
 
 @layer components {
