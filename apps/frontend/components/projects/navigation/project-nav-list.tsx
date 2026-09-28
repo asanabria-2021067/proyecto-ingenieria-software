@@ -20,6 +20,14 @@ interface ProjectNavListProps {
 }
 
 /**
+ * Destino activo: un velo del color del texto (más oscuro en claro, más claro
+ * en oscuro) con texto semibold. Funciona igual sobre el gris de la sidebar y
+ * sobre el blanco del Sheet móvil, sin acentos de color.
+ */
+const ACTIVE_CLASS = 'bg-on-surface/8 font-semibold text-text-primary';
+const INACTIVE_CLASS = 'font-medium text-text-secondary hover:bg-on-surface/5 hover:text-text-primary';
+
+/**
  * HU-154 (T-215): único renderizador de los destinos del proyecto. La
  * sidebar (expandida y colapsada) y el Sheet móvil pintan exactamente los
  * grupos que les pasa `buildProjectNavGroups`, sin listas propias.
@@ -44,13 +52,11 @@ export function ProjectNavList({ groups, activeHref, variant, onNavigate, id }: 
                         aria-current={active ? 'page' : undefined}
                         onClick={onNavigate}
                         className={cn(
-                          'relative flex size-10 items-center justify-center rounded-control transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                          active
-                            ? 'bg-primary/10 text-primary before:absolute before:-left-2 before:top-2 before:h-6 before:w-0.5 before:rounded-pill before:bg-primary'
-                            : 'text-text-secondary hover:bg-surface-container-high hover:text-on-surface',
+                          'flex size-10 items-center justify-center rounded-control transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                          active ? ACTIVE_CLASS : INACTIVE_CLASS,
                         )}
                       >
-                        <Icon className="size-5" aria-hidden="true" />
+                        <Icon className="size-4.5" aria-hidden="true" />
                       </Link>
                     </TooltipTrigger>
                     <TooltipContent side="right">{item.label}</TooltipContent>
@@ -65,7 +71,7 @@ export function ProjectNavList({ groups, activeHref, variant, onNavigate, id }: 
   }
 
   return (
-    <div id={id} className="flex flex-col gap-stack">
+    <div id={id} className="flex flex-col gap-card">
       {groups.map((group) => (
         <div
           key={group.id}
@@ -73,7 +79,10 @@ export function ProjectNavList({ groups, activeHref, variant, onNavigate, id }: 
           aria-labelledby={group.label ? `${id ?? 'project-nav'}-${group.id}` : undefined}
         >
           {group.label && (
-            <p id={`${id ?? 'project-nav'}-${group.id}`} className="type-meta mb-micro px-inline uppercase tracking-wide">
+            <p
+              id={`${id ?? 'project-nav'}-${group.id}`}
+              className="mb-tight px-inline text-xs font-semibold uppercase tracking-wider text-text-secondary"
+            >
               {group.label}
             </p>
           )}
@@ -88,13 +97,11 @@ export function ProjectNavList({ groups, activeHref, variant, onNavigate, id }: 
                     aria-current={active ? 'page' : undefined}
                     onClick={onNavigate}
                     className={cn(
-                      'flex items-center gap-inline rounded-control px-inline py-tight text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                      active
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-text-secondary hover:bg-surface-container-high hover:text-on-surface',
+                      'flex items-center gap-inline rounded-control px-inline py-tight text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                      active ? ACTIVE_CLASS : INACTIVE_CLASS,
                     )}
                   >
-                    <Icon className="size-4 shrink-0" aria-hidden="true" />
+                    <Icon className="size-4.5 shrink-0" aria-hidden="true" />
                     {item.label}
                   </Link>
                 </li>

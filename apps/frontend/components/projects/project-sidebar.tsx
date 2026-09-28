@@ -23,11 +23,13 @@ interface ProjectSidebarProps {
 const ACTOR_LABEL = { leader: 'Líder', participant: 'Participante' } as const;
 
 const TOGGLE_CLASS =
-  'flex size-8 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
+  'flex size-8 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
 
 /**
  * HU-154 (T-215): sidebar contextual del proyecto, independiente de la
- * sidebar global. Destinos y acciones salen del modelo compartido
+ * sidebar global. Se lee como navegación secundaria: fondo gris claro frente
+ * al blanco de la global, encabezado «Proyecto actual» y el chat del
+ * proyecto fijo abajo, separado del menú. Destinos y acciones salen del modelo compartido
  * (`project-nav-model`), así que expandida y colapsada ofrecen exactamente
  * lo mismo: colapsar solo cambia la presentación (iconos con tooltip).
  *
@@ -72,7 +74,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
     <aside
       data-state={collapsed ? 'collapsed' : 'expanded'}
       className={cn(
-        'hidden h-full shrink-0 flex-col border-r border-outline-variant bg-surface-container-low lg:flex',
+        'hidden h-full shrink-0 flex-col border-r border-outline-variant bg-surface-container lg:flex',
         animar && 'transition-[width] duration-200 motion-reduce:transition-none',
         collapsed ? 'w-14' : 'w-64',
       )}
@@ -99,10 +101,16 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         </div>
       ) : (
         <div className="border-b border-outline-variant px-stack py-stack">
-          <div className="flex items-center gap-tight">
-            <p className="min-w-0 flex-1 truncate text-sm font-bold text-on-surface">
-              {nav.tituloProyecto ?? 'Proyecto'}
-            </p>
+          <div className="flex items-start gap-tight">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Proyecto actual</p>
+              <p
+                className="mt-micro line-clamp-2 text-sm font-semibold leading-snug text-text-primary"
+                title={nav.tituloProyecto ?? undefined}
+              >
+                {nav.tituloProyecto ?? 'Proyecto'}
+              </p>
+            </div>
             <button
               ref={toggleRef}
               type="button"
@@ -116,7 +124,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
             </button>
           </div>
           {(nav.actor !== 'visitor' || actions.length > 0) && (
-            <div className="mt-tight flex items-center justify-between gap-tight">
+            <div className="mt-inline flex items-center justify-between gap-tight">
               {nav.actor !== 'visitor' ? <span className="pill pill-accent">{ACTOR_LABEL[nav.actor]}</span> : <span />}
               <ProjectActionsMenu idProyecto={idProyecto} actions={actions} align="start" />
             </div>
@@ -124,9 +132,11 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         </div>
       )}
 
+      {/* El menú ocupa el espacio libre y hace scroll propio; así el chat del
+          proyecto queda siempre abajo, visible mientras la altura lo permita. */}
       <nav
         aria-label="Navegación del proyecto"
-        className={cn('overflow-y-auto', collapsed ? 'px-tight py-inline' : 'p-inline')}
+        className={cn('min-h-0 flex-1 overflow-y-auto', collapsed ? 'px-tight py-inline' : 'px-inline py-stack')}
       >
         <ProjectNavList id={navId} groups={groups} activeHref={activeHref} variant={collapsed ? 'rail' : 'full'} />
       </nav>
@@ -144,7 +154,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
                 <MessageSquare className="size-4" aria-hidden="true" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="right">Chats</TooltipContent>
+            <TooltipContent side="right">Chat del proyecto</TooltipContent>
           </Tooltip>
         </div>
       )}
