@@ -277,7 +277,7 @@ export class AuthService {
     // UPDATE condicional (`tokenUtilizadoEn IS NULL`): con dos resets
     // simultáneos del mismo token, PostgreSQL deja ganar exactamente a uno y
     // el otro ve 0 filas y falla sin tocar la contraseña.
-    await this.prisma.$transaction(async (tx) => {
+    const sesionesRevocadas = await this.prisma.$transaction(async (tx) => {
       const ahora = new Date();
       const consumo = await tx.solicitudRecuperacion.updateMany({
         where: { idSolicitud: payload.idSolicitud, idUsuario: usuario.idUsuario, tokenUtilizadoEn: null },
@@ -292,10 +292,20 @@ export class AuthService {
         data: { contrasena: contrasenaHash },
       });
 
-      await tx.tokenRefresco.updateMany({
+      const revocadas = await tx.tokenRefresco.updateMany({
         where: { idUsuario: usuario.idUsuario, revocadoEn: null },
         data: { revocadoEn: ahora },
       });
+      return revocadas.count;
+    });
+
+    // G05 (OWASP25-C037): solo tras un reset realmente consumido (la
+    // transacción ya confirmó). Un token inválido o reutilizado no llega aquí.
+    await this.securityEvents.record({
+      tipo: TipoEventoSeguridad.PASSWORD_RESET_COMPLETED,
+      idActor: usuario.idUsuario,
+      idUsuarioAfectado: usuario.idUsuario,
+      detalle: { idSolicitud: payload.idSolicitud, sesionesRevocadas },
     });
 
     return { mensaje: "Contraseña actualizada exitosamente" };

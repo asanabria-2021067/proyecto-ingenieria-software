@@ -16,6 +16,8 @@ import {
   TipoProyecto,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SecurityEventsService } from '../security-events/security-events.service';
+import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 
 const RESET_TOKEN_TTL = '1h';
@@ -25,6 +27,8 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    // G05: writer best-effort de eventos de seguridad; el default (tests) usa el mismo PrismaService.
+    private readonly securityEvents: SecurityEventsService = new SecurityEventsService(prisma),
   ) {}
 
   // ─── Guards ──────────────────────────────────────────────────────────────────
@@ -686,6 +690,15 @@ export class AdminService {
         atendidaEn: new Date(),
         atendidaPor: callerId,
       },
+    });
+
+    // G05 (OWASP25-C037): emisión privilegiada de un enlace de recuperación.
+    // Solo IDs y vencimiento: nunca el token ni la URL.
+    await this.securityEvents.record({
+      tipo: TipoEventoSeguridad.PASSWORD_RESET_ISSUED,
+      idActor: callerId,
+      idUsuarioAfectado: solicitud.usuario.idUsuario,
+      detalle: { idSolicitud, expiraEn },
     });
 
     return { resetUrl, resetToken, expiraEn };
