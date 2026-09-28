@@ -1,83 +1,47 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import type { PostulacionRecibida } from '../types';
-
-vi.mock('../hooks/use-project-pending-postulations', () => ({
-  useProjectPendingPostulations: vi.fn(),
-}));
-
 import { PendingPostulationsCard } from '../components/projects/pending-postulations-card';
-import { useProjectPendingPostulations } from '../hooks/use-project-pending-postulations';
+import { PendingExitRequestsCard } from '../components/projects/pending-exit-requests-card';
+import { PROJECT_ACTION_BUTTON_CLASS } from '../components/projects/project-action-button';
 
-function postulacion(overrides: Partial<PostulacionRecibida> = {}): PostulacionRecibida {
-  return {
-    idPostulacion: 1,
-    justificacion: 'Quiero contribuir con el backend del proyecto.',
-    estadoPostulacion: 'PENDIENTE',
-    fechaPostulacion: '2026-01-05T00:00:00.000Z',
-    postulante: { idUsuario: 50, nombre: 'Diego', apellido: 'Solis', correo: 'diego@uvg.edu.gt' },
-    rolProyecto: { idRolProyecto: 9, nombreRol: 'Backend' },
-    ...overrides,
-  };
-}
+afterEach(() => cleanup());
 
-function mockPendientes(overrides: Partial<ReturnType<typeof useProjectPendingPostulations>> = {}) {
-  (useProjectPendingPostulations as any).mockReturnValue({
-    postulaciones: [],
-    isLoading: false,
-    isFetching: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-    ...overrides,
-  });
-}
-
-function renderCard() {
-  return render(createElement(PendingPostulationsCard, { idProyecto: 42 }));
-}
-
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
-
-describe('PendingPostulationsCard — F13.1 entry point', () => {
-  it('muestra el contador de postulaciones pendientes', () => {
-    mockPendientes({
-      postulaciones: [
-        postulacion({ idPostulacion: 1 }),
-        postulacion({ idPostulacion: 2 }),
-        postulacion({ idPostulacion: 3 }),
-      ],
-    });
-
-    renderCard();
-
-    expect(screen.getByText('Postulaciones pendientes')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+// Los accesos de Miembros son el mismo botón negro que «Ver proyecto»: sin
+// icono ni contador, porque ambos ya se muestran en la vista dedicada.
+describe.each([
+  {
+    nombre: 'PendingPostulationsCard — F13.1 entry point',
+    componente: PendingPostulationsCard,
+    accesible: /ver postulaciones pendientes/i,
+    texto: 'Postulaciones pendientes',
+    href: '/dashboard/proyectos/42/miembros/postulaciones',
+  },
+  {
+    nombre: 'PendingExitRequestsCard — F14.2 entry point',
+    componente: PendingExitRequestsCard,
+    accesible: /ver solicitudes de salida pendientes/i,
+    texto: 'Solicitudes de salida',
+    href: '/dashboard/proyectos/42/miembros/solicitudes-salida',
+  },
+])('$nombre', ({ componente, accesible, texto, href }) => {
+  it('navega a la vista dedicada', () => {
+    render(createElement(componente, { idProyecto: 42 }));
+    expect(screen.getByRole('link', { name: accesible })).toHaveAttribute('href', href);
   });
 
-  it('navega a la vista dedicada de postulaciones pendientes', () => {
-    mockPendientes();
-
-    renderCard();
-
-    expect(screen.getByRole('link', { name: /ver postulaciones pendientes/i })).toHaveAttribute(
-      'href',
-      '/dashboard/proyectos/42/miembros/postulaciones',
-    );
+  it('usa el botón de acción de «Ver proyecto», solo con su texto', () => {
+    render(createElement(componente, { idProyecto: 42 }));
+    const enlace = screen.getByRole('link', { name: accesible });
+    expect(enlace).toHaveClass(...PROJECT_ACTION_BUTTON_CLASS.split(' '));
+    expect(enlace).toHaveTextContent(new RegExp(`^${texto}$`));
+    expect(enlace.querySelector('svg')).toBeNull();
   });
 
   it('no comunica expansión ni renderiza el listado inline', () => {
-    mockPendientes({ postulaciones: [postulacion()] });
-
-    renderCard();
-
-    expect(screen.queryByRole('button', { name: /postulaciones pendientes/i })).not.toBeInTheDocument();
-    expect(screen.queryByText('Diego Solis')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /aceptar postulación/i })).not.toBeInTheDocument();
+    render(createElement(componente, { idProyecto: 42 }));
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 });

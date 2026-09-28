@@ -17,6 +17,7 @@ vi.mock('@/hooks/use-project-export', () => ({ useProjectExport: vi.fn() }));
 vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
+import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { useIsAdmin } from '@/hooks/use-current-user';
 import { useProjectExport } from '@/hooks/use-project-export';
@@ -59,6 +60,20 @@ describe('ProjectExportButtons', () => {
 
     expect(screen.getByRole('button', { name: /exportar csv/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /exportar pdf/i })).toBeInTheDocument();
+  });
+
+  it('ambos botones son el botón negro de «Ver proyecto», sin icono en reposo', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+    (useIsAdmin as any).mockReturnValue(false);
+    (useProjectExport as any).mockReturnValue({ exportCsv: mockMutation(), exportPdf: mockMutation() });
+
+    renderButtons();
+
+    for (const nombre of [/exportar csv/i, /exportar pdf/i]) {
+      const boton = screen.getByRole('button', { name: nombre });
+      expect(boton).toHaveClass(...PROJECT_ACTION_BUTTON_CLASS.split(' '));
+      expect(boton.querySelector('svg')).toBeNull();
+    }
   });
 
   it('la administración también ve ambos botones aunque no sea líder del proyecto', () => {
