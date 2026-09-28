@@ -26,3 +26,9 @@ Riesgo conocido de dependencias que **no** se remedia todavía, con dueño y cad
 | brace-expansion | backend | GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 | high | desarrollo | 1.1.18 | Llega por `@nestjs/cli` → `fork-ts-checker-webpack-plugin` → `minimatch@3` y solo procesa patrones del propio repo durante el build. Hay un fix dentro del rango, pero `npm audit fix` de G03-C09 no lo aplicó; se actualiza en la siguiente ventana de dependencias. | Vernel | 2026-10-31 |
 | esbuild | backend | GHSA-g7r4-m6w7-qqqr | low | desarrollo | 0.28.1 | Llega por `tsx` 4.21 (fija `~0.27`) y solo afecta al servidor de desarrollo en Windows, que no se usa. `tsx` 4.23 lo corrige dentro del rango. | Vernel | 2026-10-31 |
 <!-- exceptions:end -->
+
+## Estado al cierre de G08 (2026-09-28)
+
+- **Excepciones:** 5 vigentes y ninguna vencida. Ninguna es `critical` de producción.
+- **Caducidad próxima (2026-10-31):** `brace-expansion` y `esbuild`. Ese día el guard falla: hay que actualizarlas o renovarlas con una justificación nueva. El resto caduca el 2026-12-31.
+- **Matriz OWASP:** figuran como riesgo residual de código R1 en `owasp-top10-2025.md`. Owner: Vernel.
