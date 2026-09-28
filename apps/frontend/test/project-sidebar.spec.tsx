@@ -445,7 +445,7 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
   });
 });
 // Sidebar del proyecto como navegación secundaria: fondo propio, encabezado
-// «Proyecto actual», grupos con aire, activo neutro y el chat abajo.
+// ligero (rol + acciones + contraer), grupos con aire, activo neutro y el chat abajo.
 describe('ProjectSidebar — identidad de navegación del proyecto', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -468,16 +468,31 @@ describe('ProjectSidebar — identidad de navegación del proyecto', () => {
     expect(aside()).not.toHaveClass('bg-card');
   });
 
-  it('el encabezado dice «Proyecto actual» sobre el nombre, que admite dos líneas', () => {
+  it('la cabecera ya no repite «Proyecto actual» ni el nombre: solo rol, acciones y contraer en una fila', () => {
     renderSidebar();
 
-    const etiqueta = within(aside()).getByText('Proyecto actual');
-    expect(etiqueta).toHaveClass('uppercase', 'text-xs', 'text-text-secondary');
-    const nombre = within(aside()).getByText('Proyecto de prueba');
-    expect(nombre).toHaveClass('line-clamp-2', 'font-semibold', 'text-text-primary');
-    expect(nombre).toHaveAttribute('title', 'Proyecto de prueba');
-    expect(etiqueta.compareDocumentPosition(nombre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(aside()).getByText('Líder')).toHaveClass('pill');
+    expect(within(aside()).queryByText('Proyecto actual')).not.toBeInTheDocument();
+    expect(within(aside()).queryByText('Proyecto de prueba')).not.toBeInTheDocument();
+
+    const rol = within(aside()).getByText('Líder');
+    expect(rol).toHaveClass('pill', 'pill-accent', 'font-semibold');
+    const cabecera = rol.parentElement!;
+    expect(cabecera).toHaveClass('flex', 'items-center', 'border-b');
+    expect(within(cabecera).getByRole('button', { name: 'Acciones del proyecto' })).toBeInTheDocument();
+    expect(within(cabecera).getByRole('button', { name: 'Contraer navegación del proyecto' })).toBeInTheDocument();
+  });
+
+  it('un visitante ve la cabecera sin chip de rol, solo el control de contraer', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    (useProjectDetail as any).mockReturnValue({
+      data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', creador: { idUsuario: 1 } },
+    });
+    (useProjectMembers as any).mockReturnValue({ members: [] });
+    renderSidebar();
+
+    expect(within(aside()).queryByText('Proyecto de prueba')).not.toBeInTheDocument();
+    expect(within(aside()).getByRole('button', { name: 'Contraer navegación del proyecto' })).toBeInTheDocument();
+    expect(aside().querySelector('.pill')).toBeNull();
   });
 
   it('los grupos se separan con aire y sus títulos son encabezados discretos, sin iconos', () => {
