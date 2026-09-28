@@ -20,6 +20,9 @@ export class AuthController {
     return { mensaje: 'Sesión iniciada' };
   }
 
+  // G04 (OWASP25-C022): crear cuentas tiene su propio límite, igual de estricto
+  // que login; sin él, registro solo quedaba bajo los buckets globales.
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
   @Post('register')
   async register(@Body() registerDto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken } = await this.authService.register(registerDto);
