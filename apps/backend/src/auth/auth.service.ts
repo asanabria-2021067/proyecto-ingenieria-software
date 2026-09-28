@@ -24,6 +24,7 @@ import {
 import { SecurityEventsService } from "../security-events/security-events.service";
 import { TipoEventoSeguridad } from "../security-events/tipos-evento-seguridad";
 import { accountReference } from "../security-events/account-reference";
+import type { SecurityRequestContext } from "../security-events/request-context";
 
 /**
  * G04 (OWASP25-C023): hash bcrypt (cost 10, el mismo de registro y reset) de
@@ -100,7 +101,7 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, origen?: SecurityRequestContext) {
     // G04 (OWASP25-C036): una cuenta bloqueada sigue el MISMO camino (búsqueda
     // + bcrypt) y recibe la MISMA respuesta que unas credenciales inválidas.
     const cuenta = accountAttemptKey(loginDto.correo);
@@ -127,6 +128,7 @@ export class AuthService {
       // seudónima: nunca el correo en claro. La respuesta externa no cambia.
       await this.securityEvents.record({
         tipo: TipoEventoSeguridad.LOGIN_FAILED,
+        origen,
         idUsuarioAfectado: usuario?.idUsuario ?? null,
         detalle: {
           motivo: bloqueada
@@ -143,6 +145,7 @@ export class AuthService {
       if (bloqueoNuevo) {
         await this.securityEvents.record({
           tipo: TipoEventoSeguridad.ACCOUNT_LOCKED,
+          origen,
           idUsuarioAfectado: usuario?.idUsuario ?? null,
           detalle: { cuentaConocida: Boolean(usuario), ...cuentaRef },
         });
@@ -162,6 +165,7 @@ export class AuthService {
     // G05: el éxito se registra cuando los tokens ya existen (resultado real).
     await this.securityEvents.record({
       tipo: TipoEventoSeguridad.LOGIN_SUCCEEDED,
+      origen,
       idActor: usuario.idUsuario,
       idUsuarioAfectado: usuario.idUsuario,
     });
@@ -250,7 +254,7 @@ export class AuthService {
     return genericResponse;
   }
 
-  async resetPassword(token: string, nuevaContrasena: string) {
+  async resetPassword(token: string, nuevaContrasena: string, origen?: SecurityRequestContext) {
     let payload: ResetTokenPayload;
     try {
       payload = this.jwtService.verify<ResetTokenPayload>(token);
@@ -303,6 +307,7 @@ export class AuthService {
     // transacción ya confirmó). Un token inválido o reutilizado no llega aquí.
     await this.securityEvents.record({
       tipo: TipoEventoSeguridad.PASSWORD_RESET_COMPLETED,
+      origen,
       idActor: usuario.idUsuario,
       idUsuarioAfectado: usuario.idUsuario,
       detalle: { idSolicitud: payload.idSolicitud, sesionesRevocadas },

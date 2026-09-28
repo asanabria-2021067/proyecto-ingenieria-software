@@ -27,8 +27,10 @@ describe('Controllers and basic services', () => {
         register: vi.fn().mockResolvedValue(tokens),
       } as unknown as ConstructorParameters<typeof AuthController>[0],
     );
-    const res = { cookie: vi.fn() } as unknown as Parameters<AuthController['login']>[1];
-    await auth.login({ correo: 'a', contrasena: 'b' }, res);
+    const res = { cookie: vi.fn() } as unknown as Parameters<AuthController['login']>[2];
+    // G05-C09: login recibe la petición para el origen del evento de seguridad (req.ip).
+    const req = { ip: '127.0.0.1', app: { get: () => false } } as unknown as Parameters<AuthController['login']>[1];
+    await auth.login({ correo: 'a', contrasena: 'b' }, req, res);
     await auth.register({} as Parameters<AuthController['register']>[0], res);
 
     const usersSvc = {
