@@ -103,7 +103,11 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
       ) : (
         <div className="flex items-center gap-tight border-b border-outline-variant px-stack py-inline">
           {nav.actor !== 'visitor' && (
-            <span className="pill pill-accent px-inline font-semibold">{ACTOR_LABEL[nav.actor]}</span>
+            // Etiqueta rectangular (radio moderado, no pastilla) con más
+            // presencia horizontal; conserva el lima del acento.
+            <span className="pill pill-accent min-w-20 justify-center rounded-md px-stack font-semibold">
+              {ACTOR_LABEL[nav.actor]}
+            </span>
           )}
           <div className="ml-auto flex items-center gap-micro">
             <ProjectActionsMenu idProyecto={idProyecto} actions={actions} align="start" />
