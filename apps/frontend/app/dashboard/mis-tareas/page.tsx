@@ -3,9 +3,9 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, AlertTriangle, ClipboardList, Search, SearchX } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ClipboardList, SearchX } from 'lucide-react';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -456,19 +456,13 @@ export default function MisTareasPage() {
         {/* filtros */}
         <section aria-label="Filtros de tareas" className="card-base @container/filtros">
           <div className="grid grid-cols-1 gap-inline @xl/filtros:grid-cols-2 @4xl/filtros:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_minmax(0,1.4fr)]">
-            <div className="relative @xl/filtros:col-span-2 @4xl/filtros:col-span-1">
-              <Search
-                className="pointer-events-none absolute left-inline top-1/2 size-4 -translate-y-1/2 text-text-secondary"
-                aria-hidden="true"
-              />
-              <Input
-                value={busqueda}
-                onChange={(e) => actualizarBusqueda(e.target.value)}
-                placeholder="Buscar tarea..."
-                aria-label="Buscar tareas por título o descripción"
-                className={`${CONTROL_FILTRO} pl-9`}
-              />
-            </div>
+            <DashboardSearchField
+              containerClassName="@xl/filtros:col-span-2 @4xl/filtros:col-span-1"
+              value={busqueda}
+              onChange={(e) => actualizarBusqueda(e.target.value)}
+              placeholder="Buscar tarea..."
+              aria-label="Buscar tareas por título o descripción"
+            />
 
             <Select value={proyectoFiltro} onValueChange={actualizarProyecto}>
               <SelectTrigger aria-label="Filtrar por proyecto" className={`${CONTROL_FILTRO} data-[size=default]:h-10`}>

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertCircle, FolderPlus, Plus, Search, SearchX } from 'lucide-react';
+import { AlertCircle, FolderPlus, Plus, SearchX } from 'lucide-react';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
@@ -143,17 +144,13 @@ export default function MyProjectsPage() {
 
         {/* Buscador y filtros */}
         <div className="mb-4.5 flex flex-col gap-4 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
-            <input
-              type="text"
-              aria-label="Buscar mis proyectos por titulo o descripcion"
-              placeholder="Buscar proyectos..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="h-11.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest py-2.5 pl-10 pr-3.5 text-[14px] text-on-surface outline-none placeholder:text-outline focus:ring-2 focus:ring-primary"
-            />
-          </div>
+          <DashboardSearchField
+            containerClassName="flex-1"
+            aria-label="Buscar mis proyectos por titulo o descripcion"
+            placeholder="Buscar proyectos..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
 
           <Select value={tipoFiltro || '__ALL__'} onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}>
             <SelectTrigger

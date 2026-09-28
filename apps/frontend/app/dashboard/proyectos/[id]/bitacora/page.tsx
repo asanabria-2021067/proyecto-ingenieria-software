@@ -32,6 +32,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
@@ -404,20 +405,13 @@ export default function BitacoraPage() {
           )}
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
-            <label className="relative">
-              <Search
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary"
-              />
-              <input
-                type="text"
-                aria-label="Buscar por persona"
-                placeholder="Buscar por persona..."
-                value={personaInput}
-                onChange={(e) => setPersonaInput(e.target.value)}
-                className="rounded-lg border border-outline-variant bg-surface-container-lowest py-2 pl-9 pr-3 text-sm text-on-surface"
-              />
-            </label>
+            <DashboardSearchField
+              containerClassName="w-full sm:w-64"
+              aria-label="Buscar por persona"
+              placeholder="Buscar por persona..."
+              value={personaInput}
+              onChange={(e) => setPersonaInput(e.target.value)}
+            />
 
             <select
               aria-label="Filtrar por sprint"

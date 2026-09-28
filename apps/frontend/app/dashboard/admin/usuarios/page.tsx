@@ -5,13 +5,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import {
   RefreshCw,
-  Search,
   X,
   AlertCircle,
   Eye,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
@@ -272,16 +272,12 @@ export default function AdminUsuariosPage() {
         {/* Filters */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           {/* Search */}
-          <div className="relative flex-1 min-w-50">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-tertiary pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={handleSearchChange}
-              placeholder="Buscar por nombre o correo institucional…"
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
+          <DashboardSearchField
+            containerClassName="flex-1 min-w-50"
+            value={search}
+            onChange={handleSearchChange}
+            placeholder="Buscar por nombre o correo institucional…"
+          />
 
           {/* Rol */}
           <Select
