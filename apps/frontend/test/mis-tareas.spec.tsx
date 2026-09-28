@@ -124,7 +124,7 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     fireEvent.keyDown(selectProyecto, { key: 'Enter' });
     fireEvent.click(screen.getByRole('option', { name: 'Rubik Frontend' }));
 
-    expect(screen.getByRole('status')).toHaveTextContent('1 tarea de 3 en total');
+    expect(screen.getByRole('status')).toHaveTextContent('Total de tareas: 3 · 1 coincide con los filtros');
     expect(screen.getByText('Tarea próxima a vencer')).toBeInTheDocument();
     expect(screen.queryByText('Tarea vencida')).not.toBeInTheDocument();
   });
@@ -270,13 +270,16 @@ describe('MisTareasPage — resumen, grupos y filas compactas', () => {
     expect(fila.parentElement).toHaveClass('divide-outline-variant/50');
   });
 
-  it('el contador dice «N tareas» y los filtros viven en una sola tarjeta', async () => {
+  it('«Total de tareas: N» (dato real) va sobre la tarjeta de filtros, no dentro', async () => {
     mockMisTareas(CON_SIN_FECHA);
     renderPage();
 
     await esperarLista();
-    expect(screen.getByRole('status')).toHaveTextContent('4 tareas');
+    const total = screen.getByRole('status');
+    expect(total).toHaveTextContent(/^Total de tareas: 4$/);
     const filtros = screen.getByRole('region', { name: 'Filtros de tareas' });
+    expect(filtros).not.toContainElement(total);
+    expect(total.compareDocumentPosition(filtros) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(filtros).toHaveClass('card-base');
     expect(within(filtros).getAllByRole('combobox')).toHaveLength(4);
     expect(within(filtros).getByLabelText('Buscar tareas por título o descripción')).toBeInTheDocument();
@@ -311,5 +314,44 @@ describe('MisTareasPage — resumen, grupos y filas compactas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
     expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('cada grupo tiene una guía Tarea · Proyecto · Fecha límite · Prioridad · Estado con las mismas columnas que sus filas', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    for (const nombre of ['Vencidas', 'Próximas', 'Sin fecha', 'Completadas']) {
+      const grupo = screen.getByRole('region', { name: nombre });
+      const guia = grupo.querySelector('[aria-hidden="true"].bg-surface-container-low') as HTMLElement;
+      expect(Array.from(guia.children).map((c) => c.textContent)).toEqual([
+        'Tarea',
+        'Proyecto',
+        'Fecha límite',
+        'Prioridad',
+        'Estado',
+      ]);
+      const columnas = guia.className.match(/@2xl\/grupo:grid-cols-\S+/)![0];
+      for (const fila of within(grupo).getAllByRole('listitem')) {
+        expect(fila.className).toContain(columnas);
+        // cinco celdas siempre, aunque falte la fecha: la alineación no se rompe
+        expect(fila.children).toHaveLength(5);
+      }
+    }
+  });
+
+  it('prioridad y estado viven cada uno en su propia celda, en el mismo orden en todas las filas', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    for (const fila of screen.getAllByRole('listitem')) {
+      const [, proyecto, , prioridad, estado] = Array.from(fila.children);
+      expect(proyecto).toHaveClass('type-meta');
+      expect(prioridad.children).toHaveLength(1);
+      expect(prioridad.firstElementChild).toHaveClass('pill');
+      expect(estado.children).toHaveLength(1);
+      expect(estado.firstElementChild).toHaveClass('pill');
+    }
   });
 });
