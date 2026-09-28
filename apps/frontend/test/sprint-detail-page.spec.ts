@@ -429,6 +429,17 @@ describe('SprintDetailPage — autorización', () => {
     expect(screen.queryByText('Sprint 7')).not.toBeInTheDocument();
   });
 
+  it('el líder vuelve a la lista de Sprints, no al proyecto', () => {
+    mockDetail();
+    renderPage();
+
+    expect(screen.getByRole('link', { name: 'Volver a Sprints' })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/sprints',
+    );
+    expect(screen.queryByRole('link', { name: /volver al proyecto/i })).not.toBeInTheDocument();
+  });
+
   it('un no-líder ve "Volver al proyecto" apuntando a /dashboard/proyectos (vista pública), no a /dashboard/projects (hub del líder)', () => {
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 }, isLoading: false });
     mockDetail();
