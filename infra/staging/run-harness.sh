@@ -37,3 +37,16 @@ HARNESS_T18_CARRERA_ID="$(docker compose -p "$PROJECT" -f docker-compose.yml exe
   psql -U harness -d uvg_collab_harness -qtAc "INSERT INTO carrera (nombre_carrera) VALUES ('Carrera sintetica T18') RETURNING id_carrera" | tr -d '[:space:]')"
 export HARNESS_T18_CARRERA_ID
 node characterize.mjs
+# G07-C12 (T14): tiempo real same-origin (notificaciones y chat) via nginx,
+# con la politica de handshake de C01-C04. Usuarios sinteticos en la base
+# efimera; con HARNESS_BROWSER=1 deja una sesion sintetica en el directorio
+# temporal del arnes para el tramo de navegador y lo ejecuta.
+export HARNESS_PROJECT="$PROJECT"
+if [ "${HARNESS_BROWSER:-0}" = "1" ]; then
+  export HARNESS_BROWSER_SESSION="$HARNESS_TLS_DIR/t14-session.json"
+fi
+node realtime.mjs
+if [ "${HARNESS_BROWSER:-0}" = "1" ]; then
+  (cd ../../apps/frontend && HARNESS_BASE_URL="https://localhost:$HARNESS_HTTPS_PORT" \
+    npx playwright test -c playwright.harness.config.ts)
+fi

@@ -47,3 +47,23 @@ Sobre HTTPS local (certificado autofirmado efímero):
 - **T17**: `/` y `/login` llevan exactamente las cabeceras base del frontend (nosniff, `X-Frame-Options: DENY`, Referrer-Policy, Permissions-Policy, CSP `frame-ancestors 'none'`), la CSP Report-Only con sus directivas clave, sin `X-Powered-By` y sin HSTS.
 - **T21**: `/api` y `/api/proyectos` devuelven exactamente `max-age=31536000; includeSubDomains`, nunca `preload`.
 - **T18**: el backend del arnés corre con `COOKIE_SECURE=true`. `run-harness.sh` inserta **una** carrera sintética en la base efímera y un registro vía nginx debe devolver `access_token` y `refresh_token` con `Secure`, `HttpOnly`, `SameSite=Lax` y `Path=/`. Solo se reportan atributos, nunca valores.
+
+## T14 (G07-C12)
+
+El frontend del arnés se construye con la **variante same-origin** (`NEXT_PUBLIC_API_URL` vacía, la misma que hornea `PUBLIC_API_URL=same-origin` en `deploy.yml`). `realtime.mjs` corre después de `characterize.mjs`, con clientes Socket.IO mínimos (Engine.IO v4 sobre el WebSocket de Node 22 y sobre polling HTTPS con la cookie de sesión), todo a través de nginx:
+
+| Id | Comprueba |
+|---|---|
+| T14-01 | El bundle del navegador (`.next/static`) no contiene `:3001` ni la IP de la API |
+| T14-02/03 | Un access token de una cuenta ACTIVO conecta a `/notifications` y `/chat` por `wss://` del mismo origen |
+| T14-04 | La ruta del navegador (polling + cookie `access_token`) pasa por la política; un refresh en esa cookie no |
+| T14-05 | Una notificación llega en vivo (flujo real de recuperación → admin) |
+| T14-06 | Un token de reset emitido por el admin no abre sockets |
+| T14-07 | Un refresh token no abre sockets |
+| T14-08 | Chat en vivo: conversación nueva, `joinConversation` con ack, `newMessage`; un ajeno no se une ni recibe |
+| T14-09 | Al BLOQUEAR una cuenta sus sockets abiertos se cierran (G07-C04), la reconexión se rechaza y las demás cuentas siguen conectadas |
+| T14-10 | Lo mismo al INACTIVAR |
+
+Usa cuatro registros sintéticos (el límite de `/auth/register` es 5/min y T18 ya usa uno), el rol `administrador` y un proyecto con un participante insertados por SQL en la base efímera. Nunca imprime tokens, cookies ni correos.
+
+**Tramo de navegador (opcional):** `HARNESS_BROWSER=1 infra/staging/run-harness.sh` ejecuta además `apps/frontend/e2e-harness` con `playwright.harness.config.ts` (requiere las dependencias y el Chromium de Playwright del frontend): el dashboard abre el socket en `wss://<origen>/socket.io/`, recibe `connected` y ninguna petición va a `:3001` ni a la IP. La sesión sintética viaja en un archivo `0600` del directorio temporal del arnés, que se borra al final. El job `topology` de CI corre T14 a nivel de protocolo; el tramo de navegador no, porque ese job no instala dependencias.
