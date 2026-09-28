@@ -85,8 +85,43 @@ describe('G06-C01: harness del contrato de cabeceras del frontend', () => {
     });
   });
 
-  it('línea base antes de G06-C02: next.config todavía no declara cabeceras propias', async () => {
-    // Estado de partida medido con el harness; G06-C02 convierte esto en el contrato real.
-    expect(await headersFor(nextConfig, '/')).toEqual({});
+});
+
+/** G06-C02: cabeceras base exactas de las páginas del frontend. */
+const BASELINE_HEADER_CONTRACT = {
+  required: {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    'Content-Security-Policy': "frame-ancestors 'none'",
+  },
+};
+
+describe('G06-C02: cabeceras base de seguridad en next.config', () => {
+  it.each(['/', '/login', '/registro', '/dashboard', '/dashboard/proyectos/12', '/_next/static/chunks/app.js'])(
+    '%s recibe exactamente las cabeceras base',
+    async (pathname) => {
+      expect(headerContractFindings(await headersFor(nextConfig, pathname), BASELINE_HEADER_CONTRACT)).toEqual([]);
+    },
+  );
+
+  it.each(['/api', '/api/proyectos', '/api/auth/login'])('%s (proxy hacia el backend) queda fuera: sus cabeceras son de Helmet', async (pathname) => {
+    expect(await headersFor(nextConfig, pathname)).toEqual({});
+  });
+
+  it('fixture negativo: sin la CSP de frame-ancestors el contrato falla', async () => {
+    const sinFrameAncestors: NextConfig = {
+      async headers() {
+        const rules = (await nextConfig.headers?.()) ?? [];
+        return rules.map((rule) => ({
+          ...rule,
+          headers: rule.headers.filter((header) => header.key !== 'Content-Security-Policy'),
+        }));
+      },
+    };
+    expect(headerContractFindings(await headersFor(sinFrameAncestors, '/'), BASELINE_HEADER_CONTRACT)).toEqual([
+      'falta Content-Security-Policy',
+    ]);
   });
 });
