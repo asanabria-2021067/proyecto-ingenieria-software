@@ -35,6 +35,7 @@ const MIGRATED_FILES = [
   'app/dashboard/proyectos/[id]/sprints/[sprintId]/analytics/page.tsx',
   'app/dashboard/proyectos/[id]/sprints/[sprintId]/finalizar/page.tsx',
   'components/projects/task-board.tsx',
+  'components/projects/kanban-column-frame.tsx',
   'components/projects/task-board.utils.ts',
   'components/projects/task-card.tsx',
   'components/projects/project-chat-panel.tsx',

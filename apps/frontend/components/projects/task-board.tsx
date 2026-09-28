@@ -39,6 +39,7 @@ import { TaskFormDialog } from '@/components/projects/task-form-dialog';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import { TaskDragOverlayCard } from '@/components/projects/task-drag-overlay';
 import { MobileTaskStatusNav } from '@/components/projects/mobile-task-status-nav';
+import { KANBAN_COLUMN_CLASS, KanbanColumnHeader, kanbanColumnBodyClass } from '@/components/projects/kanban-column-frame';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { aviso, confirmar } from '@/lib/mensajes';
 import {
@@ -195,30 +196,17 @@ function KanbanColumn({
       ref={setNodeRef}
       aria-labelledby={`columna-${estado}-heading`}
       data-column-estado={estado}
-      className="flex min-h-0 min-w-0 flex-col gap-2.5"
+      className={KANBAN_COLUMN_CLASS}
     >
       {/* Encabezado fuera del contenedor: punto de color + nombre + contador (Sección 33) */}
-      <div data-slot="kanban-column-header" className="flex items-center justify-between gap-2 px-1">
-        <h3
-          id={`columna-${estado}-heading`}
-          className="flex items-center gap-2 text-sm font-semibold text-text-primary"
-        >
-          <span className={`inline-block size-2 shrink-0 rounded-full ${estilo.columnDot}`} aria-hidden="true" />
-          {titulo}
-        </h3>
-        <span className="pill pill-neutral min-w-6 justify-center font-semibold tabular-nums">
-          {tareasColumna.length}
-        </span>
-      </div>
+      <KanbanColumnHeader
+        headingId={`columna-${estado}-heading`}
+        titulo={titulo}
+        dotClassName={estilo.columnDot}
+        count={tareasColumna.length}
+      />
 
-      <div
-        data-slot="kanban-column-body"
-        className={`flex flex-1 flex-col gap-2.5 rounded-xl border p-3 transition-all duration-150 ${
-          isOver
-            ? 'border-primary bg-primary/5 ring-2 ring-inset ring-primary/25'
-            : 'border-outline-variant/40 bg-surface-container-low'
-        }`}
-      >
+      <div data-slot="kanban-column-body" className={kanbanColumnBodyClass(isOver)}>
         {tareasColumna.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-8 text-center">
             <span className={`inline-block size-2.5 rounded-full ${estilo.dot} opacity-40`} aria-hidden="true" />
