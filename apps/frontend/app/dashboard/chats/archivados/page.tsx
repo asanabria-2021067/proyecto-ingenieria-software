@@ -16,10 +16,10 @@
    =========================================================================== */
 
 import { useState } from 'react';
-import { Archive, Lock, Search, Users as UsersIcon } from 'lucide-react';
+import { Archive, Lock, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   Empty,
@@ -77,16 +77,13 @@ export default function ChatsArchivadosPage() {
         </p>
       </header>
 
-      <div className="relative mb-card max-w-md">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nombre del chat o de la persona"
-          className="pl-9"
-          aria-label="Buscar chats archivados"
-        />
-      </div>
+      <DashboardSearchField
+        containerClassName="mb-card max-w-md"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Buscar por nombre del chat o de la persona"
+        aria-label="Buscar chats archivados"
+      />
 
       {isLoading ? (
         <ListaSkeleton />

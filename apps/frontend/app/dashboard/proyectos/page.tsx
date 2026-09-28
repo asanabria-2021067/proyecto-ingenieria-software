@@ -24,9 +24,10 @@ import {
 import { apiFetch } from '@/lib/api/client';
 import { TIPO_LABEL } from '@/types';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, FolderOpen, Search, SearchX } from 'lucide-react';
+import { AlertCircle, FolderOpen, SearchX } from 'lucide-react';
 import { useState } from 'react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 
 type OrganizacionFiltro = {
   idOrganizacion: number;
@@ -101,17 +102,13 @@ export default function ProyectosPage() {
 
         {/* Buscador y filtros */}
         <div className="mb-4.5 flex flex-col gap-4 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
-            <input
-              type="text"
-              aria-label="Buscar proyectos por titulo o descripcion"
-              placeholder="Buscar proyectos disponibles..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="h-11.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest py-2.5 pl-10 pr-3.5 text-[14px] text-on-surface outline-none placeholder:text-outline focus:ring-2 focus:ring-primary"
-            />
-          </div>
+          <DashboardSearchField
+            containerClassName="flex-1"
+            aria-label="Buscar proyectos por titulo o descripcion"
+            placeholder="Buscar proyectos disponibles..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
 
           <Select
             value={tipoFiltro || '__ALL__'}
