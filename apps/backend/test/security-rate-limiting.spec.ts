@@ -164,8 +164,9 @@ describe('X-Forwarded-For y TRUST_PROXY_HOPS', () => {
 });
 
 describe('Cabeceras y validación global (main.ts)', () => {
+  // G06-C06: Helmet recibe opciones (HSTS explícito); el comportamiento se prueba en g06-hsts.spec.ts.
   it('Helmet está activo', () => {
-    expect(MAIN_SOURCE).toMatch(/app\.use\(helmet\(\)\)/);
+    expect(MAIN_SOURCE).toMatch(/app\.use\(helmet\(API_HELMET_OPTIONS\)\)/);
   });
 
   it('ValidationPipe global usa whitelist y forbidNonWhitelisted', () => {
