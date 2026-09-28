@@ -35,6 +35,8 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   FRONTEND_URL: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
   BACKEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
   FRONTEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
+  // G04-C08 (OWASP25-C021 + D2): 0 = comportamiento actual (no confiar en XFF).
+  TRUST_PROXY_HOPS: { kind: 'flag', consumer: 'apps/backend/src/config/environment.validation.ts', defaultValue: '0' },
 };
 
 /** Variables del paso de transferencia que solo sirven para la conexión SSH (no van al .env). */

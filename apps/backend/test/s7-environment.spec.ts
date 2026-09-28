@@ -301,6 +301,7 @@ describe('S7 environment foundation (TC03)', () => {
         port: 3001,
         frontendUrl: 'http://localhost:3000',
         cookieSecure: false,
+        trustProxyHops: 0,
         redis: { host: 'localhost', port: 6379 },
       });
 
