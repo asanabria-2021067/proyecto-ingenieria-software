@@ -152,7 +152,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
           variant={amistad.variant}
           disabled={amistad.disabled}
           onClick={amistad.onClick}
-          className="h-7 rounded-pill px-2.5 text-[11px]"
+          className="h-7 rounded-md px-2.5 text-[11px]"
         >
           {amistad.label}
         </Button>
@@ -222,7 +222,7 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
           variant={amistad.variant}
           disabled={amistad.disabled}
           onClick={amistad.onClick}
-          className="h-7 rounded-pill px-2.5 text-[11px]"
+          className="h-7 rounded-md px-2.5 text-[11px]"
         >
           {amistad.label}
         </Button>
@@ -273,7 +273,7 @@ function RecomendacionCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
       </div>
       <Button
         size="sm"
-        className="h-7 shrink-0 rounded-pill px-2.5 text-[11px]"
+        className="h-7 shrink-0 rounded-md px-2.5 text-[11px]"
         onClick={() => crearSolicitud.mutate(usuario.idUsuario)}
         disabled={crearSolicitud.isPending}
       >
