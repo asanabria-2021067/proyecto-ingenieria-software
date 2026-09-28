@@ -54,3 +54,26 @@ describe('Carcasa compartida de las tarjetas de proyecto', () => {
     expect(fuente).not.toContain('gap-x-4 gap-y-3 md:grid-cols-2');
   });
 });
+
+// «Ver proyecto» en Proyectos Disponibles usa el botón oscuro del sistema
+// (token `action`, el mismo del botón por defecto), no el verde de marca.
+describe('Tarjeta de Proyectos Disponibles — botón «Ver proyecto»', () => {
+  it('usa el color de acción oscuro y enlaza al detalle del proyecto', () => {
+    const disponible = {
+      idProyecto: 39,
+      tituloProyecto: 'Gestión de Mentorías',
+      descripcionProyecto: 'Descripción',
+      tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+      modalidadProyecto: 'VIRTUAL',
+      estadoProyecto: 'EN_PROGRESO',
+      roles: [{ cupos: 2 }],
+      creador: { idUsuario: 1, nombre: 'Valeria', apellido: 'Ortiz' },
+    } as never;
+    render(<AvailableProjectCard proyecto={disponible} />);
+
+    const boton = screen.getByRole('link', { name: 'Ver proyecto' });
+    expect(boton).toHaveAttribute('href', '/dashboard/proyectos/39');
+    expect(boton).toHaveClass('bg-action', 'text-on-action', 'hover:bg-action/90');
+    expect(boton.className).not.toMatch(/(?<![\w-])(bg-primary|text-on-primary)\b/);
+  });
+});

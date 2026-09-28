@@ -397,7 +397,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
     footerAction = (
       <Button
         asChild
-        className="h-9.5 w-30 shrink-0 rounded-md bg-primary px-4.5 text-[13px] font-semibold text-on-primary shadow-none hover:bg-primary/90"
+        className="h-9.5 w-30 shrink-0 rounded-md bg-action px-4.5 text-[13px] font-semibold text-on-action shadow-none hover:bg-action/90"
       >
         <Link href={`/dashboard/proyectos/${idProyecto}`}>Ver proyecto</Link>
       </Button>
