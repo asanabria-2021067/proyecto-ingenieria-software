@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoProyecto, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserNameSearchService } from '../common/search/user-name-search.service';
 import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
@@ -37,11 +38,18 @@ const MENSAJE_SELECT = {
 
 const ARCHIVADOS_PAGE_SIZE = 20;
 
+/** Escapa los comodines de LIKE (%, _, \) — mismo criterio que UserNameSearchService. */
+function likePattern(texto: string): string {
+  const escapado = texto.replace(/[\\%_]/g, (c) => `\\${c}`);
+  return `%${escapado}%`;
+}
+
 @Injectable()
 export class ChatService {
   constructor(
     private prisma: PrismaService,
     private gateway: ChatGateway,
+    private userNameSearch: UserNameSearchService,
   ) {}
 
   /** Líder o participante con participación ACTIVO en algún rol del proyecto. */
@@ -237,33 +245,13 @@ export class ChatService {
   async listArchivedConversations(userId: number, filtros: ListArchivedConversationsQueryDto = {}) {
     const query = (filtros.q ?? '').trim();
     const page = filtros.page ?? 1;
-
-    const busquedaPorPersona: Prisma.ConversacionWhereInput = {
-      participantes: {
-        some: {
-          idUsuario: { not: userId },
-          usuario: {
-            OR: [
-              { nombre: { contains: query, mode: 'insensitive' } },
-              { apellido: { contains: query, mode: 'insensitive' } },
-            ],
-          },
-        },
-      },
-    };
+    const filtroBusqueda = query ? await this.filtroBusquedaArchivados(query, userId) : {};
 
     const conversaciones = await this.prisma.conversacion.findMany({
       where: {
         participantes: { some: { idUsuario: userId } },
         proyecto: { estadoProyecto: EstadoProyecto.CERRADO },
-        ...(query
-          ? {
-              OR: [
-                { nombre: { contains: query, mode: 'insensitive' } },
-                busquedaPorPersona,
-              ],
-            }
-          : {}),
+        ...filtroBusqueda,
       },
       include: {
         proyecto: { select: { idProyecto: true, tituloProyecto: true } },
@@ -289,6 +277,41 @@ export class ChatService {
         archivada: true as const,
       })),
       hasMore,
+    };
+  }
+
+  /**
+   * T-237: la búsqueda de archivados tolera acentos y mayúsculas tanto en el
+   * nombre del chat como en el de la persona ("logistica" encuentra
+   * "Logística", "saul" encuentra a "Saúl"). La comparación la resuelve
+   * Postgres con `immutable_unaccent` (migración de T-245); el nombre de la
+   * persona se delega a UserNameSearchService para no repetir ese SQL. El
+   * propio usuario nunca cuenta como coincidencia por persona: si no, buscar
+   * su propio nombre devolvería todos sus chats.
+   */
+  private async filtroBusquedaArchivados(
+    query: string,
+    userId: number,
+  ): Promise<Prisma.ConversacionWhereInput> {
+    const patron = likePattern(query);
+    const [filasPorNombre, idsPersonas] = await Promise.all([
+      this.prisma.$queryRaw<{ id_conversacion: number }[]>(Prisma.sql`
+        SELECT id_conversacion FROM conversacion
+        WHERE nombre IS NOT NULL
+          AND immutable_unaccent(lower(nombre)) LIKE immutable_unaccent(lower(${patron})) ESCAPE '\\'
+      `),
+      this.userNameSearch.findMatchingUserIds(query),
+    ]);
+
+    return {
+      OR: [
+        { idConversacion: { in: filasPorNombre.map((fila) => fila.id_conversacion) } },
+        {
+          participantes: {
+            some: { idUsuario: { in: idsPersonas.filter((id) => id !== userId) } },
+          },
+        },
+      ],
     };
   }
 }

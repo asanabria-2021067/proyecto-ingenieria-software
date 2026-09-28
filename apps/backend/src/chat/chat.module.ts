@@ -7,10 +7,12 @@ import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { PrismaModule } from '../prisma/prisma.module';
 import { requireJwtSecret } from '../config/jwt-secret';
+import { UserNameSearchModule } from '../common/search/user-name-search.module';
 
 @Module({
   imports: [
     PrismaModule,
+    UserNameSearchModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

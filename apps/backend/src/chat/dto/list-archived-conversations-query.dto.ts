@@ -4,9 +4,9 @@ import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 /**
  * T-236: búsqueda de conversaciones archivadas por nombre de chat O por
  * persona participante — un solo campo `q` que el service compara contra
- * ambos (ver ChatService.listArchivedConversations). Sin normalización de
- * acentos todavía: esa función la implementa Saúl en T-245 (HU-161); cuando
- * exista, este mismo campo se conecta ahí sin cambiar el contrato.
+ * ambos (ver ChatService.listArchivedConversations). T-237 conectó la
+ * comparación a la normalización de acentos de T-245 sin cambiar el
+ * contrato del campo.
  */
 export class ListArchivedConversationsQueryDto {
   @IsOptional()
