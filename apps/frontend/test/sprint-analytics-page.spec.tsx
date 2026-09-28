@@ -85,16 +85,17 @@ afterEach(() => {
 });
 
 describe('SprintAnalyticsPage — encabezado', () => {
-  it('muestra el número de Sprint en el título y el back-link al Sprint', () => {
+  it('muestra el número de Sprint en el título y vuelve a la lista de Sprints', () => {
     mockAnalytics();
 
     renderPage();
 
     expect(screen.getByRole('heading', { name: 'Analítica del Sprint 3' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /volver al sprint/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Volver a Sprints' })).toHaveAttribute(
       'href',
-      '/dashboard/proyectos/42/sprints/7',
+      '/dashboard/proyectos/42/sprints',
     );
+    expect(screen.queryByRole('link', { name: /volver al sprint$/i })).not.toBeInTheDocument();
   });
 });
 

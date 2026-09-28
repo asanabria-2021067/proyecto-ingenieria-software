@@ -221,7 +221,7 @@ export default function SprintAnalyticsPage() {
   return (
     <ProjectPageShell>
       <ProjectPageHeader
-        back={{ href: `/dashboard/proyectos/${id}/sprints/${sprintId}`, label: 'Volver al Sprint' }}
+        back={{ href: `/dashboard/proyectos/${id}/sprints`, label: 'Volver a Sprints' }}
         title={analytics ? `Analítica del Sprint ${analytics.numero}` : 'Analítica del Sprint'}
         description="Cumplimiento y progreso de este Sprint: tareas, prioridades y hitos."
       />
