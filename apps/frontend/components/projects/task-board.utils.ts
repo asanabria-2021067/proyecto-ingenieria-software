@@ -36,6 +36,12 @@ export interface EstadoColumnaStyle {
   headerBg: string;
   headerText: string;
   dot: string;
+  /**
+   * Punto del encabezado de columna del Kanban, que va sobre el fondo de la
+   * página y no sobre `headerBg`: gris, lima suave, naranja de atención y el
+   * verde institucional.
+   */
+  columnDot: string;
 }
 
 export const ESTADO_COLUMNA_STYLE: Record<EstadoTarea, EstadoColumnaStyle> = {
@@ -43,6 +49,7 @@ export const ESTADO_COLUMNA_STYLE: Record<EstadoTarea, EstadoColumnaStyle> = {
     headerBg: 'bg-surface-container-high',
     headerText: 'text-text-secondary',
     dot: 'bg-text-secondary',
+    columnDot: 'bg-outline',
   },
   // En progreso = acento (única columna destacada del tablero, Sección 29).
   // En revisión se queda en neutro: `--color-status-warning` y `--color-accent`
@@ -54,16 +61,19 @@ export const ESTADO_COLUMNA_STYLE: Record<EstadoTarea, EstadoColumnaStyle> = {
     headerBg: 'bg-accent',
     headerText: 'text-on-accent',
     dot: 'bg-accent',
+    columnDot: 'bg-accent',
   },
   EN_REVISION: {
     headerBg: 'bg-surface-container-high',
     headerText: 'text-text-secondary',
     dot: 'bg-text-secondary',
+    columnDot: 'bg-attention',
   },
   HECHO: {
     headerBg: 'bg-status-success',
     headerText: 'text-on-status-success',
     dot: 'bg-status-success',
+    columnDot: 'bg-primary',
   },
 };
 
