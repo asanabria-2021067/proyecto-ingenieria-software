@@ -29,14 +29,18 @@ export function HoursKpiCard({ icon: Icon, label, value, note, destacado = false
         role="group"
         aria-label={label}
         data-destacado={destacado || undefined}
-        className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
+        className="card-base"
       >
-        <p className="flex items-center gap-tight text-xs font-bold uppercase tracking-wide text-text-primary">
+        <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-primary">
           <Icon className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
           {label}
         </p>
-        <p className="mt-tight font-headline text-2xl font-extrabold text-text-primary">{value}</p>
-        {note && <p className="type-meta mt-micro">{note}</p>}
+        {/* Cifra y nota alineadas con el texto de la etiqueta, no con el
+            icono: pl-7 = icono (size-5) + gap-tight. */}
+        <div className="pl-7">
+          <p className="mt-tight font-headline text-3xl font-bold text-text-primary">{value}</p>
+          {note && <p className="type-meta mt-micro">{note}</p>}
+        </div>
       </div>
     );
   }

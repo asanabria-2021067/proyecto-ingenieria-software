@@ -33,7 +33,7 @@ interface MyHoursRequirementsProps {
  */
 export function MyHoursRequirements({ requisitos, porTipo }: MyHoursRequirementsProps) {
   return (
-    <section aria-labelledby="mis-horas-progreso-titulo" className="card-base flex flex-col gap-stack">
+    <section aria-labelledby="mis-horas-progreso-titulo" className="card-base flex flex-col gap-card">
       <div className="flex flex-col gap-micro">
         <h2 id="mis-horas-progreso-titulo" className="type-section">
           Progreso de acreditación
@@ -41,7 +41,7 @@ export function MyHoursRequirements({ requisitos, porTipo }: MyHoursRequirements
         <p className="type-meta">Solo cuentan las horas acreditadas al aprobarse el cierre de cada proyecto.</p>
       </div>
 
-      <ul className="flex flex-col gap-stack">
+      <ul className="flex flex-col gap-card">
         {FILAS.map(({ tipo, etiqueta, meta }) => {
           const acreditadas = porTipo.find((fila) => fila.tipoProyecto === tipo)?.acreditadas ?? '0.00';
           const requeridas = meta ? requisitos[meta] : null;
@@ -67,7 +67,7 @@ export function MyHoursRequirements({ requisitos, porTipo }: MyHoursRequirements
                     value={porcentaje}
                     aria-label={`Progreso de ${etiqueta.toLowerCase()}`}
                     aria-valuenow={porcentaje}
-                    className="flex-1"
+                    className="h-1.5 flex-1 bg-primary/10"
                   />
                   <span className="type-meta w-12 shrink-0 text-right tabular-nums">{porcentaje} %</span>
                   {porcentaje === 100 && <span className="pill pill-success shrink-0">Meta cumplida</span>}

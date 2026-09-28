@@ -6,6 +6,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
+  SLATE_BADGE,
   estadoBadgeLabel,
   estadoBadgeStyle,
   tipoBadgeLabel,
@@ -37,7 +38,7 @@ function IconoTipo({ tipo }: { tipo: TipoProyecto }) {
 }
 
 function PillRol({ proyecto }: { proyecto: MisHorasProyecto }) {
-  if (proyecto.esLider) return <span className="pill pill-accent">Líder</span>;
+  if (proyecto.esLider) return <span className={`pill ${SLATE_BADGE}`}>Líder</span>;
   if (!proyecto.participacionActiva) return <span className="pill pill-neutral">Participación finalizada</span>;
   return null;
 }
@@ -51,6 +52,9 @@ function Cifra({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   );
 }
 
+/** Separadores tenues: sin color propio, `border-b` hereda el texto (casi negro). */
+const FILA_TABLA = 'border-outline-variant/50 hover:bg-surface-container-low';
+
 /** Una tarea solo enlaza si el usuario todavía puede abrirla: proyecto abierto, sigue dentro (o lo lidera) y no se eliminó. */
 function puedeEnlazar(proyecto: MisHorasProyecto, tarea: MisHorasTarea): boolean {
   return proyecto.abierto && (proyecto.participacionActiva || proyecto.esLider) && !tarea.eliminada;
@@ -63,7 +67,7 @@ function TablaTareas({ proyecto }: { proyecto: MisHorasProyecto }) {
   return (
     <Table aria-label={`Horas por tarea en ${proyecto.tituloProyecto}`}>
       <TableHeader>
-        <TableRow>
+        <TableRow className={FILA_TABLA}>
           <TableHead>Tarea</TableHead>
           <TableHead className="hidden sm:table-cell">Sprint</TableHead>
           <TableHead className="hidden sm:table-cell">Estado</TableHead>
@@ -73,7 +77,7 @@ function TablaTareas({ proyecto }: { proyecto: MisHorasProyecto }) {
       </TableHeader>
       <TableBody>
         {proyecto.tareas.map((tarea) => (
-          <TableRow key={tarea.idTarea}>
+          <TableRow key={tarea.idTarea} className={FILA_TABLA}>
             <TableCell className="max-w-64 whitespace-normal">
               {tarea.eliminada ? (
                 <span className="flex flex-wrap items-center gap-tight">
@@ -116,7 +120,7 @@ function ProyectoAbierto({ proyecto }: { proyecto: MisHorasProyecto }) {
           <span className="flex min-w-0 flex-1 flex-col gap-micro">
             <span className="flex items-center gap-tight">
               <IconoTipo tipo={proyecto.tipoProyecto} />
-              <span className="type-subtitle">{proyecto.tituloProyecto}</span>
+              <span className="type-subtitle font-semibold">{proyecto.tituloProyecto}</span>
             </span>
             <span className="flex flex-wrap gap-micro">
               <span className={`pill ${tipoBadgeStyle(proyecto.tipoProyecto)}`}>{tipoBadgeLabel(proyecto.tipoProyecto)}</span>
@@ -134,7 +138,10 @@ function ProyectoAbierto({ proyecto }: { proyecto: MisHorasProyecto }) {
         </span>
       </AccordionTrigger>
       <AccordionContent className="pt-stack pb-0">
-        <TablaTareas proyecto={proyecto} />
+        {/* La tabla vive dentro de la misma tarjeta, separada por una línea tenue. */}
+        <div className="border-t border-outline-variant/50 pt-tight">
+          <TablaTareas proyecto={proyecto} />
+        </div>
       </AccordionContent>
     </AccordionItem>
   );
@@ -147,7 +154,7 @@ function ProyectoCerrado({ proyecto }: { proyecto: MisHorasProyecto }) {
       <div className="flex min-w-0 flex-col gap-micro">
         <div className="flex items-center gap-tight">
           <IconoTipo tipo={proyecto.tipoProyecto} />
-          <h3 className="type-subtitle">{proyecto.tituloProyecto}</h3>
+          <h3 className="type-subtitle font-semibold">{proyecto.tituloProyecto}</h3>
         </div>
         <div className="flex flex-wrap items-center gap-x-inline gap-y-micro">
           {proyecto.eliminado ? (
