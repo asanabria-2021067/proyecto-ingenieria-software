@@ -57,3 +57,38 @@ describe('HoursKpiCard', () => {
     expect(icono).toHaveAttribute('aria-hidden', 'true');
   });
 });
+
+// Mis Horas usa la variante en línea: icono neutro al par de la etiqueta,
+// sin caja de color, y todo el texto en tonos neutros. La vista del
+// integrante sigue con la variante por defecto (caja).
+describe('HoursKpiCard — variante en línea', () => {
+  afterEach(() => cleanup());
+
+  it('pone el icono dentro de la fila de la etiqueta, sin caja de fondo', () => {
+    render(<HoursKpiCard variante="en-linea" icon={Clock} label="Registradas" value="75 h" />);
+
+    const grupo = screen.getByRole('group', { name: 'Registradas' });
+    const etiqueta = within(grupo).getByText('Registradas');
+    const icono = grupo.querySelector('svg')!;
+    expect(etiqueta).toContainElement(icono as unknown as HTMLElement);
+    expect(icono).toHaveClass('size-5', 'text-text-primary');
+    expect(icono).toHaveAttribute('aria-hidden', 'true');
+    expect(grupo.innerHTML).not.toMatch(/bg-primary/);
+  });
+
+  it('etiqueta y valor en tono neutro, sin verdes', () => {
+    render(<HoursKpiCard variante="en-linea" icon={CheckCircle2} label="Acreditadas" value="22.25 h" destacado />);
+
+    const grupo = screen.getByRole('group', { name: 'Acreditadas' });
+    expect(within(grupo).getByText('Acreditadas')).toHaveClass('text-text-primary');
+    expect(within(grupo).getByText('22.25 h')).toHaveClass('text-text-primary');
+    expect(grupo.innerHTML).not.toMatch(/(?<![\w-])text-(primary|tertiary)\b/);
+    expect(grupo).toHaveAttribute('data-destacado', 'true');
+  });
+
+  it('la variante por defecto conserva la caja de color del icono', () => {
+    render(<HoursKpiCard icon={Clock} label="Registradas" value="75 h" />);
+
+    expect(screen.getByRole('group', { name: 'Registradas' }).firstElementChild).toHaveClass('bg-primary/10');
+  });
+});

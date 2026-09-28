@@ -288,3 +288,41 @@ describe('MyHoursProjectList — disposición por contenedor', () => {
     expect(cifras.className).not.toMatch(/(^|\s)(sm|md|lg|xl):w-/);
   });
 });
+
+// Mis Horas: icono de tipo neutro y sin caja al par del nombre del proyecto;
+// nombres de tareas en tono neutro aunque sean enlaces.
+describe('MyHoursProjectList — iconos y colores neutros', () => {
+  afterEach(() => cleanup());
+
+  it('el icono del proyecto va junto al nombre, en negro y sin fondo', () => {
+    render(<MyHoursProjectList proyectos={[proyecto()]} />);
+
+    const cabecera = screen.getByRole('button', { name: /Tutorías/ });
+    const icono = cabecera.querySelector('[data-slot="icono-tipo"]')!;
+    const fila = within(cabecera).getByText('Tutorías').parentElement!;
+    expect(fila).toContainElement(icono as unknown as HTMLElement);
+    expect(icono).toHaveClass('size-5', 'text-text-primary');
+    expect(cabecera.innerHTML).not.toMatch(/bg-primary/);
+  });
+
+  it('en los proyectos cerrados el icono también va junto al título, sin fondo', () => {
+    render(
+      <MyHoursProjectList
+        proyectos={[proyecto({ idProyecto: 9, tituloProyecto: 'Archivo', abierto: false, estadoProyecto: 'CERRADO', tareas: [] })]}
+      />,
+    );
+
+    const titulo = screen.getByRole('heading', { name: 'Archivo' });
+    expect(titulo.parentElement!.querySelector('[data-slot="icono-tipo"]')).toHaveClass('text-text-primary');
+    expect(titulo.closest('li')!.innerHTML).not.toMatch(/bg-primary/);
+  });
+
+  it('los nombres de tareas enlazadas se ven en tono neutro, no en verde', () => {
+    render(<MyHoursProjectList proyectos={[proyecto()]} />);
+
+    const tabla = abrir('Tutorías');
+    const enlace = within(tabla).getByRole('link', { name: 'Diseñar sesiones' });
+    expect(enlace).toHaveClass('text-text-primary');
+    expect(enlace).not.toHaveClass('text-primary');
+  });
+});

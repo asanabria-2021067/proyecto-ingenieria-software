@@ -314,3 +314,34 @@ describe('MisHorasPage — disposición por contenedor', () => {
     expect(regla('.\\@2xl\\/proyecto\\:w-80')).toMatch(/@container proyecto \(width >= 42rem\)/);
   }, 60_000);
 });
+
+// Mis Horas: encabezado solo con título y subtítulo, y KPI con el icono
+// neutro al par de su etiqueta (sin caja de color).
+describe('MisHorasPage — iconos y colores neutros', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('el encabezado no lleva icono: solo el título y el subtítulo', () => {
+    mockEstado({ data: vista() });
+    render(<MisHorasPage />);
+
+    const encabezado = screen.getByRole('heading', { level: 1, name: 'Mis Horas' }).closest('header')!;
+    expect(encabezado.querySelector('svg')).toBeNull();
+    expect(within(encabezado).getByText('Tus horas registradas, propuestas y acreditadas en todos tus proyectos.')).toBeInTheDocument();
+  });
+
+  it('los tres KPI usan la variante en línea: icono negro junto a la etiqueta y sin fondo', () => {
+    mockEstado({ data: vista() });
+    render(<MisHorasPage />);
+
+    for (const nombre of ['Registradas en proyectos abiertos', 'Propuestas para acreditación', 'Acreditadas']) {
+      const grupo = kpi(nombre);
+      const icono = grupo.querySelector('svg')!;
+      expect(within(grupo).getByText(nombre)).toContainElement(icono as unknown as HTMLElement);
+      expect(icono).toHaveClass('text-text-primary');
+      expect(grupo.innerHTML, nombre).not.toMatch(/bg-primary/);
+    }
+  });
+});
