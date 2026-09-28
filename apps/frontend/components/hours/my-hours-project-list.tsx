@@ -30,13 +30,10 @@ const ESTADO_TAREA_TONE: Record<EstadoTarea, string> = {
   HECHO: 'pill-success',
 };
 
+/** Icono del tipo de proyecto: neutro y sin fondo, al par del título. */
 function IconoTipo({ tipo }: { tipo: TipoProyecto }) {
   const Icono = ICONO_TIPO[tipo] ?? FolderOpen;
-  return (
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
-      <Icono className="size-5" aria-hidden="true" />
-    </span>
-  );
+  return <Icono data-slot="icono-tipo" className="size-5 shrink-0 text-text-primary" aria-hidden="true" />;
 }
 
 function PillRol({ proyecto }: { proyecto: MisHorasProyecto }) {
@@ -86,7 +83,7 @@ function TablaTareas({ proyecto }: { proyecto: MisHorasProyecto }) {
               ) : puedeEnlazar(proyecto, tarea) ? (
                 <Link
                   href={`/dashboard/projects/${proyecto.idProyecto}/kanban/tasks/${tarea.idTarea}`}
-                  className="font-medium text-primary underline-offset-4 hover:underline"
+                  className="font-medium text-text-primary underline-offset-4 hover:underline"
                 >
                   {tarea.tituloTarea}
                 </Link>
@@ -116,17 +113,17 @@ function ProyectoAbierto({ proyecto }: { proyecto: MisHorasProyecto }) {
         {/* Título y cifras en fila solo si la tarjeta mide al menos 42rem; si
             no, las cifras bajan y el título conserva el ancho. */}
         <span className="flex min-w-0 flex-1 flex-col gap-inline @2xl/proyecto:flex-row @2xl/proyecto:items-center">
-          <span className="flex min-w-0 flex-1 items-start gap-inline">
-            <IconoTipo tipo={proyecto.tipoProyecto} />
-            <span className="flex min-w-0 flex-col gap-micro">
+          <span className="flex min-w-0 flex-1 flex-col gap-micro">
+            <span className="flex items-center gap-tight">
+              <IconoTipo tipo={proyecto.tipoProyecto} />
               <span className="type-subtitle">{proyecto.tituloProyecto}</span>
-              <span className="flex flex-wrap gap-micro">
-                <span className={`pill ${tipoBadgeStyle(proyecto.tipoProyecto)}`}>{tipoBadgeLabel(proyecto.tipoProyecto)}</span>
-                <span className={`pill ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
-                  {estadoBadgeLabel(proyecto.estadoProyecto)}
-                </span>
-                <PillRol proyecto={proyecto} />
+            </span>
+            <span className="flex flex-wrap gap-micro">
+              <span className={`pill ${tipoBadgeStyle(proyecto.tipoProyecto)}`}>{tipoBadgeLabel(proyecto.tipoProyecto)}</span>
+              <span className={`pill ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
+                {estadoBadgeLabel(proyecto.estadoProyecto)}
               </span>
+              <PillRol proyecto={proyecto} />
             </span>
           </span>
           <span className="grid shrink-0 grid-cols-3 gap-inline @2xl/proyecto:w-80">
@@ -147,28 +144,28 @@ function ProyectoCerrado({ proyecto }: { proyecto: MisHorasProyecto }) {
   const conHistorico = proyecto.estadoProyecto === 'CERRADO' && !proyecto.eliminado;
   return (
     <li className="card-base flex flex-col gap-inline sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-start gap-inline">
-        <IconoTipo tipo={proyecto.tipoProyecto} />
-        <div className="flex min-w-0 flex-col gap-micro">
+      <div className="flex min-w-0 flex-col gap-micro">
+        <div className="flex items-center gap-tight">
+          <IconoTipo tipo={proyecto.tipoProyecto} />
           <h3 className="type-subtitle">{proyecto.tituloProyecto}</h3>
-          <div className="flex flex-wrap items-center gap-x-inline gap-y-micro">
-            {proyecto.eliminado ? (
-              <span className="pill pill-neutral">Eliminado</span>
-            ) : (
-              <span className={`pill ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
-                {estadoBadgeLabel(proyecto.estadoProyecto)}
-              </span>
-            )}
-            <span className="type-meta">
-              Acreditadas <span className="font-semibold text-text-primary">{formatearHoras(proyecto.acreditadas)}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-inline gap-y-micro">
+          {proyecto.eliminado ? (
+            <span className="pill pill-neutral">Eliminado</span>
+          ) : (
+            <span className={`pill ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
+              {estadoBadgeLabel(proyecto.estadoProyecto)}
             </span>
-            {Number(proyecto.propuestasPendientes) > 0 && (
-              <span className="type-meta">
-                Propuestas{' '}
-                <span className="font-semibold text-text-primary">{formatearHoras(proyecto.propuestasPendientes)}</span>
-              </span>
-            )}
-          </div>
+          )}
+          <span className="type-meta">
+            Acreditadas <span className="font-semibold text-text-primary">{formatearHoras(proyecto.acreditadas)}</span>
+          </span>
+          {Number(proyecto.propuestasPendientes) > 0 && (
+            <span className="type-meta">
+              Propuestas{' '}
+              <span className="font-semibold text-text-primary">{formatearHoras(proyecto.propuestasPendientes)}</span>
+            </span>
+          )}
         </div>
       </div>
       {conHistorico && (

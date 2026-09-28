@@ -23,16 +23,11 @@ import { dashboardPage } from '@/components/layout/dashboard-page';
 
 function Encabezado() {
   return (
-    <header className="flex items-center gap-inline">
-      <div className="flex size-11 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
-        <Clock className="size-5" aria-hidden="true" />
-      </div>
-      <div>
-        <h1 className="type-display">Mis Horas</h1>
-        <p className="type-body mt-micro text-text-secondary">
-          Tus horas registradas, propuestas y acreditadas en todos tus proyectos.
-        </p>
-      </div>
+    <header>
+      <h1 className="type-display">Mis Horas</h1>
+      <p className="type-body mt-micro text-text-secondary">
+        Tus horas registradas, propuestas y acreditadas en todos tus proyectos.
+      </p>
     </header>
   );
 }
@@ -109,6 +104,7 @@ function Contenido({ vista }: { vista: MisHorasView }) {
           sidebar global abierta, a 768 px quedan ~500 px y no caben. */}
       <section aria-label="Resumen de horas" className="grid gap-grid @2xl/mis-horas:grid-cols-3">
         <HoursKpiCard
+          variante="en-linea"
           icon={Clock}
           label="Registradas en proyectos abiertos"
           value={formatearHoras(totales.registradasEnProyectosAbiertos)}
@@ -119,12 +115,19 @@ function Contenido({ vista }: { vista: MisHorasView }) {
           }
         />
         <HoursKpiCard
+          variante="en-linea"
           icon={Hourglass}
           label="Propuestas para acreditación"
           value={formatearHoras(totales.propuestasPendientes)}
           note="Pendientes de aprobación al cierre del proyecto"
         />
-        <HoursKpiCard icon={CheckCircle2} label="Acreditadas" value={formatearHoras(totales.acreditadas)} destacado />
+        <HoursKpiCard
+          variante="en-linea"
+          icon={CheckCircle2}
+          label="Acreditadas"
+          value={formatearHoras(totales.acreditadas)}
+          destacado
+        />
       </section>
 
       <MyHoursRequirements requisitos={vista.requisitos} porTipo={vista.porTipo} />

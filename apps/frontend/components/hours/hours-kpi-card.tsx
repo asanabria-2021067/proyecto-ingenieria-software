@@ -10,13 +10,37 @@ interface HoursKpiCardProps {
   note?: string;
   /** Resalta la cifra principal (horas acreditadas). */
   destacado?: boolean;
+  /**
+   * `caja` (por defecto): icono en una caja de color a la izquierda.
+   * `en-linea`: icono neutro al par de la etiqueta, sin fondo, y todo el
+   * texto en tonos neutros (Mis Horas).
+   */
+  variante?: 'caja' | 'en-linea';
 }
 
 /**
  * HU-158 (T-232): KPI de horas compartido por la vista del integrante y Mis
  * Horas. Extraído sin cambios de apariencia de `equipo/[idUsuario]`.
  */
-export function HoursKpiCard({ icon: Icon, label, value, note, destacado = false }: HoursKpiCardProps) {
+export function HoursKpiCard({ icon: Icon, label, value, note, destacado = false, variante = 'caja' }: HoursKpiCardProps) {
+  if (variante === 'en-linea') {
+    return (
+      <div
+        role="group"
+        aria-label={label}
+        data-destacado={destacado || undefined}
+        className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
+      >
+        <p className="flex items-center gap-tight text-xs font-bold uppercase tracking-wide text-text-primary">
+          <Icon className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
+          {label}
+        </p>
+        <p className="mt-tight font-headline text-2xl font-extrabold text-text-primary">{value}</p>
+        {note && <p className="type-meta mt-micro">{note}</p>}
+      </div>
+    );
+  }
+
   return (
     <div
       role="group"
