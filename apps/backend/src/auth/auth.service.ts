@@ -8,6 +8,7 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 import { createHash, randomUUID } from "crypto";
+import { EstadoUsuario } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
@@ -87,9 +88,17 @@ export class AuthService {
       usuario?.contrasena ?? UNKNOWN_USER_PASSWORD_HASH,
     );
 
-    if (!usuario || !contrasenaValida) {
+    // G04 (OWASP25-C023): una cuenta BLOQUEADO o INACTIVO no recibe tokens
+    // aunque la contraseña sea correcta; la respuesta es la misma genérica.
+    if (!usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
       throw new UnauthorizedException("Credenciales invalidas");
     }
+
+    // Última sesión: solo tras una autenticación exitosa.
+    await this.prisma.usuario.update({
+      where: { idUsuario: usuario.idUsuario },
+      data: { fechaUltimaSesion: new Date() },
+    });
 
     return this.issueTokens(usuario);
   }
@@ -236,7 +245,17 @@ export class AuthService {
       data: { revocadoEn: new Date() },
     });
 
-    return this.issueTokens({ idUsuario: payload.sub, correo: payload.correo });
+    // G04 (OWASP25-C023): el refresh tampoco renueva credenciales de una
+    // cuenta que dejó de estar ACTIVO; el token presentado ya quedó revocado.
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { idUsuario: payload.sub },
+      select: { idUsuario: true, correo: true, estado: true },
+    });
+    if (!usuario || usuario.estado !== EstadoUsuario.ACTIVO) {
+      throw new UnauthorizedException("Token de refresco inválido o expirado");
+    }
+
+    return this.issueTokens({ idUsuario: usuario.idUsuario, correo: usuario.correo });
   }
 
   async logout(refreshToken?: string) {

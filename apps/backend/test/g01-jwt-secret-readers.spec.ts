@@ -93,9 +93,9 @@ describe('G01-C03: Auth usa el proveedor JWT validado', () => {
   });
 
   it('AuthService firma el access token con el secreto validado y no emite tokens sin él', async () => {
-    const usuario = { idUsuario: 3, correo: 'qa@uvg.edu.gt', contrasena: 'hash' };
+    const usuario = { idUsuario: 3, correo: 'qa@uvg.edu.gt', contrasena: 'hash', estado: 'ACTIVO' };
     const prisma = {
-      usuario: { findUnique: vi.fn().mockResolvedValue(usuario) },
+      usuario: { findUnique: vi.fn().mockResolvedValue(usuario), update: vi.fn().mockResolvedValue({}) },
       tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
     const jwtService = new JwtService({});
