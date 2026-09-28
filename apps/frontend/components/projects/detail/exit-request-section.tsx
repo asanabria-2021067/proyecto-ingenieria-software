@@ -35,7 +35,9 @@ export function ExitRequestSection({ idProyecto, solicitud }: ExitRequestSection
       <Button
         asChild
         size="sm"
-        className="shrink-0 gap-micro bg-primary text-on-primary hover:bg-primary/90"
+        // `type-meta` y no `text-*`: tailwind-merge descarta el tamaño cuando va
+        // junto a `text-on-primary`, y el botón heredaba 16 px.
+        className="h-9 shrink-0 gap-micro rounded-md bg-primary px-4 type-meta font-semibold text-on-primary hover:bg-primary/90"
       >
         <Link href={`/dashboard/projects/${idProyecto}/salida/preparacion`}>Ver solicitud de salida</Link>
       </Button>

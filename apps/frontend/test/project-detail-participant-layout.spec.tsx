@@ -172,6 +172,14 @@ describe('Página del participante sin barra de pestañas local', () => {
       'href',
       '/dashboard/projects/55/salida/preparacion',
     );
+    // Mismo tamaño que «Postularme a este rol»: 36 px y texto meta.
+    expect(within(banner).getByRole('link', { name: 'Ver solicitud de salida' })).toHaveClass(
+      'h-9',
+      'px-4',
+      'type-meta',
+      'font-semibold',
+      'text-on-primary',
+    );
   });
 
   it('sin solicitud en curso no muestra el banner', async () => {
