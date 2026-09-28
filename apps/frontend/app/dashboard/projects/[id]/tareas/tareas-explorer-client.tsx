@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowLeft, ClipboardList, Search, SearchX } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ClipboardList, SearchX } from 'lucide-react';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -229,19 +229,13 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
       {/* toolbar + tabla + paginación */}
       <div className="card-base min-h-0">
         <div className="mb-stack flex flex-col gap-inline lg:flex-row lg:flex-wrap lg:items-center">
-          <div className="relative w-full lg:max-w-xs">
-            <Search
-              className="pointer-events-none absolute left-inline top-1/2 size-4 -translate-y-1/2 text-text-secondary"
-              aria-hidden="true"
-            />
-            <Input
-              value={busqueda}
-              onChange={(e) => actualizarBusqueda(e.target.value)}
-              placeholder="Buscar por título o descripción..."
-              aria-label="Buscar tareas por título o descripción"
-              className="rounded-control border-outline-variant bg-page pl-9 text-body"
-            />
-          </div>
+          <DashboardSearchField
+            containerClassName="w-full lg:max-w-xs"
+            value={busqueda}
+            onChange={(e) => actualizarBusqueda(e.target.value)}
+            placeholder="Buscar por título o descripción..."
+            aria-label="Buscar tareas por título o descripción"
+          />
 
           <Select value={estadoFiltro} onValueChange={actualizarEstado}>
             <SelectTrigger

@@ -25,14 +25,13 @@ import {
   LayoutGrid,
   List,
   MoreVertical,
-  Search,
   SlidersHorizontal,
   UserCheck,
   UserPlus,
   UserX,
   Users,
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -461,16 +460,13 @@ export default function PersonasPage() {
       <div>
         <main>
           <div className="flex items-center gap-inline">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar por nombre o apellido"
-                className="pl-9"
-                aria-label="Buscar personas"
-              />
-            </div>
+            <DashboardSearchField
+              containerClassName="flex-1"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por nombre o apellido"
+              aria-label="Buscar personas"
+            />
 
             <Popover>
               <PopoverTrigger asChild>
