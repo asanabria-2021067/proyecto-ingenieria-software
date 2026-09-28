@@ -15,6 +15,7 @@ import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, REFRESH_TOKEN_MAX_AGE_MS } from "./cookie.util";
 import { getJwtSecret } from "../config/jwt-secret";
+import { AccountAttemptsService } from "./account-attempts.service";
 
 /**
  * G04 (OWASP25-C023): hash bcrypt (cost 10, el mismo de registro y reset) de
@@ -24,6 +25,14 @@ import { getJwtSecret } from "../config/jwt-secret";
  * contraseña coincide con este hash.
  */
 export const UNKNOWN_USER_PASSWORD_HASH = "$2b$10$aIZFrVp.yjl7jr05RXCHVeqgnl4MBvycTKQSNmO.YZyOxlZpEtLR.";
+
+/**
+ * G04 (OWASP25-C036): clave del contador por cuenta. Mayúsculas y espacios no
+ * abren un contador nuevo para la misma cuenta.
+ */
+export function accountAttemptKey(correo: string): string {
+  return correo.trim().toLowerCase();
+}
 
 interface ResetTokenPayload {
   tipo: string;
@@ -40,6 +49,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private notificationsService: NotificationsService,
+    // El default solo aplica a instancias manuales (tests); Nest inyecta el provider de AuthModule.
+    private readonly attempts: AccountAttemptsService = new AccountAttemptsService(),
   ) {
     const refreshSecret = process.env.JWT_REFRESH_SECRET;
     if (!refreshSecret) {
@@ -78,6 +89,11 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
+    // G04 (OWASP25-C036): una cuenta bloqueada sigue el MISMO camino (búsqueda
+    // + bcrypt) y recibe la MISMA respuesta que unas credenciales inválidas.
+    const cuenta = accountAttemptKey(loginDto.correo);
+    const bloqueada = this.attempts.lockedUntil(cuenta) !== null;
+
     const usuario = await this.prisma.usuario.findUnique({
       where: { correo: loginDto.correo },
     });
@@ -90,9 +106,15 @@ export class AuthService {
 
     // G04 (OWASP25-C023): una cuenta BLOQUEADO o INACTIVO no recibe tokens
     // aunque la contraseña sea correcta; la respuesta es la misma genérica.
-    if (!usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
+    if (bloqueada || !usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
+      // Cuenta inexistente o contraseña incorrecta suman al contador por igual.
+      if (!bloqueada && (!usuario || !contrasenaValida)) {
+        this.attempts.recordFailure(cuenta);
+      }
       throw new UnauthorizedException("Credenciales invalidas");
     }
+
+    this.attempts.recordSuccess(cuenta);
 
     // Última sesión: solo tras una autenticación exitosa.
     await this.prisma.usuario.update({
