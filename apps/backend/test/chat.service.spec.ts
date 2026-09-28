@@ -11,6 +11,7 @@ import { ChatService } from '../src/chat/chat.service';
 
 function makePrisma() {
   return {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     proyecto: { findFirst: vi.fn() },
     conversacion: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
     conversacionParticipante: { update: vi.fn(), findFirst: vi.fn() },
@@ -21,6 +22,10 @@ function makePrisma() {
 
 function makeGateway() {
   return { broadcastMessage: vi.fn(), notifyConversationCreated: vi.fn() };
+}
+
+function makeUserNameSearch() {
+  return { findMatchingUserIds: vi.fn().mockResolvedValue([]) };
 }
 
 const USUARIO = { idUsuario: 1, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null };
@@ -46,12 +51,14 @@ function conversacionRow(
 describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProyecto', () => {
   let prisma: ReturnType<typeof makePrisma>;
   let gateway: ReturnType<typeof makeGateway>;
+  let userNameSearch: ReturnType<typeof makeUserNameSearch>;
   let service: ChatService;
 
   beforeEach(() => {
     prisma = makePrisma();
     gateway = makeGateway();
-    service = new ChatService(prisma as any, gateway as any);
+    userNameSearch = makeUserNameSearch();
+    service = new ChatService(prisma as any, gateway as any, userNameSearch as any);
   });
 
   describe('createMessage', () => {
@@ -190,34 +197,66 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(resultado.items[0].proyecto).toEqual({ idProyecto: 17, tituloProyecto: 'Feria de Ciencias UVG 2026' });
     });
 
-    it('con q, busca por nombre de chat O por participante (excluyendo al propio usuario)', async () => {
+    it('con q, busca por nombre de chat O por participante, con los ids que resuelve la búsqueda sin acentos', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id_conversacion: 40 }, { id_conversacion: 41 }]);
+      userNameSearch.findMatchingUserIds.mockResolvedValue([2, 3]);
       prisma.conversacion.findMany.mockResolvedValue([]);
 
       await service.listArchivedConversations(1, { q: 'rosa' });
 
+      expect(userNameSearch.findMatchingUserIds).toHaveBeenCalledWith('rosa');
       const llamada = prisma.conversacion.findMany.mock.calls[0][0];
       expect(llamada.where.OR).toEqual([
-        { nombre: { contains: 'rosa', mode: 'insensitive' } },
-        {
-          participantes: {
-            some: {
-              idUsuario: { not: 1 },
-              usuario: {
-                OR: [
-                  { nombre: { contains: 'rosa', mode: 'insensitive' } },
-                  { apellido: { contains: 'rosa', mode: 'insensitive' } },
-                ],
-              },
-            },
-          },
-        },
+        { idConversacion: { in: [40, 41] } },
+        { participantes: { some: { idUsuario: { in: [2, 3] } } } },
       ]);
     });
 
-    it('sin q, no agrega ninguna condición OR de búsqueda', async () => {
+    it('el propio usuario no cuenta como coincidencia por persona aunque su nombre coincida con q', async () => {
+      userNameSearch.findMatchingUserIds.mockResolvedValue([1, 2]);
+      prisma.conversacion.findMany.mockResolvedValue([]);
+
+      await service.listArchivedConversations(1, { q: 'ana' });
+
+      const llamada = prisma.conversacion.findMany.mock.calls[0][0];
+      expect(llamada.where.OR[1]).toEqual({ participantes: { some: { idUsuario: { in: [2] } } } });
+    });
+
+    it('la comparación por nombre de chat se hace en Postgres con immutable_unaccent y el texto de búsqueda como parámetro', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([]);
+
+      await service.listArchivedConversations(1, { q: 'logística' });
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const sql = prisma.$queryRaw.mock.calls[0][0];
+      expect(sql.sql).toContain('immutable_unaccent(lower(nombre))');
+      expect(sql.values).toEqual(['%logística%']);
+    });
+
+    it('escapa los comodines de LIKE para que un % escrito por el usuario se busque literal', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([]);
+
+      await service.listArchivedConversations(1, { q: '50%_off' });
+
+      const sql = prisma.$queryRaw.mock.calls[0][0];
+      expect(sql.values).toEqual(['%50\\%\\_off%']);
+    });
+
+    it('sin q, no agrega ninguna condición OR de búsqueda ni consulta la búsqueda sin acentos', async () => {
       prisma.conversacion.findMany.mockResolvedValue([]);
 
       await service.listArchivedConversations(1, {});
+
+      const llamada = prisma.conversacion.findMany.mock.calls[0][0];
+      expect(llamada.where.OR).toBeUndefined();
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(userNameSearch.findMatchingUserIds).not.toHaveBeenCalled();
+    });
+
+    it('un q de solo espacios se trata como búsqueda vacía', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([]);
+
+      await service.listArchivedConversations(1, { q: '   ' });
 
       const llamada = prisma.conversacion.findMany.mock.calls[0][0];
       expect(llamada.where.OR).toBeUndefined();
