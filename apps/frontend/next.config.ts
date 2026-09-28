@@ -24,6 +24,8 @@ const BASELINE_SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // G06 (OWASP25-C039): sin `X-Powered-By: Next.js` (divulgación del framework).
+  poweredByHeader: false,
   async headers() {
     return [{ source: FRONTEND_ROUTES, headers: BASELINE_SECURITY_HEADERS }];
   },
