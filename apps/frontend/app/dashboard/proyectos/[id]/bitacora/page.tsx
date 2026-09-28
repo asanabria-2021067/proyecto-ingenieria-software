@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowRightLeft,
   Award,
   CheckCircle2,
@@ -52,6 +50,7 @@ import {
 } from '@/components/ui/empty';
 import type { EventoBitacoraDto, TipoEventoBitacoraValor } from '@/lib/types/bitacora';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 const LIMITE_POR_PAGINA = 20;
 const DEBOUNCE_BUSQUEDA_MS = 400;
@@ -373,36 +372,30 @@ export default function BitacoraPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={`/dashboard/projects/${id}`}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al proyecto
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoProyecto && !cargandoUsuario && !cargandoMembers && !puedeVerBitacora ? (
-        <LeaderOnlyNotice description="No puedes acceder a la bitácora de este proyecto." />
+        <>
+          <ProjectBackLink href={`/dashboard/projects/${id}`} label="Volver al proyecto" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a la bitácora de este proyecto." />
+        </>
       ) : (
         <>
-          <div className="mb-8 flex items-center gap-2">
-            <ScrollText className="h-6 w-6 text-primary" aria-hidden="true" />
-            <h1 className="font-headline text-3xl font-extrabold text-on-surface">Bitácora</h1>
-          </div>
-          <p className="-mt-6 mb-6 text-sm text-tertiary">
-            Registro de quién hizo qué, cuándo y cómo evolucionó el trabajo durante el sprint.
-          </p>
-
-          {/* HU-170/T-268: el integrante necesita saber que está en modo
-              solo lectura para no buscar un botón de crear/editar/borrar
-              que no existe en esta pantalla. */}
-          {!isLeader && (
-            <p className="type-meta -mt-4 mb-6 flex items-center gap-1.5 text-tertiary" role="status">
-              <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              Estás viendo esta bitácora en modo solo lectura: no puedes crear, editar ni borrar entradas.
-            </p>
-          )}
+          <ProjectPageHeader
+            back={{ href: `/dashboard/projects/${id}`, label: 'Volver al proyecto' }}
+            icon={ScrollText}
+            title="Bitácora"
+            description="Registro de quién hizo qué, cuándo y cómo evolucionó el trabajo durante el sprint."
+          >
+            {/* HU-170/T-268: el integrante necesita saber que está en modo
+                solo lectura para no buscar un botón de crear/editar/borrar
+                que no existe en esta pantalla. */}
+            {!isLeader && (
+              <p className="type-meta mt-tight flex items-center gap-1.5 text-tertiary" role="status">
+                <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                Estás viendo esta bitácora en modo solo lectura: no puedes crear, editar ni borrar entradas.
+              </p>
+            )}
+          </ProjectPageHeader>
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
             <DashboardSearchField
@@ -455,6 +448,7 @@ export default function BitacoraPage() {
               ))}
             </select>
 
+            <div data-slot="rango-fechas" className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-1.5 text-sm text-tertiary">
               Desde
               <input
@@ -478,6 +472,7 @@ export default function BitacoraPage() {
                 className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface"
               />
             </label>
+            </div>
 
             {hayFiltrosActivos && (
               <Button
@@ -625,6 +620,6 @@ export default function BitacoraPage() {
           )}
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }

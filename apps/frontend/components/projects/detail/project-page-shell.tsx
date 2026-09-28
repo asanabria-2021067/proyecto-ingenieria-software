@@ -22,12 +22,19 @@ export interface ProjectBackLinkProps {
   label: string;
 }
 
-/** Navegación de retorno («← Volver al proyecto», «← Volver a Sprints»…). */
-export function ProjectBackLink({ href, label }: ProjectBackLinkProps) {
+/**
+ * Navegación de retorno («← Volver al proyecto», «← Volver a Sprints»…). El
+ * encabezado la incluye; suelta (`className="mb-card"`) acompaña a los avisos
+ * de acceso, que no muestran título.
+ */
+export function ProjectBackLink({ href, label, className }: ProjectBackLinkProps & { className?: string }) {
   return (
     <Link
       href={href}
-      className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-text-secondary transition-colors hover:text-primary"
+      className={cn(
+        'flex w-fit items-center gap-1.5 text-sm font-medium text-text-secondary transition-colors hover:text-primary',
+        className,
+      )}
     >
       <ArrowLeft className="size-4" aria-hidden="true" />
       {label}

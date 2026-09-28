@@ -4,7 +4,6 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
-  ArrowLeft,
   BarChart3,
   Calendar,
   CheckCircle2,
@@ -46,6 +45,7 @@ import type {
   SprintDetailTareaDto,
   SprintHistoryUsuarioDto,
 } from '@/lib/types/sprints';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -295,14 +295,8 @@ export default function SprintDetailPage() {
   const volverHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al proyecto
-      </Link>
+    <ProjectPageShell>
+      <ProjectBackLink href={volverHref} label="Volver al proyecto" className="mb-card" />
 
       {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
         <LeaderOnlyNotice description="No puedes acceder al detalle de este Sprint." />
@@ -335,7 +329,7 @@ export default function SprintDetailPage() {
           )}
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }
 
