@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertCircle, FolderPlus, Plus, SearchX } from 'lucide-react';
-import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
@@ -55,9 +55,6 @@ const ESTADO_ORDEN: Record<string, number> = {
   CERRADO: 6,
   CANCELADO: 7,
 };
-
-const inputTriggerClass =
-  'h-11.5 rounded-lg border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30';
 
 export default function MyProjectsPage() {
   const queryClient = useQueryClient();
@@ -155,7 +152,7 @@ export default function MyProjectsPage() {
           <Select value={tipoFiltro || '__ALL__'} onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}>
             <SelectTrigger
               aria-label="Filtrar mis proyectos por tipo"
-              className={`w-full sm:w-50 py-2.5 h-auto ${inputTriggerClass}`}
+              className={`w-full sm:w-50 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
             >
               <SelectValue />
             </SelectTrigger>
@@ -170,7 +167,7 @@ export default function MyProjectsPage() {
           <Select value={estadoFiltro || '__ALL__'} onValueChange={(v) => setEstadoFiltro(v === '__ALL__' ? '' : v)}>
             <SelectTrigger
               aria-label="Filtrar mis proyectos por estado"
-              className={`w-full sm:w-60 py-2.5 h-auto ${inputTriggerClass}`}
+              className={`w-full sm:w-60 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
             >
               <SelectValue />
             </SelectTrigger>

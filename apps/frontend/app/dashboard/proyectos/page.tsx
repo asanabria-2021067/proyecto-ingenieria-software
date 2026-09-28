@@ -27,15 +27,12 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, FolderOpen, SearchX } from 'lucide-react';
 import { useState } from 'react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
-import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 
 type OrganizacionFiltro = {
   idOrganizacion: number;
   nombreOrganizacion: string;
 };
-
-const inputTriggerClass =
-  'h-11.5 rounded-lg border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30';
 
 export default function ProyectosPage() {
   const [busqueda, setBusqueda] = useState('');
@@ -116,7 +113,7 @@ export default function ProyectosPage() {
           >
             <SelectTrigger
               aria-label="Filtrar proyectos por tipo"
-              className={`w-full sm:w-50 py-2.5 h-auto ${inputTriggerClass}`}
+              className={`w-full sm:w-50 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
             >
               <SelectValue />
             </SelectTrigger>
@@ -139,7 +136,7 @@ export default function ProyectosPage() {
           >
             <SelectTrigger
               aria-label="Filtrar proyectos por organizacion"
-              className={`w-full sm:w-60 py-2.5 h-auto ${inputTriggerClass}`}
+              className={`w-full sm:w-60 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
             >
               <SelectValue
                 placeholder={
