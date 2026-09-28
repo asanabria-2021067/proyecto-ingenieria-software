@@ -400,3 +400,22 @@ describe('PersonasPage — pestañas y estados vacíos', () => {
     expect(icono).toHaveClass('text-text-secondary', 'border-transparent');
   });
 });
+
+// «Sin recomendaciones por ahora» usa la misma tarjeta blanca que los demás vacíos.
+describe('PersonasPage — vacío de recomendaciones', () => {
+  beforeEach(() => {
+    getSolicitudesPendientesMock.mockResolvedValue([]);
+    getAmigosMock.mockResolvedValue([]);
+    buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
+  });
+
+  it('se muestra en tarjeta blanca con su texto intacto y el icono neutro', async () => {
+    await renderPersonas();
+
+    const tarjeta = (await screen.findByText('Sin recomendaciones por ahora')).closest('[data-slot="empty"]') as HTMLElement;
+    expect(tarjeta).toHaveClass('bg-surface-container-lowest', 'border-outline-variant/70', 'rounded-2xl', 'shadow-sm');
+    expect(tarjeta).not.toHaveClass('border-dashed');
+    expect(within(tarjeta).getByText('Agrega amigos o completa tu perfil para que te sugiramos personas.')).toBeInTheDocument();
+    expect(tarjeta.querySelector('[data-slot="empty-icon"]')).toHaveClass('text-text-secondary', 'border-transparent');
+  });
+});

@@ -442,9 +442,13 @@ export default function PersonasPage() {
               ))}
             </div>
           ) : (
-            <Empty tone="muted" aria-live="polite">
-              <EmptyMedia variant="compact">
-                <Users aria-hidden="true" className="size-6" />
+            // Tarjeta blanca, igual que los vacíos de las pestañas y Chats archivados.
+            <Empty className="surface-enter" aria-live="polite">
+              <EmptyMedia
+                variant="compact"
+                className="size-10 rounded-control border-transparent text-text-secondary"
+              >
+                <Users aria-hidden="true" className="size-5" />
               </EmptyMedia>
               <EmptyHeader>
                 <EmptyTitle className="type-subtitle">Sin recomendaciones por ahora</EmptyTitle>
