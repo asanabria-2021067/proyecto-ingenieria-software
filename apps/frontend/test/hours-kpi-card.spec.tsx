@@ -86,6 +86,15 @@ describe('HoursKpiCard — variante en línea', () => {
     expect(grupo).toHaveAttribute('data-destacado', 'true');
   });
 
+  it('mientras carga muestra un esqueleto en lugar de la cifra, sin perder etiqueta ni icono', () => {
+    render(<HoursKpiCard variante="en-linea" icon={Clock} label="Integrantes activos" value="8" isLoading />);
+
+    const grupo = screen.getByRole('group', { name: 'Integrantes activos' });
+    expect(grupo.querySelector('[data-slot="kpi-cargando"]')).not.toBeNull();
+    expect(within(grupo).queryByText('8')).not.toBeInTheDocument();
+    expect(grupo.querySelector('svg')).toHaveClass('size-5', 'text-text-primary');
+  });
+
   it('la variante por defecto conserva la caja de color del icono', () => {
     render(<HoursKpiCard icon={Clock} label="Registradas" value="75 h" />);
 

@@ -15,6 +15,7 @@ import {
   UserCheck,
   UserMinus,
   Users,
+  type LucideIcon,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -53,6 +54,7 @@ import { PendingExitRequestsCard } from '@/components/projects/pending-exit-requ
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
 import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'nombre', label: 'Integrante' },
@@ -141,26 +143,13 @@ function MetricTile({
   value,
   isLoading,
 }: {
-  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  icon: LucideIcon;
   label: string;
   value: string;
   isLoading: boolean;
 }) {
-  return (
-    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 flex items-center gap-3">
-      <div className="flex items-center justify-center size-11 rounded-xl bg-primary/10 shrink-0">
-        <Icon aria-hidden className="w-5 h-5 text-primary" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-bold text-tertiary uppercase tracking-wide">{label}</p>
-        {isLoading ? (
-          <Skeleton className="h-7 w-12 rounded mt-1 bg-surface-container-high" />
-        ) : (
-          <p className="text-2xl font-headline font-extrabold text-on-surface">{value}</p>
-        )}
-      </div>
-    </div>
-  );
+  // Mismo KPI que Mis Horas: icono neutro al par de la etiqueta, cifra grande.
+  return <HoursKpiCard variante="en-linea" icon={Icon} label={label} value={value} isLoading={isLoading} />;
 }
 
 function MiembroRow({
@@ -415,12 +404,11 @@ export default function MiembrosProyectoPage() {
         title="Miembros"
         description="Integrantes del proyecto organizados por su estado y contribución."
         actions={
-          <div className="flex flex-col items-start gap-3 @3xl/project:items-end">
+          // Una sola fila: exportar a la izquierda de Postulaciones / Solicitudes de salida.
+          <div data-slot="acciones-miembros" className="flex flex-wrap items-start gap-2 @3xl/project:justify-end">
             <ProjectExportButtons idProyecto={idProyecto} />
-            <div className="flex flex-wrap gap-2">
-              <PendingPostulationsCard idProyecto={idProyecto} />
-              <PendingExitRequestsCard idProyecto={idProyecto} />
-            </div>
+            <PendingPostulationsCard idProyecto={idProyecto} />
+            <PendingExitRequestsCard idProyecto={idProyecto} />
           </div>
         }
       >
