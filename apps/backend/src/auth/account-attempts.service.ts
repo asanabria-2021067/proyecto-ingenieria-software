@@ -35,6 +35,21 @@ export const DEFAULT_ATTEMPT_POLICY: AttemptPolicy = {
   maxEntries: 10_000,
 };
 
+/**
+ * G04 (OWASP25-C036/C014): solicitudes de recuperación por carné. Cada una
+ * crea un registro y notifica a TODOS los administradores; después de 3 en
+ * una hora, las siguientes se descartan en silencio durante una hora.
+ */
+export const RECOVERY_ATTEMPT_POLICY: AttemptPolicy = {
+  maxFailures: 3,
+  windowMs: 60 * 60_000,
+  lockMs: 60 * 60_000,
+  maxEntries: 10_000,
+};
+
+/** Token de inyección de la instancia dedicada a recuperación (otra política que login). */
+export const RECOVERY_ATTEMPTS = Symbol('RECOVERY_ATTEMPTS');
+
 interface AttemptEntry {
   failures: number;
   windowStart: number;
