@@ -29,7 +29,7 @@ export type ApiErrorScope =
   | 'general'
   // T-221: login/registro/recuperación. Aquí un 401 significa credenciales o
   // token de recuperación inválidos, no sesión vencida.
-  | 'auth';
+  | 'auth'
   // HU-169 (T-263): eventos de calendario del proyecto.
   | 'calendar';
 
