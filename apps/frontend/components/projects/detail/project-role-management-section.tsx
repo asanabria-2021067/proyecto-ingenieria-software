@@ -86,7 +86,7 @@ export function ProjectRoleManagementSection({
               size="sm"
               variant="outline"
               onClick={abrirCrearRol}
-              className="gap-micro self-start border-primary text-primary hover:bg-primary/10 sm:self-auto"
+              className="type-meta gap-micro self-start border-primary text-primary hover:bg-primary/10 sm:self-auto"
             >
               <Plus className="size-3.5" aria-hidden="true" />
               Agregar rol
