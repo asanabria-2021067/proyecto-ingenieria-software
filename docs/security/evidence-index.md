@@ -143,7 +143,8 @@ Cadena auditable de la workstream OWASP de la Fase 2 (Vernel): **control → gat
 | G08-C04 | `0bfddb57` | OWASP25-C048 | A08 | `g08-ci-delta.spec.ts` | `cd apps/backend && npx vitest run test/g08-ci-delta.spec.ts` | PASS · 12 tests | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
 | G08-C05 | `2c31875a` | OWASP25-C048 (A01–A10) | A01/A10 | `g08-evidence-index.spec.ts` | `cd apps/backend && npx vitest run test/g08-evidence-index.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
 | G08-C06 | `7bebb355` | OWASP25-C048 + pruebas negativas (A01–A10) | A01/A10 | `g08-negative-controls.spec.ts` | `cd apps/backend && npx vitest run test/g08-negative-controls.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
-| G08-C07 | este commit | OWASP25-C048 | A01–A10 | `g08-evidence-index.spec.ts` | `cd apps/backend && npx vitest run test/g08-evidence-index.spec.ts` | PASS | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | IMPLEMENTED |
+| G08-C07 | `35cb9cd8` | OWASP25-C048 (A01–A10) | A01/A10 | `g08-evidence-index.spec.ts` | `cd apps/backend && npx vitest run test/g08-evidence-index.spec.ts` | PASS · suite verde | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | PASS |
+| G08-C08 | este commit | OWASP25-C048 | A01–A10 | `g08-admin-handoff.spec.ts` | `cd apps/backend && npx vitest run test/g08-admin-handoff.spec.ts` | PASS | auditoria_gate_G08_final_code_validation.md (al cierre) | RB-CODE | IMPLEMENTED |
 
 ## Baseline de código G01/G02 (G08-C07)
 
@@ -163,3 +164,22 @@ Cadena auditable de la workstream OWASP de la Fase 2 (Vernel): **control → gat
 - **Hasta la baseline de G08:** la baseline y la regresión final de cada gate (G03–G07) y la baseline de G08 reproducen exactamente los mismos 2 fallos: 5 PASS / 2 FAIL.
 - **Chat en navegador:** `chat-mensajeria.spec.ts` pasa y los sockets aceptados en el E2E no cambian (28/0).
 - **Clasificación:** riesgo preexistente de integración, no regresión de ningún gate. Ningún gate lo corrigió ni lo ocultó: no hubo `skip`, reintentos extra, timeouts más largos ni cambios en el seed.
+
+## OUT_OF_SCOPE_ADMIN_HANDOFF (G08-C08)
+
+Las operaciones que exigen GitHub Admin, `main`, la VM, un deploy o producción no tienen fila de código en este índice; son responsabilidad del administrador o líder después del PR único hacia `develop`.
+- **Lista completa:** `owasp-top10-2025.md` → «Operaciones externas».
+- **Referencia:** `09_GATE_ADMIN_HANDOFF_OWASP_2025.md`, que no estaba disponible localmente en G08, por lo que no se citan IDs de acción.
+- **Estado:** siempre `OUT_OF_SCOPE_ADMIN_HANDOFF`; ninguna figura como ejecutada.
+- **Única fila con ID de commit:** G02-C03, no ejecutada, en la tabla de G02.
+
+| Gate | Operaciones externas | Estado |
+|---|---|---|
+| G01 | Rotación/revocación de secretos, verificación post-release del `.env` y de la imagen, longitud del secreto productivo | OUT_OF_SCOPE_ADMIN_HANDOFF |
+| G02 | G02-C03 (environment `production`), rulesets/checks requeridos, sincronización con `develop`, revisión de `k6.yml` | OUT_OF_SCOPE_ADMIN_HANDOFF |
+| G03 | Dependency Graph, Dependabot, secret scanning/push protection, NT04 | OUT_OF_SCOPE_ADMIN_HANDOFF |
+| G04 | P1 en el nginx vivo, cierre de puertos, binds loopback, `TRUST_PROXY_HOPS=1`, sondas T13/T16/T19 | OUT_OF_SCOPE_ADMIN_HANDOFF |
+| G06 | `CSP_MODE=enforce`, `COOKIE_SECURE=true`, TLS/HSTS/cabeceras en producción, sonda de certificado programada | OUT_OF_SCOPE_ADMIN_HANDOFF |
+| G05 | `SECURITY_ALERTS_ENABLED=true`, migración en producción, observabilidad operacional | OUT_OF_SCOPE_ADMIN_HANDOFF |
+| G07 | `PUBLIC_API_URL=same-origin` (P4), sondas T13/T14, recuento de URL heredadas | OUT_OF_SCOPE_ADMIN_HANDOFF |
+| G08 | Merge del PR, check requerido `OWASP_DELTA_ISOLATED`, deploy, VM, `main` | OUT_OF_SCOPE_ADMIN_HANDOFF |

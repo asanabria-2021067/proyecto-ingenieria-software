@@ -92,6 +92,34 @@ No contiene secretos, valores de cookies, tokens, direcciones IP, datos personal
 | T14 | Tiempo real same-origin completo en el arnés (nginx + TLS) | A01/A07/A10 | G07 | G07-C12 | `g07-topology-t14.spec.ts`, `infra/staging/realtime.mjs` | IMPLEMENTED | Sondas T13/T14 en producción |
 | C048 | Tests de regresión de seguridad consolidados y trazables | Transversal | G08 | G08-C01…C10 | Este documento, `evidence-index.md`, verificador del delta | IMPLEMENTED | — |
 
+## Operaciones externas (OUT_OF_SCOPE_ADMIN_HANDOFF)
+
+Responsabilidad del administrador o líder después del PR único hacia `develop`. Referencia: `09_GATE_ADMIN_HANDOFF_OWASP_2025.md`. Ese runbook no estaba disponible localmente al cerrar G08, así que no se citan IDs de acción. Ninguna de estas operaciones se ejecutó ni se verificó dentro de la workstream de código, y ninguna bloquea el `PASS` de código.
+
+| Operación | Gate de origen | Estado | Referencia |
+|---|---|---|---|
+| Revocar la clave comprometida del proveedor de correo y retirar su secreto de Actions (G01-OP-NOW-01) | G01 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G01 §13: la registra como completada por el líder/admin; G08 no lo verifica |
+| Verificación post-release de la configuración segura (`.env` 0600, imagen del frontend sin secretos, G01-OP-SD-01) | G01 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G01 §13 |
+| Confirmar la longitud del `JWT_SECRET` productivo antes del deploy | G01 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G01 §13 |
+| Environment `production` con reviewers y job productivo vinculado (G02-C03, G02-OP-NOW-01) | G02 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G02 §5; plan maestro v2 §5 |
+| Rulesets / branch protection y checks requeridos (incluye `OWASP_DELTA_ISOLATED`, «Revision de dependencias del PR» y la topología) | G02, G03, G08 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditorías G02 §14 y G03 §20 |
+| Sincronizar la rama con `develop`, resolver conflictos y hacer merge del PR | G02, G08 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G02 §15 |
+| Revisar `k6.yml` de `develop` (usa credenciales productivas) | G02 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G02 §12 |
+| Activar Dependency Graph, Dependabot, secret scanning y push protection | G03 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G03 §20 |
+| Prueba remota con un PR negativo de dependencias (NT04) | G03 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G03 §20 |
+| Aplicar la ruta P1 en el nginx vivo | G04 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G04 §29 |
+| Cerrar la exposición pública de los puertos de la app y activar los binds loopback (`BACKEND_BIND`, `FRONTEND_BIND`) | G04 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G04 §29 |
+| Activar `TRUST_PROXY_HOPS=1` (solo tras cerrar los puertos) | G04 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G04 §29 |
+| Sondas T13, T16 y T19 en producción | G04 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G04 §29 |
+| Activar `CSP_MODE=enforce` | G06 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G06 §29 |
+| Activar `COOKIE_SECURE=true` con todo el tráfico en HTTPS | G06 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G06 §29 |
+| Verificar TLS, HSTS y cabeceras en producción (T17/T18/T21) y programar la sonda de certificado | G06 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G06 §29 |
+| Activar `SECURITY_ALERTS_ENABLED=true` y aplicar la migración `ALERTA_SEGURIDAD` en producción | G05 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G05 §30 |
+| Observabilidad operacional (retención de la auditoría, visor administrativo de eventos, SIEM) | G05 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G05 §30 |
+| Seleccionar `PUBLIC_API_URL=same-origin` (P4) | G07 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G07 §32 |
+| Sondas T13/T14 en producción y recuento de URL heredadas inválidas en los 5 campos | G07 | OUT_OF_SCOPE_ADMIN_HANDOFF | Auditoría G07 §32 |
+| Deploy, Release A/B, PRADA, tags, backups, VM, DB productiva y rollback operacional | Todos | OUT_OF_SCOPE_ADMIN_HANDOFF | Plan maestro v2 §2 |
+
 ## Controles conservados (no-regresión)
 
 C001 (ValidationPipe), C002 (tipo de token y estado en HTTP), C003 (refresh rotado), C004 (autorización por proyecto), C005 (membresía de chat), C006 (SQL parametrizado), C007 (escape de React), C008 (Helmet), C009 (Docker no-root), C010 (BD en loopback), C011 (`npm ci`), C012 (bcrypt), C013 (almacenamiento de cierre), C014 (respuesta genérica en forgot), C015 (`returnTo` acotado), C016 (bitácora con `tx`), C017 (sesión solo en cookie) y C018 (throttler) se conservan. Sus suites existentes siguen verdes en la regresión de cada gate.
