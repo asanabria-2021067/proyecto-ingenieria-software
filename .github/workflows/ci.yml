@@ -89,6 +89,34 @@ jobs:
       - name: Resumen de npm audit (produccion)
         run: node .github/scripts/npm-audit-summary.mjs apps/backend apps/frontend
 
+  # G08 (OWASP25-C048 · A08:2025): el PR de la rama OWASP hacia develop solo
+  # puede traer el delta de la workstream (rutas de la allowlist, commits
+  # trazables). Base = merge-base con develop; solo Git local y lectura del
+  # repo: sin secretos, sin deploy, sin imagenes y sin ninguna ruta hacia main.
+  owasp-delta:
+    name: OWASP_DELTA_ISOLATED
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop' && github.head_ref == 'sprint8/vernel-owasp2025' && !inputs.e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repositorio (historial completo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verificar el delta OWASP aislado
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: node scripts/security/verify-owasp-delta.mjs --base-ref "$BASE_REF"
+
   backend:
     name: Backend - lint y pruebas
     runs-on: ubuntu-latest
