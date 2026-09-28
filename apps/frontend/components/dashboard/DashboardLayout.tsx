@@ -12,6 +12,7 @@ import {
   FileText,
   ListChecks,
   CalendarDays,
+  Clock,
   RotateCcw,
   Users,
   Archive,
@@ -67,6 +68,7 @@ const navEntries: NavEntry[] = [
     icon: ListChecks,
     items: [
       { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
+      { href: '/dashboard/mis-horas', label: 'Mis Horas', icon: Clock },
       {
         href: '/dashboard/calendario',
         label: 'Calendario',
