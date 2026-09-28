@@ -264,3 +264,27 @@ describe('MyHoursProjectList', () => {
     expect(screen.queryByRole('region', { name: 'Proyectos cerrados' })).not.toBeInTheDocument();
   });
 });
+
+// HU-158 (G02-X01): la cabecera de cada proyecto pone título y cifras en fila
+// según el ancho de su tarjeta; en una tarjeta estrecha las cifras bajan y la
+// flecha del acordeón se queda dentro.
+describe('MyHoursProjectList — disposición por contenedor', () => {
+  afterEach(() => cleanup());
+
+  it('cada tarjeta de proyecto abierto es un contenedor y su cabecera solo va en fila desde su propio ancho', () => {
+    render(<MyHoursProjectList proyectos={[proyecto()]} />);
+
+    const cabecera = screen.getByRole('button', { name: /Tutorías/ });
+    const tarjeta = cabecera.closest('[class*="@container/proyecto"]') as HTMLElement;
+    expect(tarjeta).not.toBeNull();
+    expect(tarjeta).toHaveClass('card-base');
+
+    const fila = cabecera.firstElementChild as HTMLElement;
+    expect(fila).toHaveClass('flex-col', '@2xl/proyecto:flex-row', '@2xl/proyecto:items-center');
+    expect(fila.className).not.toMatch(/(^|\s)(sm|md|lg|xl):flex-row/);
+
+    const cifras = within(cabecera).getByText('Registradas').closest('.grid') as HTMLElement;
+    expect(cifras).toHaveClass('grid-cols-3', '@2xl/proyecto:w-80');
+    expect(cifras.className).not.toMatch(/(^|\s)(sm|md|lg|xl):w-/);
+  });
+});
