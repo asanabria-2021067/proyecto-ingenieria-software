@@ -8,8 +8,8 @@ import { PROJECT_ACTION_BUTTON_CLASS } from '../components/projects/project-acti
 
 afterEach(() => cleanup());
 
-// Los accesos de Miembros son el mismo botón negro que «Ver proyecto»: sin
-// icono ni contador, porque ambos ya se muestran en la vista dedicada.
+// Los accesos de Miembros son el mismo botón negro que «Ver proyecto», sin
+// contador (vive en la vista dedicada) y con una flecha: llevan a otra vista.
 describe.each([
   {
     nombre: 'PendingPostulationsCard — F13.1 entry point',
@@ -31,12 +31,16 @@ describe.each([
     expect(screen.getByRole('link', { name: accesible })).toHaveAttribute('href', href);
   });
 
-  it('usa el botón de acción de «Ver proyecto», solo con su texto', () => {
+  it('usa el botón de acción de «Ver proyecto», con su texto y una flecha de navegación al final', () => {
     render(createElement(componente, { idProyecto: 42 }));
     const enlace = screen.getByRole('link', { name: accesible });
     expect(enlace).toHaveClass(...PROJECT_ACTION_BUTTON_CLASS.split(' '));
     expect(enlace).toHaveTextContent(new RegExp(`^${texto}$`));
-    expect(enlace.querySelector('svg')).toBeNull();
+    const iconos = enlace.querySelectorAll('svg');
+    expect(iconos).toHaveLength(1);
+    expect(iconos[0]).toHaveClass('lucide-arrow-right', 'size-3.5');
+    expect(iconos[0]).toHaveAttribute('aria-hidden', 'true');
+    expect(enlace.lastElementChild).toBe(iconos[0]);
   });
 
   it('no comunica expansión ni renderiza el listado inline', () => {

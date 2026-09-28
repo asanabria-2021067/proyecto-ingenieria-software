@@ -62,7 +62,7 @@ describe('ProjectExportButtons', () => {
     expect(screen.getByRole('button', { name: /exportar pdf/i })).toBeInTheDocument();
   });
 
-  it('ambos botones son el botón negro de «Ver proyecto», sin icono en reposo', () => {
+  it('ambos botones son el botón negro de «Ver proyecto», con icono de descarga en reposo', () => {
     (useIsProjectLeader as any).mockReturnValue(true);
     (useIsAdmin as any).mockReturnValue(false);
     (useProjectExport as any).mockReturnValue({ exportCsv: mockMutation(), exportPdf: mockMutation() });
@@ -72,8 +72,27 @@ describe('ProjectExportButtons', () => {
     for (const nombre of [/exportar csv/i, /exportar pdf/i]) {
       const boton = screen.getByRole('button', { name: nombre });
       expect(boton).toHaveClass(...PROJECT_ACTION_BUTTON_CLASS.split(' '));
-      expect(boton.querySelector('svg')).toBeNull();
+      const iconos = boton.querySelectorAll('svg');
+      expect(iconos).toHaveLength(1);
+      expect(iconos[0]).toHaveClass('lucide-download', 'size-3.5');
+      expect(iconos[0]).toHaveAttribute('aria-hidden', 'true');
     }
+  });
+
+  it('mientras exporta, el spinner reemplaza al icono de descarga', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+    (useIsAdmin as any).mockReturnValue(false);
+    (useProjectExport as any).mockReturnValue({
+      exportCsv: { ...mockMutation(), isPending: true },
+      exportPdf: mockMutation(),
+    });
+
+    renderButtons();
+
+    const csv = screen.getByRole('button', { name: /exportando/i });
+    expect(csv.querySelector('.lucide-download')).toBeNull();
+    expect(csv.querySelector('.animate-spin')).not.toBeNull();
+    expect(screen.getByRole('button', { name: /exportar pdf/i }).querySelector('.lucide-download')).not.toBeNull();
   });
 
   it('la administración también ve ambos botones aunque no sea líder del proyecto', () => {

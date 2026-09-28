@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 
@@ -17,6 +18,8 @@ export function PendingExitRequestsCard({ idProyecto }: { idProyecto: number }) 
         aria-label="Ver solicitudes de salida pendientes"
       >
         Solicitudes de salida
+        {/* Flecha: lleva a otra vista, no ejecuta una acción aquí. */}
+        <ArrowRight className="size-3.5" aria-hidden="true" />
       </Link>
     </Button>
   );
