@@ -16,6 +16,16 @@ describe('HoursKpiCard', () => {
     expect(within(grupo).getByText('12.5 h')).toBeInTheDocument();
   });
 
+  it('en línea, el tono de atención pinta en naranja solo la cifra, no la tarjeta', () => {
+    const { rerender } = render(<HoursKpiCard variante="en-linea" icon={Clock} label="Exceso" value="2 h" />);
+    expect(screen.getByText('2 h')).toHaveClass('text-text-primary');
+
+    rerender(<HoursKpiCard variante="en-linea" icon={Clock} label="Exceso" value="2 h" tono="atencion" />);
+    expect(screen.getByText('2 h')).toHaveClass('text-attention-strong');
+    expect(screen.getByRole('group', { name: 'Exceso' })).toHaveClass('card-base');
+    expect(screen.getByRole('group', { name: 'Exceso' }).className).not.toMatch(/attention/);
+  });
+
   it('muestra el valor recibido tal cual: no formatea ni calcula', () => {
     render(<HoursKpiCard icon={Clock} label="Propuestas" value="0.00" />);
 

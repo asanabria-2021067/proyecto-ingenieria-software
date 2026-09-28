@@ -19,6 +19,8 @@ interface HoursKpiCardProps {
   variante?: 'caja' | 'en-linea';
   /** Solo `en-linea`: mientras carga, un esqueleto ocupa el lugar de la cifra. */
   isLoading?: boolean;
+  /** Solo `en-linea`: `atencion` pinta en naranja la cifra (no la tarjeta). */
+  tono?: 'neutro' | 'atencion';
 }
 
 /**
@@ -35,6 +37,7 @@ export function HoursKpiCard({
   destacado = false,
   variante = 'caja',
   isLoading = false,
+  tono = 'neutro',
 }: HoursKpiCardProps) {
   if (variante === 'en-linea') {
     return (
@@ -54,7 +57,13 @@ export function HoursKpiCard({
           {isLoading ? (
             <Skeleton data-slot="kpi-cargando" className="mt-tight h-9 w-16" />
           ) : (
-            <p className="mt-tight font-headline text-3xl font-bold text-text-primary">{value}</p>
+            <p
+              className={`mt-tight font-headline text-3xl font-bold ${
+                tono === 'atencion' ? 'text-attention-strong' : 'text-text-primary'
+              }`}
+            >
+              {value}
+            </p>
           )}
           {note && <p className="type-meta mt-micro">{note}</p>}
         </div>

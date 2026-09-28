@@ -11,6 +11,8 @@ const alertVariants = cva(
         default: 'bg-card text-card-foreground',
         success: 'border-transparent bg-status-success text-on-status-success',
         warning: 'border-transparent bg-status-warning text-on-status-warning',
+        // Condición pendiente antes de una acción: ni éxito ni error destructivo.
+        attention: 'border-attention/35 bg-attention/10 text-attention-strong',
         destructive: 'border-transparent bg-status-error text-on-status-error',
       },
     },

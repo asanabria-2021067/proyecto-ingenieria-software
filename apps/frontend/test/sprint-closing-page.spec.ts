@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { SprintClosingSummaryDto } from '../lib/types/sprints';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
@@ -347,5 +347,146 @@ describe('SprintClosingPage — autorización', () => {
       'href',
       '/dashboard/proyectos/42',
     );
+  });
+});
+
+// Misma identidad que Miembros, Postulaciones y Solicitudes de salida: título
+// sobre el fondo, KPIs en línea, aviso de atención naranja, una sola
+// superficie para la revisión por integrante y acciones al final de la página.
+describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
+  it('el título y la descripción van en ProjectPageHeader, fuera de tarjetas, con una sola vuelta a Sprints', () => {
+    mockSummary();
+    mockClose();
+
+    renderPage();
+
+    const encabezado = screen.getByRole('banner');
+    expect(encabezado).toHaveAttribute('data-slot', 'project-page-header');
+    const titulo = within(encabezado).getByRole('heading', { level: 1, name: 'Cerrar Sprint 4' });
+    expect(titulo.closest('.card-base, .rounded-xl')).toBeNull();
+    expect(within(encabezado).getByText('En finalización')).toHaveClass('rounded-full', 'bg-status-warning');
+    expect(screen.getByRole('link', { name: 'Volver a Sprints' })).toHaveAttribute('href', '/dashboard/proyectos/42/sprints');
+    expect(screen.queryByRole('link', { name: /volver al proyecto/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="project-page-shell"]')).not.toBeNull();
+  });
+
+  it('los cuatro KPIs son los de Miembros: tarjeta blanca, icono sin caja y cifra grande', () => {
+    mockSummary();
+    mockClose();
+
+    renderPage();
+
+    const kpis = document.querySelector('[data-slot="closing-kpis"]')!;
+    expect(kpis).toHaveClass('grid-cols-2', '@3xl/project:grid-cols-4');
+    for (const nombre of ['Tareas distintas', 'Horas reportadas', 'Exceso sobre estimación', 'Horas propuestas']) {
+      const kpi = screen.getByRole('group', { name: nombre });
+      expect(kpi).toHaveClass('card-base');
+      expect(kpi.querySelector('.bg-primary\\/10, .rounded-xl')).toBeNull();
+      expect(kpi.querySelector('svg')).toHaveClass('text-text-primary');
+    }
+    expect(within(screen.getByRole('group', { name: 'Horas reportadas' })).getByText('11 h')).toHaveClass('text-3xl');
+  });
+
+  it('el exceso se pinta en naranja solo cuando hay exceso', () => {
+    mockSummary();
+    mockClose();
+    renderPage();
+    expect(within(screen.getByRole('group', { name: 'Exceso sobre estimación' })).getByText('1 h')).toHaveClass(
+      'text-attention-strong',
+    );
+    cleanup();
+
+    mockSummary({
+      summary: summary({
+        participantes: [participante({ totales: { ...participante().totales, exceso: '0.00' } })],
+      }),
+    });
+    renderPage();
+    expect(within(screen.getByRole('group', { name: 'Exceso sobre estimación' })).getByText('0 h')).toHaveClass(
+      'text-text-primary',
+    );
+  });
+
+  it('el aviso de bloqueos es de atención (naranja), no verde ni de error', () => {
+    mockSummary({
+      summary: summary({
+        blockers: [{ code: 'TRAMOS_ABIERTOS', message: 'Hay tramos sin consolidar', ids: [300], cantidad: 5 }],
+      }),
+    });
+    mockClose();
+
+    renderPage();
+
+    const aviso = screen.getByRole('alert');
+    expect(aviso).toHaveAttribute('data-slot', 'alert');
+    expect(aviso).toHaveClass('bg-attention/10', 'border-attention/35', 'text-attention-strong');
+    expect(aviso).not.toHaveClass('bg-status-warning/10');
+    expect(aviso).toHaveTextContent('El Sprint aún no puede cerrarse');
+    expect(aviso).toHaveTextContent('Hay tramos sin consolidar (5)');
+  });
+
+  it('la revisión por integrante es una sola superficie con columnas alineadas y filas expandibles', () => {
+    mockSummary({
+      summary: summary({
+        participantes: [
+          participante(),
+          participante({ idUsuario: 2, nombre: 'Luis', apellido: 'Gómez', roles: [{ idRolProyecto: 2, nombreRol: 'Logística' }] }),
+        ],
+      }),
+    });
+    mockClose();
+
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Revisión por integrante' })).toBeInTheDocument();
+    const superficie = document.querySelector('[data-slot="revision-integrantes"]')!;
+    expect(superficie).toHaveClass('rounded-xl', 'border', 'bg-surface-container-lowest');
+    const filas = within(superficie as HTMLElement).getAllByRole('button', { name: /Desglose de/ });
+    expect(filas).toHaveLength(2);
+
+    // El encabezado y cada fila comparten la misma rejilla de columnas.
+    const encabezado = superficie.firstElementChild as HTMLElement;
+    expect(encabezado).toHaveTextContent('IntegranteRolReportadasPropuestas');
+    const rejilla = [...encabezado.classList].find((c) => c.startsWith('@3xl/project:grid-cols-'));
+    expect(rejilla).toBeDefined();
+    for (const fila of filas) {
+      expect(fila.firstElementChild).toHaveClass(rejilla!);
+      expect(fila).not.toHaveTextContent(/Total reportadas|Total propuestas/);
+    }
+    expect(screen.getByText('Logística')).toHaveClass('rounded-full', 'bg-secondary-container/30');
+
+    fireEvent.click(filas[0]);
+    expect(filas[0]).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Tarea: Integración')).toBeInTheDocument();
+  });
+
+  it('las acciones van al final de la página, no en una barra fija', () => {
+    mockSummary();
+    mockClose();
+
+    renderPage();
+
+    const acciones = document.querySelector('[data-slot="closing-actions"]')!;
+    expect(acciones).not.toHaveClass('fixed');
+    expect(acciones).toHaveClass('border-t');
+    expect(within(acciones as HTMLElement).getByRole('link', { name: 'Cancelar' })).toHaveAttribute('href', '/dashboard/projects/42');
+    expect(within(acciones as HTMLElement).getByRole('button', { name: /confirmar cierre del sprint/i })).toHaveClass('bg-primary');
+  });
+
+  it('deshabilitado, el botón de cierre se ve apagado y no como una acción disponible', () => {
+    mockSummary({
+      summary: summary({
+        blockers: [{ code: 'TRAMOS_ABIERTOS', message: 'Hay tramos sin consolidar', ids: [300], cantidad: 1 }],
+      }),
+    });
+    mockClose();
+
+    renderPage();
+
+    const boton = screen.getByRole('button', { name: /confirmar cierre del sprint/i });
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveClass('disabled:bg-surface-container-high', 'disabled:text-text-secondary', 'disabled:opacity-100');
+    expect(boton.parentElement).toHaveClass('cursor-not-allowed');
   });
 });
