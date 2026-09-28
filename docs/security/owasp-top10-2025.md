@@ -13,6 +13,11 @@ Todo lo que exige GitHub Admin, `main`, la VM, un deploy o producción figura co
 
 No contiene secretos, valores de cookies, tokens, direcciones IP, datos personales ni pasos de explotación.
 
+Documentos relacionados:
+- evidencia por commit: `evidence-index.md`;
+- pruebas negativas: `negative-controls.md`;
+- cierre y paquete del PR único: `owasp-final-evidence.md`.
+
 ## Estados
 
 | Estado | Significado |
