@@ -331,10 +331,12 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
   it.each([
     ['líder', mockLeader, 'Líder'],
     ['participante', mockParticipante, 'Participante'],
-  ])('muestra el chip de actor del %s', (_, mock, chip) => {
+  ])('muestra la etiqueta de rol del %s: lima, rectangular (radio moderado) y ancha', (_, mock, chip) => {
     mock();
     renderSidebar();
-    expect(screen.getByText(chip)).toHaveClass('pill');
+    const etiqueta = screen.getByText(chip);
+    expect(etiqueta).toHaveClass('pill', 'pill-accent', 'rounded-md', 'px-stack', 'min-w-20', 'font-semibold');
+    expect(etiqueta).not.toHaveClass('rounded-full');
   });
 
   it('un visitante solo ve «Resumen», sin chip ni menú de acciones', () => {
