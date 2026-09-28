@@ -79,6 +79,8 @@ const CONFIG_A = {
   NEXT_PUBLIC_API_URL: 'http://legacy.example.invalid:3001',
   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: 'synthetic-cloud',
   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: 'synthetic-preset',
+  // G06-C05: la variante también incluye el modo de la CSP (siempre con valor en el workflow).
+  CSP_MODE: 'report-only',
 };
 const CONFIG_B = { ...CONFIG_A, NEXT_PUBLIC_API_URL: '' };
 
