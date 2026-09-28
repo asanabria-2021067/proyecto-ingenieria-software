@@ -13,20 +13,37 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { BurndownChart } from '@/components/projects/burndown-chart';
-import { ESTADO_LABEL, PRIORIDAD_LABEL } from '@/components/projects/task-board.utils';
+import { ESTADO_COLUMNA_STYLE, ESTADO_LABEL, PRIORIDAD_LABEL } from '@/components/projects/task-board.utils';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 import type { EstadoHito, SprintAnalyticsDto } from '@/lib/types/sprints';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
-/** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE`/`ESTADO_HITO_STYLE` de las páginas hermanas de Sprints. */
-const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string }> = {
-  PENDIENTE: { label: 'Pendiente', className: 'bg-surface-container-high text-tertiary' },
+/**
+ * Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE`/`ESTADO_HITO_STYLE`
+ * de las páginas hermanas de Sprints. `bar` usa el mismo tono que el badge:
+ * gris, verde lima e institucional.
+ */
+const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string; bar: string }> = {
+  PENDIENTE: { label: 'Pendiente', className: 'bg-surface-container-high text-tertiary', bar: 'bg-outline' },
   EN_PROGRESO: {
     label: 'En progreso',
     className: 'bg-status-warning text-on-status-warning',
+    bar: 'bg-accent',
   },
-  COMPLETADO: { label: 'Completado', className: 'bg-primary-container text-on-primary-container' },
+  COMPLETADO: {
+    label: 'Completado',
+    className: 'bg-primary-container text-on-primary-container',
+    bar: 'bg-primary',
+  },
+};
+
+/** Barras por prioridad: alta en rojo suave, media en lima, baja en gris. */
+const PRIORIDAD_BAR: Record<Prioridad, string> = {
+  ALTA: 'bg-error/70',
+  MEDIA: 'bg-accent',
+  BAJA: 'bg-outline',
 };
 
 /** Orden fijo de estado/prioridad — nunca derivado del objeto, para que las barras salgan siempre en el mismo orden aunque un valor esté en 0. */
@@ -37,29 +54,18 @@ function formatearHoras(horas: number): string {
   return horas.toLocaleString('es-GT', { maximumFractionDigits: 2 });
 }
 
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
+function DistribucionBar({
+  etiqueta,
+  cantidad,
+  total,
+  barClassName,
 }: {
-  icon: typeof BarChart3;
-  label: string;
-  value: string;
+  etiqueta: string;
+  cantidad: number;
+  total: number;
+  /** Color semántico de la barra (estado o prioridad). */
+  barClassName: string;
 }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-        <Icon className="size-5 text-primary" aria-hidden="true" />
-      </span>
-      <div>
-        <p className="text-xs font-semibold text-tertiary">{label}</p>
-        <p className="text-lg font-bold text-on-surface">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function DistribucionBar({ etiqueta, cantidad, total }: { etiqueta: string; cantidad: number; total: number }) {
   const porcentaje = total === 0 ? 0 : Math.round((cantidad / total) * 100);
   return (
     <div>
@@ -69,7 +75,7 @@ function DistribucionBar({ etiqueta, cantidad, total }: { etiqueta: string; cant
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
         <div
-          className="h-full rounded-full bg-primary transition-all"
+          className={`h-full rounded-full transition-all ${barClassName}`}
           style={{ width: `${porcentaje}%` }}
           role="progressbar"
           aria-valuenow={porcentaje}
@@ -90,10 +96,16 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
   return (
     <>
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MetricCard icon={ListChecks} label="Tareas totales" value={String(analytics.tareasTotales)} />
-        <MetricCard icon={CheckCircle2} label="Tareas completadas" value={String(tareasCompletadas)} />
-        <MetricCard icon={BarChart3} label="Cumplimiento" value={`${porcentajeCumplimiento}%`} />
-        <MetricCard icon={Clock} label="Horas estimadas" value={`${formatearHoras(horasEstimadas)} h`} />
+        {/* Mismo KPI que Miembros y Mis Horas: icono neutro junto a la etiqueta, sin caja. */}
+        <HoursKpiCard variante="en-linea" icon={ListChecks} label="Tareas totales" value={String(analytics.tareasTotales)} />
+        <HoursKpiCard variante="en-linea" icon={CheckCircle2} label="Tareas completadas" value={String(tareasCompletadas)} />
+        <HoursKpiCard variante="en-linea" icon={BarChart3} label="Cumplimiento" value={`${porcentajeCumplimiento}%`} />
+        <HoursKpiCard
+          variante="en-linea"
+          icon={Clock}
+          label="Horas estimadas"
+          value={`${formatearHoras(horasEstimadas)} h`}
+        />
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
@@ -106,6 +118,7 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
                 etiqueta={ESTADO_LABEL[estado]}
                 cantidad={analytics.distribucionPorEstado[estado]}
                 total={analytics.tareasTotales}
+                barClassName={ESTADO_COLUMNA_STYLE[estado].columnDot}
               />
             ))}
           </div>
@@ -120,6 +133,7 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
                 etiqueta={PRIORIDAD_LABEL[prioridad]}
                 cantidad={analytics.distribucionPorPrioridad[prioridad]}
                 total={analytics.tareasTotales}
+                barClassName={PRIORIDAD_BAR[prioridad]}
               />
             ))}
           </div>
@@ -143,7 +157,7 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
                     <p className="truncate text-sm font-semibold text-on-surface">{hito.tituloHito}</p>
                     <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
                       <div
-                        className="h-full rounded-full bg-primary"
+                        className={`h-full rounded-full ${estilo.bar}`}
                         style={{ width: `${hito.porcentaje}%` }}
                         role="progressbar"
                         aria-valuenow={hito.porcentaje}
