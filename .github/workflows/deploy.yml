@@ -63,10 +63,25 @@ jobs:
     outputs:
       variant: ${{ steps.variant.outputs.variant }}
     steps:
+      # G07 (P2/P4): la GitHub Variable PUBLIC_API_URL elige la API horneada.
+      # 'direct' (default, sin la variable) conserva la URL directa actual y la
+      # misma variante inmutable; 'same-origin' hornea una cadena vacia: HTTP y
+      # Socket.IO van por el mismo origen, via nginx (P1); otra URL http(s) se
+      # usa tal cual. Seleccionar la variante remota es decision del administrador.
+      - name: Validar PUBLIC_API_URL
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL || 'direct' }}
+        run: |
+          set -euo pipefail
+          case "$PUBLIC_API_URL" in
+            direct|same-origin|http://?*|https://?*) ;;
+            *) echo "PUBLIC_API_URL solo admite direct, same-origin o una URL http(s)" >&2; exit 1 ;;
+          esac
+
       - name: Derivar la variante de la configuracion publica de build
         id: variant
         env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
+          NEXT_PUBLIC_API_URL: ${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
           # G06 (OWASP25-C039): modo de la CSP (build-time). 'report-only' es el
@@ -155,7 +170,7 @@ jobs:
           tags: |
             ${{ steps.vars.outputs.frontend_tag }}
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
+            NEXT_PUBLIC_API_URL=${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
             CSP_MODE=${{ vars.CSP_MODE || 'report-only' }}
@@ -320,7 +335,8 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
+          # G07 (P2/P4): la misma expresion que la variante y el build.
+          NEXT_PUBLIC_API_URL: ${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
