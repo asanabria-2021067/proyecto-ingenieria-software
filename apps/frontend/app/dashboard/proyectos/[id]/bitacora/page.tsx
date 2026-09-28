@@ -381,7 +381,6 @@ export default function BitacoraPage() {
         <>
           <ProjectPageHeader
             back={{ href: `/dashboard/projects/${id}`, label: 'Volver al proyecto' }}
-            icon={ScrollText}
             title="Bitácora"
             description="Registro de quién hizo qué, cuándo y cómo evolucionó el trabajo durante el sprint."
           >

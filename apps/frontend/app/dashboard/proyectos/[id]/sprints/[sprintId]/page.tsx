@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Clock,
   Flag,
-  History,
   ListChecks,
   Lock,
   MessageCircle,
@@ -349,7 +348,6 @@ function SprintDetailContent({
     <div className="space-y-6">
       {/* ENCABEZADO de página fuera de la tarjeta (la vuelta la pone la página) */}
       <ProjectPageHeader
-        icon={History}
         title={`Sprint ${detail.numero}`}
         description={
           cerrado

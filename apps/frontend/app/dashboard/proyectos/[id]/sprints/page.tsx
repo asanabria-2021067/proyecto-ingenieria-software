@@ -8,7 +8,6 @@ import {
   Calendar,
   Clock,
   Flag,
-  History,
   ListChecks,
   Loader2,
   Lock,
@@ -240,7 +239,6 @@ export default function SprintListPage() {
         <>
       <ProjectPageHeader
         back={{ href: volverAlProyectoHref, label: 'Volver al proyecto' }}
-        icon={History}
         title="Sprints"
         description="Resumen de los sprints del proyecto y su progreso."
         actions={

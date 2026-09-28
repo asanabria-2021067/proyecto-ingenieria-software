@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, type LucideIcon } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -47,8 +47,6 @@ interface ProjectPageHeaderProps {
   back?: ProjectBackLinkProps;
   title: ReactNode;
   description?: ReactNode;
-  /** Icono de la sección junto al título (opcional, mismo tamaño en todas las vistas). */
-  icon?: LucideIcon;
   /** Acciones globales de la página: a la derecha cuando hay ancho, debajo si no. */
   actions?: ReactNode;
   /** Datos breves bajo la descripción (p. ej. «Líder: …»). */
@@ -67,7 +65,6 @@ export function ProjectPageHeader({
   back,
   title,
   description,
-  icon: Icon,
   actions,
   children,
   className,
@@ -77,10 +74,8 @@ export function ProjectPageHeader({
       {back && <ProjectBackLink {...back} />}
       <div className="flex flex-col gap-stack @3xl/project:flex-row @3xl/project:items-start @3xl/project:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-tight">
-            {Icon && <Icon className="size-6 shrink-0 text-primary" aria-hidden="true" />}
-            <h1 className="type-display min-w-0 text-text-primary">{title}</h1>
-          </div>
+          {/* Solo el título: sin icono de sección a su lado. */}
+          <h1 className="type-display min-w-0 text-text-primary">{title}</h1>
           {description && <p className="type-body mt-micro max-w-prose text-text-secondary">{description}</p>}
           {children}
         </div>
