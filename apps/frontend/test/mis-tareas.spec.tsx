@@ -63,6 +63,11 @@ function mockMisTareas(resultado: MiTareaDTO[] | Promise<never>) {
   );
 }
 
+/** Espera a que la lista agrupada esté en pantalla (ya no hay tabla). */
+function esperarLista() {
+  return screen.findByRole('region', { name: 'Vencidas' });
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -81,8 +86,8 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     mockMisTareas(TAREAS_FIXTURE);
     renderPage();
 
-    expect(await screen.findByRole('table')).toBeInTheDocument();
-    const fila = screen.getByText('Tarea vencida').closest('tr')!;
+    await esperarLista();
+    const fila = screen.getByText('Tarea vencida').closest('li')!;
     expect(within(fila).getByText('UVG Collab')).toBeInTheDocument();
     expect(within(fila).getByText('Alta')).toBeInTheDocument();
     expect(within(fila).getByText('En progreso')).toBeInTheDocument();
@@ -92,7 +97,8 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     mockMisTareas(TAREAS_FIXTURE);
     renderPage();
 
-    const filas = (await screen.findAllByRole('row')).slice(1); // sin fila de encabezado
+    await esperarLista();
+    const filas = screen.getAllByRole('listitem');
     expect(within(filas[0]).getByText('Tarea vencida')).toBeInTheDocument();
     expect(within(filas[1]).getByText('Tarea próxima a vencer')).toBeInTheDocument();
     expect(within(filas[2]).getByText('Tarea a tiempo')).toBeInTheDocument();
@@ -102,10 +108,10 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     mockMisTareas(TAREAS_FIXTURE);
     renderPage();
 
-    await screen.findByRole('table');
-    expect(within(screen.getByText('Tarea vencida').closest('tr')!).getByText('Vencida')).toBeInTheDocument();
+    await esperarLista();
+    expect(within(screen.getByText('Tarea vencida').closest('li')!).getByText('Vencida')).toBeInTheDocument();
     expect(
-      within(screen.getByText('Tarea próxima a vencer').closest('tr')!).getByText('Vence pronto'),
+      within(screen.getByText('Tarea próxima a vencer').closest('li')!).getByText('Vence pronto'),
     ).toBeInTheDocument();
   });
 
@@ -113,12 +119,12 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     mockMisTareas(TAREAS_FIXTURE);
     renderPage();
 
-    await screen.findByRole('table');
+    await esperarLista();
     const selectProyecto = screen.getByRole('combobox', { name: 'Filtrar por proyecto' });
     fireEvent.keyDown(selectProyecto, { key: 'Enter' });
     fireEvent.click(screen.getByRole('option', { name: 'Rubik Frontend' }));
 
-    expect(screen.getByText('1 resultado')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('1 tarea de 3 en total');
     expect(screen.getByText('Tarea próxima a vencer')).toBeInTheDocument();
     expect(screen.queryByText('Tarea vencida')).not.toBeInTheDocument();
   });
@@ -128,7 +134,7 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     renderPage();
 
     expect(screen.getByRole('status', { name: 'Cargando tus tareas' })).toBeInTheDocument();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Vencidas' })).not.toBeInTheDocument();
   });
 
   it('muestra el estado vacío con un enlace a mis proyectos cuando no hay tareas asignadas', async () => {
@@ -144,7 +150,7 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     mockMisTareas(TAREAS_FIXTURE);
     renderPage();
 
-    await screen.findByRole('table');
+    await esperarLista();
     fireEvent.change(screen.getByLabelText('Buscar tareas por título o descripción'), {
       target: { value: 'texto-que-no-existe' },
     });
@@ -152,7 +158,7 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     expect(screen.getByText('Sin coincidencias')).toBeInTheDocument();
     const limpiar = screen.getAllByRole('button', { name: 'Limpiar filtros' })[0];
     fireEvent.click(limpiar);
-    expect(await screen.findByRole('table')).toBeInTheDocument();
+    expect(await esperarLista()).toBeInTheDocument();
   });
 
   it('muestra el estado de error con botón de reintentar', async () => {
@@ -161,5 +167,149 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.getByText('No se pudieron cargar tus tareas')).toBeInTheDocument();
+  });
+});
+
+describe('MisTareasPage — resumen, grupos y filas compactas', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  const CON_SIN_FECHA: MiTareaDTO[] = [
+    ...TAREAS_FIXTURE,
+    tarea({ idTarea: 4, tituloTarea: 'Tarea sin fecha', estadoTarea: 'EN_REVISION', prioridad: 'BAJA' }),
+  ];
+
+  it('ya no hay tabla ni encabezado de columnas', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('columnheader')).toHaveLength(0);
+  });
+
+  it('el encabezado va directo sobre la página, sin tarjeta', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    const titulo = await screen.findByRole('heading', { level: 1, name: 'Mis Tareas' });
+    expect(titulo.closest('.card-base')).toBeNull();
+    expect(
+      screen.getByText('Todas las tareas asignadas en tus proyectos, ordenadas por lo que requiere atención primero.'),
+    ).toBeInTheDocument();
+  });
+
+  it('los 4 KPI salen de los datos reales cargados', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    const kpi = (nombre: string) => screen.getByRole('group', { name: nombre });
+    // POR_HACER: #2 · vencidas: #1 · EN_PROGRESO: #1 · HECHO: #3 (EN_REVISION no entra en ninguno)
+    expect(kpi('Pendientes')).toHaveTextContent('1');
+    expect(kpi('Vencidas')).toHaveTextContent('1');
+    expect(kpi('En progreso')).toHaveTextContent('1');
+    expect(kpi('Completadas')).toHaveTextContent('1');
+    for (const nombre of ['Pendientes', 'Vencidas', 'En progreso', 'Completadas']) {
+      expect(kpi(nombre)).toHaveClass('card-base');
+      expect(kpi(nombre).querySelector('svg')).toBeNull();
+    }
+  });
+
+  it('los KPI cambian con los datos: sin vencidas el número no se pinta en rojo', async () => {
+    mockMisTareas([tarea({ idTarea: 9, tituloTarea: 'Solo una', estadoTarea: 'POR_HACER' })]);
+    renderPage();
+
+    const vencidas = await screen.findByRole('group', { name: 'Vencidas' });
+    expect(vencidas).toHaveTextContent('0');
+    expect(vencidas.querySelector('.text-error')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Pendientes' })).toHaveTextContent('1');
+  });
+
+  it('agrupa en Vencidas, Próximas, Sin fecha y Completadas, cada grupo como tarjeta con su conteo', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    // los grupos se titulan con su h2 (aria-labelledby); filtros y resumen usan aria-label
+    const grupos = screen.getAllByRole('region').filter((g) => g.hasAttribute('aria-labelledby'));
+    expect(grupos.map((g) => within(g).getByRole('heading').textContent)).toEqual([
+      'Vencidas',
+      'Próximas',
+      'Sin fecha',
+      'Completadas',
+    ]);
+    for (const grupo of grupos) expect(grupo).toHaveClass('card-base');
+    expect(within(screen.getByRole('region', { name: 'Vencidas' })).getByText('1 tarea')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Próximas' })).getByText('Tarea próxima a vencer')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Completadas' })).getByText('Tarea a tiempo')).toBeInTheDocument();
+  });
+
+  it('en el grupo «Sin fecha» la fila no repite «Sin fecha»', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    const fila = screen.getByText('Tarea sin fecha').closest('li')!;
+    expect(within(fila).queryByText('Sin fecha')).not.toBeInTheDocument();
+  });
+
+  it('fila: título en semibold que abre la tarea sobre toda la fila, proyecto como dato secundario', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    const enlace = screen.getByRole('link', { name: 'Tarea vencida' });
+    expect(enlace).toHaveAttribute('href', '/dashboard/projects/1/kanban/tasks/1');
+    expect(enlace).toHaveClass('font-semibold', 'text-text-primary', 'after:absolute', 'after:inset-0');
+    const fila = enlace.closest('li')!;
+    expect(fila).toHaveClass('relative', 'hover:bg-surface-container-low');
+    expect(within(fila).getByText('UVG Collab')).toHaveClass('type-meta');
+    // divisores tenues, no el color del texto
+    expect(fila.parentElement).toHaveClass('divide-outline-variant/50');
+  });
+
+  it('el contador dice «N tareas» y los filtros viven en una sola tarjeta', async () => {
+    mockMisTareas(CON_SIN_FECHA);
+    renderPage();
+
+    await esperarLista();
+    expect(screen.getByRole('status')).toHaveTextContent('4 tareas');
+    const filtros = screen.getByRole('region', { name: 'Filtros de tareas' });
+    expect(filtros).toHaveClass('card-base');
+    expect(within(filtros).getAllByRole('combobox')).toHaveLength(4);
+    expect(within(filtros).getByLabelText('Buscar tareas por título o descripción')).toBeInTheDocument();
+  });
+
+  it('con muchas completadas en la página, su grupo empieza plegado y se puede desplegar', async () => {
+    const hechas = Array.from({ length: 6 }, (_, i) =>
+      tarea({ idTarea: 100 + i, tituloTarea: `Hecha ${i + 1}`, estadoTarea: 'HECHO' }),
+    );
+    mockMisTareas([...TAREAS_FIXTURE.slice(0, 1), ...hechas]);
+    renderPage();
+
+    await esperarLista();
+    const grupo = screen.getByRole('region', { name: 'Completadas' });
+    expect(within(grupo).getByText('6 tareas')).toBeInTheDocument();
+    expect(within(grupo).queryByText('Hecha 1')).not.toBeInTheDocument();
+    fireEvent.click(within(grupo).getByRole('button', { name: 'Mostrar' }));
+    expect(within(grupo).getByText('Hecha 1')).toBeInTheDocument();
+    expect(within(grupo).getByRole('button', { name: 'Ocultar' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('la paginación sigue funcionando de a 15 tareas', async () => {
+    const muchas = Array.from({ length: 16 }, (_, i) =>
+      tarea({ idTarea: 200 + i, tituloTarea: `Tarea ${String(i + 1).padStart(2, '0')}`, fechaLimite: diasDesdeHoy(-30 + i) }),
+    );
+    mockMisTareas(muchas);
+    renderPage();
+
+    await esperarLista();
+    expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(15);
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 });
