@@ -60,6 +60,17 @@ const BARRA_FILTROS =
   'grid grid-cols-1 gap-4 @xl/project:grid-cols-2 @3xl/project:grid-cols-3 @5xl/project:flex';
 const FILTRO_TRIGGER = `w-full ${DASHBOARD_FILTER_TRIGGER_CLASS}`;
 
+/**
+ * Formato de la tabla de Mis Tareas: franja guía gris verdosa con etiquetas
+ * pequeñas en seminegrita, divisores tenues (sin `border-b` casi negro) y
+ * hover muy suave. Las celdas de los extremos llevan el padding de la tarjeta.
+ */
+const BORDE_TARJETA = 'first:pl-card last:pr-card';
+const FILA_GUIA = 'border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low';
+const CELDA_GUIA = `h-auto py-tight text-xs font-semibold text-text-secondary ${BORDE_TARJETA}`;
+const FILA_TAREA = 'border-outline-variant/50 hover:bg-surface-container-low';
+const CELDA_TAREA = BORDE_TARJETA;
+
 const TAMANO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
 const ESTADO_TONE: Record<EstadoTarea, string> = {
@@ -257,12 +268,12 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
         </Select>
       </section>
 
-      {/* tabla + paginación */}
-      <div className="card-base min-h-0">
+      {/* tabla: la franja guía y las filas llegan al borde de la tarjeta, como en Mis Tareas */}
+      <div className="card-base min-h-0 overflow-hidden p-0">
 
         {/* loading — skeleton con forma de fila (título + meta + pastillas), nunca spinner */}
         {isLoading && (
-          <div className="space-y-inline py-inline" role="status" aria-label="Cargando tareas">
+          <div className="space-y-inline p-card" role="status" aria-label="Cargando tareas">
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
@@ -281,7 +292,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
 
         {/* error */}
         {!isLoading && isError && (
-          <Empty tone="danger" className="surface-enter" role="alert">
+          <Empty tone="danger" className="surface-enter m-card" role="alert">
             <EmptyMedia variant="icon">
               <AlertCircle aria-hidden="true" className="size-7" />
             </EmptyMedia>
@@ -301,7 +312,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
 
         {/* vacío o sin coincidencias */}
         {!isLoading && !isError && tareasFiltradas.length === 0 && (
-          <Empty className="surface-enter" aria-live="polite">
+          <Empty className="surface-enter m-card" aria-live="polite">
             <EmptyMedia variant="icon">
               {hayFiltrosActivos ? (
                 <SearchX aria-hidden="true" className="size-7" />
@@ -330,45 +341,44 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
         )}
 
         {!isLoading && !isError && paginado.items.length > 0 && (
-          <>
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead scope="col">Título</TableHead>
-                  <TableHead scope="col">Hito</TableHead>
-                  <TableHead scope="col">Estado</TableHead>
-                  <TableHead scope="col">Prioridad</TableHead>
-                  <TableHead scope="col">Fecha límite</TableHead>
-                  <TableHead scope="col">Asignado a</TableHead>
-                  <TableHead scope="col">Etiquetas</TableHead>
+                <TableRow className={FILA_GUIA}>
+                  <TableHead scope="col" className={CELDA_GUIA}>Título</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Hito</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Estado</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Prioridad</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Fecha límite</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Asignado a</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Etiquetas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginado.items.map((tarea) => (
-                  <TableRow key={tarea.idTarea}>
-                    <TableCell className="max-w-sm whitespace-normal type-subtitle text-text-primary">
+                  <TableRow key={tarea.idTarea} className={FILA_TAREA}>
+                    <TableCell className={`max-w-sm whitespace-normal type-body font-semibold text-text-primary ${CELDA_TAREA}`}>
                       {tarea.tituloTarea}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       <span className="type-meta">{tarea.hito?.tituloHito ?? 'Sin hito'}</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       <EstadoBadge estado={tarea.estadoTarea} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       <PrioridadBadge prioridad={tarea.prioridad} />
                     </TableCell>
-                    <TableCell>
-                      <span className="type-meta">{formatFecha(tarea.fechaLimite)}</span>
+                    <TableCell className={CELDA_TAREA}>
+                      <span className="type-meta tabular-nums text-text-secondary">{formatFecha(tarea.fechaLimite)}</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       <span className="type-meta">
                         {tarea.asignacionActiva
                           ? `${tarea.asignacionActiva.usuario.nombre} ${tarea.asignacionActiva.usuario.apellido}`
                           : 'Sin asignar'}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       {tarea.etiquetas.length === 0 ? (
                         <span className="type-meta">—</span>
                       ) : (
@@ -388,39 +398,42 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                 ))}
               </TableBody>
             </Table>
-
-            {/* paginación */}
-            <nav
-              aria-label="Paginación de tareas"
-              className="mt-stack flex items-center justify-between gap-inline border-t border-outline-variant pt-inline"
-            >
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={paginado.pagina <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                aria-label="Página anterior"
-              >
-                Anterior
-              </Button>
-              <span className="type-meta font-medium" aria-live="polite">
-                Página {paginado.pagina} de {paginado.totalPaginas}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={paginado.pagina >= paginado.totalPaginas}
-                onClick={() => setPage((p) => Math.min(paginado.totalPaginas, p + 1))}
-                aria-label="Página siguiente"
-              >
-                Siguiente
-              </Button>
-            </nav>
-          </>
         )}
       </div>
+
+      {/* paginación en su propia tarjeta, como en Mis Tareas */}
+      {!isLoading && !isError && paginado.items.length > 0 && (
+        <nav
+          aria-label="Paginación de tareas"
+          className="card-base mt-stack flex items-center justify-between gap-inline px-card py-inline"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={paginado.pagina <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Página anterior"
+            className="rounded-control"
+          >
+            Anterior
+          </Button>
+          <span className="type-meta font-medium" aria-live="polite">
+            Página {paginado.pagina} de {paginado.totalPaginas}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={paginado.pagina >= paginado.totalPaginas}
+            onClick={() => setPage((p) => Math.min(paginado.totalPaginas, p + 1))}
+            aria-label="Página siguiente"
+            className="rounded-control"
+          >
+            Siguiente
+          </Button>
+        </nav>
+      )}
     </ProjectPageShell>
   );
 }
