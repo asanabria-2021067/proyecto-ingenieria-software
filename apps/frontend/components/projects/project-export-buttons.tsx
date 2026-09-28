@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
@@ -82,7 +82,12 @@ export function ProjectExportButtons({ idProyecto }: ProjectExportButtonsProps) 
           disabled={exportCsv.isPending}
           className={PROJECT_ACTION_BUTTON_CLASS}
         >
-          {exportCsv.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+          {/* Icono de descarga; mientras exporta, el spinner ocupa su lugar. */}
+          {exportCsv.isPending ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <Download className="size-3.5" aria-hidden="true" />
+          )}
           {exportCsv.isPending ? 'Exportando…' : 'Exportar CSV'}
         </Button>
         <Button
@@ -91,7 +96,11 @@ export function ProjectExportButtons({ idProyecto }: ProjectExportButtonsProps) 
           disabled={exportPdf.isPending}
           className={PROJECT_ACTION_BUTTON_CLASS}
         >
-          {exportPdf.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+          {exportPdf.isPending ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <Download className="size-3.5" aria-hidden="true" />
+          )}
           {exportPdf.isPending ? 'Generando…' : 'Exportar PDF'}
         </Button>
       </div>
