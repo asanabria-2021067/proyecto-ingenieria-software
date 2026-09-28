@@ -30,7 +30,7 @@ const YELLOW_BADGE = 'bg-[#FFF1C4] text-[#956500] dark:bg-[#453405] dark:text-[#
 const GREEN_BADGE = 'bg-[#E2F1DD] text-[#286327] dark:bg-[#123a1a] dark:text-[#6fe08a]';
 const ORANGE_BADGE = 'bg-[#FBE8D5] text-[#A85A00] dark:bg-[#3a2308] dark:text-[#ffab5c]';
 const GOLD_BADGE = 'bg-[#F6E7B0] text-[#775700] dark:bg-[#453405] dark:text-[#ffd873]';
-const SLATE_BADGE = 'bg-[#E2E9F7] text-[#486386] dark:bg-[#182740] dark:text-[#9dc1ea]';
+export const SLATE_BADGE = 'bg-[#E2E9F7] text-[#486386] dark:bg-[#182740] dark:text-[#9dc1ea]';
 
 const TIPO_BADGE_STYLE: Partial<Record<TipoProyecto, string>> = {
   ACADEMICO_EXPERIENCIA: BLUE_BADGE,

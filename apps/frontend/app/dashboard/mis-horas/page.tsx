@@ -37,7 +37,7 @@ function MisHorasSkeleton() {
     <div aria-busy="true" aria-label="Cargando tus horas" className="flex flex-col gap-section">
       <div className="grid gap-grid @2xl/mis-horas:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 rounded-2xl" />
+          <Skeleton key={i} className="h-32 rounded-card" />
         ))}
       </div>
       <Skeleton className="h-48 rounded-card" />
