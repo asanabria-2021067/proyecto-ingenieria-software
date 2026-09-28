@@ -25,6 +25,7 @@ const MIGRATED_FILES = [
   'components/projects/navigation/project-mobile-nav.tsx',
   'components/projects/navigation/project-nav-list.tsx',
   'components/projects/detail/project-content-grid.tsx',
+  'components/projects/detail/project-page-shell.tsx',
   'components/projects/detail/project-header-card.tsx',
   'components/projects/detail/project-description-card.tsx',
   'components/projects/detail/project-owner-card.tsx',
