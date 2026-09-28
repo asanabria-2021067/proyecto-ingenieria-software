@@ -195,9 +195,9 @@ export default function ProjectPendingPostulationsPage() {
                 </EmptyContent>
               </Empty>
             ) : postulaciones.length === 0 ? (
-              <Empty tone="muted" role="status">
-                <EmptyMedia variant="icon">
-                  <UserRoundPlus aria-hidden="true" className="h-7 w-7" />
+              <Empty tone="flush" role="status">
+                <EmptyMedia variant="subtle">
+                  <UserRoundPlus aria-hidden="true" />
                 </EmptyMedia>
                 <EmptyHeader>
                   <EmptyTitle>No hay postulaciones pendientes.</EmptyTitle>

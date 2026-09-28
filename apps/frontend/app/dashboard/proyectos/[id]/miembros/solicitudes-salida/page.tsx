@@ -153,9 +153,9 @@ export default function ProjectPendingExitRequestsPage() {
                 </EmptyContent>
               </Empty>
             ) : requests.length === 0 ? (
-              <Empty tone="muted" role="status">
-                <EmptyMedia variant="icon">
-                  <UserRoundX aria-hidden="true" className="h-7 w-7" />
+              <Empty tone="flush" role="status">
+                <EmptyMedia variant="subtle">
+                  <UserRoundX aria-hidden="true" />
                 </EmptyMedia>
                 <EmptyHeader>
                   <EmptyTitle>No hay solicitudes de salida pendientes.</EmptyTitle>
