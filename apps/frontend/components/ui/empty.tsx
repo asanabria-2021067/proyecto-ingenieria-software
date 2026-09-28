@@ -13,6 +13,10 @@ const emptyVariants = cva(
           'border-dashed border-outline-variant bg-surface-container-low text-on-surface',
         danger:
           'border-error/25 bg-error-container/20 text-on-surface',
+        // Dentro de una tarjeta: el vacío va directo sobre ella, sin otra
+        // superficie (ni borde, ni fondo, ni sombra propios).
+        flush:
+          'rounded-none border-0 bg-transparent px-0 py-8 text-on-surface shadow-none md:px-0 md:py-10',
       },
     },
     defaultVariants: {
@@ -57,6 +61,9 @@ const emptyMediaVariants = cva(
         icon: "flex size-16 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm ring-8 ring-primary/5 [&_svg:not([class*='size-'])]:size-7",
         compact:
           "flex size-12 shrink-0 items-center justify-center rounded-xl border border-outline-variant bg-surface-container text-primary [&_svg:not([class*='size-'])]:size-6",
+        // Icono pequeño y neutro, sin anillo ni animación: acompaña sin decorar.
+        subtle:
+          "flex size-10 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary [animation:none] [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {
