@@ -292,11 +292,18 @@ export default function SprintDetailPage() {
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
   const volverHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
 
+  const sinAcceso = !cargandoProyecto && !cargandoUsuario && !isLeader;
+
   return (
     <ProjectPageShell>
-      <ProjectBackLink href={volverHref} label="Volver al proyecto" className="mb-card" />
+      {/* El líder vuelve a la lista de Sprints; quien no tiene acceso a ella, al proyecto. */}
+      {sinAcceso ? (
+        <ProjectBackLink href={volverHref} label="Volver al proyecto" className="mb-card" />
+      ) : (
+        <ProjectBackLink href={`/dashboard/proyectos/${id}/sprints`} label="Volver a Sprints" className="mb-card" />
+      )}
 
-      {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
+      {sinAcceso ? (
         <LeaderOnlyNotice description="No puedes acceder al detalle de este Sprint." />
       ) : (
         <>
