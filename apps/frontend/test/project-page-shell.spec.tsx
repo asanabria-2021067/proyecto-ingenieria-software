@@ -96,6 +96,7 @@ const VISTAS_MIGRADAS = [
   'app/dashboard/proyectos/[id]/miembros/solicitudes-salida/page.tsx',
   'app/dashboard/proyectos/[id]/liderazgo/page.tsx',
   'app/dashboard/proyectos/[id]/bitacora/page.tsx',
+  'app/dashboard/proyectos/[id]/reportes/page.tsx',
 ];
 
 const leer = (ruta: string) => readFileSync(join(__dirname, '..', ruta), 'utf-8');

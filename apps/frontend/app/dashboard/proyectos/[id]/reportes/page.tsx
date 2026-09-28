@@ -1,13 +1,13 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, FileSpreadsheet, FileText, FolderOutput } from 'lucide-react';
+import { FileSpreadsheet, FileText, FolderOutput } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 /**
  * T-259/T-260 (HU-164): punto de entrada dedicado a exportar, aparte de los
@@ -27,30 +27,31 @@ export default function ReportesProyectoPage() {
   const cargandoPermisos = cargandoProyecto || cargandoUsuario || !currentUser || !proyecto;
 
   return (
-    <div className="mx-auto max-w-[900px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={`/dashboard/projects/${id}`}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al proyecto
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoPermisos && !isLeader ? (
-        <LeaderOnlyNotice description="No puedes exportar la información de este proyecto." />
+        <>
+          <ProjectBackLink href={`/dashboard/projects/${id}`} label="Volver al proyecto" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes exportar la información de este proyecto." />
+        </>
       ) : (
         <>
-          <div className="mb-8 flex items-center gap-2">
-            <FolderOutput className="h-6 w-6 text-primary" aria-hidden="true" />
-            <h1 className="font-headline text-3xl font-extrabold text-on-surface">Reportes</h1>
-          </div>
-          <p className="-mt-6 mb-8 text-sm text-tertiary">
-            Exporta la información de {proyecto ? `"${proyecto.tituloProyecto}"` : 'este proyecto'} para
-            entregarla fuera de la plataforma, sin copiar datos a mano.
-          </p>
+          {/* Una sola ubicación para exportar: las acciones del encabezado. */}
+          <ProjectPageHeader
+            back={{ href: `/dashboard/projects/${id}`, label: 'Volver al proyecto' }}
+            icon={FolderOutput}
+            title="Reportes"
+            description={
+              <>
+                Exporta la información de {proyecto ? `"${proyecto.tituloProyecto}"` : 'este proyecto'} para
+                entregarla fuera de la plataforma, sin copiar datos a mano.
+              </>
+            }
+            actions={<ProjectExportButtons idProyecto={idProyecto} />}
+          />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
+          {/* Ancho normal del shell: sin contenedor centrado más estrecho. */}
+          <div className="grid gap-grid @2xl/project:grid-cols-2">
+            <div className="card-base">
               <FileSpreadsheet className="mb-3 h-8 w-8 text-primary" aria-hidden="true" />
               <h2 className="mb-1 font-headline text-lg font-bold text-on-surface">CSV de miembros y horas</h2>
               <p className="text-sm text-tertiary">
@@ -58,7 +59,7 @@ export default function ReportesProyectoPage() {
                 Excel en español, con acentos y ñ intactos.
               </p>
             </div>
-            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
+            <div className="card-base">
               <FileText className="mb-3 h-8 w-8 text-primary" aria-hidden="true" />
               <h2 className="mb-1 font-headline text-lg font-bold text-on-surface">Reporte PDF del proyecto</h2>
               <p className="text-sm text-tertiary">
@@ -68,12 +69,8 @@ export default function ReportesProyectoPage() {
               </p>
             </div>
           </div>
-
-          <div className="mt-8 flex justify-end">
-            <ProjectExportButtons idProyecto={idProyecto} />
-          </div>
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }

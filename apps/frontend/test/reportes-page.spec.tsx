@@ -51,6 +51,34 @@ describe('ReportesProyectoPage (T-259/T-260)', () => {
     expect(screen.getByRole('button', { name: /exportar pdf/i })).toBeInTheDocument();
   });
 
+  it('exportar vive en un solo lugar: las acciones del encabezado, no debajo de las tarjetas', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+
+    renderPage();
+
+    expect(screen.getAllByRole('button', { name: /exportar csv/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /exportar pdf/i })).toHaveLength(1);
+    const acciones = screen
+      .getByRole('button', { name: /exportar csv/i })
+      .closest('[data-slot="project-page-actions"]');
+    expect(acciones).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Reportes' }).closest('header')).toContainElement(
+      acciones as HTMLElement,
+    );
+  });
+
+  it('usa el shell estándar del proyecto: sin contenedor centrado más estrecho', () => {
+    (useIsProjectLeader as any).mockReturnValue(true);
+
+    const { container } = renderPage();
+
+    const shell = container.querySelector('[data-slot="project-page-shell"]') as HTMLElement;
+    expect(shell).toHaveClass('max-w-content');
+    expect(container.innerHTML).not.toMatch(/max-w-\[900px\]/);
+    const tarjeta = screen.getByRole('heading', { level: 2, name: 'CSV de miembros y horas' }).closest('.card-base');
+    expect(tarjeta?.parentElement).toHaveClass('grid', '@2xl/project:grid-cols-2');
+  });
+
   it('un integrante que no es líder ve el aviso de acceso exclusivo, no los botones', () => {
     (useIsProjectLeader as any).mockReturnValue(false);
 
