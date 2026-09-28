@@ -92,23 +92,29 @@ export class AccountAttemptsService {
     });
   }
 
-  /** Suma un fallo; al llegar al umbral dentro de la ventana, bloquea. Fail-open. */
-  recordFailure(key: string): void {
-    this.failOpen('recordFailure', undefined, () => {
+  /**
+   * Suma un fallo; al llegar al umbral dentro de la ventana, bloquea. Fail-open.
+   * Devuelve true SOLO en la llamada que hace cruzar la cuenta al bloqueo
+   * (G05: un evento ACCOUNT_LOCKED por transición, nunca uno por intento).
+   */
+  recordFailure(key: string): boolean {
+    return this.failOpen('recordFailure', false, () => {
       const now = this.now();
       const current = this.store.get(key);
       if (current && current.lockedUntil > now) {
-        return;
+        return false;
       }
       const expired = !current || current.lockedUntil !== 0 || now - current.windowStart >= this.policy.windowMs;
       const entry = expired ? { failures: 0, windowStart: now, lockedUntil: 0 } : current;
       entry.failures += 1;
-      if (entry.failures >= this.policy.maxFailures) {
+      const lockedNow = entry.failures >= this.policy.maxFailures;
+      if (lockedNow) {
         entry.lockedUntil = now + this.policy.lockMs;
       }
       this.store.delete(key);
       this.store.set(key, entry);
       this.evict(now);
+      return lockedNow;
     });
   }
 

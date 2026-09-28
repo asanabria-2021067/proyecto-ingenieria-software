@@ -120,9 +120,8 @@ export class AuthService {
     // aunque la contraseña sea correcta; la respuesta es la misma genérica.
     if (bloqueada || !usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
       // Cuenta inexistente o contraseña incorrecta suman al contador por igual.
-      if (!bloqueada && (!usuario || !contrasenaValida)) {
-        this.attempts.recordFailure(cuenta);
-      }
+      const bloqueoNuevo = !bloqueada && (!usuario || !contrasenaValida) && this.attempts.recordFailure(cuenta);
+      const cuentaRef = usuario ? {} : { cuentaRef: accountReference(loginDto.correo) };
       // G05 (OWASP25-C037): un evento por intento, tras conocer el resultado.
       // Una cuenta inexistente se identifica solo con una referencia
       // seudónima: nunca el correo en claro. La respuesta externa no cambia.
@@ -136,9 +135,18 @@ export class AuthService {
               ? "CREDENCIALES"
               : "CUENTA_NO_ACTIVA",
           cuentaConocida: Boolean(usuario),
-          ...(usuario ? {} : { cuentaRef: accountReference(loginDto.correo) }),
+          ...cuentaRef,
         },
       });
+      // G05 (OWASP25-C037/C036): el cruce al bloqueo se registra una sola vez;
+      // los intentos siguientes durante el bloqueo no generan más eventos de este tipo.
+      if (bloqueoNuevo) {
+        await this.securityEvents.record({
+          tipo: TipoEventoSeguridad.ACCOUNT_LOCKED,
+          idUsuarioAfectado: usuario?.idUsuario ?? null,
+          detalle: { cuentaConocida: Boolean(usuario), ...cuentaRef },
+        });
+      }
       throw new UnauthorizedException("Credenciales invalidas");
     }
 
