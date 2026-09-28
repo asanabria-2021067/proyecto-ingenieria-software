@@ -467,3 +467,26 @@ describe('ProjectDetailClient — lista de roles por contenedor', () => {
     expect(within(rejilla).getByRole('heading', { level: 3, name: 'Backend' })).toBeInTheDocument();
   });
 });
+
+// «Agregar rol» usa la misma escala secundaria que las acciones de cada rol.
+describe('ProjectDetailClient — tamaño de «Agregar rol»', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: proyecto(), isLoading: false, error: null, refetch: vi.fn() });
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    (useProjectMembers as any).mockReturnValue({ members: [] });
+    mockRoles([rol()]);
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('usa type-meta y conserva su color de acento', () => {
+    renderPage();
+
+    const boton = screen.getByRole('button', { name: /agregar rol/i });
+    expect(boton).toHaveClass('type-meta', 'text-primary', 'border-primary');
+  });
+});
