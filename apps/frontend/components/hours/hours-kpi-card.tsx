@@ -12,8 +12,9 @@ interface HoursKpiCardProps {
   destacado?: boolean;
   /**
    * `caja` (por defecto): icono en una caja de color a la izquierda.
-   * `en-linea`: icono neutro al par de la etiqueta, sin fondo, y todo el
-   * texto en tonos neutros (Mis Horas).
+   * `en-linea`: icono de fondo grande, translúcido y difuminado, que ocupa
+   * el alto de la tarjeta y asoma solo su mitad desde el borde izquierdo; el
+   * texto, en tonos neutros, empieza después de esa mitad (Mis Horas).
    */
   variante?: 'caja' | 'en-linea';
 }
@@ -29,12 +30,15 @@ export function HoursKpiCard({ icon: Icon, label, value, note, destacado = false
         role="group"
         aria-label={label}
         data-destacado={destacado || undefined}
-        className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
+        className="relative flex min-h-32 flex-col justify-center overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest py-5 pr-5 pl-24"
       >
-        <p className="flex items-center gap-tight text-xs font-bold uppercase tracking-wide text-text-primary">
-          <Icon className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
-          {label}
-        </p>
+        <Icon
+          data-slot="kpi-icono-fondo"
+          strokeWidth={1.5}
+          className="pointer-events-none absolute inset-y-0 left-0 aspect-square h-full w-auto -translate-x-1/2 text-text-primary opacity-15 blur-[1px]"
+          aria-hidden="true"
+        />
+        <p className="text-xs font-bold uppercase tracking-wide text-text-primary">{label}</p>
         <p className="mt-tight font-headline text-2xl font-extrabold text-text-primary">{value}</p>
         {note && <p className="type-meta mt-micro">{note}</p>}
       </div>
