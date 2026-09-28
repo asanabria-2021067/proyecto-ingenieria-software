@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDays,
   formatMonthLabel,
+  formatWeekRangeLabel,
   getMonthMatrix,
+  getWeekDays,
   parseFechaSolo,
   toDateKey,
 } from '@/lib/calendar/utils';
@@ -44,5 +47,33 @@ describe('calendar/utils', () => {
   it('formatMonthLabel capitaliza el mes en español', () => {
     expect(formatMonthLabel(2026, 4)).toBe('Mayo 2026');
     expect(formatMonthLabel(2026, 0)).toBe('Enero 2026');
+  });
+
+  it('getWeekDays devuelve 7 días de lunes a domingo conteniendo el ancla', () => {
+    // 2026-09-23 es miércoles
+    const dias = getWeekDays(new Date(2026, 8, 23));
+    expect(dias).toHaveLength(7);
+    expect(dias[0].date.getDay()).toBe(1); // lunes
+    expect(dias[6].date.getDay()).toBe(0); // domingo
+    expect(dias.some((d) => d.key === '2026-09-23')).toBe(true);
+  });
+
+  it('getWeekDays funciona cuando la semana cruza fin/inicio de mes', () => {
+    // 2026-09-30 es miércoles; su semana va del 28 sep al 4 oct.
+    const dias = getWeekDays(new Date(2026, 8, 30));
+    expect(dias[0].key).toBe('2026-09-28');
+    expect(dias[6].key).toBe('2026-10-04');
+  });
+
+  it('addDays suma/resta días en horario local sin corrimientos', () => {
+    expect(toDateKey(addDays(new Date(2026, 8, 30), 1))).toBe('2026-10-01');
+    expect(toDateKey(addDays(new Date(2026, 8, 1), -1))).toBe('2026-08-31');
+  });
+
+  it('formatWeekRangeLabel arma un rango legible', () => {
+    const texto = formatWeekRangeLabel(new Date(2026, 8, 28), new Date(2026, 9, 4));
+    expect(texto).toContain('28');
+    expect(texto).toContain('4');
+    expect(texto).toContain('2026');
   });
 });

@@ -56,6 +56,7 @@ function makeService(prisma: ReturnType<typeof makePrisma>) {
     makeProjectTransactionDouble({ tx }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
+    {} as ConstructorParameters<typeof ProjectsService>[6],
   );
 }
 

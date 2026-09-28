@@ -10,6 +10,12 @@ vi.mock('@/lib/swal', () => ({
   },
 }));
 
+const confirmarMock = vi.hoisted(() => vi.fn());
+vi.mock('../lib/mensajes', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/mensajes')>()),
+  confirmar: confirmarMock,
+}));
+
 beforeAll(() => {
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false;
   if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
@@ -343,23 +349,27 @@ describe('ProjectRolesSheet — gestión completa (Sección 23/5C)', () => {
   });
 
   it('eliminar un rol pide confirmación y llama a eliminarRol', async () => {
+    confirmarMock.mockResolvedValueOnce(true);
     const eliminarRol = mutationStub();
     renderSheet({ roles: [role()], eliminarRol });
 
     fireEvent.click(screen.getByRole('button', { name: /eliminar rol frontend/i }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Eliminar rol' }));
 
-    expect(eliminarRol.mutate).toHaveBeenCalledWith({ roleId: 100 }, expect.anything());
+    expect(confirmarMock).toHaveBeenCalledWith(
+      expect.objectContaining({ textoAccion: 'Eliminar rol', destructiva: true }),
+    );
+    await waitFor(() => expect(eliminarRol.mutate).toHaveBeenCalledWith({ roleId: 100 }, expect.anything()));
   });
 
   it('cancelar eliminación mantiene el Sheet abierto y no llama mutation', async () => {
+    confirmarMock.mockResolvedValueOnce(false);
     const eliminarRol = mutationStub();
     renderSheet({ roles: [role()], eliminarRol, intent: { kind: 'list' } });
 
     fireEvent.click(screen.getByRole('button', { name: /eliminar rol frontend/i }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
 
+    await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
     expect(eliminarRol.mutate).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.getByText('Roles existentes')).toBeInTheDocument());
+    expect(screen.getByText('Roles existentes')).toBeInTheDocument();
   });
 });

@@ -28,6 +28,7 @@ import {
 import uvgSwal from '@/lib/swal';
 import { normalizeUrlInput } from '@/lib/security/safe-url';
 import { createHabilidad, createInteres, createCualidad } from '@/lib/services/catalogs';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 const STEPS = [
   { title: 'Personal', icon: UserIcon, desc: 'Datos básicos y académicos' },
@@ -318,7 +319,7 @@ export default function EditarPerfilPage() {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error al guardar',
-        text: err.message || 'Ocurrió un error inesperado al actualizar tu perfil.',
+        text: getApiErrorMessage(err, 'general', 'Ocurrió un error inesperado al actualizar tu perfil.'),
       });
     } finally {
       setSaving(false);

@@ -330,6 +330,24 @@ describe('SocialService — buscarUsuarios', () => {
     expect(resultado.items[0]).toMatchObject({ idUsuario: 2, amigosEnComun: 2 });
   });
 
+  // T-210: el front usaba `idUsuario` en vez de `idAmistad` para eliminar
+  // amistad / aceptar solicitud desde la tarjeta porque este id nunca venía
+  // en la respuesta.
+  it('incluye idAmistad cuando hay relación con el candidato', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([
+      { idUsuario: 2, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null, perfil: null, habilidades: [], intereses: [] },
+    ]);
+    prisma.amistad.findMany
+      .mockResolvedValueOnce([]) // getAmigoIds(1)
+      .mockResolvedValueOnce([{ idAmistad: 42, idUsuarioSolicitante: 1, idUsuarioReceptor: 2, estado: EstadoAmistad.PENDIENTE }]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.buscarUsuarios(1, {});
+
+    expect(resultado.items[0]).toMatchObject({ idAmistad: 42, solicitudPendiente: { direccion: 'enviada' } });
+  });
+
   it('excluye al propio usuario del resultado', async () => {
     const prisma = makePrisma();
     prisma.usuario.findMany.mockResolvedValue([]);
@@ -456,6 +474,7 @@ describe('SocialService — obtenerPerfilPublico', () => {
     });
     // amistad(1↔2): pendiente, enviada por mí
     prisma.amistad.findFirst.mockResolvedValue({
+      idAmistad: 42,
       idUsuarioSolicitante: 1,
       idUsuarioReceptor: 2,
       estado: EstadoAmistad.PENDIENTE,
@@ -487,6 +506,7 @@ describe('SocialService — obtenerPerfilPublico', () => {
       correo: 'carla@uvg.edu.gt',
       esAmigo: false,
       solicitudPendiente: { direccion: 'enviada' },
+      idAmistad: 42,
       loSigo: false,
       carrera: 'Ingeniería',
       semestre: 5,

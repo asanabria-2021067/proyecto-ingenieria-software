@@ -31,6 +31,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import type { EstadoSprint, SprintDto } from '@/lib/types/sprints';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 function formatearFechaHora(iso: string): string {
   return new Date(iso).toLocaleDateString('es-GT', {
@@ -45,7 +46,7 @@ function formatearHoras(horas: number): string {
 }
 
 function mensajeErrorFinalizarSprint(error: unknown): string {
-  const mensaje = error instanceof Error ? error.message : '';
+  const mensaje = getApiErrorMessage(error, 'general', '');
   if (/tareas pendientes/i.test(mensaje)) {
     return 'Aún quedan tareas por realizar. Completa o cierra las tareas pendientes antes de finalizar el Sprint.';
   }
@@ -63,7 +64,7 @@ const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: stri
   ACTIVO: { label: 'ACTIVO', className: 'bg-primary-container text-on-primary-container' },
   EN_FINALIZACION: {
     label: 'EN FINALIZACIÓN',
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+    className: 'bg-status-warning text-on-status-warning',
   },
   CERRADO: { label: 'CERRADO', className: 'bg-surface-container-high text-tertiary' },
 };
@@ -287,9 +288,7 @@ export default function SprintListPage() {
           </EmptyMedia>
           <EmptyHeader>
             <EmptyTitle>
-              {error instanceof Error && error.message
-                ? error.message
-                : 'No fue posible cargar los Sprints del proyecto.'}
+              {getApiErrorMessage(error, 'general', 'No fue posible cargar los Sprints del proyecto.')}
             </EmptyTitle>
           </EmptyHeader>
           <EmptyContent>

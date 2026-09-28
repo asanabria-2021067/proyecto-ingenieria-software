@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   amigosQueryKey,
@@ -28,6 +29,7 @@ import {
 } from '@/lib/services/social';
 import { seleccionarRecomendaciones } from '@/lib/social/recomendaciones';
 import type { BuscarUsuariosFiltros, UsuarioBusquedaDto } from '@/lib/types/social';
+import uvgSwal from '@/lib/swal';
 
 function invalidateSocialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: amigosQueryKey() });
@@ -163,7 +165,13 @@ export function useEliminarAmistad() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (idAmistad: number) => eliminarAmistad(idAmistad),
-    onSuccess: () => invalidateSocialQueries(queryClient),
+    onSuccess: () => {
+      invalidateSocialQueries(queryClient);
+      uvgSwal.fire({ icon: 'success', title: 'Amistad eliminada', timer: 1800, showConfirmButton: false });
+    },
+    onError: (error: Error) => {
+      uvgSwal.fire({ icon: 'error', title: 'No se pudo eliminar la amistad', text: error.message });
+    },
   });
 }
 
@@ -191,6 +199,7 @@ interface UsuarioConRelacion {
   idUsuario: number;
   esAmigo: boolean;
   solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
+  idAmistad: number | null;
   loSigo: boolean;
 }
 
@@ -200,13 +209,14 @@ export function useAccionesAmistad(usuario: UsuarioConRelacion) {
   const eliminarAmistadMutation = useEliminarAmistad();
   const seguir = useSeguirUsuario();
   const dejarDeSeguirMutation = useDejarDeSeguir();
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   const amistad = usuario.esAmigo
     ? {
         label: 'Amigos',
         variant: 'outline' as const,
         disabled: eliminarAmistadMutation.isPending,
-        onClick: () => eliminarAmistadMutation.mutate(usuario.idUsuario),
+        onClick: () => setConfirmandoEliminar(true),
       }
     : usuario.solicitudPendiente?.direccion === 'enviada'
       ? { label: 'Solicitud enviada', variant: 'outline' as const, disabled: true, onClick: () => {} }
@@ -215,7 +225,7 @@ export function useAccionesAmistad(usuario: UsuarioConRelacion) {
             label: 'Aceptar solicitud',
             variant: 'default' as const,
             disabled: aceptarSolicitud.isPending,
-            onClick: () => aceptarSolicitud.mutate(usuario.idUsuario),
+            onClick: () => usuario.idAmistad != null && aceptarSolicitud.mutate(usuario.idAmistad),
           }
         : {
             label: 'Agregar como amigo',
@@ -228,5 +238,23 @@ export function useAccionesAmistad(usuario: UsuarioConRelacion) {
     ? { label: 'Siguiendo', disabled: dejarDeSeguirMutation.isPending, onClick: () => dejarDeSeguirMutation.mutate(usuario.idUsuario) }
     : { label: 'Seguir', disabled: seguir.isPending, onClick: () => seguir.mutate(usuario.idUsuario) };
 
-  return { amistad, seguimiento };
+  /** Props listas para `<ConfirmActionDialog {...confirmarEliminarAmistad} />`.
+   * Eliminar una amistad es irreversible desde la UI (HU-155/T-222): la otra
+   * persona tiene que volver a solicitarla. */
+  const confirmarEliminarAmistad = {
+    open: confirmandoEliminar,
+    title: 'Eliminar amistad',
+    description:
+      'Vas a eliminar esta amistad. Si quieren ser amigos de nuevo, la otra persona va a tener que enviarte una nueva solicitud.',
+    actionLabel: 'Sí, eliminar amistad',
+    variant: 'destructive' as const,
+    isPending: eliminarAmistadMutation.isPending,
+    onConfirm: () => {
+      if (usuario.idAmistad == null) return;
+      eliminarAmistadMutation.mutate(usuario.idAmistad, { onSettled: () => setConfirmandoEliminar(false) });
+    },
+    onCancel: () => setConfirmandoEliminar(false),
+  };
+
+  return { amistad, seguimiento, confirmarEliminarAmistad };
 }

@@ -20,6 +20,7 @@ import { ProjectTransactionService } from '../../src/common/project-policy/proje
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsService } from '../../src/sprints/sprints.service';
+import { SocialService } from '../../src/social/social.service';
 
 /**
  * X3 (Escenario B) — regresión cross-flow: Decisión #2 (congelada, A11) —
@@ -84,6 +85,7 @@ describeIntegration(
         new ProjectTransactionService(prismaService),
         new ProjectPolicyService(resolver),
         new ProjectReadPolicyService(prismaService),
+        new SocialService(prismaService, notifications),
       );
 
       const sprintsContext = new SprintsContextService(prismaService);

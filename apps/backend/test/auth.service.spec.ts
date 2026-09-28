@@ -14,6 +14,9 @@ vi.mock('bcryptjs', () => ({
 // AuthService exige esta variable al construirse (ver auth.service.ts) - sin
 // ella, ninguno de los tests de este archivo podría instanciar el servicio.
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+// login/register/refreshToken firman el access token con JWT_SECRET, también
+// sin valor por defecto desde T-210 (ver src/config/jwt-secret.ts).
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
 
 describe('AuthService', () => {
   it('login retorna token cuando credenciales son validas', async () => {
@@ -194,6 +197,39 @@ describe('AuthService', () => {
 
       await expect(service.refreshToken('access-token-real')).rejects.toBeInstanceOf(UnauthorizedException);
       expect(prisma.tokenRefresco.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('logout (T-210)', () => {
+    function makeService() {
+      const prisma = {
+        tokenRefresco: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      };
+      const service = new AuthService(
+        prisma as unknown as PrismaService,
+        { sign: vi.fn() } as unknown as JwtService,
+        { notifyAdminsFromTemplate: vi.fn() } as unknown as NotificationsService,
+      );
+      return { service, prisma };
+    }
+
+    it('revoca únicamente el refresh token de la sesión que cierra sesión', async () => {
+      const { service, prisma } = makeService();
+
+      await service.logout('token-de-la-sesion');
+
+      expect(prisma.tokenRefresco.updateMany).toHaveBeenCalledWith({
+        where: { tokenHash: expect.any(String), revocadoEn: null },
+        data: { revocadoEn: expect.any(Date) },
+      });
+    });
+
+    it('sin refresh token no toca la base de datos', async () => {
+      const { service, prisma } = makeService();
+
+      await service.logout(undefined);
+
+      expect(prisma.tokenRefresco.updateMany).not.toHaveBeenCalled();
     });
   });
 });

@@ -40,6 +40,7 @@ import { BitacoraModule } from './bitacora/bitacora.module';
 import { GlobalSearchModule } from './search/global-search.module';
 import { ExportsModule } from './exports/exports.module';
 import { SecurityEventsModule } from './security-events/security-events.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { SecurityEventsModule } from './security-events/security-events.module';
     ExportsModule,
     // G05 (OWASP25-C037): writer best-effort de eventos de seguridad (global).
     SecurityEventsModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [

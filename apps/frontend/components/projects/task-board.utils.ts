@@ -40,26 +40,30 @@ export interface EstadoColumnaStyle {
 
 export const ESTADO_COLUMNA_STYLE: Record<EstadoTarea, EstadoColumnaStyle> = {
   POR_HACER: {
-    headerBg: 'bg-[#E9EDF1] dark:bg-white/5',
-    headerText: 'text-[#59616C] dark:text-slate-300',
-    dot: 'bg-[#8A93A0]',
+    headerBg: 'bg-surface-container-high',
+    headerText: 'text-text-secondary',
+    dot: 'bg-text-secondary',
   },
-  // En progreso = amarillo/ámbar y En revisión = azul, según la referencia
-  // (Sección 29). Antes estaban invertidos; el color vive únicamente aquí.
+  // En progreso = acento (única columna destacada del tablero, Sección 29).
+  // En revisión se queda en neutro: `--color-status-warning` y `--color-accent`
+  // apuntan al mismo valor en global.css (secondary-container), así que
+  // pintarla con status-warning la vuelve indistinguible de En progreso. El
+  // acento solo puede destacar una cosa por bloque (docs/design-system.md) y
+  // esa ya es En progreso. Hecho = success. El color vive únicamente aquí.
   EN_PROGRESO: {
-    headerBg: 'bg-[#FFF1CC] dark:bg-amber-500/10',
-    headerText: 'text-[#8A6300] dark:text-amber-300',
-    dot: 'bg-[#D9A400]',
+    headerBg: 'bg-accent',
+    headerText: 'text-on-accent',
+    dot: 'bg-accent',
   },
   EN_REVISION: {
-    headerBg: 'bg-[#E6F0FF] dark:bg-blue-500/10',
-    headerText: 'text-[#2B63B8] dark:text-blue-300',
-    dot: 'bg-[#2B63B8]',
+    headerBg: 'bg-surface-container-high',
+    headerText: 'text-text-secondary',
+    dot: 'bg-text-secondary',
   },
   HECHO: {
-    headerBg: 'bg-[#E2F1DD] dark:bg-green-500/10',
-    headerText: 'text-[#286327] dark:text-green-300',
-    dot: 'bg-[#3E9B3A]',
+    headerBg: 'bg-status-success',
+    headerText: 'text-on-status-success',
+    dot: 'bg-status-success',
   },
 };
 
@@ -80,10 +84,12 @@ export const PRIORIDAD_ICON: Record<Prioridad, typeof ArrowUp> = {
   BAJA: ArrowDown,
 };
 
+// status-* son tokens de relleno de pastilla, no de color de letra (docs/design-system.md):
+// como texto suelto (icono + label, sin fondo) usan text-destructive / text-text-primary.
 export const PRIORIDAD_COLOR: Record<Prioridad, string> = {
-  ALTA: 'text-red-600 dark:text-red-400',
-  MEDIA: 'text-amber-600 dark:text-amber-400',
-  BAJA: 'text-blue-500 dark:text-blue-400',
+  ALTA: 'text-destructive',
+  MEDIA: 'text-text-primary',
+  BAJA: 'text-text-secondary',
 };
 
 const PRIORIDAD_ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
@@ -243,32 +249,32 @@ export function getProgressVisualState(percent: number): ProgressVisualState {
   const p = Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
   if (p >= 100) {
     return {
-      bar: 'bg-primary dark:bg-primary',
-      text: 'text-[#1B5E20] dark:text-green-300',
-      track: 'bg-[#E2F1DD] dark:bg-green-500/10',
+      bar: 'bg-primary',
+      text: 'text-primary',
+      track: 'bg-status-success/20',
       complete: true,
     };
   }
   if (p >= 67) {
     return {
-      bar: 'bg-green-600 dark:bg-green-400',
-      text: 'text-green-700 dark:text-green-300',
-      track: 'bg-[#E2F1DD] dark:bg-green-500/10',
+      bar: 'bg-status-success',
+      text: 'text-primary',
+      track: 'bg-status-success/20',
       complete: false,
     };
   }
   if (p >= 34) {
     return {
-      bar: 'bg-orange-500 dark:bg-orange-400',
-      text: 'text-orange-700 dark:text-orange-300',
-      track: 'bg-[#FDE9D3] dark:bg-orange-500/10',
+      bar: 'bg-status-warning',
+      text: 'text-text-primary',
+      track: 'bg-status-warning/20',
       complete: false,
     };
   }
   return {
-    bar: 'bg-red-500 dark:bg-red-400',
-    text: 'text-red-700 dark:text-red-300',
-    track: 'bg-[#FBE0E0] dark:bg-red-500/10',
+    bar: 'bg-status-error',
+    text: 'text-destructive',
+    track: 'bg-status-error/20',
     complete: false,
   };
 }

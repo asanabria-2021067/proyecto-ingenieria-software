@@ -70,6 +70,24 @@ describe('ChatGateway', () => {
       expect(socket.data.userId).toBe(7);
       expect(socket.emit).toHaveBeenCalledWith('connected', { userId: 7 });
     });
+
+    /**
+     * T-210 (revisión cruzada): el token de recuperación de contraseña
+     * (`tipo: 'reset'`) se firma con el mismo JWT_SECRET que el access token
+     * y verifica igual con `verifyAsync` — sin este chequeo, quien tuviera
+     * un enlace de recuperación abría un socket autenticado como esa
+     * persona y recibía sus mensajes de chat.
+     */
+    it('rechaza (desconecta) un token que no es de tipo "access" (p. ej. el de recuperación de contraseña)', async () => {
+      const { gateway, jwtService } = makeGateway();
+      jwtService.verifyAsync.mockResolvedValue({ sub: 7, correo: 'x@uvg.edu.gt', tipo: 'reset' });
+      const socket = makeSocket({ auth: { token: 'token-de-reset' } });
+
+      await gateway.handleConnection(socket as any);
+
+      expect(socket.disconnect).toHaveBeenCalled();
+      expect(socket.join).not.toHaveBeenCalled();
+    });
   });
 
   describe('joinConversation — un usuario ajeno al proyecto no puede unirse a la sala ni leer mensajes', () => {

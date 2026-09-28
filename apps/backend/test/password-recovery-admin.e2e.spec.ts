@@ -8,6 +8,12 @@ import { AuthService } from '../src/auth/auth.service';
 import { AdminService } from '../src/admin/admin.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 
+// AuthService exige esta variable al construirse (ver auth.service.ts y
+// auth.service.spec.ts) - sin ella, este archivo no puede instanciar el
+// servicio cuando corre en un worker de vitest que no cargó antes
+// auth.service.spec.ts.
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-refresh-secret';
+
 // Integration test for HU-14 (T-100): solicitud de recuperacion -> notificacion
 // al admin -> admin lista pendientes -> admin genera enlace -> solicitud atendida
 // -> reset con el token generado. Real AuthService + AdminService + NotificationsService

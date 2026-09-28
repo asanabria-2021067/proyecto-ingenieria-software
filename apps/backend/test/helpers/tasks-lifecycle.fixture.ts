@@ -11,6 +11,7 @@ import { TasksAuthorizationService } from '../../src/tasks/tasks-authorization.s
 import { TasksRelationsService } from '../../src/tasks/tasks-relations.service';
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
 import { ProjectsService } from '../../src/projects/projects.service';
+import type { SocialService } from '../../src/social/social.service';
 import {
   makeProjectPolicyDouble,
   makeProjectReadPolicyDouble,
@@ -883,6 +884,7 @@ export function setupLifecycleEnv(): LifecycleEnv {
     makeProjectTransactionDouble({ tx: db }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
+    {} as unknown as SocialService,
   );
 
   const comentariosService = new ComentariosService(

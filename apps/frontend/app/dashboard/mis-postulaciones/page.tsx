@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api/client';
 import { deletePostulacion } from '@/lib/services/applications';
 import { Postulacion, EstadoPostulacion } from '@/types';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   Empty,
   EmptyContent,
@@ -63,7 +64,7 @@ export default function MisPostulacionesPage() {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'No se pudo cancelar la postulación',
+        text: getApiErrorMessage(error, 'general', 'No se pudo cancelar la postulación'),
       });
     },
   });

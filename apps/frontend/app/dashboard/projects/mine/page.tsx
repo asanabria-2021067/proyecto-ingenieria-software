@@ -11,7 +11,8 @@ import {
 import { getMyProjects, getContributorProjects, deleteProject } from '@/lib/services/projects';
 import { TIPO_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
-import uvgSwal, { swalCustomClass } from '@/lib/swal';
+import { aviso, confirmar } from '@/lib/mensajes';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   Empty,
   EmptyContent,
@@ -80,39 +81,21 @@ export default function MyProjectsPage() {
   const participoFiltrados = proyectosParticipo.filter((p) => !idsPropios.has(p.idProyecto));
 
   async function handleDelete(proyecto: MiProyectoListItemDTO) {
-    // S7 (VIEW-09): un proyecto CERRADO es solo consulta; nunca se elimina.
     if (proyecto.estadoProyecto === 'CERRADO') return;
-    const result = await uvgSwal.fire({
-      icon: 'warning',
-      title: 'Eliminar proyecto',
-      html: `¿Estás seguro que deseas eliminar <strong>${proyecto.tituloProyecto}</strong>?<br/><br/>Esta acción no se puede deshacer.`,
-      showCancelButton: true,
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-      customClass: {
-        ...swalCustomClass,
-        confirmButton: 'rounded-control bg-error px-card py-tight text-body font-medium text-on-error hover:bg-error/90 transition-colors',
-      },
+    const confirmado = await confirmar({
+      titulo: `¿Eliminar el proyecto "${proyecto.tituloProyecto}"?`,
+      descripcion: 'El proyecto y toda su información dejan de estar disponibles.',
+      textoAccion: 'Eliminar proyecto',
+      destructiva: true,
     });
+    if (!confirmado) return;
 
-    if (result.isConfirmed) {
-      try {
-        await deleteProject(proyecto.idProyecto);
-        await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
-        await uvgSwal.fire({
-          icon: 'success',
-          title: 'Proyecto eliminado',
-          text: 'El proyecto ha sido eliminado correctamente',
-          timer: 2000,
-          showConfirmButton: false,
-        });
-      } catch (err) {
-        uvgSwal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: err instanceof Error ? err.message : 'No se pudo eliminar el proyecto',
-        });
-      }
+    try {
+      await deleteProject(proyecto.idProyecto);
+      await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
+      aviso.exito('Proyecto eliminado', `"${proyecto.tituloProyecto}" ya no está disponible.`);
+    } catch (err) {
+      aviso.error('No se pudo eliminar el proyecto', getApiErrorMessage(err, 'general'));
     }
   }
 
