@@ -18,6 +18,7 @@ import {
 import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
+  PROJECT_CARD_GRID,
   type ProyectoDisponibleResumen,
 } from '@/components/projects/available-project-card';
 import { apiFetch } from '@/lib/api/client';
@@ -177,7 +178,7 @@ export default function ProyectosPage() {
         )}
 
         {isLoading && (
-          <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2" role="status" aria-label="Cargando proyectos">
+          <div className={PROJECT_CARD_GRID} role="status" aria-label="Cargando proyectos">
             {Array.from({ length: 6 }).map((_, i) => (
               <AvailableProjectCardSkeleton key={i} />
             ))}
@@ -244,7 +245,7 @@ export default function ProyectosPage() {
         )}
 
         {!isLoading && !isError && filtrados.length > 0 && (
-          <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+          <div className={PROJECT_CARD_GRID}>
             {filtrados.map((proyecto) => (
               <AvailableProjectCard key={proyecto.idProyecto} proyecto={proyecto} />
             ))}
