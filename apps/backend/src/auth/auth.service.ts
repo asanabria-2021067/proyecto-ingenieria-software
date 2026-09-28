@@ -15,6 +15,15 @@ import { RegisterDto } from "./dto/register.dto";
 import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, REFRESH_TOKEN_MAX_AGE_MS } from "./cookie.util";
 import { getJwtSecret } from "../config/jwt-secret";
 
+/**
+ * G04 (OWASP25-C023): hash bcrypt (cost 10, el mismo de registro y reset) de
+ * un valor aleatorio descartado. Cuando el correo no existe se compara contra
+ * él, así el login hace el mismo trabajo criptográfico que con una contraseña
+ * incorrecta y el tiempo de respuesta no revela si la cuenta existe. Ninguna
+ * contraseña coincide con este hash.
+ */
+export const UNKNOWN_USER_PASSWORD_HASH = "$2b$10$aIZFrVp.yjl7jr05RXCHVeqgnl4MBvycTKQSNmO.YZyOxlZpEtLR.";
+
 interface ResetTokenPayload {
   tipo: string;
   idSolicitud: number;
@@ -72,16 +81,13 @@ export class AuthService {
       where: { correo: loginDto.correo },
     });
 
-    if (!usuario) {
-      throw new UnauthorizedException("Credenciales invalidas");
-    }
-
+    // Sin bifurcación temprana: exista o no la cuenta, siempre hay un bcrypt.compare.
     const contrasenaValida = await bcrypt.compare(
       loginDto.contrasena,
-      usuario.contrasena,
+      usuario?.contrasena ?? UNKNOWN_USER_PASSWORD_HASH,
     );
 
-    if (!contrasenaValida) {
+    if (!usuario || !contrasenaValida) {
       throw new UnauthorizedException("Credenciales invalidas");
     }
 
