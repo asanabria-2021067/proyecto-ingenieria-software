@@ -321,6 +321,11 @@ jobs:
           # a 1 (nginx del host) es una decision del administrador tras cerrar
           # los puertos publicos 3000/3001.
           TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '0' }}
+          # G04 (OWASP25-C021 + P5/T19): interfaz publicada de backend/frontend.
+          # '0.0.0.0' reproduce la exposicion actual; '127.0.0.1' es la variante
+          # loopback que activa el administrador (solo esos dos valores).
+          BACKEND_BIND: ${{ vars.BACKEND_BIND || '0.0.0.0' }}
+          FRONTEND_BIND: ${{ vars.FRONTEND_BIND || '0.0.0.0' }}
         run: |
           set -euo pipefail
           umask 077
@@ -328,6 +333,12 @@ jobs:
             echo "TRUST_PROXY_HOPS debe ser un entero >= 0" >&2
             exit 1
           fi
+          for bind in "$BACKEND_BIND" "$FRONTEND_BIND"; do
+            case "$bind" in
+              0.0.0.0|127.0.0.1) ;;
+              *) echo "BACKEND_BIND/FRONTEND_BIND solo admiten 0.0.0.0 o 127.0.0.1" >&2; exit 1 ;;
+            esac
+          done
           work="$RUNNER_TEMP/deploy-env"
           mkdir -p "$work"
           trap 'rm -rf "$work"' EXIT
@@ -348,6 +359,8 @@ jobs:
             printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"
             printf 'TRUST_PROXY_HOPS=%s\n' "$TRUST_PROXY_HOPS"
+            printf 'BACKEND_BIND=%s\n' "$BACKEND_BIND"
+            printf 'FRONTEND_BIND=%s\n' "$FRONTEND_BIND"
           } > "$work/env"
           ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             -o UserKnownHostsFile="$work/known_hosts" "$SERVER_USER@$SERVER_IP" \
