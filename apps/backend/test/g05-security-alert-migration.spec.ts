@@ -30,16 +30,63 @@ describe('G05-C11: tipo de notificación de alerta de seguridad', () => {
     expect(sql).not.toMatch(/\b(CREATE|DROP|INSERT|UPDATE|DELETE|RENAME|TRUNCATE|ALTER\s+TABLE)\b/i);
   });
 
-  it('schema.prisma añade el valor al final del enum sin reordenar los existentes', () => {
+  it('schema.prisma agrega el valor tras HORAS_ACREDITADAS sin reordenar los existentes', () => {
+    // Valores del enum previos a esta migración (S7 M6 y anteriores). Otro
+    // valor puede agregarse en paralelo tras HORAS_ACREDITADAS (p. ej.
+    // RECORDATORIO_EVENTO de HU-169) sin que esta prueba se rompa: lo único
+    // que le importa es que ALERTA_SEGURIDAD llegue después y que ninguno de
+    // estos cambie de orden relativo.
+    const VALORES_PREVIOS = [
+      'NUEVA_POSTULACION',
+      'POSTULACION_RESUELTA',
+      'TAREA_ASIGNADA',
+      'EVIDENCIA_REVISADA',
+      'PROYECTO_PUBLICADO',
+      'HORAS_VALIDADAS',
+      'CERTIFICADO_EMITIDO',
+      'PARTICIPACION_ACTUALIZADA',
+      'PROYECTO_EN_REVISION',
+      'PROYECTO_OBSERVADO',
+      'PROYECTO_APROBADO',
+      'PROYECTO_ACTUALIZADO',
+      'CAMBIO_ESTADO_PROYECTO',
+      'SOLICITUD_CIERRE_PROYECTO',
+      'CIERRE_APROBADO',
+      'CIERRE_RECHAZADO',
+      'TAREA_ACTUALIZADA',
+      'HITO_ACTUALIZADO',
+      'COMENTARIO_PROYECTO',
+      'COMENTARIO_TAREA',
+      'COMENTARIO_HITO',
+      'MENSAJE_REVISION',
+      'PROYECTO_ADVERTENCIA_INACTIVIDAD',
+      'ROL_ABANDONADO',
+      'ROL_ASIGNADO_LIDER',
+      'ROL_ACTUALIZADO',
+      'SOLICITUD_RECUPERACION_CONTRASENA',
+      'SOLICITUD_AMISTAD',
+      'AMISTAD_ACEPTADA',
+      'NUEVO_SEGUIDOR',
+      'APELACION_LIDERAZGO_RECIBIDA',
+      'APELACION_LIDERAZGO_RESUELTA',
+      'LIDERAZGO_ACTUALIZADO',
+      'POSTULACION_RECHAZADA_POR_CIERRE',
+      'CIERRE_CORRECCION_DOCUMENTAL',
+      'CIERRE_DEVUELTO_A_EJECUCION',
+      'HORAS_CONSOLIDADAS',
+      'HORAS_ACREDITADAS',
+    ];
+
     const schema = readRepoFile('apps/backend/prisma/schema.prisma');
     const body = /enum TipoNotificacion \{([\s\S]*?)\}/.exec(schema)?.[1] ?? '';
     const values = body
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith('//'));
-    expect(values.at(-1)).toBe('ALERTA_SEGURIDAD');
-    expect(values.slice(0, -1).at(-1)).toBe('HORAS_ACREDITADAS');
+
     expect(values.filter((value) => value === 'ALERTA_SEGURIDAD')).toHaveLength(1);
+    expect(values.indexOf('ALERTA_SEGURIDAD')).toBeGreaterThan(values.indexOf('HORAS_ACREDITADAS'));
+    expect(values.filter((value) => VALORES_PREVIOS.includes(value))).toEqual(VALORES_PREVIOS);
   });
 
   it('el cliente Prisma generado conoce el valor', () => {
