@@ -29,18 +29,23 @@ async function desactivarTour(page: Page) {
   });
 }
 
-/** Abre (o crea, si no existe todavía) la conversación individual con `nombreOtro`. */
+/**
+ * Abre (o crea, si no existe todavía) la conversación individual con
+ * `nombreOtro`. La lista de chats vive en el dock global (botón "Mensajes",
+ * abajo a la derecha), no en el sidebar del proyecto — crear uno nuevo sí
+ * sigue siendo una acción del proyecto ("Nuevo chat del proyecto").
+ */
 async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  const existente = page
-    .locator('aside')
-    .getByRole('button', { name: new RegExp(nombreOtro) });
+  await page.getByRole('button', { name: /^mensajes/i }).click();
+  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
 
   if (await existente.count()) {
     await existente.first().click();
     return;
   }
 
-  await page.getByLabel('Nuevo chat').click();
+  await page.getByRole('button', { name: /^mensajes/i }).click(); // cierra la lista, vacía
+  await page.getByRole('button', { name: /nuevo chat/i }).click();
   await page.getByRole('button', { name: 'Individual' }).click();
   await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
   await page.getByRole('button', { name: 'Crear chat' }).click();
