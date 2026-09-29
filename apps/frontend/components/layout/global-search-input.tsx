@@ -301,8 +301,11 @@ export function GlobalSearchInput({
         )}
       </div>
 
+      {/* z-index por encima del overlay del tour de onboarding (react-joyride,
+          zIndex 10000 en OnboardingTour.tsx) — si no, el tour intercepta los
+          clicks de este dropdown mientras esta activo (T-231). */}
       {showDropdown && (
-        <div className="absolute left-1/2 top-full z-50 mt-2 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-card border border-outline-variant bg-card shadow-raised">
+        <div className="absolute left-1/2 top-full z-[10050] mt-2 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-card border border-outline-variant bg-card shadow-raised">
           <div
             role="tablist"
             aria-label="Filtrar resultados por tipo"
