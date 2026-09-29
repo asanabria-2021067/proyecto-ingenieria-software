@@ -404,7 +404,7 @@ export default function PersonasPage() {
           <h2 className="type-section mb-card">Solicitudes pendientes</h2>
           <div className="flex flex-col gap-tight">
             {solicitudes.map((s) => (
-              <div key={s.idAmistad} className="card-base flex items-center justify-between gap-tight py-tight">
+              <div key={s.idAmistad} className="card-base flex flex-wrap items-center justify-between gap-tight py-tight">
                 <div className="flex items-center gap-tight">
                   <Avatar>
                     {s.solicitante.fotoUrl && (
@@ -463,7 +463,7 @@ export default function PersonasPage() {
 
       <div>
         <main>
-          <div className="flex items-center gap-inline">
+          <div className="flex flex-wrap items-center gap-inline">
             <DashboardSearchField
               containerClassName="flex-1"
               value={q}
