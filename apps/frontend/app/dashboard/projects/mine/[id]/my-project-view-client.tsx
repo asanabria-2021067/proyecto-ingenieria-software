@@ -457,7 +457,7 @@ export default function MyProjectViewClient({ id }: Props) {
                   {fieldErrors.descripcionProyecto && <p className="text-xs text-error mt-1">{fieldErrors.descripcionProyecto}</p>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>Tipo <span className="text-error">*</span></label>
                     <Select value={form.tipoProyecto || '__NONE__'} onValueChange={(v) => updateForm('tipoProyecto', v === '__NONE__' ? '' : v)}>
@@ -493,7 +493,7 @@ export default function MyProjectViewClient({ id }: Props) {
                   <textarea className={`${inputClass} resize-none`} rows={2} placeholder="Objetivos principales del proyecto" value={form.objetivosProyecto} onChange={(e) => updateForm('objetivosProyecto', e.target.value)} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>Contexto académico</label>
                     <input className={inputClass} placeholder="ej. Tesis, proyecto de curso..." value={form.contextoAcademico} onChange={(e) => updateForm('contextoAcademico', e.target.value)} />
@@ -504,7 +504,7 @@ export default function MyProjectViewClient({ id }: Props) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>Fecha de inicio</label>
                     <input type="date" className={inputClass} value={form.fechaInicio} onChange={(e) => updateForm('fechaInicio', e.target.value)} />
@@ -553,7 +553,7 @@ export default function MyProjectViewClient({ id }: Props) {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                           <label className={labelClass}>Nombre del rol <span className="text-error">*</span></label>
                           <input
