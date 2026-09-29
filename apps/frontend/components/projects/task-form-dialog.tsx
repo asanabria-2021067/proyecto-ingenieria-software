@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { TaskFormFields } from '@/components/projects/task-form-fields';
 import { getApiErrorMessage } from '@/components/projects/api-error';
-import uvgSwal from '@/lib/swal';
+import { toast } from 'sonner';
 import {
   SIN_ASIGNAR,
   buildCreatePayload,
@@ -35,19 +35,11 @@ import type { TareaPublicaDTO } from '@/lib/types/tasks';
 type ProjectTasksHook = ReturnType<typeof useProjectTasks>;
 
 function mostrarAvisoTareaGuardada(mode: 'create' | 'edit') {
-  void uvgSwal.fire({
-    toast: true,
-    backdrop: false,
-    icon: 'success',
-    title: mode === 'create' ? 'Tarea creada' : 'Cambios guardados',
-    text:
+  toast.success(mode === 'create' ? 'Tarea creada' : 'Cambios guardados', {
+    description:
       mode === 'create'
         ? 'La tarea se agregó al tablero.'
         : 'La tarea se actualizó correctamente.',
-    position: 'top-end',
-    timer: 1800,
-    timerProgressBar: true,
-    showConfirmButton: false,
   });
 }
 
