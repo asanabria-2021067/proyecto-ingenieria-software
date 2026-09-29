@@ -5,8 +5,10 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   Briefcase,
+  Code2,
   GraduationCap,
   Mail,
+  Share2,
   Users,
 } from 'lucide-react';
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
@@ -28,6 +30,14 @@ import {
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { useAccionesAmistad, usePerfilUsuario } from '@/hooks/use-social';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
+import { aviso } from '@/lib/mensajes';
+
+function compartirPerfil() {
+  navigator.clipboard
+    .writeText(window.location.href)
+    .then(() => aviso.exito('Enlace copiado', 'El enlace de este perfil se copió al portapapeles.'))
+    .catch(() => aviso.error('No se pudo copiar', 'Copia el enlace manualmente desde la barra de direcciones.'));
+}
 
 function motivoAfinidad(mismaCarrera: boolean, amigosEnComun: number): string | null {
   if (amigosEnComun > 0) {
@@ -92,43 +102,57 @@ export default function PerfilPersonaPage() {
 
   return (
     <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
-      <Link
-        href="/dashboard/personas"
-        className="type-body mb-section inline-flex items-center gap-tight font-medium text-primary hover:underline"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        Volver a Personas
-      </Link>
+      <div className="mb-section flex items-center justify-between gap-tight">
+        <Link
+          href="/dashboard/personas"
+          className="type-body inline-flex items-center gap-tight font-medium text-primary hover:underline"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Volver a Personas
+        </Link>
+        <button
+          type="button"
+          onClick={compartirPerfil}
+          className="inline-flex items-center gap-tight rounded-control border border-outline-variant bg-card px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-container"
+        >
+          <Share2 className="size-4 text-text-secondary" aria-hidden="true" />
+          Compartir perfil
+        </button>
+      </div>
 
       <div className="layout-grid">
         <div className="layout-main space-y-section">
           {/* Encabezado */}
-          <section className="card-base flex flex-col items-center gap-tight py-section text-center">
-            <Avatar className="size-20">
+          <section className="card-base flex flex-col items-center gap-tight text-center sm:flex-row sm:items-start sm:text-left">
+            <Avatar className="size-24 shrink-0">
               {perfil.fotoUrl && <AvatarImage src={perfil.fotoUrl} alt="" />}
               <AvatarFallback className="type-display text-text-secondary">
                 {getIniciales(perfil.nombre, perfil.apellido)}
               </AvatarFallback>
             </Avatar>
-            <h1 className="type-display text-text-primary">{nombreCompleto}</h1>
-            {perfil.carrera && <p className="type-body text-text-secondary">{perfil.carrera}</p>}
+            <div className="flex min-w-0 flex-1 flex-col items-center gap-tight sm:items-start">
+              <div>
+                <h1 className="type-display text-text-primary">{nombreCompleto}</h1>
+                {perfil.carrera && <p className="type-body text-text-secondary">{perfil.carrera}</p>}
+              </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-tight">
-              {perfil.semestre != null && (
-                <span className={`pill font-semibold ${getSemestreBadgeStyle(perfil.semestre)}`}>
-                  Semestre {perfil.semestre}
-                </span>
-              )}
-              {motivo && <span className="pill pill-accent">{motivo}</span>}
-            </div>
+              <div className="flex flex-wrap items-center justify-center gap-tight sm:justify-start">
+                {perfil.semestre != null && (
+                  <span className={`pill font-semibold ${getSemestreBadgeStyle(perfil.semestre)}`}>
+                    Semestre {perfil.semestre}
+                  </span>
+                )}
+                {motivo && <span className="pill pill-accent">{motivo}</span>}
+              </div>
 
-            <div className="mt-stack grid w-full max-w-sm grid-cols-2 gap-tight">
-              <Button variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick}>
-                {amistad.label}
-              </Button>
-              <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick}>
-                {seguimiento.label}
-              </Button>
+              <div className="mt-tight grid w-full max-w-sm grid-cols-2 gap-tight">
+                <Button variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick}>
+                  {amistad.label}
+                </Button>
+                <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick}>
+                  {seguimiento.label}
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -136,7 +160,10 @@ export default function PerfilPersonaPage() {
             <section className="card-base space-y-stack">
               {perfil.habilidades.length > 0 && (
                 <div>
-                  <h2 className="type-meta uppercase tracking-wide">Habilidades</h2>
+                  <h2 className="type-meta flex items-center gap-tight uppercase tracking-wide">
+                    <Code2 className="size-4 text-primary" aria-hidden="true" />
+                    Habilidades
+                  </h2>
                   <div className="mt-tight flex flex-wrap gap-tight">
                     {perfil.habilidades.map((h) => (
                       <span key={h} className={`pill font-semibold ${getHabilidadBadgeStyle(h)}`}>
@@ -165,10 +192,10 @@ export default function PerfilPersonaPage() {
           <section className="card-base">
             <div className="mb-stack flex items-center justify-between gap-tight">
               <h2 className="type-subtitle flex items-center gap-tight text-text-primary">
-                <Briefcase className="size-4 text-text-secondary" aria-hidden="true" />
+                <Briefcase className="size-4 text-primary" aria-hidden="true" />
                 Proyectos activos
               </h2>
-              <span className="type-meta">
+              <span className="pill pill-neutral">
                 {perfil.proyectosActivos.length}{' '}
                 {perfil.proyectosActivos.length === 1 ? 'colaboración' : 'colaboraciones'}
               </span>
