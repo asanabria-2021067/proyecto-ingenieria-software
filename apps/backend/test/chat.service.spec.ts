@@ -12,7 +12,7 @@ import { ChatService } from '../src/chat/chat.service';
 function makePrisma() {
   return {
     proyecto: { findFirst: vi.fn() },
-    conversacion: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
+    conversacion: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
     conversacionParticipante: { update: vi.fn(), findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
     mensajeChat: { create: vi.fn(), count: vi.fn(), findMany: vi.fn() },
@@ -221,6 +221,127 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
 
       const llamada = prisma.conversacion.findMany.mock.calls[0][0];
       expect(llamada.where.OR).toBeUndefined();
+    });
+  });
+
+  describe('deleteConversation — dock global de chat', () => {
+    it('marca eliminadaEn y notifica al resto de participantes, no a quien elimina', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(
+        conversacionRow('EN_PROGRESO', { participantes: [{ idUsuario: 1 }, { idUsuario: 2 }] }),
+      );
+      prisma.conversacion.update.mockResolvedValue({});
+
+      await service.deleteConversation(10, 5, 1);
+
+      expect(prisma.conversacion.update).toHaveBeenCalledWith({
+        where: { idConversacion: 5 },
+        data: { eliminadaEn: expect.any(Date) },
+      });
+      expect(gateway.notifyConversationCreated).toHaveBeenCalledWith(5, [2]);
+    });
+
+    it('rechaza si el usuario no participa en la conversación', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(
+        conversacionRow('EN_PROGRESO', { participantes: [{ idUsuario: 2 }, { idUsuario: 3 }] }),
+      );
+
+      await expect(service.deleteConversation(10, 5, 1)).rejects.toThrow(ForbiddenException);
+      expect(prisma.conversacion.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateConversation — silenciar y prioridad', () => {
+    it('acepta silenciada y esPrioritaria igual que los campos existentes', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+      prisma.conversacion.update.mockResolvedValue({});
+
+      await service.updateConversation(10, 5, 1, { silenciada: true, esPrioritaria: false });
+
+      expect(prisma.conversacion.update).toHaveBeenCalledWith({
+        where: { idConversacion: 5 },
+        data: { silenciada: true, esPrioritaria: false },
+      });
+    });
+  });
+
+  describe('listAllConversations — dock global de chat', () => {
+    function conversacionGlobalRow(
+      overrides: Partial<{ idConversacion: number; esFavorita: boolean }> = {},
+    ) {
+      return {
+        idConversacion: overrides.idConversacion ?? 1,
+        idProyecto: 10,
+        tipo: 'INDIVIDUAL' as const,
+        nombre: null,
+        nombrePersonalizado: null,
+        proyecto: { idProyecto: 10, tituloProyecto: 'Feria de Ciencias UVG 2026' },
+        participantes: [
+          { idUsuario: 1, ultimaLecturaEn: null, usuario: USUARIO },
+          { idUsuario: 2, ultimaLecturaEn: null, usuario: { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null } },
+        ],
+        mensajes: [],
+        esFavorita: overrides.esFavorita ?? false,
+        archivadaEn: null,
+        silenciada: false,
+        esPrioritaria: true,
+      };
+    }
+
+    it('excluye proyectos CERRADO y conversaciones eliminadas del where', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([]);
+
+      await service.listAllConversations(1);
+
+      const llamada = prisma.conversacion.findMany.mock.calls[0][0];
+      expect(llamada.where.eliminadaEn).toBeNull();
+      expect(llamada.where.proyecto).toEqual({ estadoProyecto: { not: 'CERRADO' } });
+    });
+
+    it('con q, busca por nombre, participante y contenido de mensajes', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([]);
+
+      await service.listAllConversations(1, 'rosa');
+
+      const llamada = prisma.conversacion.findMany.mock.calls[0][0];
+      expect(llamada.where.OR).toEqual([
+        { nombre: { contains: 'rosa', mode: 'insensitive' } },
+        { nombrePersonalizado: { contains: 'rosa', mode: 'insensitive' } },
+        {
+          participantes: {
+            some: {
+              idUsuario: { not: 1 },
+              usuario: {
+                OR: [
+                  { nombre: { contains: 'rosa', mode: 'insensitive' } },
+                  { apellido: { contains: 'rosa', mode: 'insensitive' } },
+                ],
+              },
+            },
+          },
+        },
+        { mensajes: { some: { contenido: { contains: 'rosa', mode: 'insensitive' } } } },
+      ]);
+    });
+
+    it('favoritas primero', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([
+        conversacionGlobalRow({ idConversacion: 1, esFavorita: false }),
+        conversacionGlobalRow({ idConversacion: 2, esFavorita: true }),
+      ]);
+      prisma.mensajeChat.count.mockResolvedValue(0);
+
+      const resultado = await service.listAllConversations(1);
+
+      expect(resultado.map((c) => c.idConversacion)).toEqual([2, 1]);
+    });
+
+    it('incluye el proyecto de cada conversación (necesario para el badge del dock)', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([conversacionGlobalRow()]);
+      prisma.mensajeChat.count.mockResolvedValue(0);
+
+      const resultado = await service.listAllConversations(1);
+
+      expect(resultado[0].proyecto).toEqual({ idProyecto: 10, tituloProyecto: 'Feria de Ciencias UVG 2026' });
     });
   });
 });
