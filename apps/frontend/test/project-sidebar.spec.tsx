@@ -32,11 +32,11 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('@/hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
-// Doble mínimo: el panel real tiene su propio spec; aquí importa si está
-// montado y habilitado, no su contenido.
-vi.mock('@/components/projects/project-chat-panel', () => ({
-  ProjectChatPanel: ({ habilitado }: { habilitado: boolean }) =>
-    habilitado ? createElement('section', { 'data-testid': 'project-chat-panel' }, 'Chats del proyecto') : null,
+// Doble mínimo: el dock global de chat tiene su propio spec; aquí solo
+// importa si el diálogo de "Nuevo chat" se abre, no su contenido.
+vi.mock('@/components/chat-dock/new-chat-dialog', () => ({
+  NewChatDialog: ({ open }: { open: boolean }) =>
+    open ? createElement('div', { 'data-testid': 'new-chat-dialog' }, 'Nuevo chat') : null,
 }));
 vi.mock('@/hooks/use-exit-request', () => ({ useCurrentExitRequest: vi.fn(() => ({ request: null })) }));
 vi.mock('@/components/projects/leave-project-modal', () => ({ LeaveProjectModal: () => null }));
@@ -351,7 +351,7 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
     expect(screen.queryByText('Líder')).not.toBeInTheDocument();
     expect(screen.queryByText('Participante')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Acciones del proyecto' })).not.toBeInTheDocument();
-    expect(screen.queryByTestId('project-chat-panel')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /nuevo chat/i })).not.toBeInTheDocument();
   });
 
   it('arranca expandida (w-64) y el control anuncia aria-expanded y a qué lista controla', () => {
@@ -432,18 +432,16 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
     expect(screen.getByRole('button', { name: 'Expandir navegación del proyecto' })).toBeInTheDocument();
   });
 
-  it('colapsada, el panel de chat sigue montado (oculto) y el icono de chats expande la sidebar', () => {
+  it('colapsada, el icono de nuevo chat sigue disponible y abre el diálogo sin expandir la sidebar', () => {
     mockParticipante();
     renderSidebar();
     colapsar();
 
-    const panel = screen.getByTestId('project-chat-panel');
-    expect(panel).toBeInTheDocument();
-    expect(panel.parentElement).toHaveClass('hidden');
+    expect(screen.queryByTestId('new-chat-dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo chat del proyecto' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar chats del proyecto' }));
-    expect(aside()).toHaveAttribute('data-state', 'expanded');
-    expect(screen.getByTestId('project-chat-panel').parentElement).not.toHaveClass('hidden');
+    expect(aside()).toHaveAttribute('data-state', 'collapsed');
+    expect(screen.getByTestId('new-chat-dialog')).toBeInTheDocument();
   });
 });
 // Sidebar del proyecto como navegación secundaria: fondo propio, encabezado
@@ -520,22 +518,21 @@ describe('ProjectSidebar — identidad de navegación del proyecto', () => {
     expect(inactivo).toHaveClass('font-medium', 'text-text-secondary');
   });
 
-  it('el menú ocupa el espacio libre y el chat del proyecto queda al final de la sidebar', () => {
+  it('el menú ocupa el espacio libre y el botón de nuevo chat queda al final de la sidebar', () => {
     renderSidebar();
 
     const nav = within(aside()).getByRole('navigation', { name: 'Navegación del proyecto' });
     expect(nav).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto');
-    const chat = screen.getByTestId('project-chat-panel');
-    expect(nav.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(aside().lastElementChild).toContainElement(chat);
+    const boton = screen.getByRole('button', { name: 'Nuevo chat del proyecto' });
+    expect(nav.compareDocumentPosition(boton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('colapsada, el botón de chat se anuncia como «Chat del proyecto»', async () => {
+  it('colapsada, el botón de chat se anuncia como «Nuevo chat»', async () => {
     window.localStorage.setItem('uvg-collab-project-sidebar', 'collapsed');
     renderSidebar();
 
-    const boton = screen.getByRole('button', { name: 'Mostrar chats del proyecto' });
+    const boton = screen.getByRole('button', { name: 'Nuevo chat del proyecto' });
     fireEvent.focus(boton);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Chat del proyecto');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Nuevo chat');
   });
 });
