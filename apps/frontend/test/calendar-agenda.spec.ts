@@ -25,6 +25,12 @@ function evento(overrides: Partial<MiEventoDTO> = {}): MiEventoDTO {
     fechaInicio: '2026-09-23T15:00:00.000Z',
     fechaFin: '2026-09-23T16:00:00.000Z',
     antelacionMinutos: 60,
+    modalidad: 'VIRTUAL',
+    ubicacionLat: null,
+    ubicacionLng: null,
+    ubicacionNombre: null,
+    linkSesion: null,
+    rolesDestino: [],
     proyecto: { idProyecto: 10, tituloProyecto: 'Proyecto X' },
     ...overrides,
   };
