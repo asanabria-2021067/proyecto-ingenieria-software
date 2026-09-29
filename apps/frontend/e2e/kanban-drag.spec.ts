@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './support/test';
 import { login } from './support/auth';
 
 // carlos.mendoza es el líder del Proyecto 1 (seed), así que tiene el handle

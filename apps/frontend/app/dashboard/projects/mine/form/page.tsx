@@ -16,6 +16,7 @@ import {
   STEPS, newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, partialProjectSchema, zodToFieldErrors,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from './types';
+import { normalizeUrlInput } from '@/lib/security/safe-url';
 
 // Estados con edición completa (asistente de 3 pasos) vs. edición PARCIAL
 // (subconjunto seguro: proyecto ya publicado / en progreso). El resto no es
@@ -129,7 +130,7 @@ function NewProjectFormContent() {
     objetivosProyecto: form.objetivosProyecto || undefined,
     ubicacionProyecto: form.ubicacionProyecto || undefined,
     contextoAcademico: form.contextoAcademico || undefined,
-    urlRecursoExterno: form.urlRecursoExterno || undefined,
+    urlRecursoExterno: normalizeUrlInput(form.urlRecursoExterno),
     fechaInicio: form.fechaInicio || undefined,
     fechaFinEstimada: form.fechaFinEstimada || undefined,
     roles: form.roles.length > 0 ? form.roles.map((r) => ({
@@ -251,7 +252,7 @@ function NewProjectFormContent() {
     objetivosProyecto: form.objetivosProyecto || undefined,
     ubicacionProyecto: form.ubicacionProyecto || undefined,
     contextoAcademico: form.contextoAcademico || undefined,
-    urlRecursoExterno: form.urlRecursoExterno || undefined,
+    urlRecursoExterno: normalizeUrlInput(form.urlRecursoExterno),
     fechaFinEstimada: form.fechaFinEstimada || undefined,
   });
 

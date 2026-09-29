@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 import { getFrontendUrl } from './common/utils/cookie';
+import { applyTrustProxy } from './config/trust-proxy';
+import { API_HELMET_OPTIONS } from './config/security-headers';
 const cookieParser = require('cookie-parser');
 
 async function bootstrap() {
@@ -11,8 +13,12 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   app.setGlobalPrefix('api');
 
-  // Security headers
-  app.use(helmet());
+  // G04 (OWASP25-C021 + D2): 0 por defecto = no se confía en X-Forwarded-For.
+  applyTrustProxy(app, configService.get<number>('app.trustProxyHops', 0));
+
+  // Security headers. G06 (NBD-1 + C008): HSTS explícito (1 año,
+  // includeSubDomains, sin preload); el resto de Helmet con sus defaults.
+  app.use(helmet(API_HELMET_OPTIONS));
 
   // Cookie parser
   app.use(cookieParser());

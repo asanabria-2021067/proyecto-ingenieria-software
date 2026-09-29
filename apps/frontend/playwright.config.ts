@@ -3,6 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 // Suite de humo (T-125): solo 3 flujos críticos, un navegador. La cobertura
 // multi-browser/rendimiento/carga queda para sprints posteriores.
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
+// G02-C14 (OWASP25-C033): en CI (E2E_PRODUCTION_SERVER=1) se prueba el build de
+// producción ya compilado (`next start`), no el dev server. En local se
+// mantiene `npm run dev`.
+const productionServer = process.env.E2E_PRODUCTION_SERVER === '1';
 
 export default defineConfig({
   testDir: './e2e',
@@ -32,7 +36,7 @@ export default defineConfig({
   // reutiliza en vez de levantar uno nuevo. El backend + base de datos
   // deben estar arriba aparte (docker-compose.dev.yml).
   webServer: {
-    command: 'npm run dev',
+    command: productionServer ? 'npm run start' : 'npm run dev',
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

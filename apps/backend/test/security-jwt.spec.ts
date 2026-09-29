@@ -6,6 +6,7 @@ import { AuthService } from '../src/auth/auth.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
+import { SYNTHETIC_JWT_SECRET } from './helpers/synthetic-jwt-secret';
 
 vi.mock('bcryptjs', () => ({
   compare: vi.fn(),
@@ -28,7 +29,8 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
  * asumida.
  */
 
-const SECRET = process.env.JWT_SECRET as string;
+// G01 · OWASP25-C019: secreto sintético del setupFile; sin fallback predecible.
+const SECRET = SYNTHETIC_JWT_SECRET;
 
 function makeStrategy(usuario: { estado: string } | null = { estado: 'ACTIVO' }) {
   const prisma = { usuario: { findUnique: vi.fn().mockResolvedValue(usuario) } };
@@ -175,7 +177,8 @@ describe('AuthService — contenido del payload emitido', () => {
       usuario: {
         findUnique: vi
           .fn()
-          .mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu.gt', contrasena: 'hash-secreto' }),
+          .mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu.gt', contrasena: 'hash-secreto', estado: 'ACTIVO' }),
+        update: vi.fn().mockResolvedValue({}),
       },
       tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     };

@@ -20,6 +20,7 @@ import {
 import { projectMembersQueryKey, projectTeamSummaryQueryKey } from '@/lib/query-keys/members';
 import { adminAppealsPrefix, adminProjectDetailQueryKey, adminProjectsPrefix } from '@/lib/query-keys/admin-projects';
 import { projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
+import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 export interface Notification {
   tipoNotificacion: string;
@@ -78,13 +79,11 @@ export function useRealtimeNotifications(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    // El esquema ws/wss se deriva de cómo se sirve la página (no del prefijo
-    // http/https de NEXT_PUBLIC_API_URL): si la página es https y el env var
-    // quedó en http (proxy externo con TLS añadido después del build), un
-    // ws:// literal sería mixed content y el navegador lo bloquearía.
-    const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsUrl = apiUrl.replace(/^https?/, wsScheme);
+    // G07 (P2/T12): con NEXT_PUBLIC_API_URL horneada vacía (variante
+    // same-origin) el socket usa el origen de la página; con una URL explícita
+    // se conserva el comportamiento previo, con el esquema ws/wss de la página
+    // (ver lib/realtime/socket-url.ts).
+    const wsUrl = realtimeBaseUrl(process.env.NEXT_PUBLIC_API_URL, window.location);
 
     // La sesión vive en la cookie httpOnly access_token; `withCredentials`
     // hace que el handshake (polling + upgrade) la adjunte, sin que el JS

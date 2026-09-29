@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DynamicModule, Type } from '@nestjs/common';
+import { MODULE_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { AppController } from '../src/app.controller';
 import { ApplicationsController } from '../src/applications/applications.controller';
 import { AuthController } from '../src/auth/auth.controller';
@@ -9,9 +11,7 @@ import { NotificationsController } from '../src/notifications/notifications.cont
 import { ProjectsController } from '../src/projects/projects.controller';
 import { RevisionesController } from '../src/revisiones/revisiones.controller';
 import { UsersController } from '../src/users/users.controller';
-import { ValidationController } from '../src/validation/validation.controller';
 import { CatalogsService } from '../src/catalogs/catalogs.service';
-import { ValidationService } from '../src/validation/validation.service';
 import { TasksController } from '../src/tasks/tasks.controller';
 
 describe('Controllers and basic services', () => {
@@ -27,8 +27,10 @@ describe('Controllers and basic services', () => {
         register: vi.fn().mockResolvedValue(tokens),
       } as unknown as ConstructorParameters<typeof AuthController>[0],
     );
-    const res = { cookie: vi.fn() } as unknown as Parameters<AuthController['login']>[1];
-    await auth.login({ correo: 'a', contrasena: 'b' }, res);
+    const res = { cookie: vi.fn() } as unknown as Parameters<AuthController['login']>[2];
+    // G05-C09: login recibe la petición para el origen del evento de seguridad (req.ip).
+    const req = { ip: '127.0.0.1', app: { get: () => false } } as unknown as Parameters<AuthController['login']>[1];
+    await auth.login({ correo: 'a', contrasena: 'b' }, req, res);
     await auth.register({} as Parameters<AuthController['register']>[0], res);
 
     const usersSvc = {
@@ -194,13 +196,55 @@ describe('Controllers and basic services', () => {
 
     tasks.findOne(1, 5, { userId: 9 });
     expect(tasksService.findOne).toHaveBeenCalledWith(1, 5, 9);
-
-    const validationService = new ValidationService(
-      {} as ConstructorParameters<typeof ValidationService>[0],
-    );
-    const validation = new ValidationController(validationService);
-    expect(validation.findAll()).toEqual({ message: 'Not implemented yet' });
-    expect(validation.create({})).toEqual({ message: 'Not implemented yet' });
-
   });
+
+  // G01-C10 · OWASP25-C030 (cambio de test tipo B): este spec exigía que el
+  // stub anónimo `/api/validaciones` respondiera "Not implemented yet". Era
+  // superficie pública sin función ni autenticación; se retira y ahora se
+  // exige que ningún controller del grafo real de AppModule registre la ruta
+  // (una petición a ella cae en el 404 por defecto de Nest).
+  it('AppModule ya no expone el stub anónimo /api/validaciones', async () => {
+    process.env.FRONTEND_URL ??= 'http://localhost:3000';
+    const { AppModule } = await import('../src/app.module');
+
+    const visited = new Set<unknown>();
+    const paths: string[] = [];
+    const visit = async (entry: unknown): Promise<void> => {
+      let resolved = await entry;
+      if (resolved && typeof resolved === 'object' && 'forwardRef' in resolved) {
+        resolved = (resolved as { forwardRef: () => unknown }).forwardRef();
+      }
+      const moduleClass = (
+        resolved && typeof resolved === 'object' && 'module' in resolved
+          ? (resolved as DynamicModule).module
+          : resolved
+      ) as Type<unknown>;
+      if (!moduleClass || visited.has(moduleClass)) {
+        return;
+      }
+      visited.add(moduleClass);
+      const controllers = [
+        ...((Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, moduleClass) ?? []) as Type<unknown>[]),
+        ...(((resolved as DynamicModule).controllers ?? []) as Type<unknown>[]),
+      ];
+      for (const controller of controllers) {
+        const routePath = Reflect.getMetadata(PATH_METADATA, controller) as string | string[] | undefined;
+        paths.push(...[routePath ?? ''].flat());
+      }
+      const imports = [
+        ...((Reflect.getMetadata(MODULE_METADATA.IMPORTS, moduleClass) ?? []) as unknown[]),
+        ...((resolved as DynamicModule).imports ?? []),
+      ];
+      for (const child of imports) {
+        await visit(child);
+      }
+    };
+    await visit(AppModule);
+
+    // Guardarraíl: el recorrido encontró los controllers reales.
+    expect(paths).toContain('auth');
+    expect(paths.length).toBeGreaterThan(20);
+    expect(paths.map((p) => p.replace(/^\/+|\/+$/g, ''))).not.toContain('validaciones');
+    // Importar el grafo completo de AppModule es lento bajo instrumentación de cobertura.
+  }, 30_000);
 });
