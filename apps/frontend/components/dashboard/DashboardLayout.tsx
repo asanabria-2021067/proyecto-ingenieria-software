@@ -32,6 +32,8 @@ import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboa
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
+import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
+import { ChatDock } from '@/components/chat-dock/chat-dock';
 import { toast } from 'sonner';
 import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
@@ -149,6 +151,7 @@ export default function DashboardLayout({
   }
 
   return (
+    <ChatDockProvider>
     <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-page">
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
@@ -295,6 +298,8 @@ export default function DashboardLayout({
       </nav>
 
       <OnboardingTour />
+      <ChatDock />
     </div>
+    </ChatDockProvider>
   );
 }
