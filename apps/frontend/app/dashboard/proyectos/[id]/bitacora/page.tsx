@@ -565,7 +565,7 @@ export default function BitacoraPage() {
               <EmptyHeader>
                 <EmptyTitle>Ningún evento coincide con estos filtros.</EmptyTitle>
                 <EmptyDescription>
-                  Prueba a quitar alguno o usa &quot;Limpiar todo&quot; para ver la bitácora completa.
+                  Prueba a quitar alguno o usa «Limpiar todo» para ver la bitácora completa.
                 </EmptyDescription>
               </EmptyHeader>
               <EmptyContent>

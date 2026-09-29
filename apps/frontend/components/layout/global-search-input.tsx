@@ -172,12 +172,14 @@ export function GlobalSearchInput({
     [todos, pestana],
   );
 
-  useEffect(() => {
-    // G02-C08 (OWASP25-C031): supresión puntual sin cambio de comportamiento;
-    // reescribir el reinicio del índice queda para su owner (HU-171).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Reinicia el indice activo cuando cambian los resultados o la pestana,
+  // ajustando el estado durante el render (sin efecto) para no disparar un
+  // segundo render en cascada tras cada busqueda.
+  const [ultimoReset, setUltimoReset] = useState({ data, pestana });
+  if (ultimoReset.data !== data || ultimoReset.pestana !== pestana) {
+    setUltimoReset({ data, pestana });
     setActiveIndex(-1);
-  }, [data, pestana]);
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
