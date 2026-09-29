@@ -1490,6 +1490,13 @@ model Conversacion {
   nombrePersonalizado String?     @db.VarChar(120) @map("nombre_personalizado")
   esFavorita          Boolean     @default(false) @map("es_favorita")
   archivadaEn         DateTime?   @map("archivada_en")
+  // Dock global de chat (estilo LinkedIn): silenciar y la pestaña
+  // Prioritarios/Otros. Mismo patrón que esFavorita/archivadaEn arriba:
+  // campo compartido en Conversacion, no por participante — así ya venía
+  // modelado el menú de 3 puntos en este chat.
+  silenciada    Boolean   @default(false) @map("silenciada")
+  esPrioritaria Boolean   @default(true) @map("es_prioritaria")
+  eliminadaEn   DateTime? @map("eliminada_en")
 
   proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto])
   creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
