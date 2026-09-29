@@ -38,7 +38,10 @@ const MIGRATED_FILES = [
   'components/projects/kanban-column-frame.tsx',
   'components/projects/task-board.utils.ts',
   'components/projects/task-card.tsx',
-  'components/projects/project-chat-panel.tsx',
+  'components/chat-dock/chat-dock.tsx',
+  'components/chat-dock/chat-window.tsx',
+  'components/chat-dock/chat-list-popover.tsx',
+  'components/chat-dock/new-chat-dialog.tsx',
   'components/layout/notifications-bell.tsx',
   'components/ui/toast.tsx',
   // HU-154 (T-214/T-215/T-216): navegación contextual y detalle de proyecto.
