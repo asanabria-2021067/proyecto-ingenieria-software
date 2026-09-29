@@ -3,9 +3,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { register, type RegisterPayload } from '@/lib/services/auth';
-import { aviso } from '@/lib/mensajes';
+import uvgSwal from '@/lib/swal';
 
-function mensajeErrorRegistroToast(error: (Error & { statusCode?: number }) | null): string {
+function mensajeErrorRegistro(error: (Error & { statusCode?: number }) | null): string {
   if (!error) return 'No se pudo completar el registro. Intenta de nuevo.';
   if (error.statusCode === 429) {
     return 'Demasiados intentos de registro. Espera un minuto antes de volver a intentarlo.';
@@ -19,11 +19,22 @@ export function useRegister() {
   return useMutation({
     mutationFn: (data: RegisterPayload) => register(data),
     onSuccess: () => {
-      aviso.exito('Cuenta creada', 'Bienvenido a UVGenius. Redirigiendo…');
+      uvgSwal.fire({
+        icon: 'success',
+        title: 'Cuenta creada',
+        text: 'Bienvenido a UVGenius. Redirigiendo…',
+        timer: 1500,
+        timerProgressBar: true,
+        showConfirmButton: false,
+      });
       setTimeout(() => router.push('/dashboard'), 1500);
     },
     onError: (error) => {
-      aviso.error('No se pudo completar el registro', mensajeErrorRegistroToast(error as Error & { statusCode?: number }));
+      uvgSwal.fire({
+        icon: 'error',
+        title: 'No se pudo completar el registro',
+        text: mensajeErrorRegistro(error as Error & { statusCode?: number }),
+      });
     },
   });
 }
