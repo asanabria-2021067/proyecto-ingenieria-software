@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { Blend, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Pin, Trash2, Users } from 'lucide-react';
+import { Blend, Bookmark, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Pin, Trash2, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { usePinnedProjects } from '@/hooks/use-pinned-projects';
+import { useSaveProject } from '@/hooks/use-save-project';
 import { MODALIDAD_LABEL, TIPO_LABEL } from '@/types';
 import type { ModalidadProyecto, ProyectoResumen, TipoProyecto } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
@@ -287,6 +288,18 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
   const { isPinned, togglePin, maxAlcanzado } = usePinnedProjects(currentUser?.idUsuario ?? null);
   const anclado = isPinned(idProyecto);
 
+  // "Guardar" (bookmark) solo aplica a "Explorar Proyectos": en "Mis
+  // Proyectos" no tiene sentido guardar tu propio proyecto.
+  const esExplorar = props.context !== 'mine';
+  const guardado = esExplorar && Boolean((proyecto as ProyectoDisponibleResumen).guardado);
+  const { guardar, desguardar } = useSaveProject();
+  const guardadoPendiente = guardar.isPending || desguardar.isPending;
+  const toggleGuardado = () => {
+    if (guardadoPendiente) return;
+    if (guardado) desguardar.mutate(idProyecto);
+    else guardar.mutate(idProyecto);
+  };
+
   const tipoStyle = tipoBadgeStyle(tipoProyecto);
   const ModalidadIcon = MODALIDAD_ICON[modalidadProyecto as ModalidadProyecto] ?? MapPin;
 
@@ -424,6 +437,20 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
           {tituloProyecto}
         </h3>
         <div className="flex shrink-0 items-start gap-1.5">
+          {esExplorar && (
+            <button
+              type="button"
+              onClick={toggleGuardado}
+              disabled={guardadoPendiente}
+              aria-pressed={guardado}
+              aria-label={guardado ? `Quitar ${tituloProyecto} de guardados` : `Guardar ${tituloProyecto}`}
+              className={`flex h-6.25 w-6.25 shrink-0 items-center justify-center rounded-[7px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                guardado ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <Bookmark className={`h-3.5 w-3.5 ${guardado ? 'fill-current' : ''}`} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => togglePin({ idProyecto, tituloProyecto })}
