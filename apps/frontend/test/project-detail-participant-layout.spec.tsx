@@ -33,7 +33,7 @@ vi.mock('../hooks/use-project-roles', () => ({ useProjectRoles: vi.fn() }));
 vi.mock('../hooks/use-historical-project', () => ({
   useHistoricalProject: () => ({ data: undefined, isPending: false, isError: false }),
 }));
-vi.mock('../components/projects/project-chat-panel', () => ({ ProjectChatPanel: () => null }));
+vi.mock('../components/chat-dock/new-chat-dialog', () => ({ NewChatDialog: () => null }));
 vi.mock('../components/projects/leave-project-modal', () => ({
   LeaveProjectModal: ({ open }: { open: boolean }) =>
     open ? createElement('div', { role: 'dialog', 'aria-label': 'Solicitar salida del proyecto' }) : null,
@@ -42,10 +42,10 @@ vi.mock('../app/dashboard/projects/[id]/project-detail-client', () => ({
   default: () => createElement('div', { 'data-testid': 'leader-workspace' }),
 }));
 vi.mock('../lib/swal', () => ({ default: { fire: vi.fn() } }));
-const requestChatWith = vi.fn();
-vi.mock('../components/projects/chat-panel-context', () => ({
-  ChatPanelProvider: ({ children }: { children: ReactNode }) => children,
-  useChatPanel: () => ({ requestChatWith, pendingChatUserId: null, clearPendingChat: vi.fn() }),
+const iniciarChatCon = vi.fn();
+vi.mock('../components/chat-dock/chat-dock-context', () => ({
+  ChatDockProvider: ({ children }: { children: ReactNode }) => children,
+  useChatDock: () => ({ iniciarChatCon, windows: [], minimizedIds: new Set(), abrirChat: vi.fn(), cerrarChat: vi.fn(), toggleMinimize: vi.fn() }),
 }));
 
 import ProyectoDetallePage from '../app/dashboard/proyectos/[id]/page';
@@ -294,7 +294,7 @@ describe('Página del participante sobre el esqueleto compartido', () => {
     expect(within(responsable).getByText('Valeria Ortiz')).toBeInTheDocument();
     expect(within(responsable).getByText('s6.lider@uvg.edu.gt')).toBeInTheDocument();
     fireEvent.click(within(responsable).getByRole('button', { name: 'Chat' }));
-    expect(requestChatWith).toHaveBeenCalledWith(1);
+    expect(iniciarChatCon).toHaveBeenCalledWith(55, 1);
 
     expect(within(aside).getByText('Detalles del proyecto')).toBeInTheDocument();
     expect(within(aside).getByText('Modalidad')).toBeInTheDocument();
