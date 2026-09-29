@@ -216,10 +216,10 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
           )}
         </ScrollArea>
 
-        <div className="shrink-0 border-t border-outline-variant px-4 py-3">
+        <div className="shrink-0 border-t border-outline-variant bg-surface-container-lowest px-4 py-3">
           <Link
             href="/dashboard/notificaciones"
-            className="block w-full rounded-lg px-3 py-2 text-center text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
+            className="block w-full rounded-lg bg-primary/10 px-3 py-2 text-center text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
           >
             Ver todas
           </Link>
