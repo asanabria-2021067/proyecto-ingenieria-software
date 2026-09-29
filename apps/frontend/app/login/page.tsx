@@ -43,7 +43,7 @@ export default function LoginPage() {
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [errores, setErrores] = useState<{ correo?: string; contrasena?: string }>({});
-  const { mutate, isPending, isError, isSuccess: loginOk, error } = useLogin();
+  const { mutate, isPending } = useLogin();
   // Sesión ya válida (cookie refresh_token de hasta 30 días todavía viva):
   // no tiene sentido pedir credenciales de nuevo, se manda directo al panel.
   const { data: user, isSuccess } = useCurrentUser();
@@ -188,14 +188,8 @@ export default function LoginPage() {
                 )}
               </div>
 
-              {/* T-219/T-274: mensaje neutro de error o exito, sin popups. */}
-              {(isError || loginOk) && (
-                <p role="alert" className={`text-xs font-medium ${loginOk ? 'text-primary' : 'text-error'}`}>
-                  {loginOk
-                    ? 'Inicio de sesion exitoso. Redirigiendo…'
-                    : mensajeError(error as (Error & { statusCode?: number }) | null)}
-                </p>
-              )}
+              {/* T-274: el mensaje neutro de exito/error se muestra por SweetAlert
+                  (ver useLogin), no aqui inline. */}
 
               {/* Submit */}
               <button
