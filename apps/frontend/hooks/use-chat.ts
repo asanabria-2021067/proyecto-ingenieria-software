@@ -5,14 +5,16 @@ import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createConversation,
+  deleteConversation,
   getMessages,
+  listAllConversations,
   listArchivedConversations,
-  listConversations,
   markConversationRead,
   sendMessage,
   updateConversation,
 } from '@/lib/services/chat';
 import {
+  allConversationsQueryKey,
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
   projectConversationsQueryKey,
@@ -43,22 +45,25 @@ async function joinConversationReliably(
   }
 }
 
-export function useConversations(idProyecto: number) {
+/** Dock global de chat: todas las conversaciones activas del usuario, de cualquier proyecto. */
+export function useAllConversations(q: string = '') {
   const query = useQuery({
-    queryKey: projectConversationsQueryKey(idProyecto),
-    queryFn: () => listConversations(idProyecto),
-    enabled: Number.isInteger(idProyecto) && idProyecto > 0,
+    queryKey: allConversationsQueryKey(q.trim()),
+    queryFn: () => listAllConversations(q.trim() || undefined),
   });
   return { conversations: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
+}
+
+function invalidateChatLists(queryClient: ReturnType<typeof useQueryClient>, idProyecto: number) {
+  queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
+  queryClient.invalidateQueries({ queryKey: ['chats-global'] });
 }
 
 export function useCreateConversation(idProyecto: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CreateConversationPayload) => createConversation(idProyecto, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
-    },
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
 
@@ -80,7 +85,7 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
         conversationMessagesQueryKey(idProyecto, idConversacion as number),
         (current) => (current ? [...current, mensaje] : [mensaje]),
       );
-      queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
+      invalidateChatLists(queryClient, idProyecto);
     },
   });
 }
@@ -104,15 +109,21 @@ export function useArchivedConversations(q: string) {
   };
 }
 
-/** Menú de 3 puntos: archivar, renombrar o marcar como favorita. */
+/** Menú del dock de chat: archivar, renombrar, favorito, silenciar o prioridad. */
 export function useUpdateConversation(idProyecto: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ idConversacion, payload }: { idConversacion: number; payload: UpdateConversationPayload }) =>
       updateConversation(idProyecto, idConversacion, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
-    },
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+export function useDeleteConversation(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idConversacion: number) => deleteConversation(idProyecto, idConversacion),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
 
@@ -120,35 +131,30 @@ export function useMarkConversationRead(idProyecto: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (idConversacion: number) => markConversationRead(idProyecto, idConversacion),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
-    },
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
 
 /**
- * Conexión al namespace /chat: se une a la room de `activeConversationId`
- * (si hay una abierta) y mantiene el historial + la lista de conversaciones
- * sincronizados en vivo. Vive solo mientras el panel de chat está montado
- * (no es una conexión global del dashboard, a diferencia de las
- * notificaciones) — se abre y cierra con el sidebar del proyecto.
+ * Conexión global al namespace /chat para el dock de chat (estilo LinkedIn):
+ * una sola conexión para todo el dashboard (no una por proyecto). Se une a
+ * la room de cada conversación con una ventana abierta (`openConversationIds`)
+ * para recibir `newMessage` en vivo sin refetch, y a `conversationUpdated`
+ * (emitido automáticamente a `user:{id}` por el gateway) para refrescar la
+ * lista global aunque la conversación que cambió no tenga ventana abierta.
  */
-export function useChatSocket(idProyecto: number, activeConversationId: number | null) {
+export function useGlobalChatSocket(openConversationIds: number[]) {
   const queryClient = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
-  const activeConversationIdRef = useRef<number | null>(activeConversationId);
+  const openIdsRef = useRef<number[]>(openConversationIds);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    activeConversationIdRef.current = activeConversationId;
-  }, [activeConversationId]);
+    openIdsRef.current = openConversationIds;
+  }, [openConversationIds]);
 
   useEffect(() => {
-    // G07 (P2/T12): mismo contrato que useRealtimeNotifications. Vacía →
-    // origen de la página (same-origin vía nginx); URL explícita → esa URL con
-    // el esquema ws/wss de la página (ver lib/realtime/socket-url.ts).
     const wsUrl = realtimeBaseUrl(process.env.NEXT_PUBLIC_API_URL, window.location);
-    // Sesión vía cookie httpOnly access_token (ver useRealtimeNotifications).
     const socket = io(`${wsUrl}/chat`, {
       withCredentials: true,
       transports: ['websocket', 'polling'],
@@ -163,8 +169,8 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
       mensaje: ChatMensaje;
     }) => {
       let huboCache = false;
-      queryClient.setQueryData<ChatMensaje[]>(
-        conversationMessagesQueryKey(idProyecto, idConversacion),
+      queryClient.setQueriesData<ChatMensaje[]>(
+        { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes' },
         (current) => {
           if (!current) return current;
           huboCache = true;
@@ -172,22 +178,17 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
           return [...current, mensaje];
         },
       );
-      // Sin cache previa (p. ej. la conversación se acaba de abrir y su
-      // fetch inicial todavía no resuelve) no hay nada que anexar — pero
-      // descartar el mensaje en silencio lo pierde para siempre si ese
-      // fetch inicial ya había arrancado con datos viejos. Forzar un
-      // refetch explícito de ESTA conversación en vez de confiar en que
-      // projectConversationsQueryKey la invalide por accidente de prefijo.
       if (!huboCache) {
         queryClient.invalidateQueries({
-          queryKey: conversationMessagesQueryKey(idProyecto, idConversacion),
+          predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes',
         });
       }
-      queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
+      queryClient.invalidateQueries({ queryKey: ['chats-global'] });
     };
 
     const handleConversationUpdated = () => {
-      queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
+      queryClient.invalidateQueries({ queryKey: ['chats-global'] });
+      queryClient.invalidateQueries({ queryKey: ['proyecto-conversaciones'] });
     };
 
     // Las rooms de socket.io viven en la conexión, no en la cuenta: cada
@@ -197,9 +198,8 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
     // "conectado" a simple vista.
     const handleConnect = () => {
       setIsConnected(true);
-      const idConversacion = activeConversationIdRef.current;
-      if (idConversacion != null) {
-        joinConversationReliably(socket, idConversacion, () => activeConversationIdRef.current !== idConversacion);
+      for (const idConversacion of openIdsRef.current) {
+        joinConversationReliably(socket, idConversacion, () => !openIdsRef.current.includes(idConversacion));
       }
     };
 
@@ -220,19 +220,26 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
       socket.close();
       socketRef.current = null;
     };
-  }, [idProyecto, queryClient]);
+  }, [queryClient]);
 
+  // Une/abandona rooms según qué ventanas de chat están abiertas ahora mismo.
+  const idsKey = openConversationIds.join(',');
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || activeConversationId == null) return;
+    if (!socket) return;
 
+    const ids = idsKey ? idsKey.split(',').map(Number) : [];
     let cancelado = false;
-    joinConversationReliably(socket, activeConversationId, () => cancelado);
+    for (const idConversacion of ids) {
+      joinConversationReliably(socket, idConversacion, () => cancelado);
+    }
     return () => {
       cancelado = true;
-      socket.emit('leaveConversation', { idConversacion: activeConversationId });
+      for (const idConversacion of ids) {
+        socket.emit('leaveConversation', { idConversacion });
+      }
     };
-  }, [activeConversationId]);
+  }, [idsKey]);
 
   return { isConnected };
 }
