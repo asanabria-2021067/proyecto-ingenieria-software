@@ -71,6 +71,8 @@ export type ProyectoResumen = {
   intereses: { interes: { nombreInteres: string } }[];
   roles?: { idRolProyecto: number }[];
   _count?: { roles: number };
+  /** Bookmark personal del usuario actual sobre este proyecto (distinto de postularse). */
+  guardado?: boolean;
 };
 export type Postulacion = {
   idPostulacion: number;
