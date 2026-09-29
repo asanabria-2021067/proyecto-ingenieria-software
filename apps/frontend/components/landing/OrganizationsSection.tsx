@@ -41,7 +41,7 @@ export default function OrganizationsSection() {
           </div>
         </div>
         <div className="lg:w-1/2">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-4 pt-8">
               <div className="group relative overflow-hidden rounded-3xl h-48">
                 <Image
