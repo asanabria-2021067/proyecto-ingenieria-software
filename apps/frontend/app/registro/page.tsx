@@ -227,7 +227,7 @@ export default function RegistroPage() {
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-tight">
-            <div className="grid grid-cols-2 gap-tight">
+            <div className="grid grid-cols-1 gap-tight sm:grid-cols-2">
               <div className="flex flex-col gap-tight">
                 <Label htmlFor="nombre" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
                   Nombre
