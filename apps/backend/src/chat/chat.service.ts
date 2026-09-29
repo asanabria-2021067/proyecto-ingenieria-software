@@ -88,7 +88,7 @@ export class ChatService {
     const archivada = chatArchivado(proyecto.estadoProyecto);
 
     const conversaciones = await this.prisma.conversacion.findMany({
-      where: { idProyecto, participantes: { some: { idUsuario: userId } } },
+      where: { idProyecto, eliminadaEn: null, participantes: { some: { idUsuario: userId } } },
       include: {
         participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
@@ -117,6 +117,8 @@ export class ChatService {
           archivada,
           esFavorita: c.esFavorita,
           archivadaManual: c.archivadaEn !== null,
+          silenciada: c.silenciada,
+          esPrioritaria: c.esPrioritaria,
         };
       }),
     );
@@ -243,11 +245,106 @@ export class ChatService {
     const data: Prisma.ConversacionUpdateInput = {};
     if (dto.archivada !== undefined) data.archivadaEn = dto.archivada ? new Date() : null;
     if (dto.esFavorita !== undefined) data.esFavorita = dto.esFavorita;
+    if (dto.silenciada !== undefined) data.silenciada = dto.silenciada;
+    if (dto.esPrioritaria !== undefined) data.esPrioritaria = dto.esPrioritaria;
     if (dto.nombrePersonalizado !== undefined) {
       data.nombrePersonalizado = dto.nombrePersonalizado?.trim() || null;
     }
 
     await this.prisma.conversacion.update({ where: { idConversacion }, data });
+  }
+
+  /** Borrar conversación desde el dock de chat: soft-delete (mismo patrón que
+   * archivadaEn), notifica en vivo al resto de participantes para que
+   * desaparezca de su lista sin que tengan que recargar. */
+  async deleteConversation(idProyecto: number, idConversacion: number, userId: number) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    await this.prisma.conversacion.update({
+      where: { idConversacion },
+      data: { eliminadaEn: new Date() },
+    });
+    const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
+    this.gateway.notifyConversationCreated(idConversacion, destinatarios);
+  }
+
+  /**
+   * Dock global de chat: todas las conversaciones activas del usuario A
+   * TRAVÉS DE TODOS sus proyectos (mismo espíritu que listArchivedConversations,
+   * pero para las NO archivadas/eliminadas). La búsqueda cubre nombre del
+   * chat, nombre de la otra persona y contenido de mensajes enviados.
+   */
+  async listAllConversations(userId: number, q?: string) {
+    const query = (q ?? '').trim();
+
+    const conversaciones = await this.prisma.conversacion.findMany({
+      where: {
+        eliminadaEn: null,
+        participantes: { some: { idUsuario: userId } },
+        proyecto: { estadoProyecto: { not: EstadoProyecto.CERRADO } },
+        ...(query
+          ? {
+              OR: [
+                { nombre: { contains: query, mode: 'insensitive' } },
+                { nombrePersonalizado: { contains: query, mode: 'insensitive' } },
+                {
+                  participantes: {
+                    some: {
+                      idUsuario: { not: userId },
+                      usuario: {
+                        OR: [
+                          { nombre: { contains: query, mode: 'insensitive' } },
+                          { apellido: { contains: query, mode: 'insensitive' } },
+                        ],
+                      },
+                    },
+                  },
+                },
+                { mensajes: { some: { contenido: { contains: query, mode: 'insensitive' } } } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
+      },
+      orderBy: { creadaEn: 'desc' },
+    });
+
+    const mapeadas = await Promise.all(
+      conversaciones.map(async (c) => {
+        const propia = c.participantes.find((p) => p.idUsuario === userId);
+        const noLeidos = await this.prisma.mensajeChat.count({
+          where: {
+            idConversacion: c.idConversacion,
+            idRemitente: { not: userId },
+            ...(propia?.ultimaLecturaEn ? { enviadoEn: { gt: propia.ultimaLecturaEn } } : {}),
+          },
+        });
+        return {
+          idConversacion: c.idConversacion,
+          idProyecto: c.idProyecto,
+          proyecto: c.proyecto,
+          tipo: c.tipo,
+          nombre: c.nombre,
+          nombrePersonalizado: c.nombrePersonalizado,
+          participantes: c.participantes.map((p) => p.usuario),
+          ultimoMensaje: c.mensajes[0] ?? null,
+          ultimoMensajeEsPropio: c.mensajes[0]?.remitente.idUsuario === userId,
+          noLeidos,
+          esFavorita: c.esFavorita,
+          archivadaManual: c.archivadaEn !== null,
+          silenciada: c.silenciada,
+          esPrioritaria: c.esPrioritaria,
+        };
+      }),
+    );
+
+    return mapeadas.sort((a, b) => {
+      if (a.esFavorita !== b.esFavorita) return a.esFavorita ? -1 : 1;
+      return 0;
+    });
   }
 
   async markRead(idProyecto: number, idConversacion: number, userId: number) {
