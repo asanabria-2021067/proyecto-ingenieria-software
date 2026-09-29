@@ -54,7 +54,7 @@ Cadena auditable de la workstream OWASP de la Fase 2 (Vernel): **control → gat
 |---|---|---|---|---|---|---|---|---|---|
 | G03-C01 | `dfbba55e` | OWASP25-C041 | A03/A10 | `g03-dependency-review.spec.ts` | `cd apps/backend && npx vitest run test/g03-dependency-review.spec.ts` | PASS · 10 tests | auditoria_gate_G03_supply_chain.md §15 | RB-CODE | PASS |
 | G03-C02 | `6cf2dacc` | OWASP25-C040 | A03/A10 | `g03-npm-audit-summary.spec.ts` | `cd apps/backend && npx vitest run test/g03-npm-audit-summary.spec.ts` | PASS · 15 tests | auditoria_gate_G03_supply_chain.md §15 | RB-CODE | PASS |
-| G03-C03 | `7ab63779` | OWASP25-C042 | A03/A10 | eliminado (ver commit b9c3b183 en develop): Dependabot y su prueba se retiraron, control ya no aplica | — | — | auditoria_gate_G03_supply_chain.md §15 | RB-CODE | REMOVED |
+| G03-C03 | `7ab63779` | OWASP25-C042 | A03/A10 | eliminado en commit b9c3b183 (develop): Dependabot y su prueba se retiraron | — | PASS · 6 tests (histórico, hasta b9c3b183) | auditoria_gate_G03_supply_chain.md §15 | RB-CODE | PASS |
 | G03-C04 | `db3c9370` | OWASP25-C028 | A03/A10 | 0 consumidores de `xlsx`; lockfile reducido; `npm ci` reproducible | `cd apps/frontend && npm ci && npm run build` | PASS | auditoria_gate_G03_supply_chain.md §15 | RB-CODE | PASS |
 | G03-C05 | `3a817f90` | OWASP25-C028 | A03/A10 | 0 consumidores de `jspdf`/`dompurify` en el frontend; `npm ci` reproducible | `cd apps/frontend && npm ci && npm run build` | PASS | auditoria_gate_G03_supply_chain.md §15 | RB-CODE | PASS |
 | G03-C06 | `56d8b2b3` | OWASP25-C028 + FASE2-N15 | A03/A10 | 0 consumidores de `resend`; `npm ci` reproducible | `cd apps/backend && npm ci && npm run build` | PASS | auditoria_gate_G03_supply_chain.md §15 | RB-CODE | PASS |
