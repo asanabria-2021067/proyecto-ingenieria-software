@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DynamicModule, Type } from '@nestjs/common';
-import { MODULE_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import type { DynamicModule, ExecutionContext, Type } from '@nestjs/common';
+import { RequestMethod } from '@nestjs/common';
+import {
+  CUSTOM_ROUTE_ARGS_METADATA,
+  GUARDS_METADATA,
+  METHOD_METADATA,
+  MODULE_METADATA,
+  PATH_METADATA,
+  ROUTE_ARGS_METADATA,
+} from '@nestjs/common/constants';
+import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { AppController } from '../src/app.controller';
 import { ApplicationsController } from '../src/applications/applications.controller';
 import { AuthController } from '../src/auth/auth.controller';
