@@ -1,9 +1,30 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Bell, BellOff, Check, CheckCheck } from 'lucide-react';
+import {
+  AlertCircle,
+  Award,
+  Bell,
+  BellOff,
+  CalendarClock,
+  Check,
+  CheckCheck,
+  ChevronRight,
+  ClipboardList,
+  Clock3,
+  Flag,
+  FolderKanban,
+  KeyRound,
+  MessageSquare,
+  ShieldAlert,
+  UserCheck,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import uvgSwal from '@/lib/swal';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -22,6 +43,54 @@ import {
 } from '@/lib/services/notifications';
 import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+
+/** Heurística por palabra clave del tipo (30+ valores en TipoNotificacion):
+ * evita mantener un mapa exhaustivo que se desactualiza con cada tipo nuevo. */
+const TYPE_ICON_RULES: Array<[string, typeof Bell]> = [
+  ['POSTULACION', UserCheck],
+  ['TAREA', ClipboardList],
+  ['HITO', Flag],
+  ['CIERRE', FolderKanban],
+  ['PROYECTO', FolderKanban],
+  ['HORAS', Clock3],
+  ['CERTIFICADO', Award],
+  ['COMENTARIO', MessageSquare],
+  ['MENSAJE', MessageSquare],
+  ['AMISTAD', UserPlus],
+  ['SEGUIDOR', UserPlus],
+  ['LIDERAZGO', Users],
+  ['APELACION', Users],
+  ['ROL_', Users],
+  ['ALERTA_SEGURIDAD', ShieldAlert],
+  ['RECUPERACION', KeyRound],
+  ['EVENTO', CalendarClock],
+];
+
+function getNotifIcon(tipo: string): typeof Bell {
+  return TYPE_ICON_RULES.find(([key]) => tipo.includes(key))?.[1] ?? Bell;
+}
+
+function humanizeTipo(tipo: string): string {
+  const lower = tipo.toLowerCase().replace(/_/g, ' ');
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+function NotificacionesSkeleton() {
+  return (
+    <div className="flex flex-col gap-stack" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="card-base flex items-start gap-stack">
+          <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-2/5" />
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3.5 w-3/5" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
@@ -79,40 +148,40 @@ export default function NotificacionesPage() {
   const unreadCount = notificaciones.filter((n) => !n.leidaEn).length;
 
   return (
-      <div className={dashboardPage('py-8')}>
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Bell className="w-6 h-6 text-primary" />
-              <h1 className="font-headline font-extrabold text-3xl text-on-surface">
-                Notificaciones
-              </h1>
+      <div className={dashboardPage('py-section flex flex-col gap-section')}>
+        <div className="flex flex-col gap-stack lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-stack">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-container/15 text-primary">
+              <Bell className="h-5 w-5" aria-hidden="true" />
             </div>
-            <p className="text-tertiary text-sm">
-              {unreadCount > 0
-                ? `Tienes ${unreadCount} notificación${unreadCount !== 1 ? 'es' : ''} sin leer`
-                : 'No tienes notificaciones sin leer'}
-            </p>
+            <div>
+              <div className="flex flex-wrap items-center gap-tight">
+                <h1 className="type-display">Notificaciones</h1>
+                {unreadCount > 0 && (
+                  <span className="pill pill-accent">
+                    {unreadCount} nueva{unreadCount !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              <p className="type-meta mt-micro">
+                Entérate de postulaciones, revisiones de horas y avisos de tus proyectos.
+              </p>
+            </div>
           </div>
           {unreadCount > 0 && (
-            <button
-              type="button"
+            <Button
               onClick={() => markAllMutation.mutate()}
               disabled={markAllMutation.isPending}
               aria-label="Marcar todas las notificaciones como leidas"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="self-start rounded-full bg-primary text-on-primary hover:bg-primary/90 lg:self-center"
             >
-              <CheckCheck className="w-4 h-4" />
+              <CheckCheck className="h-4 w-4" />
               Marcar todas como leídas
-            </button>
+            </Button>
           )}
         </div>
 
-        {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm" role="status">
-            Cargando notificaciones...
-          </div>
-        )}
+        {isLoading && <NotificacionesSkeleton />}
 
         {isError && (
           <Empty tone="danger" className="surface-enter" role="alert">
@@ -126,13 +195,9 @@ export default function NotificacionesPage() {
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <button
-                type="button"
-                onClick={() => refetch()}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-              >
+              <Button onClick={() => refetch()} className="rounded-full bg-primary text-on-primary hover:bg-primary/90">
                 Reintentar
-              </button>
+              </Button>
             </EmptyContent>
           </Empty>
         )}
@@ -152,69 +217,91 @@ export default function NotificacionesPage() {
           </Empty>
         )}
 
-        <div className="space-y-6">
+        {!isLoading && !isError && notificaciones.length > 0 && (
+        <div className="flex flex-col gap-section">
           {Object.entries(grouped).map(([fecha, notifs], groupIndex) => (
             <div
               key={fecha}
-              className="surface-enter"
+              className="surface-enter flex flex-col gap-stack"
               style={{ animationDelay: `${Math.min(groupIndex, 8) * 45}ms` }}
             >
-              <h2 className="font-headline font-bold text-sm text-tertiary uppercase tracking-wider mb-3">
-                {fecha}
-              </h2>
-              <div className="space-y-3">
+              <div className="flex items-center justify-between px-tight">
+                <div className="flex items-center gap-tight">
+                  <span className="h-2 w-2 rounded-full bg-outline-variant" aria-hidden="true" />
+                  <h2 className="type-meta font-bold uppercase tracking-wider text-text-secondary">
+                    {fecha}
+                  </h2>
+                </div>
+                <span className="type-meta text-text-secondary/80">
+                  {notifs.length} aviso{notifs.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-tight">
                 {notifs.map((n) => {
                   const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
-                  const cardClassName = `relative rounded-2xl border p-5 transition-all ${
-                    n.leidaEn
-                      ? 'bg-surface-container-lowest border-outline-variant'
-                      : 'bg-primary-container/10 border-primary/30 shadow-sm'
-                  } ${href ? 'cursor-pointer hover:shadow-md' : ''}`;
+                  const Icon = getNotifIcon(n.tipoNotificacion);
+                  const cardClassName = `card-base flex items-start gap-stack transition-all ${
+                    n.leidaEn ? '' : 'border-primary/30 bg-primary-container/5 shadow-sm'
+                  } ${href ? 'cursor-pointer hover:shadow-raised' : ''}`;
 
                   const card = (
-                    <div className="flex items-start gap-4">
+                    <>
                       <div
-                        className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                          n.leidaEn ? 'bg-surface-container' : 'bg-primary'
+                        className={`relative shrink-0 flex h-11 w-11 items-center justify-center rounded-2xl ${
+                          n.leidaEn ? 'bg-surface-container text-tertiary' : 'bg-primary-container/15 text-primary'
                         }`}
                       >
-                        <Bell
-                          className={`w-5 h-5 ${n.leidaEn ? 'text-tertiary' : 'text-on-primary'}`}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-headline font-bold text-on-surface text-base mb-1">
-                          {n.tituloNotificacion}
-                        </h3>
-                        {n.mensajeNotificacion && (
-                          <p className="text-on-surface text-sm leading-relaxed mb-2">
-                            {n.mensajeNotificacion}
-                          </p>
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                        {!n.leidaEn && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-surface-container-lowest"
+                          />
                         )}
-                        <p className="text-xs text-tertiary">
-                          {new Date(n.creadaEn).toLocaleString('es-GT', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
                       </div>
-                      {!n.leidaEn && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            markOneMutation.mutate(n.idNotificacion);
-                          }}
-                          disabled={markOneMutation.isPending}
-                          aria-label={`Marcar como leida la notificacion ${n.tituloNotificacion}`}
-                          className="shrink-0 p-2 rounded-lg hover:bg-surface-container transition-colors disabled:opacity-50"
-                          title="Marcar como leída"
-                        >
-                          <Check className="w-4 h-4 text-primary" />
-                        </button>
-                      )}
-                    </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-tight">
+                          <h3 className="type-subtitle font-bold text-text-primary">
+                            {n.tituloNotificacion}
+                          </h3>
+                          <span className="pill pill-neutral">{humanizeTipo(n.tipoNotificacion)}</span>
+                          <span className="type-meta">
+                            ·{' '}
+                            {new Date(n.creadaEn).toLocaleString('es-GT', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        {n.mensajeNotificacion && (
+                          <p className="type-body mt-micro">{n.mensajeNotificacion}</p>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-tight self-start">
+                        {!n.leidaEn && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              markOneMutation.mutate(n.idNotificacion);
+                            }}
+                            disabled={markOneMutation.isPending}
+                            aria-label={`Marcar como leida la notificacion ${n.tituloNotificacion}`}
+                            className="shrink-0 rounded-lg p-2 text-primary transition-colors hover:bg-surface-container disabled:opacity-50"
+                            title="Marcar como leída"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                        )}
+                        {href && (
+                          <ChevronRight className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+                        )}
+                      </div>
+                    </>
                   );
 
                   if (href) {
@@ -225,7 +312,7 @@ export default function NotificacionesPage() {
                         onClick={() => {
                           if (!n.leidaEn) markOneMutation.mutate(n.idNotificacion);
                         }}
-                        className={`block ${cardClassName}`}
+                        className={cardClassName}
                       >
                         {card}
                       </Link>
@@ -242,6 +329,7 @@ export default function NotificacionesPage() {
             </div>
           ))}
         </div>
+        )}
       </div>
   );
 }
