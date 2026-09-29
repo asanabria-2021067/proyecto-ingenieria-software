@@ -19,6 +19,15 @@ vi.mock('next/image', () => ({ default: () => null }));
 const avisoMock = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() }));
 vi.mock('@/lib/mensajes', () => ({ aviso: avisoMock }));
 
+// useLogin/useRegister muestran el aviso de exito/error con un SweetAlert2
+// centrado (no un toast): la libreria real usa su propio timer interno para
+// autocerrarse, que no combina bien con vi.useFakeTimers() en jsdom
+// ("swalPromiseResolve is not a function" al desmontar antes de que su
+// promesa interna se asiente). Como estas pruebas ya verifican por separado
+// que se llama con los mensajes correctos, aqui basta un stub.
+const swalFireMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/swal', () => ({ default: { fire: swalFireMock, close: vi.fn(), stopTimer: vi.fn(), resumeTimer: vi.fn() } }));
+
 const loginMock = vi.hoisted(() => vi.fn());
 const registerMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/services/auth', () => ({ login: loginMock, register: registerMock }));
