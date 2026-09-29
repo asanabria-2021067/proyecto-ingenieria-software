@@ -1706,6 +1706,22 @@ async function main() {
     },
   });
 
+  // conversacion/mensaje_chat/evento_proyecto se siembran con id explícito
+  // (arriba, evento_proyecto incluida) después del reset de secuencias de
+  // más arriba: sin este segundo reset, el primer mensaje, conversación o
+  // evento de calendario que crea la app en tiempo real pide nextval() = 1
+  // y choca con las filas ya insertadas (mismo P2002 que documenta el reset
+  // de más arriba, con estos tres en su lugar).
+  for (const { table, column } of [
+    { table: 'conversacion', column: 'id_conversacion' },
+    { table: 'mensaje_chat', column: 'id_mensaje' },
+    { table: 'evento_proyecto', column: 'id_evento' },
+  ]) {
+    await prisma.$executeRawUnsafe(
+      `SELECT setval(pg_get_serial_sequence('${table}', '${column}'), COALESCE((SELECT MAX(${column}) FROM ${table}), 0) + 1, false)`,
+    );
+  }
+
   console.log('Seed completed successfully');
 }
 
