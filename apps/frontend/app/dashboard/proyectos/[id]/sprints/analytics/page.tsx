@@ -1,9 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AlertCircle, Repeat } from 'lucide-react';
-import { useSprintsAnalytics } from '@/hooks/use-project-sprints';
+import { useSprintsAnalytics, useSprintBurndown } from '@/hooks/use-project-sprints';
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
+import { BurndownChart } from '@/components/projects/burndown-chart';
+import { VelocityChart } from '@/components/projects/velocity-chart';
+import { ReportsDialogTrigger, SprintReportsDialog } from '@/components/projects/sprint-reports-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -16,6 +20,16 @@ import {
 import type { EstadoSprint, SprintComparativeAnalyticsItemDto } from '@/lib/types/sprints';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+
+/** El Sprint mas relevante para la vista previa de burndown: el operable
+ * (ACTIVO/EN_FINALIZACION) si hay uno, si no el CERRADO mas reciente por
+ * numero. `null` si el proyecto aun no tiene ningun Sprint. */
+function sprintMasReciente(sprints: SprintComparativeAnalyticsItemDto[]): SprintComparativeAnalyticsItemDto | null {
+  const operable = sprints.find((s) => s.estado === 'ACTIVO' || s.estado === 'EN_FINALIZACION');
+  if (operable) return operable;
+  const cerrados = sprints.filter((s) => s.estado === 'CERRADO').sort((a, b) => b.numero - a.numero);
+  return cerrados[0] ?? null;
+}
 
 /** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE` en `sprints/page.tsx`/`sprints/[sprintId]/page.tsx`. */
 const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
@@ -54,59 +68,12 @@ function BarraTareasCompletadas({ sprint, maximo }: { sprint: SprintComparativeA
 }
 
 /**
- * T-241 (HU-160): barra de velocidad por Sprint CERRADO, en story points
- * completados. `sprint.puntosHistoriaCompletados === null` es "sin puntos
- * asignados" — no se dibuja como una barra en 0, se rotula explícitamente.
- */
-function BarraVelocidad({ sprint, maximo }: { sprint: SprintComparativeAnalyticsItemDto; maximo: number }) {
-  const puntos = sprint.puntosHistoriaCompletados;
-  const porcentajeAncho = puntos === null || maximo === 0 ? 0 : Math.round((puntos / maximo) * 100);
-  return (
-    <div className="flex items-center gap-3">
-      <span className="w-16 shrink-0 text-sm font-semibold text-on-surface">Sprint {sprint.numero}</span>
-      <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-container-high">
-        {puntos !== null && (
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${porcentajeAncho}%` }}
-            role="progressbar"
-            aria-valuenow={puntos}
-            aria-valuemin={0}
-            aria-valuemax={maximo}
-            aria-label={`Story points completados en Sprint ${sprint.numero}`}
-          />
-        )}
-      </div>
-      <span className="w-32 shrink-0 text-right text-sm font-bold text-on-surface">
-        {puntos === null ? 'Sin puntos asignados' : `${puntos} pts`}
-      </span>
-    </div>
-  );
-}
-
-/**
  * T-241 (HU-160): velocidad — la métrica PRINCIPAL de la comparativa, en
  * story points, solo para Sprints `CERRADO` (la velocidad se alimenta del
- * congelado de T-239, nunca del estado actual). El promedio ignora los
- * Sprints "sin puntos asignados": promediarlos como 0 castigaría
- * falsamente la referencia para comprometer el siguiente Sprint.
+ * congelado de T-239, nunca del estado actual). `VelocityChart` ya excluye
+ * del promedio los Sprints "sin puntos asignados".
  */
 function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItemDto[] }) {
-  const sprintsCerrados = sprints.filter((sprint) => sprint.estado === 'CERRADO');
-  const conPuntos = sprintsCerrados.filter(
-    (sprint): sprint is SprintComparativeAnalyticsItemDto & { puntosHistoriaCompletados: number } =>
-      sprint.puntosHistoriaCompletados !== null,
-  );
-  const promedio =
-    conPuntos.length === 0
-      ? null
-      : Math.round(
-          (conPuntos.reduce((acumulado, sprint) => acumulado + sprint.puntosHistoriaCompletados, 0) /
-            conPuntos.length) *
-            10,
-        ) / 10;
-  const maximo = Math.max(1, ...conPuntos.map((sprint) => sprint.puntosHistoriaCompletados));
-
   return (
     <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
       <h2 className="mb-1 text-sm font-bold text-on-surface">Velocidad (story points completados)</h2>
@@ -114,29 +81,33 @@ function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItem
         Story points completados por Sprint cerrado. El promedio es la referencia para comprometer el siguiente
         Sprint.
       </p>
-      {sprintsCerrados.length === 0 ? (
-        <p className="text-sm text-tertiary">Aún no hay Sprints cerrados para calcular la velocidad.</p>
-      ) : (
-        <>
-          <div className="space-y-3">
-            {sprintsCerrados.map((sprint) => (
-              <BarraVelocidad key={sprint.idSprint} sprint={sprint} maximo={maximo} />
-            ))}
-          </div>
-          <p className="mt-4 text-sm font-semibold text-on-surface">
-            Promedio: {promedio === null ? 'sin datos suficientes' : `${promedio} pts / sprint`}
-          </p>
-        </>
-      )}
+      <VelocityChart sprints={sprints} />
     </div>
   );
 }
 
-function ComparativeContent({ sprints }: { sprints: SprintComparativeAnalyticsItemDto[] }) {
+/** Vista previa del burndown del Sprint mas relevante, directo en la
+ * comparativa — sin tener que exportar ni navegar a otra pantalla primero. */
+function SeccionBurndownPreview({ idProyecto, sprint }: { idProyecto: number; sprint: SprintComparativeAnalyticsItemDto }) {
+  const { burndown, isLoading, isError } = useSprintBurndown(idProyecto, sprint.idSprint);
+
+  if (isLoading) return <Skeleton className="mb-6 h-[340px] w-full rounded-xl" />;
+  if (isError || !burndown) return null;
+
+  return (
+    <div className="mb-6">
+      <BurndownChart burndown={burndown} />
+    </div>
+  );
+}
+
+function ComparativeContent({ idProyecto, sprints }: { idProyecto: number; sprints: SprintComparativeAnalyticsItemDto[] }) {
   const maximoTareasCompletadas = Math.max(1, ...sprints.map((sprint) => sprint.tareasCompletadas));
+  const sprintPreview = sprintMasReciente(sprints);
 
   return (
     <>
+      {sprintPreview && <SeccionBurndownPreview idProyecto={idProyecto} sprint={sprintPreview} />}
       <SeccionVelocidad sprints={sprints} />
 
       <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
@@ -193,8 +164,10 @@ function ComparativeContent({ sprints }: { sprints: SprintComparativeAnalyticsIt
 export default function SprintsAnalyticsPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
+  const [informesAbierto, setInformesAbierto] = useState(false);
 
   const { sprints, isLoading, isError, error, refetch } = useSprintsAnalytics(idProyecto);
+  const sprintParaInformes = sprintMasReciente(sprints);
 
   return (
     <ProjectPageShell>
@@ -202,7 +175,18 @@ export default function SprintsAnalyticsPage() {
         back={{ href: `/dashboard/proyectos/${id}/sprints`, label: 'Volver a Sprints' }}
         title="Analítica comparativa"
         description="Cumplimiento y progreso de cada Sprint del proyecto, para comparar cómo avanza el equipo."
-        actions={<ProjectExportButtons idProyecto={idProyecto} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <ProjectExportButtons idProyecto={idProyecto} />
+            <ReportsDialogTrigger onClick={() => setInformesAbierto(true)} />
+          </div>
+        }
+      />
+      <SprintReportsDialog
+        open={informesAbierto}
+        onOpenChange={setInformesAbierto}
+        idProyecto={idProyecto}
+        idSprintBurndown={sprintParaInformes?.idSprint ?? null}
       />
 
       {isLoading && (
@@ -248,7 +232,9 @@ export default function SprintsAnalyticsPage() {
         </Empty>
       )}
 
-      {!isLoading && !isError && sprints.length > 0 && <ComparativeContent sprints={sprints} />}
+      {!isLoading && !isError && sprints.length > 0 && (
+        <ComparativeContent idProyecto={idProyecto} sprints={sprints} />
+      )}
     </ProjectPageShell>
   );
 }
