@@ -2,19 +2,45 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createConversation,
   getMessages,
+  listArchivedConversations,
   listConversations,
   markConversationRead,
   sendMessage,
 } from '@/lib/services/chat';
 import {
+  archivedConversationsQueryKey,
   conversationMessagesQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
 import type { ChatMensaje, CreateConversationPayload } from '@/lib/types/chat';
+import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
+
+/**
+ * 'joinConversation' es fire-and-forget salvo por este ack: sin él, un join
+ * que falla (p. ej. la comprobación de ConversacionParticipante en el
+ * gateway tarda o la fila aún no existe) deja al cliente creyendo que está
+ * en la room `conversation:{id}` cuando en realidad nunca recibirá
+ * `newMessage`. Reintenta unas pocas veces antes de rendirse.
+ */
+async function joinConversationReliably(
+  socket: Socket,
+  idConversacion: number,
+  shouldAbort: () => boolean,
+) {
+  for (let attempt = 0; attempt < 3 && !shouldAbort(); attempt++) {
+    try {
+      const ack = await socket.timeout(3000).emitWithAck('joinConversation', { idConversacion });
+      if (ack?.joined) return;
+    } catch {
+      // sin ack (timeout o desconexión): reintenta
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+}
 
 export function useConversations(idProyecto: number) {
   const query = useQuery({
@@ -58,6 +84,25 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
   });
 }
 
+/** T-236: paginado, con búsqueda por nombre de chat o por persona (el `q`
+ * viaja tal cual al backend, que compara contra ambos). */
+export function useArchivedConversations(q: string) {
+  const query = useInfiniteQuery({
+    queryKey: archivedConversationsQueryKey(q.trim()),
+    queryFn: ({ pageParam }) => listArchivedConversations({ q: q.trim() || undefined, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length + 1 : undefined),
+  });
+  return {
+    conversaciones: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
+}
+
 export function useMarkConversationRead(idProyecto: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -79,15 +124,17 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
   const queryClient = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
   const activeConversationIdRef = useRef<number | null>(activeConversationId);
-  activeConversationIdRef.current = activeConversationId;
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    // Mismo criterio que useRealtimeNotifications: el esquema ws/wss sigue
-    // el protocolo real de la página, no el prefijo de NEXT_PUBLIC_API_URL.
-    const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsUrl = apiUrl.replace(/^https?/, wsScheme);
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    // G07 (P2/T12): mismo contrato que useRealtimeNotifications. Vacía →
+    // origen de la página (same-origin vía nginx); URL explícita → esa URL con
+    // el esquema ws/wss de la página (ver lib/realtime/socket-url.ts).
+    const wsUrl = realtimeBaseUrl(process.env.NEXT_PUBLIC_API_URL, window.location);
     // Sesión vía cookie httpOnly access_token (ver useRealtimeNotifications).
     const socket = io(`${wsUrl}/chat`, {
       withCredentials: true,
@@ -102,14 +149,27 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
       idConversacion: number;
       mensaje: ChatMensaje;
     }) => {
+      let huboCache = false;
       queryClient.setQueryData<ChatMensaje[]>(
         conversationMessagesQueryKey(idProyecto, idConversacion),
         (current) => {
           if (!current) return current;
+          huboCache = true;
           if (current.some((m) => m.idMensaje === mensaje.idMensaje)) return current;
           return [...current, mensaje];
         },
       );
+      // Sin cache previa (p. ej. la conversación se acaba de abrir y su
+      // fetch inicial todavía no resuelve) no hay nada que anexar — pero
+      // descartar el mensaje en silencio lo pierde para siempre si ese
+      // fetch inicial ya había arrancado con datos viejos. Forzar un
+      // refetch explícito de ESTA conversación en vez de confiar en que
+      // projectConversationsQueryKey la invalide por accidente de prefijo.
+      if (!huboCache) {
+        queryClient.invalidateQueries({
+          queryKey: conversationMessagesQueryKey(idProyecto, idConversacion),
+        });
+      }
       queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
     };
 
@@ -124,8 +184,9 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
     // "conectado" a simple vista.
     const handleConnect = () => {
       setIsConnected(true);
-      if (activeConversationIdRef.current != null) {
-        socket.emit('joinConversation', { idConversacion: activeConversationIdRef.current });
+      const idConversacion = activeConversationIdRef.current;
+      if (idConversacion != null) {
+        joinConversationReliably(socket, idConversacion, () => activeConversationIdRef.current !== idConversacion);
       }
     };
 
@@ -152,8 +213,10 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
     const socket = socketRef.current;
     if (!socket || activeConversationId == null) return;
 
-    socket.emit('joinConversation', { idConversacion: activeConversationId });
+    let cancelado = false;
+    joinConversationReliably(socket, activeConversationId, () => cancelado);
     return () => {
+      cancelado = true;
       socket.emit('leaveConversation', { idConversacion: activeConversationId });
     };
   }, [activeConversationId]);

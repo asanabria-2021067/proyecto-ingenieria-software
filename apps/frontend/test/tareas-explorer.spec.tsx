@@ -72,11 +72,15 @@ describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
       mockTareas({ tasks: TAREAS_FIXTURE });
       renderExplorer();
 
-      expect(screen.getByRole('heading', { name: 'UVG Collab' })).toBeInTheDocument();
+      // encabezado de página fuera de tarjetas; el proyecto es contexto
+      expect(screen.getByRole('heading', { level: 1, name: 'Lista de tareas' })).toBeInTheDocument();
+      expect(screen.getByText('UVG Collab')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Volver al Tablero' })).toHaveAttribute(
+        'href',
+        expect.stringMatching(/\/kanban$/),
+      );
       expect(screen.getByRole('table')).toBeInTheDocument();
-      expect(
-        screen.getByText(`${TAREAS_FIXTURE.length} resultados`),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(`Resultados: ${TAREAS_FIXTURE.length}`);
     });
 
     it('renderiza una fila por tarea con su título, estado y prioridad', () => {
@@ -158,7 +162,9 @@ describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
         target: { value: 'HorasModule' },
       });
 
-      expect(screen.getByText('1 resultado')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(
+        `Resultados: 1 de ${TAREAS_FIXTURE.length} tareas en total`,
+      );
       expect(screen.getByText('Implementar HorasModule')).toBeInTheDocument();
       expect(screen.queryByText('Diseñar esquema de base de datos')).not.toBeInTheDocument();
     });
@@ -187,12 +193,27 @@ describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
       expect(tabla.closest('[data-slot="table-container"]')).toHaveClass('overflow-x-auto');
     });
 
-    it('la toolbar usa flex-wrap para apilarse en pantallas angostas', () => {
+    it('la barra de búsqueda y filtros va fuera de la tarjeta y se apila en anchos angostos (como Mis Tareas)', () => {
       mockTareas({ tasks: TAREAS_FIXTURE });
-      const { container } = renderExplorer();
+      renderExplorer();
 
-      const toolbar = container.querySelector('.flex-col.lg\\:flex-row');
-      expect(toolbar).toBeInTheDocument();
+      const barra = screen.getByRole('region', { name: 'Filtros de tareas' });
+      // una columna de base, una sola fila solo con ancho suficiente del área del proyecto
+      expect(barra).toHaveClass('grid', 'grid-cols-1', '@5xl/project:flex');
+      expect(barra.closest('.card-base')).toBeNull();
+      expect(screen.getByRole('table').closest('.card-base')).not.toBeNull();
+      expect(within(barra).getByRole('textbox', { name: 'Buscar tareas por título o descripción' })).toHaveClass(
+        'h-11.5',
+        'bg-surface-container-lowest',
+      );
+      for (const select of within(barra).getAllByRole('combobox')) {
+        expect(select).toHaveClass('rounded-lg', 'bg-surface-container-lowest');
+        expect(select).not.toHaveClass('bg-page');
+      }
+      // «Resultados» queda arriba de la barra, no dentro de la tarjeta
+      const total = screen.getByRole('status');
+      expect(total.compareDocumentPosition(barra) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(total.closest('.card-base')).toBeNull();
     });
   });
 
@@ -202,16 +223,48 @@ describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
       renderExplorer();
 
       const encabezados = screen.getAllByRole('columnheader');
-      expect(encabezados.length).toBe(6);
+      expect(encabezados.length).toBe(7);
       encabezados.forEach((th) => expect(th).toHaveAttribute('scope', 'col'));
+    });
+
+    it('la tabla usa el formato de Mis Tareas sin cambiar sus columnas', () => {
+      mockTareas({ tasks: TAREAS_FIXTURE });
+      renderExplorer();
+
+      const tabla = screen.getByRole('table');
+      const encabezados = screen.getAllByRole('columnheader');
+      // mismo contenido: las 7 columnas de siempre, en el mismo orden
+      expect(encabezados.map((th) => th.textContent)).toEqual([
+        'Título',
+        'Hito',
+        'Estado',
+        'Prioridad',
+        'Fecha límite',
+        'Asignado a',
+        'Etiquetas',
+      ]);
+      // franja guía gris verdosa con etiquetas pequeñas en seminegrita
+      const filaGuia = encabezados[0].closest('tr')!;
+      expect(filaGuia).toHaveClass('bg-surface-container-low', 'border-outline-variant/50');
+      for (const th of encabezados) expect(th).toHaveClass('text-xs', 'font-semibold', 'text-text-secondary');
+      // filas con divisor tenue y hover suave; título en seminegrita charcoal
+      const [, primeraFila] = within(tabla).getAllByRole('row');
+      expect(primeraFila).toHaveClass('border-outline-variant/50', 'hover:bg-surface-container-low');
+      expect(within(primeraFila).getAllByRole('cell')[0]).toHaveClass('font-semibold', 'text-text-primary');
+      // la tabla llega al borde de su tarjeta y la paginación va en su propia tarjeta
+      expect(tabla.closest('.card-base')).toHaveClass('p-0', 'overflow-hidden');
+      const paginacion = screen.getByRole('navigation', { name: 'Paginación de tareas' });
+      expect(paginacion).toHaveClass('card-base');
+      expect(tabla.closest('.card-base')).not.toContainElement(paginacion);
     });
 
     it('el contador de resultados es una región aria-live para lectores de pantalla', () => {
       mockTareas({ tasks: TAREAS_FIXTURE });
       renderExplorer();
 
-      const contador = screen.getByText(`${TAREAS_FIXTURE.length} resultados`).closest('[aria-live="polite"]');
+      const contador = screen.getByText(/^Resultados:/).closest('[aria-live="polite"]');
       expect(contador).toBeInTheDocument();
+      expect(contador).not.toHaveClass('pill');
     });
 
     it('los botones de paginación tienen aria-label y se deshabilitan en los extremos', () => {

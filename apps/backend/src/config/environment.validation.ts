@@ -1,5 +1,6 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { EstadoUsuario, type Prisma } from '@prisma/client';
+import { assertJwtSecret, JWT_SECRET_VARIABLE } from './jwt-secret';
 
 /**
  * Validador único y puro de environment (06 v2 §51.1 y §51.2). Conserva las
@@ -82,6 +83,10 @@ export interface AppEnvironment {
   frontendUrl: string;
   cookieSecure: boolean;
   redis: RedisEnvironment;
+  /** G04 (OWASP25-C021 + D2): saltos de proxy confiables; 0 = no confiar en X-Forwarded-For. */
+  trustProxyHops: number;
+  /** G05 (OWASP25-C038): alertas de ráfaga a admins; false = inertes. */
+  securityAlertsEnabled: boolean;
 }
 
 export interface ValidatedEnvironment extends Record<string, unknown> {
@@ -138,16 +143,67 @@ function parsePort(raw: RawEnvironment, name: string, fallback: number): number 
   return port;
 }
 
+export const TRUST_PROXY_HOPS_VARIABLE = 'TRUST_PROXY_HOPS';
+/** Tope de cordura: más saltos que esto es un error de configuración, no una topología real. */
+export const MAX_TRUST_PROXY_HOPS = 10;
+
+/**
+ * G04 (OWASP25-C021 + D2): contrato de TRUST_PROXY_HOPS. Entero >= 0, default
+ * 0 (comportamiento actual: Express no confía en X-Forwarded-For). Un valor
+ * inválido falla el arranque en lugar de caer en un default silencioso.
+ */
+export function parseTrustProxyHops(value: string | undefined): number {
+  if (value === undefined) {
+    return 0;
+  }
+  if (!/^\d+$/.test(value) || Number(value) > MAX_TRUST_PROXY_HOPS) {
+    throw new Error(`${TRUST_PROXY_HOPS_VARIABLE} must be an integer between 0 and ${MAX_TRUST_PROXY_HOPS}`);
+  }
+  return Number(value);
+}
+
+export const COOKIE_SECURE_VARIABLE = 'COOKIE_SECURE';
+
+/**
+ * G06 (OWASP25-C049 parcial): contrato de COOKIE_SECURE. Solo `true` o `false`
+ * (ausente o vacío = false, comportamiento actual). Cualquier otro valor falla
+ * el arranque en lugar de dejar cookies sin Secure en silencio.
+ */
+export function parseCookieSecure(value: string | undefined): boolean {
+  if (value === undefined || value === '') {
+    return false;
+  }
+  if (value === 'true' || value === 'false') {
+    return value === 'true';
+  }
+  throw new Error(`${COOKIE_SECURE_VARIABLE} must be true or false`);
+}
+
+export const SECURITY_ALERTS_ENABLED_VARIABLE = 'SECURITY_ALERTS_ENABLED';
+
+/** G05 (OWASP25-C038): solo `true` o `false` (ausente o vacío = false); otro valor falla el arranque. */
+export function parseSecurityAlertsEnabled(value: string | undefined): boolean {
+  if (value === undefined || value === '') {
+    return false;
+  }
+  if (value === 'true' || value === 'false') {
+    return value === 'true';
+  }
+  throw new Error(`${SECURITY_ALERTS_ENABLED_VARIABLE} must be true or false`);
+}
+
 function deriveAppEnvironment(raw: RawEnvironment): AppEnvironment {
   return {
     nodeEnv: readString(raw, 'NODE_ENV') ?? 'development',
     port: parsePort(raw, 'PORT', 3001),
     frontendUrl: assertFrontendUrl(readString(raw, 'FRONTEND_URL')),
-    cookieSecure: readString(raw, 'COOKIE_SECURE') === 'true',
+    cookieSecure: parseCookieSecure(readString(raw, COOKIE_SECURE_VARIABLE)),
     redis: {
       host: readString(raw, 'REDIS_HOST') ?? 'localhost',
       port: parsePort(raw, 'REDIS_PORT', 6379),
     },
+    trustProxyHops: parseTrustProxyHops(readString(raw, TRUST_PROXY_HOPS_VARIABLE)),
+    securityAlertsEnabled: parseSecurityAlertsEnabled(readString(raw, SECURITY_ALERTS_ENABLED_VARIABLE)),
   };
 }
 
@@ -284,6 +340,8 @@ function deriveClosureAvailability(raw: RawEnvironment): ClosureAvailability {
 
 export function validateEnvironment(raw: RawEnvironment): ValidatedEnvironment {
   const app = deriveAppEnvironment(raw);
+  // G01 · OWASP25-C019: sin un JWT_SECRET válido el backend no arranca.
+  assertJwtSecret(raw[JWT_SECRET_VARIABLE]);
   const closure = deriveClosureAvailability(raw);
 
   if (!closure.disponible) {

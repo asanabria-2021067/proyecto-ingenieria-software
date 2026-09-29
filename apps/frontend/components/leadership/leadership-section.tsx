@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { ScrollText } from 'lucide-react';
-import { LeadershipCard } from '@/components/leadership/leadership-card';
+import { Crown, History, ScrollText } from 'lucide-react';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
+import { LeadershipCard, LeadershipHistoryTable } from '@/components/leadership/leadership-card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { LeadershipAppealSheet } from '@/components/leadership/leadership-appeal-sheet';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { Button } from '@/components/ui/button';
@@ -76,7 +78,7 @@ export function LeadershipSection({
         size="sm"
         disabled={cancel.isPending}
         onClick={() => void cancelarApelacion(pendiente)}
-        className="mt-2 h-8 w-full rounded-md border-error/40 text-xs font-semibold text-error hover:bg-error/10 hover:text-error"
+        className="mt-stack h-8 w-full rounded-md border-error/40 text-xs font-semibold text-error hover:bg-error/10 hover:text-error"
       >
         {cancel.isPending ? 'Cancelando…' : 'Cancelar apelación'}
       </Button>
@@ -119,52 +121,135 @@ export function LeadershipSection({
 
   if (contexto.isError) return null;
 
+  const lider = contexto.data?.liderActual;
+  const cambios = historial.data?.items ?? [];
+
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="flex flex-col gap-section">
       {isLeader && (
         <LeadershipAppealSheet projectId={idProyecto} open={apelacionAbierta} onOpenChange={setApelacionAbierta} />
       )}
-      <LeadershipCard
-        context={contexto.data}
-        history={historial.data?.items}
-        isLoading={contexto.isPending}
-        action={action}
-      />
-      <section
-        aria-labelledby="apelaciones-pendientes-title"
-        className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm"
-      >
-        <h2 id="apelaciones-pendientes-title" className="flex items-center gap-2 text-base font-bold text-on-surface">
-          <ScrollText className="size-4 text-primary" aria-hidden="true" />
-          Apelaciones pendientes
-        </h2>
-        {apelaciones.isPending ? (
-          <Skeleton className="mt-3 h-20 w-full rounded-lg" />
-        ) : apelaciones.isError ? (
-          <p className="mt-3 text-xs text-tertiary">No fue posible consultar las apelaciones.</p>
-        ) : pendiente ? (
-          <div className="mt-3 space-y-2 rounded-lg border border-outline-variant/40 bg-surface-container-low p-3 text-xs">
-            <p className="text-tertiary">
-              Solicitante{' '}
-              <span className="block text-sm font-semibold text-on-surface">
-                {pendiente.liderSolicitante.nombre} {pendiente.liderSolicitante.apellido}
-              </span>
-            </p>
-            <p className="text-tertiary">
-              Candidato propuesto{' '}
-              <span className="block text-sm font-semibold text-on-surface">
-                {pendiente.candidatoPropuesto.nombre} {pendiente.candidatoPropuesto.apellido}
-              </span>
-            </p>
-            <p className="text-tertiary">
-              Asunto <span className="block text-sm text-on-surface">{pendiente.asunto}</span>
-            </p>
-            <p className="text-[11px] text-tertiary">Enviada el {formatearFechaCorta(pendiente.creadaEn)} · pendiente de resolución administrativa</p>
-            {appealSlot?.(pendiente)}
-          </div>
-        ) : (
-          <p className="mt-3 text-sm italic text-tertiary">No hay apelaciones pendientes.</p>
-        )}
+
+      {/* Mini-resumen con datos que ya entrega el backend (sin cálculos nuevos). */}
+      <section aria-label="Resumen de liderazgo" className="grid grid-cols-1 gap-grid @xl/project:grid-cols-3">
+        <HoursKpiCard
+          variante="en-linea"
+          icon={Crown}
+          label="Líder actual"
+          value={lider ? `${lider.nombre} ${lider.apellido}` : '—'}
+          isLoading={contexto.isPending}
+        />
+        <HoursKpiCard
+          variante="en-linea"
+          icon={ScrollText}
+          label="Apelaciones pendientes"
+          value={apelaciones.isError ? '—' : String(apelaciones.data?.total ?? 0)}
+          isLoading={apelaciones.isPending}
+        />
+        <HoursKpiCard
+          variante="en-linea"
+          icon={History}
+          label="Cambios de liderazgo"
+          value={historial.isError ? '—' : String(historial.data?.total ?? 0)}
+          isLoading={historial.isPending}
+        />
+      </section>
+
+      {/* Liderazgo actual (2/3) + apelaciones pendientes (1/3). */}
+      <div className="grid grid-cols-1 gap-grid @4xl/project:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <LeadershipCard
+          context={contexto.data}
+          history={historial.data?.items}
+          isLoading={contexto.isPending}
+          action={action}
+          showHistory={false}
+        />
+        <section aria-labelledby="apelaciones-pendientes-title" className="card-base flex flex-col">
+          <h2
+            id="apelaciones-pendientes-title"
+            className="flex items-center gap-tight type-subtitle font-semibold text-text-primary"
+          >
+            <ScrollText className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
+            Apelaciones pendientes
+          </h2>
+          {apelaciones.isPending ? (
+            <Skeleton className="mt-stack h-24 w-full rounded-control" />
+          ) : apelaciones.isError ? (
+            <p className="type-meta mt-stack">No fue posible consultar las apelaciones.</p>
+          ) : pendiente ? (
+            <div className="mt-stack rounded-control bg-surface-container-low p-stack">
+              <dl className="grid gap-inline">
+                <div>
+                  <dt className="type-meta">Solicitante</dt>
+                  <dd className="text-sm font-semibold text-text-primary">
+                    {pendiente.liderSolicitante.nombre} {pendiente.liderSolicitante.apellido}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="type-meta">Candidato propuesto</dt>
+                  <dd className="text-sm font-semibold text-text-primary">
+                    {pendiente.candidatoPropuesto.nombre} {pendiente.candidatoPropuesto.apellido}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="type-meta">Asunto</dt>
+                  <dd className="text-sm text-text-primary">{pendiente.asunto}</dd>
+                </div>
+              </dl>
+              <p className="type-meta mt-inline">
+                Enviada el {formatearFechaCorta(pendiente.creadaEn)} · pendiente de resolución administrativa
+              </p>
+              {appealSlot?.(pendiente)}
+            </div>
+          ) : (
+            <Empty tone="flush" className="py-6 md:py-8">
+              <EmptyMedia variant="subtle">
+                <ScrollText aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle className="type-subtitle">No hay apelaciones pendientes.</EmptyTitle>
+                <EmptyDescription>
+                  Cuando se solicite un cambio de liderazgo, aparecerá aquí mientras la administración lo resuelve.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </section>
+      </div>
+
+      {/* Historial como sección propia, ya no un enlace plegable suelto. */}
+      <section aria-labelledby="historial-liderazgo-title" className="flex flex-col gap-stack">
+        <div className="flex flex-wrap items-baseline justify-between gap-inline">
+          <h2 id="historial-liderazgo-title" className="type-section text-text-primary">
+            Historial de liderazgo
+          </h2>
+          {!historial.isPending && !historial.isError && (
+            <span className="type-meta">
+              {historial.data?.total === 1 ? '1 cambio registrado' : `${historial.data?.total ?? 0} cambios registrados`}
+            </span>
+          )}
+        </div>
+        <div className="card-base overflow-hidden p-0">
+          {historial.isPending ? (
+            <div className="p-card">
+              <Skeleton className="h-24 w-full rounded-control" />
+            </div>
+          ) : historial.isError ? (
+            <p className="type-meta p-card">No fue posible consultar el historial de liderazgo.</p>
+          ) : cambios.length === 0 ? (
+            <Empty tone="flush" className="px-card py-6 md:px-card md:py-8">
+              <EmptyMedia variant="subtle">
+                <History aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle className="type-subtitle">Sin cambios de liderazgo registrados.</EmptyTitle>
+                <EmptyDescription>Cada cambio de líder queda registrado aquí con su fecha, origen y motivo.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <LeadershipHistoryTable items={cambios} />
+          )}
+        </div>
       </section>
     </div>
   );

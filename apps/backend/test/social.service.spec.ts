@@ -9,21 +9,31 @@ function makePrisma() {
   return {
     amistad: {
       findUnique: vi.fn(),
-      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
     seguimiento: {
       findUnique: vi.fn(),
-      findMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       delete: vi.fn(),
     },
     usuario: {
       findUniqueOrThrow: vi.fn().mockResolvedValue({ nombre: 'Ana', apellido: 'Pérez' }),
+      findUnique: vi.fn(),
       findMany: vi.fn(),
     },
+    perfilEstudiante: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+    },
+    participacionProyecto: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    $queryRaw: vi.fn().mockResolvedValue([]),
   };
 }
 
@@ -201,7 +211,141 @@ describe('SocialService — buscarUsuarios', () => {
     const prisma = makePrisma();
     const { service } = makeService(prisma);
 
-    await expect(service.buscarUsuarios(1, 'a')).rejects.toThrow(BadRequestException);
+    await expect(service.buscarUsuarios(1, { q: 'a' })).rejects.toThrow(BadRequestException);
+  });
+
+  it('sin q ni filtros lista igual (pestaña Todos) paginando', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.buscarUsuarios(1, {});
+
+    expect(resultado).toEqual({ items: [], hasMore: false });
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0, take: 13 }),
+    );
+  });
+
+  it('excluye a los administradores del directorio', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, {});
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: expect.arrayContaining([
+            { rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } } },
+          ]),
+        },
+      }),
+    );
+  });
+
+  it('pagina: page=2 desplaza el skip y hasMore indica si sobra una fila', async () => {
+    const prisma = makePrisma();
+    const trece = Array.from({ length: 13 }, (_, i) => ({
+      idUsuario: i + 1,
+      nombre: `U${i}`,
+      apellido: 'X',
+      fotoUrl: null,
+      perfil: null,
+      habilidades: [],
+      intereses: [],
+    }));
+    prisma.usuario.findMany.mockResolvedValue(trece);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.buscarUsuarios(1, { page: 2 });
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 12, take: 13 }));
+    expect(resultado.hasMore).toBe(true);
+    expect(resultado.items).toHaveLength(12);
+  });
+
+  it('filtra por soloAmigos usando los amigos del usuario actual', async () => {
+    const prisma = makePrisma();
+    prisma.amistad.findMany.mockResolvedValue([
+      { idUsuarioSolicitante: 1, idUsuarioReceptor: 2, estado: EstadoAmistad.ACEPTADA },
+    ]);
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, { soloAmigos: true });
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { AND: expect.arrayContaining([{ idUsuario: { in: [2] } }]) },
+      }),
+    );
+  });
+
+  it('calcula mismaCarrera y amigosEnComun por resultado', async () => {
+    const prisma = makePrisma();
+    prisma.perfilEstudiante.findUnique.mockResolvedValue({ idCarrera: 7 });
+    prisma.perfilEstudiante.findMany.mockResolvedValue([{ idUsuario: 1 }, { idUsuario: 2 }]);
+    prisma.usuario.findMany.mockResolvedValue([
+      { idUsuario: 2, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null, perfil: null, habilidades: [], intereses: [] },
+    ]);
+    prisma.amistad.findMany
+      .mockResolvedValueOnce([{ idUsuarioSolicitante: 1, idUsuarioReceptor: 3, estado: EstadoAmistad.ACEPTADA }]) // amigos del usuario 1 (getAmigoIds)
+      .mockResolvedValueOnce([]) // relación directa entre el usuario 1 y el candidato 2
+      .mockResolvedValueOnce([{ idUsuarioSolicitante: 2, idUsuarioReceptor: 3 }]); // amigos en común (candidato 2 ↔ amigo 3)
+    const { service } = makeService(prisma);
+
+    const resultado = await service.buscarUsuarios(1, { q: 'ana' });
+
+    expect(resultado.items[0]).toMatchObject({ mismaCarrera: true, amigosEnComun: 1 });
+  });
+
+  // T-196: A y B no son amigos directos, pero comparten 2 amigos (C y D) —
+  // con amigosDeAmigos, B debe aparecer como candidato con el conteo real.
+  it('con amigosDeAmigos, calcula el conteo real cuando hay 2 amigos en común', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([
+      { idUsuario: 2, nombre: 'Beto', apellido: 'Gómez', fotoUrl: null, perfil: null, habilidades: [], intereses: [] },
+    ]);
+    prisma.amistad.findMany
+      .mockResolvedValueOnce([
+        { idUsuarioSolicitante: 1, idUsuarioReceptor: 3 },
+        { idUsuarioSolicitante: 1, idUsuarioReceptor: 4 },
+      ]) // amigos de A=1 (getAmigoIds dentro de getAmigosDeAmigosIds): C=3, D=4
+      .mockResolvedValueOnce([
+        { idUsuarioSolicitante: 1, idUsuarioReceptor: 3 },
+        { idUsuarioSolicitante: 1, idUsuarioReceptor: 4 },
+      ]) // mismos amigos de A, para idsAmigoActual
+      .mockResolvedValueOnce([]) // relación directa entre A=1 y el candidato B=2
+      .mockResolvedValueOnce([
+        { idUsuarioSolicitante: 2, idUsuarioReceptor: 3 },
+        { idUsuarioSolicitante: 4, idUsuarioReceptor: 2 },
+      ]); // B=2 es amigo tanto de C=3 como de D=4
+    prisma.$queryRaw.mockResolvedValue([{ idUsuario: 2 }]); // amigos-de-amigos de A: B=2
+    const { service } = makeService(prisma);
+
+    const resultado = await service.buscarUsuarios(1, { amigosDeAmigos: true });
+
+    expect(resultado.items[0]).toMatchObject({ idUsuario: 2, amigosEnComun: 2 });
+  });
+
+  // T-210: el front usaba `idUsuario` en vez de `idAmistad` para eliminar
+  // amistad / aceptar solicitud desde la tarjeta porque este id nunca venía
+  // en la respuesta.
+  it('incluye idAmistad cuando hay relación con el candidato', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([
+      { idUsuario: 2, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null, perfil: null, habilidades: [], intereses: [] },
+    ]);
+    prisma.amistad.findMany
+      .mockResolvedValueOnce([]) // getAmigoIds(1)
+      .mockResolvedValueOnce([{ idAmistad: 42, idUsuarioSolicitante: 1, idUsuarioReceptor: 2, estado: EstadoAmistad.PENDIENTE }]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.buscarUsuarios(1, {});
+
+    expect(resultado.items[0]).toMatchObject({ idAmistad: 42, solicitudPendiente: { direccion: 'enviada' } });
   });
 
   it('excluye al propio usuario del resultado', async () => {
@@ -209,10 +353,223 @@ describe('SocialService — buscarUsuarios', () => {
     prisma.usuario.findMany.mockResolvedValue([]);
     const { service } = makeService(prisma);
 
-    await service.buscarUsuarios(1, 'ana');
+    await service.buscarUsuarios(1, { q: 'ana' });
 
     expect(prisma.usuario.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ idUsuario: { not: 1 } }) }),
+      expect.objectContaining({
+        where: { AND: expect.arrayContaining([{ idUsuario: { not: 1 } }]) },
+      }),
     );
+  });
+
+  it('filtra por misma carrera usando el perfil del usuario actual', async () => {
+    const prisma = makePrisma();
+    prisma.perfilEstudiante.findUnique.mockResolvedValue({ idCarrera: 7 });
+    prisma.perfilEstudiante.findMany.mockResolvedValue([{ idUsuario: 2 }, { idUsuario: 3 }]);
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, { carrera: true });
+
+    expect(prisma.perfilEstudiante.findUnique).toHaveBeenCalledWith({
+      where: { idUsuario: 1 },
+      select: { idCarrera: true },
+    });
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { AND: expect.arrayContaining([{ idUsuario: { in: [2, 3] } }]) },
+      }),
+    );
+  });
+
+  it('no filtra por carrera si el usuario actual no tiene carrera asignada', async () => {
+    const prisma = makePrisma();
+    prisma.perfilEstudiante.findUnique.mockResolvedValue({ idCarrera: null });
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, { carrera: true });
+
+    expect(prisma.perfilEstudiante.findMany).not.toHaveBeenCalled();
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { AND: expect.arrayContaining([{ idUsuario: { in: [] } }]) },
+      }),
+    );
+  });
+
+  it('filtra por habilidades e intereses combinables (AND entre tipos)', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, { habilidades: [4, 5], intereses: [9] });
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: expect.arrayContaining([
+            { habilidades: { some: { idHabilidad: { in: [4, 5] } } } },
+            { intereses: { some: { idInteres: { in: [9] } } } },
+          ]),
+        },
+      }),
+    );
+  });
+
+  // T-195: filtro de semestre en Personas.
+  it.each([
+    ['1-4', { gte: 1, lte: 4 }],
+    ['5-7', { gte: 5, lte: 7 }],
+    ['8+', { gte: 8 }],
+  ] as const)('filtra por rango de semestre %s', async (rango, limites) => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, { semestreRango: rango });
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: expect.arrayContaining([{ perfil: { semestre: limites } }]),
+        },
+      }),
+    );
+  });
+
+  it('sin semestreRango, no agrega ninguna condición de semestre', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, {});
+
+    const llamada = prisma.usuario.findMany.mock.calls[0][0];
+    const condiciones = llamada.where.AND as unknown[];
+    expect(condiciones.some((c) => typeof c === 'object' && c !== null && 'perfil' in c)).toBe(false);
+  });
+});
+
+describe('SocialService — obtenerPerfilPublico', () => {
+  it('lanza 404 si el usuario objetivo no existe', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findUnique.mockResolvedValue(null);
+    const { service } = makeService(prisma);
+
+    await expect(service.obtenerPerfilPublico(1, 999)).rejects.toThrow(NotFoundException);
+  });
+
+  it('arma el perfil con relación, amigos en común y proyectos activos', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findUnique.mockResolvedValue({
+      idUsuario: 2,
+      nombre: 'Carla',
+      apellido: 'Ruiz',
+      fotoUrl: null,
+      correo: 'carla@uvg.edu.gt',
+      perfil: { semestre: 5, carrera: { nombreCarrera: 'Ingeniería' } },
+      habilidades: [{ habilidad: { nombreHabilidad: 'React' } }],
+      intereses: [{ interes: { nombreInteres: 'IA' } }],
+    });
+    // amistad(1↔2): pendiente, enviada por mí
+    prisma.amistad.findFirst.mockResolvedValue({
+      idAmistad: 42,
+      idUsuarioSolicitante: 1,
+      idUsuarioReceptor: 2,
+      estado: EstadoAmistad.PENDIENTE,
+    });
+    prisma.seguimiento.findUnique.mockResolvedValue(null);
+    prisma.perfilEstudiante.findUnique.mockResolvedValue({ idCarrera: 7 });
+    prisma.perfilEstudiante.findMany.mockResolvedValue([{ idUsuario: 1 }, { idUsuario: 2 }]);
+    // getAmigoIds(1) luego getAmigoIds(2), en ese orden (Promise.all evalúa el arreglo en orden)
+    prisma.amistad.findMany
+      .mockResolvedValueOnce([{ idUsuarioSolicitante: 1, idUsuarioReceptor: 3, estado: EstadoAmistad.ACEPTADA }])
+      .mockResolvedValueOnce([{ idUsuarioSolicitante: 2, idUsuarioReceptor: 3, estado: EstadoAmistad.ACEPTADA }]);
+    prisma.participacionProyecto.findMany.mockResolvedValue([
+      {
+        rolProyecto: {
+          nombreRol: 'Desarrollador',
+          proyecto: { idProyecto: 9, tituloProyecto: 'Portal UVG', estadoProyecto: 'EN_PROGRESO' },
+        },
+      },
+    ]);
+    prisma.usuario.findMany.mockResolvedValue([{ idUsuario: 3, nombre: 'Beto', apellido: 'Gómez', fotoUrl: null }]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.obtenerPerfilPublico(1, 2);
+
+    expect(resultado).toMatchObject({
+      idUsuario: 2,
+      nombre: 'Carla',
+      apellido: 'Ruiz',
+      correo: 'carla@uvg.edu.gt',
+      esAmigo: false,
+      solicitudPendiente: { direccion: 'enviada' },
+      idAmistad: 42,
+      loSigo: false,
+      carrera: 'Ingeniería',
+      semestre: 5,
+      mismaCarrera: true,
+      habilidades: ['React'],
+      intereses: ['IA'],
+    });
+    expect(resultado.amigosEnComun).toEqual([{ idUsuario: 3, nombre: 'Beto', apellido: 'Gómez', fotoUrl: null }]);
+    expect(resultado.proyectosActivos).toEqual([
+      { idProyecto: 9, tituloProyecto: 'Portal UVG', estadoProyecto: 'EN_PROGRESO', rolNombre: 'Desarrollador' },
+    ]);
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { idUsuario: { in: [3] } } }),
+    );
+  });
+
+  it('sin amigos en común no consulta usuario.findMany para armar la lista', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findUnique.mockResolvedValue({
+      idUsuario: 2,
+      nombre: 'Carla',
+      apellido: 'Ruiz',
+      fotoUrl: null,
+      correo: 'carla@uvg.edu.gt',
+      perfil: null,
+      habilidades: [],
+      intereses: [],
+    });
+    prisma.amistad.findFirst.mockResolvedValue(null);
+    prisma.seguimiento.findUnique.mockResolvedValue(null);
+    prisma.perfilEstudiante.findUnique.mockResolvedValue(null);
+    prisma.amistad.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.obtenerPerfilPublico(1, 2);
+
+    expect(resultado.amigosEnComun).toEqual([]);
+    expect(prisma.usuario.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('SocialService — getAmigosDeAmigosIds', () => {
+  it('devuelve vacío si el usuario no tiene amigos directos', async () => {
+    const prisma = makePrisma();
+    prisma.amistad.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.getAmigosDeAmigosIds(1);
+
+    expect(resultado).toEqual([]);
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('excluye al propio usuario y a los amigos directos del resultado de 2 saltos', async () => {
+    const prisma = makePrisma();
+    prisma.amistad.findMany.mockResolvedValue([
+      { idUsuarioSolicitante: 1, idUsuarioReceptor: 2 },
+    ]);
+    prisma.$queryRaw.mockResolvedValue([{ idUsuario: 1 }, { idUsuario: 2 }, { idUsuario: 3 }]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.getAmigosDeAmigosIds(1);
+
+    expect(resultado).toEqual([3]);
   });
 });

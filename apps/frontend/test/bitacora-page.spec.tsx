@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { EventoBitacoraDto } from '../lib/types/bitacora';
 
@@ -74,6 +74,20 @@ function renderPage() {
   return render(createElement(BitacoraPage));
 }
 
+// Los filtros son Select del sistema (Radix), como en Mis Proyectos: jsdom no
+// implementa captura de puntero ni scrollIntoView, que Radix usa al abrirlos.
+beforeAll(() => {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+});
+
+/** Abre el Select del filtro (teclado, como un usuario) y elige una opción. */
+function elegir(filtro: string, opcion: string) {
+  fireEvent.keyDown(screen.getByRole('combobox', { name: filtro }), { key: 'Enter' });
+  fireEvent.click(screen.getByRole('option', { name: opcion }));
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -125,6 +139,26 @@ describe('BitacoraPage — autorización (exclusiva del líder)', () => {
     expect(screen.getByRole('heading', { name: 'Bitácora' })).toBeInTheDocument();
   });
 
+  it('los iconos de evento son neutros y sin fondo, al par del título (como en Mis Horas)', () => {
+    mockLeader(true);
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    const iconos = document.querySelectorAll('[data-slot="icono-evento"]');
+    expect(iconos.length).toBeGreaterThan(0);
+    for (const icono of iconos) {
+      expect(icono).toHaveClass('size-5', 'text-text-primary');
+      expect(icono).not.toHaveClass('text-primary');
+      // sin caja de color alrededor: comparte fila con la categoría y el título
+      expect(icono.parentElement).toHaveClass('flex', 'items-center');
+      expect(icono.parentElement!.className).not.toMatch(/bg-primary/);
+      expect(icono.nextElementSibling).toHaveClass('pill');
+    }
+  });
+
   it('un no-líder NUNCA dispara la petición al backend (useProjectBitacora recibe habilitado=false)', () => {
     mockLeader(false);
     mockSprints();
@@ -147,6 +181,91 @@ describe('BitacoraPage — autorización (exclusiva del líder)', () => {
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
     expect(ultimaLlamada[2]).toBe(true);
+  });
+});
+
+describe('BitacoraPage — autorización (HU-170: integrante en solo lectura)', () => {
+  it('un integrante activo (no líder) ve la línea de tiempo en vez del aviso de "solo líder"', () => {
+    mockLeader(false);
+    mockSprints();
+    // El usuario actual (idUsuario 999, definido por mockLeader(false)) SÍ
+    // está en la lista de miembros del proyecto: es integrante activo, no
+    // un ajeno. A diferencia del test de "autorización (exclusiva del
+    // líder)" de arriba, donde el usuario 999 no aparece en mockMembers().
+    mockMembers([{ idUsuario: 999, nombre: 'Carlos', apellido: 'Diaz' }]);
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.queryByText('¡No eres líder!')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Bitácora' })).toBeInTheDocument();
+  });
+
+  it('un integrante activo SÍ dispara la petición (useProjectBitacora recibe habilitado=true)', () => {
+    mockLeader(false);
+    mockSprints();
+    mockMembers([{ idUsuario: 999, nombre: 'Carlos', apellido: 'Diaz' }]);
+    mockBitacora();
+
+    renderPage();
+
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[2]).toBe(true);
+  });
+
+  it('un usuario ajeno (ni líder ni integrante) sigue viendo el aviso y NUNCA dispara la petición', () => {
+    mockLeader(false);
+    mockSprints();
+    // idUsuario 999 (el usuario actual) no aparece en esta lista de miembros.
+    mockMembers([{ idUsuario: 1, nombre: 'Ana', apellido: 'Lopez' }]);
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.getByText('¡No eres líder!')).toBeInTheDocument();
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[2]).toBe(false);
+  });
+
+  it('un integrante ve los mismos filtros y la misma paginación que el líder, sin ningún control de crear/editar/borrar', () => {
+    mockLeader(false);
+    mockSprints();
+    mockMembers([{ idUsuario: 999, nombre: 'Carlos', apellido: 'Diaz' }]);
+    mockBitacora({ totalPages: 2 });
+
+    renderPage();
+
+    expect(screen.getByLabelText('Filtrar por sprint')).toBeInTheDocument();
+    expect(screen.getByLabelText('Filtrar por integrante')).toBeInTheDocument();
+    expect(screen.getByLabelText('Filtrar por tipo de evento')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeInTheDocument();
+    // La bitácora nunca tuvo endpoints de escritura (T-269): esta pantalla
+    // tampoco debe ofrecer ningún control para crear, editar o borrar.
+    expect(screen.queryByRole('button', { name: /crear|nueva entrada/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /editar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /borrar|eliminar/i })).not.toBeInTheDocument();
+  });
+
+  it('un integrante ve el aviso de que la vista es de solo lectura', () => {
+    mockLeader(false);
+    mockSprints();
+    mockMembers([{ idUsuario: 999, nombre: 'Carlos', apellido: 'Diaz' }]);
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.getByText(/modo solo lectura/i)).toBeInTheDocument();
+  });
+
+  it('el líder NO ve el aviso de solo lectura', () => {
+    mockLeader(true);
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.queryByText(/modo solo lectura/i)).not.toBeInTheDocument();
   });
 });
 
@@ -265,7 +384,7 @@ describe('BitacoraPage — filtros', () => {
 
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
-    fireEvent.change(screen.getByLabelText('Filtrar por sprint'), { target: { value: '3' } });
+    elegir('Filtrar por sprint', 'Sprint 3');
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
     expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ idSprint: 3, page: 1 }));
@@ -278,12 +397,73 @@ describe('BitacoraPage — filtros', () => {
     mockBitacora();
 
     renderPage();
-    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
-      target: { value: 'SPRINT_STARTED' },
-    });
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
     expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ tipoEvento: 'SPRINT_STARTED' }));
+  });
+});
+
+describe('BitacoraPage — misma barra de filtros que Mis Proyectos', () => {
+  it('usa el buscador del dashboard y los Select del sistema, sin selects nativos', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    const { container } = renderPage();
+
+    // Buscador compartido (DashboardSearchField): ocupa el espacio libre y mide 46 px.
+    const buscador = screen.getByRole('textbox', { name: 'Buscar por persona' });
+    expect(buscador).toHaveClass('h-11.5', 'rounded-lg', 'border-outline-variant', 'pl-10');
+    expect(buscador.parentElement).toHaveClass('flex-1');
+
+    // Los tres filtros son el Select del sistema con el disparador de Mis Proyectos.
+    expect(container.querySelector('select')).toBeNull();
+    for (const nombre of ['Filtrar por sprint', 'Filtrar por integrante', 'Filtrar por tipo de evento']) {
+      const filtro = screen.getByRole('combobox', { name: nombre });
+      expect(filtro, nombre).toHaveClass('h-11.5', 'rounded-lg', 'border-outline-variant', 'bg-surface-container-lowest');
+    }
+    expect(screen.getByRole('combobox', { name: 'Filtrar por sprint' })).toHaveTextContent('Todos los sprints');
+
+    // Buscador y selects comparten fila (en columna si el contenedor es angosto).
+    const fila = buscador.parentElement!.parentElement!;
+    expect(fila).toHaveClass('flex-col', '@3xl/project:flex-row');
+    expect(fila).toContainElement(screen.getByRole('combobox', { name: 'Filtrar por tipo de evento' }));
+
+    // Las fechas usan la misma caja que el buscador y los selects.
+    for (const fecha of [screen.getByLabelText('Filtrar desde'), screen.getByLabelText('Filtrar hasta')]) {
+      expect(fecha).toHaveClass('h-11.5', 'rounded-lg', 'border-outline-variant', 'bg-surface-container-lowest');
+    }
+  });
+
+  it('elegir «Todos los sprints» después de un sprint vuelve a quitar ese filtro', () => {
+    mockLeader();
+    mockSprints([{ idSprint: 3, numero: 3 }]);
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    elegir('Filtrar por sprint', 'Sprint 3');
+    expect((useProjectBitacora as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ idSprint: 3 }));
+
+    elegir('Filtrar por sprint', 'Todos los sprints');
+    expect((useProjectBitacora as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ idSprint: undefined }));
+  });
+
+  it('el filtro de integrante se aplica con el id del miembro elegido', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers([
+      { idUsuario: 1, nombre: 'Ana', apellido: 'Lopez' },
+      { idUsuario: 7, nombre: 'Carlos', apellido: 'Diaz' },
+    ]);
+    mockBitacora();
+
+    renderPage();
+    elegir('Filtrar por integrante', 'Carlos Diaz');
+
+    expect((useProjectBitacora as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ idActor: 7, page: 1 }));
   });
 });
 
@@ -314,6 +494,163 @@ describe('BitacoraPage — paginación', () => {
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
     expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ page: 2 }));
+  });
+});
+
+describe('BitacoraPage — búsqueda por persona (T-246, debounce)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('escribir en el buscador no consulta de inmediato; espera a que el usuario deje de escribir', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    act(() => {
+      fireEvent.change(screen.getByLabelText('Buscar por persona'), { target: { value: 'saul' } });
+    });
+
+    let ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1].persona).toBeUndefined();
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ persona: 'saul', page: 1 }));
+  });
+
+  it('escribir varias veces seguidas solo consulta una vez, con el último valor', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    const campo = screen.getByLabelText('Buscar por persona');
+    act(() => {
+      fireEvent.change(campo, { target: { value: 's' } });
+      vi.advanceTimersByTime(100);
+      fireEvent.change(campo, { target: { value: 'sa' } });
+      vi.advanceTimersByTime(100);
+      fireEvent.change(campo, { target: { value: 'saul' } });
+      vi.advanceTimersByTime(400);
+    });
+
+    const llamadasConPersona = (useProjectBitacora as any).mock.calls.filter(
+      (llamada: any) => llamada[1].persona !== undefined,
+    );
+    expect(llamadasConPersona).toHaveLength(1);
+    expect(llamadasConPersona[0][1].persona).toBe('saul');
+  });
+});
+
+describe('BitacoraPage — rango de fechas (T-246)', () => {
+  it('cambiar "desde" y "hasta" se los pasa al hook y reinicia la página', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora({ totalPages: 2 });
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    fireEvent.change(screen.getByLabelText('Filtrar desde'), { target: { value: '2026-08-01' } });
+
+    let ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ desde: '2026-08-01', page: 1 }));
+
+    fireEvent.change(screen.getByLabelText('Filtrar hasta'), { target: { value: '2026-08-31' } });
+
+    ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(
+      expect.objectContaining({ desde: '2026-08-01', hasta: '2026-08-31', page: 1 }),
+    );
+  });
+});
+
+describe('BitacoraPage — pastillas de filtros activos (T-246)', () => {
+  it('sin ningún filtro activo, no muestra ninguna pastilla', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    expect(screen.queryByLabelText('Filtros aplicados')).not.toBeInTheDocument();
+  });
+
+  it('cada filtro activo aparece como su propia pastilla removible', () => {
+    mockLeader();
+    mockSprints([{ idSprint: 3, numero: 3 }]);
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    elegir('Filtrar por sprint', 'Sprint 3');
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
+
+    const contenedor = screen.getByLabelText('Filtros aplicados');
+    expect(within(contenedor).getByText('Sprint 3')).toBeInTheDocument();
+    expect(within(contenedor).getByText('Sprint iniciado')).toBeInTheDocument();
+  });
+
+  it('quitar una sola pastilla solo retira ese filtro y conserva los demás', () => {
+    mockLeader();
+    mockSprints([{ idSprint: 3, numero: 3 }]);
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    elegir('Filtrar por sprint', 'Sprint 3');
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro Sprint 3' }));
+
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(
+      expect.objectContaining({ idSprint: undefined, tipoEvento: 'SPRINT_STARTED' }),
+    );
+  });
+
+  it('"Limpiar todo" retira todos los filtros a la vez', () => {
+    mockLeader();
+    mockSprints([{ idSprint: 3, numero: 3 }]);
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    elegir('Filtrar por sprint', 'Sprint 3');
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar todo' }));
+
+    expect(screen.queryByLabelText('Filtros aplicados')).not.toBeInTheDocument();
+    const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
+    expect(ultimaLlamada[1]).toEqual(
+      expect.objectContaining({ idSprint: undefined, tipoEvento: undefined, page: 1 }),
+    );
+  });
+});
+
+describe('BitacoraPage — vacío con filtros aplicados (T-246)', () => {
+  it('sin resultados y con un filtro activo, muestra el mensaje de "sin coincidencias", no el de bitácora vacía', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora({ eventos: [], total: 0 });
+
+    renderPage();
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
+
+    expect(screen.getByText('Ningún evento coincide con estos filtros.')).toBeInTheDocument();
+    expect(screen.queryByText('Todavía no hay eventos registrados.')).not.toBeInTheDocument();
   });
 });
 

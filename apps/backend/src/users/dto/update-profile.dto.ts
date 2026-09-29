@@ -10,11 +10,13 @@ import {
   IsString,
   Matches,
   Max,
+  MaxLength,
   Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsHttpUrl } from '../../common/validators/http-url.validator';
 
 export class HabilidadInputDto {
   @IsInt()
@@ -158,20 +160,30 @@ export class UpdateProfileDto {
   @IsString()
   fotoUrl?: string;
 
+  // G07 (OWASP25-C027): los enlaces que escribe el usuario solo admiten http(s)
+  // ('' = sin enlace). fotoUrl es la imagen subida a Cloudinary, no un enlace.
   @IsOptional()
   @IsString()
+  @MaxLength(255)
+  @IsHttpUrl()
   enlacePortafolio?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
+  @IsHttpUrl()
   githubUrl?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
+  @IsHttpUrl()
   linkedinUrl?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
+  @IsHttpUrl()
   urlCv?: string;
 
   // ==================== RELACIONES (para reemplazo masivo) ====================

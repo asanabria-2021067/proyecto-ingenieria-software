@@ -3,13 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { getJwtSecretFromConfig } from '../config/jwt-secret';
 
 @Module({
   imports: [
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') || 'dev-secret-change-me',
+        secret: getJwtSecretFromConfig(config),
         signOptions: { expiresIn: '24h' },
       }),
     }),

@@ -1,9 +1,12 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   AmistadDto,
+  BuscarUsuariosFiltros,
+  BuscarUsuariosResultado,
   FeedSocialDto,
   SolicitudAmistadPendienteDto,
   UsuarioBusquedaDto,
+  UsuarioPerfilDto,
   UsuarioResumenDto,
 } from '@/lib/types/social';
 
@@ -53,10 +56,23 @@ export function getSeguidores(): Promise<UsuarioResumenDto[]> {
   return apiFetch<UsuarioResumenDto[]>('/social/seguimientos/seguidores');
 }
 
-export function buscarUsuarios(q: string): Promise<UsuarioBusquedaDto[]> {
-  return apiFetch<UsuarioBusquedaDto[]>(`/social/usuarios/buscar?q=${encodeURIComponent(q)}`);
+export function buscarUsuarios(filtros: BuscarUsuariosFiltros): Promise<BuscarUsuariosResultado> {
+  const params = new URLSearchParams();
+  if (filtros.q) params.set('q', filtros.q);
+  if (filtros.carrera) params.set('carrera', 'true');
+  if (filtros.amigosDeAmigos) params.set('amigosDeAmigos', 'true');
+  if (filtros.soloAmigos) params.set('soloAmigos', 'true');
+  if (filtros.habilidades?.length) params.set('habilidades', filtros.habilidades.join(','));
+  if (filtros.intereses?.length) params.set('intereses', filtros.intereses.join(','));
+  if (filtros.semestreRango) params.set('semestreRango', filtros.semestreRango);
+  if (filtros.page) params.set('page', String(filtros.page));
+  return apiFetch<BuscarUsuariosResultado>(`/social/usuarios/buscar?${params.toString()}`);
 }
 
 export function getFeedSocial(): Promise<FeedSocialDto> {
   return apiFetch<FeedSocialDto>('/social/feed');
+}
+
+export function getPerfilUsuario(idUsuario: number): Promise<UsuarioPerfilDto> {
+  return apiFetch<UsuarioPerfilDto>(`/social/usuarios/${idUsuario}`);
 }

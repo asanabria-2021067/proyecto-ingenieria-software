@@ -19,7 +19,12 @@ vi.mock('../hooks/use-exit-request', () => ({
   useRejectExitRequest: vi.fn(),
 }));
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
-vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn(), useIsAdmin: vi.fn() }));
+// T-259/T-260 (HU-164): el botón de exportar tiene su propio spec
+// (project-export-buttons.spec.tsx); aquí solo se stubea para que esta
+// página siga probándose sin QueryClientProvider (useProjectExport usa
+// useMutation internamente).
+vi.mock('../hooks/use-project-export', () => ({ useProjectExport: vi.fn() }));
 // S7 (F008): la card de liderazgo tiene cobertura propia (leadership-card.spec.ts);
 // aquí se stubea para que esta página siga probándose sin QueryClientProvider.
 vi.mock('../hooks/use-leadership', () => ({
@@ -41,7 +46,8 @@ import {
   useRejectExitRequest,
 } from '../hooks/use-exit-request';
 import { useProjectDetail } from '../hooks/use-project-detail';
-import { useCurrentUser } from '../hooks/use-current-user';
+import { useCurrentUser, useIsAdmin } from '../hooks/use-current-user';
+import { useProjectExport } from '../hooks/use-project-export';
 import type { PendingLeaderReviewDto } from '../lib/types/exit-requests';
 
 const LIDER: LiderProyectoDTO = {
@@ -162,6 +168,11 @@ beforeEach(() => {
     isLoading: false,
   });
   (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 }, isLoading: false });
+  (useIsAdmin as any).mockReturnValue(false);
+  (useProjectExport as any).mockReturnValue({
+    exportCsv: { mutate: vi.fn(), isPending: false, isError: false },
+    exportPdf: { mutate: vi.fn(), isPending: false, isError: false },
+  });
 });
 
 afterEach(() => {
@@ -687,5 +698,35 @@ describe('MiembrosProyectoPage — F14: loading/error local no afecta F12/F13', 
     expect(refetchExitRequests).toHaveBeenCalled();
     // Ningún miembro muestra acciones potencialmente incorrectas mientras el reader falla.
     expect(screen.queryByRole('button', { name: /Aprobar solicitud de salida/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('MiembrosProyectoPage — métricas y acciones con el lenguaje de Mis Horas', () => {
+  it('las métricas usan el KPI de Mis Horas: tarjeta estándar, icono neutro al par de la etiqueta, sin caja verde', () => {
+    mockHook();
+    renderPage();
+
+    for (const nombre of ['Integrantes activos', 'Tareas activas', 'Tareas completadas', 'Horas reconocidas']) {
+      const kpi = screen.getByRole('group', { name: nombre });
+      expect(kpi).toHaveClass('card-base');
+      const icono = kpi.querySelector('svg')!;
+      expect(icono).toHaveClass('size-5', 'text-text-primary');
+      expect(icono.parentElement).toHaveTextContent(nombre);
+      expect(kpi.innerHTML).not.toMatch(/bg-primary\/10|bg-primary-container/);
+    }
+  });
+
+  it('exportar CSV/PDF va en la misma fila, a la izquierda de Postulaciones pendientes y Solicitudes de salida', () => {
+    mockHook();
+    renderPage();
+
+    const fila = document.querySelector('[data-slot="acciones-miembros"]') as HTMLElement;
+    expect(fila).toHaveClass('flex', 'flex-wrap');
+    const textos = Array.from(fila.querySelectorAll('a, button')).map((el) => el.textContent?.trim());
+    expect(textos.slice(0, 2)).toEqual(['Exportar CSV', 'Exportar PDF']);
+    expect(textos.indexOf('Exportar PDF')).toBeLessThan(textos.findIndex((t) => /postulaciones pendientes/i.test(t ?? '')));
+    expect(textos.findIndex((t) => /postulaciones pendientes/i.test(t ?? ''))).toBeLessThan(
+      textos.findIndex((t) => /solicitudes de salida/i.test(t ?? '')),
+    );
   });
 });

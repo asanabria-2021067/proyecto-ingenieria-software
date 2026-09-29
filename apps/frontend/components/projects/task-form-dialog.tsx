@@ -135,8 +135,14 @@ function TaskFormDialogContent({
   onManageLabels,
 }: TaskFormDialogProps) {
   const schema = useMemo(
-    () => buildTaskFormSchema({ fechaOriginal: task?.fechaLimite ?? null, miembros: members }),
-    [task, members],
+    () =>
+      buildTaskFormSchema({
+        fechaOriginal: task?.fechaLimite ?? null,
+        miembros: members,
+        mode,
+        hitoOriginal: task?.idHito ?? null,
+      }),
+    [task, members, mode],
   );
 
   const form = useForm<TaskFormValues>({
@@ -216,7 +222,7 @@ function TaskFormDialogContent({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex max-h-[90vh] min-h-0 flex-col">
+      <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="flex max-h-[90vh] min-h-0 flex-col">
         <DialogHeader className="relative shrink-0 space-y-1 border-b border-outline-variant/40 px-6 py-4 text-left">
           <DialogTitle className="text-xl font-bold text-on-surface">
             {mode === 'create' ? 'Crear nueva tarea' : 'Editar tarea'}
@@ -241,6 +247,8 @@ function TaskFormDialogContent({
             members={members}
             labels={labels}
             onManageLabels={onManageLabels}
+            mode={mode}
+            hitoOriginal={task?.idHito ?? null}
           />
 
           {progreso && (

@@ -32,15 +32,19 @@ services:
     profiles:
       - app
     restart: unless-stopped
+    # G04 (OWASP25-C021 + P5/T19): la interfaz publicada es configurable. El
+    # default 0.0.0.0 conserva la exposicion actual; 127.0.0.1 deja el backend
+    # solo detras de nginx (activacion: administrador, via deploy).
     ports:
-      - "3001:3001"
+      - "${BACKEND_BIND:-0.0.0.0}:3001:3001"
     env_file: .env
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}?schema=public
-      - DIRECT_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-uvg_collab}?schema=public
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:?debes definir DB_PASSWORD, no tiene valor por defecto}@postgres:5432/${DB_NAME:-uvg_collab}?schema=public
+      - DIRECT_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:?debes definir DB_PASSWORD, no tiene valor por defecto}@postgres:5432/${DB_NAME:-uvg_collab}?schema=public
       - PORT=3001
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-me}
+      # G01 (OWASP25-C019): sin valor por defecto; el backend exige >=32 caracteres.
+      - JWT_SECRET=${JWT_SECRET:?debes definir JWT_SECRET, no tiene valor por defecto}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?debes definir JWT_REFRESH_SECRET, no tiene valor por defecto}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -67,8 +71,9 @@ services:
     profiles:
       - app
     restart: unless-stopped
+    # G04 (OWASP25-C021 + P5/T19): igual que el backend.
     ports:
-      - "3000:3000"
+      - "${FRONTEND_BIND:-0.0.0.0}:3000:3000"
     env_file: .env
     environment:
       - NODE_ENV=${NODE_ENV:-development}

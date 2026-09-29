@@ -191,6 +191,12 @@ PowerShell:
 Copy-Item .env.example .env
 ```
 
+Luego completá en `.env` las variables marcadas `[obligatoria]`: `DB_PASSWORD`,
+`JWT_SECRET` (aleatorio, al menos 32 caracteres; por ejemplo
+`openssl rand -base64 48`) y `JWT_REFRESH_SECRET`. Sin ellas, `docker compose` y
+el backend se niegan a arrancar. pgAdmin no tiene contraseña por defecto:
+definí `PGADMIN_PASSWORD` antes de usar el perfil `tools`.
+
 ### 2) Levantar entorno con Docker
 
 Todo el entorno (DB + Backend + Frontend):

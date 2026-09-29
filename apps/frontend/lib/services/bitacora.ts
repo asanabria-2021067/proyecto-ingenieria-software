@@ -5,7 +5,10 @@ function buildQueryString(filtros: FiltrosBitacora): string {
   const params = new URLSearchParams();
   if (filtros.idSprint !== undefined) params.set('idSprint', String(filtros.idSprint));
   if (filtros.idActor !== undefined) params.set('idActor', String(filtros.idActor));
+  if (filtros.persona !== undefined) params.set('persona', filtros.persona);
   if (filtros.tipoEvento !== undefined) params.set('tipoEvento', filtros.tipoEvento);
+  if (filtros.desde !== undefined) params.set('desde', filtros.desde);
+  if (filtros.hasta !== undefined) params.set('hasta', filtros.hasta);
   if (filtros.page !== undefined) params.set('page', String(filtros.page));
   if (filtros.limit !== undefined) params.set('limit', String(filtros.limit));
   const query = params.toString();

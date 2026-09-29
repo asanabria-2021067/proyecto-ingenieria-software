@@ -1,4 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DynamicModule, ExecutionContext, Type } from '@nestjs/common';
+import { RequestMethod } from '@nestjs/common';
+import {
+  CUSTOM_ROUTE_ARGS_METADATA,
+  GUARDS_METADATA,
+  METHOD_METADATA,
+  MODULE_METADATA,
+  PATH_METADATA,
+  ROUTE_ARGS_METADATA,
+} from '@nestjs/common/constants';
+import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { AppController } from '../src/app.controller';
 import { ApplicationsController } from '../src/applications/applications.controller';
 import { AuthController } from '../src/auth/auth.controller';
@@ -9,9 +20,7 @@ import { NotificationsController } from '../src/notifications/notifications.cont
 import { ProjectsController } from '../src/projects/projects.controller';
 import { RevisionesController } from '../src/revisiones/revisiones.controller';
 import { UsersController } from '../src/users/users.controller';
-import { ValidationController } from '../src/validation/validation.controller';
 import { CatalogsService } from '../src/catalogs/catalogs.service';
-import { ValidationService } from '../src/validation/validation.service';
 import { TasksController } from '../src/tasks/tasks.controller';
 
 describe('Controllers and basic services', () => {
@@ -27,8 +36,10 @@ describe('Controllers and basic services', () => {
         register: vi.fn().mockResolvedValue(tokens),
       } as unknown as ConstructorParameters<typeof AuthController>[0],
     );
-    const res = { cookie: vi.fn() } as unknown as Parameters<AuthController['login']>[1];
-    await auth.login({ correo: 'a', contrasena: 'b' }, res);
+    const res = { cookie: vi.fn() } as unknown as Parameters<AuthController['login']>[2];
+    // G05-C09: login recibe la petición para el origen del evento de seguridad (req.ip).
+    const req = { ip: '127.0.0.1', app: { get: () => false } } as unknown as Parameters<AuthController['login']>[1];
+    await auth.login({ correo: 'a', contrasena: 'b' }, req, res);
     await auth.register({} as Parameters<AuthController['register']>[0], res);
 
     const usersSvc = {
@@ -194,13 +205,107 @@ describe('Controllers and basic services', () => {
 
     tasks.findOne(1, 5, { userId: 9 });
     expect(tasksService.findOne).toHaveBeenCalledWith(1, 5, 9);
+  });
 
-    const validationService = new ValidationService(
-      {} as ConstructorParameters<typeof ValidationService>[0],
-    );
-    const validation = new ValidationController(validationService);
-    expect(validation.findAll()).toEqual({ message: 'Not implemented yet' });
-    expect(validation.create({})).toEqual({ message: 'Not implemented yet' });
+  // G01-C10 · OWASP25-C030 (cambio de test tipo B): este spec exigía que el
+  // stub anónimo `/api/validaciones` respondiera "Not implemented yet". Era
+  // superficie pública sin función ni autenticación; se retira y ahora se
+  // exige que ningún controller del grafo real de AppModule registre la ruta
+  // (una petición a ella cae en el 404 por defecto de Nest).
+  it('AppModule ya no expone el stub anónimo /api/validaciones', async () => {
+    process.env.FRONTEND_URL ??= 'http://localhost:3000';
+    const { AppModule } = await import('../src/app.module');
 
+    const visited = new Set<unknown>();
+    const paths: string[] = [];
+    const visit = async (entry: unknown): Promise<void> => {
+      let resolved = await entry;
+      if (resolved && typeof resolved === 'object' && 'forwardRef' in resolved) {
+        resolved = (resolved as { forwardRef: () => unknown }).forwardRef();
+      }
+      const moduleClass = (
+        resolved && typeof resolved === 'object' && 'module' in resolved
+          ? (resolved as DynamicModule).module
+          : resolved
+      ) as Type<unknown>;
+      if (!moduleClass || visited.has(moduleClass)) {
+        return;
+      }
+      visited.add(moduleClass);
+      const controllers = [
+        ...((Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, moduleClass) ?? []) as Type<unknown>[]),
+        ...(((resolved as DynamicModule).controllers ?? []) as Type<unknown>[]),
+      ];
+      for (const controller of controllers) {
+        const routePath = Reflect.getMetadata(PATH_METADATA, controller) as string | string[] | undefined;
+        paths.push(...[routePath ?? ''].flat());
+      }
+      const imports = [
+        ...((Reflect.getMetadata(MODULE_METADATA.IMPORTS, moduleClass) ?? []) as unknown[]),
+        ...((resolved as DynamicModule).imports ?? []),
+      ];
+      for (const child of imports) {
+        await visit(child);
+      }
+    };
+    await visit(AppModule);
+
+    // Guardarraíl: el recorrido encontró los controllers reales.
+    expect(paths).toContain('auth');
+    expect(paths.length).toBeGreaterThan(20);
+    expect(paths.map((p) => p.replace(/^\/+|\/+$/g, ''))).not.toContain('validaciones');
+    // Importar el grafo completo de AppModule es lento bajo instrumentación de cobertura.
+  }, 30_000);
+});
+
+// HU-158 (T-231): GET /usuarios/me/horas solo conoce al usuario del token.
+describe('UsersController GET me/horas', () => {
+  it('es un GET a usuarios/me/horas protegido por el guard JWT del controller', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, UsersController)).toBe('usuarios');
+    expect(Reflect.getMetadata(PATH_METADATA, UsersController.prototype.getMisHoras)).toBe('me/horas');
+    expect(Reflect.getMetadata(METHOD_METADATA, UsersController.prototype.getMisHoras)).toBe(RequestMethod.GET);
+    expect(Reflect.getMetadata(GUARDS_METADATA, UsersController)).toContain(JwtAuthGuard);
+  });
+
+  it('su único argumento es @CurrentUser: no declara @Param, @Query ni @Body', () => {
+    const argumentos = Reflect.getMetadata(ROUTE_ARGS_METADATA, UsersController, 'getMisHoras') as Record<
+      string,
+      { index: number; factory?: (data: unknown, ctx: ExecutionContext) => unknown }
+    >;
+    const claves = Object.keys(argumentos);
+    expect(claves).toHaveLength(1);
+    expect(claves[0]).toContain(CUSTOM_ROUTE_ARGS_METADATA);
+    expect(UsersController.prototype.getMisHoras).toHaveLength(1);
+
+    // La fábrica de @CurrentUser toma el usuario del token e ignora cualquier id
+    // que el cliente intente colar por query, params o body.
+    const request = {
+      user: { userId: 7 },
+      query: { idUsuario: '99' },
+      params: { idUsuario: '99' },
+      body: { idUsuario: 99 },
+    };
+    const ctx = { switchToHttp: () => ({ getRequest: () => request }) } as unknown as ExecutionContext;
+    expect(argumentos[claves[0]].factory!(undefined, ctx)).toEqual({ userId: 7 });
+  });
+
+  it('delega en UsersService.getMisHoras con el userId de la sesión y devuelve su respuesta tal cual', async () => {
+    const respuesta = { idUsuario: 7, proyectos: [] };
+    const usersSvc = { getMisHoras: vi.fn().mockResolvedValue(respuesta), getDashboard: vi.fn() };
+    const users = new UsersController(usersSvc as unknown as ConstructorParameters<typeof UsersController>[0]);
+
+    await expect(users.getMisHoras({ userId: 7 })).resolves.toBe(respuesta);
+    expect(usersSvc.getMisHoras).toHaveBeenCalledTimes(1);
+    expect(usersSvc.getMisHoras).toHaveBeenCalledWith(7);
+    expect(usersSvc.getDashboard).not.toHaveBeenCalled();
+  });
+
+  it('el dashboard conserva su ruta y su delegación', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, UsersController.prototype.getDashboard)).toBe('me/dashboard');
+    const usersSvc = { getDashboard: vi.fn(), getMisHoras: vi.fn() };
+    const users = new UsersController(usersSvc as unknown as ConstructorParameters<typeof UsersController>[0]);
+    users.getDashboard({ userId: 3 });
+    expect(usersSvc.getDashboard).toHaveBeenCalledWith(3);
+    expect(usersSvc.getMisHoras).not.toHaveBeenCalled();
   });
 });

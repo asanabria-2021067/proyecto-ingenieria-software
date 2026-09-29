@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -16,7 +17,6 @@ import { ProjectsModule } from './projects/projects.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { TasksModule } from './tasks/tasks.module';
 import { EvidenceModule } from './evidence/evidence.module';
-import { ValidationModule } from './validation/validation.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CatalogsModule } from './catalogs/catalogs.module';
 import { RevisionesModule } from './revisiones/revisiones.module';
@@ -37,11 +37,17 @@ import { TeamModule } from './team/team.module';
 import { SocialModule } from './social/social.module';
 import { ChatModule } from './chat/chat.module';
 import { BitacoraModule } from './bitacora/bitacora.module';
+import { GlobalSearchModule } from './search/global-search.module';
+import { ExportsModule } from './exports/exports.module';
+import { SecurityEventsModule } from './security-events/security-events.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(buildEnvOptions()),
     EventEmitterModule.forRoot(),
+    // HU-160/T-238: instantánea diaria del Sprint activo (SprintSnapshotsService).
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         name: 'short',
@@ -77,7 +83,6 @@ import { BitacoraModule } from './bitacora/bitacora.module';
     ApplicationsModule,
     TasksModule,
     EvidenceModule,
-    ValidationModule,
     NotificationsModule,
     CatalogsModule,
     RevisionesModule,
@@ -98,6 +103,11 @@ import { BitacoraModule } from './bitacora/bitacora.module';
     SocialModule,
     ChatModule,
     BitacoraModule,
+    GlobalSearchModule,
+    ExportsModule,
+    // G05 (OWASP25-C037): writer best-effort de eventos de seguridad (global).
+    SecurityEventsModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [

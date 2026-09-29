@@ -37,6 +37,8 @@ import { useHistoricalProject } from '@/hooks/use-historical-project';
 import { motivoInelegibilidadLabel, type LeadershipCandidateDto } from '@/lib/types/leadership';
 import type { HistoricalHorasUsuario } from '@/lib/services/historical';
 import type { EstadoSprint } from '@/lib/types/sprints';
+import { getApiErrorMessage } from '@/components/projects/api-error';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 
 /**
  * Estilos de estado de Sprint (mismo criterio `statusConfig` manual que
@@ -48,7 +50,7 @@ const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: stri
   ACTIVO: { label: 'ACTIVO', className: 'bg-primary-container text-on-primary-container' },
   EN_FINALIZACION: {
     label: 'EN FINALIZACIÓN',
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+    className: 'bg-status-warning text-on-status-warning',
   },
   CERRADO: { label: 'CERRADO', className: 'bg-surface-container-high text-tertiary' },
 };
@@ -165,7 +167,7 @@ export default function DetalleIntegranteProyectoPage() {
             <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-10 text-center">
               <ShieldAlert className="w-10 h-10 text-error mx-auto mb-3" />
               <p className="text-sm text-error">
-                {error instanceof Error ? error.message : 'No se pudo cargar el detalle del integrante.'}
+                {getApiErrorMessage(error, 'general', 'No se pudo cargar el detalle del integrante.')}
               </p>
             </div>
           )}
@@ -290,10 +292,10 @@ function DetalleIntegranteContent({
           Horas del integrante por nivel
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <HorasKpi icon={Clock} label="Horas registradas" value={registradas != null ? `${formatearDecimal(registradas)} h` : '—'} />
-          <HorasKpi icon={History} label="Horas legacy" value={legacy != null ? `${formatearDecimal(legacy)} h` : '—'} />
-          <HorasKpi icon={Calendar} label="Horas propuestas" value={`${formatearDecimal(propuestas)} h`} />
-          <HorasKpi icon={CheckCircle2} label="Horas acreditadas" value={`${formatearDecimal(acreditadas)} h`} destacado />
+          <HoursKpiCard icon={Clock} label="Horas registradas" value={registradas != null ? `${formatearDecimal(registradas)} h` : '—'} />
+          <HoursKpiCard icon={History} label="Horas legacy" value={legacy != null ? `${formatearDecimal(legacy)} h` : '—'} />
+          <HoursKpiCard icon={Calendar} label="Horas propuestas" value={`${formatearDecimal(propuestas)} h`} />
+          <HoursKpiCard icon={CheckCircle2} label="Horas acreditadas" value={`${formatearDecimal(acreditadas)} h`} destacado />
         </div>
         <p className="text-xs text-tertiary">
           Registradas y legacy provienen del servidor por integrante; propuestas y acreditadas se consolidan por Sprint. Los
@@ -371,34 +373,6 @@ function DetalleIntegranteContent({
   );
 }
 
-function HorasKpi({
-  icon: Icon,
-  label,
-  value,
-  destacado = false,
-}: {
-  icon: typeof Clock;
-  label: string;
-  value: string;
-  destacado?: boolean;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={label}
-      className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
-    >
-      <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${destacado ? 'bg-primary/15' : 'bg-primary/10'}`}>
-        <Icon className="size-5 text-primary" aria-hidden="true" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-wide text-tertiary">{label}</p>
-        <p className="font-headline text-2xl font-extrabold text-on-surface">{value}</p>
-      </div>
-    </div>
-  );
-}
-
 function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegranteDTO }) {
   const estilo = ESTADO_SPRINT_STYLE[sprint.estado];
   const headingId = `sprint-historial-${sprint.idSprint}`;
@@ -443,7 +417,7 @@ function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegrante
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+            <Clock className="w-4 h-4 text-tertiary shrink-0" aria-hidden="true" />
             <div>
               <p className="text-base font-bold text-on-surface leading-tight">
                 {formatearHoras(sprint.horasAprobadas)} h
@@ -466,7 +440,7 @@ function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegrante
               <li key={tarea.idTarea} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 {tarea.estadoTarea === 'HECHO' ? (
                   <CheckCircle2
-                    className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0"
+                    className="w-4 h-4 text-primary shrink-0"
                     aria-hidden="true"
                   />
                 ) : (

@@ -6,11 +6,20 @@ import { AuthService } from '../src/auth/auth.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
+import { SYNTHETIC_JWT_SECRET } from './helpers/synthetic-jwt-secret';
 
 vi.mock('bcryptjs', () => ({
   compare: vi.fn(),
   hash: vi.fn(),
 }));
+
+// AuthService exige esta variable al construirse (ver auth.service.ts y
+// auth.service.spec.ts) - sin ella, "AuthService — contenido del payload
+// emitido" no puede instanciar el servicio cuando este archivo corre en un
+// worker de vitest que no cargó antes auth.service.spec.ts.
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-refresh-secret';
+// JwtStrategy exige JWT_SECRET al construirse (T-210: sin valor por defecto).
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
 
 /**
  * T-127 (IESUC-285). JwtStrategy es la implementación real de passport-jwt
@@ -20,7 +29,8 @@ vi.mock('bcryptjs', () => ({
  * asumida.
  */
 
-const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+// G01 · OWASP25-C019: secreto sintético del setupFile; sin fallback predecible.
+const SECRET = SYNTHETIC_JWT_SECRET;
 
 function makeStrategy(usuario: { estado: string } | null = { estado: 'ACTIVO' }) {
   const prisma = { usuario: { findUnique: vi.fn().mockResolvedValue(usuario) } };
@@ -167,7 +177,8 @@ describe('AuthService — contenido del payload emitido', () => {
       usuario: {
         findUnique: vi
           .fn()
-          .mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu.gt', contrasena: 'hash-secreto' }),
+          .mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu.gt', contrasena: 'hash-secreto', estado: 'ACTIVO' }),
+        update: vi.fn().mockResolvedValue({}),
       },
       tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
     };

@@ -9,6 +9,7 @@ import uvgSwal from '@/lib/swal';
 
 import logo from '@/public/logo.png';
 import img from '@/public/login-foto.jpg';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 
 export default function RecuperarContrasenaPage() {
   const [carne, setCarne] = useState('');
@@ -27,7 +28,7 @@ export default function RecuperarContrasenaPage() {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'No se pudo registrar la solicitud de recuperación',
+        text: getApiErrorMessage(error, 'auth', 'No se pudo registrar la solicitud de recuperación'),
       });
     } finally {
       setEnviando(false);

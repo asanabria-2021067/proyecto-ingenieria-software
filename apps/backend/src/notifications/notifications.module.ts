@@ -6,6 +6,8 @@ import { NotificationsService } from './notifications.service';
 import { NotificationsGateway } from './notifications.gateway';
 import { ApplicationNotificationListener } from './listeners/application-notification.listener';
 import { PrismaModule } from '../prisma/prisma.module';
+import { getJwtSecretFromConfig } from '../config/jwt-secret';
+import { WsAuthService } from '../ws-auth/ws-auth.service';
 
 @Module({
   imports: [
@@ -13,7 +15,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') || 'dev-secret-change-me',
+        secret: getJwtSecretFromConfig(config),
         signOptions: { expiresIn: '7d' },
       }),
     }),
@@ -23,6 +25,8 @@ import { PrismaModule } from '../prisma/prisma.module';
     NotificationsService,
     NotificationsGateway,
     ApplicationNotificationListener,
+    // G07 (OWASP25-C025): política del handshake con el JwtService de este módulo.
+    WsAuthService,
   ],
   exports: [NotificationsService, NotificationsGateway],
 })

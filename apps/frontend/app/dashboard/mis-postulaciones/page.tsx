@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api/client';
 import { deletePostulacion } from '@/lib/services/applications';
 import { Postulacion, EstadoPostulacion } from '@/types';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   Empty,
   EmptyContent,
@@ -16,6 +17,7 @@ import {
   EmptySteps,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 const ESTADO_CONFIG: Record<
   EstadoPostulacion,
@@ -63,7 +65,7 @@ export default function MisPostulacionesPage() {
       uvgSwal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'No se pudo cancelar la postulación',
+        text: getApiErrorMessage(error, 'general', 'No se pudo cancelar la postulación'),
       });
     },
   });
@@ -86,7 +88,7 @@ export default function MisPostulacionesPage() {
   };
 
   return (
-      <div className="mx-auto max-w-[1400px] px-8 py-8">
+      <div className={dashboardPage('py-8')}>
         <div className="mb-8">
           <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
             Mis Postulaciones

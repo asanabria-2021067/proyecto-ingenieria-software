@@ -3,7 +3,16 @@ import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import type { ProyectoDetalleDTO, RevisionProyectoDTO, RolProyectoDTO } from '../lib/dto/project.dto';
+import type {
+  HabilidadDTO,
+  ProyectoDetalleDTO,
+  RevisionProyectoDTO,
+  RolProyectoDTO,
+} from '../lib/dto/project.dto';
+
+// G02-C10: la API real puede enviar categoriaHabilidad = null aunque el DTO la
+// tipe como string; el fixture conserva ese null y solo lo declara.
+const CATEGORIA_NULA = null as unknown as string;
 
 /**
  * Cobertura de regresión dedicada a `my-project-view-client.tsx` (T21):
@@ -58,7 +67,8 @@ function rolActual(overrides: Partial<RolProyectoDTO> = {}): RolProyectoDTO {
         idHabilidad: 1,
         nivelMinimo: 'BASICO',
         obligatorio: true,
-        habilidad: { idHabilidad: 1, nombreHabilidad: 'React CURRENT', categoriaHabilidad: null },
+        // G02-C10: el fixture omite descripcionHabilidad (el componente no la usa).
+        habilidad: { idHabilidad: 1, nombreHabilidad: 'React CURRENT', categoriaHabilidad: CATEGORIA_NULA } as HabilidadDTO,
       },
     ],
     ...overrides,
@@ -81,10 +91,14 @@ function proyectoActual(overrides: Partial<ProyectoDetalleDTO> = {}): ProyectoDe
     fechaInicio: '2026-02-01',
     fechaFinEstimada: '2026-06-01',
     fechaCreacion: '2026-01-01T00:00:00.000Z',
+    creador: { idUsuario: 1, nombre: 'Ana', apellido: 'Lopez', correo: 'ana@uvg.edu.gt' },
+    organizaciones: [],
+    intereses: [],
     roles: [rolActual()],
     hitos: [],
     ...overrides,
-  };
+    // G02-C10: el fixture omite `creador` a propósito (el componente no lo usa).
+  } as ProyectoDetalleDTO;
 }
 
 function snapshotRevision(overrides: Partial<RevisionProyectoDTO> = {}): RevisionProyectoDTO {
@@ -116,7 +130,7 @@ function snapshotRevision(overrides: Partial<RevisionProyectoDTO> = {}): Revisio
               idRequisitoHabilidad: 9,
               nivelMinimo: 'AVANZADO',
               obligatorio: false,
-              habilidad: { idHabilidad: 9, nombreHabilidad: 'Vue SNAPSHOT', categoriaHabilidad: null },
+              habilidad: { idHabilidad: 9, nombreHabilidad: 'Vue SNAPSHOT', categoriaHabilidad: CATEGORIA_NULA },
             },
           ],
         },
@@ -214,6 +228,29 @@ describe('MyProjectViewClient — vista actual vs panel histórico', () => {
     await screen.findByText('Tu proyecto tiene observaciones del revisor');
     expect(screen.getByText('Comentario actual general.')).toBeInTheDocument();
     expect(screen.getByText('Comentario actual roles.')).toBeInTheDocument();
+  });
+
+  it('observado: aviso del revisor y «Enviar correcciones» usan el naranja de atención, no el lima', async () => {
+    getMyProjectByIdMock.mockResolvedValue(proyectoActual({ estadoProyecto: 'OBSERVADO' }));
+    getProjectRevisionsMock.mockResolvedValue([]);
+    renderPage();
+
+    const titulo = await screen.findByText('Tu proyecto tiene observaciones del revisor');
+    const aviso = titulo.closest('[data-slot="aviso-observado"]') as HTMLElement;
+    expect(aviso).toHaveClass('bg-attention-strong', 'border-attention');
+    expect(titulo).toHaveClass('text-on-attention');
+    expect(
+      within(aviso).getByText('Revisa los comentarios de cada sección y aplica las correcciones necesarias.'),
+    ).toHaveClass('text-on-attention/85');
+    expect(aviso.className).not.toMatch(/status-warning/);
+
+    const corregir = within(aviso).getByRole('button', { name: /editar y corregir/i });
+    expect(corregir).toHaveClass('bg-on-attention', 'text-attention-strong');
+
+    fireEvent.click(corregir);
+    const enviar = await screen.findByRole('button', { name: /enviar correcciones/i });
+    expect(enviar).toHaveClass('bg-attention', 'text-on-attention', 'hover:bg-attention-strong');
+    expect(enviar.className).not.toMatch(/status-warning/);
   });
 
   it('panel histórico con snapshot: datos y comentarios aislados, sin contaminación en ninguna dirección', async () => {

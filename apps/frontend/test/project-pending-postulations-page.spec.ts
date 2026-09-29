@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { PostulacionRecibida } from '../types';
 
@@ -16,6 +16,12 @@ vi.mock('../hooks/use-project-pending-postulations', () => ({
   useResolvePostulacion: vi.fn(),
 }));
 vi.mock('@/lib/swal', () => ({ default: { fire: vi.fn() } }));
+
+const mensajesMock = vi.hoisted(() => ({
+  confirmar: vi.fn(),
+  aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
+}));
+vi.mock('@/lib/mensajes', () => mensajesMock);
 
 beforeAll(() => {
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false;
@@ -148,6 +154,12 @@ describe('ProjectPendingPostulationsPage — F13.1 vista dedicada', () => {
     expect(
       screen.getByText('Cuando alguien solicite unirse a un rol de este proyecto, aparecerá aquí para su revisión.'),
     ).toBeInTheDocument();
+    // Vacío directo sobre la tarjeta «Postulaciones recibidas», sin otra caja gris interna.
+    const vacio = screen.getByText('No hay postulaciones pendientes.').closest('[data-slot="empty"]') as HTMLElement;
+    expect(vacio).toHaveClass('border-0', 'bg-transparent', 'shadow-none');
+    expect(vacio).not.toHaveClass('border-dashed', 'bg-surface-container-low');
+    expect(vacio.querySelector('[data-slot="empty-icon"]')).toHaveAttribute('data-variant', 'subtle');
+    expect(screen.getByText('0 pendientes')).toBeInTheDocument();
   });
 
   it('el link "Volver a miembros" apunta a la vista de miembros', () => {
@@ -163,25 +175,48 @@ describe('ProjectPendingPostulationsPage — F13.1 vista dedicada', () => {
     );
   });
 
-  it('conecta Aceptar y Rechazar al flujo existente de resolución', async () => {
+  it('conecta Aceptar y Rechazar al flujo existente de resolución, cada uno con su propia confirmación', async () => {
     mockLeader();
     const { mutate } = mockResolver();
     mockPendientes({ postulaciones: [postulacion()] });
+    mensajesMock.confirmar.mockResolvedValue(true);
 
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: /aceptar postulación de maria lopez/i }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, aceptar postulación' }));
-    expect(mutate).toHaveBeenCalledWith(
-      { postulacionId: 1, estadoPostulacion: 'ACEPTADA' },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    await waitFor(() =>
+      expect(mutate).toHaveBeenCalledWith(
+        { postulacionId: 1, estadoPostulacion: 'ACEPTADA' },
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      ),
+    );
+    expect(mensajesMock.confirmar).toHaveBeenCalledWith(
+      expect.objectContaining({ textoAccion: 'Aceptar postulación', destructiva: false }),
     );
 
     fireEvent.click(screen.getByRole('button', { name: /rechazar postulación de maria lopez/i }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, rechazar postulación' }));
-    expect(mutate).toHaveBeenCalledWith(
-      { postulacionId: 1, estadoPostulacion: 'RECHAZADA' },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    await waitFor(() =>
+      expect(mutate).toHaveBeenCalledWith(
+        { postulacionId: 1, estadoPostulacion: 'RECHAZADA' },
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      ),
     );
+    expect(mensajesMock.confirmar).toHaveBeenCalledWith(
+      expect.objectContaining({ textoAccion: 'Rechazar postulación', destructiva: true }),
+    );
+  });
+
+  it('cancelar la confirmación no resuelve la postulación', async () => {
+    mockLeader();
+    const { mutate } = mockResolver();
+    mockPendientes({ postulaciones: [postulacion()] });
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /rechazar postulación de maria lopez/i }));
+
+    await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalled());
+    expect(mutate).not.toHaveBeenCalled();
   });
 });

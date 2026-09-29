@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Kanban, Plus, Tags } from 'lucide-react';
+import { Kanban, Plus, Tags } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
@@ -22,14 +22,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskBoard } from '@/components/projects/task-board';
 import { StartSprintButton } from '@/components/projects/start-sprint-button';
@@ -61,6 +53,7 @@ import {
 import { MODALIDAD_LABEL } from '@/types';
 import type { AvanceProyectoDTO, ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import type { TareaPublicaDTO } from '@/lib/types/tasks';
+import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 interface Props {
   id: number;
@@ -164,7 +157,7 @@ function WorkspaceProgress({
 // ─── Skeleton ──────────────────────────────────────────────────────────────
 function WorkspaceSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-5 py-6 md:px-7">
+    <ProjectPageShell>
       <Skeleton className="mb-4 h-4 w-72" />
       <Skeleton className="mb-6 h-16 w-full max-w-xl rounded-xl" />
       <Skeleton className="mb-4 h-9 w-48" />
@@ -173,7 +166,7 @@ function WorkspaceSkeleton() {
           <Skeleton key={i} className="h-[480px] w-[300px] shrink-0 rounded-xl" />
         ))}
       </div>
-    </div>
+    </ProjectPageShell>
   );
 }
 
@@ -256,7 +249,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const esParticipante =
     !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeCrear = isLeader || esParticipante;
-  const { crearHito } = useProjectMilestones(idProyecto);
+  const { crearHito, asignarHitoTareas } = useProjectMilestones(idProyecto);
   const opcionesRol = useMemo(() => derivarOpcionesRol(tasks), [tasks]);
   const opcionesHito = useMemo(() => derivarOpcionesHito(tasks), [tasks]);
   const hayFiltrosActivos = filtroRol !== FILTRO_TODOS || filtroHito !== FILTRO_TODOS;
@@ -276,43 +269,23 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   }, [currentUser, members, proyecto.roles]);
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-5 pb-10 pt-5 md:px-7">
-      {/* BREADCRUMB (Sección 26) */}
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList className="text-[13px]">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard/projects/mine" className="text-tertiary hover:text-on-surface">
-                Mis proyectos
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link
-                href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}
-                className="max-w-[16rem] truncate text-tertiary hover:text-on-surface"
-              >
-                {proyecto.tituloProyecto}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="font-medium text-on-surface">Kanban</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <ProjectPageShell>
+      {/* Identidad de la página fuera de las tarjetas: la vuelta al proyecto
+          (antes breadcrumb + botón dentro de la tarjeta) va en el encabezado. */}
+      <ProjectPageHeader
+        back={{
+          href: isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`,
+          label: 'Volver al proyecto',
+        }}
+        title="Tablero"
+        description="Workspace del proyecto"
+      />
 
-      {/* TARJETA RESUMEN DEL PROYECTO (Secciones 10-15) */}
-      <div className="mb-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:p-6">
+      {/* TARJETA RESUMEN DEL PROYECTO (Secciones 10-15): contenido, no encabezado de página */}
+      <div className="card-base mb-grid">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
-            <h1 className="line-clamp-2 text-2xl font-bold leading-tight text-on-surface md:text-[28px]">
-              {proyecto.tituloProyecto}
-            </h1>
-            <p className="text-sm text-tertiary">Workspace del proyecto</p>
+            <h2 className="type-section line-clamp-2 text-text-primary">{proyecto.tituloProyecto}</h2>
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}
@@ -343,20 +316,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               ))}
             </div>
           </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-            >
-              <Link href={isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`}>
-                <ArrowLeft className="size-3.5" aria-hidden="true" />
-                Volver al proyecto
-              </Link>
-            </Button>
-          </div>
         </div>
 
         {/* PROGRESO (Secciones 13-16): tareas siempre; hitos solo si hay avance */}
@@ -368,7 +327,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
       {/* TARJETA PRINCIPAL: pestañas + barra de herramientas + contenido (Sección 10-11).
           Una sola tarjeta blanca envuelve Tablero e Hitos; el scroll horizontal
           del tablero pertenece al área interna del board, no a la página. */}
-      <div className="min-h-0 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm md:p-5">
+      <div className="card-base min-h-0 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 gap-0">
           <TabsList className="mb-7 h-9 w-full justify-start gap-0 rounded-none border-b border-outline-variant/40 bg-transparent p-0">
             <TabsTrigger
@@ -450,18 +409,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               )}
 
-              {puedeCrear && activeTab === 'hitos' && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setCrearHitoAbierto(true)}
-                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
-                >
-                  <Plus className="size-3.5" aria-hidden="true" />
-                  Agregar hito
-                </Button>
-              )}
-
               {isLeader && (
                 <Button
                   type="button"
@@ -472,6 +419,19 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 >
                   <Tags className="size-3.5" aria-hidden="true" />
                   Gestionar etiquetas
+                </Button>
+              )}
+              {/* Acciones de creación juntas: «Agregar hito» va pegado a
+                  «Nueva tarea», con el mismo gap del grupo. */}
+              {puedeCrear && activeTab === 'hitos' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setCrearHitoAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Agregar hito
                 </Button>
               )}
               {/* Sin Sprint de trabajo (F2), la creación de tareas queda
@@ -500,7 +460,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               </div>
             ) : isErrorSprints ? (
               <div role="alert" className="space-y-3 py-10 text-center">
-                <p className="text-sm font-medium text-red-600">
+                <p className="type-body font-medium text-destructive">
                   No se pudo verificar el estado del Sprint. Intenta nuevamente.
                 </p>
                 <Button
@@ -610,6 +570,9 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               milestones={proyecto.hitos}
               members={members}
               labels={labels}
+              puedeCrear={puedeCrear}
+              crearHito={crearHito}
+              asignarHitoTareas={asignarHitoTareas}
             />
           </TabsContent>
         </Tabs>
@@ -651,7 +614,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           />
         )}
       </div>
-    </div>
+    </ProjectPageShell>
   );
 }
 
@@ -665,12 +628,14 @@ export default function KanbanWorkspaceClient({ id }: Props) {
 
   if (error || !proyecto) {
     return (
-        <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <p className="font-medium text-red-600">No se pudo cargar el proyecto. Intenta nuevamente.</p>
-          <Button asChild variant="outline" size="sm" className="mt-4">
-            <Link href="/dashboard/proyectos">Volver a mis proyectos</Link>
-          </Button>
-        </div>
+        <ProjectPageShell>
+          <div className="mx-auto max-w-prose py-16 text-center">
+            <p className="font-medium text-destructive">No se pudo cargar el proyecto. Intenta nuevamente.</p>
+            <Button asChild variant="outline" size="sm" className="mt-4">
+              <Link href="/dashboard/proyectos">Volver a mis proyectos</Link>
+            </Button>
+          </div>
+        </ProjectPageShell>
     );
   }
 

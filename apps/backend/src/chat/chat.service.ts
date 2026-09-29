@@ -1,7 +1,27 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { EstadoProyecto, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
+
+/**
+ * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
+ * `Proyecto.estadoProyecto`. Un proyecto llega a CERRADO por un único camino
+ * (ProjectClosureReviewService.approveClosure, dentro de su propia
+ * transacción — ver ese archivo), así que derivar el estado del chat de ahí
+ * en vez de duplicarlo en una columna propia da dos cosas gratis, sin
+ * migración ni escritura adicional: (1) el archivado queda atómico con el
+ * cierre por construcción (no hay un segundo write que pueda fallar a
+ * medias), y (2) si el proyecto alguna vez vuelve a un estado distinto de
+ * CERRADO, el chat queda activo de nuevo sin ningún paso extra — no hace
+ * falta un evento de "reapertura" explícito que hoy no existe en el dominio
+ * (CERRADO es, hoy, un estado terminal: no hay ningún camino de código que
+ * revierta un proyecto ya CERRADO a otro estado).
+ */
+function chatArchivado(estadoProyecto: EstadoProyecto): boolean {
+  return estadoProyecto === EstadoProyecto.CERRADO;
+}
 
 const USUARIO_SELECT = {
   select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
@@ -15,6 +35,8 @@ const MENSAJE_SELECT = {
   remitente: USUARIO_SELECT,
 } as const;
 
+const ARCHIVADOS_PAGE_SIZE = 20;
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -26,7 +48,7 @@ export class ChatService {
   private async assertProjectMember(idProyecto: number, userId: number) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto, eliminadoEn: null },
-      select: { idProyecto: true, creadoPor: true },
+      select: { idProyecto: true, creadoPor: true, estadoProyecto: true },
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
@@ -46,7 +68,10 @@ export class ChatService {
   private async getConversacionOrThrow(idProyecto: number, idConversacion: number, userId: number) {
     const conversacion = await this.prisma.conversacion.findFirst({
       where: { idConversacion, idProyecto },
-      include: { participantes: { select: { idUsuario: true } } },
+      include: {
+        participantes: { select: { idUsuario: true } },
+        proyecto: { select: { estadoProyecto: true } },
+      },
     });
     if (!conversacion) {
       throw new NotFoundException(`Conversación con id ${idConversacion} no encontrada`);
@@ -58,7 +83,8 @@ export class ChatService {
   }
 
   async listConversations(idProyecto: number, userId: number) {
-    await this.assertProjectMember(idProyecto, userId);
+    const proyecto = await this.assertProjectMember(idProyecto, userId);
+    const archivada = chatArchivado(proyecto.estadoProyecto);
 
     const conversaciones = await this.prisma.conversacion.findMany({
       where: { idProyecto, participantes: { some: { idUsuario: userId } } },
@@ -86,6 +112,7 @@ export class ChatService {
           participantes: c.participantes.map((p) => p.usuario),
           ultimoMensaje: c.mensajes[0] ?? null,
           noLeidos,
+          archivada,
         };
       }),
     );
@@ -93,6 +120,13 @@ export class ChatService {
 
   async createConversation(idProyecto: number, userId: number, dto: CreateConversationDto) {
     const proyecto = await this.assertProjectMember(idProyecto, userId);
+    // T-234: sin este chequeo, abrir una conversación NUEVA sería una vía
+    // libre para seguir mandando mensajes en un proyecto ya cerrado.
+    if (chatArchivado(proyecto.estadoProyecto)) {
+      throw new ForbiddenException(
+        'Este proyecto ya cerró: no se pueden crear conversaciones nuevas.',
+      );
+    }
 
     const idsUnicos = Array.from(new Set([...dto.idsParticipantes, userId]));
     if (idsUnicos.length < 2) {
@@ -156,6 +190,17 @@ export class ChatService {
 
   async createMessage(idProyecto: number, idConversacion: number, userId: number, contenido: string) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    // T-234: único punto real de creación de mensajes (REST) — el gateway de
+    // socket nunca crea mensajes por su cuenta, solo retransmite los que
+    // este método ya persistió (broadcastMessage, más abajo, solo se llama
+    // desde aquí). Bloquear acá cubre API y socket a la vez: si esto lanza,
+    // broadcastMessage nunca se invoca, así que tampoco sale un evento en
+    // vivo para un mensaje que nunca existió.
+    if (chatArchivado(conversacion.proyecto.estadoProyecto)) {
+      throw new ForbiddenException(
+        'Esta conversación está archivada: el proyecto ya cerró y no se pueden enviar mensajes nuevos.',
+      );
+    }
 
     const mensaje = await this.prisma.mensajeChat.create({
       data: { idConversacion, idRemitente: userId, contenido: contenido.trim() },
@@ -179,5 +224,71 @@ export class ChatService {
       where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
       data: { ultimaLecturaEn: new Date() },
     });
+  }
+
+  /**
+   * T-236: conversaciones archivadas del usuario A TRAVÉS DE TODOS sus
+   * proyectos (a diferencia de listConversations, que solo mira uno). Nunca
+   * puede devolver una conversación activa: el filtro por
+   * `proyecto.estadoProyecto = CERRADO` es parte del WHERE, no un chequeo
+   * posterior — así que aunque un proyecto se reabra entre que el cliente
+   * pagina, esa página ya no la va a incluir.
+   */
+  async listArchivedConversations(userId: number, filtros: ListArchivedConversationsQueryDto = {}) {
+    const query = (filtros.q ?? '').trim();
+    const page = filtros.page ?? 1;
+
+    const busquedaPorPersona: Prisma.ConversacionWhereInput = {
+      participantes: {
+        some: {
+          idUsuario: { not: userId },
+          usuario: {
+            OR: [
+              { nombre: { contains: query, mode: 'insensitive' } },
+              { apellido: { contains: query, mode: 'insensitive' } },
+            ],
+          },
+        },
+      },
+    };
+
+    const conversaciones = await this.prisma.conversacion.findMany({
+      where: {
+        participantes: { some: { idUsuario: userId } },
+        proyecto: { estadoProyecto: EstadoProyecto.CERRADO },
+        ...(query
+          ? {
+              OR: [
+                { nombre: { contains: query, mode: 'insensitive' } },
+                busquedaPorPersona,
+              ],
+            }
+          : {}),
+      },
+      include: {
+        proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+        participantes: { select: { idUsuario: true, usuario: USUARIO_SELECT } },
+        mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
+      },
+      orderBy: { creadaEn: 'desc' },
+      skip: (page - 1) * ARCHIVADOS_PAGE_SIZE,
+      take: ARCHIVADOS_PAGE_SIZE + 1,
+    });
+
+    const hasMore = conversaciones.length > ARCHIVADOS_PAGE_SIZE;
+    const pagina = hasMore ? conversaciones.slice(0, ARCHIVADOS_PAGE_SIZE) : conversaciones;
+
+    return {
+      items: pagina.map((c) => ({
+        idConversacion: c.idConversacion,
+        tipo: c.tipo,
+        nombre: c.nombre,
+        proyecto: c.proyecto,
+        participantes: c.participantes.map((p) => p.usuario),
+        ultimoMensaje: c.mensajes[0] ?? null,
+        archivada: true as const,
+      })),
+      hasMore,
+    };
   }
 }

@@ -52,6 +52,7 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    puntosHistoria: null,
     asignacionActiva: null,
     rolProyecto: null,
     hito: null,
@@ -137,6 +138,39 @@ describe('TaskBoard', () => {
     expect(within(columnaPorHacer).getByText('2')).toBeInTheDocument();
     const columnaHecho = screen.getByRole('heading', { name: 'Hecho' }).closest('section') as HTMLElement;
     expect(within(columnaHecho).getByText('1')).toBeInTheDocument();
+  });
+
+  it('el encabezado va fuera del contenedor de tareas: punto de color, nombre y contador compacto', () => {
+    renderBoard({
+      tasks: [
+        tarea({ idTarea: 1, estadoTarea: 'POR_HACER' }),
+        tarea({ idTarea: 2, estadoTarea: 'EN_REVISION' }),
+      ],
+    });
+    const puntos: Record<string, string> = {
+      'Por hacer': 'bg-outline',
+      'En progreso': 'bg-accent',
+      'En revisión': 'bg-attention',
+      Hecho: 'bg-primary',
+    };
+    for (const [nombre, punto] of Object.entries(puntos)) {
+      const titulo = screen.getByRole('heading', { level: 3, name: nombre });
+      expect(titulo).toHaveClass('font-semibold', 'text-text-primary');
+      expect(titulo.querySelector('span[aria-hidden="true"]')).toHaveClass('rounded-full', punto);
+
+      const encabezado = titulo.parentElement as HTMLElement;
+      expect(encabezado).toHaveAttribute('data-slot', 'kanban-column-header');
+      // Sin franja de color: el encabezado no lleva fondo ni borde propio.
+      expect(encabezado.className).not.toMatch(/\bbg-|\bborder\b/);
+      expect(encabezado.querySelector('.pill')).toHaveClass('pill-neutral');
+
+      const cuerpo = encabezado.nextElementSibling as HTMLElement;
+      expect(cuerpo).toHaveAttribute('data-slot', 'kanban-column-body');
+      expect(cuerpo).toHaveClass('rounded-xl', 'border', 'bg-surface-container-low');
+      expect(cuerpo).not.toContainElement(titulo);
+    }
+    const porHacer = screen.getByRole('heading', { name: 'Por hacer' }).parentElement as HTMLElement;
+    expect(within(porHacer).getByText('1')).toHaveClass('pill');
   });
 
   it('columna vacía muestra el mensaje de estado vacío (Sección 46)', () => {

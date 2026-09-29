@@ -2,17 +2,83 @@ import { describe, expect, it, vi } from 'vitest';
 import { GATEWAY_OPTIONS } from '@nestjs/websockets/constants';
 import { JwtService } from '@nestjs/jwt';
 import { NotificationsGateway } from '../src/notifications/notifications.gateway';
+import { WsAuthService } from '../src/ws-auth/ws-auth.service';
 import { getFrontendUrl } from '../src/common/utils/cookie';
+import type { PrismaService } from '../src/prisma/prisma.service';
 
 function makeGateway() {
-  const gateway = new NotificationsGateway(new JwtService());
+  const gateway = new NotificationsGateway(new WsAuthService(new JwtService(), {} as PrismaService));
   const emit = vi.fn();
   const to = vi.fn(() => ({ emit }));
   Reflect.set(gateway, 'server', { to });
   return { gateway, to, emit };
 }
 
+function makeSocket(overrides: Partial<{ auth: Record<string, unknown> }> = {}) {
+  return {
+    id: 'socket-1',
+    handshake: { auth: overrides.auth ?? {}, headers: {} },
+    data: {} as Record<string, unknown>,
+    join: vi.fn(),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+  };
+}
+
 describe('NotificationsGateway', () => {
+  describe('handleConnection', () => {
+    /**
+     * G07 (OWASP25-C025): el gateway ya no verifica el token directamente,
+     * delega la política completa (firma, tipo `access`, cuenta ACTIVO en
+     * BD) en WsAuthService.authenticate. Estas pruebas mockean ESE contrato
+     * — la política de WsAuthService en sí tiene su propia cobertura en
+     * ws-auth.service.spec.ts — para no volver a probar la consulta a la
+     * base de datos aquí.
+     */
+    function makeWsAuth(result: { ok: true; userId: number } | { ok: false; motivo: string }) {
+      return { authenticate: vi.fn().mockResolvedValue(result) };
+    }
+
+    it('rechaza (desconecta) un cliente sin token', async () => {
+      const gateway = new NotificationsGateway(makeWsAuth({ ok: false, motivo: 'SIN_TOKEN' }) as any);
+      const socket = makeSocket();
+
+      await gateway.handleConnection(socket as any);
+
+      expect(socket.disconnect).toHaveBeenCalled();
+      expect(socket.join).not.toHaveBeenCalled();
+    });
+
+    /**
+     * T-210 (revisión cruzada): el token de recuperación de contraseña
+     * (`tipo: 'reset'`) se firma con el mismo JWT_SECRET que el access
+     * token y verifica igual — sin este chequeo, quien tuviera un enlace de
+     * recuperación abría un socket autenticado como esa persona y recibía
+     * sus notificaciones.
+     */
+    it('rechaza (desconecta) un token que no es de tipo "access" (p. ej. el de recuperación de contraseña)', async () => {
+      const gateway = new NotificationsGateway(makeWsAuth({ ok: false, motivo: 'TIPO_NO_ACCESS' }) as any);
+      const socket = makeSocket({ auth: { token: 'token-de-reset' } });
+
+      await gateway.handleConnection(socket as any);
+
+      expect(socket.disconnect).toHaveBeenCalled();
+      expect(socket.join).not.toHaveBeenCalled();
+    });
+
+    it('con un access token válido, une al cliente a su room user:{id} y confirma la conexión', async () => {
+      const gateway = new NotificationsGateway(makeWsAuth({ ok: true, userId: 7 }) as any);
+      const socket = makeSocket({ auth: { token: 'token-valido' } });
+
+      await gateway.handleConnection(socket as any);
+
+      expect(socket.disconnect).not.toHaveBeenCalled();
+      expect(socket.join).toHaveBeenCalledWith('user:7');
+      expect(socket.data.userId).toBe(7);
+      expect(socket.emit).toHaveBeenCalledWith('connected', { userId: 7 });
+    });
+  });
+
   describe('notifyUsers (evento genérico existente)', () => {
     it('emite "notification" a la room user:{idUsuario} de cada destinatario', async () => {
       const { gateway, to, emit } = makeGateway();

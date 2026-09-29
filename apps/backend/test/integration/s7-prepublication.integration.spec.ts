@@ -40,6 +40,7 @@ import { TimeRecordsController } from '../../src/time-records/time-records.contr
 import { TimeRecordsService } from '../../src/time-records/time-records.service';
 import { ProjectsController } from '../../src/projects/projects.controller';
 import { ProjectsService } from '../../src/projects/projects.service';
+import type { SocialService } from '../../src/social/social.service';
 import { calcularProgresoHito } from '../../src/common/hito-progreso';
 import { ComentariosController } from '../../src/comentarios/comentarios.controller';
 import { ComentariosService } from '../../src/comentarios/comentarios.service';
@@ -154,6 +155,7 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
         projectTx,
         policy,
         new ProjectReadPolicyService(prismaService),
+        {} as unknown as SocialService,
       ),
     );
 
@@ -951,7 +953,10 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
             tasksController.create(
               projectId,
               { userId: leader.idUsuario },
-              { tituloTarea: 'Tarea prohibida', fechaLimite: '2099-01-01', prioridad: 'MEDIA' },
+              // HU-147/T-185: idHito ahora es obligatorio en CreateTaskDto.
+              // El valor es irrelevante: el rechazo ocurre por estado/actor
+              // antes de llegar a validar el hito.
+              { tituloTarea: 'Tarea prohibida', fechaLimite: '2099-01-01', prioridad: 'MEDIA', idHito: 1 },
             ),
           ),
         ),
@@ -1057,7 +1062,9 @@ describeIntegration('T33 — prepublicación contra PostgreSQL real (06 v2 §33)
           tasksController.create(
             projectId,
             { userId: externo.idUsuario },
-            { tituloTarea: 'Tarea de un ajeno', fechaLimite: '2099-01-01', prioridad: 'MEDIA' },
+            // HU-147/T-185: idHito ahora es obligatorio en CreateTaskDto; el
+            // rechazo ocurre por actor externo antes de validar el hito.
+            { tituloTarea: 'Tarea de un ajeno', fechaLimite: '2099-01-01', prioridad: 'MEDIA', idHito: 1 },
           ),
         ),
       ),

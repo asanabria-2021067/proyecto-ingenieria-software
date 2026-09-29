@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   amigosQueryKey,
   buscarUsuariosQueryKey,
   feedSocialQueryKey,
+  perfilUsuarioQueryKey,
+  recomendacionesQueryKey,
   seguidoresQueryKey,
   siguiendoQueryKey,
   solicitudesAmistadPendientesQueryKey,
@@ -17,18 +20,39 @@ import {
   eliminarAmistad,
   getAmigos,
   getFeedSocial,
+  getPerfilUsuario,
   getSeguidores,
   getSiguiendo,
   getSolicitudesPendientes,
   rechazarSolicitudAmistad,
   seguirUsuario,
 } from '@/lib/services/social';
+import { seleccionarRecomendaciones } from '@/lib/social/recomendaciones';
+import type { BuscarUsuariosFiltros, UsuarioBusquedaDto } from '@/lib/types/social';
+import uvgSwal from '@/lib/swal';
 
 function invalidateSocialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: amigosQueryKey() });
   queryClient.invalidateQueries({ queryKey: solicitudesAmistadPendientesQueryKey() });
   queryClient.invalidateQueries({ queryKey: ['social-buscar-usuarios'] });
   queryClient.invalidateQueries({ queryKey: feedSocialQueryKey() });
+  queryClient.invalidateQueries({ queryKey: ['social-perfil-usuario'] });
+  queryClient.invalidateQueries({ queryKey: recomendacionesQueryKey() });
+}
+
+export function useRecomendaciones() {
+  const query = useQuery({
+    queryKey: recomendacionesQueryKey(),
+    queryFn: async (): Promise<UsuarioBusquedaDto[]> => {
+      let { items } = await buscarUsuarios({ amigosDeAmigos: true, page: 1 });
+      if (items.length === 0) {
+        ({ items } = await buscarUsuarios({ carrera: true, page: 1 }));
+      }
+      return seleccionarRecomendaciones(items);
+    },
+  });
+
+  return { recomendaciones: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
 }
 
 export function useAmigos() {
@@ -54,14 +78,31 @@ export function useSeguidores() {
   return { seguidores: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
 }
 
-export function useBuscarUsuarios(q: string) {
-  const enabled = q.trim().length >= 2;
-  const query = useQuery({
-    queryKey: buscarUsuariosQueryKey(q),
-    queryFn: () => buscarUsuarios(q),
-    enabled,
+/**
+ * Cada pestaña de Personas es una consulta distinta al servidor, paginada
+ * (no se filtra en el navegador una lista ya cargada). Un `q` a medio
+ * escribir (1 carácter) se omite del pedido en vez de bloquear la pestaña:
+ * el backend exige 2+ caracteres para filtrar por texto.
+ */
+export function useBuscarUsuarios(filtros: Omit<BuscarUsuariosFiltros, 'page'>) {
+  const q = filtros.q?.trim() ?? '';
+  const filtrosEfectivos: Omit<BuscarUsuariosFiltros, 'page'> = { ...filtros, q: q.length >= 2 ? q : undefined };
+
+  const query = useInfiniteQuery({
+    queryKey: buscarUsuariosQueryKey(filtrosEfectivos),
+    queryFn: ({ pageParam }) => buscarUsuarios({ ...filtrosEfectivos, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length + 1 : undefined),
   });
-  return { resultados: query.data ?? [], isLoading: query.isLoading, isError: query.isError, enabled };
+
+  return {
+    resultados: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
 }
 
 export function useFeedSocial() {
@@ -74,10 +115,32 @@ export function useFeedSocial() {
   };
 }
 
+export function usePerfilUsuario(idUsuario: number) {
+  const query = useQuery({
+    queryKey: perfilUsuarioQueryKey(idUsuario),
+    queryFn: () => getPerfilUsuario(idUsuario),
+    enabled: Number.isFinite(idUsuario),
+  });
+  return { perfil: query.data ?? null, isLoading: query.isLoading, isError: query.isError };
+}
+
 export function useCrearSolicitudAmistad() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (idReceptor: number) => crearSolicitudAmistad(idReceptor),
+    onMutate: async (idReceptor: number) => {
+      await queryClient.cancelQueries({ queryKey: recomendacionesQueryKey() });
+      const previas = queryClient.getQueryData<UsuarioBusquedaDto[]>(recomendacionesQueryKey());
+      queryClient.setQueryData<UsuarioBusquedaDto[]>(recomendacionesQueryKey(), (actuales) =>
+        (actuales ?? []).filter((u) => u.idUsuario !== idReceptor),
+      );
+      return { previas };
+    },
+    onError: (_err, _idReceptor, context) => {
+      if (context?.previas) {
+        queryClient.setQueryData(recomendacionesQueryKey(), context.previas);
+      }
+    },
     onSuccess: () => invalidateSocialQueries(queryClient),
   });
 }
@@ -102,7 +165,13 @@ export function useEliminarAmistad() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (idAmistad: number) => eliminarAmistad(idAmistad),
-    onSuccess: () => invalidateSocialQueries(queryClient),
+    onSuccess: () => {
+      invalidateSocialQueries(queryClient);
+      uvgSwal.fire({ icon: 'success', title: 'Amistad eliminada', timer: 1800, showConfirmButton: false });
+    },
+    onError: (error: Error) => {
+      uvgSwal.fire({ icon: 'error', title: 'No se pudo eliminar la amistad', text: error.message });
+    },
   });
 }
 
@@ -120,4 +189,72 @@ export function useDejarDeSeguir() {
     mutationFn: (idSeguido: number) => dejarDeSeguir(idSeguido),
     onSuccess: () => invalidateSocialQueries(queryClient),
   });
+}
+
+/** Forma mínima que necesita `useAccionesAmistad`: tanto `UsuarioBusquedaDto`
+ * (resultado de búsqueda) como `UsuarioPerfilDto` (perfil de una persona) la
+ * cumplen, así que las tarjetas de la lista y la página de perfil comparten
+ * la misma lógica de botones sin duplicarla. */
+interface UsuarioConRelacion {
+  idUsuario: number;
+  esAmigo: boolean;
+  solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
+  idAmistad: number | null;
+  loSigo: boolean;
+}
+
+export function useAccionesAmistad(usuario: UsuarioConRelacion) {
+  const crearSolicitud = useCrearSolicitudAmistad();
+  const aceptarSolicitud = useAceptarSolicitudAmistad();
+  const eliminarAmistadMutation = useEliminarAmistad();
+  const seguir = useSeguirUsuario();
+  const dejarDeSeguirMutation = useDejarDeSeguir();
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+
+  const amistad = usuario.esAmigo
+    ? {
+        label: 'Amigos',
+        variant: 'outline' as const,
+        disabled: eliminarAmistadMutation.isPending,
+        onClick: () => setConfirmandoEliminar(true),
+      }
+    : usuario.solicitudPendiente?.direccion === 'enviada'
+      ? { label: 'Solicitud enviada', variant: 'outline' as const, disabled: true, onClick: () => {} }
+      : usuario.solicitudPendiente?.direccion === 'recibida'
+        ? {
+            label: 'Aceptar solicitud',
+            variant: 'default' as const,
+            disabled: aceptarSolicitud.isPending,
+            onClick: () => usuario.idAmistad != null && aceptarSolicitud.mutate(usuario.idAmistad),
+          }
+        : {
+            label: 'Agregar como amigo',
+            variant: 'default' as const,
+            disabled: crearSolicitud.isPending,
+            onClick: () => crearSolicitud.mutate(usuario.idUsuario),
+          };
+
+  const seguimiento = usuario.loSigo
+    ? { label: 'Siguiendo', disabled: dejarDeSeguirMutation.isPending, onClick: () => dejarDeSeguirMutation.mutate(usuario.idUsuario) }
+    : { label: 'Seguir', disabled: seguir.isPending, onClick: () => seguir.mutate(usuario.idUsuario) };
+
+  /** Props listas para `<ConfirmActionDialog {...confirmarEliminarAmistad} />`.
+   * Eliminar una amistad es irreversible desde la UI (HU-155/T-222): la otra
+   * persona tiene que volver a solicitarla. */
+  const confirmarEliminarAmistad = {
+    open: confirmandoEliminar,
+    title: 'Eliminar amistad',
+    description:
+      'Vas a eliminar esta amistad. Si quieren ser amigos de nuevo, la otra persona va a tener que enviarte una nueva solicitud.',
+    actionLabel: 'Sí, eliminar amistad',
+    variant: 'destructive' as const,
+    isPending: eliminarAmistadMutation.isPending,
+    onConfirm: () => {
+      if (usuario.idAmistad == null) return;
+      eliminarAmistadMutation.mutate(usuario.idAmistad, { onSettled: () => setConfirmandoEliminar(false) });
+    },
+    onCancel: () => setConfirmandoEliminar(false),
+  };
+
+  return { amistad, seguimiento, confirmarEliminarAmistad };
 }

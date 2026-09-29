@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, MessageSquarePlus, Send, Users as UsersIcon } from 'lucide-react';
+import { Loader2, Lock, MessageSquarePlus, Send, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,28 +88,36 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
   if (!habilitado) return null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col border-t border-outline-variant">
-      <div className="flex items-center justify-between px-4 py-2.5">
-        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-tertiary">
-          Chats
+    // Sección propia, fija abajo en la sidebar del proyecto: borde superior,
+    // aire arriba y una lista con alto máximo para no empujar el menú.
+    <section
+      aria-labelledby="chat-del-proyecto-titulo"
+      className="flex max-h-[45%] min-h-0 shrink-0 flex-col border-t border-outline-variant pt-stack"
+    >
+      <div className="flex items-center justify-between px-stack pb-tight">
+        <h2
+          id="chat-del-proyecto-titulo"
+          className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wider text-text-secondary"
+        >
+          Chat del proyecto
           <span
             role="status"
             title={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
             aria-label={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
-            className={`size-1.5 shrink-0 rounded-full ${isConnected ? 'bg-green-500' : 'animate-pulse bg-amber-500'}`}
+            className={`size-2 shrink-0 rounded-full ${isConnected ? 'bg-primary' : 'animate-pulse bg-destructive'}`}
           />
-        </span>
+        </h2>
         <button
           type="button"
           onClick={() => setNuevoChatAbierto(true)}
           aria-label="Nuevo chat"
-          className="rounded-md p-1 text-tertiary hover:bg-surface-container-high hover:text-on-surface"
+          className="rounded-control p-1 text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary"
         >
           <MessageSquarePlus className="size-4" aria-hidden="true" />
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
+      <div className="min-h-0 flex-1 space-y-micro overflow-y-auto px-inline pb-stack">
         {isLoading && <p className="px-2 text-xs text-tertiary">Cargando chats…</p>}
         {!isLoading && conversations.length === 0 && (
           <p className="px-2 text-xs text-tertiary">Sin chats todavía. Crea uno con el ícono de arriba.</p>
@@ -121,8 +129,8 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
             onClick={() => abrirConversacion(c.idConversacion)}
             className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors ${
               activeId === c.idConversacion
-                ? 'bg-primary/10 text-primary'
-                : 'text-on-surface hover:bg-surface-container-high'
+                ? 'bg-on-surface/8 font-semibold text-text-primary'
+                : 'text-text-primary hover:bg-on-surface/5'
             }`}
           >
             {c.tipo === 'GRUPAL' ? (
@@ -139,11 +147,17 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
                 </AvatarFallback>
               </Avatar>
             )}
-            <span className="min-w-0 flex-1 truncate font-medium">{nombreConversacion(c, currentUserId)}</span>
-            {c.noLeidos > 0 && (
-              <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-on-primary">
-                {c.noLeidos}
-              </span>
+            <span className={`min-w-0 flex-1 truncate font-medium ${c.archivada ? 'text-text-secondary' : ''}`}>
+              {nombreConversacion(c, currentUserId)}
+            </span>
+            {c.archivada ? (
+              <Lock className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
+            ) : (
+              c.noLeidos > 0 && (
+                <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-on-primary">
+                  {c.noLeidos}
+                </span>
+              )
             )}
           </button>
         ))}
@@ -167,7 +181,7 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
           if (!open) setActiveId(null);
         }}
       />
-    </div>
+    </section>
   );
 }
 
@@ -245,7 +259,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
                 type="button"
                 size="sm"
                 variant={tipo === 'INDIVIDUAL' ? 'default' : 'outline'}
-                className={tipo === 'INDIVIDUAL' ? 'text-white hover:text-white' : ''}
+                className={tipo === 'INDIVIDUAL' ? 'text-primary-foreground hover:text-primary-foreground' : ''}
                 onClick={() => {
                   setTipo('INDIVIDUAL');
                   setSeleccionados((current) => current.slice(0, 1));
@@ -257,7 +271,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
                 type="button"
                 size="sm"
                 variant={tipo === 'GRUPAL' ? 'default' : 'outline'}
-                className={tipo === 'GRUPAL' ? 'text-white hover:text-white' : ''}
+                className={tipo === 'GRUPAL' ? 'text-primary-foreground hover:text-primary-foreground' : ''}
                 onClick={() => setTipo('GRUPAL')}
               >
                 Grupal
@@ -310,7 +324,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
             </div>
 
             {error && (
-              <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+              <p role="alert" className="type-meta text-destructive">
                 {error}
               </p>
             )}
@@ -329,7 +343,7 @@ function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId,
             <Button
               type="submit"
               disabled={crear.isPending}
-              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-white hover:bg-primary/90 hover:text-white"
+              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
             >
               {crear.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
               {crear.isPending ? 'Creando...' : 'Crear chat'}
@@ -378,6 +392,15 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
           </SheetTitle>
         </SheetHeader>
 
+        {conversacion?.archivada && (
+          <div className="flex items-center gap-2 border-b border-outline-variant bg-surface-container px-4 py-2.5">
+            <Lock className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
+            <p className="type-meta text-text-secondary">
+              El proyecto ya cerró. Esta conversación quedó archivada y en solo lectura.
+            </p>
+          </div>
+        )}
+
         <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
           {isLoading && <p className="text-xs text-tertiary">Cargando historial…</p>}
           {!isLoading && messages.length === 0 && (
@@ -395,7 +418,7 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
                 </Avatar>
                 <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
                   propio
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-surface-container-high text-on-surface'
                 }`}>
                   {!propio && (
@@ -404,7 +427,7 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
                     </p>
                   )}
                   <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
-                  <p className={`mt-0.5 text-[10px] ${propio ? 'text-white/70' : 'text-tertiary'}`}>
+                  <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>
                     {formatHora(m.enviadoEn)}
                   </p>
                 </div>
@@ -413,25 +436,27 @@ function ChatThreadSheet({ idProyecto, idConversacion, conversations, currentUse
           })}
         </div>
 
-        <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-3">
-          <Input
-            value={texto}
-            onChange={(event) => setTexto(event.target.value)}
-            placeholder="Escribe un mensaje…"
-            maxLength={4000}
-            disabled={enviar.isPending}
-            className="h-10 flex-1 rounded-full border-outline-variant text-sm"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={enviar.isPending || texto.trim().length === 0}
-            className="size-10 shrink-0 rounded-full bg-primary text-white hover:bg-primary/90 hover:text-white"
-            aria-label="Enviar mensaje"
-          >
-            <Send className="size-4" aria-hidden="true" />
-          </Button>
-        </form>
+        {!conversacion?.archivada && (
+          <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-3">
+            <Input
+              value={texto}
+              onChange={(event) => setTexto(event.target.value)}
+              placeholder="Escribe un mensaje…"
+              maxLength={4000}
+              disabled={enviar.isPending}
+              className="h-10 flex-1 rounded-full border-outline-variant text-sm"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={enviar.isPending || texto.trim().length === 0}
+              className="size-10 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+              aria-label="Enviar mensaje"
+            >
+              <Send className="size-4" aria-hidden="true" />
+            </Button>
+          </form>
+        )}
       </SheetContent>
     </Sheet>
   );

@@ -80,10 +80,10 @@ export function SidebarNav({ entries, theme = 'default', search = null }: Sideba
               className={
                 isAdmin
                   ? `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`
-                  : `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  : `flex items-center gap-inline rounded-control px-inline py-tight text-body font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
                       active
-                        ? 'bg-primary text-on-primary'
-                        : 'text-on-surface hover:bg-surface-container-high'
+                        ? 'bg-action text-on-action shadow-card'
+                        : 'text-text-secondary hover:bg-muted hover:text-text-primary'
                     }`
               }
               style={
@@ -117,10 +117,10 @@ export function SidebarNav({ entries, theme = 'default', search = null }: Sideba
               className={
                 isAdmin
                   ? 'admin-nav-inactive flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium outline-none transition-all duration-200'
-                  : `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  : `flex w-full items-center gap-inline rounded-control px-inline py-tight text-body font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
                       groupActiveByRoute
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-on-surface hover:bg-surface-container-high'
+                        ? 'bg-muted text-text-primary'
+                        : 'text-text-secondary hover:bg-muted hover:text-text-primary'
                     }`
               }
               style={
@@ -150,10 +150,10 @@ export function SidebarNav({ entries, theme = 'default', search = null }: Sideba
                       className={
                         isAdmin
                           ? `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`
-                          : `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                          : `flex items-center gap-tight rounded-control px-inline py-tight text-body font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
                               active
-                                ? 'bg-primary text-on-primary'
-                                : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
+                                ? 'bg-action text-on-action shadow-card'
+                                : 'text-text-secondary hover:bg-muted hover:text-text-primary'
                             }`
                       }
                       style={

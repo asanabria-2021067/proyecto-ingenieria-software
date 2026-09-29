@@ -1,20 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { AlertCircle, ArrowLeft, BriefcaseBusiness, Calendar, Clock3, UserRoundPlus, Users } from 'lucide-react';
+import { AlertCircle, BriefcaseBusiness, Calendar, Clock3, UserRoundPlus, Users, type LucideIcon } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectPendingPostulations, useResolvePostulacion } from '@/hooks/use-project-pending-postulations';
-import uvgSwal from '@/lib/swal';
+import { aviso, confirmar } from '@/lib/mensajes';
 import type { PostulacionRecibida } from '@/types';
+import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 
 type Accion = 'ACEPTADA' | 'RECHAZADA';
 
@@ -41,28 +41,13 @@ function MetricCard({
   value,
   isLoading,
 }: {
-  icon: typeof Clock3;
+  icon: LucideIcon;
   label: string;
   value: number;
   isLoading: boolean;
 }) {
-  return (
-    <div className="rounded-xl border border-outline-variant bg-surface-container-lowest px-5 py-5 shadow-sm">
-      <div className="flex items-center gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-container">
-          <Icon aria-hidden="true" className="h-6 w-6 text-on-primary-container" />
-        </div>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-tertiary">{label}</p>
-          {isLoading ? (
-            <Skeleton className="mt-2 h-7 w-10 rounded bg-surface-container-high" />
-          ) : (
-            <p className="mt-1 font-headline text-3xl font-extrabold text-on-surface">{value}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  // Mismo KPI que Mis Horas: icono neutro al par de la etiqueta, cifra grande.
+  return <HoursKpiCard variante="en-linea" icon={Icon} label={label} value={String(value)} isLoading={isLoading} />;
 }
 
 function PostulacionSkeleton() {
@@ -96,82 +81,56 @@ export default function ProjectPendingPostulationsPage() {
 
   const { postulaciones, isLoading, isError, error, refetch } = useProjectPendingPostulations(idProyecto);
   const resolver = useResolvePostulacion(idProyecto);
-  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
 
   const rolesConSolicitudes = new Set(postulaciones.map((p) => p.rolProyecto.idRolProyecto)).size;
   const postulantesUnicos = new Set(postulaciones.map((p) => p.postulante.idUsuario)).size;
   const cargandoDatos = isLoading || cargandoPermisos;
 
-  function pedirConfirmacion(postulacion: PostulacionRecibida, accion: Accion) {
-    setConfirmTarget({ postulacion, accion });
-  }
-
-  function cancelarConfirmacion() {
-    if (resolver.isPending) return;
-    setConfirmTarget(null);
-  }
-
-  function confirmar() {
-    if (!confirmTarget) return;
-    const { postulacion, accion } = confirmTarget;
+  async function pedirConfirmacion(postulacion: PostulacionRecibida, accion: Accion) {
+    const { nombre, apellido } = postulacion.postulante;
+    const nombrePostulante = `${nombre} ${apellido}`;
+    const confirmado = await confirmar({
+      titulo: accion === 'ACEPTADA' ? `¿Aceptar la postulación de ${nombrePostulante}?` : `¿Rechazar la postulación de ${nombrePostulante}?`,
+      descripcion:
+        accion === 'ACEPTADA'
+          ? `${nombrePostulante} se une al proyecto en el rol solicitado.`
+          : `${nombrePostulante} no se une al proyecto en el rol solicitado.`,
+      textoAccion: accion === 'ACEPTADA' ? 'Aceptar postulación' : 'Rechazar postulación',
+      destructiva: accion === 'RECHAZADA',
+    });
+    if (!confirmado) return;
 
     resolver.mutate(
       { postulacionId: postulacion.idPostulacion, estadoPostulacion: accion },
       {
         onSuccess: () => {
-          setConfirmTarget(null);
-          const { nombre, apellido } = postulacion.postulante;
-          uvgSwal.fire({
-            icon: 'success',
-            title: accion === 'ACEPTADA' ? 'Nueva miembro activa' : 'Postulación rechazada',
-            text:
-              accion === 'ACEPTADA'
-                ? `${nombre} ${apellido} ya es parte del equipo y aparece en la lista de miembros activos.`
-                : undefined,
-            timer: 2200,
-          });
+          aviso.exito(
+            accion === 'ACEPTADA' ? 'Nueva miembro activa' : 'Postulación rechazada',
+            accion === 'ACEPTADA'
+              ? `${nombrePostulante} ya es parte del equipo y aparece en la lista de miembros activos.`
+              : undefined,
+          );
         },
-        onError: (mutationError: any) => {
-          setConfirmTarget(null);
-          uvgSwal.fire({
-            icon: 'error',
-            title: 'No se pudo resolver la postulación',
-            text: mutationError?.message || 'Ocurrió un error inesperado.',
-          });
-        },
+        onError: (mutationError: any) =>
+          aviso.error('No se pudo resolver la postulación', mutationError?.message),
       },
     );
   }
 
-  const nombrePostulante = confirmTarget
-    ? `${confirmTarget.postulacion.postulante.nombre} ${confirmTarget.postulacion.postulante.apellido}`
-    : '';
-
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverAMiembrosHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver a miembros
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoPermisos && !isLeader ? (
-        <LeaderOnlyNotice description="No puedes acceder a las postulaciones pendientes de este proyecto." />
+        <>
+          <ProjectBackLink href={volverAMiembrosHref} label="Volver a miembros" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a las postulaciones pendientes de este proyecto." />
+        </>
       ) : (
         <>
-          <header className="mb-8">
-            <div className="mb-2 flex items-center gap-3">
-              <UserRoundPlus aria-hidden="true" className="h-7 w-7 text-primary" />
-              <h1 className="font-headline text-3xl font-extrabold text-on-surface">
-                Postulaciones pendientes
-              </h1>
-            </div>
-            <p className="max-w-3xl text-sm text-tertiary">
-              Personas que han solicitado unirse a roles de este proyecto y están esperando una resolución.
-            </p>
-          </header>
+          <ProjectPageHeader
+            back={{ href: volverAMiembrosHref, label: 'Volver a miembros' }}
+            title="Postulaciones pendientes"
+            description="Personas que han solicitado unirse a roles de este proyecto y están esperando una resolución."
+          />
 
           <section aria-label="Resumen de postulaciones" className="mb-6 grid gap-4 md:grid-cols-3">
             <MetricCard
@@ -211,9 +170,7 @@ export default function ProjectPendingPostulationsPage() {
                 </EmptyMedia>
                 <EmptyHeader>
                   <EmptyTitle>
-                    {error instanceof Error && error.message
-                      ? error.message
-                      : 'No fue posible cargar las postulaciones.'}
+                    {getApiErrorMessage(error, 'general', 'No fue posible cargar las postulaciones.')}
                   </EmptyTitle>
                 </EmptyHeader>
                 <EmptyContent>
@@ -223,9 +180,9 @@ export default function ProjectPendingPostulationsPage() {
                 </EmptyContent>
               </Empty>
             ) : postulaciones.length === 0 ? (
-              <Empty tone="muted" role="status">
-                <EmptyMedia variant="icon">
-                  <UserRoundPlus aria-hidden="true" className="h-7 w-7" />
+              <Empty tone="flush" role="status">
+                <EmptyMedia variant="subtle">
+                  <UserRoundPlus aria-hidden="true" />
                 </EmptyMedia>
                 <EmptyHeader>
                   <EmptyTitle>No hay postulaciones pendientes.</EmptyTitle>
@@ -283,7 +240,7 @@ export default function ProjectPendingPostulationsPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => pedirConfirmacion(postulacion, 'RECHAZADA')}
+                              onClick={() => void pedirConfirmacion(postulacion, 'RECHAZADA')}
                               disabled={enCurso}
                               aria-label={`Rechazar postulación de ${nombreCompleto}`}
                               className="border-error px-4 font-bold text-error hover:bg-error-container"
@@ -292,7 +249,7 @@ export default function ProjectPendingPostulationsPage() {
                             </Button>
                             <Button
                               type="button"
-                              onClick={() => pedirConfirmacion(postulacion, 'ACEPTADA')}
+                              onClick={() => void pedirConfirmacion(postulacion, 'ACEPTADA')}
                               disabled={enCurso}
                               aria-label={`Aceptar postulación de ${nombreCompleto}`}
                               className="px-4 font-bold text-on-primary"
@@ -311,20 +268,6 @@ export default function ProjectPendingPostulationsPage() {
         </>
       )}
 
-      <ConfirmActionDialog
-        open={confirmTarget !== null}
-        title={confirmTarget?.accion === 'ACEPTADA' ? 'Aceptar postulación' : 'Rechazar postulación'}
-        description={
-          confirmTarget?.accion === 'ACEPTADA'
-            ? `¿Confirmas que deseas aceptar la postulación de ${nombrePostulante}?`
-            : `¿Confirmas que deseas rechazar la postulación de ${nombrePostulante}?`
-        }
-        actionLabel={confirmTarget?.accion === 'ACEPTADA' ? 'Sí, aceptar postulación' : 'Sí, rechazar postulación'}
-        variant={confirmTarget?.accion === 'RECHAZADA' ? 'destructive' : 'default'}
-        isPending={resolver.isPending}
-        onConfirm={confirmar}
-        onCancel={cancelarConfirmacion}
-      />
-    </div>
+    </ProjectPageShell>
   );
 }

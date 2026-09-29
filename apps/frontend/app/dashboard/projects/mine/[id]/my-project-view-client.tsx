@@ -16,6 +16,7 @@ import { getMyProjectById, updateProject, resubmitProject, getProjectRevisions }
 import { getCarreras, getHabilidades } from '@/lib/services/catalogs';
 import type { Carrera, Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
+import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   step1Schema, rolSchema, formSchema, zodToFieldErrors,
   newRol, newRequisito, safeId,
@@ -26,6 +27,7 @@ import {
   SectionCommentReadonly,
 } from '@/components/projects/detail/project-general-info-section';
 import { ProjectRolesSkillsSection } from '@/components/projects/detail/project-roles-skills-section';
+import { normalizeUrlInput } from '@/lib/security/safe-url';
 
 interface Props { id: number; }
 
@@ -79,18 +81,23 @@ function ProjectReadOnlyView({
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-10">
 
       {esObservado && (
-        <div className="rounded-2xl border border-amber-400 bg-amber-200 dark:bg-amber-500/25 dark:border-amber-500/60 px-5 py-4 flex items-start justify-between gap-4">
+        // Naranja = observación que requiere corrección: tokens `attention`,
+        // el mismo naranja del botón «Editar» de un proyecto observado.
+        <div
+          data-slot="aviso-observado"
+          className="rounded-2xl border border-attention bg-attention-strong px-5 py-4 flex items-start justify-between gap-4"
+        >
           <div>
-            <p className="text-sm font-bold text-on-surface">
+            <p className="type-subtitle text-on-attention">
               Tu proyecto tiene observaciones del revisor
             </p>
-            <p className="text-xs mt-0.5 text-on-surface/70">
+            <p className="type-meta mt-0.5 text-on-attention/85">
               Revisa los comentarios de cada sección y aplica las correcciones necesarias.
             </p>
           </div>
           <button
             onClick={onEdit}
-            className="shrink-0 flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors"
+            className="shrink-0 flex items-center gap-2 rounded-xl bg-on-attention px-4 py-2 type-meta font-bold text-attention-strong transition-colors hover:bg-on-attention/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-attention/70"
           >
             <Pencil className="h-3.5 w-3.5" />
             Editar y corregir
@@ -250,7 +257,7 @@ export default function MyProjectViewClient({ id }: Props) {
     objetivosProyecto: form.objetivosProyecto || undefined,
     ubicacionProyecto: form.ubicacionProyecto || undefined,
     contextoAcademico: form.contextoAcademico || undefined,
-    urlRecursoExterno: form.urlRecursoExterno || undefined,
+    urlRecursoExterno: normalizeUrlInput(form.urlRecursoExterno),
     fechaInicio: form.fechaInicio || undefined,
     fechaFinEstimada: form.fechaFinEstimada || undefined,
     roles: form.roles.length > 0
@@ -322,7 +329,7 @@ export default function MyProjectViewClient({ id }: Props) {
       await uvgSwal.fire({
         icon: 'error',
         title: 'No se pudo guardar',
-        text: err instanceof Error ? err.message : 'Ocurrió un error al guardar el proyecto.',
+        text: getApiErrorMessage(err, 'general', 'Ocurrió un error al guardar el proyecto.'),
       });
     } finally {
       setSaving(false);
@@ -356,7 +363,7 @@ export default function MyProjectViewClient({ id }: Props) {
             </button>
             <div className="h-5 w-px bg-outline-variant/40" />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+              <p className="type-meta font-black uppercase tracking-widest text-text-primary">
                 Mis Proyectos · Editando correcciones
               </p>
               <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
@@ -425,7 +432,8 @@ export default function MyProjectViewClient({ id }: Props) {
               <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
                 Información general
               </h2>
-              <div className="space-y-5">
+              {/* Misma tarjeta que cada rol en edición: los dos bloques se leen igual. */}
+              <div data-slot="edit-card" className="rounded-xl border border-outline-variant bg-surface-container-low p-5 space-y-5">
                 <div>
                   <label className={labelClass}>Título del proyecto <span className="text-error">*</span></label>
                   <input
@@ -537,7 +545,7 @@ export default function MyProjectViewClient({ id }: Props) {
                 {form.roles.map((rol, rolIdx) => {
                   const rolErrs = rolErrorsMap[rol.id] ?? {};
                   return (
-                    <div key={rol.id} className="rounded-xl border border-outline-variant bg-surface-container-low p-5 space-y-4">
+                    <div key={rol.id} data-slot="edit-card" className="rounded-xl border border-outline-variant bg-surface-container-low p-5 space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-on-surface">Rol {rolIdx + 1}</span>
                         <button onClick={() => removeRol(rol.id)} className="text-tertiary hover:text-error transition-colors">
@@ -715,7 +723,7 @@ export default function MyProjectViewClient({ id }: Props) {
             <button
               disabled={saving}
               onClick={() => void submit('EN_REVISION')}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-attention px-5 py-3 type-body font-bold text-on-attention transition-colors hover:bg-attention-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-attention/40 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="h-4 w-4" />
               {saving ? 'Enviando…' : 'Enviar correcciones'}
@@ -789,14 +797,14 @@ export default function MyProjectViewClient({ id }: Props) {
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
                       Información general
                     </h2>
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                    <div className="rounded-xl border border-outline-variant bg-status-warning/10 p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                        <MessageSquare className="h-3.5 w-3.5 text-text-primary shrink-0" />
+                        <span className="type-meta font-black uppercase tracking-widest text-text-primary">
                           Comentarios del revisor
                         </span>
                       </div>
-                      <p className="text-sm text-on-surface whitespace-pre-wrap">{c.general}</p>
+                      <p className="type-body text-text-primary whitespace-pre-wrap">{c.general}</p>
                     </div>
                   </section>
                 )}
@@ -817,14 +825,14 @@ export default function MyProjectViewClient({ id }: Props) {
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
                       Roles y habilidades
                     </h2>
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                    <div className="rounded-xl border border-outline-variant bg-status-warning/10 p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                        <MessageSquare className="h-3.5 w-3.5 text-text-primary shrink-0" />
+                        <span className="type-meta font-black uppercase tracking-widest text-text-primary">
                           Comentarios del revisor
                         </span>
                       </div>
-                      <p className="text-sm text-on-surface whitespace-pre-wrap">{c.roles}</p>
+                      <p className="type-body text-text-primary whitespace-pre-wrap">{c.roles}</p>
                     </div>
                   </section>
                 )}

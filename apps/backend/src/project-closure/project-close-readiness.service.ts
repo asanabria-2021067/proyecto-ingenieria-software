@@ -14,8 +14,11 @@ import { matchesStoredExecutionFingerprint, type ClosureReportContext } from './
  * inventado. Así, un informe generado con otra versión del renderer no puede
  * confundirse con uno producido por esta: cambiar cualquiera de las dos
  * dependencias obliga a actualizar esta constante, y la huella lo delata.
+ *
+ * G03-C10: jsPDF 4.2.1 (sin los advisories de 3.x) + autotable 5.0.8. El test
+ * g03-jspdf-remediation compara esta constante con el lockfile.
  */
-export const CLOSURE_GENERATOR_VERSION = 'closure-report/1.0.0+jspdf3.0.3+jspdf-autotable5.0.2';
+export const CLOSURE_GENERATOR_VERSION = 'closure-report/1.0.0+jspdf4.2.1+jspdf-autotable5.0.8';
 
 type Db = Prisma.TransactionClient | PrismaService;
 

@@ -1,6 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { DashboardStats } from '@/lib/services/users';
 
@@ -38,11 +44,18 @@ window.matchMedia =
   };
 
 vi.mock('@/components/dashboard/DashboardLayout', () => ({
-  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
-vi.mock('@/components/profile/CompleteProfileDialog', () => ({ default: () => null }));
+vi.mock('@/components/profile/CompleteProfileDialog', () => ({
+  default: () => null,
+}));
 vi.mock('@/hooks/use-current-user', () => ({
-  useCurrentUser: () => ({ data: { idUsuario: 1, nombre: 'Ana', perfil: null, habilidades: [] }, isLoading: false }),
+  useCurrentUser: () => ({
+    data: { idUsuario: 1, nombre: 'Ana', perfil: null, habilidades: [] },
+    isLoading: false,
+  }),
   isProfileIncomplete: () => false,
 }));
 vi.mock('@/hooks/use-social', () => ({
@@ -52,6 +65,7 @@ vi.mock('@/hooks/use-social', () => ({
 const getDashboardStatsMock = vi.fn();
 vi.mock('@/lib/services/users', () => ({
   getDashboardStats: () => getDashboardStatsMock(),
+  getMisTareas: () => Promise.resolve([]),
 }));
 vi.mock('@/lib/services/projects', () => ({
   searchProjects: () => Promise.resolve([]),
@@ -77,7 +91,9 @@ function stats(overrides: Partial<DashboardStats> = {}): DashboardStats {
 
 async function renderDashboard() {
   const { default: DashboardPage } = await import('@/app/dashboard/page');
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   render(
     <QueryClientProvider client={queryClient}>
       <DashboardPage />
@@ -98,8 +114,12 @@ describe('Dashboard — horas abiertas y acreditadas (VIEW-08 / F018)', () => {
   it('muestra las horas abiertas y las acreditadas por separado, con el string del backend formateado sin recálculo', async () => {
     await renderDashboard();
 
-    const abiertas = await screen.findByRole('group', { name: 'Horas registradas en proyectos abiertos' });
-    const acreditadas = screen.getByRole('group', { name: 'Horas acreditadas' });
+    const abiertas = await screen.findByRole('group', {
+      name: 'Horas Registradas',
+    });
+    const acreditadas = screen.getByRole('group', {
+      name: 'Horas acreditadas',
+    });
     expect(within(abiertas).getByText('12.5')).toBeInTheDocument();
     expect(within(acreditadas).getByText('40')).toBeInTheDocument();
     expect(within(abiertas).queryByText('40')).not.toBeInTheDocument();
@@ -114,27 +134,42 @@ describe('Dashboard — horas abiertas y acreditadas (VIEW-08 / F018)', () => {
     expect(screen.queryByText(/horas totales/i)).not.toBeInTheDocument();
   });
 
-  it('cada métrica explica su significado con un tooltip accesible', async () => {
+  it('cada métrica tiene un tooltip accesible y un estado corto siempre visible', async () => {
     await renderDashboard();
     await screen.findByRole('group', { name: 'Horas acreditadas' });
 
-    expect(screen.getByRole('button', { name: 'Qué significa: Horas registradas en proyectos abiertos' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Qué significa: Horas acreditadas' })).toBeInTheDocument();
-    expect(screen.getByText(/Pueden cambiar hasta que el proyecto se cierre/)).toBeInTheDocument();
-    expect(screen.getByText(/Ya no cambian/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Qué significa: Horas Registradas' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Qué significa: Horas acreditadas' }),
+    ).toBeInTheDocument();
+    // el detalle completo vive en el tooltip (bajo demanda); el estado corto
+    // siempre visible es lo que reemplaza al párrafo permanente de antes.
+    expect(screen.getByText('Pendiente de cierre')).toBeInTheDocument();
+    expect(screen.getByText('Validado oficial')).toBeInTheDocument();
   });
 
   it('si el bloque de horas no viene, el resto del dashboard se renderiza igual', async () => {
     getDashboardStatsMock.mockResolvedValue(
-      stats({ horasRegistradasEnProyectosAbiertos: undefined, horasAcreditadas: undefined }),
+      stats({
+        horasRegistradasEnProyectosAbiertos: undefined,
+        horasAcreditadas: undefined,
+      }),
     );
     await renderDashboard();
 
-    await waitFor(() => expect(screen.getByText('Proyectos Disponibles')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Proyectos' }),
+      ).toBeInTheDocument(),
+    );
     expect(screen.getByText('Proyectos Activos')).toBeInTheDocument();
     expect(screen.getByText('02')).toBeInTheDocument();
-    const abiertas = screen.getByRole('group', { name: 'Horas registradas en proyectos abiertos' });
-    expect(within(abiertas).getByText('No disponible por ahora')).toBeInTheDocument();
+    const abiertas = screen.getByRole('group', { name: 'Horas Registradas' });
+    expect(
+      within(abiertas).getByText('No disponible por ahora'),
+    ).toBeInTheDocument();
     expect(within(abiertas).queryByText('0')).not.toBeInTheDocument();
   });
 });

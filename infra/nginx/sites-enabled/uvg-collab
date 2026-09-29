@@ -1,0 +1,62 @@
+server {
+    listen 80;
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/158.23.57.118.nip.io/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/158.23.57.118.nip.io/privkey.pem;
+
+    # [G02-C16] Exclusion declarada (ver infra/nginx/manifest.json): en produccion
+    # [G02-C16] este server tambien sirve estaticos de otros proyectos del host,
+    # [G02-C16] ajenos a UVG Collab. No se versionan ni se modifican desde aqui.
+    # @g02-excluded-locations /angel/ /derek/ /vernel/
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    # Frontend UVG Collab
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # [G04-C11] P1: Socket.IO (chat y notificaciones) por el mismo origen.
+    # Polling HTTP y upgrade a WebSocket hacia el backend; el timeout cubre el
+    # ciclo de ping de Socket.IO (25s + 20s) con margen.
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+
+    # Backend API
+    location /api {
+        if ($http_accept ~* "text/html") {
+            return 403;
+        }
+
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}

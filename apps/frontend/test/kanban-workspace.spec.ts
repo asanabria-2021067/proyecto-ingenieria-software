@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
@@ -34,6 +34,15 @@ vi.mock('../hooks/use-project-sprints', () => ({
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
+
+// Mismo mock que task-form-dialog.spec.ts/create-milestone-dialog.spec.ts:
+// evita ejercer el DOM real de SweetAlert2 (toast de éxito al crear un
+// hito, T-186) dentro de jsdom.
+vi.mock('@/lib/swal', () => ({
+  default: {
+    fire: vi.fn(),
+  },
 }));
 
 import KanbanWorkspaceClient from '../app/dashboard/projects/[id]/kanban/kanban-workspace-client';
@@ -86,6 +95,7 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    puntosHistoria: null,
     asignacionActiva: null,
     rolProyecto: null,
     hito: null,
@@ -156,6 +166,7 @@ function sprint(overrides: Partial<SprintDto> = {}): SprintDto {
     numero: 1,
     estado: 'ACTIVO',
     fechaInicio: '2026-01-01T00:00:00.000Z',
+    fechaFinPlaneada: null,
     fechaFinalizacionIniciada: null,
     fechaCierre: null,
     ...overrides,
@@ -235,17 +246,20 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     );
   });
 
-  it('el breadcrumb enlaza a Mis proyectos y al detalle real; muestra estado/tipo/modalidad', () => {
+  it('el encabezado «Tablero» va fuera de la tarjeta, con la vuelta al detalle real; la tarjeta muestra estado/tipo/modalidad', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks();
 
     renderWorkspace();
 
-    expect(screen.getByRole('link', { name: 'Mis proyectos' })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/mine',
-    );
-    expect(screen.getByRole('link', { name: 'Proyecto de prueba' })).toHaveAttribute(
+    const titulo = screen.getByRole('heading', { level: 1, name: 'Tablero' });
+    expect(titulo.closest('[data-slot="project-page-header"]')).not.toBeNull();
+    expect(screen.getByText('Workspace del proyecto').closest('[data-slot="project-page-header"]')).not.toBeNull();
+    // el nombre del proyecto es contenido de la tarjeta resumen, no el título de la página
+    expect(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    // una sola vuelta al proyecto (ya no hay botón duplicado dentro de la tarjeta)
+    expect(screen.getAllByRole('link', { name: /volver al proyecto/i })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/42',
     );
@@ -393,6 +407,21 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     renderWorkspace();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
     expect(screen.queryByRole('button', { name: /agregar hito/i })).not.toBeInTheDocument();
+  });
+
+  it('en Hitos, las acciones de creación van juntas: «Gestionar etiquetas», «Agregar hito» y «Nueva tarea» contiguos', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    renderWorkspace();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
+
+    const etiquetas = screen.getByRole('button', { name: /gestionar etiquetas/i });
+    const hito = screen.getByRole('button', { name: /agregar hito/i });
+    const tarea = screen.getByRole('button', { name: /nueva tarea/i });
+    expect(etiquetas.nextElementSibling).toBe(hito);
+    expect(hito.nextElementSibling).toBe(tarea);
+    expect(hito.parentElement).toHaveClass('gap-2');
   });
 
   it('"Agregar hito" no se muestra en la pestaña Tablero', () => {
@@ -544,29 +573,35 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     expect(screen.getByRole('button', { name: /nueva tarea/i })).toBeInTheDocument();
   });
 
-  it('Caso 5 — "Iniciar Sprint" invoca la mutación de F1 exactamente una vez', () => {
+  it('Caso 5 (HU-160) — "Iniciar Sprint" abre el diálogo de fecha planeada y confirmar invoca la mutación de F1 exactamente una vez', async () => {
     mockUseProjectSprints({ sprints: [] });
-    const mutate = vi.fn();
-    mockUseStartSprint({ mutate });
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    mockUseStartSprint({ mutateAsync });
 
     renderWorkspace();
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sprint' }));
 
-    expect(mutate).toHaveBeenCalledTimes(1);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Iniciar Sprint' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     expect(useStartSprint).toHaveBeenCalledWith(42);
   });
 
-  it('Caso 6 — mientras startSprint está pendiente, el botón queda disabled y evita doble click', () => {
+  it('Caso 6 (HU-160) — mientras startSprint está pendiente, el botón de confirmar del diálogo queda disabled y evita doble click', () => {
     mockUseProjectSprints({ sprints: [] });
-    const mutate = vi.fn();
-    mockUseStartSprint({ mutate, isPending: true });
+    const mutateAsync = vi.fn();
+    mockUseStartSprint({ mutateAsync, isPending: true });
 
     renderWorkspace();
-    const boton = screen.getByRole('button', { name: /iniciando/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sprint' }));
+
+    const dialog = screen.getByRole('dialog');
+    const boton = within(dialog).getByRole('button', { name: /iniciando/i });
     expect(boton).toBeDisabled();
 
     fireEvent.click(boton);
-    expect(mutate).not.toHaveBeenCalled();
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 
   it('Caso 7 — mientras useProjectSprints está cargando no aparece el falso Empty state', () => {

@@ -6,6 +6,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { EstadoProyectoCreador } from '../src/projects/dto/update-estado-proyecto.dto';
 import { ProjectsService } from '../src/projects/projects.service';
+import { SocialService } from '../src/social/social.service';
 import {
   makeProjectPolicyDouble,
   makeProjectReadPolicyDouble,
@@ -50,6 +51,10 @@ function makePrisma() {
     // (mockResolvedValue(null)), para que los tests preexistentes de este
     // archivo que nunca configuran este mock sigan pasando sin cambios.
     sprint: { findFirst: vi.fn().mockResolvedValue(null) },
+    // T-251: orden ponderado de "Proyectos Disponibles" (amigos + carrera).
+    amistad: { findMany: vi.fn().mockResolvedValue([]) },
+    perfilEstudiante: { findUnique: vi.fn().mockResolvedValue(null) },
+    $queryRaw: vi.fn().mockResolvedValue([]),
     $transaction: vi.fn(async (cb: (tx: typeof defaultTx) => unknown) => cb(defaultTx)),
   };
 }
@@ -69,13 +74,18 @@ function makeService(
   prisma: ReturnType<typeof makePrisma>,
   notifications: Partial<NotificationsService> | Record<string, unknown> = {},
 ) {
+  const notificationsDouble = makeNotifications(notifications as Record<string, unknown>) as unknown as NotificationsService;
   return new ProjectsService(
     prisma as unknown as PrismaService,
-    makeNotifications(notifications as Record<string, unknown>) as unknown as NotificationsService,
+    notificationsDouble,
     {} as unknown as Cache,
     makeProjectTransactionDouble({ tx: prisma }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
+    // SocialService real (no doble) para que las pruebas de orden ponderado
+    // (T-251) sigan ejerciendo `prisma.amistad.findMany` real, la misma
+    // fuente de amigos que usa el resto del producto (finding 5 de revisión).
+    new SocialService(prisma as unknown as PrismaService, notificationsDouble),
   );
 }
 
@@ -375,5 +385,135 @@ describe('ProjectsService', () => {
     });
     const service = makeService(prisma);
     await expect(service.findPostulacionesByProject(2, 1)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  /** T-251/T-252: orden ponderado de "Proyectos Disponibles" por amigos y carrera. */
+  describe('findAll — orden ponderado por amigos y carrera', () => {
+    function proyecto(idProyecto: number) {
+      return { idProyecto, tituloProyecto: `Proyecto ${idProyecto}` };
+    }
+
+    it('un proyecto con 2 amigos participantes sube sobre uno más reciente sin amigos', async () => {
+      const prisma = makePrisma();
+      // La base ya viene ordenada por recencia: el 1 (sin amigos) es más
+      // reciente que el 2 (con 2 amigos).
+      prisma.proyecto.findMany.mockResolvedValue([proyecto(1), proyecto(2)]);
+      prisma.amistad.findMany.mockResolvedValue([
+        { idUsuarioSolicitante: 9, idUsuarioReceptor: 101 },
+        { idUsuarioSolicitante: 9, idUsuarioReceptor: 102 },
+      ]);
+      prisma.$queryRaw.mockResolvedValue([
+        { idProyecto: 1, amigosParticipantes: 0, mismaCarrera: false },
+        { idProyecto: 2, amigosParticipantes: 2, mismaCarrera: false },
+      ]);
+      const service = makeService(prisma);
+
+      const resultado = await service.findAll({}, 9);
+
+      expect(resultado.map((p) => p.idProyecto)).toEqual([2, 1]);
+    });
+
+    it('a igualdad de recencia, un proyecto de la carrera del usuario sube sobre uno de otra carrera', async () => {
+      const prisma = makePrisma();
+      prisma.proyecto.findMany.mockResolvedValue([proyecto(1), proyecto(2)]);
+      prisma.perfilEstudiante.findUnique.mockResolvedValue({ idCarrera: 5 });
+      prisma.$queryRaw.mockResolvedValue([
+        { idProyecto: 1, amigosParticipantes: 0, mismaCarrera: false },
+        { idProyecto: 2, amigosParticipantes: 0, mismaCarrera: true },
+      ]);
+      const service = makeService(prisma);
+
+      const resultado = await service.findAll({}, 9);
+
+      expect(resultado.map((p) => p.idProyecto)).toEqual([2, 1]);
+    });
+
+    it('los amigos pesan más que la carrera cuando compiten', async () => {
+      const prisma = makePrisma();
+      // 1: misma carrera, sin amigos. 2: otra carrera, 1 amigo participante.
+      prisma.proyecto.findMany.mockResolvedValue([proyecto(1), proyecto(2)]);
+      prisma.amistad.findMany.mockResolvedValue([{ idUsuarioSolicitante: 9, idUsuarioReceptor: 101 }]);
+      prisma.perfilEstudiante.findUnique.mockResolvedValue({ idCarrera: 5 });
+      prisma.$queryRaw.mockResolvedValue([
+        { idProyecto: 1, amigosParticipantes: 0, mismaCarrera: true },
+        { idProyecto: 2, amigosParticipantes: 1, mismaCarrera: false },
+      ]);
+      const service = makeService(prisma);
+
+      const resultado = await service.findAll({}, 9);
+
+      expect(resultado.map((p) => p.idProyecto)).toEqual([2, 1]);
+    });
+
+    it('CRÍTICO: un usuario sin amigos ve el mismo conjunto de proyectos que uno con amigos, solo cambia el orden', async () => {
+      const prismaConAmigos = makePrisma();
+      const listaBase = [proyecto(1), proyecto(2), proyecto(3)];
+      prismaConAmigos.proyecto.findMany.mockResolvedValue(listaBase);
+      prismaConAmigos.amistad.findMany.mockResolvedValue([{ idUsuarioSolicitante: 9, idUsuarioReceptor: 101 }]);
+      prismaConAmigos.$queryRaw.mockResolvedValue([
+        { idProyecto: 1, amigosParticipantes: 0, mismaCarrera: false },
+        { idProyecto: 2, amigosParticipantes: 1, mismaCarrera: false },
+        { idProyecto: 3, amigosParticipantes: 0, mismaCarrera: false },
+      ]);
+      const serviceConAmigos = makeService(prismaConAmigos);
+      const resultadoConAmigos = await serviceConAmigos.findAll({}, 9);
+
+      const prismaSinAmigos = makePrisma();
+      prismaSinAmigos.proyecto.findMany.mockResolvedValue(listaBase);
+      // sin amigos y sin carrera: ni siquiera dispara la consulta agregada.
+      const serviceSinAmigos = makeService(prismaSinAmigos);
+      const resultadoSinAmigos = await serviceSinAmigos.findAll({}, 10);
+
+      const idsConAmigos = new Set(resultadoConAmigos.map((p) => p.idProyecto));
+      const idsSinAmigos = new Set(resultadoSinAmigos.map((p) => p.idProyecto));
+      expect(idsConAmigos).toEqual(idsSinAmigos);
+      expect(resultadoConAmigos).toHaveLength(3);
+      expect(resultadoSinAmigos).toHaveLength(3);
+      // sin amigos y sin carrera: orden de recencia de siempre, sin reordenar.
+      expect(resultadoSinAmigos.map((p) => p.idProyecto)).toEqual([1, 2, 3]);
+    });
+
+    it('el conteo de amigos del motivo coincide con los amigos reales de ese proyecto', async () => {
+      const prisma = makePrisma();
+      prisma.proyecto.findMany.mockResolvedValue([proyecto(1)]);
+      prisma.amistad.findMany.mockResolvedValue([
+        { idUsuarioSolicitante: 9, idUsuarioReceptor: 101 },
+        { idUsuarioSolicitante: 102, idUsuarioReceptor: 9 },
+        { idUsuarioSolicitante: 9, idUsuarioReceptor: 103 },
+      ]);
+      prisma.$queryRaw.mockResolvedValue([{ idProyecto: 1, amigosParticipantes: 3, mismaCarrera: false }]);
+      const service = makeService(prisma);
+
+      const [resultado] = await service.findAll({}, 9);
+
+      expect(resultado.amigosParticipantes).toBe(3);
+    });
+
+    it('no dispara una consulta por proyecto: la consulta agregada se ejecuta una sola vez sin importar cuántos proyectos haya', async () => {
+      const prisma = makePrisma();
+      const muchos = Array.from({ length: 20 }, (_, i) => proyecto(i + 1));
+      prisma.proyecto.findMany.mockResolvedValue(muchos);
+      prisma.amistad.findMany.mockResolvedValue([{ idUsuarioSolicitante: 9, idUsuarioReceptor: 101 }]);
+      prisma.$queryRaw.mockResolvedValue(muchos.map((p) => ({ idProyecto: p.idProyecto, amigosParticipantes: 0, mismaCarrera: false })));
+      const service = makeService(prisma);
+
+      await service.findAll({}, 9);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.amistad.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.perfilEstudiante.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it('sin userId (anónimo) no personaliza: ni siquiera consulta amigos o carrera', async () => {
+      const prisma = makePrisma();
+      prisma.proyecto.findMany.mockResolvedValue([proyecto(1), proyecto(2)]);
+      const service = makeService(prisma);
+
+      const resultado = await service.findAll({});
+
+      expect(resultado.map((p) => p.idProyecto)).toEqual([1, 2]);
+      expect(prisma.amistad.findMany).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
   });
 });

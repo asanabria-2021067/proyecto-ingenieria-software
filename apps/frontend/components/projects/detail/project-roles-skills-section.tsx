@@ -1,6 +1,10 @@
 import { NIVEL_LABEL } from '@/types';
 import type { NivelHabilidad } from '@/types';
-import { ReadonlyField, SectionCommentReadonly } from '@/components/projects/detail/project-general-info-section';
+import {
+  READONLY_CARD_CLASS,
+  ReadonlyField,
+  SectionCommentReadonly,
+} from '@/components/projects/detail/project-general-info-section';
 
 const labelClass = 'block text-[10px] font-black uppercase tracking-widest text-tertiary mb-1.5';
 
@@ -45,7 +49,7 @@ export function ProjectRolesSkillsSection({
       ) : (
         <div className="space-y-4">
           {roles.map((rol, i) => (
-            <div key={rol.idRolProyecto} className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4">
+            <div key={rol.idRolProyecto} data-slot="readonly-card" className={READONLY_CARD_CLASS}>
               <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Rol {i + 1}</p>
               <div className="grid grid-cols-2 gap-4">
                 <ReadonlyField label="Nombre del rol" value={rol.nombreRol} />

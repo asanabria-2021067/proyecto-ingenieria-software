@@ -1,0 +1,22 @@
+-- T-244: índice funcional para GET /proyectos/:id/bitacora.
+--
+-- BitacoraConsultaService.listEventos filtra SIEMPRE por
+-- `detalleJson: { path: ['idProyecto'], equals: projectId }` (aislamiento
+-- cross-project obligatorio, ver comentario de la clase) y ordena por
+-- `fechaEvento DESC, idAuditoria DESC` (orden estable de T-244). Sin
+-- índice, esa condición fuerza un Seq Scan completo de bitacora_auditoria
+-- —una tabla GLOBAL compartida por todos los proyectos— en cada página.
+--
+-- La expresión del índice calca EXACTAMENTE la que genera Prisma para ese
+-- filtro (confirmado con `prisma.$on('query', ...)`):
+--   (detalle_json #> ARRAY['idProyecto']::text[])::jsonb = $N
+-- Un índice sobre `detalle_json->>'idProyecto'` (texto) o
+-- `(detalle_json->>'idProyecto')::int` NO calza con esa expresión y
+-- Postgres no lo usa (verificado con EXPLAIN ANALYZE antes de aplicarlo).
+--
+-- Medido con apps/backend/scripts/bitacora-perf-benchmark.ts (proyecto
+-- objetivo con 600 eventos dentro de una tabla con 75,600 filas en total,
+-- repartidas entre 151 proyectos — escala realista de una bitácora global):
+-- promedio 40.80ms -> 4.45ms, p95 48.85ms -> 6.77ms (Seq Scan -> Index Scan).
+CREATE INDEX "bitacora_auditoria_id_proyecto_fecha_idx"
+ON "bitacora_auditoria" ((detalle_json #> '{idProyecto}'), fecha_evento DESC, id_auditoria DESC);

@@ -14,6 +14,8 @@ vi.mock('../lib/services/task-comments', () => ({
   eliminarComentarioTarea: vi.fn(),
 }));
 
+vi.mock('../lib/swal', () => ({ default: { fire: vi.fn() }, swalCustomClass: {} }));
+
 import { TaskCommentsDialog } from '../components/projects/task-comments-dialog';
 import { getComentariosTarea, crearComentarioTarea, eliminarComentarioTarea } from '../lib/services/task-comments';
 import { projectTasksQueryKey, taskCommentsQueryKey } from '../lib/query-keys/tasks';
@@ -122,11 +124,47 @@ describe('TaskCommentsDialog — integración de caché (Tarea 36)', () => {
     const deleteBtn = await screen.findByRole('button', { name: /eliminar comentario/i });
     fireEvent.click(deleteBtn);
 
+    const confirmBtn = await screen.findByRole('button', { name: /sí, eliminar comentario/i });
+    fireEvent.click(confirmBtn);
+
     await waitFor(() => expect(eliminarComentarioTarea).toHaveBeenCalledWith(7, 55, 9));
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskCommentsQueryKey(7, 55) });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectTasksQueryKey(7) });
     });
+  });
+
+  it('eliminar comentario pide confirmación antes de llamar al servicio (T-222)', async () => {
+    (getComentariosTarea as any).mockResolvedValue([
+      {
+        idComentario: 9,
+        idAutor: 1,
+        contenido: 'mi comentario',
+        creadoEn: '2026-01-01T00:00:00.000Z',
+        editadoEn: null,
+        autor: { idUsuario: 1, nombre: 'Ana', apellido: 'Lopez', fotoUrl: null },
+      },
+    ]);
+    const { wrapper } = createWrapper();
+
+    render(
+      createElement(TaskCommentsDialog, {
+        tarea,
+        idProyecto: 7,
+        open: true,
+        onOpenChange: () => {},
+      }),
+      { wrapper },
+    );
+
+    const deleteBtn = await screen.findByRole('button', { name: /eliminar comentario/i });
+    fireEvent.click(deleteBtn);
+
+    expect(await screen.findByText(/no se puede deshacer/i)).toBeInTheDocument();
+    expect(eliminarComentarioTarea).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(eliminarComentarioTarea).not.toHaveBeenCalled();
   });
 
   it('un fallo al crear no invalida como éxito', async () => {

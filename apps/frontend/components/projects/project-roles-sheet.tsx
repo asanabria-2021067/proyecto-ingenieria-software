@@ -22,19 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { getCarreras, getHabilidades, type Carrera, type Habilidad } from '@/lib/services/catalogs';
-import uvgSwal from '@/lib/swal';
+import { aviso, confirmar } from '@/lib/mensajes';
 import { NIVEL_LABEL, type NivelHabilidad } from '@/types';
 import type { ProjectRoleDTO, CreateRoleInput } from '@/lib/services/roles';
 import type { useProjectRoles } from '@/hooks/use-project-roles';
@@ -62,20 +52,8 @@ type RoleSheetEntryContext = 'DIRECT' | 'MANAGER';
 type RoleSheetView = 'LIST' | 'CREATE' | 'EDIT';
 
 function mostrarAvisoRolGuardado(view: 'CREATE' | 'EDIT') {
-  void uvgSwal.fire({
-    toast: true,
-    backdrop: false,
-    icon: 'success',
-    title: view === 'CREATE' ? 'Rol creado' : 'Cambios guardados',
-    text:
-      view === 'CREATE'
-        ? 'El rol se agregó al proyecto.'
-        : 'El rol se actualizó correctamente.',
-    position: 'top-end',
-    timer: 1800,
-    timerProgressBar: true,
-    showConfirmButton: false,
-  });
+  if (view === 'CREATE') aviso.exito('Rol creado', 'El rol se agregó al proyecto.');
+  else aviso.exito('Cambios guardados', 'El rol se actualizó correctamente.');
 }
 
 interface ProjectRolesSheetProps {
@@ -178,7 +156,6 @@ export function ProjectRolesSheet({
   const [view, setView] = useState<RoleSheetView>('LIST');
   const [rolEditando, setRolEditando] = useState<ProjectRoleDTO | null>(null);
   const [form, setForm] = useState<FormState>(FORM_VACIO);
-  const [rolAEliminar, setRolAEliminar] = useState<ProjectRoleDTO | null>(null);
   const [errorForm, setErrorForm] = useState<string | null>(null);
 
   const { data: carreras = [] } = useQuery<Carrera[]>({
@@ -202,7 +179,6 @@ export function ProjectRolesSheet({
     setRolEditando(null);
     setForm(FORM_VACIO);
     setErrorForm(null);
-    setRolAEliminar(null);
   };
 
   const abrirCrear = (context: RoleSheetEntryContext = entryContext) => {
@@ -327,16 +303,23 @@ export function ProjectRolesSheet({
     }
   };
 
-  const handleEliminar = () => {
-    if (!rolAEliminar) return;
+  const handleEliminar = async (role: ProjectRoleDTO) => {
+    const confirmado = await confirmar({
+      titulo: `¿Eliminar el rol "${role.nombreRol}"?`,
+      descripcion:
+        'Solo es posible si nunca fue utilizado (sin participaciones, tareas ni postulaciones). Sus habilidades requeridas se eliminan junto con el rol.',
+      textoAccion: 'Eliminar rol',
+      destructiva: true,
+    });
+    if (!confirmado) return;
     eliminarRol.mutate(
-      { roleId: rolAEliminar.idRolProyecto },
-      { onSuccess: () => setRolAEliminar(null) },
+      { roleId: role.idRolProyecto },
+      {
+        onSuccess: () => aviso.exito('Rol eliminado', `"${role.nombreRol}" ya no forma parte del proyecto.`),
+        onError: (error) => aviso.error('No se pudo eliminar el rol', getApiErrorMessage(error, 'role')),
+      },
     );
   };
-
-  const errorEliminar =
-    eliminarRol.isError && rolAEliminar ? getApiErrorMessage(eliminarRol.error, 'role') : null;
   const sheetCopy = useMemo(() => {
     if (view === 'CREATE') {
       return {
@@ -457,7 +440,7 @@ export function ProjectRolesSheet({
                             size="icon"
                             variant="ghost"
                             aria-label={`Eliminar rol ${role.nombreRol}`}
-                            onClick={() => setRolAEliminar(role)}
+                            onClick={() => void handleEliminar(role)}
                             className="size-10 rounded-md text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
                           >
                             <Trash2 className="size-4" aria-hidden="true" />
@@ -703,37 +686,6 @@ export function ProjectRolesSheet({
           )}
         </div>
 
-        {/* Confirmación de eliminación (Sección 9: rechazo 400 si el rol tiene historial) */}
-        <AlertDialog open={rolAEliminar !== null} onOpenChange={(o) => !o && setRolAEliminar(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Eliminar rol</AlertDialogTitle>
-              <AlertDialogDescription>
-                {rolAEliminar
-                  ? `Se eliminará el rol "${rolAEliminar.nombreRol}". Solo es posible si nunca fue utilizado (sin participaciones, tareas ni postulaciones). Sus habilidades requeridas se eliminan junto con el rol.`
-                  : ''}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            {errorEliminar && (
-              <p role="alert" className="text-xs text-red-600 dark:text-red-400">
-                {errorEliminar}
-              </p>
-            )}
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={eliminarRol.isPending}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={eliminarRol.isPending}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleEliminar();
-                }}
-                className="bg-red-600 text-white hover:bg-red-700"
-              >
-                {eliminarRol.isPending ? 'Eliminando…' : 'Eliminar rol'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

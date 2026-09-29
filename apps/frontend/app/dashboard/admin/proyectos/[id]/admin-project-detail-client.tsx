@@ -10,6 +10,7 @@ import { isHistoricalDetail } from '@/lib/services/admin-projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle, tipoBadgeLabel, tipoBadgeStyle } from '@/components/projects/available-project-card';
 import { ClosureStatusBanner } from '@/components/projects/closure-status-banner';
+import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { LeadershipCard } from '@/components/leadership/leadership-card';
 import { LeadershipChangeDialog } from '@/components/leadership/leadership-change-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -258,8 +259,8 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
               {vista.descripcion || 'Sin descripción disponible.'}
             </p>
           </div>
-          {puedeTransferirLiderazgo(vista.estado) && (
-            <div className="shrink-0">
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {puedeTransferirLiderazgo(vista.estado) && (
               <Button
                 type="button"
                 onClick={() => setCambioAbierto(true)}
@@ -268,8 +269,12 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
                 <UserCog className="size-4" aria-hidden="true" />
                 Cambiar liderazgo
               </Button>
-            </div>
-          )}
+            )}
+            {/* T-259/T-260/T-261 (HU-164): la administración exporta desde
+                aquí — su propia vista de solo lectura, sin pasar por el
+                sidebar exclusivo del líder. */}
+            <ProjectExportButtons idProyecto={vista.idProyecto} />
+          </div>
         </div>
         <dl className="mt-5 grid grid-cols-1 gap-4 border-t border-outline-variant/40 pt-4 text-sm sm:grid-cols-3">
           <div className="flex items-center gap-3">

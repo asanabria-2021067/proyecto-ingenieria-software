@@ -6,6 +6,7 @@ import {
   validateEnvironment,
   type ClosureAvailability,
 } from '../src/config/environment.validation';
+import { SYNTHETIC_JWT_SECRET } from './helpers/synthetic-jwt-secret';
 
 /**
  * SDK mockeado: ninguna llamada sale del proceso. `upload_stream` devuelve un
@@ -246,6 +247,7 @@ describe('S7 adaptador Cloudinary de cierre', () => {
     // Un valor no enumerado no es una modalidad: la configuración lo rechaza.
     const invalido = validateEnvironment({
       FRONTEND_URL: 'http://localhost:3000',
+      JWT_SECRET: SYNTHETIC_JWT_SECRET,
       CLOSURE_CLOUDINARY_DELIVERY_MODE: 'publico',
     });
     expect((invalido.closure as ClosureAvailability).motivos).toContain('DELIVERY_MODE_INVALIDO');

@@ -23,6 +23,11 @@ export interface LeadershipCardProps {
   action?: ReactNode;
   /** Modo lectura (VIEW-16): sin slot de acción ni advertencias de líder. */
   readOnly?: boolean;
+  /**
+   * Historial plegable dentro de la tarjeta (por defecto, VIEW-16). La vista
+   * de Liderazgo lo muestra aparte, como sección propia, y lo desactiva.
+   */
+  showHistory?: boolean;
   className?: string;
 }
 
@@ -46,7 +51,53 @@ function formatearFecha(iso: string | null | undefined): string | null {
   return fecha.toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
+const CARD = 'card-base';
+
+/** Formato de tabla de Mis Tareas: franja guía gris verdosa, divisores tenues, hover suave. */
+const FILA_GUIA = 'border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low';
+const CELDA_GUIA = 'h-auto whitespace-nowrap py-tight text-xs font-semibold text-text-secondary first:pl-card last:pr-card';
+const FILA = 'border-outline-variant/50 hover:bg-surface-container-low';
+const CELDA = 'first:pl-card last:pr-card';
+
+/**
+ * Historial de liderazgo (más reciente primero): Fecha · Líder anterior ·
+ * Nuevo líder · Origen · Motivo, todo del backend. Solo la tabla: cada
+ * contenedor (tarjeta propia o plegable) decide su marco.
+ */
+export function LeadershipHistoryTable({ items }: { items: LeadershipHistoryItemDto[] }) {
+  return (
+    <Table aria-label="Historial de liderazgo">
+      <TableHeader>
+        <TableRow className={FILA_GUIA}>
+          <TableHead className={CELDA_GUIA}>Fecha</TableHead>
+          <TableHead className={CELDA_GUIA}>Líder anterior</TableHead>
+          <TableHead className={CELDA_GUIA}>Nuevo líder</TableHead>
+          <TableHead className={CELDA_GUIA}>Origen</TableHead>
+          <TableHead className={CELDA_GUIA}>Motivo</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {[...items].reverse().map((item) => (
+          <TableRow key={item.idHistorialLiderazgo} className={FILA}>
+            <TableCell className={`type-meta whitespace-nowrap tabular-nums text-text-secondary ${CELDA}`}>
+              {formatearFecha(item.registradoEn) ?? '—'}
+            </TableCell>
+            <TableCell className={`whitespace-nowrap text-sm text-text-primary ${CELDA}`}>
+              {item.liderAnterior.nombre} {item.liderAnterior.apellido}
+            </TableCell>
+            <TableCell className={`whitespace-nowrap text-sm font-semibold text-text-primary ${CELDA}`}>
+              {item.liderNuevo.nombre} {item.liderNuevo.apellido}
+            </TableCell>
+            <TableCell className={CELDA}>
+              <span className="pill pill-neutral">{origenLabel(item.origen)}</span>
+            </TableCell>
+            <TableCell className={`type-meta min-w-50 whitespace-normal text-text-secondary ${CELDA}`}>{item.motivo}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
 
 /**
  * VIEW-06 (F008), reutilizada por VIEW-16 (F013) — card «Liderazgo»: líder
@@ -61,6 +112,7 @@ export function LeadershipCard({
   liderDesde,
   action,
   readOnly = false,
+  showHistory = true,
   className = '',
 }: LeadershipCardProps) {
   const [historialAbierto, setHistorialAbierto] = useState(false);
@@ -91,80 +143,55 @@ export function LeadershipCard({
 
   return (
     <section className={`${CARD} ${className}`} aria-labelledby="leadership-card-title">
-      <h2 id="leadership-card-title" className="flex items-center gap-2 text-base font-bold text-on-surface">
-        <Crown className="size-4 text-primary" aria-hidden="true" />
+      <h2 id="leadership-card-title" className="flex items-center gap-tight type-subtitle font-semibold text-text-primary">
+        <Crown className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
         Liderazgo
       </h2>
 
-      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Avatar className="size-14">
-            <AvatarFallback className="bg-primary text-base font-bold text-on-primary">
+      <div className="mt-card flex flex-col gap-card sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-stack">
+          <Avatar className="size-16 shrink-0">
+            <AvatarFallback className="bg-primary text-lg font-bold text-on-primary">
               {getInitials(context.liderActual.nombre, context.liderActual.apellido)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="text-base font-bold text-on-surface">
+            <p className="type-section truncate text-text-primary">
               {context.liderActual.nombre} {context.liderActual.apellido}
             </p>
-            <p className="text-sm text-on-surface-variant">Líder actual del proyecto</p>
-            {desde && <p className="text-xs text-tertiary">Líder desde {desde}</p>}
+            <p className="type-body text-text-secondary">Líder actual del proyecto</p>
+            {desde && <p className="type-meta mt-micro">Líder desde {desde}</p>}
           </div>
         </div>
-        {!readOnly && action && <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{action}</div>}
+        {!readOnly && action && (
+          <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{action}</div>
+        )}
       </div>
 
-      <Collapsible open={historialAbierto} onOpenChange={setHistorialAbierto} className="mt-4">
-        <CollapsibleTrigger
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
-          aria-controls="leadership-history-table"
-        >
-          <ChevronDown
-            className={`size-4 transition-transform motion-reduce:transition-none ${historialAbierto ? 'rotate-0' : '-rotate-90'}`}
-            aria-hidden="true"
-          />
-          <History className="size-4" aria-hidden="true" />
-          Historial de liderazgo
-        </CollapsibleTrigger>
-        <CollapsibleContent id="leadership-history-table" className="mt-3">
-          {items.length === 0 ? (
-            <p className="text-sm italic text-tertiary">Sin cambios de liderazgo registrados.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-outline-variant/40">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                    <TableHead className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-tertiary">Fecha</TableHead>
-                    <TableHead className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-tertiary">Líder anterior</TableHead>
-                    <TableHead className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-tertiary">Nuevo líder</TableHead>
-                    <TableHead className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-tertiary">Origen</TableHead>
-                    <TableHead className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-tertiary">Motivo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...items].reverse().map((item) => (
-                    <TableRow key={item.idHistorialLiderazgo} className="border-outline-variant/40">
-                      <TableCell className="whitespace-nowrap px-3 py-2 text-xs text-on-surface-variant">
-                        {formatearFecha(item.registradoEn) ?? '—'}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap px-3 py-2 text-xs text-on-surface">
-                        {item.liderAnterior.nombre} {item.liderAnterior.apellido}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap px-3 py-2 text-xs text-on-surface">
-                        {item.liderNuevo.nombre} {item.liderNuevo.apellido}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap px-3 py-2 text-xs text-on-surface-variant">
-                        {origenLabel(item.origen)}
-                      </TableCell>
-                      <TableCell className="min-w-[200px] px-3 py-2 text-xs text-on-surface-variant">{item.motivo}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CollapsibleContent>
-      </Collapsible>
+      {showHistory && (
+        <Collapsible open={historialAbierto} onOpenChange={setHistorialAbierto} className="mt-card">
+          <CollapsibleTrigger
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+            aria-controls="leadership-history-table"
+          >
+            <ChevronDown
+              className={`size-4 transition-transform motion-reduce:transition-none ${historialAbierto ? 'rotate-0' : '-rotate-90'}`}
+              aria-hidden="true"
+            />
+            <History className="size-4" aria-hidden="true" />
+            Historial de liderazgo
+          </CollapsibleTrigger>
+          <CollapsibleContent id="leadership-history-table" className="mt-3">
+            {items.length === 0 ? (
+              <p className="text-sm italic text-tertiary">Sin cambios de liderazgo registrados.</p>
+            ) : (
+              <div className="overflow-hidden rounded-control border border-outline-variant/50">
+                <LeadershipHistoryTable items={items} />
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </section>
   );
 }

@@ -13,8 +13,16 @@ function readStoredIndex(): number {
   return SCALE_LEVELS[parsed] !== undefined ? parsed : DEFAULT_INDEX;
 }
 
+/** Además del fontSize del <html> (de donde salen casi todos los `rem` del
+ * layout), expone la escala y su inverso como custom properties: el sidebar
+ * (`.sidebar-scale-lock`, global.css) los usa para quedar con tamaño fijo
+ * en pantalla sin importar el nivel elegido acá. */
 function applyFontScale(index: number) {
-  document.documentElement.style.fontSize = `${SCALE_LEVELS[index] * 100}%`;
+  const scale = SCALE_LEVELS[index];
+  const root = document.documentElement;
+  root.style.fontSize = `${scale * 100}%`;
+  root.style.setProperty('--font-scale', String(scale));
+  root.style.setProperty('--font-scale-inverse', String(1 / scale));
 }
 
 export function FontScaleToggle() {
@@ -30,10 +38,10 @@ export function FontScaleToggle() {
   };
 
   const buttonClass =
-    'p-2 rounded-full bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface disabled:opacity-50 disabled:cursor-not-allowed';
+    'flex size-10 items-center justify-center rounded-control bg-muted text-meta text-text-primary transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-micro">
       <button
         type="button"
         onClick={() => changeLevel(levelIndex - 1)}

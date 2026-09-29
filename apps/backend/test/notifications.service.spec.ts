@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { TipoNotificacion } from '@prisma/client';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { NotificationsGateway } from '../src/notifications/notifications.gateway';
+import { WsAuthService } from '../src/ws-auth/ws-auth.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 function makePrisma() {
@@ -110,9 +111,9 @@ describe('NotificationsService', () => {
      * NotificationsService exige un NotificationsGateway real (clase con
      * campos privados: un objeto literal nunca es estructuralmente
      * compatible con ese tipo, de ahí el `any` original). En vez de
-     * falsear el tipo, se instancia el gateway real — JwtService también
-     * se construye real, su constructor no exige configuración para estos
-     * tests — y se espía notifySprintFinalizationStarted con vi.spyOn
+     * falsear el tipo, se instancia el gateway real — su política WS (G07)
+     * y el JwtService también se construyen reales, sus constructores no
+     * exigen configuración para estos tests — y se espía notifySprintFinalizationStarted con vi.spyOn
      * (completamente tipado). El único campo que Nest solo asigna en
      * arranque real es `server` (un Server de socket.io); para simular
      * "socket conectado" sin construir un Server real se usa
@@ -120,7 +121,7 @@ describe('NotificationsService', () => {
      * archivo — cero `any` nuevos.
      */
     function makeConnectedGateway() {
-      const gateway = new NotificationsGateway(new JwtService());
+      const gateway = new NotificationsGateway(new WsAuthService(new JwtService(), {} as PrismaService));
       Reflect.set(gateway, 'server', {});
       vi.spyOn(gateway, 'notifySprintFinalizationStarted').mockResolvedValue(undefined);
       return gateway;
@@ -129,7 +130,7 @@ describe('NotificationsService', () => {
     function makeDisconnectedGateway() {
       // Instancia real sin `server` asignado (tal como queda antes de que
       // Nest complete el arranque real): this.gateway?.server es undefined.
-      return new NotificationsGateway(new JwtService());
+      return new NotificationsGateway(new WsAuthService(new JwtService(), {} as PrismaService));
     }
 
     it('destinatarios = participantes ACTIVO del proyecto, excluyendo al autor', async () => {
@@ -180,14 +181,14 @@ describe('NotificationsService', () => {
 
   describe('notifySprintClosed (A9.1)', () => {
     function makeConnectedGateway() {
-      const gateway = new NotificationsGateway(new JwtService());
+      const gateway = new NotificationsGateway(new WsAuthService(new JwtService(), {} as PrismaService));
       Reflect.set(gateway, 'server', {});
       vi.spyOn(gateway, 'notifySprintClosed').mockResolvedValue(undefined);
       return gateway;
     }
 
     function makeDisconnectedGateway() {
-      return new NotificationsGateway(new JwtService());
+      return new NotificationsGateway(new WsAuthService(new JwtService(), {} as PrismaService));
     }
 
     it('destinatarios = participantes ACTIVO del proyecto, excluyendo al autor (mismo criterio que START)', async () => {
@@ -235,14 +236,14 @@ describe('NotificationsService', () => {
 
   describe('notifyTaskHoursLogged (HU-142 / T-171)', () => {
     function makeConnectedGateway() {
-      const gateway = new NotificationsGateway(new JwtService());
+      const gateway = new NotificationsGateway(new WsAuthService(new JwtService(), {} as PrismaService));
       Reflect.set(gateway, 'server', {});
       vi.spyOn(gateway, 'notifyTaskHoursLogged').mockResolvedValue(undefined);
       return gateway;
     }
 
     function makeDisconnectedGateway() {
-      return new NotificationsGateway(new JwtService());
+      return new NotificationsGateway(new WsAuthService(new JwtService(), {} as PrismaService));
     }
 
     it('destinatarios = participantes ACTIVO del proyecto, excluyendo al autor (mismo criterio que los eventos de Sprint)', async () => {

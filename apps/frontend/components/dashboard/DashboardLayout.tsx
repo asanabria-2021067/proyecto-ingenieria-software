@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,13 +11,23 @@ import {
   Briefcase,
   FileText,
   ListChecks,
+  CalendarDays,
+  Clock,
+  RotateCcw,
   Users,
+  Archive,
+  Search as SearchIcon,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
+import { GlobalSearchInput } from '@/components/layout/global-search-input';
 import { UserMenu } from '@/components/dashboard/UserMenu';
-import { SidebarNav, flattenNavEntries, type NavEntry } from '@/components/dashboard/SidebarNav';
+import {
+  SidebarNav,
+  flattenNavEntries,
+  type NavEntry,
+} from '@/components/dashboard/SidebarNav';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
@@ -28,15 +38,31 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
 
 const navEntries: NavEntry[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    exact: true,
+  },
   { href: '/dashboard/personas', label: 'Personas', icon: Users },
   {
     type: 'group',
     label: 'Proyectos',
     icon: Briefcase,
     items: [
-      { href: '/dashboard/proyectos', label: 'Explorar Proyectos', icon: FolderOpen },
-      { href: '/dashboard/projects/mine', label: 'Mis Proyectos', icon: Briefcase },
+      {
+        href: '/dashboard/proyectos',
+        label: 'Explorar Proyectos',
+        icon: FolderOpen,
+        // Solo la lista: las vistas de un proyecto (/dashboard/proyectos/:id/…)
+        // tienen su propia sidebar y no son «Explorar».
+        exact: true,
+      },
+      {
+        href: '/dashboard/projects/mine',
+        label: 'Mis Proyectos',
+        icon: Briefcase,
+      },
     ],
   },
   {
@@ -45,7 +71,22 @@ const navEntries: NavEntry[] = [
     icon: ListChecks,
     items: [
       { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
-      { href: '/dashboard/mis-postulaciones', label: 'Mis Postulaciones', icon: FileText },
+      { href: '/dashboard/mis-horas', label: 'Mis Horas', icon: Clock },
+      {
+        href: '/dashboard/calendario',
+        label: 'Calendario',
+        icon: CalendarDays,
+      },
+      {
+        href: '/dashboard/mis-postulaciones',
+        label: 'Mis Postulaciones',
+        icon: FileText,
+      },
+      {
+        href: '/dashboard/chats/archivados',
+        label: 'Chats archivados',
+        icon: Archive,
+      },
     ],
   },
 ];
@@ -63,8 +104,10 @@ export default function DashboardLayout({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user, isLoading, isError } = useCurrentUser();
-  const { latestNotification, isConnected: notificationsConnected } = useRealtimeNotifications(!!user);
+  const { latestNotification, isConnected: notificationsConnected } =
+    useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   useEffect(() => {
     if (!allowAdmin && !isLoading && isAdminUser(user)) {
@@ -117,21 +160,21 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-surface">
+    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-page">
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
       </a>
 
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-surface-container-low md:flex">
-        <div className="px-6 py-5 border-b border-outline-variant flex items-center gap-3">
+      <aside className="sidebar-scale-lock hidden h-full shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex">
+        <div className="flex items-center gap-inline border-b border-outline-variant px-card py-stack">
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
-          <span className="font-headline font-extrabold text-xl text-primary">UVGenius</span>
+          <span className="type-section text-text-primary">UVGenius</span>
         </div>
 
         <SidebarNav entries={navEntries} />
 
-        <div className="px-3 py-4 border-t border-outline-variant">
+        <div className="border-t border-outline-variant px-inline py-stack">
           <UserMenu user={user} onLogout={handleLogout} variant="sidebar" />
         </div>
       </aside>
@@ -140,38 +183,85 @@ export default function DashboardLayout({
       <main
         id="dashboard-main"
         tabIndex={-1}
-        className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface focus:outline-none"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page focus:outline-none"
       >
         {/* Top Header Bar */}
-        <header className="h-16 border-b border-outline-variant px-4 md:px-8 flex items-center justify-between shrink-0 bg-surface-container-low z-30">
-          <div className="flex items-center gap-3">
+        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_auto_1fr] md:px-section">
+          <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
-            <div className="md:hidden flex items-center gap-2">
+            <div className="flex items-center gap-tight md:hidden">
               <Image src={logo} alt="UVGENIUS" className="h-8 w-auto" />
-              <span className="font-headline font-black text-base text-primary">UVGenius</span>
+              <span className="type-subtitle text-text-primary">UVGenius</span>
             </div>
-            <span className="hidden md:inline font-headline font-bold text-sm text-tertiary">
-              Universidad del Valle de Guatemala
-            </span>
+            <button
+              type="button"
+              onClick={() => setMobileSearchOpen((v) => !v)}
+              aria-label="Buscar"
+              aria-expanded={mobileSearchOpen}
+              className="flex size-9 items-center justify-center rounded-control text-text-secondary hover:bg-surface-container-high hover:text-text-primary md:hidden"
+            >
+              <SearchIcon className="size-5" aria-hidden="true" />
+            </button>
+            <div className="hidden md:block">
+              <FontScaleToggle />
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="hidden md:block">
+            <GlobalSearchInput className="w-64 lg:w-96" />
+          </div>
+          <div className="flex items-center gap-tight md:justify-self-end">
             {!!user && (
               <span
                 role="status"
-                title={notificationsConnected ? 'Notificaciones en vivo conectadas' : 'Reconectando notificaciones en vivo…'}
-                aria-label={notificationsConnected ? 'Notificaciones en vivo conectadas' : 'Reconectando notificaciones en vivo'}
+                title={
+                  notificationsConnected
+                    ? 'Notificaciones en vivo conectadas'
+                    : 'Reconectando notificaciones en vivo…'
+                }
+                aria-label={
+                  notificationsConnected
+                    ? 'Notificaciones en vivo conectadas'
+                    : 'Reconectando notificaciones en vivo'
+                }
                 className={`size-2 shrink-0 rounded-full ${
-                  notificationsConnected ? 'bg-green-500' : 'animate-pulse bg-amber-500'
+                  notificationsConnected
+                    ? 'bg-status-success'
+                    : 'animate-pulse bg-status-warning'
                 }`}
               />
             )}
             <NotificationsBell onlyIcon />
-            <FontScaleToggle />
+            <button
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(new Event('start-onboarding-tour'))
+              }
+              aria-label="Repetir tour de bienvenida"
+              className="flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary"
+            >
+              <RotateCcw className="size-5" aria-hidden="true" />
+            </button>
             <div id="dashboard-theme-toggle">
               <ThemeToggle />
             </div>
+            <div
+              id="dashboard-account-menu"
+              className="hidden border-l border-outline-variant pl-tight lg:block"
+            >
+              <UserMenu user={user} onLogout={handleLogout} variant="compact" />
+            </div>
           </div>
         </header>
+
+        {mobileSearchOpen && (
+          <div className="border-b border-outline-variant bg-card px-stack py-tight md:hidden">
+            <GlobalSearchInput
+              autoFocus
+              onNavigate={() => setMobileSearchOpen(false)}
+              className="w-full"
+            />
+          </div>
+        )}
 
         {/* F6: franja global de bloqueo por finalización de Sprint — fuera del
             área con scroll para que no desaparezca al desplazar la página,
@@ -187,7 +277,7 @@ export default function DashboardLayout({
       </main>
 
       {/* Bottom Navigation Bar - Mobile Only */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-outline-variant bg-card px-tight pb-safe shadow-card md:hidden">
         {navItemsMobile.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
@@ -197,8 +287,10 @@ export default function DashboardLayout({
               id={`nav-item-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`}
               aria-label={label}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ${
-                active ? 'text-primary bg-primary/10' : 'text-outline hover:text-on-surface'
+              className={`flex h-12 w-12 flex-col items-center justify-center rounded-control transition-all duration-200 ${
+                active
+                  ? 'bg-action text-on-action'
+                  : 'text-text-secondary hover:bg-muted hover:text-text-primary'
               }`}
               title={label}
             >

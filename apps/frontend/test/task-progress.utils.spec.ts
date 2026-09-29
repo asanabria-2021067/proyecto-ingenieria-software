@@ -20,6 +20,7 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     fechaLimite: null,
     actualizadaEn: null,
     tiempoEstimadoHoras: null,
+    puntosHistoria: null,
     asignacionActiva: null,
     rolProyecto: null,
     hito: null,
@@ -30,28 +31,29 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
 }
 
 describe('getProgressVisualState (Sección 16)', () => {
-  it('0–33 % es rojo', () => {
-    for (const p of [0, 10, 33]) expect(getProgressVisualState(p).bar).toContain('red');
+  it('0–33 % usa el token de error', () => {
+    for (const p of [0, 10, 33]) expect(getProgressVisualState(p).bar).toContain('status-error');
   });
 
-  it('34–66 % es naranja', () => {
-    for (const p of [34, 50, 66]) expect(getProgressVisualState(p).bar).toContain('orange');
+  it('34–66 % usa el token de warning', () => {
+    for (const p of [34, 50, 66]) expect(getProgressVisualState(p).bar).toContain('status-warning');
   });
 
-  it('67–99 % es verde', () => {
-    for (const p of [67, 80, 99]) expect(getProgressVisualState(p).bar).toContain('green');
+  it('67–99 % usa el token de success', () => {
+    for (const p of [67, 80, 99]) expect(getProgressVisualState(p).bar).toContain('status-success');
   });
 
   it('100 % usa el verde UVG (primary) y marca complete', () => {
     const v = getProgressVisualState(100);
     expect(v.bar).toContain('primary');
+    expect(v.bar).not.toContain('status-success');
     expect(v.complete).toBe(true);
   });
 
   it('acota valores fuera de rango o no finitos sin lanzar', () => {
-    expect(getProgressVisualState(-20).bar).toContain('red');
+    expect(getProgressVisualState(-20).bar).toContain('status-error');
     expect(getProgressVisualState(999).complete).toBe(true);
-    expect(getProgressVisualState(Number.NaN).bar).toContain('red');
+    expect(getProgressVisualState(Number.NaN).bar).toContain('status-error');
   });
 });
 

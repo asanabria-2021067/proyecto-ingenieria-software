@@ -19,6 +19,7 @@ import {
 } from './dto/update-estado-proyecto.dto';
 import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SocialService } from '../social/social.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService, type ReadDecision } from '../common/project-policy/project-read-policy.service';
@@ -33,6 +34,17 @@ type Db = Prisma.TransactionClient | PrismaService;
 
 const FEATURED_CACHE_KEY = 'projects:featured';
 const FEATURED_CACHE_TTL = 300_000;
+
+/**
+ * T-252: único lugar donde viven los pesos del orden ponderado de
+ * "Proyectos Disponibles". `amigoParticipante` es por amigo (así que 2
+ * amigos ya superan `mismaCarrera`); `mismaCarrera` es fijo, aplica una
+ * sola vez por proyecto sin importar cuántos roles pidan esa carrera.
+ */
+export const PESOS_ORDEN_DISPONIBLES = {
+  amigoParticipante: 2,
+  mismaCarrera: 1,
+} as const;
 
 /** Estados que aparecen en el catálogo público y en destacados. */
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
@@ -289,6 +301,7 @@ export class ProjectsService {
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly readPolicy: ProjectReadPolicyService,
+    private readonly social: SocialService,
   ) {}
 
   /**
@@ -346,20 +359,145 @@ export class ProjectsService {
     return andConditions;
   }
 
-  async findAll(filters: {
-    q?: string;
-    tipoProyecto?: string;
-    modalidad?: string;
-    organizacionId?: number;
-    habilidadId?: number;
-  } = {}) {
+  /**
+   * T-251: catálogo corto ("Proyectos Disponibles" del dashboard). La base
+   * sigue siendo recencia (`orderBy fechaCreacion desc`); con sesión
+   * (`userId`), T-252 reordena por afinidad SIN filtrar — mismo conjunto de
+   * proyectos para todo el mundo, solo cambia el orden.
+   *
+   * Esta misma ruta (sin `page`) también sirve al buscador global del header
+   * (`ProjectSearchInput` → `searchProjects(q)`): con `q` presente NO se
+   * pondera por afinidad, para no subir un proyecto peor emparejado con el
+   * texto buscado solo porque participa un amigo, y para no pagar las dos
+   * consultas extra en cada tecla del debounce.
+   *
+   * NOTA CACHE: a diferencia de `findFeatured`, esta lista no se puede
+   * cachear igual para todos los usuarios en cuanto el orden depende de
+   * quién pregunta (sus amigos, su carrera). Hoy no está cacheada; si se le
+   * agrega cache más adelante, la key tiene que incluir el userId.
+   */
+  async findAll(
+    filters: {
+      q?: string;
+      tipoProyecto?: string;
+      modalidad?: string;
+      organizacionId?: number;
+      habilidadId?: number;
+    } = {},
+    userId?: number,
+  ) {
     const andConditions = this._buildListConditions(filters);
-    return this.prisma.proyecto.findMany({
+    const proyectos = await this.prisma.proyecto.findMany({
       where: { AND: andConditions },
       select: proyectoListSelect,
       orderBy: { fechaCreacion: 'desc' },
       take: 20,
     });
+
+    const esBusqueda = !!filters.q && filters.q.trim().length > 0;
+    if (!userId || esBusqueda || proyectos.length === 0) {
+      return proyectos;
+    }
+    return this._ordenarPorAfinidad(proyectos, userId);
+  }
+
+  /**
+   * T-252: agrega `amigosParticipantes`/`mismaCarrera` a cada proyecto y
+   * reordena por afinidad (ver `PESOS_ORDEN_DISPONIBLES`). El motivo textual
+   * ("2 amigos participan", "De tu carrera") se arma en el FRONTEND a partir
+   * de estos dos campos estructurados — acá nunca se manda texto armado.
+   *
+   * Dos consultas fijas además de la lista base (amigos del usuario + una
+   * consulta agregada para TODOS los proyectos a la vez), nunca una por
+   * proyecto: no escalan con la cantidad de proyectos mostrados.
+   */
+  private async _ordenarPorAfinidad<
+    T extends { idProyecto: number },
+  >(proyectos: T[], userId: number): Promise<Array<T & { amigosParticipantes: number; mismaCarrera: boolean }>> {
+    const idsProyecto = proyectos.map((p) => p.idProyecto);
+
+    // Ids de amigos: misma fuente de verdad que el resto del producto
+    // (social-feed.service.ts ya la consume así), en vez de duplicar la
+    // consulta de amistades acá.
+    const [amigoIds, perfil] = await Promise.all([
+      this.social.getAmigoIds(userId),
+      this.prisma.perfilEstudiante.findUnique({
+        where: { idUsuario: userId },
+        select: { idCarrera: true },
+      }),
+    ]);
+    const carreraId = perfil?.idCarrera ?? null;
+
+    // Ni amigos ni carrera registrada: nada que ponderar. Se evita la
+    // consulta agregada y se devuelve tal cual (orden por recencia de siempre).
+    if (amigoIds.length === 0 && carreraId === null) {
+      return proyectos.map((p) => ({ ...p, amigosParticipantes: 0, mismaCarrera: false }));
+    }
+
+    const amigoParticipaCondicion =
+      amigoIds.length > 0 ? Prisma.sql`pp.id_usuario IN (${Prisma.join(amigoIds)})` : Prisma.sql`FALSE`;
+    const liderEsAmigoCondicion =
+      amigoIds.length > 0 ? Prisma.sql`p.creado_por IN (${Prisma.join(amigoIds)})` : Prisma.sql`FALSE`;
+
+    // UNA sola consulta agregada para TODOS los proyectos listados (no una
+    // por proyecto): cuenta, por proyecto, cuántos de los amigos del usuario
+    // participan ACTIVOS en cualquiera de sus roles, y si algún rol pide la
+    // carrera del usuario. El líder de un proyecto NO tiene fila en
+    // `participacion_proyecto` (schema.prisma: "no existe una
+    // ParticipacionProyecto equivalente para el líder"), así que se cuenta
+    // aparte en la segunda rama del UNION cuando también es amigo — mismo
+    // criterio que ya usa `social-feed.service.ts`.
+    const filas = await this.prisma.$queryRaw<
+      { idProyecto: number; amigosParticipantes: number; mismaCarrera: boolean }[]
+    >(Prisma.sql`
+      SELECT
+        x."idProyecto",
+        COUNT(DISTINCT x."idUsuarioAmigo")::int AS "amigosParticipantes",
+        COALESCE(BOOL_OR(x."mismaCarrera"), FALSE) AS "mismaCarrera"
+      FROM (
+        SELECT
+          rp.id_proyecto AS "idProyecto",
+          pp.id_usuario AS "idUsuarioAmigo",
+          (rp.id_carrera_requerida = ${carreraId}) AS "mismaCarrera"
+        FROM rol_proyecto rp
+        LEFT JOIN participacion_proyecto pp
+          ON pp.id_rol_proyecto = rp.id_rol_proyecto
+          AND pp.estado_participacion = 'ACTIVO'
+          AND ${amigoParticipaCondicion}
+        WHERE rp.id_proyecto IN (${Prisma.join(idsProyecto)})
+
+        UNION ALL
+
+        SELECT
+          p.id_proyecto AS "idProyecto",
+          CASE WHEN ${liderEsAmigoCondicion} THEN p.creado_por END AS "idUsuarioAmigo",
+          NULL::boolean AS "mismaCarrera"
+        FROM proyecto p
+        WHERE p.id_proyecto IN (${Prisma.join(idsProyecto)})
+      ) x
+      GROUP BY x."idProyecto"
+    `);
+    const afinidadPorProyecto = new Map(filas.map((f) => [f.idProyecto, f]));
+
+    const enriquecidos = proyectos.map((p) => {
+      const fila = afinidadPorProyecto.get(p.idProyecto);
+      return {
+        ...p,
+        amigosParticipantes: fila?.amigosParticipantes ?? 0,
+        mismaCarrera: fila?.mismaCarrera ?? false,
+      };
+    });
+
+    // `proyectos` ya viene ordenado por recencia; Array.sort es estable, así
+    // que a igual score se conserva ese orden (la recencia como base, T-251).
+    return enriquecidos.sort((a, b) => this._scoreAfinidad(b) - this._scoreAfinidad(a));
+  }
+
+  private _scoreAfinidad(p: { amigosParticipantes: number; mismaCarrera: boolean }): number {
+    return (
+      p.amigosParticipantes * PESOS_ORDEN_DISPONIBLES.amigoParticipante +
+      (p.mismaCarrera ? PESOS_ORDEN_DISPONIBLES.mismaCarrera : 0)
+    );
   }
 
   async findAllPaginated(filters: {
@@ -1153,9 +1291,14 @@ export class ProjectsService {
    * calcula server-side dentro de la misma transacción como
    * (máximo orden existente para el proyecto) + 1, para no depender de un
    * valor enviado por el cliente que podría colisionar con hitos existentes.
+   *
+   * T-186 (HU-147): `dto.idsTareas` opcional permite, en la misma
+   * operación/transacción, asignar el hito recién creado a tareas ya
+   * existentes del proyecto (ver `_asignarHitoATareas`) — el flujo que
+   * rescata tareas legacy sin hito tras T-185, sin migraciones automáticas.
    */
   async createHito(idProyecto: number, userId: number, dto: CreateHitoDto) {
-    const hito = await this.projectTx.run(idProyecto, userId, 'projects.createHito', async (ctx) => {
+    const resultado = await this.projectTx.run(idProyecto, userId, 'projects.createHito', async (ctx) => {
       const { tx } = ctx;
       await this._requireActiveMember(idProyecto, userId, tx);
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'HITO_CREATE', userId);
@@ -1167,7 +1310,7 @@ export class ProjectsService {
       });
       const nuevoOrden = (ultimo?.orden ?? 0) + 1;
 
-      return tx.hito.create({
+      const hito = await tx.hito.create({
         data: {
           idProyecto,
           tituloHito: dto.tituloHito,
@@ -1185,9 +1328,129 @@ export class ProjectsService {
           orden: true,
         },
       });
+
+      // T-186: asignación masiva opcional, en la MISMA transacción que la
+      // creación — si alguna tarea seleccionada falla su validación, el
+      // rollback también revierte el hito recién creado (nunca queda un
+      // hito huérfano sin ninguna tarea asignada por un error a mitad de
+      // camino).
+      let idsTareasAsignadas: number[] | undefined;
+      if (dto.idsTareas !== undefined) {
+        idsTareasAsignadas = await this._asignarHitoATareas(tx, idProyecto, hito.idHito, dto.idsTareas);
+      }
+
+      return { hito, idsTareasAsignadas };
     });
 
-    return { ...hito, fechaLimite: toDateOnly(hito.fechaLimite) };
+    const publico = { ...resultado.hito, fechaLimite: toDateOnly(resultado.hito.fechaLimite) };
+    // El campo solo aparece en la respuesta cuando el cliente pidió
+    // asignación masiva: mantiene sin cambios la forma histórica de la
+    // respuesta para quien solo crea un hito (createHito original).
+    return resultado.idsTareasAsignadas !== undefined
+      ? { ...publico, idsTareasAsignadas: resultado.idsTareasAsignadas }
+      : publico;
+  }
+
+  /**
+   * T-186 (HU-147): asigna `idHito` a un conjunto de tareas del mismo
+   * proyecto en una sola operación — el mecanismo que evita que T-185 (hito
+   * obligatorio para tablero/sprint) deje atrapadas para siempre a las
+   * tareas existentes que hoy no tienen hito. No crea ni modifica hitos.
+   *
+   * Autorización: reutiliza la política HITO_CREATE ya evaluada por el
+   * caller (líder o participante activo), deliberadamente NO TAREA_WRITE —
+   * TAREA_WRITE exige que el Sprint de CADA tarea esté ACTIVO, y las tareas
+   * que este flujo debe poder rescatar son precisamente las que pueden
+   * pertenecer a un Sprint ya cerrado. Vincular una tarea a un hito no es
+   * una edición del tablero/sprint, es la relación que T-185 exige antes de
+   * que la tarea pueda volver a él.
+   *
+   * Valida existencia + pertenencia a `idProyecto` + no eliminada ANTES de
+   * escribir nada: si falta alguna tarea, lanza y no actualiza ninguna
+   * (todo o nada, igual que el resto de esta transacción).
+   */
+  async assignHitoTasks(
+    idProyecto: number,
+    idHito: number,
+    userId: number,
+    idsTareas: number[],
+  ) {
+    return this.projectTx.run(idProyecto, userId, 'projects.assignHitoTasks', async (ctx) => {
+      const { tx } = ctx;
+      await this._requireActiveMember(idProyecto, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'HITO_CREATE', userId);
+
+      const hito = await tx.hito.findFirst({
+        where: { idHito, idProyecto },
+        select: { idHito: true },
+      });
+
+      if (!hito) {
+        throw new NotFoundException(
+          `Hito con id ${idHito} no encontrado en el proyecto ${idProyecto}`,
+        );
+      }
+
+      const idsTareasAsignadas = await this._asignarHitoATareas(
+        tx,
+        idProyecto,
+        idHito,
+        idsTareas,
+      );
+
+      return { idHito, idsTareasAsignadas };
+    });
+  }
+
+  private async _asignarHitoATareas(
+    tx: Prisma.TransactionClient,
+    idProyecto: number,
+    idHito: number,
+    idsTareas: number[],
+  ): Promise<number[]> {
+    if (idsTareas.length === 0) {
+      return [];
+    }
+
+    const tareasValidas = await tx.tarea.findMany({
+      where: { idTarea: { in: idsTareas }, idProyecto, eliminadoEn: null },
+      select: { idTarea: true },
+    });
+    const idsValidos = new Set(tareasValidas.map((tarea) => tarea.idTarea));
+    const idsInvalidos = idsTareas.filter((idTarea) => !idsValidos.has(idTarea));
+    if (idsInvalidos.length > 0) {
+      throw new NotFoundException(
+        `Tarea(s) con id ${idsInvalidos.join(', ')} no encontrada(s) en el proyecto ${idProyecto}`,
+      );
+    }
+
+    await tx.tarea.updateMany({
+      where: { idTarea: { in: idsTareas }, idProyecto },
+      data: { idHito },
+    });
+
+    // A12: el hito recién creado gana tareas vigentes de golpe — su
+    // estadoHito persistido debe reflejarlo, misma fórmula única que
+    // TasksService#syncHitoEstado (calcularProgresoHito).
+    await this._sincronizarEstadoHito(tx, idHito);
+
+    return idsTareas;
+  }
+
+  /**
+   * A12: misma fórmula que TasksService#syncHitoEstado
+   * (src/common/hito-progreso.ts) — este es el otro write-path capaz de
+   * cambiar el conjunto de tareas vigentes de un Hito fuera de TasksService,
+   * así que reutiliza la única fórmula compartida en vez de definir una
+   * segunda.
+   */
+  private async _sincronizarEstadoHito(tx: Prisma.TransactionClient, idHito: number): Promise<void> {
+    const tareasHito = await tx.tarea.findMany({
+      where: { idHito, eliminadoEn: null },
+      select: { estadoTarea: true },
+    });
+    const { estadoHito } = calcularProgresoHito(tareasHito);
+    await tx.hito.update({ where: { idHito }, data: { estadoHito } });
   }
 
   async delete(id: number, userId: number) {

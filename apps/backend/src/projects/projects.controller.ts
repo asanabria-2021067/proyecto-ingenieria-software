@@ -18,7 +18,9 @@ import { CreateProjectFullDto } from './dto/create-project-full.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateEstadoProyectoDto } from './dto/update-estado-proyecto.dto';
 import { CreateHitoDto } from './dto/create-hito.dto';
+import { AssignHitoTasksDto } from './dto/assign-hito-tasks.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
@@ -49,6 +51,7 @@ export class ProjectsController {
   constructor(private projectsService: ProjectsService) {}
 
   @Get()
+  @UseGuards(OptionalJwtAuthGuard)
   findAll(
     @Query('q') q?: string,
     @Query('tipoProyecto') tipoProyecto?: string,
@@ -57,6 +60,7 @@ export class ProjectsController {
     @Query('habilidad') habilidad?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @CurrentUser() user?: { userId: number },
   ) {
     const filters = {
       q,
@@ -72,7 +76,10 @@ export class ProjectsController {
       return this.projectsService.findAllPaginated({ ...filters, page: parsedPage, limit: parsedLimit });
     }
 
-    return this.projectsService.findAll(filters);
+    // T-251/T-252: sin filtros de página es el catálogo corto que usa el
+    // dashboard ("Proyectos Disponibles"); ahí sí se pondera por amistad y
+    // carrera cuando hay sesión (OptionalJwtAuthGuard nunca bloquea anónimos).
+    return this.projectsService.findAll(filters, user?.userId);
   }
 
   @Get('mine')
@@ -206,6 +213,19 @@ export class ProjectsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.projectsService.createHito(id, user.userId, data);
+  }
+
+  @Post(':id/hitos/:idHito/tareas')
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(PROJECT_MILESTONE)
+  @HttpCode(HttpStatus.OK)
+  assignHitoTasks(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('idHito', ParseIntPipe) idHito: number,
+    @Body() data: AssignHitoTasksDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.assignHitoTasks(id, idHito, user.userId, data.idsTareas);
   }
 
   // ---------- POSTULACIONES DEL PROYECTO ----------

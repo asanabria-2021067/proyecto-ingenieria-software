@@ -8,22 +8,27 @@ export const SIN_ASIGNAR = 'sin-asignar';
 
 const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * Día calendario local (no UTC) — mismo criterio que
- * `task-board.utils.ts#estaVencida` (protegido en esta tarea; se repite
- * aquí en vez de importarlo porque ese archivo no lo exporta). El backend
- * (`IsFutureCalendarDateConstraint`,
- * apps/backend/src/tasks/dto/validators/is-future-calendar-date.validator.ts)
- * exige estrictamente posterior al día de hoy en America/Guatemala; esta es
- * una aproximación con la hora local del navegador — el backend sigue
- * siendo la autoridad final y puede rechazar un valor límite que el cliente
- * aceptó por una diferencia de huso horario.
- */
-function hoyLocalISO(ahora: Date): string {
-  const anio = ahora.getFullYear();
-  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-  const dia = String(ahora.getDate()).padStart(2, '0');
-  return `${anio}-${mes}-${dia}`;
+function hoyGuatemalaISO(ahora: Date): string {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(ahora);
+  const valor = (tipo: 'year' | 'month' | 'day') =>
+    partes.find((parte) => parte.type === tipo)?.value ?? '';
+  return `${valor('year')}-${valor('month')}-${valor('day')}`;
+}
+
+function fechaCalendarioValida(value: string): boolean {
+  if (!DATE_FORMAT.test(value)) return false;
+  const [anio, mes, dia] = value.split('-').map(Number);
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  return (
+    fecha.getUTCFullYear() === anio &&
+    fecha.getUTCMonth() === mes - 1 &&
+    fecha.getUTCDate() === dia
+  );
 }
 
 export interface BuildTaskFormSchemaOptions {
@@ -32,6 +37,17 @@ export interface BuildTaskFormSchemaOptions {
   /** Candidatos reales para el cascada rol → usuario asignado. */
   miembros: MiembroProyecto[];
   ahora?: Date;
+  /**
+   * HU-147/T-185: el backend exige idHito en la creación y ya no admite
+   * quitarlo en la edición (ver CreateTaskDto/UpdateTaskDto). Por defecto
+   * 'edit' — permisivo, sin exigir hito — para no romper los muchos tests
+   * de este schema que no ejercitan la regla de hito; quien construye un
+   * formulario de CREACIÓN real debe pasar 'create' explícitamente
+   * (TaskFormDialogContent ya lo hace).
+   */
+  mode?: 'create' | 'edit';
+  /** Hito ya persistido de la tarea (null si nunca tuvo uno). Solo importa en modo 'edit'. */
+  hitoOriginal?: number | null;
 }
 
 /**
@@ -42,8 +58,14 @@ export interface BuildTaskFormSchemaOptions {
  * del modo/tarea original — evita mantener dos schemas duplicados para
  * crear/editar.
  */
-export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = new Date() }: BuildTaskFormSchemaOptions) {
-  const hoy = hoyLocalISO(ahora);
+export function buildTaskFormSchema({
+  fechaOriginal = null,
+  miembros,
+  ahora = new Date(),
+  mode = 'edit',
+  hitoOriginal = null,
+}: BuildTaskFormSchemaOptions) {
+  const hoy = hoyGuatemalaISO(ahora);
 
   return z
     .object({
@@ -52,12 +74,16 @@ export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = ne
         .trim()
         .min(1, 'El título no puede estar vacío.')
         .max(150, 'El título no puede exceder 150 caracteres.'),
-      descripcionTarea: z.string().max(5000, 'La descripción no puede exceder 5000 caracteres.'),
+      descripcionTarea: z.string().refine(
+        (value) => value.trim().length <= 5000,
+        'La descripción no puede exceder 5000 caracteres.',
+      ),
       prioridad: z.enum(['ALTA', 'MEDIA', 'BAJA'], {
         errorMap: () => ({ message: 'Selecciona una prioridad válida.' }),
       }),
-      fechaLimite: z.string().regex(DATE_FORMAT, 'Selecciona una fecha límite válida.'),
+      fechaLimite: z.string().refine(fechaCalendarioValida, 'Selecciona una fecha límite válida.'),
       tiempoEstimadoHoras: z.string(),
+      puntosHistoria: z.string(),
       idRolProyecto: z.string().min(1),
       idUsuarioAsignado: z.string().min(1),
       idHito: z.string().min(1),
@@ -80,6 +106,17 @@ export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = ne
             code: z.ZodIssueCode.custom,
             path: ['tiempoEstimadoHoras'],
             message: 'El tiempo estimado debe ser un número entero entre 1 y 1000.',
+          });
+        }
+      }
+
+      if (values.puntosHistoria !== '') {
+        const n = Number(values.puntosHistoria);
+        if (!Number.isInteger(n) || n < 1 || n > 100) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['puntosHistoria'],
+            message: 'Los puntos de historia deben ser un número entero entre 1 y 100.',
           });
         }
       }
@@ -107,6 +144,27 @@ export function buildTaskFormSchema({ fechaOriginal = null, miembros, ahora = ne
           message: 'Hay etiquetas duplicadas.',
         });
       }
+
+      // HU-147/T-185: toda tarea nueva necesita un hito para poder entrar al
+      // tablero/sprint (no existe backlog separado en este proyecto — crear
+      // la tarea YA la coloca ahí).
+      if (mode === 'create' && values.idHito === SIN_HITO) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['idHito'],
+          message: 'Selecciona un hito: la tarea lo necesita para poder entrar al tablero.',
+        });
+      }
+      // Igual regla en edición, pero solo si la tarea YA tenía un hito: no
+      // se puede retirarlo (el backend rechaza idHito: null en ese caso).
+      // Una tarea legacy sin hito puede seguir dejándose así.
+      if (mode === 'edit' && hitoOriginal !== null && values.idHito === SIN_HITO) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['idHito'],
+          message: 'No puedes quitar el hito de una tarea que ya está en el tablero o en un sprint.',
+        });
+      }
     });
 }
 
@@ -121,6 +179,7 @@ export function defaultTaskFormValues(tarea: TareaPublicaDTO | null): TaskFormVa
       prioridad: 'MEDIA',
       fechaLimite: '',
       tiempoEstimadoHoras: '',
+      puntosHistoria: '',
       idRolProyecto: SIN_ROL,
       idUsuarioAsignado: SIN_ASIGNAR,
       idHito: SIN_HITO,
@@ -134,6 +193,7 @@ export function defaultTaskFormValues(tarea: TareaPublicaDTO | null): TaskFormVa
     prioridad: tarea.prioridad,
     fechaLimite: tarea.fechaLimite ?? '',
     tiempoEstimadoHoras: tarea.tiempoEstimadoHoras === null ? '' : String(tarea.tiempoEstimadoHoras),
+    puntosHistoria: tarea.puntosHistoria === null ? '' : String(tarea.puntosHistoria),
     idRolProyecto: tarea.idRolProyecto === null ? SIN_ROL : String(tarea.idRolProyecto),
     // Precarga el asignado activo; las asignaciones históricas nunca llegan
     // aquí (mapTarea ya filtra `desasignadaEn: null` en el backend).
@@ -156,6 +216,7 @@ export function buildCreatePayload(values: TaskFormValues): CreateTaskInput {
   if (descripcion !== '') input.descripcionTarea = descripcion;
 
   if (values.tiempoEstimadoHoras !== '') input.tiempoEstimadoHoras = Number(values.tiempoEstimadoHoras);
+  if (values.puntosHistoria !== '') input.puntosHistoria = Number(values.puntosHistoria);
   if (values.idHito !== SIN_HITO) input.idHito = Number(values.idHito);
   if (values.idRolProyecto !== SIN_ROL) input.idRolProyecto = Number(values.idRolProyecto);
   if (values.idUsuarioAsignado !== SIN_ASIGNAR) input.idUsuarioAsignado = Number(values.idUsuarioAsignado);
@@ -194,6 +255,11 @@ export function buildUpdatePayload(original: TareaPublicaDTO, values: TaskFormVa
   if (values.tiempoEstimadoHoras !== '') {
     const tiempoNuevo = Number(values.tiempoEstimadoHoras);
     if (tiempoNuevo !== original.tiempoEstimadoHoras) input.tiempoEstimadoHoras = tiempoNuevo;
+  }
+
+  if (values.puntosHistoria !== '') {
+    const puntosNuevos = Number(values.puntosHistoria);
+    if (puntosNuevos !== original.puntosHistoria) input.puntosHistoria = puntosNuevos;
   }
 
   const hitoNuevo = values.idHito === SIN_HITO ? null : Number(values.idHito);

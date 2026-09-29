@@ -100,7 +100,7 @@ export interface ClosureTramoInput {
 export interface ClosureTaskInput {
   idTarea: number;
   tituloTarea: string;
-  idSprint: number;
+  idSprint: number | null;
   idRolProyecto: number | null;
   estadoTarea: string;
   eliminada: boolean;

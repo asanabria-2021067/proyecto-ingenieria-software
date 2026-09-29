@@ -22,8 +22,10 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
+import { SafeExternalLink } from '@/components/profile/safe-external-link';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 function initials(nombre: string, apellido: string) {
   return `${nombre?.[0] ?? ''}${apellido?.[0] ?? ''}`.toUpperCase() || 'U';
@@ -100,7 +102,7 @@ export default function PerfilPage() {
   }
 
   return (
-      <div className="mx-auto max-w-[1400px] px-8 py-8">
+      <div className={dashboardPage('py-8')}>
         <div className="mb-6 flex items-center justify-end">
           <button
             onClick={() => router.push('/dashboard/perfil/editar')}
@@ -308,48 +310,40 @@ export default function PerfilPage() {
 
                     <div className="mt-6 flex flex-wrap gap-3">
                       {user?.perfil?.enlacePortafolio && (
-                        <a
-                          href={user.perfil.enlacePortafolio}
-                          target="_blank"
-                          rel="noreferrer"
+                        <SafeExternalLink
+                          url={user.perfil.enlacePortafolio}
                           className="inline-flex items-center gap-2 rounded-xl bg-surface-container px-3 py-2 text-xs font-bold text-on-surface hover:bg-primary hover:text-on-primary transition-colors"
                         >
                           <Link2 className="h-4 w-4" />
                           Portafolio
-                        </a>
+                        </SafeExternalLink>
                       )}
                       {user?.perfil?.githubUrl && (
-                        <a
-                          href={user.perfil.githubUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <SafeExternalLink
+                          url={user.perfil.githubUrl}
                           className="inline-flex items-center gap-2 rounded-xl bg-surface-container px-3 py-2 text-xs font-bold text-on-surface hover:bg-primary hover:text-on-primary transition-colors"
                         >
                           <ExternalLink className="h-4 w-4" />
                           GitHub
-                        </a>
+                        </SafeExternalLink>
                       )}
                       {user?.perfil?.linkedinUrl && (
-                        <a
-                          href={user.perfil.linkedinUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <SafeExternalLink
+                          url={user.perfil.linkedinUrl}
                           className="inline-flex items-center gap-2 rounded-xl bg-surface-container px-3 py-2 text-xs font-bold text-on-surface hover:bg-primary hover:text-on-primary transition-colors"
                         >
                           <ExternalLink className="h-4 w-4" />
                           LinkedIn
-                        </a>
+                        </SafeExternalLink>
                       )}
                       {user?.perfil?.urlCv && (
-                        <a
-                          href={user.perfil.urlCv}
-                          target="_blank"
-                          rel="noreferrer"
+                        <SafeExternalLink
+                          url={user.perfil.urlCv}
                           className="inline-flex items-center gap-2 rounded-xl bg-surface-container px-3 py-2 text-xs font-bold text-on-surface hover:bg-primary hover:text-on-primary transition-colors"
                         >
                           <Download className="h-4 w-4" />
                           CV
-                        </a>
+                        </SafeExternalLink>
                       )}
                     </div>
                   </div>

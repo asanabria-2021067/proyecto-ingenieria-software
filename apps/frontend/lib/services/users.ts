@@ -1,4 +1,6 @@
 import { apiFetch } from '@/lib/api/client';
+import type { EstadoProyecto, EstadoTarea, TipoProyecto } from '@/types';
+import type { EstadoSprint } from '@/lib/types/sprints';
 
 export interface UserProfile {
   idUsuario: number;
@@ -78,6 +80,65 @@ export function getMe(): Promise<UserProfile> {
 
 export function getDashboardStats(): Promise<DashboardStats> {
   return apiFetch<DashboardStats>('/usuarios/me/dashboard');
+}
+
+/**
+ * HU-158 (T-232): respuesta de GET /usuarios/me/horas, idéntica al read-model
+ * `MisHorasView` del backend. Todos los importes llegan como string decimal
+ * de dos posiciones ya calculado: la vista los muestra y NUNCA los suma.
+ */
+export interface MisHorasTarea {
+  idTarea: number;
+  tituloTarea: string;
+  estadoTarea: EstadoTarea;
+  eliminada: boolean;
+  sprint: { idSprint: number; numero: number; estado: EstadoSprint } | null;
+  registradas: string;
+  legacy: string;
+}
+
+export interface MisHorasProyecto {
+  idProyecto: number;
+  tituloProyecto: string;
+  tipoProyecto: TipoProyecto;
+  estadoProyecto: EstadoProyecto;
+  abierto: boolean;
+  eliminado: boolean;
+  esLider: boolean;
+  participacionActiva: boolean;
+  registradas: string;
+  legacy: string;
+  propuestasPendientes: string;
+  acreditadas: string;
+  tareasDistintas: number;
+  /** Vacío en los proyectos que no están abiertos. */
+  tareas: MisHorasTarea[];
+}
+
+export interface MisHorasPorTipo {
+  tipoProyecto: TipoProyecto;
+  registradasEnProyectosAbiertos: string;
+  propuestasPendientes: string;
+  acreditadas: string;
+}
+
+export interface MisHorasView {
+  idUsuario: number;
+  requisitos: { horasBecaRequeridas: number | null; horasExtensionRequeridas: number | null };
+  totales: {
+    registradasEnProyectosAbiertos: string;
+    legacyEnProyectosAbiertos: string;
+    propuestasPendientes: string;
+    acreditadas: string;
+  };
+  /** Siempre beca, extensión y experiencia, en ese orden. */
+  porTipo: MisHorasPorTipo[];
+  /** Ya ordenados por el backend: abiertos primero, luego por título. */
+  proyectos: MisHorasProyecto[];
+}
+
+export function getMisHoras(): Promise<MisHorasView> {
+  return apiFetch<MisHorasView>('/usuarios/me/horas');
 }
 
 export function updateProfile(data: Record<string, unknown>) {

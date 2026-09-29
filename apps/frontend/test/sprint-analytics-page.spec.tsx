@@ -1,17 +1,32 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { SprintAnalyticsDto } from '../lib/types/sprints';
+
+// T-240 (HU-160): jsdom no implementa ResizeObserver; el último test de este
+// archivo llega a renderizar el BurndownChart real (recharts.ResponsiveContainer
+// lo usa para medir su contenedor). Mismo stub mínimo que burndown-chart.spec.tsx.
+beforeAll(() => {
+  class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserverStub;
+});
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '42', sprintId: '7' }),
 }));
 
-vi.mock('../hooks/use-project-sprints', () => ({ useSprintAnalytics: vi.fn() }));
+vi.mock('../hooks/use-project-sprints', () => ({
+  useSprintAnalytics: vi.fn(),
+  useSprintBurndown: vi.fn(),
+}));
 
 import SprintAnalyticsPage from '../app/dashboard/proyectos/[id]/sprints/[sprintId]/analytics/page';
-import { useSprintAnalytics } from '../hooks/use-project-sprints';
+import { useSprintAnalytics, useSprintBurndown } from '../hooks/use-project-sprints';
 
 function analytics(overrides: Partial<SprintAnalyticsDto> = {}): SprintAnalyticsDto {
   return {
@@ -37,6 +52,27 @@ function mockAnalytics(overrides: Record<string, unknown> = {}) {
     refetch: vi.fn(),
     ...overrides,
   });
+  // Todas las pruebas de esta página mockean analytics; el burndown es una
+  // sección independiente (T-240) que igual se monta, así que necesita su
+  // propio default seguro salvo que un test lo sobrescriba explícitamente.
+  mockBurndown();
+}
+
+/**
+ * T-240 (HU-160): por defecto en `isLoading` (solo pinta un `Skeleton`, sin
+ * tocar `recharts`) — las pruebas de esta página no necesitan un
+ * `ResizeObserver` stub porque nunca llegan a renderizar el gráfico real;
+ * eso ya lo cubre `burndown-chart.spec.tsx`.
+ */
+function mockBurndown(overrides: Record<string, unknown> = {}) {
+  (useSprintBurndown as any).mockReturnValue({
+    burndown: undefined,
+    isLoading: true,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    ...overrides,
+  });
 }
 
 function renderPage() {
@@ -49,16 +85,17 @@ afterEach(() => {
 });
 
 describe('SprintAnalyticsPage — encabezado', () => {
-  it('muestra el número de Sprint en el título y el back-link al Sprint', () => {
+  it('muestra el número de Sprint en el título y vuelve a la lista de Sprints', () => {
     mockAnalytics();
 
     renderPage();
 
     expect(screen.getByRole('heading', { name: 'Analítica del Sprint 3' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /volver al sprint/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Volver a Sprints' })).toHaveAttribute(
       'href',
-      '/dashboard/proyectos/42/sprints/7',
+      '/dashboard/proyectos/42/sprints',
     );
+    expect(screen.queryByRole('link', { name: /volver al sprint$/i })).not.toBeInTheDocument();
   });
 });
 
@@ -144,5 +181,105 @@ describe('SprintAnalyticsPage — hitos', () => {
     expect(
       screen.getByText('Ninguna tarea de este Sprint está vinculada a un hito.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('SprintAnalyticsPage — burndown (T-240, HU-160)', () => {
+  it('mientras el burndown carga, muestra un skeleton propio sin bloquear el resto de la analítica ya cargada', () => {
+    mockAnalytics();
+    mockBurndown({ isLoading: true });
+
+    renderPage();
+
+    expect(screen.getByText('Tareas totales')).toBeInTheDocument();
+  });
+
+  it('un error del burndown no oculta el resto de la analítica, y ofrece Reintentar', () => {
+    const refetchBurndown = vi.fn();
+    mockAnalytics();
+    mockBurndown({ isLoading: false, isError: true, error: new Error('500'), refetch: refetchBurndown });
+
+    renderPage();
+
+    expect(screen.getByText('Tareas totales')).toBeInTheDocument();
+    const alertas = screen.getAllByRole('alert');
+    expect(alertas.length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /reintentar/i, hidden: false }));
+  });
+
+  it('con burndown cargado y suficientes instantáneas, renderiza el gráfico', () => {
+    mockAnalytics();
+    mockBurndown({
+      isLoading: false,
+      burndown: {
+        idSprint: 7,
+        fechaInicio: '2026-01-01T00:00:00.000Z',
+        fechaFinPlaneada: '2026-01-15T00:00:00.000Z',
+        tareasPlanificadasTotal: 4,
+        puntosHistoriaPlanificadosTotal: 10,
+        instantaneas: [
+          { fecha: '2026-01-01T00:00:00.000Z', tareasPendientes: 4, tareasCompletadas: 0, puntosHistoriaRestantes: 10 },
+          { fecha: '2026-01-02T00:00:00.000Z', tareasPendientes: 3, tareasCompletadas: 1, puntosHistoriaRestantes: 8 },
+        ],
+      },
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Burndown del Sprint')).toBeInTheDocument();
+  });
+});
+
+// Refinamientos visuales: KPIs como Miembros/Mis Horas y barras con color
+// semántico (mismos tonos que el Kanban y los badges de hito).
+describe('SprintAnalyticsPage — lectura semántica', () => {
+  const barra = (nombre: string) => screen.getByRole('progressbar', { name: nombre });
+
+  it('los KPIs usan la tarjeta en línea: icono charcoal sin caja de color', () => {
+    mockAnalytics();
+    renderPage();
+
+    for (const nombre of ['Tareas totales', 'Tareas completadas', 'Cumplimiento', 'Horas estimadas']) {
+      const kpi = screen.getByRole('group', { name: nombre });
+      expect(kpi).toHaveClass('card-base');
+      expect(kpi.querySelector('svg')).toHaveClass('text-text-primary');
+      expect(kpi.querySelector('.bg-primary\\/10')).toBeNull();
+    }
+    expect(within(screen.getByRole('group', { name: 'Cumplimiento' })).getByText('50%')).toBeInTheDocument();
+  });
+
+  it('cada estado tiene su color: gris, lima, ámbar e institucional', () => {
+    mockAnalytics();
+    renderPage();
+
+    expect(barra('Por hacer')).toHaveClass('bg-outline');
+    expect(barra('En progreso')).toHaveClass('bg-accent');
+    expect(barra('En revisión')).toHaveClass('bg-attention');
+    expect(barra('Hecho')).toHaveClass('bg-primary');
+    expect(barra('Hecho')).toHaveAttribute('aria-valuenow', '50');
+  });
+
+  it('cada prioridad tiene su color: alta rojo suave, media lima, baja gris', () => {
+    mockAnalytics();
+    renderPage();
+
+    expect(barra('Alta')).toHaveClass('bg-error/70');
+    expect(barra('Media')).toHaveClass('bg-accent');
+    expect(barra('Baja')).toHaveClass('bg-outline');
+    expect(barra('Media')).toHaveAttribute('aria-valuenow', '50');
+  });
+
+  it.each([
+    ['PENDIENTE', 'Pendiente', 'bg-outline', 'bg-surface-container-high'],
+    ['EN_PROGRESO', 'En progreso', 'bg-accent', 'bg-status-warning'],
+    ['COMPLETADO', 'Completado', 'bg-primary', 'bg-primary-container'],
+  ] as const)('hito %s: la barra y el badge comparten tono', (estadoHito, etiqueta, barraClase, badgeClase) => {
+    mockAnalytics({
+      analytics: analytics({ hitos: [{ idHito: 1, tituloHito: 'MVP', estadoHito, porcentaje: 40 }] }),
+    });
+    renderPage();
+
+    expect(barra('MVP')).toHaveClass(barraClase);
+    expect(screen.getByText(`${etiqueta} · 40%`)).toHaveClass(badgeClase);
   });
 });

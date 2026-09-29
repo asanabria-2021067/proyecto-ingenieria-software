@@ -172,7 +172,7 @@ describeIntegration('Foundation invariants (PostgreSQL real)', () => {
   // INVARIANTE 3 — tarea.id_sprint NOT NULL
   // ---------------------------------------------------------------------
 
-  it('invariante 3: PostgreSQL rechaza id_sprint = NULL sobre una Tarea real (NOT NULL, no solo el tipo Prisma)', async () => {
+  it('invariante 3 (T-189, HU-148): PostgreSQL acepta id_sprint = NULL sobre una Tarea real (backlog), no solo el tipo Prisma', async () => {
     const leader = await createIntegrationUser(prisma);
     scope.userIds = [leader.idUsuario];
 
@@ -185,28 +185,16 @@ describeIntegration('Foundation invariants (PostgreSQL real)', () => {
     const task = await createIntegrationTask(prisma, project.idProyecto, leader.idUsuario, sprint.idSprint);
     scope.taskIds = [task.idTarea];
 
-    let rejection: unknown;
-    try {
-      await prisma.$transaction(async (tx) => {
-        await tx.$executeRawUnsafe(`UPDATE "tarea" SET "id_sprint" = NULL WHERE "id_tarea" = ${task.idTarea};`);
-      });
-    } catch (error) {
-      rejection = error;
-    }
+    await prisma.$executeRawUnsafe(`UPDATE "tarea" SET "id_sprint" = NULL WHERE "id_tarea" = ${task.idTarea};`);
 
-    expect(rejection).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
-    // 23502 = not_null_violation (PostgreSQL). Prisma reporta el código real
-    // de Postgres en meta.code cuando envuelve un fallo de $executeRawUnsafe.
-    expect((rejection as Prisma.PrismaClientKnownRequestError).meta?.code).toBe('23502');
-
-    const filaTrasIntento = await prisma.tarea.findUniqueOrThrow({ where: { idTarea: task.idTarea } });
-    expect(filaTrasIntento.idSprint).toBe(sprint.idSprint);
+    const filaTrasElUpdate = await prisma.tarea.findUniqueOrThrow({ where: { idTarea: task.idTarea } });
+    expect(filaTrasElUpdate.idSprint).toBeNull();
 
     const columna = await prisma.$queryRawUnsafe<{ is_nullable: string }[]>(`
       SELECT is_nullable FROM information_schema.columns
       WHERE table_name = 'tarea' AND column_name = 'id_sprint';
     `);
-    expect(columna[0].is_nullable).toBe('NO');
+    expect(columna[0].is_nullable).toBe('YES');
   });
 
   // ---------------------------------------------------------------------

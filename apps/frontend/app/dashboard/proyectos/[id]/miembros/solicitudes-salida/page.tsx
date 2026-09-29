@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { AlertCircle, ArrowLeft, Calendar, Clock3, UserRoundX, Users } from 'lucide-react';
+import { AlertCircle, Calendar, Clock3, UserRoundX, Users, type LucideIcon } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +12,9 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectPendingExitRequests } from '@/hooks/use-exit-request';
+import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -32,28 +34,13 @@ function MetricCard({
   value,
   isLoading,
 }: {
-  icon: typeof Clock3;
+  icon: LucideIcon;
   label: string;
   value: number;
   isLoading: boolean;
 }) {
-  return (
-    <div className="rounded-xl border border-outline-variant bg-surface-container-lowest px-5 py-5 shadow-sm">
-      <div className="flex items-center gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-container">
-          <Icon aria-hidden="true" className="h-6 w-6 text-on-primary-container" />
-        </div>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-tertiary">{label}</p>
-          {isLoading ? (
-            <Skeleton className="mt-2 h-7 w-10 rounded bg-surface-container-high" />
-          ) : (
-            <p className="mt-1 font-headline text-3xl font-extrabold text-on-surface">{value}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  // Mismo KPI que Mis Horas: icono neutro al par de la etiqueta, cifra grande.
+  return <HoursKpiCard variante="en-linea" icon={Icon} label={label} value={String(value)} isLoading={isLoading} />;
 }
 
 function ExitRequestSkeleton() {
@@ -95,30 +82,19 @@ export default function ProjectPendingExitRequestsPage() {
   const cargandoDatos = isLoading || cargandoPermisos;
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverAMiembrosHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver a miembros
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoPermisos && !isLeader ? (
-        <LeaderOnlyNotice description="No puedes acceder a las solicitudes de salida de este proyecto." />
+        <>
+          <ProjectBackLink href={volverAMiembrosHref} label="Volver a miembros" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a las solicitudes de salida de este proyecto." />
+        </>
       ) : (
         <>
-          <header className="mb-8">
-            <div className="mb-2 flex items-center gap-3">
-              <UserRoundX aria-hidden="true" className="h-7 w-7 text-primary" />
-              <h1 className="font-headline text-3xl font-extrabold text-on-surface">
-                Solicitudes de salida
-              </h1>
-            </div>
-            <p className="max-w-3xl text-sm text-tertiary">
-              Integrantes que solicitaron salir del proyecto y están esperando tu revisión.
-            </p>
-          </header>
+          <ProjectPageHeader
+            back={{ href: volverAMiembrosHref, label: 'Volver a miembros' }}
+            title="Solicitudes de salida"
+            description="Integrantes que solicitaron salir del proyecto y están esperando tu revisión."
+          />
 
           <section aria-label="Resumen de solicitudes de salida" className="mb-6 grid gap-4 md:grid-cols-2">
             <MetricCard
@@ -152,9 +128,7 @@ export default function ProjectPendingExitRequestsPage() {
                 </EmptyMedia>
                 <EmptyHeader>
                   <EmptyTitle>
-                    {error instanceof Error && error.message
-                      ? error.message
-                      : 'No fue posible cargar las solicitudes de salida.'}
+                    {getApiErrorMessage(error, 'general', 'No fue posible cargar las solicitudes de salida.')}
                   </EmptyTitle>
                 </EmptyHeader>
                 <EmptyContent>
@@ -164,9 +138,9 @@ export default function ProjectPendingExitRequestsPage() {
                 </EmptyContent>
               </Empty>
             ) : requests.length === 0 ? (
-              <Empty tone="muted" role="status">
-                <EmptyMedia variant="icon">
-                  <UserRoundX aria-hidden="true" className="h-7 w-7" />
+              <Empty tone="flush" role="status">
+                <EmptyMedia variant="subtle">
+                  <UserRoundX aria-hidden="true" />
                 </EmptyMedia>
                 <EmptyHeader>
                   <EmptyTitle>No hay solicitudes de salida pendientes.</EmptyTitle>
@@ -232,6 +206,6 @@ export default function ProjectPendingExitRequestsPage() {
           </section>
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }

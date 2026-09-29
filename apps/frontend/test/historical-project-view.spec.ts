@@ -206,7 +206,9 @@ describe('VIEW-02 — proyecto CERRADO / histórico (F007)', () => {
     (useProjectMembers as any).mockReturnValue({ members: [], isLoading: false });
     renderPage();
 
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Sistema de Tutorías'));
+    // Resumen abierto: la página se titula «Resumen» y el nombre del proyecto va en la tarjeta (h2).
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: /Sistema de Tutorías/ })).toBeInTheDocument());
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Resumen');
     await new Promise((r) => setTimeout(r, 20));
     expect(getHistoricalProject).not.toHaveBeenCalled();
     expect(screen.queryByRole('tab', { name: /histórico/i })).not.toBeInTheDocument();

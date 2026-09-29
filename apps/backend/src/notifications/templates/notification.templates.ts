@@ -121,6 +121,13 @@ export interface NotificationTemplateData {
     solicitudId: number;
   };
 
+  // G05-C12 (OWASP25-C038): ráfaga de eventos de seguridad. Solo conteos:
+  // nunca IPs, correos, cuentas ni tokens.
+  ALERTA_SEGURIDAD: {
+    eventos: number;
+    ventanaMinutos: number;
+  };
+
   // T-113 (HU-125, salida completa del proyecto): notifica al solicitante la
   // resolución de su SolicitudSalidaProyecto. Reutiliza
   // TipoNotificacion.PARTICIPACION_ACTUALIZADA — existe en el schema desde la
@@ -215,6 +222,17 @@ export interface NotificationTemplateData {
     projectTitle: string;
     projectId: number;
     horasAcreditadas: string;
+  };
+
+  // HU-169 (T-265): recordatorio de un EventoProyecto próximo a iniciar,
+  // emitido por EventsReminderService a los integrantes del proyecto.
+  RECORDATORIO_EVENTO: {
+    eventTitle: string;
+    projectTitle: string;
+    projectId: number;
+    eventId: number;
+    /** Fecha/hora de inicio ya formateada por el emisor (es-GT), lista para mostrar. */
+    fechaInicioTexto: string;
   };
 }
 
@@ -322,6 +340,12 @@ export const NOTIFICATION_TEMPLATES = {
       `El rol "${data.roleName}" del proyecto "${data.projectTitle}" fue actualizado.`,
   },
 
+  ALERTA_SEGURIDAD: {
+    title: 'Alerta de seguridad',
+    message: (data: NotificationTemplateData['ALERTA_SEGURIDAD']) =>
+      `Se registraron ${data.eventos} intentos de acceso fallidos o bloqueos de cuenta en los últimos ${data.ventanaMinutos} minutos. Revisa los eventos de seguridad y el estado de las cuentas.`,
+  },
+
   SOLICITUD_RECUPERACION_CONTRASENA: {
     title: 'Solicitud de recuperación de contraseña',
     message: (
@@ -418,6 +442,12 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Horas acreditadas',
     message: (data: NotificationTemplateData['HORAS_ACREDITADAS']) =>
       `Se acreditaron ${data.horasAcreditadas} horas por tu participación en el proyecto "${data.projectTitle}".`,
+  },
+
+  RECORDATORIO_EVENTO: {
+    title: 'Recordatorio de evento',
+    message: (data: NotificationTemplateData['RECORDATORIO_EVENTO']) =>
+      `"${data.eventTitle}" en el proyecto "${data.projectTitle}" comienza el ${data.fechaInicioTexto}.`,
   },
 } as const;
 

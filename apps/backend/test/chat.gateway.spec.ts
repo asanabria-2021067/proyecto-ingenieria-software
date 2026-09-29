@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ChatGateway } from '../src/chat/chat.gateway';
+import { WsAuthService } from '../src/ws-auth/ws-auth.service';
+import type { JwtService } from '@nestjs/jwt';
+import type { PrismaService } from '../src/prisma/prisma.service';
 
 function makeSocket(overrides: Partial<{ auth: Record<string, unknown>; headers: Record<string, unknown> }> = {}) {
   return {
@@ -22,8 +25,13 @@ function makeGateway(prismaOverrides: { findUnique?: ReturnType<typeof vi.fn> } 
     conversacionParticipante: {
       findUnique: prismaOverrides.findUnique ?? vi.fn(),
     },
+    // G07-C03: la política del handshake consulta el estado de la cuenta.
+    usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }) },
   };
-  const gateway = new ChatGateway(jwtService as any, prisma as any);
+  const gateway = new ChatGateway(
+    new WsAuthService(jwtService as unknown as JwtService, prisma as unknown as PrismaService),
+    prisma as unknown as PrismaService,
+  );
   return { gateway, jwtService, prisma };
 }
 
@@ -62,6 +70,24 @@ describe('ChatGateway', () => {
       expect(socket.data.userId).toBe(7);
       expect(socket.emit).toHaveBeenCalledWith('connected', { userId: 7 });
     });
+
+    /**
+     * T-210 (revisión cruzada): el token de recuperación de contraseña
+     * (`tipo: 'reset'`) se firma con el mismo JWT_SECRET que el access token
+     * y verifica igual con `verifyAsync` — sin este chequeo, quien tuviera
+     * un enlace de recuperación abría un socket autenticado como esa
+     * persona y recibía sus mensajes de chat.
+     */
+    it('rechaza (desconecta) un token que no es de tipo "access" (p. ej. el de recuperación de contraseña)', async () => {
+      const { gateway, jwtService } = makeGateway();
+      jwtService.verifyAsync.mockResolvedValue({ sub: 7, correo: 'x@uvg.edu.gt', tipo: 'reset' });
+      const socket = makeSocket({ auth: { token: 'token-de-reset' } });
+
+      await gateway.handleConnection(socket as any);
+
+      expect(socket.disconnect).toHaveBeenCalled();
+      expect(socket.join).not.toHaveBeenCalled();
+    });
   });
 
   describe('joinConversation — un usuario ajeno al proyecto no puede unirse a la sala ni leer mensajes', () => {
@@ -71,13 +97,14 @@ describe('ChatGateway', () => {
       const socket = makeSocket();
       socket.data.userId = 99;
 
-      await gateway.joinConversation(socket as any, { idConversacion: 1 });
+      const ack = await gateway.joinConversation(socket as any, { idConversacion: 1 });
 
       expect(findUnique).toHaveBeenCalledWith({
         where: { idConversacion_idUsuario: { idConversacion: 1, idUsuario: 99 } },
         select: { idUsuario: true },
       });
       expect(socket.join).not.toHaveBeenCalled();
+      expect(ack).toEqual({ joined: false });
     });
 
     it('sin userId autenticado en el socket, ni siquiera consulta la participación', async () => {
@@ -85,21 +112,23 @@ describe('ChatGateway', () => {
       const { gateway } = makeGateway({ findUnique });
       const socket = makeSocket();
 
-      await gateway.joinConversation(socket as any, { idConversacion: 1 });
+      const ack = await gateway.joinConversation(socket as any, { idConversacion: 1 });
 
       expect(findUnique).not.toHaveBeenCalled();
       expect(socket.join).not.toHaveBeenCalled();
+      expect(ack).toEqual({ joined: false });
     });
 
-    it('con fila en ConversacionParticipante, sí une al cliente a la room conversation:{id}', async () => {
+    it('con fila en ConversacionParticipante, sí une al cliente a la room conversation:{id} y confirma con { joined: true }', async () => {
       const findUnique = vi.fn().mockResolvedValue({ idUsuario: 5 });
       const { gateway } = makeGateway({ findUnique });
       const socket = makeSocket();
       socket.data.userId = 5;
 
-      await gateway.joinConversation(socket as any, { idConversacion: 3 });
+      const ack = await gateway.joinConversation(socket as any, { idConversacion: 3 });
 
       expect(socket.join).toHaveBeenCalledWith('conversation:3');
+      expect(ack).toEqual({ joined: true });
     });
   });
 
@@ -114,6 +143,19 @@ describe('ChatGateway', () => {
 
       expect(to).toHaveBeenCalledWith('conversation:3');
       expect(emit).toHaveBeenCalledWith('newMessage', { idConversacion: 3, mensaje: { contenido: 'hola' } });
+    });
+
+    it('además emite conversationUpdated a la room user:{id} de CADA destinatario, sin depender de que estén en la room de la conversación', () => {
+      const { gateway } = makeGateway();
+      const emit = vi.fn();
+      const to = vi.fn(() => ({ emit }));
+      Reflect.set(gateway, 'server', { to });
+
+      gateway.broadcastMessage(3, [5, 6], { contenido: 'hola' });
+
+      expect(to).toHaveBeenCalledWith('user:5');
+      expect(to).toHaveBeenCalledWith('user:6');
+      expect(emit).toHaveBeenCalledWith('conversationUpdated', { idConversacion: 3 });
     });
   });
 

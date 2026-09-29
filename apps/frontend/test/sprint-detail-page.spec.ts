@@ -63,6 +63,7 @@ function sprintDetail(overrides: Partial<SprintDetailDto> = {}): SprintDetailDto
     numero: 7,
     estado: 'CERRADO',
     fechaInicio: '2026-08-14T00:00:00.000Z',
+    fechaFinPlaneada: null,
     fechaFinalizacionIniciada: null,
     fechaCierre: null,
     cerradoPor: null,
@@ -171,6 +172,16 @@ describe('SprintDetailPage — solo lectura', () => {
 
     for (const nombre of ['Finalizar', 'Cerrar Sprint', 'Guardar', 'Editar horas', 'Nueva tarea', 'Aprobar', 'Reabrir']) {
       expect(screen.queryByRole('button', { name: nombre })).not.toBeInTheDocument();
+    }
+  });
+
+  it('no enlaza a la analítica del Sprint desde el encabezado', () => {
+    for (const estado of ['ACTIVO', 'CERRADO'] as const) {
+      mockDetail({ detail: sprintDetail({ estado, fechaCierre: estado === 'CERRADO' ? '2026-08-25T00:00:00.000Z' : null }) });
+      renderPage();
+      expect(screen.queryByRole('link', { name: /ver analítica/i })).not.toBeInTheDocument();
+      expect(document.querySelector('a[href$="/analytics"]')).toBeNull();
+      cleanup();
     }
   });
 });
@@ -416,6 +427,17 @@ describe('SprintDetailPage — autorización', () => {
     expect(screen.getByText('¡No eres líder!')).toBeInTheDocument();
     expect(screen.getByText('No puedes acceder al detalle de este Sprint.')).toBeInTheDocument();
     expect(screen.queryByText('Sprint 7')).not.toBeInTheDocument();
+  });
+
+  it('el líder vuelve a la lista de Sprints, no al proyecto', () => {
+    mockDetail();
+    renderPage();
+
+    expect(screen.getByRole('link', { name: 'Volver a Sprints' })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/sprints',
+    );
+    expect(screen.queryByRole('link', { name: /volver al proyecto/i })).not.toBeInTheDocument();
   });
 
   it('un no-líder ve "Volver al proyecto" apuntando a /dashboard/proyectos (vista pública), no a /dashboard/projects (hub del líder)', () => {

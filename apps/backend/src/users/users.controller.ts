@@ -106,6 +106,15 @@ export class UsersController {
     return this.usersService.getDashboard(user.userId);
   }
 
+  /**
+   * HU-158 (T-231): horas del usuario autenticado por tipo, proyecto y tarea.
+   * Sin parámetros: la identidad sale solo del token.
+   */
+  @Get('me/horas')
+  getMisHoras(@CurrentUser() user: { userId: number }) {
+    return this.usersService.getMisHoras(user.userId);
+  }
+
   @Get('me/tareas')
   getMisTareas(
     @CurrentUser() user: { userId: number },

@@ -107,6 +107,14 @@ export interface ProyectoListItemDTO {
   estadoProyecto: string;
   modalidadProyecto: string;
   descripcionProyecto: string | null;
+  /**
+   * T-251/T-252: solo presentes cuando el pedido tenía sesión — amigos
+   * ACTIVOS del usuario que participan en el proyecto y si alguno de sus
+   * roles pide la carrera del usuario. El backend nunca arma el texto del
+   * motivo, solo estos datos estructurados; el texto se arma en el frontend.
+   */
+  amigosParticipantes?: number;
+  mismaCarrera?: boolean;
 }
 
 export interface SnapshotRolDTO {
@@ -222,6 +230,30 @@ export interface CreateHitoPayload {
   tituloHito: string;
   descripcionHito?: string;
   fechaLimite?: string;
+  /**
+   * T-186 (HU-147): asigna el hito recién creado a estas tareas del
+   * proyecto, en la misma operación — típicamente tareas existentes sin
+   * hito que T-185 dejó sin poder entrar al tablero/sprint.
+   */
+  idsTareas?: number[];
+}
+
+/**
+ * Respuesta de createHito — igual forma que HitoDTO, más `idsTareasAsignadas`
+ * cuando el payload envió `idsTareas` (T-186). Ausente si no se pidió
+ * asignación masiva, igual que el backend (ver ProjectsService.createHito).
+ */
+export interface CreateHitoResult extends HitoDTO {
+  idsTareasAsignadas?: number[];
+}
+
+export interface AssignHitoTasksPayload {
+  idsTareas: number[];
+}
+
+export interface AssignHitoTasksResult {
+  idHito: number;
+  idsTareasAsignadas: number[];
 }
 
 /** Payload para resolver una revisión (admin) */

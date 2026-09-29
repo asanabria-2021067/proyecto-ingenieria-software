@@ -21,7 +21,13 @@
 //                   (tasks.controller.ts:91-101, DTO real AssignTaskDto: { idUsuario })
 //   cerrar tramo:   POST {baseUrl}/proyectos/{projectId}/tareas/{taskId}/asignaciones/{assignmentId}/cerrar
 //                   (tasks.controller.ts:114-129, DTO real CloseAssignmentDto:
-//                   { horasReales, contenidoAvance (>=200 chars), marcarComoHecha? })
+//                   { contenidoAvance (>=200 chars), marcarComoHecha? } —
+//                   T-197: `horasReales` YA NO es parte del DTO, el service
+//                   la recalcula solo vía TimeRecordsService.recalculateAssignment
+//                   (tasks.service.ts:1220); con ValidationPipe global
+//                   { whitelist: true, forbidNonWhitelisted: true } (main.ts),
+//                   mandar esa propiedad hacía que el cierre real fallara
+//                   siempre con 400 "property horasReales should not exist")
 //
 // Nota de diseño (idRolProyecto/idUsuarioAsignado en creación): se omiten
 // deliberadamente. TasksService.closeAssignment exige que sea el propio
@@ -59,6 +65,11 @@ function positiveIntEnvOrDefault(name, fallback) {
 export const options = {
   vus: positiveIntEnvOrDefault('K6_VUS', 1),
   iterations: positiveIntEnvOrDefault('K6_ITERATIONS', 1),
+  // Sin esto, un check() fallido no afecta el exit code de k6 (T-200): CI
+  // seguiría en verde aunque todos los checks fallaran.
+  thresholds: {
+    checks: ['rate==1.0'],
+  },
 };
 
 function requirePositiveIntEnv(name) {
@@ -192,7 +203,6 @@ export default function (data) {
   const closeRes = http.post(
     `${tasksBase}/${taskId}/asignaciones/${activeAssignment.idAsignacion}/cerrar`,
     JSON.stringify({
-      horasReales: 2,
       contenidoAvance: PROGRESS_NOTE,
       marcarComoHecha: true,
     }),
