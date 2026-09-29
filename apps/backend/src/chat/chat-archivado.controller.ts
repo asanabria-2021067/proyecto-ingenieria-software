@@ -12,6 +12,15 @@ import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversat
 export class ChatArchivadoController {
   constructor(private chatService: ChatService) {}
 
+  /** Dock global de chat: todas las conversaciones activas del usuario, de cualquier proyecto. */
+  @Get()
+  listTodas(
+    @Query('q') q: string | undefined,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.listAllConversations(user.userId, q);
+  }
+
   @Get('archivados')
   listArchivados(
     @Query() query: ListArchivedConversationsQueryDto,
