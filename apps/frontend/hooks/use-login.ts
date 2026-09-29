@@ -6,7 +6,7 @@ import { login, type LoginPayload } from '@/lib/services/auth';
 import { getMe } from '@/lib/services/users';
 import { isAdminUser } from '@/hooks/use-current-user';
 import { readNextFromLocation } from '@/lib/api/session';
-import { aviso } from '@/lib/mensajes';
+import uvgSwal from '@/lib/swal';
 
 // T-274 (OWASP): un solo mensaje para credenciales invalidas, nunca se dice
 // si el correo existe o no. El limite de intentos (5/60s, ver
@@ -28,13 +28,26 @@ export function useLogin() {
   return useMutation({
     mutationFn: (data: LoginPayload) => login(data),
     onSuccess: async () => {
-      aviso.exito('Inicio de sesion exitoso', 'Redirigiendo…');
+      // Dialog centrado, no un toast de esquina (T-274 lo mostraba en
+      // esquina; aca va en medio de la pantalla y se cierra solo).
+      uvgSwal.fire({
+        icon: 'success',
+        title: 'Inicio de sesión exitoso',
+        text: 'Redirigiendo…',
+        timer: 1200,
+        timerProgressBar: true,
+        showConfirmButton: false,
+      });
       const user = await getMe().catch(() => null);
       const destination = readNextFromLocation() ?? (isAdminUser(user) ? '/dashboard/admin' : '/dashboard');
       setTimeout(() => router.push(destination), 1200);
     },
     onError: (error) => {
-      aviso.error('No se pudo iniciar sesion', mensajeErrorLogin(error as Error & { statusCode?: number }));
+      uvgSwal.fire({
+        icon: 'error',
+        title: 'No se pudo iniciar sesión',
+        text: mensajeErrorLogin(error as Error & { statusCode?: number }),
+      });
     },
   });
 }
