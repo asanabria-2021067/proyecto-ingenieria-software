@@ -72,7 +72,7 @@ Documentos relacionados:
 | C047 | nginx versionado y arnés efímero de topología | A02/A08 | G02, G04 | G02-C16…C18, G04-C11 | `g02-nginx-baseline.spec.ts`, `g02-topology-harness.spec.ts`, `g02-topology-ci.spec.ts` | PASS | Aplicar la ruta P1 en el nginx vivo |
 | C041 | `dependency-review` bloquea dependencias nuevas high/critical | A03 | G03 | G03-C01 | `g03-dependency-review.spec.ts` | PASS | Dependency Graph (Gate Admin) |
 | C040 | Resumen informativo de `npm audit` | A03 | G03 | G03-C02, G03-C11 | `g03-npm-audit-summary.spec.ts` | PASS | — |
-| C042 | Dependabot controlado | A03 | G03 | G03-C03 | eliminado (commit b9c3b183 en develop) | REMOVED | — |
+| C042 | Dependabot controlado | A03 | G03 | G03-C03 | eliminado en commit b9c3b183 (develop) | PASS | — |
 | C028 | Retiro de dependencias sin uso y remediación segura | A03 | G03 | G03-C04…C09 | lockfiles + `npm ci` reproducible (auditoría G03 §9–§12) | PASS | — |
 | C059 | Remediación de jsPDF alcanzable en el backend | A03 | G03 | G03-C10 | `g03-jspdf-remediation.spec.ts`, `pdf-export.builder.spec.ts` | PASS | — |
 | C046 | Registro de excepciones de dependencias con owner y caducidad | A03 | G03 | G03-C11 | `g03-dependency-exceptions.spec.ts` | PASS | Secret scanning / push protection (Gate Admin) |
