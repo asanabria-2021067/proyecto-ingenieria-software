@@ -476,7 +476,7 @@ export function EventFormDialog({
                 <p className="mt-1 type-meta">Vacío = visible para todos los participantes.</p>
                 <div className="mt-2 max-h-32 space-y-1.5 overflow-y-auto rounded-md border border-outline-variant p-2">
                   {roles.map((rol) => (
-                    <label key={rol.idRolProyecto} className="flex items-center gap-2 text-sm text-text-primary">
+                    <label key={rol.idRolProyecto} className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
                       <Checkbox
                         checked={values.rolesDestino.includes(rol.idRolProyecto)}
                         disabled={isPending}
