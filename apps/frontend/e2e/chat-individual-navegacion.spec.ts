@@ -113,10 +113,14 @@ test('navegación: cambiar de página no cierra el chat ni pierde el historial',
 
   // El dock de chat es global (vive en el layout del dashboard, no en el
   // del proyecto): navegar a otra página, incluso fuera del proyecto, no
-  // debe cerrar la ventana ni perder el historial ya cargado.
-  await page.goto(`/dashboard/projects/${PROYECTO_ID}/kanban`);
+  // debe cerrar la ventana ni perder el historial ya cargado. Usa
+  // navegación real de cliente (click, no page.goto): page.goto siempre
+  // hace una recarga completa del navegador, que reinicia cualquier React
+  // en memoria sin importar qué tan bien persista el layout — no es lo que
+  // le pasa a un usuario real haciendo click dentro de la app.
+  await page.getByRole('link', { name: /tablero/i }).click();
   await expect(page.getByText(mensaje).first()).toBeVisible();
 
-  await page.goto('/dashboard/personas');
+  await page.getByRole('link', { name: 'Personas' }).click();
   await expect(page.getByText(mensaje).first()).toBeVisible();
 });
