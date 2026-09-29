@@ -10,13 +10,14 @@ import {
   listConversations,
   markConversationRead,
   sendMessage,
+  updateConversation,
 } from '@/lib/services/chat';
 import {
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload } from '@/lib/types/chat';
+import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -101,6 +102,18 @@ export function useArchivedConversations(q: string) {
     cargarMas: () => query.fetchNextPage(),
     cargandoMas: query.isFetchingNextPage,
   };
+}
+
+/** Menú de 3 puntos: archivar, renombrar o marcar como favorita. */
+export function useUpdateConversation(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idConversacion, payload }: { idConversacion: number; payload: UpdateConversationPayload }) =>
+      updateConversation(idProyecto, idConversacion, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: projectConversationsQueryKey(idProyecto) });
+    },
+  });
 }
 
 export function useMarkConversationRead(idProyecto: number) {
