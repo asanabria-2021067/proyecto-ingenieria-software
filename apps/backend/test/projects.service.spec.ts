@@ -54,6 +54,7 @@ function makePrisma() {
     // T-251: orden ponderado de "Proyectos Disponibles" (amigos + carrera).
     amistad: { findMany: vi.fn().mockResolvedValue([]) },
     perfilEstudiante: { findUnique: vi.fn().mockResolvedValue(null) },
+    proyectoGuardado: { findMany: vi.fn().mockResolvedValue([]) },
     $queryRaw: vi.fn().mockResolvedValue([]),
     $transaction: vi.fn(async (cb: (tx: typeof defaultTx) => unknown) => cb(defaultTx)),
   };
