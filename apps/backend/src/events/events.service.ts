@@ -22,6 +22,12 @@ const EVENT_SELECT = {
   fechaInicio: true,
   fechaFin: true,
   antelacionMinutos: true,
+  modalidad: true,
+  ubicacionLat: true,
+  ubicacionLng: true,
+  ubicacionNombre: true,
+  linkSesion: true,
+  rolesDestino: true,
 } as const;
 
 /**
@@ -72,6 +78,7 @@ export class EventsService {
       throw new ConflictException('No se puede crear un evento en un proyecto cerrado');
     }
     this.assertFechaFinPosterior(dto.fechaInicio, dto.fechaFin);
+    this.assertFechaInicioNoPasada(dto.fechaInicio);
 
     return this.prisma.eventoProyecto.create({
       data: {
@@ -82,6 +89,12 @@ export class EventsService {
         fechaInicio: new Date(dto.fechaInicio),
         fechaFin: new Date(dto.fechaFin),
         antelacionMinutos: dto.antelacionMinutos ?? 60,
+        modalidad: dto.modalidad ?? 'VIRTUAL',
+        ubicacionLat: dto.ubicacionLat,
+        ubicacionLng: dto.ubicacionLng,
+        ubicacionNombre: dto.ubicacionNombre,
+        linkSesion: dto.linkSesion,
+        rolesDestino: dto.rolesDestino ?? [],
       },
       select: EVENT_SELECT,
     });
@@ -104,6 +117,12 @@ export class EventsService {
     if (dto.descripcionEvento !== undefined) data.descripcionEvento = dto.descripcionEvento;
     if (dto.antelacionMinutos !== undefined) data.antelacionMinutos = dto.antelacionMinutos;
     if (dto.fechaFin !== undefined) data.fechaFin = new Date(dto.fechaFin);
+    if (dto.modalidad !== undefined) data.modalidad = dto.modalidad;
+    if (dto.ubicacionLat !== undefined) data.ubicacionLat = dto.ubicacionLat;
+    if (dto.ubicacionLng !== undefined) data.ubicacionLng = dto.ubicacionLng;
+    if (dto.ubicacionNombre !== undefined) data.ubicacionNombre = dto.ubicacionNombre;
+    if (dto.linkSesion !== undefined) data.linkSesion = dto.linkSesion;
+    if (dto.rolesDestino !== undefined) data.rolesDestino = dto.rolesDestino;
     // T-265: mover fechaInicio invalida el recordatorio ya agendado/enviado
     // contra la fecha vieja — se resetea para que EventsReminderService lo
     // recalcule contra la fecha nueva, nunca reenvía el viejo. El diálogo del
@@ -114,6 +133,7 @@ export class EventsService {
     if (dto.fechaInicio !== undefined) {
       const nuevaFechaInicio = new Date(dto.fechaInicio);
       if (nuevaFechaInicio.getTime() !== actual.fechaInicio.getTime()) {
+        this.assertFechaInicioNoPasada(dto.fechaInicio);
         data.recordatorioEnviadoEn = null;
       }
       data.fechaInicio = nuevaFechaInicio;
@@ -141,6 +161,12 @@ export class EventsService {
   private assertFechaFinPosterior(fechaInicio: string, fechaFin: string): void {
     if (new Date(fechaFin).getTime() <= new Date(fechaInicio).getTime()) {
       throw new BadRequestException('La fecha y hora de fin debe ser posterior a la fecha y hora de inicio');
+    }
+  }
+
+  private assertFechaInicioNoPasada(fechaInicio: string): void {
+    if (new Date(fechaInicio).getTime() < Date.now()) {
+      throw new BadRequestException('La fecha y hora de inicio no puede ser anterior al momento actual');
     }
   }
 
