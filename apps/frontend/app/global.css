@@ -460,6 +460,12 @@ html {
   zoom: var(--font-scale-inverse, 1);
 }
 
+/** Sidebar global colapsado a solo iconos (ver use-dashboard-sidebar-collapsed.ts). */
+.sidebar-scale-lock-collapsed {
+  width: calc(72px * var(--font-scale, 1));
+  zoom: var(--font-scale-inverse, 1);
+}
+
 .skip-link {
   position: fixed;
   left: 1rem;
