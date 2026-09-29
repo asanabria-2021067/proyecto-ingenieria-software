@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
+import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -95,7 +96,7 @@ export class ChatService {
       orderBy: { creadaEn: 'desc' },
     });
 
-    return Promise.all(
+    const mapeadas = await Promise.all(
       conversaciones.map(async (c) => {
         const propia = c.participantes.find((p) => p.idUsuario === userId);
         const noLeidos = await this.prisma.mensajeChat.count({
@@ -109,13 +110,25 @@ export class ChatService {
           idConversacion: c.idConversacion,
           tipo: c.tipo,
           nombre: c.nombre,
+          nombrePersonalizado: c.nombrePersonalizado,
           participantes: c.participantes.map((p) => p.usuario),
           ultimoMensaje: c.mensajes[0] ?? null,
           noLeidos,
           archivada,
+          esFavorita: c.esFavorita,
+          archivadaManual: c.archivadaEn !== null,
         };
       }),
     );
+
+    // Favoritas primero; entre el resto, las archivadas manualmente al final.
+    // `Array.prototype.sort` es estable, así que el orden por `creadaEn desc`
+    // de la consulta se conserva dentro de cada grupo.
+    return mapeadas.sort((a, b) => {
+      if (a.esFavorita !== b.esFavorita) return a.esFavorita ? -1 : 1;
+      if (a.archivadaManual !== b.archivadaManual) return a.archivadaManual ? 1 : -1;
+      return 0;
+    });
   }
 
   async createConversation(idProyecto: number, userId: number, dto: CreateConversationDto) {
@@ -216,6 +229,25 @@ export class ChatService {
     this.gateway.broadcastMessage(idConversacion, destinatarios, mensaje);
 
     return mensaje;
+  }
+
+  /** Menú de 3 puntos: archivar/desarchivar, renombrar o (des)marcar favorita. */
+  async updateConversation(
+    idProyecto: number,
+    idConversacion: number,
+    userId: number,
+    dto: UpdateConversationDto,
+  ) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+
+    const data: Prisma.ConversacionUpdateInput = {};
+    if (dto.archivada !== undefined) data.archivadaEn = dto.archivada ? new Date() : null;
+    if (dto.esFavorita !== undefined) data.esFavorita = dto.esFavorita;
+    if (dto.nombrePersonalizado !== undefined) {
+      data.nombrePersonalizado = dto.nombrePersonalizado?.trim() || null;
+    }
+
+    await this.prisma.conversacion.update({ where: { idConversacion }, data });
   }
 
   async markRead(idProyecto: number, idConversacion: number, userId: number) {
