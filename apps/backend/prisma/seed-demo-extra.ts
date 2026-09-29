@@ -149,6 +149,122 @@ async function ensureRolProyecto(data: { idProyecto: number; nombreRol: string; 
   return prisma.rolProyecto.create({ data });
 }
 
+/** Amistad.@@unique es direccional (solicitante, receptor); una amistad ya
+ * aceptada en cualquier sentido cuenta como existente. */
+async function ensureAmistad(idA: number, idB: number) {
+  const existente = await prisma.amistad.findFirst({
+    where: {
+      OR: [
+        { idUsuarioSolicitante: idA, idUsuarioReceptor: idB },
+        { idUsuarioSolicitante: idB, idUsuarioReceptor: idA },
+      ],
+    },
+  });
+  if (existente) {
+    if (existente.estado !== 'ACEPTADA') {
+      return prisma.amistad.update({ where: { idAmistad: existente.idAmistad }, data: { estado: 'ACEPTADA', fechaResolucion: new Date() } });
+    }
+    return existente;
+  }
+  return prisma.amistad.create({
+    data: { idUsuarioSolicitante: idA, idUsuarioReceptor: idB, estado: 'ACEPTADA', fechaResolucion: new Date() },
+  });
+}
+
+/** Crea un Sprint YA CERRADO con su propio set de tareas terminadas/arrastradas
+ * y una serie diaria de instantaneas (fuente real del burndown, T-238) que
+ * baja desde el total planificado hasta lo que de verdad quedo sin terminar.
+ * Replica a mano las mismas formulas de calcularCongeladoDeCierreTx
+ * (sprints.service.ts) para que los datos congelados sean consistentes con
+ * lo que el propio cierre real habria calculado. */
+async function ensureClosedSprintWithBurndown(params: {
+  idProyecto: number;
+  numero: number;
+  diasInicio: number;
+  diasFin: number;
+  tareas: { titulo: string; puntos: number; hecha: boolean; creadaPor: number; asignadoA?: number }[];
+}) {
+  const existente = await prisma.sprint.findFirst({ where: { idProyecto: params.idProyecto, numero: params.numero } });
+  if (existente) return existente;
+
+  const fechaInicio = enDias(params.diasInicio);
+  const fechaCierre = enDias(params.diasFin);
+  const planificadas = params.tareas.length;
+  const completadas = params.tareas.filter((t) => t.hecha).length;
+  const arrastradas = planificadas - completadas;
+  const porcentaje = planificadas === 0 ? 0 : Math.round((completadas / planificadas) * 100);
+  const puntosPlanificados = params.tareas.reduce((acc, t) => acc + t.puntos, 0);
+  const puntosCompletados = params.tareas.filter((t) => t.hecha).reduce((acc, t) => acc + t.puntos, 0);
+
+  const sprint = await prisma.sprint.create({
+    data: {
+      idProyecto: params.idProyecto,
+      numero: params.numero,
+      estado: 'CERRADO',
+      fechaInicio,
+      fechaFinPlaneada: fechaCierre,
+      fechaCierre,
+      tareasPlanificadasCierre: planificadas,
+      tareasCompletadasCierre: completadas,
+      tareasArrastradasCierre: arrastradas,
+      hitosTotalesCierre: 0,
+      hitosCompletadosCierre: 0,
+      porcentajeCumplimientoCierre: porcentaje,
+      puntosHistoriaPlanificadosCierre: puntosPlanificados,
+      puntosHistoriaCompletadosCierre: puntosCompletados,
+    },
+  });
+
+  for (const t of params.tareas) {
+    const tarea = await prisma.tarea.create({
+      data: {
+        idProyecto: params.idProyecto,
+        idSprint: sprint.idSprint,
+        tituloTarea: t.titulo,
+        estadoTarea: t.hecha ? 'HECHO' : 'POR_HACER',
+        prioridad: 'MEDIA',
+        puntosHistoria: t.puntos,
+        creadaPor: t.creadaPor,
+        fechaLimite: fechaCierre,
+      },
+    });
+    if (t.asignadoA) {
+      await prisma.asignacionTarea.create({ data: { idTarea: tarea.idTarea, idUsuario: t.asignadoA, asignadoPor: t.creadaPor } });
+    }
+  }
+
+  // Serie diaria de instantaneas: escalera decreciente realista (T-238),
+  // terminando exactamente en lo que quedo pendiente al cierre (arrastradas).
+  const duracionDias = Math.max(1, params.diasFin - params.diasInicio);
+  const pasos = Math.min(duracionDias, 9);
+  for (let i = 0; i <= pasos; i++) {
+    const progreso = i / pasos;
+    const tareasCompletadasAlDia = Math.min(completadas, Math.round(progreso * completadas));
+    const puntosRestantesAlDia =
+      i === pasos
+        ? puntosPlanificados - puntosCompletados
+        : Math.max(
+            puntosPlanificados - puntosCompletados,
+            Math.round(puntosPlanificados * (1 - progreso) * 0.97 ** i),
+          );
+    const dia = new Date(fechaInicio);
+    dia.setDate(dia.getDate() + Math.round((i / pasos) * duracionDias));
+    await prisma.instantaneaSprint.upsert({
+      where: { idSprint_fecha: { idSprint: sprint.idSprint, fecha: dia } },
+      update: {},
+      create: {
+        idSprint: sprint.idSprint,
+        fecha: dia,
+        tareasPendientes: planificadas - tareasCompletadasAlDia,
+        tareasCompletadas: tareasCompletadasAlDia,
+        puntosHistoriaRestantes: puntosRestantesAlDia,
+      },
+    });
+  }
+
+  return sprint;
+}
+
 async function main() {
   const usuario = (correo: string) => prisma.usuario.findUniqueOrThrow({ where: { correo } });
 
@@ -505,6 +621,55 @@ async function main() {
       create: { idUsuario: vernel.idUsuario, idProyecto },
     });
   }
+
+  // ─── Amistades: san24725 y vernel no tenian ningun amigo ────────────────
+  await ensureAmistad(carlos.idUsuario, maria.idUsuario);
+  await ensureAmistad(carlos.idUsuario, jose.idUsuario);
+  await ensureAmistad(angel.idUsuario, maria.idUsuario);
+  await ensureAmistad(angel.idUsuario, jose.idUsuario);
+  await ensureAmistad(angel.idUsuario, carlos.idUsuario);
+  await ensureAmistad(vernel.idUsuario, maria.idUsuario);
+  await ensureAmistad(vernel.idUsuario, ana.idUsuario);
+  await ensureAmistad(vernel.idUsuario, sofia.idUsuario);
+  await ensureAmistad(maria.idUsuario, ana.idUsuario);
+
+  // ─── Chats activos adicionales para Angel y Vernel ───────────────────────
+  const convELearning = await ensureConversacion(pELearning.idProyecto, angel.idUsuario, [angel.idUsuario, luis.idUsuario]);
+  await ensureMensaje(convELearning.idConversacion, angel.idUsuario, 'Luis, ¿cómo va el motor de evaluaciones? Quiero mostrarlo en la demo.');
+  await ensureMensaje(convELearning.idConversacion, luis.idUsuario, 'Ya corrige automáticamente. Me falta pulir el reporte de resultados.');
+  await ensureMensaje(convELearning.idConversacion, angel.idUsuario, 'Perfecto, con eso alcanza para la demo.');
+
+  const convApoyo = await ensureConversacion(pApoyoPares.idProyecto, vernel.idUsuario, [vernel.idUsuario, sofia.idUsuario]);
+  await ensureMensaje(convApoyo.idConversacion, vernel.idUsuario, 'Sofía, ¿el formulario de solicitud ya está listo para revisión?');
+  await ensureMensaje(convApoyo.idConversacion, sofia.idUsuario, 'Sí, lo subí ayer. Quedo atenta a tus comentarios.');
+
+  // ─── Sprints ya cerrados: datos reales para Analitica/Burndown/Velocidad ─
+  await ensureClosedSprintWithBurndown({
+    idProyecto: pGestionAcademica.idProyecto,
+    numero: 1,
+    diasInicio: -28,
+    diasFin: -14,
+    tareas: [
+      { titulo: 'Levantamiento de requisitos con Asuntos Estudiantiles', puntos: 8, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+      { titulo: 'Diseño de wireframes del panel de cursos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+      { titulo: 'Definición del modelo de datos de cursos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+      { titulo: 'Setup de repositorio y CI', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+      { titulo: 'Prototipo de autenticación institucional', puntos: 3, hecha: false, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+    ],
+  });
+  await ensureClosedSprintWithBurndown({
+    idProyecto: pReservas.idProyecto,
+    numero: 1,
+    diasInicio: -30,
+    diasFin: -16,
+    tareas: [
+      { titulo: 'Entrevistas con encargados de laboratorios', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+      { titulo: 'Modelado inicial de disponibilidad', puntos: 8, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+      { titulo: 'Investigación de librerías de calendario', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: carlos.idUsuario },
+      { titulo: 'Mockups del flujo de reserva', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+      { titulo: 'Validación legal de retención de datos de uso', puntos: 2, hecha: false, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+    ],
+  });
 
   console.log('Demo extra seed completed successfully');
 }

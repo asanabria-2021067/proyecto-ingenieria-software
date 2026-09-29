@@ -4,11 +4,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { SprintComparativeAnalyticsItemDto } from '../lib/types/sprints';
 
+// VelocityChart usa recharts (ResponsiveContainer), que depende de
+// ResizeObserver — ausente en jsdom.
+if (typeof (globalThis as any).ResizeObserver === 'undefined') {
+  (globalThis as any).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '42' }),
 }));
 
-vi.mock('../hooks/use-project-sprints', () => ({ useSprintsAnalytics: vi.fn() }));
+vi.mock('../hooks/use-project-sprints', () => ({
+  useSprintsAnalytics: vi.fn(),
+  useSprintBurndown: () => ({ burndown: undefined, isLoading: false, isError: false, isFetching: false, error: null, refetch: vi.fn() }),
+}));
 // T-259/T-260 (HU-164): el botón de exportar tiene su propio spec
 // (project-export-buttons.spec.tsx); aquí solo se stubea para que esta
 // página no dependa de QueryClientProvider ni del resto de sus hooks.
