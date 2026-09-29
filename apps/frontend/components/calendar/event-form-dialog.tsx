@@ -207,6 +207,11 @@ export function EventFormDialog({
   }, [open, editingEvent?.idEvento]);
 
   // Requisito 3: roles del proyecto activo (el que se está creando/editando), para el multi-select.
+  // Bloquea en el propio selector nativo (ademas de la validacion al enviar)
+  // fechas/horas ya pasadas para Inicio, y cualquier Fin anterior o igual a
+  // Inicio — si son las 4pm no deja elegir las 2pm de hoy.
+  const minInicio = toDatetimeLocalValue(new Date());
+
   const idProyectoActivo = isEditing ? (editingEvent?.idProyecto ?? 0) : Number(values.idProyecto) || 0;
   const { roles } = useProjectRoles(idProyectoActivo, { enabled: open && idProyectoActivo > 0 });
 
@@ -302,7 +307,7 @@ export function EventFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
-      <DialogContent className="flex max-h-[90vh] w-[96vw] max-w-[520px] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0">
+      <DialogContent className="flex max-h-[90vh] w-[96vw] max-w-[720px] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0">
         <form onSubmit={handleSubmit} className="flex max-h-[90vh] min-h-0 flex-col">
           <DialogHeader className="shrink-0 border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
             <DialogTitle className="text-xl font-bold text-on-surface">
@@ -313,44 +318,46 @@ export function EventFormDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
-            {!isEditing && (
-              <div>
-                <label htmlFor="evento-proyecto" className="text-xs font-semibold text-on-surface">
-                  Proyecto
-                </label>
-                <Select
-                  value={values.idProyecto}
-                  onValueChange={(v) => setValues((c) => ({ ...c, idProyecto: v, rolesDestino: [] }))}
-                  disabled={isPending}
-                >
-                  <SelectTrigger id="evento-proyecto" className="mt-1 h-10 w-full border-outline-variant">
-                    <SelectValue placeholder="Selecciona un proyecto que lideras" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ledProjects.map((p) => (
-                      <SelectItem key={p.idProyecto} value={String(p.idProyecto)}>
-                        {p.tituloProyecto}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {!isEditing && (
+                <div>
+                  <label htmlFor="evento-proyecto" className="text-xs font-semibold text-on-surface">
+                    Proyecto
+                  </label>
+                  <Select
+                    value={values.idProyecto}
+                    onValueChange={(v) => setValues((c) => ({ ...c, idProyecto: v, rolesDestino: [] }))}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger id="evento-proyecto" className="mt-1 h-10 w-full border-outline-variant">
+                      <SelectValue placeholder="Selecciona un proyecto que lideras" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ledProjects.map((p) => (
+                        <SelectItem key={p.idProyecto} value={String(p.idProyecto)}>
+                          {p.tituloProyecto}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-            <div>
-              <label htmlFor="evento-titulo" className="text-xs font-semibold text-on-surface">
-                Título
-              </label>
-              <Input
-                id="evento-titulo"
-                value={values.tituloEvento}
-                maxLength={200}
-                disabled={isPending}
-                onChange={(e) => setValues((c) => ({ ...c, tituloEvento: e.target.value }))}
-                placeholder="Ej. Reunión de avance"
-                className="mt-1 h-10 rounded-md border-outline-variant text-sm"
-              />
+              <div className={isEditing ? 'sm:col-span-2' : ''}>
+                <label htmlFor="evento-titulo" className="text-xs font-semibold text-on-surface">
+                  Título
+                </label>
+                <Input
+                  id="evento-titulo"
+                  value={values.tituloEvento}
+                  maxLength={200}
+                  disabled={isPending}
+                  onChange={(e) => setValues((c) => ({ ...c, tituloEvento: e.target.value }))}
+                  placeholder="Ej. Reunión de avance"
+                  className="mt-1 h-10 rounded-md border-outline-variant text-sm"
+                />
+              </div>
             </div>
 
             <div>
@@ -359,6 +366,7 @@ export function EventFormDialog({
               </label>
               <Textarea
                 id="evento-descripcion"
+                rows={2}
                 value={values.descripcionEvento}
                 disabled={isPending}
                 onChange={(e) => setValues((c) => ({ ...c, descripcionEvento: e.target.value }))}
@@ -376,6 +384,7 @@ export function EventFormDialog({
                   id="evento-inicio"
                   type="datetime-local"
                   value={values.fechaInicio}
+                  min={isEditing ? undefined : minInicio}
                   disabled={isPending}
                   onChange={(e) => setValues((c) => ({ ...c, fechaInicio: e.target.value }))}
                   className="mt-1 h-10 rounded-md border-outline-variant text-sm"
@@ -389,6 +398,7 @@ export function EventFormDialog({
                   id="evento-fin"
                   type="datetime-local"
                   value={values.fechaFin}
+                  min={values.fechaInicio || undefined}
                   disabled={isPending}
                   onChange={(e) => setValues((c) => ({ ...c, fechaFin: e.target.value }))}
                   className="mt-1 h-10 rounded-md border-outline-variant text-sm"
