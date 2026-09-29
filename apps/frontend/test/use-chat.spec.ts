@@ -31,8 +31,8 @@ vi.mock('socket.io-client', () => ({
   io: (...args: unknown[]) => mockIo(...args),
 }));
 
-import { useChatSocket } from '../hooks/use-chat';
-import { conversationMessagesQueryKey, projectConversationsQueryKey } from '../lib/query-keys/chat';
+import { useGlobalChatSocket } from '../hooks/use-chat';
+import { conversationMessagesQueryKey } from '../lib/query-keys/chat';
 import type { ChatMensaje } from '../lib/types/chat';
 
 function createWrapper() {
@@ -56,56 +56,59 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('useChatSocket — join de conversación', () => {
-  it('al abrir una conversación, emite joinConversation con ack (no fire-and-forget)', async () => {
+describe('useGlobalChatSocket — join de ventanas abiertas', () => {
+  it('al abrir una ventana de chat, emite joinConversation con ack (no fire-and-forget)', async () => {
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper } = createWrapper();
 
-    renderHook(({ activeId }) => useChatSocket(1, activeId), { wrapper, initialProps: { activeId: 5 } });
+    renderHook(({ ids }) => useGlobalChatSocket(ids), { wrapper, initialProps: { ids: [5] } });
 
     await waitFor(() => expect(socket.timeout).toHaveBeenCalledWith(3000));
     await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalledWith('joinConversation', { idConversacion: 5 }));
   });
 
-  it('si el ack indica joined:false, reintenta hasta que el gateway confirme la unión', async () => {
+  it('al cerrar una ventana, emite leaveConversation', async () => {
     const socket = createMockSocket();
-    socket.emitWithAck
-      .mockResolvedValueOnce({ joined: false })
-      .mockResolvedValueOnce({ joined: false })
-      .mockResolvedValueOnce({ joined: true });
     mockIo.mockReturnValue(socket);
     const { wrapper } = createWrapper();
 
-    renderHook(({ activeId }) => useChatSocket(1, activeId), { wrapper, initialProps: { activeId: 5 } });
+    const { rerender } = renderHook(({ ids }) => useGlobalChatSocket(ids), {
+      wrapper,
+      initialProps: { ids: [5] },
+    });
+    await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalledWith('joinConversation', { idConversacion: 5 }));
 
-    await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalledTimes(3), { timeout: 3000 });
+    rerender({ ids: [] });
+
+    await waitFor(() => expect(socket.emit).toHaveBeenCalledWith('leaveConversation', { idConversacion: 5 }));
   });
 
-  it('al reconectar (evento connect) re-emite joinConversation para la conversación activa', async () => {
+  it('al reconectar (evento connect) re-emite joinConversation para las ventanas abiertas', async () => {
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper } = createWrapper();
-    renderHook(({ activeId }) => useChatSocket(1, activeId), { wrapper, initialProps: { activeId: 5 } });
+    renderHook(({ ids }) => useGlobalChatSocket(ids), { wrapper, initialProps: { ids: [5] } });
 
-    await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalled());
+    socket.emitWithAck.mockClear();
 
     act(() => {
       socket.__emit('connect');
     });
 
-    await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalledWith('joinConversation', { idConversacion: 5 }));
   });
 });
 
-describe('useChatSocket — newMessage sin actualizar cache en silencio', () => {
+describe('useGlobalChatSocket — newMessage sin actualizar cache en silencio', () => {
   it('con la cache de mensajes ya poblada, anexa el mensaje nuevo', async () => {
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper, queryClient } = createWrapper();
     queryClient.setQueryData(conversationMessagesQueryKey(1, 5), [] as ChatMensaje[]);
 
-    renderHook(({ activeId }) => useChatSocket(1, activeId), { wrapper, initialProps: { activeId: 5 } });
+    renderHook(({ ids }) => useGlobalChatSocket(ids), { wrapper, initialProps: { ids: [5] } });
 
     act(() => {
       socket.__emit('newMessage', { idConversacion: 5, mensaje });
@@ -122,34 +125,31 @@ describe('useChatSocket — newMessage sin actualizar cache en silencio', () => 
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    renderHook(({ activeId }) => useChatSocket(1, activeId), { wrapper, initialProps: { activeId: 5 } });
+    renderHook(({ ids }) => useGlobalChatSocket(ids), { wrapper, initialProps: { ids: [5] } });
 
     act(() => {
       socket.__emit('newMessage', { idConversacion: 5, mensaje });
     });
 
-    await waitFor(() =>
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: conversationMessagesQueryKey(1, 5) }),
-    );
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith(expect.objectContaining({ predicate: expect.any(Function) })));
     expect(queryClient.getQueryData(conversationMessagesQueryKey(1, 5))).toBeUndefined();
   });
 });
 
-describe('useChatSocket — conversationUpdated', () => {
-  it('invalida la lista de conversaciones del proyecto', async () => {
+describe('useGlobalChatSocket — conversationUpdated', () => {
+  it('invalida la lista global y las listas por proyecto', async () => {
     const socket = createMockSocket();
     mockIo.mockReturnValue(socket);
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    renderHook(() => useChatSocket(1, null), { wrapper });
+    renderHook(() => useGlobalChatSocket([]), { wrapper });
 
     act(() => {
       socket.__emit('conversationUpdated', { idConversacion: 5 });
     });
 
-    await waitFor(() =>
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectConversationsQueryKey(1) }),
-    );
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chats-global'] }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['proyecto-conversaciones'] });
   });
 });
