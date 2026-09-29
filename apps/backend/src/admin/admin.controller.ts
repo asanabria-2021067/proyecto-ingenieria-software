@@ -7,13 +7,16 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 import { UpdateAdminUserStatusDto } from './dto/update-admin-user-status.dto';
+import { securityRequestContext } from '../security-events/request-context';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard)
@@ -46,8 +49,9 @@ export class AdminController {
     @CurrentUser() user: { userId: number },
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminUserStatusDto,
+    @Req() req: Request,
   ) {
-    return this.adminService.updateUsuarioEstado(user.userId, id, dto.estado);
+    return this.adminService.updateUsuarioEstado(user.userId, id, dto.estado, securityRequestContext(req));
   }
 
   @Get('password-reset-requests')
@@ -59,7 +63,8 @@ export class AdminController {
   generarEnlaceRecuperacion(
     @CurrentUser() user: { userId: number },
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
   ) {
-    return this.adminService.generarEnlaceRecuperacion(user.userId, id);
+    return this.adminService.generarEnlaceRecuperacion(user.userId, id, securityRequestContext(req));
   }
 }

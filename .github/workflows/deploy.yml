@@ -10,29 +10,116 @@ on:
       - '.github/workflows/deploy.yml'
       - '.github/workflows/ci.yml'
 
+  # G02 (FASE2-N07): `config-only` reaplica la configuracion runtime (.env y
+  # contenedores) con imagenes ya publicadas y probadas, sin reconstruir ni
+  # mover tags. `full` (por defecto, y siempre en push) construye y despliega.
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'full = build + deploy; config-only = solo configuracion runtime, sin build ni push'
+        type: choice
+        options: [full, config-only]
+        default: full
+      image_sha:
+        description: 'Solo config-only: SHA (40 hex) de imagenes ya publicadas a reutilizar; vacio = este commit'
+        type: string
+        required: false
+        default: ''
+
+# G02 (OWASP25-C044): permisos minimos por defecto; solo los jobs que publican
+# imagenes en GHCR suben a `packages: write` en su propio bloque.
+permissions:
+  contents: read
+
+# Un deploy productivo a la vez; uno nuevo espera en cola y nunca cancela un
+# release que ya esta en curso (migraciones a medias, contenedores recreados).
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   # Ejecuta la suite completa de pruebas antes de construir y desplegar.
   # Reutiliza el workflow ci.yml, el mismo que corre en cada pull request.
   test:
     name: Pruebas antes de desplegar
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
+    # G02 (OWASP25-C033): todo deploy (push a main o dispatch) exige el E2E.
+    with:
+      e2e: run
+
+  # G02 (FASE2-N07): cada combinacion de configuracion publica de build del
+  # frontend (NEXT_PUBLIC_*, horneada en el bundle) es una variante con tag
+  # propio `:<sha>-cfg-<12 hex>`. Activar o revertir un flag de build cambia de
+  # variante en vez de sobrescribir una imagen ya probada. Solo sale el hash,
+  # nunca los valores. Las expresiones deben coincidir con los build-args de
+  # build-frontend (lo exige g02-immutable-variants.spec.ts).
+  frontend-variant:
+    name: Calcular variante de build del frontend
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      variant: ${{ steps.variant.outputs.variant }}
+    steps:
+      # G07 (P2/P4): la GitHub Variable PUBLIC_API_URL elige la API horneada.
+      # 'direct' (default, sin la variable) conserva la URL directa actual y la
+      # misma variante inmutable; 'same-origin' hornea una cadena vacia: HTTP y
+      # Socket.IO van por el mismo origen, via nginx (P1); otra URL http(s) se
+      # usa tal cual. Seleccionar la variante remota es decision del administrador.
+      - name: Validar PUBLIC_API_URL
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL || 'direct' }}
+        run: |
+          set -euo pipefail
+          case "$PUBLIC_API_URL" in
+            direct|same-origin|http://?*|https://?*) ;;
+            *) echo "PUBLIC_API_URL solo admite direct, same-origin o una URL http(s)" >&2; exit 1 ;;
+          esac
+
+      - name: Derivar la variante de la configuracion publica de build
+        id: variant
+        env:
+          NEXT_PUBLIC_API_URL: ${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
+          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+          # G06 (OWASP25-C039): modo de la CSP (build-time). 'report-only' es el
+          # comportamiento actual; 'enforce' lo activa el administrador y produce
+          # otra variante inmutable.
+          CSP_MODE: ${{ vars.CSP_MODE || 'report-only' }}
+        run: |
+          set -euo pipefail
+          case "$CSP_MODE" in
+            report-only|enforce) ;;
+            *) echo "CSP_MODE solo admite report-only o enforce" >&2; exit 1 ;;
+          esac
+          digest=$(printf 'NEXT_PUBLIC_API_URL=%s\nNEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\nNEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\nCSP_MODE=%s\n' \
+            "$NEXT_PUBLIC_API_URL" "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME" "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET" "$CSP_MODE" \
+            | sha256sum | cut -c1-12)
+          echo "variant=cfg-${digest}" >> "$GITHUB_OUTPUT"
 
   build-frontend:
     name: Build y push imagen frontend
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
+    # G02 (OWASP25-C035): sin tests verdes no se construye ni publica nada.
+    needs: [test, frontend-variant]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - name: Checkout repository
+        if: inputs.mode != 'config-only'
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
+        if: inputs.mode != 'config-only'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: inputs.mode != 'config-only'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -40,39 +127,168 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare image name
+        if: inputs.mode != 'config-only'
         id: vars
+        env:
+          FRONTEND_VARIANT: ${{ needs.frontend-variant.outputs.variant }}
         run: |
+          set -euo pipefail
+          if ! printf '%s' "$FRONTEND_VARIANT" | grep -Eq '^cfg-[0-9a-f]{12}$'; then
+            echo "Variante de frontend invalida o ausente" >&2
+            exit 1
+          fi
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend" >> "$GITHUB_OUTPUT"
+          echo "frontend_tag=ghcr.io/${owner}/${repo_name}-frontend:${GITHUB_SHA}-${FRONTEND_VARIANT}" >> "$GITHUB_OUTPUT"
+
+      # G02 (FASE2-N07): un tag ya publicado nunca se sobrescribe; si existe se
+      # reutiliza tal cual. Solo "not found" permite construir; cualquier otro
+      # error de GHCR aborta en vez de arriesgar una sobrescritura.
+      - name: Comprobar si el tag inmutable ya existe
+        if: inputs.mode != 'config-only'
+        id: existing
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.frontend_tag }}
+        run: |
+          set -uo pipefail
+          if inspect_output=$(docker buildx imagetools inspect "$IMAGE_TAG" 2>&1); then
+            echo "El tag ya existe; se reutiliza sin reconstruir"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$inspect_output" | grep -qi 'not found'; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No se pudo comprobar el tag en GHCR; se aborta sin publicar" >&2
+            exit 1
+          fi
 
       - name: Build and push frontend image
+        if: inputs.mode != 'config-only' && steps.existing.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
           context: ./apps/frontend
           push: true
           tags: |
-            ${{ steps.vars.outputs.frontend_image }}:${{ github.sha }}
-            ${{ steps.vars.outputs.frontend_image }}:latest
+            ${{ steps.vars.outputs.frontend_tag }}
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
-            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-            MAIL_FROM=${{ secrets.MAIL_FROM }}
-            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            NEXT_PUBLIC_API_URL=${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+            CSP_MODE=${{ vars.CSP_MODE || 'report-only' }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
 
   build-backend:
     name: Build y push imagen backend
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
+    # G02 (OWASP25-C035): sin tests verdes no se construye ni publica nada.
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - name: Checkout repository
+        if: inputs.mode != 'config-only'
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        if: inputs.mode != 'config-only'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: inputs.mode != 'config-only'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare image name
+        if: inputs.mode != 'config-only'
+        id: vars
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
+          echo "backend_tag=ghcr.io/${owner}/${repo_name}-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      # G02 (FASE2-N07): un tag ya publicado nunca se sobrescribe; si existe se
+      # reutiliza tal cual. Solo "not found" permite construir; cualquier otro
+      # error de GHCR aborta en vez de arriesgar una sobrescritura.
+      - name: Comprobar si el tag inmutable ya existe
+        if: inputs.mode != 'config-only'
+        id: existing
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.backend_tag }}
+        run: |
+          set -uo pipefail
+          if inspect_output=$(docker buildx imagetools inspect "$IMAGE_TAG" 2>&1); then
+            echo "El tag ya existe; se reutiliza sin reconstruir"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$inspect_output" | grep -qi 'not found'; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No se pudo comprobar el tag en GHCR; se aborta sin publicar" >&2
+            exit 1
+          fi
+
+      - name: Build and push backend image
+        if: inputs.mode != 'config-only' && steps.existing.outputs.exists == 'false'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/backend
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.backend_tag }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+  deploy:
+    name: Desplegar en la VM
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
+    needs: [test, frontend-variant, build-frontend, build-backend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      # G02 (FASE2-N07): en `full` siempre se despliega el commit recien
+      # construido; solo `config-only` puede reutilizar las imagenes de otro
+      # SHA ya publicado. Los inputs llegan por env y se validan (sin
+      # interpolarlos en el script).
+      - name: Prepare image names
+        id: vars
+        env:
+          DEPLOY_MODE: ${{ inputs.mode || 'full' }}
+          REQUESTED_IMAGE_SHA: ${{ inputs.image_sha }}
+          FRONTEND_VARIANT: ${{ needs.frontend-variant.outputs.variant }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$FRONTEND_VARIANT" | grep -Eq '^cfg-[0-9a-f]{12}$'; then
+            echo "Variante de frontend invalida o ausente" >&2
+            exit 1
+          fi
+          case "$DEPLOY_MODE" in
+            full|config-only) ;;
+            *) echo "Modo de deploy desconocido" >&2; exit 1 ;;
+          esac
+          image_sha="$GITHUB_SHA"
+          if [ -n "$REQUESTED_IMAGE_SHA" ]; then
+            if [ "$DEPLOY_MODE" != "config-only" ]; then
+              echo "image_sha solo se admite en modo config-only" >&2
+              exit 1
+            fi
+            image_sha="$REQUESTED_IMAGE_SHA"
+          fi
+          if ! printf '%s' "$image_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "image_sha debe ser un SHA de 40 caracteres hexadecimales" >&2
+            exit 1
+          fi
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
+          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${image_sha}-${FRONTEND_VARIANT}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${image_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -84,36 +300,113 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare image name
-        id: vars
+      # Antes de tocar la VM: las dos imagenes deben existir ya en GHCR (en
+      # config-only nada se construye; un SHA sin imagenes aborta aqui).
+      - name: Verificar que las imagenes a desplegar existen en GHCR
+        env:
+          FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
+          BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
         run: |
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          for image in "$FRONTEND_IMAGE" "$BACKEND_IMAGE"; do
+            if ! docker buildx imagetools inspect "$image" > /dev/null; then
+              echo "La imagen $image no existe en GHCR; no se despliega" >&2
+              exit 1
+            fi
+          done
 
-      - name: Build and push backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./apps/backend
-          push: true
-          tags: |
-            ${{ steps.vars.outputs.backend_image }}:${{ github.sha }}
-            ${{ steps.vars.outputs.backend_image }}:latest
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,scope=backend,mode=max
-
-  deploy:
-    name: Desplegar en la VM
-    needs: [test, build-frontend, build-backend]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Prepare image names
-        id: vars
+      # G01 (FASE2-N01 + VM0-F012): el .env de produccion se arma en el runner a
+      # partir de variables de entorno del paso (nunca interpoladas en el texto
+      # de un comando) y viaja a la VM por stdin de SSH. El comando remoto es
+      # estatico, asi que ningun secreto queda en el argv ni en /proc de la VM.
+      #
+      # Contrato de configuracion (G01-C08, OWASP25-C030 + VM0-F019): cada
+      # variable escrita aqui tiene un consumidor registrado en
+      # apps/backend/test/helpers/deploy-env-registry.ts. Un flag nuevo se
+      # declara SIEMPRE como `NOMBRE: ${{ vars.NOMBRE || '<default>' }}`, con un
+      # default que reproduce el comportamiento actual, de modo que el deploy
+      # funciona con cero GitHub Variables creadas.
+      - name: Transferir .env de produccion por stdin
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          # G07 (P2/P4): la misma expresion que la variante y el build.
+          NEXT_PUBLIC_API_URL: ${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
+          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
+          # G04 (OWASP25-C021 + D2): '0' reproduce el comportamiento actual. Subirlo
+          # a 1 (nginx del host) es una decision del administrador tras cerrar
+          # los puertos publicos 3000/3001.
+          TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '0' }}
+          # G04 (OWASP25-C021 + P5/T19): interfaz publicada de backend/frontend.
+          # '0.0.0.0' reproduce la exposicion actual; '127.0.0.1' es la variante
+          # loopback que activa el administrador (solo esos dos valores).
+          BACKEND_BIND: ${{ vars.BACKEND_BIND || '0.0.0.0' }}
+          FRONTEND_BIND: ${{ vars.FRONTEND_BIND || '0.0.0.0' }}
+          # G06 (OWASP25-C049 parcial): 'false' reproduce las cookies actuales.
+          # 'true' (Secure) solo cuando todo el trafico sea HTTPS: Gate Admin.
+          COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'false' }}
+          # G05 (OWASP25-C038): 'false' deja las alertas de seguridad inertes;
+          # activarlas es decision del administrador.
+          SECURITY_ALERTS_ENABLED: ${{ vars.SECURITY_ALERTS_ENABLED || 'false' }}
         run: |
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
-          echo "frontend_image=ghcr.io/${owner}/${repo_name}-frontend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          umask 077
+          if ! printf '%s' "$TRUST_PROXY_HOPS" | grep -Eq '^[0-9]+$'; then
+            echo "TRUST_PROXY_HOPS debe ser un entero >= 0" >&2
+            exit 1
+          fi
+          case "$COOKIE_SECURE" in
+            true|false) ;;
+            *) echo "COOKIE_SECURE solo admite true o false" >&2; exit 1 ;;
+          esac
+          for bind in "$BACKEND_BIND" "$FRONTEND_BIND"; do
+            case "$bind" in
+              0.0.0.0|127.0.0.1) ;;
+              *) echo "BACKEND_BIND/FRONTEND_BIND solo admiten 0.0.0.0 o 127.0.0.1" >&2; exit 1 ;;
+            esac
+          done
+          case "$SECURITY_ALERTS_ENABLED" in
+            true|false) ;;
+            *) echo "SECURITY_ALERTS_ENABLED solo admite true o false" >&2; exit 1 ;;
+          esac
+          work="$RUNNER_TEMP/deploy-env"
+          mkdir -p "$work"
+          trap 'rm -rf "$work"' EXIT
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$work/key"
+          {
+            printf 'NODE_ENV=production\n'
+            printf 'DB_USER=%s\n' "$DB_USER"
+            printf 'DB_PASSWORD=%s\n' "$DB_PASSWORD"
+            printf 'DB_NAME=uvg_collab\n'
+            printf 'DB_PORT=5432\n'
+            printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
+            printf 'JWT_REFRESH_SECRET=%s\n' "$JWT_REFRESH_SECRET"
+            printf 'NEXT_PUBLIC_API_URL=%s\n' "$NEXT_PUBLIC_API_URL"
+            printf 'NEXT_PUBLIC_API_PREFIX=/api\n'
+            printf 'NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\n' "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"
+            printf 'NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\n' "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"
+            printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
+            printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
+            printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"
+            printf 'TRUST_PROXY_HOPS=%s\n' "$TRUST_PROXY_HOPS"
+            printf 'BACKEND_BIND=%s\n' "$BACKEND_BIND"
+            printf 'FRONTEND_BIND=%s\n' "$FRONTEND_BIND"
+            printf 'COOKIE_SECURE=%s\n' "$COOKIE_SECURE"
+            printf 'SECURITY_ALERTS_ENABLED=%s\n' "$SECURITY_ALERTS_ENABLED"
+          } > "$work/env"
+          ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$work/known_hosts" "$SERVER_USER@$SERVER_IP" \
+            'umask 077 && mkdir -p ~/.uvg-deploy && chmod 700 ~/.uvg-deploy && cat > ~/.uvg-deploy/env.incoming' \
+            < "$work/env"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -127,37 +420,27 @@ jobs:
 
             cd ~/proyecto-ingenieria-software
 
-            git checkout main
-            if ! git diff --quiet || ! git diff --cached --quiet; then
-              git stash push --include-untracked -m "auto-deploy-$(date +%Y%m%d-%H%M%S)" || true
-            fi
-            git fetch --depth=1 --prune origin main
-            git reset --hard FETCH_HEAD
-            AUTO_STASHES=$(git stash list | grep "auto-deploy-" | tail -n +6 | cut -d: -f1 || true)
-            if [ -n "$AUTO_STASHES" ]; then
-              echo "$AUTO_STASHES" | while read -r STASH_REF; do
-                [ -n "$STASH_REF" ] && git stash drop "$STASH_REF" || true
-              done
+            # G02 (VM0-F020): la copia de produccion debe coincidir con un commit
+            # de main. Si alguien la modifico a mano (tracked o untracked, no
+            # ignorados), el deploy se aborta sin esconder nada en un stash ni
+            # descartarlo: el operador lo revisa y decide. Solo se listan
+            # nombres de archivo, nunca su contenido.
+            LOCAL_CHANGES=$(git status --porcelain --untracked-files=normal)
+            if [ -n "$LOCAL_CHANGES" ]; then
+              echo "Deploy abortado: la copia de produccion tiene cambios locales sin versionar:" >&2
+              printf '%s\n' "$LOCAL_CHANGES" | cut -c4- >&2
+              exit 1
             fi
 
-            cat > .env <<'ENVEOF'
-            NODE_ENV=production
-            DB_USER=${{ secrets.DB_USER }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DB_NAME=uvg_collab
-            DB_PORT=5432
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-            NEXT_PUBLIC_API_URL=${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
-            NEXT_PUBLIC_API_PREFIX=/api
-            NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
-            NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
-            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-            MAIL_FROM=${{ secrets.MAIL_FROM }}
-            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-            BACKEND_IMAGE=${{ steps.vars.outputs.backend_image }}
-            FRONTEND_IMAGE=${{ steps.vars.outputs.frontend_image }}
-            ENVEOF
+            git checkout main
+            git fetch --depth=1 --prune origin main
+            git reset --hard FETCH_HEAD
+
+            # G01: el .env llego por stdin en el paso anterior (fuera del argv);
+            # se instala con permisos 0600 y el temporal se elimina.
+            test -s ~/.uvg-deploy/env.incoming
+            install -m 600 ~/.uvg-deploy/env.incoming .env
+            rm -f ~/.uvg-deploy/env.incoming
 
             # Solo backend/frontend viven en GHCR y cambian en cada deploy.
             # postgres/redis son imagenes fijas que ya estan en la VM: pedirlas
@@ -199,3 +482,45 @@ jobs:
 
             docker compose --profile app ps
             docker image prune -f --filter "until=168h"
+
+  # G02 (OWASP25-C035): `:latest` es mutable y lo usa compose por defecto. Solo
+  # se mueve cuando tests, ambas imagenes y el deploy terminaron en verde, y
+  # siempre al mismo par frontend/backend ya publicado como `:<sha>` (se
+  # re-etiqueta en el registro, sin reconstruir).
+  promote-latest:
+    name: Promover imagenes probadas a latest
+    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
+    if: github.ref == 'refs/heads/main'
+    needs: [test, frontend-variant, build-frontend, build-backend, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        if: inputs.mode != 'config-only'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: inputs.mode != 'config-only'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Re-etiquetar las imagenes desplegadas como :latest
+        if: inputs.mode != 'config-only'
+        env:
+          FRONTEND_VARIANT: ${{ needs.frontend-variant.outputs.variant }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$FRONTEND_VARIANT" | grep -Eq '^cfg-[0-9a-f]{12}$'; then
+            echo "Variante de frontend invalida o ausente" >&2
+            exit 1
+          fi
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name=$(basename "${GITHUB_REPOSITORY,,}")
+          image="ghcr.io/${owner}/${repo_name}"
+          docker buildx imagetools create --tag "${image}-frontend:latest" "${image}-frontend:${GITHUB_SHA}-${FRONTEND_VARIANT}"
+          docker buildx imagetools create --tag "${image}-backend:latest" "${image}-backend:${GITHUB_SHA}"

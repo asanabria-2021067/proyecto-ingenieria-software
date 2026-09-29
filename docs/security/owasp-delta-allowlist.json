@@ -1,0 +1,1374 @@
+{
+  "version": 1,
+  "description": "Allowlist del delta de la workstream OWASP Top 10:2025 (Fase 2, Vernel). Cada ruta nombra los gates que pueden tocarla; un commit de otro gate o una ruta ausente hacen fallar scripts/security/verify-owasp-delta.mjs.",
+  "branch": "sprint8/vernel-owasp2025",
+  "baseSha": "0a723a8d93b640f6077c801d9a0ad5a7b59cbef3",
+  "baseDescription": "Padre local del primer commit de G01 (79230ea7): punto de partida del código OWASP de la rama. No es main ni una release.",
+  "gates": [
+    "G01",
+    "G02",
+    "G03",
+    "G04",
+    "G06",
+    "G05",
+    "G07",
+    "G08"
+  ],
+  "traceability": "Security/integration contract: Gate <Gxx> · Commit <Gxx-Cnn> · …",
+  "notExecuted": [
+    {
+      "id": "G02-C03",
+      "status": "OUT_OF_SCOPE_ADMIN_HANDOFF",
+      "reason": "Requiere el environment production de GitHub (Gate Admin); no existe como commit."
+    }
+  ],
+  "paths": [
+    {
+      "path": ".env.example",
+      "gates": [
+        "G01",
+        "G04",
+        "G06",
+        "G05",
+        "G07"
+      ]
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": ".github/scripts/npm-audit-summary.mjs",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "gates": [
+        "G01",
+        "G02",
+        "G03",
+        "G08"
+      ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "gates": [
+        "G01",
+        "G02",
+        "G04",
+        "G06",
+        "G05",
+        "G07"
+      ]
+    },
+    {
+      "path": ".gitignore",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/docker-compose.yml",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/Dockerfile",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/package-lock.json",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/package.json",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/prisma/migrations/20260927230000_security_alert_notification_type/migration.sql",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/prisma/schema.prisma",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/admin/admin.controller.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/admin/admin.module.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/src/admin/admin.service.ts",
+      "gates": [
+        "G05",
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/app.module.ts",
+      "gates": [
+        "G01",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/auth/account-attempts.service.ts",
+      "gates": [
+        "G04",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/auth/auth.controller.ts",
+      "gates": [
+        "G04",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/auth/auth.module.ts",
+      "gates": [
+        "G01",
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/src/auth/auth.service.ts",
+      "gates": [
+        "G01",
+        "G04",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/auth/cookie.util.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/src/auth/jwt.strategy.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/src/chat/chat.gateway.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/chat/chat.module.ts",
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/common/interceptors/audit.interceptor.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/common/validators/http-url.validator.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/config/environment.validation.ts",
+      "gates": [
+        "G01",
+        "G04",
+        "G06",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/config/jwt-secret.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/src/config/security-headers.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/src/config/trust-proxy.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/src/exports/csv-export.util.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/main.ts",
+      "gates": [
+        "G04",
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/src/notifications/notifications.gateway.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/notifications/notifications.module.ts",
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/notifications/templates/notification.templates.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/project-closure/project-close-readiness.service.ts",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/src/projects/dto/create-project-full.dto.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/projects/dto/create-project.dto.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/projects/dto/update-project.dto.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/security-events/account-reference.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/security-events/request-context.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/security-events/security-alerts.service.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/security-events/security-events.module.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/security-events/security-events.service.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/security-events/tipos-evento-seguridad.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/src/users/dto/update-profile.dto.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/validation/validation.controller.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/src/validation/validation.module.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/src/validation/validation.service.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/src/ws-auth/account-access.events.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/src/ws-auth/ws-auth.service.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/auth.service.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/chat.gateway.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/controllers-and-basic.spec.ts",
+      "gates": [
+        "G01",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-backend-startup.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-compose-contract.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-deploy-config-contract.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-deploy-env-transport.spec.ts",
+      "gates": [
+        "G01",
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-env-example-contract.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-frontend-image-secrets.spec.ts",
+      "gates": [
+        "G01",
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-gitignore-contract.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-jwt-secret-readers.spec.ts",
+      "gates": [
+        "G01",
+        "G04",
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g01-synthetic-jwt-environment.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-ci-quality-gates.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-deploy-config-only.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-deploy-dirty-checkout.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-e2e-production-like.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-e2e-trigger-contract.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-immutable-variants.spec.ts",
+      "gates": [
+        "G02",
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-nginx-baseline.spec.ts",
+      "gates": [
+        "G02",
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-publish-gate.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-real-db-integration.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-topology-ci.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-topology-harness.spec.ts",
+      "gates": [
+        "G02",
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g02-workflow-permissions.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g03-dependabot.spec.ts",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g03-dependency-exceptions.spec.ts",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g03-dependency-review.spec.ts",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g03-jspdf-remediation.spec.ts",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g03-npm-audit-summary.spec.ts",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-account-attempts.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-account-lockout.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-active-only-tokens.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-login-equal-work.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-recovery-bound.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-register-throttle.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-reset-atomic.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-topology-t13.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-trust-proxy.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g04-xff-spoof.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-account-locked-event.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-audit-redaction.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-auth-security-events.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-export-event-contract.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-ip-trust.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-password-reset-events.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-security-alert-migration.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-security-alerts.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-security-event-catalog.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-security-event-writer.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g05-user-status-events.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g06-cookie-secure.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g06-csp-mode-deploy.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g06-hsts.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g06-tls-expiry-probe.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g06-topology-tls.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-account-disconnect.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-chat-gateway-auth.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-csv-formula-neutralization.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-notifications-gateway-auth.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-public-api-url-variant.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-raw-sql-guard.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-topology-t14.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-url-validation.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/g07-ws-auth-policy.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/helpers/auth-http-harness.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/helpers/deploy-env-registry.ts",
+      "gates": [
+        "G01",
+        "G04",
+        "G06",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/helpers/gha-expression.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/helpers/owasp-delta-fixture.ts",
+      "gates": [
+        "G08"
+      ]
+    },
+    {
+      "path": "apps/backend/test/helpers/owasp-evidence.ts",
+      "gates": [
+        "G08"
+      ]
+    },
+    {
+      "path": "apps/backend/test/helpers/synthetic-jwt-secret.setup.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/helpers/synthetic-jwt-secret.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/helpers/workflow-yaml.ts",
+      "gates": [
+        "G01",
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/integration/g05-security-alert-type.integration.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/integration/g05-security-alerts.integration.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/integration/g05-security-event-visibility.integration.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/jwt-secret-config.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/jwt-secret.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/notifications.gateway.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/notifications.service.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/backend/test/password-recovery-admin.e2e.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/password-recovery-admin.real-db.e2e.spec.ts",
+      "gates": [
+        "G04",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/pdf-export.builder.spec.ts",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/backend/test/s7-cloudinary-adapter.spec.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/test/s7-environment.spec.ts",
+      "gates": [
+        "G01",
+        "G04",
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/backend/test/security-deploy-ref-guard.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/backend/test/security-exposed-ports.spec.ts",
+      "gates": [
+        "G04",
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/test/security-jwt.spec.ts",
+      "gates": [
+        "G01",
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/backend/test/security-rate-limiting.spec.ts",
+      "gates": [
+        "G04",
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/backend/vitest.config.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/backend/vitest.integration.config.ts",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "apps/frontend/app/api/[...path]/route.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/frontend/app/dashboard/perfil/editar/page.tsx",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/app/dashboard/perfil/page.tsx",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/app/dashboard/projects/mine/[id]/my-project-view-client.tsx",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/app/dashboard/projects/mine/form/page.tsx",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/app/dashboard/proyectos/[id]/bitacora/page.tsx",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/frontend/components/layout/global-search-input.tsx",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/frontend/components/profile/CompleteProfileDialog.tsx",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/components/profile/safe-external-link.tsx",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/Dockerfile",
+      "gates": [
+        "G01",
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e-harness/realtime-same-origin.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e/chat-individual-navegacion.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e/chat-mensajeria.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e/csp-violaciones.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e/kanban-drag.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e/recuperar-contrasena.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e/registro-postulacion.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e/support/csp-violations.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/e2e/support/test.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/hooks/use-chat.ts",
+      "gates": [
+        "G02",
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/lib/hooks/useRealtimeNotifications.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/lib/realtime/socket-url.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/lib/security/csp.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/lib/security/safe-url.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/lib/services/notifications.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/frontend/next.config.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/package-lock.json",
+      "gates": [
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/frontend/package.json",
+      "gates": [
+        "G02",
+        "G03"
+      ]
+    },
+    {
+      "path": "apps/frontend/playwright.config.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/frontend/playwright.harness.config.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/api-proxy-xff.spec.ts",
+      "gates": [
+        "G04"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/chat-same-origin.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/csp-mode.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/csp-policy.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/csp-violations.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/helpers/next-headers.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/html-sink-guard.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/my-project-view.spec.tsx",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/realtime-same-origin.spec.ts",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/safe-links.spec.tsx",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/security-alert-notification.spec.ts",
+      "gates": [
+        "G05"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/security-headers-contract.spec.ts",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "apps/frontend/test/theme-tokens.spec.ts",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "docker-compose.example.yml",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "docker-compose.yml",
+      "gates": [
+        "G01",
+        "G04"
+      ]
+    },
+    {
+      "path": "docs/security/dependency-exceptions.md",
+      "gates": [
+        "G03",
+        "G08"
+      ]
+    },
+    {
+      "path": "docs/security/evidence-index.md",
+      "gates": [
+        "G08"
+      ]
+    },
+    {
+      "path": "docs/security/negative-controls.md",
+      "gates": [
+        "G08"
+      ]
+    },
+    {
+      "path": "docs/security/owasp-delta-allowlist.json",
+      "gates": [
+        "G08"
+      ]
+    },
+    {
+      "path": "docs/security/owasp-final-evidence.md",
+      "gates": [
+        "G08"
+      ]
+    },
+    {
+      "path": "docs/security/owasp-top10-2025.md",
+      "gates": [
+        "G08"
+      ]
+    },
+    {
+      "path": "infra/nginx/compare-live.mjs",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "infra/nginx/manifest.json",
+      "gates": [
+        "G02",
+        "G04"
+      ]
+    },
+    {
+      "path": "infra/nginx/nginx.conf",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "infra/nginx/README.md",
+      "gates": [
+        "G02",
+        "G04"
+      ]
+    },
+    {
+      "path": "infra/nginx/sites-enabled/uvg-collab",
+      "gates": [
+        "G02",
+        "G04"
+      ]
+    },
+    {
+      "path": "infra/staging/characterize.mjs",
+      "gates": [
+        "G02",
+        "G04",
+        "G06"
+      ]
+    },
+    {
+      "path": "infra/staging/check-representativity.mjs",
+      "gates": [
+        "G02",
+        "G04"
+      ]
+    },
+    {
+      "path": "infra/staging/docker-compose.yml",
+      "gates": [
+        "G02",
+        "G04",
+        "G06",
+        "G07"
+      ]
+    },
+    {
+      "path": "infra/staging/nginx/conf.d/.gitkeep",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "infra/staging/nginx/nginx.conf",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "infra/staging/nginx/sites-enabled/uvg-collab",
+      "gates": [
+        "G02",
+        "G04"
+      ]
+    },
+    {
+      "path": "infra/staging/README.md",
+      "gates": [
+        "G02",
+        "G04",
+        "G06",
+        "G07"
+      ]
+    },
+    {
+      "path": "infra/staging/realtime.mjs",
+      "gates": [
+        "G07"
+      ]
+    },
+    {
+      "path": "infra/staging/run-harness.sh",
+      "gates": [
+        "G02",
+        "G04",
+        "G06",
+        "G07"
+      ]
+    },
+    {
+      "path": "infra/staging/should-run.mjs",
+      "gates": [
+        "G02"
+      ]
+    },
+    {
+      "path": "infra/staging/substitutions.json",
+      "gates": [
+        "G02",
+        "G04"
+      ]
+    },
+    {
+      "path": "infra/tls/cert-expiry-probe.mjs",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "infra/tls/README.md",
+      "gates": [
+        "G06"
+      ]
+    },
+    {
+      "path": "README.md",
+      "gates": [
+        "G01"
+      ]
+    },
+    {
+      "path": "scripts/security/verify-owasp-delta.mjs",
+      "gates": [
+        "G08"
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "glob": "apps/backend/test/g08-*.spec.ts",
+      "gates": [
+        "G08"
+      ],
+      "reason": "Tests y guards de G08 (una spec por propiedad)."
+    }
+  ],
+  "exceptions": []
+}

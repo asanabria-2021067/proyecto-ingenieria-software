@@ -1,25 +1,52 @@
+import type { ConfigService } from '@nestjs/config';
+
 /**
- * Lee JWT_SECRET sin valor por defecto (T-210). Firmar o verificar tokens de
- * acceso con un secreto conocido ('dev-secret-change-me', el que usaban los
- * 6 puntos que leían esta variable) permite forjar sesiones válidas si la
- * variable queda sin definir en el entorno: el arranque no falla y el fallo
- * de seguridad no es visible. Mismo patrón que JWT_REFRESH_SECRET
- * (auth.service.ts) y que getRequiredFrontendUrl (./frontend-url.ts).
+ * Proveedor único del secreto de firma de los access tokens (G01 ·
+ * OWASP25-C019). Toda lectura de JWT_SECRET pasa por este módulo y falla
+ * cerrada: si el valor está ausente, vacío, es un valor por defecto conocido o
+ * tiene menos de JWT_SECRET_MIN_LENGTH caracteres, se lanza un error y el
+ * backend no arranca. Los mensajes solo nombran la variable y la regla
+ * incumplida; nunca incluyen el valor ni su longitud.
  */
-export function getRequiredJwtSecret(): string {
-  return requireJwtSecret(process.env.JWT_SECRET);
+
+export const JWT_SECRET_VARIABLE = 'JWT_SECRET';
+export const JWT_SECRET_MIN_LENGTH = 32;
+
+/** Valores públicos que alguna vez fueron fallback del código o del template de entorno. */
+export const KNOWN_INSECURE_JWT_SECRETS: readonly string[] = [
+  'dev-secret-change-me',
+  'super-secret-key-change-in-production',
+];
+
+export function assertJwtSecret(value: unknown): string {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+
+  if (trimmed.length === 0) {
+    throw new Error(`${JWT_SECRET_VARIABLE} environment variable is required`);
+  }
+
+  if (KNOWN_INSECURE_JWT_SECRETS.includes(trimmed)) {
+    throw new Error(`${JWT_SECRET_VARIABLE} must not use a known default value`);
+  }
+
+  if (trimmed.length < JWT_SECRET_MIN_LENGTH) {
+    throw new Error(
+      `${JWT_SECRET_VARIABLE} must be at least ${JWT_SECRET_MIN_LENGTH} characters long`,
+    );
+  }
+
+  return value as string;
 }
 
 /**
- * Misma regla que `getRequiredJwtSecret`, para los 4 `JwtModule.registerAsync`
- * (Auth/Admin/Notifications/Chat) que ya leen el entorno vía `ConfigService`
- * en vez de `process.env` directo (invariante cubierta por
- * `test/s7-environment.spec.ts` TC03-D: ningún consumidor lee el entorno
- * antes de `ConfigModule.forRoot`).
+ * Lector para consumidores que se instancian después de cargar el entorno
+ * (ConfigModule ya asignó el entorno validado a process.env).
  */
-export function requireJwtSecret(value: string | undefined | null): string {
-  if (!value) {
-    throw new Error('JWT_SECRET environment variable is required');
-  }
-  return value;
+export function getJwtSecret(): string {
+  return assertJwtSecret(process.env[JWT_SECRET_VARIABLE]);
+}
+
+/** Lector para las factories de JwtModule, que reciben el ConfigService validado. */
+export function getJwtSecretFromConfig(config: Pick<ConfigService, 'get'>): string {
+  return assertJwtSecret(config.get<string>(JWT_SECRET_VARIABLE));
 }

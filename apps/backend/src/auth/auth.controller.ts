@@ -7,6 +7,7 @@ import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { setAuthCookies, clearAuthCookies } from './cookie.util';
+import { securityRequestContext } from '../security-events/request-context';
 
 @Controller('auth')
 export class AuthController {
@@ -14,12 +15,15 @@ export class AuthController {
 
   @Throttle({ short: { limit: 5, ttl: 60000 } })
   @Post('login')
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, refreshToken } = await this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const { accessToken, refreshToken } = await this.authService.login(loginDto, securityRequestContext(req));
     setAuthCookies(res, accessToken, refreshToken);
     return { mensaje: 'Sesión iniciada' };
   }
 
+  // G04 (OWASP25-C022): crear cuentas tiene su propio límite, igual de estricto
+  // que login; sin él, registro solo quedaba bajo los buckets globales.
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
   @Post('register')
   async register(@Body() registerDto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken } = await this.authService.register(registerDto);
@@ -35,8 +39,8 @@ export class AuthController {
 
   @Throttle({ short: { limit: 5, ttl: 60000 } })
   @Post('reset-password')
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto.token, dto.nuevaContrasena);
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
+    return this.authService.resetPassword(dto.token, dto.nuevaContrasena, securityRequestContext(req));
   }
 
   @Throttle({ short: { limit: 10, ttl: 60000 } })

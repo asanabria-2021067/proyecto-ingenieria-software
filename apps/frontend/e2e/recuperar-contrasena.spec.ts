@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/test';
 
 // Usuario real del seed (perfilEstudiante.carne = '24001'): forgotPassword
 // responde siempre el mismo mensaje genérico exista o no la cuenta, pero
