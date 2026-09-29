@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 /**
  * G07-C10 · OWASP25-C006 (A05:2025). Guarda de superficie de los sumideros de
@@ -52,7 +52,11 @@ function listFiles(path: string): string[] {
 
 function sourceTree(): Record<string, string> {
   const files = SCANNED.flatMap((entry) => listFiles(join(ROOT, entry)));
-  return Object.fromEntries(files.map((file) => [relative(ROOT, file), readFileSync(file, 'utf8')]));
+  // `relative` usa el separador del SO (`\` en Windows); las claves de este
+  // mapa y de HTML_SINK_ALLOWLIST son siempre con `/`.
+  return Object.fromEntries(
+    files.map((file) => [relative(ROOT, file).split(sep).join('/'), readFileSync(file, 'utf8')]),
+  );
 }
 
 export function htmlSinkCounts(files: Record<string, string>): Record<string, number> {
