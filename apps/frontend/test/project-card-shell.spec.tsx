@@ -2,13 +2,22 @@ import '@testing-library/jest-dom/vitest';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
   PROJECT_CARD_GRID,
 } from '../components/projects/available-project-card';
 import type { MiProyectoListItemDTO } from '../lib/dto/project.dto';
+
+// El botón de anclar (Pin) usa useCurrentUser (TanStack Query): la tarjeta
+// necesita un QueryClient en el árbol aunque estos tests no ejerciten ese flujo.
+function renderConQueryClient(ui: ReactNode) {
+  const queryClient = new QueryClient();
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 // «Proyectos Disponibles» y «Mis Proyectos» comparten una sola carcasa de
 // tarjeta basada en `.card-base` (radio, sombra, borde y relleno del
@@ -31,7 +40,7 @@ const proyectoMio = {
 
 describe('Carcasa compartida de las tarjetas de proyecto', () => {
   it('la tarjeta parte de card-base, con altura mínima y realce al pasar el cursor', () => {
-    render(<AvailableProjectCard context="mine" proyecto={proyectoMio} />);
+    renderConQueryClient(<AvailableProjectCard context="mine" proyecto={proyectoMio} />);
     const card = screen.getByTestId('project-card-7');
     for (const clase of ['card-base', 'min-h-56', 'hover:shadow-raised']) {
       expect(card).toHaveClass(clase);
@@ -69,7 +78,7 @@ describe('Tarjeta de Proyectos Disponibles — botón «Ver proyecto»', () => {
       roles: [{ cupos: 2 }],
       creador: { idUsuario: 1, nombre: 'Valeria', apellido: 'Ortiz' },
     } as never;
-    render(<AvailableProjectCard proyecto={disponible} />);
+    renderConQueryClient(<AvailableProjectCard proyecto={disponible} />);
 
     const boton = screen.getByRole('link', { name: 'Ver proyecto' });
     expect(boton).toHaveAttribute('href', '/dashboard/proyectos/39');
