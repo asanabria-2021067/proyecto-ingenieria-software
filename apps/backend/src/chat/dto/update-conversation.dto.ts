@@ -11,6 +11,14 @@ export class UpdateConversationDto {
   @IsBoolean()
   esFavorita?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  silenciada?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  esPrioritaria?: boolean;
+
   @ValidateIf((_object, value) => value !== undefined && value !== null)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()

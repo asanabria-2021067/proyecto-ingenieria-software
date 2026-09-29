@@ -3,13 +3,11 @@ import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-vi.mock('@/lib/swal', () => ({
-  default: {
-    fire: vi.fn(),
-  },
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }),
 }));
 
-import uvgSwal from '@/lib/swal';
+import { toast } from 'sonner';
 import { TaskFormDialog } from '../components/projects/task-form-dialog';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 import type { MiembroProyecto } from '../hooks/use-project-members';
@@ -34,7 +32,7 @@ beforeAll(() => {
 
 function cleanupDialog() {
   cleanup();
-  vi.mocked(uvgSwal.fire).mockClear();
+  vi.mocked(toast.success).mockClear();
 }
 
 function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
@@ -221,13 +219,7 @@ describe('TaskFormDialog — creación', () => {
       idHito: 1,
     });
     expect(payload.idProyecto).toBeUndefined();
-    expect(uvgSwal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toast: true,
-        icon: 'success',
-        title: 'Tarea creada',
-      }),
-    );
+    expect(toast.success).toHaveBeenCalledWith('Tarea creada', expect.any(Object));
   });
 
   it('incluye asignado inicial cuando se seleccionó uno', async () => {
@@ -388,13 +380,7 @@ describe('TaskFormDialog — edición', () => {
       taskId: original.idTarea,
       input: { tituloTarea: 'Modificado' },
     });
-    expect(uvgSwal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toast: true,
-        icon: 'success',
-        title: 'Cambios guardados',
-      }),
-    );
+    expect(toast.success).toHaveBeenCalledWith('Cambios guardados', expect.any(Object));
   });
 
   it('campos no tocados quedan omitidos del payload', async () => {

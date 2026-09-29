@@ -4,10 +4,9 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-vi.mock('@/lib/swal', () => ({
-  default: {
-    fire: vi.fn(),
-  },
+const toastSuccess = vi.hoisted(() => vi.fn());
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), { success: toastSuccess, error: vi.fn(), warning: vi.fn() }),
 }));
 
 const confirmarMock = vi.hoisted(() => vi.fn());
@@ -28,7 +27,6 @@ vi.mock('../lib/services/catalogs', () => ({
     .mockResolvedValue([{ idHabilidad: 7, nombreHabilidad: 'React', categoriaHabilidad: null }]),
 }));
 
-import uvgSwal from '@/lib/swal';
 import { ProjectRolesSheet } from '../components/projects/project-roles-sheet';
 import type { ProjectRoleDTO } from '../lib/services/roles';
 
@@ -98,7 +96,7 @@ async function elegirOpcion(triggerName: string, optionName: string | RegExp) {
 describe('ProjectRolesSheet — gestión completa (Sección 23/5C)', () => {
   afterEach(() => {
     cleanup();
-    vi.mocked(uvgSwal.fire).mockClear();
+    toastSuccess.mockClear();
   });
 
   it('entrada directa CREATE: abre formulario, no lista, y cancelar cierra el Sheet', () => {
@@ -126,13 +124,7 @@ describe('ProjectRolesSheet — gestión completa (Sección 23/5C)', () => {
 
     expect(crearRol.mutate).toHaveBeenCalledTimes(1);
     expect(onOpenChange).toHaveBeenCalledWith(false);
-    expect(uvgSwal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toast: true,
-        icon: 'success',
-        title: 'Rol creado',
-      }),
-    );
+    expect(toastSuccess).toHaveBeenCalledWith('Rol creado', expect.any(Object));
   });
 
   it('entrada directa EDIT: abre el rol seleccionado y cancelar cierra el Sheet', () => {
@@ -173,13 +165,7 @@ describe('ProjectRolesSheet — gestión completa (Sección 23/5C)', () => {
       expect.anything(),
     );
     expect(onOpenChange).toHaveBeenCalledWith(false);
-    expect(uvgSwal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toast: true,
-        icon: 'success',
-        title: 'Cambios guardados',
-      }),
-    );
+    expect(toastSuccess).toHaveBeenCalledWith('Cambios guardados', expect.any(Object));
   });
 
   it('entrada MANAGER: abre lista, muestra todos los roles y Nuevo rol', () => {

@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import uvgSwal from '@/lib/swal';
+import { toast } from 'sonner';
 import {
   createEvent,
   deleteEvent,
@@ -223,16 +224,7 @@ export function EventFormDialog({
     mutationFn: (projectId: number) => createEvent(projectId, buildPayload(values, { keepEmptyDescripcion: false })),
     onSuccess: () => {
       invalidate();
-      void uvgSwal.fire({
-        toast: true,
-        backdrop: false,
-        icon: 'success',
-        title: 'Evento creado',
-        position: 'top-end',
-        timer: 2000,
-        timerProgressBar: true,
-        showConfirmButton: false,
-      });
+      toast.success('Evento creado');
       onOpenChange(false);
     },
     onError: (err) => setError(getApiErrorMessage(err, 'calendar')),

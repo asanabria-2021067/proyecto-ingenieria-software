@@ -6,3 +6,7 @@ export const conversationMessagesQueryKey = (idProyecto: number, idConversacion:
 
 export const archivedConversationsQueryKey = (q: string) =>
   ['chats-archivados', q] as const;
+
+/** Dock global de chat: cruza todos los proyectos del usuario. */
+export const allConversationsQueryKey = (q: string = '') =>
+  ['chats-global', q] as const;

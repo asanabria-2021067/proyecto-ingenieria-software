@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getApiErrorMessage } from '@/components/projects/api-error';
-import uvgSwal from '@/lib/swal';
+import { toast } from 'sonner';
 import type { useProjectMilestones } from '@/hooks/use-project-milestones';
 
 type MilestonesHook = ReturnType<typeof useProjectMilestones>;
@@ -82,18 +82,10 @@ export function CreateMilestoneDialog({
         fechaLimite: values.fechaLimite || undefined,
         idsTareas: hayAsignacionMasiva ? tareasSeleccionadas.map((t) => t.idTarea) : undefined,
       });
-      void uvgSwal.fire({
-        toast: true,
-        backdrop: false,
-        icon: 'success',
-        title: 'Hito creado',
-        text: hayAsignacionMasiva
+      toast.success('Hito creado', {
+        description: hayAsignacionMasiva
           ? `Se asignó a ${tareasSeleccionadas.length} ${tareasSeleccionadas.length === 1 ? 'tarea' : 'tareas'}.`
           : 'El hito se agregó al proyecto.',
-        position: 'top-end',
-        timer: 2000,
-        timerProgressBar: true,
-        showConfirmButton: false,
       });
       if (hayAsignacionMasiva) onAsignado?.();
       handleOpenChange(false);

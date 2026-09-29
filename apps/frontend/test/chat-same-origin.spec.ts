@@ -8,7 +8,7 @@ vi.mock('socket.io-client', () => ({
   io: (...args: unknown[]) => mockIo(...args),
 }));
 
-import { useChatSocket } from '../hooks/use-chat';
+import { useGlobalChatSocket } from '../hooks/use-chat';
 
 /**
  * G07-C06 · P2/T12 (HU-159). El chat sigue el mismo contrato que las
@@ -32,12 +32,12 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('T12: useChatSocket', () => {
+describe('T12: useGlobalChatSocket', () => {
   it('same-origin: conecta /chat en el origen de la página, con la cookie de sesión', () => {
     vi.stubEnv('NEXT_PUBLIC_API_URL', '');
     mockIo.mockReturnValue(fakeSocket());
 
-    renderHook(() => useChatSocket(4, null), { wrapper });
+    renderHook(() => useGlobalChatSocket([]), { wrapper });
 
     const [url, options] = mockIo.mock.calls[0];
     expect(url).toBe(`${window.location.origin}/chat`);
@@ -50,7 +50,7 @@ describe('T12: useChatSocket', () => {
     vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://158.23.57.118:3001');
     mockIo.mockReturnValue(fakeSocket());
 
-    renderHook(() => useChatSocket(4, null), { wrapper });
+    renderHook(() => useGlobalChatSocket([]), { wrapper });
 
     expect(mockIo.mock.calls[0][0]).toBe('ws://158.23.57.118:3001/chat');
   });
@@ -60,7 +60,7 @@ describe('T12: useChatSocket', () => {
     mockIo.mockReturnValue(fakeSocket());
     const { useRealtimeNotifications } = await import('../lib/hooks/useRealtimeNotifications');
 
-    renderHook(() => useChatSocket(4, null), { wrapper });
+    renderHook(() => useGlobalChatSocket([]), { wrapper });
     renderHook(() => useRealtimeNotifications(true), { wrapper });
 
     const bases = mockIo.mock.calls.map(([url]) => String(url).replace(/\/(chat|notifications)$/, ''));
