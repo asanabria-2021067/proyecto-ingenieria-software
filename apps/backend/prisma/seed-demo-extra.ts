@@ -184,7 +184,9 @@ async function ensureClosedSprintWithBurndown(params: {
   diasFin: number;
   tareas: { titulo: string; puntos: number; hecha: boolean; creadaPor: number; asignadoA?: number }[];
 }) {
-  const existente = await prisma.sprint.findFirst({ where: { idProyecto: params.idProyecto, numero: params.numero } });
+  const existente = await prisma.sprint.findFirst({
+    where: { idProyecto: params.idProyecto, numero: params.numero, estado: 'CERRADO' },
+  });
   if (existente) return existente;
 
   const fechaInicio = enDias(params.diasInicio);
@@ -646,7 +648,7 @@ async function main() {
   // ─── Sprints ya cerrados: datos reales para Analitica/Burndown/Velocidad ─
   await ensureClosedSprintWithBurndown({
     idProyecto: pGestionAcademica.idProyecto,
-    numero: 1,
+    numero: 0,
     diasInicio: -28,
     diasFin: -14,
     tareas: [
@@ -659,7 +661,7 @@ async function main() {
   });
   await ensureClosedSprintWithBurndown({
     idProyecto: pReservas.idProyecto,
-    numero: 1,
+    numero: 0,
     diasInicio: -30,
     diasFin: -16,
     tareas: [
