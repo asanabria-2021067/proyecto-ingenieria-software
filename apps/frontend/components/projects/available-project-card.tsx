@@ -1,9 +1,14 @@
+'use client';
+
 import Link from 'next/link';
-import { Blend, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Trash2, Users } from 'lucide-react';
+import { Blend, Bookmark, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Pin, Trash2, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { usePinnedProjects } from '@/hooks/use-pinned-projects';
+import { useSaveProject } from '@/hooks/use-save-project';
 import { MODALIDAD_LABEL, TIPO_LABEL } from '@/types';
 import type { ModalidadProyecto, ProyectoResumen, TipoProyecto } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
@@ -279,6 +284,22 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
   const { idProyecto, tituloProyecto, descripcionProyecto, tipoProyecto, modalidadProyecto, estadoProyecto } =
     proyecto;
 
+  const { data: currentUser } = useCurrentUser();
+  const { isPinned, togglePin, maxAlcanzado } = usePinnedProjects(currentUser?.idUsuario ?? null);
+  const anclado = isPinned(idProyecto);
+
+  // "Guardar" (bookmark) solo aplica a "Explorar Proyectos": en "Mis
+  // Proyectos" no tiene sentido guardar tu propio proyecto.
+  const esExplorar = props.context !== 'mine';
+  const guardado = esExplorar && Boolean((proyecto as ProyectoDisponibleResumen).guardado);
+  const { guardar, desguardar } = useSaveProject();
+  const guardadoPendiente = guardar.isPending || desguardar.isPending;
+  const toggleGuardado = () => {
+    if (guardadoPendiente) return;
+    if (guardado) desguardar.mutate(idProyecto);
+    else guardar.mutate(idProyecto);
+  };
+
   const tipoStyle = tipoBadgeStyle(tipoProyecto);
   const ModalidadIcon = MODALIDAD_ICON[modalidadProyecto as ModalidadProyecto] ?? MapPin;
 
@@ -415,23 +436,52 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
         <h3 className="min-w-0 flex-1 text-[17px] font-bold leading-5.5 text-on-surface line-clamp-2">
           {tituloProyecto}
         </h3>
-        {/* La tarjeta se angosta en una grilla de 2 columnas aunque el
-            viewport sea ancho, por eso el quiebre usa container queries
-            (@sm, ligado al ancho real de la tarjeta) y no el breakpoint de
-            viewport (sm:), que nunca se activaba dentro del grid. */}
-        <div className="flex shrink-0 flex-col items-end gap-1 @sm:flex-row @sm:items-center @sm:gap-2">
-          <span
-            className={`inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap ${tipoStyle}`}
-          >
-            {tipoBadgeLabel(tipoProyecto)}
-          </span>
-          <span
-            className={`inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap ${
-              estadoAnimated ? 'blink-gold-gray' : estadoStyle
+        <div className="flex shrink-0 items-start gap-1.5">
+          {esExplorar && (
+            <button
+              type="button"
+              onClick={toggleGuardado}
+              disabled={guardadoPendiente}
+              aria-pressed={guardado}
+              aria-label={guardado ? `Quitar ${tituloProyecto} de guardados` : `Guardar ${tituloProyecto}`}
+              className={`flex h-6.25 w-6.25 shrink-0 items-center justify-center rounded-[7px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                guardado ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <Bookmark className={`h-3.5 w-3.5 ${guardado ? 'fill-current' : ''}`} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => togglePin({ idProyecto, tituloProyecto })}
+            disabled={!anclado && maxAlcanzado}
+            aria-pressed={anclado}
+            aria-label={anclado ? `Desanclar ${tituloProyecto} del sidebar` : `Anclar ${tituloProyecto} al sidebar`}
+            title={!anclado && maxAlcanzado ? 'Ya tienes 5 proyectos anclados' : undefined}
+            className={`flex h-6.25 w-6.25 shrink-0 items-center justify-center rounded-[7px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              anclado ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
             }`}
           >
-            {estadoLabelText}
-          </span>
+            <Pin className={`h-3.5 w-3.5 ${anclado ? 'fill-current' : ''}`} />
+          </button>
+          {/* La tarjeta se angosta en una grilla de 2 columnas aunque el
+              viewport sea ancho, por eso el quiebre usa container queries
+              (@sm, ligado al ancho real de la tarjeta) y no el breakpoint de
+              viewport (sm:), que nunca se activaba dentro del grid. */}
+          <div className="flex flex-col items-end gap-1 @sm:flex-row @sm:items-center @sm:gap-2">
+            <span
+              className={`inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap ${tipoStyle}`}
+            >
+              {tipoBadgeLabel(tipoProyecto)}
+            </span>
+            <span
+              className={`inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap ${
+                estadoAnimated ? 'blink-gold-gray' : estadoStyle
+              }`}
+            >
+              {estadoLabelText}
+            </span>
+          </div>
         </div>
       </div>
 

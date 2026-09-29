@@ -1,7 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Lock, MessageSquarePlus, Send, Users as UsersIcon } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  Loader2,
+  Lock,
+  MessageSquarePlus,
+  MoreVertical,
+  Pencil,
+  Send,
+  Star,
+  StarOff,
+  Users as UsersIcon,
+} from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +26,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { getApiErrorMessage } from '@/components/projects/api-error';
@@ -24,6 +42,7 @@ import {
   useMarkConversationRead,
   useMessages,
   useSendMessage,
+  useUpdateConversation,
 } from '@/hooks/use-chat';
 import { useChatPanel } from '@/components/projects/chat-panel-context';
 import type { ChatConversacion } from '@/lib/types/chat';
@@ -37,6 +56,7 @@ interface ProjectChatPanelProps {
 }
 
 function nombreConversacion(conversacion: ChatConversacion, currentUserId: number | null): string {
+  if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
   return otro ? `${otro.nombre} ${otro.apellido}` : 'Conversación';
@@ -50,6 +70,7 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
   const { conversations, isLoading } = useConversations(idProyecto);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [nuevoChatAbierto, setNuevoChatAbierto] = useState(false);
+  const [renombrarConversacion, setRenombrarConversacion] = useState<ChatConversacion | null>(null);
   const markRead = useMarkConversationRead(idProyecto);
   const crearDesdeOtraVista = useCreateConversation(idProyecto);
   const { pendingChatUserId, clearPendingChat } = useChatPanel();
@@ -123,33 +144,38 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
           <p className="px-2 text-xs text-tertiary">Sin chats todavía. Crea uno con el ícono de arriba.</p>
         )}
         {conversations.map((c) => (
-          <button
+          <div
             key={c.idConversacion}
-            type="button"
-            onClick={() => abrirConversacion(c.idConversacion)}
-            className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors ${
+            className={`group flex w-full items-center gap-1 rounded-lg px-2 py-2 text-sm transition-colors ${
               activeId === c.idConversacion
                 ? 'bg-on-surface/8 font-semibold text-text-primary'
                 : 'text-text-primary hover:bg-on-surface/5'
             }`}
           >
-            {c.tipo === 'GRUPAL' ? (
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
-                <UsersIcon className="size-3.5" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={() => abrirConversacion(c.idConversacion)}
+              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            >
+              {c.tipo === 'GRUPAL' ? (
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+                  <UsersIcon className="size-3.5" aria-hidden="true" />
+                </span>
+              ) : (
+                <Avatar className="size-7 shrink-0">
+                  <AvatarFallback className="text-[10px]">
+                    {getIniciales(
+                      c.participantes.find((p) => p.idUsuario !== currentUserId)?.nombre ?? '?',
+                      c.participantes.find((p) => p.idUsuario !== currentUserId)?.apellido ?? '',
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <span className={`min-w-0 flex-1 truncate font-medium ${c.archivada ? 'text-text-secondary' : ''}`}>
+                {nombreConversacion(c, currentUserId)}
               </span>
-            ) : (
-              <Avatar className="size-7 shrink-0">
-                <AvatarFallback className="text-[10px]">
-                  {getIniciales(
-                    c.participantes.find((p) => p.idUsuario !== currentUserId)?.nombre ?? '?',
-                    c.participantes.find((p) => p.idUsuario !== currentUserId)?.apellido ?? '',
-                  )}
-                </AvatarFallback>
-              </Avatar>
-            )}
-            <span className={`min-w-0 flex-1 truncate font-medium ${c.archivada ? 'text-text-secondary' : ''}`}>
-              {nombreConversacion(c, currentUserId)}
-            </span>
+            </button>
+            {c.esFavorita && <Star className="size-3.5 shrink-0 fill-current text-primary" aria-hidden="true" />}
             {c.archivada ? (
               <Lock className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
             ) : (
@@ -159,7 +185,8 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
                 </span>
               )
             )}
-          </button>
+            <ConversationMenu conversacion={c} idProyecto={idProyecto} onRenombrar={() => setRenombrarConversacion(c)} />
+          </div>
         ))}
       </div>
 
@@ -172,6 +199,15 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
         onCreated={abrirConversacion}
       />
 
+      <RenameConversationDialog
+        key={renombrarConversacion?.idConversacion ?? 'ninguna'}
+        conversacion={renombrarConversacion}
+        idProyecto={idProyecto}
+        onOpenChange={(open) => {
+          if (!open) setRenombrarConversacion(null);
+        }}
+      />
+
       <ChatThreadSheet
         idProyecto={idProyecto}
         idConversacion={activeId}
@@ -182,6 +218,138 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
         }}
       />
     </section>
+  );
+}
+
+interface ConversationMenuProps {
+  conversacion: ChatConversacion;
+  idProyecto: number;
+  onRenombrar: () => void;
+}
+
+/** Menú de 3 puntos de cada conversación: archivar, renombrar o marcar favorita. */
+function ConversationMenu({ conversacion, idProyecto, onRenombrar }: ConversationMenuProps) {
+  const actualizar = useUpdateConversation(idProyecto);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          onClick={(event) => event.stopPropagation()}
+          aria-label="Opciones de la conversación"
+          className="shrink-0 rounded-control p-1 text-text-secondary opacity-0 transition-opacity hover:bg-on-surface/10 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+        >
+          <MoreVertical className="size-4" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onClick={() =>
+            actualizar.mutate({
+              idConversacion: conversacion.idConversacion,
+              payload: { archivada: !conversacion.archivadaManual },
+            })
+          }
+        >
+          {conversacion.archivadaManual ? (
+            <ArchiveRestore className="size-4" aria-hidden="true" />
+          ) : (
+            <Archive className="size-4" aria-hidden="true" />
+          )}
+          {conversacion.archivadaManual ? 'Desarchivar' : 'Archivar'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onRenombrar}>
+          <Pencil className="size-4" aria-hidden="true" />
+          Renombrar
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() =>
+            actualizar.mutate({
+              idConversacion: conversacion.idConversacion,
+              payload: { esFavorita: !conversacion.esFavorita },
+            })
+          }
+        >
+          {conversacion.esFavorita ? (
+            <StarOff className="size-4" aria-hidden="true" />
+          ) : (
+            <Star className="size-4" aria-hidden="true" />
+          )}
+          {conversacion.esFavorita ? 'Quitar de favoritos' : 'Marcar como favorito'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+interface RenameConversationDialogProps {
+  conversacion: ChatConversacion | null;
+  idProyecto: number;
+  onOpenChange: (open: boolean) => void;
+}
+
+function RenameConversationDialog({ conversacion, idProyecto, onOpenChange }: RenameConversationDialogProps) {
+  const actualizar = useUpdateConversation(idProyecto);
+  const [nombre, setNombre] = useState(conversacion?.nombrePersonalizado ?? '');
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!conversacion) return;
+    actualizar.mutate(
+      { idConversacion: conversacion.idConversacion, payload: { nombrePersonalizado: nombre.trim() || null } },
+      { onSuccess: () => onOpenChange(false) },
+    );
+  };
+
+  return (
+    <Dialog open={conversacion != null} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[96vw] max-w-[380px] gap-0 border-outline-variant bg-surface-container-lowest p-0">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader className="border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
+            <DialogTitle className="text-xl font-bold text-on-surface">Renombrar conversación</DialogTitle>
+            <DialogDescription className="text-sm text-on-surface-variant">
+              Deja el campo vacío para volver al nombre por defecto.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 py-5">
+            <label htmlFor="chat-nombre-personalizado" className="text-xs font-semibold text-on-surface">
+              Nombre
+            </label>
+            <Input
+              id="chat-nombre-personalizado"
+              value={nombre}
+              maxLength={120}
+              onChange={(event) => setNombre(event.target.value)}
+              placeholder="Ej. Equipo backend"
+              className="mt-1 h-10 rounded-md border-outline-variant text-sm"
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-outline-variant/35 px-6 py-4 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={actualizar.isPending}
+              onClick={() => onOpenChange(false)}
+              className="h-10 rounded-md border-outline-variant text-xs font-bold"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={actualizar.isPending}
+              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+            >
+              {actualizar.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

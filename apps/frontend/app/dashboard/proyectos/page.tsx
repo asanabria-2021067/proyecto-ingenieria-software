@@ -88,17 +88,15 @@ export default function ProyectosPage() {
   return (
       <div className={dashboardPage('pt-7 pb-10')}>
         {/* Encabezado */}
-        <div className="mb-4.5">
-          <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">
-            Proyectos Disponibles
-          </h1>
-          <p className="mt-1 text-[14px] font-normal text-tertiary">
+        <div className="mb-section">
+          <h1 className="type-display">Proyectos Disponibles</h1>
+          <p className="type-body mt-tight text-text-secondary">
             Explora las oportunidades publicadas y postúlate a los roles que más se ajusten a ti.
           </p>
         </div>
 
         {/* Buscador y filtros */}
-        <div className="mb-4.5 flex flex-col gap-4 sm:flex-row">
+        <div className="mb-section flex flex-col gap-stack sm:flex-row">
           <DashboardSearchField
             containerClassName="flex-1"
             aria-label="Buscar proyectos por titulo o descripcion"
@@ -166,7 +164,7 @@ export default function ProyectosPage() {
         </div>
 
         {isErrorOrganizaciones && (
-          <div className="mb-6 text-error text-sm">
+          <div className="mb-stack type-meta text-error">
             No se pudieron cargar las organizaciones para filtrar.
           </div>
         )}
@@ -233,7 +231,7 @@ export default function ProyectosPage() {
         )}
 
         {!isLoading && !isError && filtrados.length > 0 && cerrados > 0 && (
-          <p className="mb-3 text-[13px] text-tertiary" role="note">
+          <p className="type-meta mb-stack" role="note">
             {cerrados === 1 ? '1 proyecto cerrado' : `${cerrados} proyectos cerrados`}: ya no aceptan postulaciones y se muestran solo para consulta.
           </p>
         )}

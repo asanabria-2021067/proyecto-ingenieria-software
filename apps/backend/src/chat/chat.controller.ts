@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -13,6 +14,7 @@ import {
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -59,6 +61,16 @@ export class ChatController {
     @Body() dto: SendMessageDto,
   ) {
     return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido);
+  }
+
+  @Patch(':conversationId')
+  update(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: UpdateConversationDto,
+  ) {
+    return this.chatService.updateConversation(projectId, conversationId, user.userId, dto);
   }
 
   @Post(':conversationId/leido')

@@ -100,16 +100,16 @@ export function ProjectGeneralInfoSection({
       <div data-slot="readonly-card" className={READONLY_CARD_CLASS}>
         <ReadonlyField label="Título del proyecto" value={tituloProyecto} />
         <ReadonlyField label="Descripción" value={descripcionProyecto} />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ReadonlyField label="Tipo" value={TIPO_LABEL[tipoProyecto as TipoProyecto] ?? tipoProyecto} />
           <ReadonlyField label="Modalidad" value={MODALIDAD_LABEL[modalidadProyecto as ModalidadProyecto] ?? modalidadProyecto} />
         </div>
         <ReadonlyField label="Objetivos" value={objetivosProyecto} />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ReadonlyField label="Contexto académico" value={contextoAcademico} />
           <ReadonlyField label="Ubicación" value={ubicacionProyecto} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ReadonlyField label="Fecha de inicio" value={formatDate(fechaInicio)} />
           <ReadonlyField label="Fecha fin estimada" value={formatDate(fechaFinEstimada)} />
         </div>

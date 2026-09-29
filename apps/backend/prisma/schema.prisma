@@ -93,6 +93,14 @@ enum ModalidadProyecto {
   MIXTA
 }
 
+/// Modalidad de un EventoProyecto (sesión/reunión), distinta de ModalidadProyecto:
+/// un proyecto presencial puede tener eventos virtuales puntuales y viceversa.
+enum ModalidadEvento {
+  PRESENCIAL
+  VIRTUAL
+  MIXTA
+}
+
 enum RolOrganizacionProyecto {
   PRINCIPAL
   COLABORADORA
@@ -347,6 +355,7 @@ model Usuario {
   conversacionesParticipa          ConversacionParticipante[]
   mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
   tokensRefresco                   TokenRefresco[]
+  proyectosGuardados               ProyectoGuardado[]
 
   @@map("usuario")
 }
@@ -603,8 +612,23 @@ model Proyecto {
   revisionesCierre     RevisionCierreProyecto[]
   documentosCierre     DocumentoCierre[]
   eventos              EventoProyecto[]
+  guardadoPor          ProyectoGuardado[]
 
   @@map("proyecto")
+}
+
+/// Bookmark personal de un usuario sobre un proyecto ("guardar" en Explorar
+/// Proyectos), distinto de postularse. Tabla nueva, no toca nada existente.
+model ProyectoGuardado {
+  idUsuario  Int      @map("id_usuario")
+  idProyecto Int      @map("id_proyecto")
+  guardadoEn DateTime @default(now()) @map("guardado_en")
+
+  usuario  Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto], onDelete: Cascade)
+
+  @@id([idUsuario, idProyecto])
+  @@map("proyecto_guardado")
 }
 
 /// HU-169 (T-263): evento de calendario de un proyecto (reunión, entrega,
@@ -630,6 +654,14 @@ model EventoProyecto {
   creadoEn              DateTime  @default(now()) @map("creado_en")
   actualizadoEn         DateTime? @map("actualizado_en")
   eliminadoEn           DateTime? @map("eliminado_en")
+  /// Modalidad de la sesión (mapa/link condicionan en el frontend según este valor).
+  modalidad             ModalidadEvento @default(VIRTUAL) @map("modalidad")
+  ubicacionLat          Float?    @map("ubicacion_lat")
+  ubicacionLng          Float?    @map("ubicacion_lng")
+  ubicacionNombre       String?   @map("ubicacion_nombre") @db.VarChar(255)
+  linkSesion            String?   @map("link_sesion") @db.VarChar(500)
+  /// idRolProyecto destinatarios; [] = visible para todos los participantes del proyecto.
+  rolesDestino          Int[]     @default([]) @map("roles_destino")
 
   proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
   creador  Usuario  @relation(fields: [idCreador], references: [idUsuario])
@@ -1453,6 +1485,11 @@ model Conversacion {
   nombre         String?          @db.VarChar(255)
   creadaPor      Int              @map("creada_por")
   creadaEn       DateTime         @default(now()) @map("creada_en")
+  // T-xxx: menú de 3 puntos del chat — renombrar/archivar/favorito. Aditivas,
+  // nullable/default para no tocar filas existentes.
+  nombrePersonalizado String?     @db.VarChar(120) @map("nombre_personalizado")
+  esFavorita          Boolean     @default(false) @map("es_favorita")
+  archivadaEn         DateTime?   @map("archivada_en")
 
   proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto])
   creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])

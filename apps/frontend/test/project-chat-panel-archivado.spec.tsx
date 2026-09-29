@@ -12,6 +12,7 @@ const CONVERSACION_ARCHIVADA: ChatConversacion = {
   idConversacion: 1,
   tipo: 'INDIVIDUAL',
   nombre: null,
+  nombrePersonalizado: null,
   participantes: [
     { idUsuario: 1, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null },
     { idUsuario: 2, nombre: 'Luis', apellido: 'Gómez', fotoUrl: null },
@@ -19,6 +20,8 @@ const CONVERSACION_ARCHIVADA: ChatConversacion = {
   ultimoMensaje: null,
   noLeidos: 0,
   archivada: true,
+  esFavorita: false,
+  archivadaManual: false,
 };
 
 const MENSAJES: ChatMensaje[] = [
@@ -37,6 +40,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useMarkConversationRead: () => ({ mutate: vi.fn() }),
   useMessages: () => ({ messages: MENSAJES, isLoading: false }),
   useSendMessage: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateConversation: () => ({ mutate: vi.fn(), isPending: false }),
   useChatSocket: () => ({ isConnected: true }),
 }));
 
