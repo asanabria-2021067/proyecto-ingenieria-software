@@ -25,14 +25,13 @@ import {
   LayoutGrid,
   List,
   MoreVertical,
-  Search,
   SlidersHorizontal,
   UserCheck,
   UserPlus,
   UserX,
   Users,
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -69,6 +68,7 @@ import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badg
 import { formatMotivoRecomendacion } from '@/lib/social/recomendaciones';
 import uvgSwal from '@/lib/swal';
 import type { SemestreRango, SolicitudAmistadPendienteDto, UsuarioBusquedaDto } from '@/lib/types/social';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 type PestanaId = 'todos' | 'amigos-de-amigos' | 'mi-carrera' | 'mis-amigos';
 type VistaId = 'tarjetas' | 'lista';
@@ -151,7 +151,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
           variant={amistad.variant}
           disabled={amistad.disabled}
           onClick={amistad.onClick}
-          className="h-7 rounded-pill px-2.5 text-[11px]"
+          className="h-7 rounded-md px-2.5 text-[11px]"
         >
           {amistad.label}
         </Button>
@@ -221,7 +221,7 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
           variant={amistad.variant}
           disabled={amistad.disabled}
           onClick={amistad.onClick}
-          className="h-7 rounded-pill px-2.5 text-[11px]"
+          className="h-7 rounded-md px-2.5 text-[11px]"
         >
           {amistad.label}
         </Button>
@@ -272,7 +272,7 @@ function RecomendacionCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
       </div>
       <Button
         size="sm"
-        className="h-7 shrink-0 rounded-pill px-2.5 text-[11px]"
+        className="h-7 shrink-0 rounded-md px-2.5 text-[11px]"
         onClick={() => crearSolicitud.mutate(usuario.idUsuario)}
         disabled={crearSolicitud.isPending}
       >
@@ -391,8 +391,8 @@ export default function PersonasPage() {
   const vacio = mensajeVacio(pestana, amigos.length > 0, totalFiltros > 0);
 
   return (
-    <div className="px-section py-page">
-      <header className="mx-auto mb-section max-w-content">
+    <div className={dashboardPage('py-page')}>
+      <header className="mb-section">
         <h1 className="type-display text-text-primary">Personas</h1>
         <p className="type-body mt-tight text-text-secondary">
           Busca compañeros, sigue su actividad y hazte amigo.
@@ -400,7 +400,7 @@ export default function PersonasPage() {
       </header>
 
       {solicitudes.length > 0 && (
-        <section className="mx-auto mb-section max-w-content">
+        <section className="mb-section">
           <h2 className="type-section mb-card">Solicitudes pendientes</h2>
           <div className="flex flex-col gap-tight">
             {solicitudes.map((s) => (
@@ -433,7 +433,7 @@ export default function PersonasPage() {
       )}
 
       {!isLoadingRecomendaciones && (
-        <section className="mx-auto mb-section max-w-content">
+        <section className="mb-section">
           <h2 className="type-section mb-card">Personas que quizás conozcas</h2>
           {recomendaciones.length > 0 ? (
             <div className="grid gap-tight sm:grid-cols-2 xl:grid-cols-3">
@@ -442,9 +442,13 @@ export default function PersonasPage() {
               ))}
             </div>
           ) : (
-            <Empty tone="muted" aria-live="polite">
-              <EmptyMedia variant="compact">
-                <Users aria-hidden="true" className="size-6" />
+            // Tarjeta blanca, igual que los vacíos de las pestañas y Chats archivados.
+            <Empty className="surface-enter" aria-live="polite">
+              <EmptyMedia
+                variant="compact"
+                className="size-10 rounded-control border-transparent text-text-secondary"
+              >
+                <Users aria-hidden="true" className="size-5" />
               </EmptyMedia>
               <EmptyHeader>
                 <EmptyTitle className="type-subtitle">Sin recomendaciones por ahora</EmptyTitle>
@@ -457,19 +461,16 @@ export default function PersonasPage() {
         </section>
       )}
 
-      <div className="mx-auto max-w-content">
+      <div>
         <main>
           <div className="flex items-center gap-inline">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar por nombre o apellido"
-                className="pl-9"
-                aria-label="Buscar personas"
-              />
-            </div>
+            <DashboardSearchField
+              containerClassName="flex-1"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por nombre o apellido"
+              aria-label="Buscar personas"
+            />
 
             <Popover>
               <PopoverTrigger asChild>
@@ -571,7 +572,7 @@ export default function PersonasPage() {
                 <TabsTrigger
                   key={p.id}
                   value={p.id}
-                  className="rounded-pill text-text-primary data-[state=active]:bg-primary data-[state=active]:text-on-primary data-[state=active]:shadow-none"
+                  className="rounded-md text-text-primary data-[state=active]:bg-primary data-[state=active]:text-on-primary data-[state=active]:shadow-none"
                 >
                   {p.label}
                 </TabsTrigger>
@@ -582,9 +583,14 @@ export default function PersonasPage() {
               {isLoading ? (
                 <ListaSkeleton />
               ) : resultados.length === 0 ? (
-                <Empty tone="muted" aria-live="polite">
-                  <EmptyMedia variant="compact">
-                    <Users aria-hidden="true" className="size-6" />
+                // Mismo criterio que Chats archivados: tarjeta blanca (tono por
+                // defecto de Empty) con el icono pequeño y neutro.
+                <Empty className="surface-enter" aria-live="polite">
+                  <EmptyMedia
+                    variant="compact"
+                    className="size-10 rounded-control border-transparent text-text-secondary"
+                  >
+                    <Users aria-hidden="true" className="size-5" />
                   </EmptyMedia>
                   <EmptyHeader>
                     <EmptyTitle className="type-subtitle">{vacio.titulo}</EmptyTitle>

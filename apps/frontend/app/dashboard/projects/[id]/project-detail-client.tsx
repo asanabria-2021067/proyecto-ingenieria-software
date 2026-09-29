@@ -7,13 +7,21 @@ import { useProjectDetail } from '@/hooks/use-project-detail';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { type RolesSheetIntent } from '@/components/projects/project-roles-sheet';
-import { ProjectSummarySection } from '@/components/projects/detail/project-summary-section';
+import { ProjectClosureAction, ProjectHeaderCard } from '@/components/projects/detail/project-header-card';
+import { ProjectDescriptionCard } from '@/components/projects/detail/project-description-card';
+import { ProjectOwnerCard } from '@/components/projects/detail/project-owner-card';
+import { parseObjetivos } from '@/components/projects/detail/parse-objetivos';
 import { ExitRequestSection } from '@/components/projects/detail/exit-request-section';
 import { ClosureStatusBanner } from '@/components/projects/closure-status-banner';
 import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-banner';
-import { ProjectObjectivesSection } from '@/components/projects/detail/project-objectives-section';
 import { ProjectRoleManagementSection } from '@/components/projects/detail/project-role-management-section';
 import { ProjectDetailsSection } from '@/components/projects/detail/project-details-section';
+import {
+  ProjectContentGrid,
+  ProjectGridAside,
+  ProjectGridFull,
+  ProjectGridMain,
+} from '@/components/projects/detail/project-content-grid';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -21,6 +29,7 @@ import { useCurrentExitRequest } from '@/hooks/use-exit-request';
 import { useCloseReadiness, useClosureRevisions } from '@/hooks/use-closure';
 import { countPassedChecks, TOTAL_CLOSURE_CHECKS } from '@/components/closure/closure-readiness-panel';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
+import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 interface Props {
   id: number;
@@ -29,23 +38,25 @@ interface Props {
 const MIS_PROYECTOS_HREF = '/dashboard/projects/mine';
 
 // ─── Skeleton de carga ────────────────────────────────────────────────────────
+// Misma geometría que la vista cargada (encabezado a ancho completo, 8/4 por
+// contenedor) para que no haya salto al terminar de cargar.
 function ProjectDetailSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 py-6 pb-12">
-      <Skeleton className="mb-5 h-4 w-56" />
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        <div className="w-full space-y-5 lg:flex-1">
-          <Skeleton className="h-44 w-full rounded-xl" />
-          <Skeleton className="h-28 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-        </div>
-        <div className="w-full space-y-4 lg:w-80">
-          <Skeleton className="h-28 w-full rounded-xl" />
-          <Skeleton className="h-56 w-full rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-xl" />
-        </div>
-      </div>
-    </div>
+    <ProjectContentGrid aria-busy="true" aria-label="Cargando proyecto">
+      <ProjectGridFull>
+        <Skeleton className="h-4 w-56" />
+        <Skeleton className="h-44 w-full rounded-card" />
+      </ProjectGridFull>
+      <ProjectGridMain>
+        <Skeleton className="h-28 w-full rounded-card" />
+        <Skeleton className="h-64 w-full rounded-card" />
+      </ProjectGridMain>
+      <ProjectGridAside>
+        <Skeleton className="h-28 w-full rounded-card" />
+        <Skeleton className="h-56 w-full rounded-card" />
+        <Skeleton className="h-40 w-full rounded-card" />
+      </ProjectGridAside>
+    </ProjectContentGrid>
   );
 }
 
@@ -168,69 +179,87 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const misRoles = rolesAdmin.filter((r) => r.isMine);
 
   // Objetivos: texto real, separado por líneas (Sección 16).
-  const objetivos = (proyecto.objetivosProyecto ?? '')
-    .split('\n')
-    .map((s) => s.replace(/^[-*•]\s*/, '').trim())
-    .filter(Boolean);
+  const objetivos = parseObjetivos(proyecto.objetivosProyecto);
+
+  // D-02: quien no participa (ni lidera ni administra) no tiene nada que
+  // hacer en este workspace salvo postularse, y los roles con postulación
+  // viven en la ruta pública del proyecto.
+  const mostrarPostularme = !isLeader && !puedeVerKanban && !isAdmin && !proyectoCerrado;
 
   if (debeRedirigir) {
     return <ProjectDetailSkeleton />;
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 pb-12 pt-6 md:px-8">
-      <ProjectSummarySection
-        proyecto={proyecto}
-        isLeader={isLeader}
-        isAdmin={isAdmin}
-        puedeVerKanban={puedeVerKanban}
-        closureAction={closureAction}
-        readOnly={proyectoCerrado}
-      >
-        {proyectoCerrado && (
-          <ReadOnlyProjectBanner fechaCierre={proyecto.fechaActualizacion} className="mb-5" />
-        )}
+    <ProjectContentGrid>
+      {/* Encabezado y estado del proyecto a ancho completo. La navegación
+          entre secciones (Tablero, Miembros, Sprints…) y las acciones
+          secundarias (editar, revisiones) viven en la navegación contextual. */}
+      <ProjectGridFull>
+        <ProjectHeaderCard
+          breadcrumb={{ href: MIS_PROYECTOS_HREF, label: 'Mis proyectos' }}
+          titulo={proyecto.tituloProyecto}
+          descripcion={proyecto.descripcionProyecto}
+          tipoProyecto={proyecto.tipoProyecto}
+          estadoProyecto={proyecto.estadoProyecto}
+          modalidadProyecto={proyecto.modalidadProyecto}
+          etiquetas={proyecto.intereses.map((pi) => pi.interes.nombreInteres)}
+          lider={isLeader ? proyecto.creador : null}
+          acciones={
+            mostrarPostularme || closureAction ? (
+              <>
+                {mostrarPostularme && (
+                  <Button asChild className="bg-primary text-on-primary hover:bg-primary/90">
+                    <Link href={`/dashboard/proyectos/${idProyecto}`}>Ver roles y postularme</Link>
+                  </Button>
+                )}
+                {closureAction && <ProjectClosureAction action={closureAction} />}
+              </>
+            ) : undefined
+          }
+        />
+        {proyectoCerrado && <ReadOnlyProjectBanner fechaCierre={proyecto.fechaActualizacion} />}
         {enSolicitudCierre && (
           <ClosureStatusBanner
             idProyecto={idProyecto}
             estadoProyecto={estadoProyecto}
             revision={ultimaRevision}
             isLeader={isLeader}
-            className="mb-5"
           />
         )}
+      </ProjectGridFull>
+
+      <ProjectGridMain>
+        <ProjectDescriptionCard descripcion={proyecto.descripcionProyecto} objetivos={objetivos} />
+
+        {/* Estado personal: junto a los roles, igual que en la vista del participante. */}
         {solicitudSalidaAbierta && !proyectoCerrado && (
           <ExitRequestSection idProyecto={idProyecto} solicitud={solicitudSalidaAbierta} />
         )}
-      </ProjectSummarySection>
 
-      {/* La navegación entre secciones del proyecto (Editar Información,
-          Revisiones Pasadas, Editar Roles, Miembros, Sprints, Tablero) vive
-          ahora únicamente en la sidebar del workspace (ProjectSidebar). */}
+        <ProjectRoleManagementSection
+          isLeader={puedeEscribir}
+          proyecto={proyecto}
+          rolesAdmin={rolesAdmin}
+          asignarmeRol={asignarmeRol}
+          salirDeRol={salirDeRol}
+          crearRol={crearRol}
+          editarRol={editarRol}
+          eliminarRol={eliminarRol}
+          abrirCrearRol={abrirCrearRol}
+          abrirEditarRol={abrirEditarRol}
+          rolesSheetAbierto={rolesSheetAbierto}
+          setRolesSheetAbierto={setRolesSheetAbierto}
+          rolesSheetIntent={rolesSheetIntent}
+        />
+      </ProjectGridMain>
 
-      {/* Fila 2: objetivos/roles · detalles/resumen sticky. */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
-        {/* FILA 2 · COL 1 — Objetivos + Roles */}
-        <div className="min-w-0 space-y-5">
-          <ProjectObjectivesSection objetivos={objetivos} />
-
-          <ProjectRoleManagementSection
-            isLeader={puedeEscribir}
-            proyecto={proyecto}
-            rolesAdmin={rolesAdmin}
-            asignarmeRol={asignarmeRol}
-            salirDeRol={salirDeRol}
-            crearRol={crearRol}
-            editarRol={editarRol}
-            eliminarRol={eliminarRol}
-            abrirCrearRol={abrirCrearRol}
-            abrirEditarRol={abrirEditarRol}
-            rolesSheetAbierto={rolesSheetAbierto}
-            setRolesSheetAbierto={setRolesSheetAbierto}
-            rolesSheetIntent={rolesSheetIntent}
-          />
-        </div>
-
+      <ProjectGridAside aria-label="Información del proyecto">
+        <ProjectOwnerCard
+          nombre={proyecto.creador.nombre}
+          apellido={proyecto.creador.apellido}
+          correo={proyecto.creador.correo}
+        />
         <ProjectDetailsSection
           proyecto={proyecto}
           isLeader={puedeEscribir}
@@ -239,8 +268,8 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           rolesDisponiblesCount={rolesDisponiblesCount}
           cuposTotales={cuposTotales}
         />
-      </div>
-    </div>
+      </ProjectGridAside>
+    </ProjectContentGrid>
   );
 }
 
@@ -256,26 +285,28 @@ export default function ProjectDetailClient({ id }: Props) {
     const status = (error as { statusCode?: number } | null)?.statusCode;
     const noEncontrado = status === 404;
     return (
-        <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <h2 className="text-lg font-bold text-on-surface">
-            {noEncontrado ? 'Proyecto no encontrado' : 'No fue posible cargar la información del proyecto.'}
-          </h2>
-          <p className="mt-2 text-sm text-on-surface-variant">
-            {noEncontrado
-              ? 'El proyecto que buscas no existe o ya no está disponible.'
-              : 'Ocurrió un problema al cargar el proyecto.'}
-          </p>
-          <div className="mt-5 flex justify-center gap-2">
-            {!noEncontrado && (
-              <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Reintentar
+        <ProjectPageShell>
+          <div className="mx-auto max-w-prose py-16 text-center">
+            <h2 className="text-lg font-bold text-on-surface">
+              {noEncontrado ? 'Proyecto no encontrado' : 'No fue posible cargar la información del proyecto.'}
+            </h2>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              {noEncontrado
+                ? 'El proyecto que buscas no existe o ya no está disponible.'
+                : 'Ocurrió un problema al cargar el proyecto.'}
+            </p>
+            <div className="mt-5 flex justify-center gap-2">
+              {!noEncontrado && (
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  Reintentar
+                </Button>
+              )}
+              <Button asChild size="sm" className="bg-primary text-on-primary hover:bg-primary/90">
+                <Link href={MIS_PROYECTOS_HREF}>Volver a Mis Proyectos</Link>
               </Button>
-            )}
-            <Button asChild size="sm" className="bg-primary text-on-primary hover:bg-primary/90">
-              <Link href={MIS_PROYECTOS_HREF}>Volver a Mis Proyectos</Link>
-            </Button>
+            </div>
           </div>
-        </div>
+        </ProjectPageShell>
     );
   }
 

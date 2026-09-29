@@ -12,6 +12,7 @@ import {
   FileText,
   ListChecks,
   CalendarDays,
+  Clock,
   RotateCcw,
   Users,
   Archive,
@@ -53,6 +54,9 @@ const navEntries: NavEntry[] = [
         href: '/dashboard/proyectos',
         label: 'Explorar Proyectos',
         icon: FolderOpen,
+        // Solo la lista: las vistas de un proyecto (/dashboard/proyectos/:id/…)
+        // tienen su propia sidebar y no son «Explorar».
+        exact: true,
       },
       {
         href: '/dashboard/projects/mine',
@@ -67,6 +71,7 @@ const navEntries: NavEntry[] = [
     icon: ListChecks,
     items: [
       { href: '/dashboard/mis-tareas', label: 'Mis Tareas', icon: ListChecks },
+      { href: '/dashboard/mis-horas', label: 'Mis Horas', icon: Clock },
       {
         href: '/dashboard/calendario',
         label: 'Calendario',

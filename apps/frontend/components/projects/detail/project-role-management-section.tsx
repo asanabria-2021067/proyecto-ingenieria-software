@@ -17,7 +17,7 @@ import uvgSwal from '@/lib/swal';
 
 type ProjectRolesHook = ReturnType<typeof useProjectRoles>;
 
-const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
+const CARD = 'card-base';
 
 const ULTIMO_ROL_MSG = 'No puedes abandonar tu último rol desde esta opción.';
 
@@ -79,39 +79,43 @@ export function ProjectRoleManagementSection({
       {isLeader ? (
         <div className={CARD}>
           <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-            <h2 className="font-headline text-sm font-black text-on-surface">
+            <h2 className="type-section">
               Roles del proyecto ({rolesAdmin.length})
             </h2>
             <Button
               size="sm"
               variant="outline"
               onClick={abrirCrearRol}
-              className="gap-1.5 self-start rounded-md border-primary text-xs font-bold text-primary hover:bg-primary/10 sm:self-auto"
+              className="type-meta gap-micro self-start border-primary text-primary hover:bg-primary/10 sm:self-auto"
             >
               <Plus className="size-3.5" aria-hidden="true" />
               Agregar rol
             </Button>
           </div>
           {rolesAdmin.length === 0 ? (
-            <p className="text-sm text-tertiary">No hay roles registrados.</p>
+            <p className="type-body text-text-secondary">No hay roles registrados.</p>
           ) : (
-            <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
-              {rolesAdmin.map((role) => (
-                <RoleAdminCard
-                  key={role.idRolProyecto}
-                  role={role}
-                  asignarmeRol={asignarmeRol}
-                  salirDeRol={salirDeRol}
-                  onEditar={() => abrirEditarRol(role)}
-                />
-              ))}
+            // Dos columnas según el ancho real de la lista, no de la ventana: en la
+            // columna principal 8/12 dos tarjetas por fila no caben hasta ~42rem.
+            <div className="@container/roles">
+              <div className="grid grid-cols-1 gap-grid @2xl/roles:grid-cols-2">
+                {rolesAdmin.map((role) => (
+                  <RoleAdminCard
+                    key={role.idRolProyecto}
+                    role={role}
+                    asignarmeRol={asignarmeRol}
+                    salirDeRol={salirDeRol}
+                    onEditar={() => abrirEditarRol(role)}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
       ) : (
         proyecto.roles.length > 0 && (
           <div className={CARD}>
-            <h2 className="mb-4 font-headline text-xs font-black uppercase tracking-widest text-tertiary">
+            <h2 className="type-meta mb-stack uppercase tracking-wide">
               Roles disponibles
             </h2>
             <div className="space-y-5">
@@ -131,14 +135,14 @@ export function ProjectRoleManagementSection({
                   <div key={rol.idRolProyecto} className="border-l-4 border-primary py-0.5 pl-5">
                     <div className="mb-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-headline text-sm font-black text-on-surface">{rol.nombreRol}</h3>
+                        <h3 className="type-subtitle">{rol.nombreRol}</h3>
                         {esMiRol && (
-                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                          <span className="pill pill-success">
                             Mi rol
                           </span>
                         )}
                         {rol.cupos > 0 && (
-                          <span className="rounded-full bg-[#DCF6AE] dark:bg-[#1f3a0a] px-2.5 py-1 text-[11px] font-semibold text-[#397016] dark:text-[#b8f27a]">
+                          <span className="pill pill-accent">
                             Disponible
                           </span>
                         )}
@@ -150,7 +154,7 @@ export function ProjectRoleManagementSection({
                             size="sm"
                             onClick={() => handleSalirDeRol(rol)}
                             disabled={saliendo}
-                            className="shrink-0 self-start gap-1.5 rounded-md bg-error text-xs font-bold text-white hover:bg-error/90"
+                            className="shrink-0 self-start gap-micro bg-error text-on-error hover:bg-error/90"
                           >
                             {saliendo ? 'Saliendo…' : 'Salir de este rol'}
                           </Button>
@@ -162,7 +166,7 @@ export function ProjectRoleManagementSection({
                                   size="sm"
                                   variant="outline"
                                   disabled
-                                  className="pointer-events-none gap-1.5 rounded-md border-outline-variant text-xs font-bold text-tertiary"
+                                  className="pointer-events-none gap-micro border-outline-variant text-text-disabled"
                                 >
                                   Salir de este rol
                                 </Button>
@@ -176,7 +180,7 @@ export function ProjectRoleManagementSection({
                           asChild
                           size="sm"
                           variant="outline"
-                          className="shrink-0 self-start gap-1.5 rounded-md border-outline-variant text-xs font-bold text-on-surface hover:bg-surface-container"
+                          className="shrink-0 self-start gap-micro border-outline-variant text-text-primary hover:bg-surface-container"
                         >
                           <Link href="/dashboard/mis-postulaciones">Ver mi postulación</Link>
                         </Button>
@@ -184,7 +188,7 @@ export function ProjectRoleManagementSection({
                         <Button
                           asChild
                           size="sm"
-                          className="shrink-0 self-start gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
+                          className="shrink-0 self-start gap-micro bg-primary text-on-primary hover:bg-primary/90"
                         >
                           <Link href={`/dashboard/proyectos/${proyecto.idProyecto}/postular/${rol.idRolProyecto}`}>
                             Postularme a este rol
@@ -193,12 +197,12 @@ export function ProjectRoleManagementSection({
                         </Button>
                       )}
                     </div>
-                    <div className="mb-3 flex items-center gap-1.5 text-xs text-tertiary">
+                    <div className="type-meta mb-inline flex items-center gap-micro">
                       <Users className="size-3.5" />
                       {rol.cupos} {rol.cupos === 1 ? 'cupo disponible' : 'cupos disponibles'}
                     </div>
                     {rol.descripcionRolProyecto && (
-                      <p className="mb-3 text-xs leading-relaxed text-on-surface-variant">
+                      <p className="type-meta mb-inline">
                         {rol.descripcionRolProyecto}
                       </p>
                     )}
@@ -207,7 +211,7 @@ export function ProjectRoleManagementSection({
                         {rol.requisitos.map((req) => (
                           <span
                             key={req.idRequisitoHabilidad}
-                            className="rounded-md bg-surface-container-low px-2.5 py-1 text-xs font-medium text-on-surface"
+                            className="pill pill-neutral"
                           >
                             {req.habilidad.nombreHabilidad}
                           </span>

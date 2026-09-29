@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, TipoExperiencia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectHoursSummaryService } from '../sprints/project-hours-summary.service';
@@ -7,6 +7,7 @@ import {
   CreateExperienciaDto,
 } from './dto/update-profile.dto';
 import { GetMisTareasQueryDto } from './dto/get-mis-tareas-query.dto';
+import type { MisHorasResponse } from './dto/mis-horas.response';
 
 @Injectable()
 export class UsersService {
@@ -438,6 +439,19 @@ export class UsersService {
       horasRegistradasEnProyectosAbiertos: abiertas?.reportadasGranulares ?? '0.00',
       horasAcreditadas: abiertas?.acreditadas ?? '0.00',
     };
+  }
+
+  /**
+   * HU-158 (T-231): desglose de «Mis Horas». Toda la contabilidad vive en el
+   * proveedor de horas; aquí no se consulta Prisma. A diferencia del
+   * dashboard, sin proveedor no hay un valor por defecto honesto: devolver
+   * ceros haría creer al estudiante que no tiene horas.
+   */
+  async getMisHoras(userId: number): Promise<MisHorasResponse> {
+    if (!this.projectHours) {
+      throw new InternalServerErrorException('El proveedor de horas no está disponible.');
+    }
+    return this.projectHours.forUserBreakdown(userId);
   }
 
   /**

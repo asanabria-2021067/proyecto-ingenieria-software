@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ArchivedConversacion, ChatMensaje } from '@/lib/types/chat';
 
@@ -54,6 +54,25 @@ describe('ChatsArchivadosPage', () => {
   it('muestra el estado vacío cuando no hay chats archivados', async () => {
     await renderPage();
     expect(await screen.findByText('Todavía no tenés chats archivados')).toBeInTheDocument();
+  });
+
+  it('el estado vacío es una tarjeta blanca (como Mis Postulaciones) con un icono pequeño y neutro', async () => {
+    await renderPage();
+    const titulo = await screen.findByText('Todavía no tenés chats archivados');
+    const vacio = titulo.closest('[data-slot="empty"]') as HTMLElement;
+    expect(vacio).toHaveClass('bg-surface-container-lowest', 'rounded-2xl', 'shadow-sm');
+    expect(vacio).not.toHaveClass('border-dashed', 'bg-surface-container-low');
+    const icono = vacio.querySelector('[data-slot="empty-icon"]') as HTMLElement;
+    expect(icono).toHaveClass('size-10', 'text-text-secondary');
+    expect(icono.querySelector('svg')).toHaveClass('size-5');
+    expect(within(vacio).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(vacio).queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('el título «Chats archivados» va sin icono al lado', async () => {
+    await renderPage();
+    const titulo = screen.getByRole('heading', { level: 1, name: 'Chats archivados' });
+    expect(titulo.closest('header')!.querySelector('svg')).toBeNull();
   });
 
   it('lista una conversación archivada con el nombre del proyecto y un candado', async () => {

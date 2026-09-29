@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { UserPlus, Users, LogOut, Clock, GraduationCap, Pencil } from 'lucide-react';
+import { UserPlus, LogOut, GraduationCap, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -69,137 +69,131 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
     );
 
   return (
-    <div className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-headline text-sm font-black text-on-surface">{role.nombreRol}</h3>
-            {role.isMine && (
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                Mi rol
-              </span>
-            )}
-            {/* Disponibilidad real (Sección 19): solo si hay cupos disponibles. */}
-            {role.cuposDisponibles > 0 ? (
-              <span className="inline-flex items-center rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-300">
-                Disponible
-              </span>
-            ) : (
-              <span className="inline-flex items-center rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-medium text-tertiary">
-                Sin cupos
-              </span>
-            )}
-          </div>
-          {role.carreraRequerida && (
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-tertiary">
-              <GraduationCap className="size-3.5" aria-hidden="true" />
-              {role.carreraRequerida.nombreCarrera}
-            </p>
-          )}
-        </div>
-
-        {/* Acciones del líder (Sección 22 A-D) */}
-        <div className="flex shrink-0 flex-col items-stretch gap-1.5 sm:items-end">
-          {!role.isMine ? (
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleAsignarme}
-              disabled={asignandome}
-              className="gap-1.5 rounded-lg bg-primary text-xs font-bold text-on-primary hover:bg-primary/90 min-h-9"
-            >
-              {asignandome ? <Spinner className="size-3.5" /> : <UserPlus className="size-3.5" aria-hidden="true" />}
-              Asignarme a este rol
-            </Button>
-          ) : role.canLeave ? (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setConfirmarSalir(true)}
-              disabled={saliendo}
-              className="gap-1.5 rounded-lg border-transparent bg-error text-xs font-bold text-white hover:bg-error/90 min-h-9"
-            >
-              {saliendo ? <Spinner className="size-3.5" /> : <LogOut className="size-3.5" aria-hidden="true" />}
-              Salir de este rol
-            </Button>
+    // Tarjeta del rol en una sola columna, de arriba abajo: título, estado,
+    // carrera, acciones, descripción, métricas y requisitos. Ocupa todo el alto
+    // de su celda para que las tarjetas de una misma fila midan lo mismo.
+    <div data-slot="role-card" className="card-base flex h-full flex-col gap-stack">
+      <div className="flex flex-col gap-tight">
+        <h3 className="type-subtitle line-clamp-2 leading-snug" title={role.nombreRol}>
+          {role.nombreRol}
+        </h3>
+        {/* Estado del rol en su propia fila: no comprime el título. */}
+        <div className="flex flex-wrap items-center gap-micro">
+          {role.isMine && <span className="pill pill-success">Mi rol</span>}
+          {/* Disponibilidad real (Sección 19): solo si hay cupos disponibles. */}
+          {role.cuposDisponibles > 0 ? (
+            <span className="pill pill-accent">Disponible</span>
           ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {/* span envuelve el botón deshabilitado para que el tooltip reciba foco/hover */}
-                <span tabIndex={0} aria-label={ULTIMO_ROL_MSG}>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled
-                    className="pointer-events-none gap-1.5 rounded-lg border-outline-variant text-xs font-bold text-tertiary min-h-9"
-                  >
-                    <LogOut className="size-3.5" aria-hidden="true" />
-                    Salir de este rol
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{ULTIMO_ROL_MSG}</TooltipContent>
-            </Tooltip>
-          )}
-
-          {onEditar && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={onEditar}
-              aria-label={`Editar rol ${role.nombreRol}`}
-              className="gap-1.5 rounded-lg text-xs font-bold text-on-surface-variant min-h-9"
-            >
-              <Pencil className="size-3.5" aria-hidden="true" />
-              Editar rol
-            </Button>
+            <span className="pill pill-neutral">Sin cupos</span>
           )}
         </div>
+        {role.carreraRequerida && (
+          <p className="type-meta flex items-center gap-micro">
+            <GraduationCap className="size-3.5 shrink-0" aria-hidden="true" />
+            {role.carreraRequerida.nombreCarrera}
+          </p>
+        )}
+      </div>
+
+      {/* Acciones del líder (Sección 22 A-D): la principal y, al lado, Editar
+          rol con menos peso visual. `type-meta` fija el tamaño: tailwind-merge
+          confunde el `text-body` del botón con un color y lo descarta al
+          recibir `text-on-primary`, y el texto heredaría 16 px. */}
+      <div className="flex flex-wrap items-center gap-tight">
+        {!role.isMine ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleAsignarme}
+            disabled={asignandome}
+            className="type-meta min-h-9 gap-micro bg-primary text-on-primary hover:bg-primary/90"
+          >
+            {asignandome ? <Spinner className="size-3.5" /> : <UserPlus className="size-3.5" aria-hidden="true" />}
+            Asignarme a este rol
+          </Button>
+        ) : role.canLeave ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setConfirmarSalir(true)}
+            disabled={saliendo}
+            className="type-meta min-h-9 gap-micro border-transparent bg-error text-on-error hover:bg-error/90"
+          >
+            {saliendo ? <Spinner className="size-3.5" /> : <LogOut className="size-3.5" aria-hidden="true" />}
+            Salir de este rol
+          </Button>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {/* span envuelve el botón deshabilitado para que el tooltip reciba foco/hover */}
+              <span tabIndex={0} aria-label={ULTIMO_ROL_MSG}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  className="type-meta pointer-events-none min-h-9 gap-micro border-outline-variant text-text-disabled"
+                >
+                  <LogOut className="size-3.5" aria-hidden="true" />
+                  Salir de este rol
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{ULTIMO_ROL_MSG}</TooltipContent>
+          </Tooltip>
+        )}
+
+        {onEditar && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={onEditar}
+            aria-label={`Editar rol ${role.nombreRol}`}
+            className="type-meta min-h-9 gap-micro text-text-secondary hover:text-text-primary"
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Editar rol
+          </Button>
+        )}
       </div>
 
       {role.descripcionRolProyecto && (
-        <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+        <p className="type-meta line-clamp-3 leading-relaxed" title={role.descripcionRolProyecto}>
           {role.descripcionRolProyecto}
         </p>
       )}
 
-      {/* Métricas del rol (Sección 22) */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-tertiary">
-        <span className="inline-flex items-center gap-1.5">
-          <Users className="size-3.5" aria-hidden="true" />
+      {/* Métricas del rol (Sección 22): bloque propio, sin iconos y abajo del
+          todo para que se alineen entre tarjetas de la misma fila. */}
+      <div
+        data-slot="role-card-metricas"
+        className="type-meta mt-auto flex flex-wrap items-center gap-x-card gap-y-micro border-t border-outline-variant/40 pt-stack"
+      >
+        <span>
           {role.participantesActivos}/{role.cupos} ocupados
         </span>
         <span>
           {role.cuposDisponibles} {role.cuposDisponibles === 1 ? 'cupo disponible' : 'cupos disponibles'}
         </span>
-        {role.horasSemanalesEstimadas != null && (
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="size-3.5" aria-hidden="true" />
-            {role.horasSemanalesEstimadas} h/sem
-          </span>
-        )}
+        {role.horasSemanalesEstimadas != null && <span>{role.horasSemanalesEstimadas} h/sem</span>}
       </div>
 
       {role.requisitos.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <ul aria-label="Habilidades requeridas" className="flex flex-wrap gap-micro">
           {role.requisitos.map((req) => (
-            <span
+            <li
               key={req.idHabilidad}
-              className="inline-flex items-center gap-1 rounded-lg bg-surface-container-high px-2 py-0.5 text-[11px] font-medium text-on-surface-variant"
+              className="rounded-control bg-surface-container-high px-tight py-micro text-meta text-text-secondary"
             >
-              {req.nombreHabilidad}
-              <span className="text-[10px] text-tertiary">
-                · {NIVEL_LABEL_ROL[req.nivelMinimo] ?? req.nivelMinimo}
-              </span>
-            </span>
+              {req.nombreHabilidad} · {NIVEL_LABEL_ROL[req.nivelMinimo] ?? req.nivelMinimo}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {(errorAsignar || errorSalir) && (
-        <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="type-meta text-error">
           {errorAsignar ?? errorSalir}
         </p>
       )}
@@ -216,7 +210,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
             </AlertDialogDescription>
           </AlertDialogHeader>
           {errorSalir && (
-            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+            <p role="alert" className="type-meta text-error">
               {errorSalir}
             </p>
           )}
@@ -228,7 +222,7 @@ export function RoleAdminCard({ role, asignarmeRol, salirDeRol, onEditar }: Role
                 e.preventDefault();
                 handleSalir();
               }}
-              className="bg-error text-white hover:bg-error/90"
+              className="bg-error text-on-error hover:bg-error/90"
             >
               {saliendo ? 'Saliendo…' : 'Salir del rol'}
             </AlertDialogAction>

@@ -1,12 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { AlertCircle, ArrowLeft, ClipboardList, Search, SearchX } from 'lucide-react';
+import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
+import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -23,14 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import {
   Empty,
   EmptyContent,
@@ -54,10 +45,31 @@ import {
   type DireccionOrden,
 } from '@/lib/tasks/filters';
 import type { EstadoTarea, Prioridad, TareaPublicaDTO } from '@/lib/types/tasks';
+import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 interface Props {
   idProyecto: number;
 }
+
+/**
+ * Barra de búsqueda y filtros como la de Mis Tareas: fuera de la tarjeta,
+ * buscador ancho y selects blancos. Mide el ancho del área del proyecto:
+ * una sola fila desde 64rem; antes, el buscador va en su propia fila.
+ */
+const BARRA_FILTROS =
+  'grid grid-cols-1 gap-4 @xl/project:grid-cols-2 @3xl/project:grid-cols-3 @5xl/project:flex';
+const FILTRO_TRIGGER = `w-full ${DASHBOARD_FILTER_TRIGGER_CLASS}`;
+
+/**
+ * Formato de la tabla de Mis Tareas: franja guía gris verdosa con etiquetas
+ * pequeñas en seminegrita, divisores tenues (sin `border-b` casi negro) y
+ * hover muy suave. Las celdas de los extremos llevan el padding de la tarjeta.
+ */
+const BORDE_TARJETA = 'first:pl-card last:pr-card';
+const FILA_GUIA = 'border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low';
+const CELDA_GUIA = `h-auto py-tight text-xs font-semibold text-text-secondary ${BORDE_TARJETA}`;
+const FILA_TAREA = 'border-outline-variant/50 hover:bg-surface-container-low';
+const CELDA_TAREA = BORDE_TARJETA;
 
 const TAMANO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
@@ -169,156 +181,99 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-content px-stack py-section md:px-section">
-      {/* breadcrumb */}
-      <Breadcrumb className="mb-stack">
-        <BreadcrumbList className="type-meta">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard/projects/mine" className="text-text-secondary hover:text-text-primary">
-                Mis proyectos
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link
-                href={`/dashboard/projects/${idProyecto}/kanban`}
-                className="max-w-64 truncate text-text-secondary hover:text-text-primary"
-              >
-                {proyecto?.tituloProyecto ?? 'Proyecto'}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="font-medium text-text-primary">Lista de tareas</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      {/* encabezado */}
-      <div className="card-base mb-stack flex flex-col gap-stack md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0 space-y-micro">
-          {isLoadingProyecto ? (
-            <Skeleton className="h-8 w-64" />
-          ) : (
-            <h1 className="type-display line-clamp-2 text-text-primary">
-              {proyecto?.tituloProyecto ?? 'Proyecto'}
-            </h1>
-          )}
-          <p className="type-body text-text-secondary">
-            Vista de solo lectura de todas las tareas del proyecto. Para editar, abre el Kanban.
+    <ProjectPageShell>
+      {/* encabezado fuera de las tarjetas; la vuelta lleva al Tablero, como el breadcrumb anterior */}
+      <ProjectPageHeader
+        back={{ href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Volver al Tablero' }}
+        title="Lista de tareas"
+        description="Vista de solo lectura de todas las tareas del proyecto. Para editar, abre el Kanban."
+      >
+        {isLoadingProyecto ? (
+          <Skeleton className="mt-tight h-4 w-48" />
+        ) : (
+          <p className="type-meta mt-tight">
+            Proyecto: <span className="font-medium text-text-primary">{proyecto?.tituloProyecto ?? 'Proyecto'}</span>
           </p>
-        </div>
+        )}
+      </ProjectPageHeader>
 
-        <Button
-          asChild
-          variant="outline"
-          size="sm"
-          className="shrink-0 border-outline-variant"
-        >
-          <Link href={`/dashboard/projects/${idProyecto}/kanban`}>
-            <ArrowLeft className="size-3.5" aria-hidden="true" />
-            Ir al Kanban
-          </Link>
-        </Button>
+      {/* resultados + limpiar, sobre la barra (mismo criterio que Mis Tareas) */}
+      <div className="mb-stack flex min-h-8 flex-wrap items-center justify-between gap-inline">
+        <p className="type-body text-text-secondary" aria-live="polite" role="status">
+          Resultados: <span className="font-semibold tabular-nums text-text-primary">{tareasFiltradas.length}</span>
+          {hayFiltrosActivos && ` de ${tasks.length} tareas en total`}
+        </p>
+        {hayFiltrosActivos && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={limpiarFiltros}
+            className="font-medium text-primary"
+          >
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
-      {/* toolbar + tabla + paginación */}
-      <div className="card-base min-h-0">
-        <div className="mb-stack flex flex-col gap-inline lg:flex-row lg:flex-wrap lg:items-center">
-          <div className="relative w-full lg:max-w-xs">
-            <Search
-              className="pointer-events-none absolute left-inline top-1/2 size-4 -translate-y-1/2 text-text-secondary"
-              aria-hidden="true"
-            />
-            <Input
-              value={busqueda}
-              onChange={(e) => actualizarBusqueda(e.target.value)}
-              placeholder="Buscar por título o descripción..."
-              aria-label="Buscar tareas por título o descripción"
-              className="rounded-control border-outline-variant bg-page pl-9 text-body"
-            />
-          </div>
+      {/* barra de búsqueda y filtros sobre el fondo, fuera de la tarjeta */}
+      <section aria-label="Filtros de tareas" className={`mb-stack ${BARRA_FILTROS}`}>
+        <DashboardSearchField
+          containerClassName="@xl/project:col-span-2 @3xl/project:col-span-3 @5xl/project:flex-1"
+          value={busqueda}
+          onChange={(e) => actualizarBusqueda(e.target.value)}
+          placeholder="Buscar por título o descripción..."
+          aria-label="Buscar tareas por título o descripción"
+        />
 
-          <Select value={estadoFiltro} onValueChange={actualizarEstado}>
-            <SelectTrigger
-              aria-label="Filtrar por estado"
-              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-44"
-            >
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={FILTRO_TODOS}>Todos los estados</SelectItem>
-              {Object.entries(ESTADO_LABEL).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Select value={estadoFiltro} onValueChange={actualizarEstado}>
+          <SelectTrigger aria-label="Filtrar por estado" className={`${FILTRO_TRIGGER} @5xl/project:w-44`}>
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={FILTRO_TODOS}>Todos los estados</SelectItem>
+            {Object.entries(ESTADO_LABEL).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          <Select value={prioridadFiltro} onValueChange={actualizarPrioridad}>
-            <SelectTrigger
-              aria-label="Filtrar por prioridad"
-              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-44"
-            >
-              <SelectValue placeholder="Prioridad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={FILTRO_TODOS}>Todas las prioridades</SelectItem>
-              {Object.entries(PRIORIDAD_LABEL).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Select value={prioridadFiltro} onValueChange={actualizarPrioridad}>
+          <SelectTrigger aria-label="Filtrar por prioridad" className={`${FILTRO_TRIGGER} @5xl/project:w-44`}>
+            <SelectValue placeholder="Prioridad" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={FILTRO_TODOS}>Todas las prioridades</SelectItem>
+            {Object.entries(PRIORIDAD_LABEL).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          <Select value={ordenValor} onValueChange={actualizarOrden}>
-            <SelectTrigger
-              aria-label="Ordenar tareas"
-              className="w-full rounded-control border-outline-variant bg-page text-body lg:w-64"
-            >
-              <SelectValue placeholder="Ordenar" />
-            </SelectTrigger>
-            <SelectContent>
-              {OPCIONES_ORDEN.map((opcion) => (
-                <SelectItem key={opcion.value} value={opcion.value}>
-                  {opcion.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Select value={ordenValor} onValueChange={actualizarOrden}>
+          <SelectTrigger aria-label="Ordenar tareas" className={`${FILTRO_TRIGGER} @5xl/project:w-60`}>
+            <SelectValue placeholder="Ordenar" />
+          </SelectTrigger>
+          <SelectContent>
+            {OPCIONES_ORDEN.map((opcion) => (
+              <SelectItem key={opcion.value} value={opcion.value}>
+                {opcion.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </section>
 
-          {hayFiltrosActivos && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={limpiarFiltros}
-              className="font-medium text-primary lg:ml-auto"
-            >
-              Limpiar filtros
-            </Button>
-          )}
-        </div>
-
-        {/* contador de resultados */}
-        <div className="mb-inline flex items-center gap-tight" aria-live="polite" role="status">
-          <span className="pill pill-accent">
-            {tareasFiltradas.length} {tareasFiltradas.length === 1 ? 'resultado' : 'resultados'}
-          </span>
-          {hayFiltrosActivos && (
-            <span className="type-meta">de {tasks.length} tareas en total</span>
-          )}
-        </div>
+      {/* tabla: la franja guía y las filas llegan al borde de la tarjeta, como en Mis Tareas */}
+      <div className="card-base min-h-0 overflow-hidden p-0">
 
         {/* loading — skeleton con forma de fila (título + meta + pastillas), nunca spinner */}
         {isLoading && (
-          <div className="space-y-inline py-inline" role="status" aria-label="Cargando tareas">
+          <div className="space-y-inline p-card" role="status" aria-label="Cargando tareas">
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
@@ -337,7 +292,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
 
         {/* error */}
         {!isLoading && isError && (
-          <Empty tone="danger" className="surface-enter" role="alert">
+          <Empty tone="danger" className="surface-enter m-card" role="alert">
             <EmptyMedia variant="icon">
               <AlertCircle aria-hidden="true" className="size-7" />
             </EmptyMedia>
@@ -357,7 +312,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
 
         {/* vacío o sin coincidencias */}
         {!isLoading && !isError && tareasFiltradas.length === 0 && (
-          <Empty className="surface-enter" aria-live="polite">
+          <Empty className="surface-enter m-card" aria-live="polite">
             <EmptyMedia variant="icon">
               {hayFiltrosActivos ? (
                 <SearchX aria-hidden="true" className="size-7" />
@@ -386,45 +341,44 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
         )}
 
         {!isLoading && !isError && paginado.items.length > 0 && (
-          <>
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead scope="col">Título</TableHead>
-                  <TableHead scope="col">Hito</TableHead>
-                  <TableHead scope="col">Estado</TableHead>
-                  <TableHead scope="col">Prioridad</TableHead>
-                  <TableHead scope="col">Fecha límite</TableHead>
-                  <TableHead scope="col">Asignado a</TableHead>
-                  <TableHead scope="col">Etiquetas</TableHead>
+                <TableRow className={FILA_GUIA}>
+                  <TableHead scope="col" className={CELDA_GUIA}>Título</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Hito</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Estado</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Prioridad</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Fecha límite</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Asignado a</TableHead>
+                  <TableHead scope="col" className={CELDA_GUIA}>Etiquetas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginado.items.map((tarea) => (
-                  <TableRow key={tarea.idTarea}>
-                    <TableCell className="max-w-sm whitespace-normal type-subtitle text-text-primary">
+                  <TableRow key={tarea.idTarea} className={FILA_TAREA}>
+                    <TableCell className={`max-w-sm whitespace-normal type-body font-semibold text-text-primary ${CELDA_TAREA}`}>
                       {tarea.tituloTarea}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       <span className="type-meta">{tarea.hito?.tituloHito ?? 'Sin hito'}</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       <EstadoBadge estado={tarea.estadoTarea} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       <PrioridadBadge prioridad={tarea.prioridad} />
                     </TableCell>
-                    <TableCell>
-                      <span className="type-meta">{formatFecha(tarea.fechaLimite)}</span>
+                    <TableCell className={CELDA_TAREA}>
+                      <span className="type-meta tabular-nums text-text-secondary">{formatFecha(tarea.fechaLimite)}</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       <span className="type-meta">
                         {tarea.asignacionActiva
                           ? `${tarea.asignacionActiva.usuario.nombre} ${tarea.asignacionActiva.usuario.apellido}`
                           : 'Sin asignar'}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={CELDA_TAREA}>
                       {tarea.etiquetas.length === 0 ? (
                         <span className="type-meta">—</span>
                       ) : (
@@ -444,39 +398,42 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                 ))}
               </TableBody>
             </Table>
-
-            {/* paginación */}
-            <nav
-              aria-label="Paginación de tareas"
-              className="mt-stack flex items-center justify-between gap-inline border-t border-outline-variant pt-inline"
-            >
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={paginado.pagina <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                aria-label="Página anterior"
-              >
-                Anterior
-              </Button>
-              <span className="type-meta font-medium" aria-live="polite">
-                Página {paginado.pagina} de {paginado.totalPaginas}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={paginado.pagina >= paginado.totalPaginas}
-                onClick={() => setPage((p) => Math.min(paginado.totalPaginas, p + 1))}
-                aria-label="Página siguiente"
-              >
-                Siguiente
-              </Button>
-            </nav>
-          </>
         )}
       </div>
-    </div>
+
+      {/* paginación en su propia tarjeta, como en Mis Tareas */}
+      {!isLoading && !isError && paginado.items.length > 0 && (
+        <nav
+          aria-label="Paginación de tareas"
+          className="card-base mt-stack flex items-center justify-between gap-inline px-card py-inline"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={paginado.pagina <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Página anterior"
+            className="rounded-control"
+          >
+            Anterior
+          </Button>
+          <span className="type-meta font-medium" aria-live="polite">
+            Página {paginado.pagina} de {paginado.totalPaginas}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={paginado.pagina >= paginado.totalPaginas}
+            onClick={() => setPage((p) => Math.min(paginado.totalPaginas, p + 1))}
+            aria-label="Página siguiente"
+            className="rounded-control"
+          >
+            Siguiente
+          </Button>
+        </nav>
+      )}
+    </ProjectPageShell>
   );
 }

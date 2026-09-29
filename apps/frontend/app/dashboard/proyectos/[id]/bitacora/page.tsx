@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowRightLeft,
   Award,
   CheckCircle2,
@@ -32,6 +30,14 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
+import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
@@ -51,9 +57,18 @@ import {
 } from '@/components/ui/empty';
 import type { EventoBitacoraDto, TipoEventoBitacoraValor } from '@/lib/types/bitacora';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 const LIMITE_POR_PAGINA = 20;
 const DEBOUNCE_BUSQUEDA_MS = 400;
+
+/** Valor de «Todos» en los Select (Radix no admite ''); el filtro guarda ''. */
+const TODOS = '__ALL__';
+/** Opción resaltada igual que en los filtros de Mis Proyectos. */
+const ITEM_CLASS = 'focus:bg-primary focus:text-on-primary';
+/** Fechas con la misma caja que el buscador y los selects de la barra. */
+const FECHA_CLASS =
+  'h-11.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-3.5 text-sm text-on-surface outline-none transition-[border-color,box-shadow] hover:border-outline focus:ring-2 focus:ring-primary';
 
 /** Exhaustivo por diseño: un TipoEventoBitacoraValor nuevo en el backend rompe la compilación en vez de mostrarse en blanco. */
 interface EstiloEvento {
@@ -215,11 +230,10 @@ function BitacoraItem({ evento, miembros }: { evento: EventoBitacoraDto; miembro
 
   return (
     <div className="flex gap-inline rounded-card border border-outline-variant bg-surface-container-lowest p-card shadow-card">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary/10">
-        <Icon className="size-5 text-primary" aria-hidden="true" />
-      </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-tight">
+          {/* Icono neutro y sin fondo, al par del título (mismo criterio que Mis Horas). */}
+          <Icon data-slot="icono-evento" className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
           {/* Pastilla por tipoEntidad: color con texto oscuro sobre fondo
               sólido (nunca texto de color a secas), contraste AA heredado de
               los mismos tonos ya usados para estados de tarea/prioridad. */}
@@ -372,130 +386,142 @@ export default function BitacoraPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={`/dashboard/projects/${id}`}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al proyecto
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoProyecto && !cargandoUsuario && !cargandoMembers && !puedeVerBitacora ? (
-        <LeaderOnlyNotice description="No puedes acceder a la bitácora de este proyecto." />
+        <>
+          <ProjectBackLink href={`/dashboard/projects/${id}`} label="Volver al proyecto" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a la bitácora de este proyecto." />
+        </>
       ) : (
         <>
-          <div className="mb-8 flex items-center gap-2">
-            <ScrollText className="h-6 w-6 text-primary" aria-hidden="true" />
-            <h1 className="font-headline text-3xl font-extrabold text-on-surface">Bitácora</h1>
-          </div>
-          <p className="-mt-6 mb-6 text-sm text-tertiary">
-            Registro de quién hizo qué, cuándo y cómo evolucionó el trabajo durante el sprint.
-          </p>
+          <ProjectPageHeader
+            back={{ href: `/dashboard/projects/${id}`, label: 'Volver al proyecto' }}
+            title="Bitácora"
+            description="Registro de quién hizo qué, cuándo y cómo evolucionó el trabajo durante el sprint."
+          >
+            {/* HU-170/T-268: el integrante necesita saber que está en modo
+                solo lectura para no buscar un botón de crear/editar/borrar
+                que no existe en esta pantalla. */}
+            {!isLeader && (
+              <p className="type-meta mt-tight flex items-center gap-1.5 text-tertiary" role="status">
+                <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                Estás viendo esta bitácora en modo solo lectura: no puedes crear, editar ni borrar entradas.
+              </p>
+            )}
+          </ProjectPageHeader>
 
-          {/* HU-170/T-268: el integrante necesita saber que está en modo
-              solo lectura para no buscar un botón de crear/editar/borrar
-              que no existe en esta pantalla. */}
-          {!isLeader && (
-            <p className="type-meta -mt-4 mb-6 flex items-center gap-1.5 text-tertiary" role="status">
-              <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              Estás viendo esta bitácora en modo solo lectura: no puedes crear, editar ni borrar entradas.
-            </p>
-          )}
-
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <label className="relative">
-              <Search
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary"
-              />
-              <input
-                type="text"
+          {/* Misma barra que Mis Proyectos: buscador del dashboard que ocupa el
+              espacio libre y los selects del sistema con su disparador común.
+              Mide el contenedor del proyecto (hay dos sidebars): en fila desde
+              48rem y, si no caben todos, los selects bajan a la línea siguiente. */}
+          <div data-slot="bitacora-filtros" className="mb-6 flex flex-col gap-4">
+            <div className="flex flex-col gap-4 @3xl/project:flex-row @3xl/project:flex-wrap">
+              <DashboardSearchField
+                containerClassName="flex-1 @3xl/project:min-w-52"
                 aria-label="Buscar por persona"
                 placeholder="Buscar por persona..."
                 value={personaInput}
                 onChange={(e) => setPersonaInput(e.target.value)}
-                className="rounded-lg border border-outline-variant bg-surface-container-lowest py-2 pl-9 pr-3 text-sm text-on-surface"
               />
-            </label>
 
-            <select
-              aria-label="Filtrar por sprint"
-              value={idSprintFiltro}
-              onChange={(e) => actualizarFiltro(setIdSprintFiltro, e.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface"
-            >
-              <option value="">Todos los sprints</option>
-              {sprints.map((sprint) => (
-                <option key={sprint.idSprint} value={sprint.idSprint}>
-                  Sprint {sprint.numero}
-                </option>
-              ))}
-            </select>
-
-            <select
-              aria-label="Filtrar por integrante"
-              value={idActorFiltro}
-              onChange={(e) => actualizarFiltro(setIdActorFiltro, e.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface"
-            >
-              <option value="">Todos los integrantes</option>
-              {members.map((miembro) => (
-                <option key={miembro.idUsuario} value={miembro.idUsuario}>
-                  {miembro.nombre} {miembro.apellido}
-                </option>
-              ))}
-            </select>
-
-            <select
-              aria-label="Filtrar por tipo de evento"
-              value={tipoEventoFiltro}
-              onChange={(e) => actualizarFiltro(setTipoEventoFiltro, e.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface"
-            >
-              <option value="">Todos los tipos</option>
-              {(Object.keys(EVENTO_STYLE) as TipoEventoBitacoraValor[]).map((tipo) => (
-                <option key={tipo} value={tipo}>
-                  {EVENTO_STYLE[tipo].label}
-                </option>
-              ))}
-            </select>
-
-            <label className="flex items-center gap-1.5 text-sm text-tertiary">
-              Desde
-              <input
-                type="date"
-                aria-label="Filtrar desde"
-                value={desdeFiltro}
-                onChange={(e) => actualizarFiltro(setDesdeFiltro, e.target.value)}
-                max={hastaFiltro || undefined}
-                className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface"
-              />
-            </label>
-
-            <label className="flex items-center gap-1.5 text-sm text-tertiary">
-              Hasta
-              <input
-                type="date"
-                aria-label="Filtrar hasta"
-                value={hastaFiltro}
-                onChange={(e) => actualizarFiltro(setHastaFiltro, e.target.value)}
-                min={desdeFiltro || undefined}
-                className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface"
-              />
-            </label>
-
-            {hayFiltrosActivos && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={limpiarFiltros}
-                className="font-medium text-primary"
+              <Select
+                value={idSprintFiltro || TODOS}
+                onValueChange={(v) => actualizarFiltro(setIdSprintFiltro, v === TODOS ? '' : v)}
               >
-                Limpiar todo
-              </Button>
-            )}
+                <SelectTrigger
+                  aria-label="Filtrar por sprint"
+                  className={`w-full @3xl/project:w-44 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-9999">
+                  <SelectItem value={TODOS} className={ITEM_CLASS}>Todos los sprints</SelectItem>
+                  {sprints.map((sprint) => (
+                    <SelectItem key={sprint.idSprint} value={String(sprint.idSprint)} className={ITEM_CLASS}>
+                      Sprint {sprint.numero}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={idActorFiltro || TODOS}
+                onValueChange={(v) => actualizarFiltro(setIdActorFiltro, v === TODOS ? '' : v)}
+              >
+                <SelectTrigger
+                  aria-label="Filtrar por integrante"
+                  className={`w-full @3xl/project:w-52 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-9999">
+                  <SelectItem value={TODOS} className={ITEM_CLASS}>Todos los integrantes</SelectItem>
+                  {members.map((miembro) => (
+                    <SelectItem key={miembro.idUsuario} value={String(miembro.idUsuario)} className={ITEM_CLASS}>
+                      {miembro.nombre} {miembro.apellido}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={tipoEventoFiltro || TODOS}
+                onValueChange={(v) => actualizarFiltro(setTipoEventoFiltro, v === TODOS ? '' : v)}
+              >
+                <SelectTrigger
+                  aria-label="Filtrar por tipo de evento"
+                  className={`w-full @3xl/project:w-40 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-9999">
+                  <SelectItem value={TODOS} className={ITEM_CLASS}>Todos los tipos</SelectItem>
+                  {(Object.keys(EVENTO_STYLE) as TipoEventoBitacoraValor[]).map((tipo) => (
+                    <SelectItem key={tipo} value={tipo} className={ITEM_CLASS}>
+                      {EVENTO_STYLE[tipo].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div data-slot="rango-fechas" className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-tight text-sm text-text-secondary">
+                Desde
+                <input
+                  type="date"
+                  aria-label="Filtrar desde"
+                  value={desdeFiltro}
+                  onChange={(e) => actualizarFiltro(setDesdeFiltro, e.target.value)}
+                  max={hastaFiltro || undefined}
+                  className={FECHA_CLASS}
+                />
+              </label>
+
+              <label className="flex items-center gap-tight text-sm text-text-secondary">
+                Hasta
+                <input
+                  type="date"
+                  aria-label="Filtrar hasta"
+                  value={hastaFiltro}
+                  onChange={(e) => actualizarFiltro(setHastaFiltro, e.target.value)}
+                  min={desdeFiltro || undefined}
+                  className={FECHA_CLASS}
+                />
+              </label>
+
+              {hayFiltrosActivos && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={limpiarFiltros}
+                  className="font-medium text-primary"
+                >
+                  Limpiar todo
+                </Button>
+              )}
+            </div>
           </div>
 
           {chipsActivos.length > 0 && (
@@ -631,6 +657,6 @@ export default function BitacoraPage() {
           )}
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }

@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -155,8 +155,9 @@ describe('VIEW-06 — vista de Liderazgo del proyecto (F008)', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Apelar cambio de liderazgo' })).toBeDisabled());
     expect(screen.getByLabelText('Ya existe una apelación pendiente para este proyecto.')).toHaveAttribute('tabindex', '0');
-    expect(screen.getByText('Cambio de liderazgo por carga académica')).toBeInTheDocument();
-    expect(screen.getByText('Ana García')).toBeInTheDocument();
+    const apelaciones = screen.getByRole('region', { name: 'Apelaciones pendientes' });
+    expect(within(apelaciones).getByText('Cambio de liderazgo por carga académica')).toBeInTheDocument();
+    expect(within(apelaciones).getByText('Ana García')).toBeInTheDocument();
   });
 
   it('con el proyecto fuera de PUBLICADO/EN_PROGRESO el botón queda deshabilitado', async () => {
@@ -179,5 +180,40 @@ describe('VIEW-06 — vista de Liderazgo del proyecto (F008)', () => {
     // …y la card, que es lo que depende del contexto, simplemente no aparece.
     expect(screen.queryByText('Líder actual del proyecto')).not.toBeInTheDocument();
     expect(screen.queryByText('Historial de liderazgo')).not.toBeInTheDocument();
+  });
+});
+
+describe('VIEW-06 — rediseño: resumen, módulos y historial como sección', () => {
+  it('muestra un mini-resumen con líder actual, apelaciones pendientes y cambios de liderazgo del backend', async () => {
+    const { wrapper } = createWrapper();
+    render(createElement(LiderazgoProyectoPage), { wrapper });
+
+    const resumen = await screen.findByRole('region', { name: 'Resumen de liderazgo' });
+    await waitFor(() =>
+      expect(within(resumen).getByRole('group', { name: 'Líder actual' })).toHaveTextContent('Valeria Ortiz'),
+    );
+    expect(within(resumen).getByRole('group', { name: 'Apelaciones pendientes' })).toHaveTextContent('0');
+    expect(within(resumen).getByRole('group', { name: 'Cambios de liderazgo' })).toHaveTextContent('1');
+  });
+
+  it('el historial ya no es un enlace plegable: es una sección con su tabla visible', async () => {
+    const { wrapper } = createWrapper();
+    render(createElement(LiderazgoProyectoPage), { wrapper });
+
+    const historial = await screen.findByRole('region', { name: 'Historial de liderazgo' });
+    expect(screen.queryByRole('button', { name: /historial de liderazgo/i })).not.toBeInTheDocument();
+    const tabla = await within(historial).findByRole('table', { name: 'Historial de liderazgo' });
+    expect(within(tabla).getByText('Reasignación administrativa')).toBeInTheDocument();
+    expect(within(historial).getByText('1 cambio registrado')).toBeInTheDocument();
+  });
+
+  it('sin apelaciones pendientes, el vacío va directo sobre su tarjeta con el mensaje de siempre', async () => {
+    const { wrapper } = createWrapper();
+    render(createElement(LiderazgoProyectoPage), { wrapper });
+
+    const apelaciones = await screen.findByRole('region', { name: 'Apelaciones pendientes' });
+    const vacio = (await within(apelaciones).findByText('No hay apelaciones pendientes.')).closest('[data-slot="empty"]');
+    expect(vacio).toHaveClass('border-0', 'bg-transparent');
+    expect(apelaciones).toHaveClass('card-base');
   });
 });

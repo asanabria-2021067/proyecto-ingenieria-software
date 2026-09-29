@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { SprintAnalyticsDto } from '../lib/types/sprints';
 
 // T-240 (HU-160): jsdom no implementa ResizeObserver; el último test de este
@@ -85,16 +85,17 @@ afterEach(() => {
 });
 
 describe('SprintAnalyticsPage — encabezado', () => {
-  it('muestra el número de Sprint en el título y el back-link al Sprint', () => {
+  it('muestra el número de Sprint en el título y vuelve a la lista de Sprints', () => {
     mockAnalytics();
 
     renderPage();
 
     expect(screen.getByRole('heading', { name: 'Analítica del Sprint 3' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /volver al sprint/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Volver a Sprints' })).toHaveAttribute(
       'href',
-      '/dashboard/proyectos/42/sprints/7',
+      '/dashboard/proyectos/42/sprints',
     );
+    expect(screen.queryByRole('link', { name: /volver al sprint$/i })).not.toBeInTheDocument();
   });
 });
 
@@ -226,5 +227,59 @@ describe('SprintAnalyticsPage — burndown (T-240, HU-160)', () => {
     renderPage();
 
     expect(screen.getByText('Burndown del Sprint')).toBeInTheDocument();
+  });
+});
+
+// Refinamientos visuales: KPIs como Miembros/Mis Horas y barras con color
+// semántico (mismos tonos que el Kanban y los badges de hito).
+describe('SprintAnalyticsPage — lectura semántica', () => {
+  const barra = (nombre: string) => screen.getByRole('progressbar', { name: nombre });
+
+  it('los KPIs usan la tarjeta en línea: icono charcoal sin caja de color', () => {
+    mockAnalytics();
+    renderPage();
+
+    for (const nombre of ['Tareas totales', 'Tareas completadas', 'Cumplimiento', 'Horas estimadas']) {
+      const kpi = screen.getByRole('group', { name: nombre });
+      expect(kpi).toHaveClass('card-base');
+      expect(kpi.querySelector('svg')).toHaveClass('text-text-primary');
+      expect(kpi.querySelector('.bg-primary\\/10')).toBeNull();
+    }
+    expect(within(screen.getByRole('group', { name: 'Cumplimiento' })).getByText('50%')).toBeInTheDocument();
+  });
+
+  it('cada estado tiene su color: gris, lima, ámbar e institucional', () => {
+    mockAnalytics();
+    renderPage();
+
+    expect(barra('Por hacer')).toHaveClass('bg-outline');
+    expect(barra('En progreso')).toHaveClass('bg-accent');
+    expect(barra('En revisión')).toHaveClass('bg-attention');
+    expect(barra('Hecho')).toHaveClass('bg-primary');
+    expect(barra('Hecho')).toHaveAttribute('aria-valuenow', '50');
+  });
+
+  it('cada prioridad tiene su color: alta rojo suave, media lima, baja gris', () => {
+    mockAnalytics();
+    renderPage();
+
+    expect(barra('Alta')).toHaveClass('bg-error/70');
+    expect(barra('Media')).toHaveClass('bg-accent');
+    expect(barra('Baja')).toHaveClass('bg-outline');
+    expect(barra('Media')).toHaveAttribute('aria-valuenow', '50');
+  });
+
+  it.each([
+    ['PENDIENTE', 'Pendiente', 'bg-outline', 'bg-surface-container-high'],
+    ['EN_PROGRESO', 'En progreso', 'bg-accent', 'bg-status-warning'],
+    ['COMPLETADO', 'Completado', 'bg-primary', 'bg-primary-container'],
+  ] as const)('hito %s: la barra y el badge comparten tono', (estadoHito, etiqueta, barraClase, badgeClase) => {
+    mockAnalytics({
+      analytics: analytics({ hitos: [{ idHito: 1, tituloHito: 'MVP', estadoHito, porcentaje: 40 }] }),
+    });
+    renderPage();
+
+    expect(barra('MVP')).toHaveClass(barraClase);
+    expect(screen.getByText(`${etiqueta} · 40%`)).toHaveClass(badgeClase);
   });
 });

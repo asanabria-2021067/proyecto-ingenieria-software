@@ -42,6 +42,7 @@ import { MonthView } from '@/components/calendar/month-view';
 import { WeekView } from '@/components/calendar/week-view';
 import { AgendaItemRow } from '@/components/calendar/agenda-item-row';
 import { EventFormDialog } from '@/components/calendar/event-form-dialog';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 type Vista = 'mes' | 'semana';
 
@@ -182,7 +183,7 @@ export default function CalendarioPage() {
     : undefined;
 
   return (
-    <div className="mx-auto max-w-[1400px] px-8 py-8">
+    <div className={dashboardPage('py-8')}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-gap">
         <div>
           <h1 className="mb-1 font-headline text-3xl font-extrabold text-on-surface">

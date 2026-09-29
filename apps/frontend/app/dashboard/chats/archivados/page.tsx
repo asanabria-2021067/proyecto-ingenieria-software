@@ -16,10 +16,10 @@
    =========================================================================== */
 
 import { useState } from 'react';
-import { Archive, Lock, Search, Users as UsersIcon } from 'lucide-react';
+import { Archive, Lock, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   Empty,
@@ -36,6 +36,7 @@ import { getMessages } from '@/lib/services/chat';
 import { useQuery } from '@tanstack/react-query';
 import type { ArchivedConversacion } from '@/lib/types/chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 function nombreConversacion(conversacion: ArchivedConversacion, currentUserId: number | null): string {
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
@@ -68,36 +69,33 @@ export default function ChatsArchivadosPage() {
   const { conversaciones, hasMore, isLoading, cargarMas, cargandoMas } = useArchivedConversations(q);
 
   return (
-    <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
-      <header className="mb-section flex items-center gap-tight">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
-          <Archive className="size-5" aria-hidden="true" />
-        </div>
-        <div>
-          <h1 className="type-display text-text-primary">Chats archivados</h1>
-          <p className="type-body mt-tight text-text-secondary">
-            Conversaciones de proyectos que ya cerraron, en solo lectura.
-          </p>
-        </div>
+    <div className={dashboardPage('py-section lg:py-page')}>
+      <header className="mb-section">
+        <h1 className="type-display text-text-primary">Chats archivados</h1>
+        <p className="type-body mt-tight text-text-secondary">
+          Conversaciones de proyectos que ya cerraron, en solo lectura.
+        </p>
       </header>
 
-      <div className="relative mb-card max-w-md">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nombre del chat o de la persona"
-          className="pl-9"
-          aria-label="Buscar chats archivados"
-        />
-      </div>
+      <DashboardSearchField
+        containerClassName="mb-card max-w-md"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Buscar por nombre del chat o de la persona"
+        aria-label="Buscar chats archivados"
+      />
 
       {isLoading ? (
         <ListaSkeleton />
       ) : conversaciones.length === 0 ? (
-        <Empty tone="muted" aria-live="polite">
-          <EmptyMedia variant="compact">
-            <Archive aria-hidden="true" className="size-6" />
+        // Misma superficie que el estado vacío de Mis Postulaciones (tono por
+        // defecto: tarjeta blanca); el icono va pequeño y neutro.
+        <Empty className="surface-enter" aria-live="polite">
+          <EmptyMedia
+            variant="compact"
+            className="size-10 rounded-control border-transparent text-text-secondary"
+          >
+            <Archive aria-hidden="true" className="size-5" />
           </EmptyMedia>
           <EmptyHeader>
             <EmptyTitle className="type-subtitle">

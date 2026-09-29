@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { ChartLine } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -14,7 +15,7 @@ import {
   YAxis,
 } from 'recharts';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import type { SprintBurndownDto } from '@/lib/types/sprints';
 
 export type Eje = 'puntos' | 'tareas';
@@ -98,7 +99,10 @@ export function BurndownChart({ burndown }: BurndownChartProps) {
 
   if (burndown.instantaneas.length < 2) {
     return (
-      <Empty tone="muted" role="status">
+      <Empty role="status">
+        <EmptyMedia variant="subtle">
+          <ChartLine aria-hidden="true" />
+        </EmptyMedia>
         <EmptyHeader>
           <EmptyTitle>Aún no hay suficientes datos para el burndown.</EmptyTitle>
           <EmptyDescription>

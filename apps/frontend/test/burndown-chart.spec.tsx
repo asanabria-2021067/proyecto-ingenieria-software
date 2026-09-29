@@ -44,7 +44,19 @@ describe('BurndownChart', () => {
     render(<BurndownChart burndown={burndown({ instantaneas: [] })} />);
 
     expect(screen.getByText('Aún no hay suficientes datos para el burndown.')).toBeInTheDocument();
-    expect(document.querySelector('svg')).not.toBeInTheDocument();
+    // El único svg permitido es el icono discreto del estado vacío, nunca un gráfico.
+    expect(document.querySelector('svg:not(.lucide)')).not.toBeInTheDocument();
+  });
+
+  it('el estado vacío es una tarjeta blanca con borde sutil, sin fondo gris ni borde punteado', () => {
+    render(<BurndownChart burndown={burndown({ instantaneas: [] })} />);
+
+    const vacio = screen.getByRole('status');
+    expect(vacio).toHaveAttribute('data-slot', 'empty');
+    expect(vacio).toHaveClass('bg-surface-container-lowest', 'shadow-sm', 'rounded-2xl');
+    expect(vacio).not.toHaveClass('border-dashed');
+    expect(vacio).not.toHaveClass('bg-surface-container-low');
+    expect(vacio.querySelector('[data-slot="empty-icon"] svg')).toHaveClass('lucide');
   });
 
   it('con exactamente 1 instantánea: sigue sin ser suficiente (el AC exige al menos 2)', () => {
