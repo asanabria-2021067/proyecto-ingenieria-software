@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -71,6 +72,16 @@ export class ChatController {
     @Body() dto: UpdateConversationDto,
   ) {
     return this.chatService.updateConversation(projectId, conversationId, user.userId, dto);
+  }
+
+  @Delete(':conversationId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.deleteConversation(projectId, conversationId, user.userId);
   }
 
   @Post(':conversationId/leido')
