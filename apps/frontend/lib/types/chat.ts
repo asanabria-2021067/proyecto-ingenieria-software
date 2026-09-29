@@ -27,6 +27,28 @@ export interface ChatConversacion {
   esFavorita: boolean;
   /** Archivado manual desde el menú de 3 puntos (distinto de `archivada`, que es por cierre de proyecto). */
   archivadaManual: boolean;
+  silenciada: boolean;
+  esPrioritaria: boolean;
+}
+
+/** Dock global de chat: cruza todos los proyectos del usuario (a diferencia
+ * de ChatConversacion, que vive dentro de un solo proyecto). */
+export interface ChatConversacionGlobal {
+  idConversacion: number;
+  idProyecto: number;
+  proyecto: { idProyecto: number; tituloProyecto: string };
+  tipo: 'GRUPAL' | 'INDIVIDUAL';
+  nombre: string | null;
+  nombrePersonalizado: string | null;
+  participantes: ChatUsuario[];
+  ultimoMensaje: ChatMensaje | null;
+  ultimoMensajeEsPropio: boolean;
+  noLeidos: number;
+  esFavorita: boolean;
+  /** Archivado manual desde el menú del dock (proyectos cerrados no aparecen en esta lista). */
+  archivadaManual: boolean;
+  silenciada: boolean;
+  esPrioritaria: boolean;
 }
 
 export interface CreateConversationPayload {
@@ -39,6 +61,8 @@ export interface CreateConversationPayload {
 export interface UpdateConversationPayload {
   archivada?: boolean;
   esFavorita?: boolean;
+  silenciada?: boolean;
+  esPrioritaria?: boolean;
   nombrePersonalizado?: string | null;
 }
 
