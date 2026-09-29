@@ -1,4 +1,4 @@
-import Swal from 'sweetalert2';
+import Swal, { type SweetAlertOptions } from 'sweetalert2';
 
 /**
  * SweetAlert2 combina `Swal.mixin(...)` con las opciones de cada `.fire()`
@@ -18,11 +18,25 @@ export const swalCustomClass = {
   icon: 'scale-75 mb-0', // Make the icon smaller and reduce margin
 };
 
-const uvgSwal = Swal.mixin({
+// Check estático (sin el dibujo animado por defecto de SweetAlert2): se
+// inyecta como `iconHtml` en vez de pelear con sus keyframes CSS, que dejan
+// el ícono a medio dibujar si se les desactiva la animación.
+const CHECK_ICON_HTML =
+  '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" style="stroke:var(--color-on-status-success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 7"/></svg>';
+
+const base = Swal.mixin({
   customClass: swalCustomClass,
   buttonsStyling: false,
   confirmButtonText: 'Aceptar',
   padding: '1.25rem',
 });
+
+const uvgSwal = {
+  ...base,
+  fire: (options: SweetAlertOptions) =>
+    base.fire(
+      options.icon === 'success' && !options.iconHtml ? { ...options, iconHtml: CHECK_ICON_HTML } : options,
+    ),
+};
 
 export default uvgSwal;
