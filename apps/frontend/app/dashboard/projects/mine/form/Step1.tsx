@@ -53,7 +53,7 @@ export function Step1({ form, update, errors, partial = false }: Props) {
       </div>
 
       {!partial && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Tipo <span className="text-error">*</span></label>
             <Select value={form.tipoProyecto || '__NONE__'} onValueChange={(v) => update('tipoProyecto', v === '__NONE__' ? '' : v)}>
@@ -90,7 +90,7 @@ export function Step1({ form, update, errors, partial = false }: Props) {
         <textarea className={`${inputClass} resize-none`} rows={2} placeholder="Objetivos principales del proyecto" value={form.objetivosProyecto} onChange={(e) => update('objetivosProyecto', e.target.value)} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className={labelClass}>Contexto académico</label>
           <input maxLength={255} className={`${inputClass} ${hasError('contextoAcademico', errors) ? 'border-error' : ''}`} placeholder="ej. Tesis, proyecto de curso..." value={form.contextoAcademico} onChange={(e) => update('contextoAcademico', e.target.value)} />
@@ -103,7 +103,7 @@ export function Step1({ form, update, errors, partial = false }: Props) {
         </div>
       </div>
 
-      <div className={partial ? '' : 'grid grid-cols-2 gap-4'}>
+      <div className={partial ? '' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}>
         {!partial && (
           <div>
             <label className={labelClass}>Fecha de inicio</label>
