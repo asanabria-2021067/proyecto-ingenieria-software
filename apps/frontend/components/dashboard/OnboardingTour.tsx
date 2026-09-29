@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { useJoyride, STATUS } from 'react-joyride';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
 
@@ -79,8 +80,14 @@ const CustomTooltip = ({
   );
 };
 
+// Los 6 pasos del tour solo existen como elementos del DOM en /dashboard
+// (home): #stats-container, #nav-item-explorar-proyectos, etc. no existen en
+// /dashboard/personas/[id] ni en el resto de rutas del panel.
+const RUTA_TOUR = '/dashboard';
+
 export default function OnboardingTour() {
   const { data: user } = useCurrentUser();
+  const pathname = usePathname();
   const [run, setRun] = useState(false);
 
   const startTour = useCallback(
@@ -212,7 +219,11 @@ export default function OnboardingTour() {
 
   return (
     <>
-      {Tour}
+      {/* Los pasos apuntan a ids que solo existen en /dashboard (home); en
+          cualquier otra ruta react-joyride no encuentra el target y revienta
+          intentando reposicionarse (visto en vivo navegando desde el
+          buscador a /dashboard/personas/:id con el tour activo). */}
+      {pathname === RUTA_TOUR && Tour}
       <style
         dangerouslySetInnerHTML={{
           __html: `
