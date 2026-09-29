@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma, type TipoNotificacion, type ModalidadEvento } from '@prisma/client';
+import { hashSync } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -128,10 +129,30 @@ async function ensureMensaje(idConversacion: number, idRemitente: number, conten
   return prisma.mensajeChat.create({ data: { idConversacion, idRemitente, contenido } });
 }
 
+async function ensureProyecto(data: {
+  tituloProyecto: string;
+  descripcionProyecto: string;
+  tipoProyecto: 'ACADEMICO_EXPERIENCIA' | 'ACADEMICO_HORAS_BECA' | 'EXTRACURRICULAR_EXTENSION';
+  estadoProyecto: 'PUBLICADO' | 'EN_PROGRESO';
+  creadoPor: number;
+  fechaInicio: Date;
+  fechaFinEstimada: Date;
+}) {
+  const existente = await prisma.proyecto.findFirst({ where: { tituloProyecto: data.tituloProyecto } });
+  if (existente) return existente;
+  return prisma.proyecto.create({ data });
+}
+
+async function ensureRolProyecto(data: { idProyecto: number; nombreRol: string; descripcionRolProyecto?: string; cupos: number }) {
+  const existente = await prisma.rolProyecto.findFirst({ where: { idProyecto: data.idProyecto, nombreRol: data.nombreRol } });
+  if (existente) return existente;
+  return prisma.rolProyecto.create({ data });
+}
+
 async function main() {
   const usuario = (correo: string) => prisma.usuario.findUniqueOrThrow({ where: { correo } });
 
-  const [angel, carlos, maria, jose, ana, luis, sofia, fernando, camila] = await Promise.all([
+  const [angel, carlos, maria, jose, ana, luis, sofia, fernando, camila, vernel] = await Promise.all([
     usuario('san24725@uvg.edu.gt'),
     usuario('carlos.mendoza@uvg.edu.gt'),
     usuario('maria.lopez@uvg.edu.gt'),
@@ -141,7 +162,18 @@ async function main() {
     usuario('sofia.martinez@uvg.edu.gt'),
     usuario('fernando.castaneda@uvg.edu.gt'),
     usuario('camila.rodriguez@uvg.edu.gt'),
+    usuario('vernel@uvg.edu.gt'),
   ]);
+
+  // ─── Reafirma la contraseña de las cuentas de demo ───────────────────────
+  // seed.ts crea estas dos cuentas con upsert({ update: {} }): la primera vez
+  // que corre fija la contraseña, pero en corridas posteriores (o si alguien
+  // la cambio a mano probando "olvide mi contraseña") update:{} nunca la
+  // vuelve a tocar. Sin este bloque, un reset de contraseña real deja a
+  // san24725/vernel sin poder entrar con la clave de demo documentada.
+  const TEST_HASH = hashSync('12345678', 10);
+  await prisma.usuario.update({ where: { idUsuario: angel.idUsuario }, data: { contrasena: TEST_HASH, estado: 'ACTIVO' } });
+  await prisma.usuario.update({ where: { idUsuario: vernel.idUsuario }, data: { contrasena: TEST_HASH, estado: 'ACTIVO' } });
 
   // Proyectos de Angel (10-13, ver seed.ts) y otros dos usados para chats/guardados.
   const [pGestionAcademica, pSaludMental, pELearning, pDashboardDeportivo] = await Promise.all([
@@ -342,6 +374,137 @@ async function main() {
     update: {},
     create: { idUsuario: carlos.idUsuario, idProyecto: pELearning.idProyecto },
   });
+
+  // ─── Semilla enriquecida para Vernel (segunda cuenta de demo) ────────────
+  const pReservas = await ensureProyecto({
+    tituloProyecto: 'Sistema de Reservas de Laboratorios',
+    descripcionProyecto: 'Plataforma para reservar cubículos y laboratorios del CIT por horario, evitando choques y listas de espera en papel.',
+    tipoProyecto: 'ACADEMICO_HORAS_BECA',
+    estadoProyecto: 'PUBLICADO',
+    creadoPor: vernel.idUsuario,
+    fechaInicio: enDias(-20),
+    fechaFinEstimada: enDias(120),
+  });
+  const pApoyoPares = await ensureProyecto({
+    tituloProyecto: 'Red de Apoyo entre Pares - Bienestar',
+    descripcionProyecto: 'Conecta estudiantes voluntarios capacitados con compañeros que buscan apoyo académico o emocional durante el semestre.',
+    tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
+    estadoProyecto: 'EN_PROGRESO',
+    creadoPor: vernel.idUsuario,
+    fechaInicio: enDias(-45),
+    fechaFinEstimada: enDias(90),
+  });
+
+  const rolReservasBackend = await ensureRolProyecto({ idProyecto: pReservas.idProyecto, nombreRol: 'Backend Developer', descripcionRolProyecto: 'API de disponibilidad y reservas', cupos: 2 });
+  await ensureRolProyecto({ idProyecto: pReservas.idProyecto, nombreRol: 'Frontend Developer', descripcionRolProyecto: 'Calendario de reservas', cupos: 2 });
+  const rolApoyoCoordinador = await ensureRolProyecto({ idProyecto: pApoyoPares.idProyecto, nombreRol: 'Coordinador de Voluntarios', descripcionRolProyecto: 'Capacitación y asignación de pares', cupos: 1 });
+  await ensureRolProyecto({ idProyecto: pApoyoPares.idProyecto, nombreRol: 'Desarrollador Web', descripcionRolProyecto: 'Formulario de solicitud y match', cupos: 1 });
+
+  const [sprintReservas, sprintApoyo] = await Promise.all([
+    resolveSprint(pReservas.idProyecto, 1),
+    resolveSprint(pApoyoPares.idProyecto, 1),
+  ]);
+
+  const tareaReservas1 = await ensureTarea({
+    idProyecto: pReservas.idProyecto, idSprint: sprintReservas.idSprint,
+    tituloTarea: 'Modelar disponibilidad de cubículos por horario', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: vernel.idUsuario,
+  });
+  const tareaReservas2 = await ensureTarea({
+    idProyecto: pReservas.idProyecto, idSprint: sprintReservas.idSprint,
+    tituloTarea: 'Endpoint de creación y cancelación de reservas', estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', creadaPor: vernel.idUsuario, fechaLimite: enDias(3),
+  });
+  const tareaReservas3 = await ensureTarea({
+    idProyecto: pReservas.idProyecto, idSprint: sprintReservas.idSprint,
+    tituloTarea: 'Calendario semanal de disponibilidad', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: vernel.idUsuario, fechaLimite: enDias(8),
+    idRolProyecto: rolReservasBackend.idRolProyecto,
+  });
+  await ensureAsignacion(tareaReservas1.idTarea, vernel.idUsuario, vernel.idUsuario);
+  await ensureAsignacion(tareaReservas2.idTarea, vernel.idUsuario, vernel.idUsuario);
+  await ensureAsignacion(tareaReservas3.idTarea, carlos.idUsuario, vernel.idUsuario);
+
+  const tareaApoyo1 = await ensureTarea({
+    idProyecto: pApoyoPares.idProyecto, idSprint: sprintApoyo.idSprint,
+    tituloTarea: 'Diseñar guía de capacitación para pares voluntarios', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: vernel.idUsuario,
+  });
+  const tareaApoyo2 = await ensureTarea({
+    idProyecto: pApoyoPares.idProyecto, idSprint: sprintApoyo.idSprint,
+    tituloTarea: 'Formulario de solicitud de apoyo', estadoTarea: 'EN_REVISION', prioridad: 'MEDIA', creadaPor: vernel.idUsuario,
+  });
+  const tareaApoyo3 = await ensureTarea({
+    idProyecto: pApoyoPares.idProyecto, idSprint: sprintApoyo.idSprint,
+    tituloTarea: 'Algoritmo simple de match por carrera e intereses', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: vernel.idUsuario, fechaLimite: enDias(10),
+    idRolProyecto: rolApoyoCoordinador.idRolProyecto,
+  });
+  await ensureAsignacion(tareaApoyo1.idTarea, vernel.idUsuario, vernel.idUsuario);
+  await ensureAsignacion(tareaApoyo2.idTarea, sofia.idUsuario, vernel.idUsuario);
+  await ensureAsignacion(tareaApoyo3.idTarea, ana.idUsuario, vernel.idUsuario);
+
+  await ensureEvento({
+    idProyecto: pReservas.idProyecto, idCreador: vernel.idUsuario,
+    tituloEvento: 'Revisión semanal del sprint de reservas', descripcionEvento: 'Repaso de avance y bloqueos del equipo.',
+    fechaInicio: enDiasHora(2, 15, 0), fechaFin: enDiasHora(2, 16, 0), modalidad: 'VIRTUAL',
+    linkSesion: 'https://meet.google.com/reservas-labs-standup',
+  });
+  await ensureEvento({
+    idProyecto: pReservas.idProyecto, idCreador: vernel.idUsuario,
+    tituloEvento: 'Prueba piloto en laboratorio CIT 302', descripcionEvento: 'Validación con usuarios reales del flujo de reserva.',
+    fechaInicio: enDiasHora(7, 10, 0), fechaFin: enDiasHora(7, 11, 30), modalidad: 'PRESENCIAL',
+    ubicacionLat: 14.5915, ubicacionLng: -90.5138, ubicacionNombre: 'Universidad del Valle de Guatemala, Laboratorio CIT 302',
+  });
+  await ensureEvento({
+    idProyecto: pApoyoPares.idProyecto, idCreador: vernel.idUsuario,
+    tituloEvento: 'Capacitación de nuevos voluntarios', descripcionEvento: 'Sesión híbrida: algunos voluntarios se conectan de otras sedes.',
+    fechaInicio: enDiasHora(4, 17, 0), fechaFin: enDiasHora(4, 18, 30), modalidad: 'MIXTA',
+    ubicacionLat: 14.5915, ubicacionLng: -90.5138, ubicacionNombre: 'Universidad del Valle de Guatemala, Sala de Bienestar Estudiantil',
+    linkSesion: 'https://meet.google.com/apoyo-pares-capacitacion',
+  });
+
+  await ensurePostulacion({
+    idUsuarioPostulante: fernando.idUsuario, idRolProyecto: rolReservasBackend.idRolProyecto,
+    justificacion: 'Tengo experiencia con NestJS y modelado de disponibilidad por horario.',
+  });
+  await ensurePostulacion({
+    idUsuarioPostulante: jose.idUsuario, idRolProyecto: rolApoyoCoordinador.idRolProyecto,
+    justificacion: 'He sido monitor de curso y me interesa coordinar el programa de pares.',
+    estadoPostulacion: 'ACEPTADA',
+  });
+
+  await ensureNotificacion({
+    idUsuario: vernel.idUsuario, tipoNotificacion: 'NUEVA_POSTULACION',
+    tituloNotificacion: 'Nueva postulación recibida',
+    mensajeNotificacion: `${fernando.nombre} ${fernando.apellido} se postuló para el rol "Backend Developer" en tu proyecto "${pReservas.tituloProyecto}".`,
+    datosJson: { projectId: pReservas.idProyecto },
+  });
+  await ensureNotificacion({
+    idUsuario: vernel.idUsuario, tipoNotificacion: 'POSTULACION_RESUELTA',
+    tituloNotificacion: 'Postulación aceptada',
+    mensajeNotificacion: `Aceptaste a ${jose.nombre} ${jose.apellido} como Coordinador de Voluntarios en "${pApoyoPares.tituloProyecto}".`,
+    datosJson: { projectId: pApoyoPares.idProyecto }, leidaEn: new Date(),
+  });
+  await ensureNotificacion({
+    idUsuario: vernel.idUsuario, tipoNotificacion: 'TAREA_ACTUALIZADA',
+    tituloNotificacion: 'Tarea en revisión',
+    mensajeNotificacion: 'La tarea "Formulario de solicitud de apoyo" pasó a revisión.',
+    datosJson: { projectId: pApoyoPares.idProyecto },
+  });
+  await ensureNotificacion({
+    idUsuario: carlos.idUsuario, tipoNotificacion: 'TAREA_ASIGNADA',
+    tituloNotificacion: 'Nueva tarea asignada',
+    mensajeNotificacion: 'Se te asignó la tarea "Calendario semanal de disponibilidad".',
+    datosJson: { projectId: pReservas.idProyecto },
+  });
+
+  const convReservas = await ensureConversacion(pReservas.idProyecto, vernel.idUsuario, [vernel.idUsuario, carlos.idUsuario]);
+  await ensureMensaje(convReservas.idConversacion, vernel.idUsuario, 'Carlos, ¿cómo va el calendario de disponibilidad? Lo necesitamos para la prueba piloto del jueves.');
+  await ensureMensaje(convReservas.idConversacion, carlos.idUsuario, 'Voy avanzando, ya tengo la vista semanal armada, me falta conectar los horarios reales.');
+
+  for (const idProyecto of [pGestionAcademica.idProyecto, pELearning.idProyecto]) {
+    await prisma.proyectoGuardado.upsert({
+      where: { idUsuario_idProyecto: { idUsuario: vernel.idUsuario, idProyecto } },
+      update: {},
+      create: { idUsuario: vernel.idUsuario, idProyecto },
+    });
+  }
 
   console.log('Demo extra seed completed successfully');
 }
