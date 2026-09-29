@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, render, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, render, renderHook } from '@testing-library/react';
 
 /**
  * T-221 — lado del login: aviso de sesión vencida, regreso a la ruta
@@ -15,9 +15,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock, replace: replaceMock }),
 }));
 vi.mock('next/image', () => ({ default: () => null }));
-
-const swalFire = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
-vi.mock('@/lib/swal', () => ({ default: { fire: swalFire } }));
 
 const avisoMock = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() }));
 vi.mock('@/lib/mensajes', () => ({ aviso: avisoMock }));
@@ -36,9 +33,8 @@ vi.mock('@/hooks/use-current-user', async (importOriginal) => {
 });
 
 import { useLogin } from '../hooks/use-login';
-import { useRegister } from '../hooks/use-register';
-import LoginPage from '../app/login/page';
-import { MENSAJE_ERROR_GENERICO } from '../components/projects/api-error';
+import LoginPage, { mensajeError as mensajeErrorLogin } from '../app/login/page';
+import { mensajeError as mensajeErrorRegistro } from '../app/registro/page';
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
@@ -53,6 +49,8 @@ const ESTUDIANTE = { roles: ['estudiante'] };
 const ADMIN = { roles: ['Administrador'] };
 
 beforeEach(() => {
+  pushMock.mockClear();
+  replaceMock.mockClear();
   loginMock.mockResolvedValue({});
   getMeMock.mockResolvedValue(ESTUDIANTE);
 });
@@ -63,13 +61,29 @@ afterEach(() => {
 });
 
 describe('T-221: useLogin', () => {
+  // La navegación real se retrasa 1200ms (setTimeout en use-login.ts) para
+  // que el usuario vea el mensaje de éxito antes de salir del login. Con
+  // temporizadores reales y `waitFor`, ese retraso queda a merced del reloj
+  // de la maquina de CI: el push de una prueba puede terminar de disparar
+  // durante la SIGUIENTE prueba (temporizador real, no ligado al ciclo de
+  // vida de React) y contaminar su aserción. Con fake timers avanzamos el
+  // reloj a mano, sin esa carrera.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('tras iniciar sesión vuelve a la ruta anterior (`next`)', async () => {
     irA('/login?next=%2Fdashboard%2Fproyectos%2F123%3Ftab%3Dsprints&motivo=sesion-expirada');
     const { result } = renderHook(() => useLogin(), { wrapper });
 
     act(() => result.current.mutate({ correo: 'a@uvg.edu.gt', contrasena: 'x' }));
+    await act(() => vi.advanceTimersByTimeAsync(1200));
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/dashboard/proyectos/123?tab=sprints'));
+    expect(pushMock).toHaveBeenCalledWith('/dashboard/proyectos/123?tab=sprints');
   });
 
   it('un `next` externo se ignora y se usa el destino por rol', async () => {
@@ -78,8 +92,9 @@ describe('T-221: useLogin', () => {
     const { result } = renderHook(() => useLogin(), { wrapper });
 
     act(() => result.current.mutate({ correo: 'a@uvg.edu.gt', contrasena: 'x' }));
+    await act(() => vi.advanceTimersByTimeAsync(1200));
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/dashboard/admin'));
+    expect(pushMock).toHaveBeenCalledWith('/dashboard/admin');
   });
 
   it('sin `next` conserva el destino por rol de siempre', async () => {
@@ -87,30 +102,23 @@ describe('T-221: useLogin', () => {
     const { result } = renderHook(() => useLogin(), { wrapper });
 
     act(() => result.current.mutate({ correo: 'a@uvg.edu.gt', contrasena: 'x' }));
+    await act(() => vi.advanceTimersByTimeAsync(1200));
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/dashboard'));
+    expect(pushMock).toHaveBeenCalledWith('/dashboard');
   });
 
-  it('401 de credenciales → muestra el mensaje del backend, no «sesión vencida»', async () => {
-    loginMock.mockRejectedValue(Object.assign(new Error('Credenciales invalidas'), { statusCode: 401 }));
-    const { result } = renderHook(() => useLogin(), { wrapper });
-
-    act(() => result.current.mutate({ correo: 'a@uvg.edu.gt', contrasena: 'x' }));
-
-    await waitFor(() =>
-      expect(swalFire).toHaveBeenCalledWith(expect.objectContaining({ text: 'Credenciales invalidas' })),
-    );
+  // T-274 (OWASP): un solo mensaje neutro para cualquier fallo de login, sin
+  // importar el status ni el texto del backend — decir "no existe esa
+  // cuenta" o "credenciales invalidas" por separado permite enumerar
+  // correos registrados. Solo 429 (limite de intentos) tiene mensaje propio.
+  it.each([401, 500])('%i → mensaje neutro, nunca el detalle del backend', (statusCode) => {
+    const error = Object.assign(new Error('Internal server error: constraint failed'), { statusCode });
+    expect(mensajeErrorLogin(error)).toBe('No se pudo iniciar sesion. Verifica tu correo y contraseña.');
   });
 
-  it('500 → mensaje genérico, nunca «Internal server error»', async () => {
-    loginMock.mockRejectedValue(Object.assign(new Error('Internal server error'), { statusCode: 500 }));
-    const { result } = renderHook(() => useLogin(), { wrapper });
-
-    act(() => result.current.mutate({ correo: 'a@uvg.edu.gt', contrasena: 'x' }));
-
-    await waitFor(() =>
-      expect(swalFire).toHaveBeenCalledWith(expect.objectContaining({ text: MENSAJE_ERROR_GENERICO })),
-    );
+  it('429 → aviso de limite de intentos, no el mensaje de credenciales', () => {
+    const error = Object.assign(new Error('Too Many Requests'), { statusCode: 429 });
+    expect(mensajeErrorLogin(error)).toMatch(/demasiados intentos/i);
   });
 });
 
@@ -142,37 +150,17 @@ describe('T-221: página de login', () => {
 });
 
 describe('T-221: useRegister', () => {
-  it('la validación del backend se muestra traducida como texto (no HTML)', async () => {
-    registerMock.mockRejectedValue(
-      Object.assign(new Error('correo must be an email'), {
-        statusCode: 400,
-        details: ['correo must be an email', 'carne should not be empty'],
-      }),
-    );
-    const { result } = renderHook(() => useRegister(), { wrapper });
-
-    act(() => result.current.mutate({} as never));
-
-    await waitFor(() =>
-      expect(swalFire).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: 'El campo «correo» debe ser un correo electrónico válido. El campo «carne» es obligatorio.',
-        }),
-      ),
-    );
-    expect(swalFire).not.toHaveBeenCalledWith(expect.objectContaining({ html: expect.anything() }));
+  // T-274 (OWASP): antes se mostraba error.message crudo (p. ej. "El correo
+  // ya esta registrado"), lo que permitia enumerar cuentas existentes. Ahora
+  // cualquier fallo de registro (validacion del backend, correo duplicado,
+  // 5xx) muestra el mismo mensaje neutro.
+  it.each([400, 409, 500])('%i → mensaje neutro, nunca el detalle ni el correo duplicado', (statusCode) => {
+    const error = Object.assign(new Error('El correo ya está registrado'), { statusCode });
+    expect(mensajeErrorRegistro(error)).toBe('No se pudo completar el registro. Intenta de nuevo.');
   });
 
-  it('409 de dominio (correo ya registrado) → se conserva el mensaje del backend', async () => {
-    registerMock.mockRejectedValue(
-      Object.assign(new Error('El correo ya está registrado'), { statusCode: 409 }),
-    );
-    const { result } = renderHook(() => useRegister(), { wrapper });
-
-    act(() => result.current.mutate({} as never));
-
-    await waitFor(() =>
-      expect(swalFire).toHaveBeenCalledWith(expect.objectContaining({ text: 'El correo ya está registrado' })),
-    );
+  it('429 → aviso de limite de intentos', () => {
+    const error = Object.assign(new Error('Too Many Requests'), { statusCode: 429 });
+    expect(mensajeErrorRegistro(error)).toMatch(/demasiados intentos/i);
   });
 });
