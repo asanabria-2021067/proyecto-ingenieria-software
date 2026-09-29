@@ -106,7 +106,7 @@ test('navegación: cambiar de pestaña del proyecto no cierra el chat ni pierde 
   // El panel de chat vive en el layout del proyecto (sidebar), no en la
   // página — navegar a otra pestaña del mismo proyecto no debe desmontarlo.
   await page.goto(`/dashboard/projects/${PROYECTO_ID}/kanban`);
-  await expect(page.getByText('Chats')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Chat del proyecto' })).toBeVisible();
 
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
   await abrirChatIndividualCon(page, 'José');
