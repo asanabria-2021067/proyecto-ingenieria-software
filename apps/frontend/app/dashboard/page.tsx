@@ -318,9 +318,9 @@ function DashboardSkeleton() {
     >
       <div className={dashboardPage('py-section lg:py-page')}>
         <section className="mb-section">
-          <Skeleton width={150} height={16} className="mb-2" />
-          <Skeleton width={300} height={48} />
-          <Skeleton width={500} height={20} className="mt-2" />
+          <Skeleton width="min(150px, 100%)" height={16} className="mb-2" />
+          <Skeleton width="min(300px, 100%)" height={48} />
+          <Skeleton width="min(500px, 100%)" height={20} className="mt-2" />
         </section>
 
         <div className="mb-section grid grid-cols-1 gap-grid md:grid-cols-3">
