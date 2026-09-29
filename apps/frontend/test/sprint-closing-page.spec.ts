@@ -33,8 +33,9 @@ vi.mock('../hooks/use-hour-adjustments', async (importOriginal) => {
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 
-vi.mock('@/lib/swal', () => ({
-  default: { fire: vi.fn() },
+const toastSuccess = vi.hoisted(() => vi.fn());
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), { success: toastSuccess, error: vi.fn(), warning: vi.fn() }),
 }));
 
 import SprintClosingPage from '../app/dashboard/proyectos/[id]/sprints/[sprintId]/finalizar/page';
@@ -42,7 +43,6 @@ import { useCloseSprint, useProjectSprints, useSprintClosingSummary, useSprintDe
 import { useHourAdjustments } from '../hooks/use-hour-adjustments';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useCurrentUser } from '../hooks/use-current-user';
-import uvgSwal from '@/lib/swal';
 
 // GET .../resumen-cierre es exclusivo del líder en backend
 // (assertCanViewClosingSummary). Todos los tests asumen el punto de vista
@@ -249,7 +249,7 @@ describe('SprintClosingPage — cierre', () => {
     await waitFor(() => expect(mutateAsyncClose).toHaveBeenCalledTimes(1));
     expect(mutateAsyncClose).toHaveBeenCalledWith({ idSprint: 1, destino: undefined });
     expect(push).toHaveBeenCalledWith('/dashboard/projects/42');
-    expect(uvgSwal.fire).toHaveBeenCalled();
+    expect(toastSuccess).toHaveBeenCalled();
   });
 
   it('el cierre falla: el error queda visible, no se navega y la pantalla permanece disponible', async () => {
