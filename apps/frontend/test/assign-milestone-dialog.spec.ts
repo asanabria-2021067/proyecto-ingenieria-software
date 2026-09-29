@@ -5,12 +5,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 import { AssignMilestoneDialog } from '../components/projects/assign-milestone-dialog';
 
-const swalFire = vi.hoisted(() => vi.fn());
+const toastSuccess = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/swal', () => ({
-  default: {
-    fire: swalFire,
-  },
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), { success: toastSuccess, error: vi.fn(), warning: vi.fn() }),
 }));
 
 function mutationStub(result: unknown) {
@@ -133,6 +131,6 @@ describe('AssignMilestoneDialog', () => {
 
     expect(asignarHitoTareas.mutateAsync).not.toHaveBeenCalled();
     expect(onAsignado).toHaveBeenCalledOnce();
-    expect(swalFire).toHaveBeenCalled();
+    expect(toastSuccess).toHaveBeenCalled();
   });
 });
