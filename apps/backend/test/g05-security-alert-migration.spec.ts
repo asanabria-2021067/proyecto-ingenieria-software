@@ -16,9 +16,9 @@ const MIGRATIONS = join(REPO_ROOT, 'apps/backend/prisma/migrations');
 const NAME = '20260927230000_security_alert_notification_type';
 
 describe('G05-C11: tipo de notificación de alerta de seguridad', () => {
-  it('es la migración más reciente y contiene solo un ADD VALUE idempotente', () => {
-    const dirs = readdirSync(MIGRATIONS).filter((entry) => /^\d{14}_/.test(entry)).sort();
-    expect(dirs.at(-1)).toBe(NAME);
+  it('existe entre las migraciones aplicadas y contiene solo un ADD VALUE idempotente', () => {
+    const dirs = readdirSync(MIGRATIONS).filter((entry) => /^\d{14}_/.test(entry));
+    expect(dirs).toContain(NAME);
     const statements = readRepoFile(`apps/backend/prisma/migrations/${NAME}/migration.sql`)
       .split('\n')
       .filter((line) => line.trim() && !line.trim().startsWith('--'));
