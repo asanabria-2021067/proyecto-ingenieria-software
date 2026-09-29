@@ -35,7 +35,7 @@ const loginSchema = z.object({
 // si el correo existe o no. El limite de intentos (5/60s, ver
 // auth.controller.ts) se explica aparte para que el bloqueo se sienta como
 // un estado temporal y no como otro error de credenciales.
-function mensajeError(error: (Error & { statusCode?: number }) | null): string {
+export function mensajeError(error: (Error & { statusCode?: number }) | null): string {
   if (!error) return '';
   if (error.statusCode === 429) {
     return 'Demasiados intentos de inicio de sesion. Espera un minuto antes de volver a intentarlo.';
