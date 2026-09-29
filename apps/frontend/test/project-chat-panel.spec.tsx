@@ -22,6 +22,7 @@ const useCreateConversationMock = vi.fn();
 const useMarkConversationReadMock = vi.fn();
 const useMessagesMock = vi.fn();
 const useSendMessageMock = vi.fn();
+const useUpdateConversationMock = vi.fn();
 const useChatSocketMock = vi.fn();
 
 vi.mock('@/hooks/use-chat', () => ({
@@ -30,6 +31,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useMarkConversationRead: (...args: unknown[]) => useMarkConversationReadMock(...args),
   useMessages: (...args: unknown[]) => useMessagesMock(...args),
   useSendMessage: (...args: unknown[]) => useSendMessageMock(...args),
+  useUpdateConversation: (...args: unknown[]) => useUpdateConversationMock(...args),
   useChatSocket: (...args: unknown[]) => useChatSocketMock(...args),
 }));
 
@@ -41,6 +43,7 @@ const CONVERSACION: ChatConversacion = {
   idConversacion: 5,
   tipo: 'INDIVIDUAL',
   nombre: null,
+  nombrePersonalizado: null,
   participantes: [
     { idUsuario: 1, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null },
     { idUsuario: 2, nombre: 'Luis', apellido: 'Gómez', fotoUrl: null },
@@ -48,6 +51,8 @@ const CONVERSACION: ChatConversacion = {
   ultimoMensaje: null,
   noLeidos: 2,
   archivada: false,
+  esFavorita: false,
+  archivadaManual: false,
 };
 
 const MENSAJE: ChatMensaje = {
@@ -70,6 +75,7 @@ beforeEach(() => {
   useMarkConversationReadMock.mockReturnValue({ mutate: vi.fn() });
   useMessagesMock.mockReturnValue({ messages: [], isLoading: false });
   useSendMessageMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+  useUpdateConversationMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
   useChatSocketMock.mockReturnValue({ isConnected: true });
   useCreateConversationMock.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
 });
@@ -177,7 +183,7 @@ describe('ProjectChatPanel — sección «Chat del proyecto»', () => {
     expect(screen.queryByText(/^Chats$/)).not.toBeInTheDocument();
     expect(within(seccion).getByRole('status', { name: 'Chat en vivo conectado' })).toBeInTheDocument();
     // El contador de no leídos es el real de la conversación.
-    const fila = within(seccion).getByRole('button', { name: /Luis Gómez/ });
+    const fila = within(seccion).getByText('Luis Gómez').closest('.group') as HTMLElement;
     expect(within(fila).getByText('2')).toBeInTheDocument();
   });
 });
