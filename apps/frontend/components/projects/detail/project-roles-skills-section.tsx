@@ -51,14 +51,14 @@ export function ProjectRolesSkillsSection({
           {roles.map((rol, i) => (
             <div key={rol.idRolProyecto} data-slot="readonly-card" className={READONLY_CARD_CLASS}>
               <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Rol {i + 1}</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <ReadonlyField label="Nombre del rol" value={rol.nombreRol} />
                 <ReadonlyField label="Cupos" value={String(rol.cupos)} />
               </div>
               {rol.descripcionRolProyecto && (
                 <ReadonlyField label="Descripción del rol" value={rol.descripcionRolProyecto} />
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {rol.carreraRequerida && <ReadonlyField label="Carrera requerida" value={rol.carreraRequerida.nombreCarrera} />}
                 {rol.horasSemanalesEstimadas != null && <ReadonlyField label="Horas semanales" value={String(rol.horasSemanalesEstimadas)} />}
               </div>
