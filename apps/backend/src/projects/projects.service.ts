@@ -395,10 +395,49 @@ export class ProjectsService {
     });
 
     const esBusqueda = !!filters.q && filters.q.trim().length > 0;
-    if (!userId || esBusqueda || proyectos.length === 0) {
-      return proyectos;
+    const ordenados =
+      !userId || esBusqueda || proyectos.length === 0
+        ? proyectos
+        : await this._ordenarPorAfinidad(proyectos, userId);
+    return this._conGuardado(ordenados, userId);
+  }
+
+  /** Marca cada proyecto con `guardado` (bookmark del usuario actual). Sin sesión, siempre `false`. */
+  private async _conGuardado<T extends { idProyecto: number }>(
+    proyectos: T[],
+    userId?: number,
+  ): Promise<Array<T & { guardado: boolean }>> {
+    if (!userId || proyectos.length === 0) {
+      return proyectos.map((p) => ({ ...p, guardado: false }));
     }
-    return this._ordenarPorAfinidad(proyectos, userId);
+    const guardados = await this.prisma.proyectoGuardado.findMany({
+      where: { idUsuario: userId, idProyecto: { in: proyectos.map((p) => p.idProyecto) } },
+      select: { idProyecto: true },
+    });
+    const guardadoIds = new Set(guardados.map((g) => g.idProyecto));
+    return proyectos.map((p) => ({ ...p, guardado: guardadoIds.has(p.idProyecto) }));
+  }
+
+  /** Bookmark personal ("guardar"), distinto de postularse. Idempotente. */
+  async guardarProyecto(idProyecto: number, userId: number) {
+    const proyecto = await this.prisma.proyecto.findUnique({
+      where: { idProyecto },
+      select: { idProyecto: true },
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
+    }
+    await this.prisma.proyectoGuardado.upsert({
+      where: { idUsuario_idProyecto: { idUsuario: userId, idProyecto } },
+      create: { idUsuario: userId, idProyecto },
+      update: {},
+    });
+    return { idProyecto, guardado: true };
+  }
+
+  async desguardarProyecto(idProyecto: number, userId: number) {
+    await this.prisma.proyectoGuardado.deleteMany({ where: { idUsuario: userId, idProyecto } });
+    return { idProyecto, guardado: false };
   }
 
   /**
