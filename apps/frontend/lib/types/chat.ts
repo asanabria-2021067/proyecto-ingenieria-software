@@ -17,17 +17,29 @@ export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';
   nombre: string | null;
+  /** Menú de 3 puntos: sobrescribe el nombre mostrado si existe. */
+  nombrePersonalizado: string | null;
   participantes: ChatUsuario[];
   ultimoMensaje: ChatMensaje | null;
   noLeidos: number;
   /** T-234: el proyecto ya cerró — solo lectura, sin mensajes nuevos. */
   archivada: boolean;
+  esFavorita: boolean;
+  /** Archivado manual desde el menú de 3 puntos (distinto de `archivada`, que es por cierre de proyecto). */
+  archivadaManual: boolean;
 }
 
 export interface CreateConversationPayload {
   tipo: 'GRUPAL' | 'INDIVIDUAL';
   nombre?: string;
   idsParticipantes: number[];
+}
+
+/** Menú de 3 puntos: cada acción manda un único campo a la vez. */
+export interface UpdateConversationPayload {
+  archivada?: boolean;
+  esFavorita?: boolean;
+  nombrePersonalizado?: string | null;
 }
 
 /** T-236: conversación archivada, cruzando todos los proyectos del usuario
