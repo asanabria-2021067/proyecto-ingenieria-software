@@ -34,6 +34,7 @@ import {
   ESTADO_LABEL,
   PRIORIDAD_ICON,
   PRIORIDAD_LABEL,
+  estaVencida,
 } from '@/components/projects/task-board.utils';
 import {
   filterTasksByPriority,
@@ -122,6 +123,33 @@ function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
   );
 }
 
+function PuntoResumen({ className }: { className: string }) {
+  return <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${className}`} />;
+}
+
+/** Mismo patrón de tarjeta KPI que "Mis Tareas" (ResumenKpi). */
+function ResumenKpi({
+  label,
+  valor,
+  punto,
+  tonoValor = 'text-text-primary',
+}: {
+  label: string;
+  valor: number;
+  punto: string;
+  tonoValor?: string;
+}) {
+  return (
+    <div role="group" aria-label={label} className="card-base px-card py-stack">
+      <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        <PuntoResumen className={punto} />
+        {label}
+      </p>
+      <p className={`mt-tight font-headline text-3xl font-bold tabular-nums ${tonoValor}`}>{valor}</p>
+    </div>
+  );
+}
+
 export default function TareasExplorerClient({ idProyecto }: Props) {
   const { data: proyecto, isLoading: isLoadingProyecto } = useProjectDetail(idProyecto);
   const { tasks, isLoading, isError, refetch } = useProjectTasks(idProyecto);
@@ -170,6 +198,17 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
     [tareasFiltradas, page],
   );
 
+  // resumen sobre TODAS las tareas del proyecto (no solo la página ni el filtro)
+  const resumen = useMemo(
+    () => ({
+      pendientes: tasks.filter((t) => t.estadoTarea === 'POR_HACER').length,
+      vencidas: tasks.filter((t) => estaVencida(t)).length,
+      enProgreso: tasks.filter((t) => t.estadoTarea === 'EN_PROGRESO').length,
+      completadas: tasks.filter((t) => t.estadoTarea === 'HECHO').length,
+    }),
+    [tasks],
+  );
+
   const hayFiltrosActivos =
     busqueda.trim() !== '' || estadoFiltro !== FILTRO_TODOS || prioridadFiltro !== FILTRO_TODOS;
 
@@ -196,6 +235,24 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
           </p>
         )}
       </ProjectPageHeader>
+
+      {/* resumen: mismo patrón de KPIs que Mis Tareas, sobre TODAS las tareas del proyecto */}
+      {!isLoading && !isError && tasks.length > 0 && (
+        <section
+          aria-label="Resumen de tareas"
+          className="mb-stack grid grid-cols-1 gap-stack @sm/project:grid-cols-2 @2xl/project:grid-cols-4"
+        >
+          <ResumenKpi label="Pendientes" valor={resumen.pendientes} punto="bg-outline" />
+          <ResumenKpi
+            label="Vencidas"
+            valor={resumen.vencidas}
+            punto="bg-error"
+            tonoValor={resumen.vencidas > 0 ? 'text-error' : undefined}
+          />
+          <ResumenKpi label="En progreso" valor={resumen.enProgreso} punto="bg-status-warning" />
+          <ResumenKpi label="Completadas" valor={resumen.completadas} punto="bg-primary" tonoValor="text-primary" />
+        </section>
+      )}
 
       {/* resultados + limpiar, sobre la barra (mismo criterio que Mis Tareas) */}
       <div className="mb-stack flex min-h-8 flex-wrap items-center justify-between gap-inline">
