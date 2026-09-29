@@ -153,6 +153,15 @@ export async function deleteProject(id: number): Promise<{ mensaje: string }> {
   return apiFetch(`/proyectos/${id}`, { method: 'DELETE' });
 }
 
+/** Bookmark personal ("guardar"), distinto de postularse. Idempotente. */
+export async function saveProject(id: number): Promise<{ idProyecto: number; guardado: boolean }> {
+  return apiFetch(`/proyectos/${id}/guardar`, { method: 'POST' });
+}
+
+export async function unsaveProject(id: number): Promise<{ idProyecto: number; guardado: boolean }> {
+  return apiFetch(`/proyectos/${id}/guardar`, { method: 'DELETE' });
+}
+
 export async function createHito(idProyecto: number, payload: CreateHitoPayload): Promise<CreateHitoResult> {
   return apiFetch<CreateHitoResult>(`/proyectos/${idProyecto}/hitos`, {
     method: 'POST',
