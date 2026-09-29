@@ -32,7 +32,7 @@ import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboa
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
-import uvgSwal from '@/lib/swal';
+import { toast } from 'sonner';
 import logo from '@/public/logo.png';
 import OnboardingTour from '@/components/dashboard/OnboardingTour';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -133,23 +133,10 @@ export default function DashboardLayout({
     queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
 
     const href = getNotificationLink(latestNotification);
-    uvgSwal.fire({
-      toast: true,
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 6000,
-      timerProgressBar: true,
-      icon: 'info',
-      title: latestNotification.tituloNotificacion,
-      text: latestNotification.mensajeNotificacion,
-      didOpen: (popup) => {
-        if (!href) return;
-        popup.style.cursor = 'pointer';
-        popup.addEventListener('click', () => {
-          router.push(href);
-          uvgSwal.close();
-        });
-      },
+    toast(latestNotification.tituloNotificacion, {
+      description: latestNotification.mensajeNotificacion,
+      duration: 6000,
+      action: href ? { label: 'Ver', onClick: () => router.push(href) } : undefined,
     });
   }, [latestNotification, queryClient, router]);
 
