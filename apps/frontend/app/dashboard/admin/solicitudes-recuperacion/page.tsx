@@ -220,6 +220,7 @@ export default function AdminSolicitudesRecuperacionPage() {
 
         {/* Table card */}
         <div className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
@@ -299,6 +300,7 @@ export default function AdminSolicitudesRecuperacionPage() {
                 ))}
             </TableBody>
           </Table>
+          </div>
         </div>
 
         {/* Generated links (this session) */}
