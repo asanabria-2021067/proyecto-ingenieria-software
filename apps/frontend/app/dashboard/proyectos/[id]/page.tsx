@@ -56,7 +56,7 @@ import { ProjectDescriptionCard } from '@/components/projects/detail/project-des
 import { ProjectOwnerCard } from '@/components/projects/detail/project-owner-card';
 import { parseObjetivos } from '@/components/projects/detail/parse-objetivos';
 import { useProjectMembers } from '@/hooks/use-project-members';
-import { useChatPanel } from '@/components/projects/chat-panel-context';
+import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useCurrentExitRequest } from '@/hooks/use-exit-request';
 import { useProjectRoles } from '@/hooks/use-project-roles';
@@ -134,7 +134,7 @@ export default function ProyectoDetallePage() {
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
   const esParticipante =
     !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
-  const { requestChatWith } = useChatPanel();
+  const { iniciarChatCon } = useChatDock();
   const resolviendoPertenencia = isLoadingCurrentUser || (!!currentUser && isLoadingMembers);
 
   // Roles + isMine/canLeave: solo se piden para un participante activo (el
@@ -405,7 +405,7 @@ export default function ProyectoDetallePage() {
               nombre={proyecto.creador.nombre}
               apellido={proyecto.creador.apellido}
               correo={proyecto.creador.correo}
-              onChat={esParticipante ? () => requestChatWith(proyecto.creador.idUsuario) : undefined}
+              onChat={esParticipante ? () => iniciarChatCon(projectId, proyecto.creador.idUsuario) : undefined}
             />
           )}
 
