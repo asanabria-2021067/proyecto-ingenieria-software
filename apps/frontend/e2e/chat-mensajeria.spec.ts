@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './support/test';
 import { login } from './support/auth';
 
 // Ambos participan realmente en el Proyecto 1 del seed (carlos.mendoza es su

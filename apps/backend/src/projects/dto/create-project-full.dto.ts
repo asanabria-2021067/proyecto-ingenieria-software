@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@prisma/client';
+import { IsHttpUrl } from '../../common/validators/http-url.validator';
 
 export class RequisitoHabilidadDto {
   @IsInt()
@@ -99,6 +100,8 @@ export class CreateProjectFullDto {
   @IsOptional()
   @IsString()
   @MaxLength(255)
+  // G07 (OWASP25-C027): solo http(s); '' = sin enlace.
+  @IsHttpUrl()
   urlRecursoExterno?: string;
 
   @IsOptional()

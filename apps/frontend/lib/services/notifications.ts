@@ -49,6 +49,11 @@ export function getNotificationLink(n: {
       return '/dashboard/mis-postulaciones';
     case 'SOLICITUD_RECUPERACION_CONTRASENA':
       return '/dashboard/admin/solicitudes-recuperacion';
+    // G05 (OWASP25-C038): alerta de ráfaga de accesos fallidos/bloqueos; el
+    // admin revisa el estado de las cuentas. El texto viene del backend (solo
+    // conteos) y se muestra como texto; datosJson nunca se renderiza.
+    case 'ALERTA_SEGURIDAD':
+      return '/dashboard/admin/usuarios';
     default:
       return null;
   }

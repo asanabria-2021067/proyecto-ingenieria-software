@@ -17,6 +17,7 @@ import {
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
 import type { ChatMensaje, CreateConversationPayload } from '@/lib/types/chat';
+import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
  * 'joinConversation' es fire-and-forget salvo por este ack: sin él, un join
@@ -123,15 +124,17 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
   const queryClient = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
   const activeConversationIdRef = useRef<number | null>(activeConversationId);
-  activeConversationIdRef.current = activeConversationId;
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    // Mismo criterio que useRealtimeNotifications: el esquema ws/wss sigue
-    // el protocolo real de la página, no el prefijo de NEXT_PUBLIC_API_URL.
-    const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsUrl = apiUrl.replace(/^https?/, wsScheme);
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    // G07 (P2/T12): mismo contrato que useRealtimeNotifications. Vacía →
+    // origen de la página (same-origin vía nginx); URL explícita → esa URL con
+    // el esquema ws/wss de la página (ver lib/realtime/socket-url.ts).
+    const wsUrl = realtimeBaseUrl(process.env.NEXT_PUBLIC_API_URL, window.location);
     // Sesión vía cookie httpOnly access_token (ver useRealtimeNotifications).
     const socket = io(`${wsUrl}/chat`, {
       withCredentials: true,

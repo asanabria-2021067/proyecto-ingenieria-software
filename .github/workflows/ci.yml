@@ -9,7 +9,16 @@ on:
     branches: [main, develop]
   push:
     branches: [develop]
+  # G02 (OWASP25-C033 + FASE2-N06): quien reutiliza este workflow decide de
+  # forma explicita si corre el E2E. Dentro de un workflow_call,
+  # github.event_name es el evento del CALLER (p. ej. `push` a main), asi que
+  # no sirve para decidirlo.
   workflow_call:
+    inputs:
+      e2e:
+        description: "'run' ejecuta la suite E2E; 'skip' la omite"
+        type: string
+        required: true
   workflow_dispatch:
 
 # Si se empujan varios commits seguidos al mismo PR, cancela las corridas
@@ -17,6 +26,11 @@ on:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+# G02 (OWASP25-C044): el token de CI solo lee el repositorio. Ningun job de CI
+# publica ni despliega, asi que ninguno necesita permisos de escritura.
+permissions:
+  contents: read
 
 env:
   # Prisma exige que la variable exista para generar el cliente.
@@ -28,12 +42,81 @@ env:
   # AuthService falla al arrancar sin esto (ver auth.service.ts) - no tiene
   # valor por defecto a proposito, asi que CI debe proveerlo explicitamente.
   JWT_REFRESH_SECRET: ci-refresh-secret
-  # JwtStrategy y los gateways realtime exigen esto (T-210: sin valor por
-  # defecto a proposito) - sin declararlo aqui, cualquier spec nuevo que
-  # construya JwtStrategy o un JwtModule rompe CI sin aviso previo.
-  JWT_SECRET: ci-secret
+  # G01 (OWASP25-C019): secreto JWT SINTETICO de >=32 caracteres para todo job
+  # que arranque Nest; CI no debe depender del fallback predecible del codigo.
+  # No es un secreto real: solo firma tokens efimeros dentro del runner.
+  JWT_SECRET: ci-synthetic-jwt-secret-not-for-production-0000
 
 jobs:
+  # G03 (OWASP25-C041): en todo PR se revisan SOLO las dependencias que el PR
+  # agrega o cambia (diff base..head del dependency graph) y se bloquea si
+  # alguna trae una vulnerabilidad high o critical. El backlog historico no se
+  # evalua aqui (lo reporta el audit informativo). Solo lectura del repo.
+  dependency-review:
+    name: Revision de dependencias del PR
+    if: github.event_name == 'pull_request' && !inputs.e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Revisar dependencias nuevas o cambiadas
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  # G03 (OWASP25-C040): resumen INFORMATIVO del backlog de `npm audit
+  # --omit=dev` por app, desde el lockfile y sin instalar nada. El script solo
+  # publica conteos, paquetes e IDs GHSA saneados y siempre termina en 0; sin
+  # secretos ni credenciales de registry. No corre en el workflow_call del deploy.
+  dependency-audit:
+    name: Audit de dependencias (informativo)
+    if: ${{ !inputs.e2e }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resumen de npm audit (produccion)
+        run: node .github/scripts/npm-audit-summary.mjs apps/backend apps/frontend
+
+  # G08 (OWASP25-C048 · A08:2025): el PR de la rama OWASP hacia develop solo
+  # puede traer el delta de la workstream (rutas de la allowlist, commits
+  # trazables). Base = merge-base con develop; solo Git local y lectura del
+  # repo: sin secretos, sin deploy, sin imagenes y sin ninguna ruta hacia main.
+  owasp-delta:
+    name: OWASP_DELTA_ISOLATED
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop' && github.head_ref == 'sprint8/vernel-owasp2025' && !inputs.e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repositorio (historial completo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verificar el delta OWASP aislado
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: node scripts/security/verify-owasp-delta.mjs --base-ref "$BASE_REF"
+
   backend:
     name: Backend - lint y pruebas
     runs-on: ubuntu-latest
@@ -80,9 +163,10 @@ jobs:
       - name: Compilar (nest build)
         run: npm run build
 
+      # G02 (OWASP25-C031): un error de lint hace fallar el job; nada lo
+      # convierte en exito.
       - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       # Cobertura completa solo en PR (gate antes de mergear); en push/deploy
       # (workflow_call) corren las pruebas sin instrumentar cobertura para
@@ -96,10 +180,15 @@ jobs:
         if: github.event_name != 'pull_request'
         run: npm run test
 
+      # G02 (OWASP25-C034): las suites que exigen PostgreSQL real no se saltan en
+      # CI. Cada interruptor apunta SOLO al servicio efimero de este job; nunca a
+      # una base compartida ni productiva.
       - name: Pruebas de integracion en serie contra Postgres efimero (Vitest)
         run: npm run test:integration
         env:
           INTEGRATION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+          ROLES_IT_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+          RUN_REAL_DB_TESTS: '1'
 
   frontend:
     name: Frontend - lint y pruebas
@@ -121,9 +210,25 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      # G02 (OWASP25-C031): un error de lint hace fallar el job; nada lo
+      # convierte en exito.
       - name: Lint
         run: npm run lint
-        continue-on-error: true
+
+      # G02 (OWASP25-C043): errores de TypeScript (incluidos los tests) fallan
+      # en todo evento; no dependen de lo que `next build` decida comprobar.
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      # G02 (OWASP25-C043): build de produccion de Next en todo evento (PR,
+      # push, dispatch y workflow_call del deploy), con configuracion publica
+      # SINTETICA: nunca secretos ni la URL real de produccion.
+      - name: Build de produccion (next build)
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_API_PREFIX: /api
 
       # La cobertura es un gate obligatorio en Pull Requests.
       # Los umbrales se definen en apps/frontend/vitest.config.ts.
@@ -133,19 +238,27 @@ jobs:
         if: github.event_name == 'pull_request'
         run: npm run test:coverage
 
+      # G02 (OWASP25-C032): fuera de PR (push, dispatch y el workflow_call del
+      # deploy) las pruebas corren igual, sin instrumentar cobertura, como en
+      # el job backend: un deploy de main no puede saltarse estos tests.
+      - name: Pruebas unitarias (Vitest, sin cobertura)
+        if: github.event_name != 'pull_request'
+        run: npm run test
+
   e2e:
     name: E2E - suite de humo (Playwright)
     runs-on: ubuntu-latest
     # A diferencia de los jobs backend/frontend (que usan mocks), este job
     # necesita una base de datos y un Redis reales: arranca el backend de
     # verdad y navega la app de verdad con un navegador. Es lento (~10min+)
-    # aun con cache, asi que NO corre en cada push/PR a develop: solo en PR
-    # hacia main, manualmente (workflow_dispatch), o cuando deploy.yml
-    # reusa este workflow antes de desplegar (workflow_call).
+    # aun con cache, asi que NO corre en cada push/PR a develop.
+    # - Reutilizado (workflow_call): decide SOLO el input `e2e` del caller
+    #   (deploy.yml pide `run`).
+    # - Invocado directamente (sin input): PR hacia main o workflow_dispatch.
     if: >-
-      github.event_name == 'workflow_call' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.base_ref == 'main')
+      inputs.e2e == 'run' ||
+      (!inputs.e2e && (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')))
     services:
       postgres:
         image: postgres:17-alpine
@@ -172,12 +285,13 @@ jobs:
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
       DIRECT_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
-      JWT_SECRET: e2e-ci-secret
+      JWT_SECRET: e2e-ci-synthetic-jwt-secret-not-for-production
       REDIS_HOST: localhost
       REDIS_PORT: 6379
       FRONTEND_URL: http://localhost:3000
       NEXT_PUBLIC_API_URL: http://localhost:3001
       PLAYWRIGHT_BASE_URL: http://localhost:3000
+      E2E_PRODUCTION_SERVER: '1'
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -195,10 +309,13 @@ jobs:
         working-directory: apps/backend
         run: npm ci
 
-      - name: Preparar base de datos (schema + seed)
+      # G02 (OWASP25-C033): el esquema se crea con las migraciones reales
+      # (`migrate deploy`, lo mismo que corre produccion al arrancar), nunca con
+      # `db push`, que ignora el historial de migraciones. Base efimera del job.
+      - name: Preparar base de datos (migraciones + seed)
         working-directory: apps/backend
         run: |
-          npx prisma db push
+          npx prisma migrate deploy
           npx prisma db seed
 
       - name: Compilar y levantar el backend en segundo plano
@@ -224,6 +341,14 @@ jobs:
       - name: Instalar dependencias del frontend
         working-directory: apps/frontend
         run: npm ci
+
+      # G02 (OWASP25-C033): el E2E navega el build de produccion (next build +
+      # next start via playwright.config.ts), no el dev server.
+      - name: Build de produccion del frontend para E2E
+        working-directory: apps/frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
 
       - name: Cache de navegadores de Playwright
         id: playwright-cache
@@ -253,3 +378,44 @@ jobs:
           name: playwright-report
           path: apps/frontend/playwright-report/
           retention-days: 7
+
+  # G02 (D4 + OWASP25-C043/C044): arnes efimero de topologia (nginx versionado,
+  # TLS autofirmado, imagenes de los Dockerfiles productivos, PostgreSQL 17 y
+  # Redis 7) dentro del runner. Siempre en PR hacia main; en PR hacia develop
+  # solo si el PR toca realtime, nginx, cabeceras, topologia o el arnes
+  # (infra/staging/should-run.mjs); a mano con workflow_dispatch. Nunca dentro
+  # del workflow_call del deploy (el input `e2e` solo existe en esa llamada).
+  # Sin secretos, sin publicacion ni deploy: alcance a produccion NONE.
+  topology:
+    name: Topologia - arnes efimero (nginx + TLS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: >-
+      !inputs.e2e &&
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          # Merge commit del PR y su primer padre (punta de la base) para el filtro de rutas.
+          fetch-depth: 2
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Decidir si el arnes aplica a este cambio
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: node infra/staging/should-run.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Guard de representatividad (infra/staging vs infra/nginx)
+        if: steps.scope.outputs.run == 'true'
+        run: node infra/staging/check-representativity.mjs
+
+      - name: Arnes efimero - build, caracterizacion y destruccion
+        if: steps.scope.outputs.run == 'true'
+        run: infra/staging/run-harness.sh

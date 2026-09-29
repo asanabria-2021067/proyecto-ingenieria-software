@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ChatGateway } from '../src/chat/chat.gateway';
+import { WsAuthService } from '../src/ws-auth/ws-auth.service';
+import type { JwtService } from '@nestjs/jwt';
+import type { PrismaService } from '../src/prisma/prisma.service';
 
 function makeSocket(overrides: Partial<{ auth: Record<string, unknown>; headers: Record<string, unknown> }> = {}) {
   return {
@@ -22,8 +25,13 @@ function makeGateway(prismaOverrides: { findUnique?: ReturnType<typeof vi.fn> } 
     conversacionParticipante: {
       findUnique: prismaOverrides.findUnique ?? vi.fn(),
     },
+    // G07-C03: la política del handshake consulta el estado de la cuenta.
+    usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }) },
   };
-  const gateway = new ChatGateway(jwtService as any, prisma as any);
+  const gateway = new ChatGateway(
+    new WsAuthService(jwtService as unknown as JwtService, prisma as unknown as PrismaService),
+    prisma as unknown as PrismaService,
+  );
   return { gateway, jwtService, prisma };
 }
 
