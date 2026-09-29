@@ -12,6 +12,7 @@ import {
   useExitPreparationSummary,
 } from '@/hooks/use-exit-request';
 import { CloseAssignmentForm } from '@/components/projects/close-assignment-form';
+import { KANBAN_COLUMN_CLASS, KanbanColumnHeader, kanbanColumnBodyClass } from '@/components/projects/kanban-column-frame';
 import { PendingLeaderReview } from '@/components/projects/pending-leader-review';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -145,7 +146,7 @@ function ResponsibilityCard({
 }
 
 // ─── Tablero filtrado (solo lectura) ─────────────────────────────────────────
-// Reutiliza la estructura visual de KanbanColumn (task-board.tsx): mismo
+// Reutiliza el marco de columna del Kanban (kanban-column-frame.tsx): mismo
 // encabezado con punto + título + contador, mismo grid responsive con
 // overflow-x-auto. No reutiliza el componente literal porque KanbanColumn
 // está acoplado a EstadoTarea/DnD/@dnd-kit — este tablero es de solo lectura
@@ -168,24 +169,16 @@ function ExitPreparationBoard({
             <section
               key={columna.key}
               aria-labelledby={`preparacion-columna-${columna.key}-heading`}
-              className="flex min-h-0 min-w-0 flex-col gap-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low p-3"
+              className={KANBAN_COLUMN_CLASS}
             >
-              <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 ${estilo.headerBg}`}>
-                <h3
-                  id={`preparacion-columna-${columna.key}-heading`}
-                  className={`flex items-center gap-2 text-[13px] font-bold ${estilo.headerText}`}
-                >
-                  <span className={`inline-block size-2 rounded-full ${estilo.dot}`} aria-hidden="true" />
-                  {columna.titulo}
-                </h3>
-                <span
-                  className={`inline-flex min-h-[22px] min-w-[22px] items-center justify-center rounded-full bg-surface-container-highest px-1.5 text-xs font-semibold ${estilo.headerText}`}
-                >
-                  {items.length}
-                </span>
-              </div>
+              <KanbanColumnHeader
+                headingId={`preparacion-columna-${columna.key}-heading`}
+                titulo={columna.titulo}
+                dotClassName={estilo.columnDot}
+                count={items.length}
+              />
 
-              <div className="flex flex-1 flex-col gap-2.5 pr-1">
+              <div data-slot="kanban-column-body" className={kanbanColumnBodyClass()}>
                 {items.length === 0 ? (
                   <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-8 text-center">
                     <span

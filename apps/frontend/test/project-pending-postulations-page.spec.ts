@@ -154,6 +154,12 @@ describe('ProjectPendingPostulationsPage — F13.1 vista dedicada', () => {
     expect(
       screen.getByText('Cuando alguien solicite unirse a un rol de este proyecto, aparecerá aquí para su revisión.'),
     ).toBeInTheDocument();
+    // Vacío directo sobre la tarjeta «Postulaciones recibidas», sin otra caja gris interna.
+    const vacio = screen.getByText('No hay postulaciones pendientes.').closest('[data-slot="empty"]') as HTMLElement;
+    expect(vacio).toHaveClass('border-0', 'bg-transparent', 'shadow-none');
+    expect(vacio).not.toHaveClass('border-dashed', 'bg-surface-container-low');
+    expect(vacio.querySelector('[data-slot="empty-icon"]')).toHaveAttribute('data-variant', 'subtle');
+    expect(screen.getByText('0 pendientes')).toBeInTheDocument();
   });
 
   it('el link "Volver a miembros" apunta a la vista de miembros', () => {

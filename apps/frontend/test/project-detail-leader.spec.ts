@@ -37,6 +37,9 @@ import { useProjectDetail } from '../hooks/use-project-detail';
 import { useProjectMembers } from '../hooks/use-project-members';
 import { useCurrentUser } from '../hooks/use-current-user';
 import { useProjectRoles } from '../hooks/use-project-roles';
+import { ProjectHeaderCard, ProjectClosureAction } from '../components/projects/detail/project-header-card';
+import { ProjectOwnerCard } from '../components/projects/detail/project-owner-card';
+import { ProjectDescriptionCard } from '../components/projects/detail/project-description-card';
 
 function proyecto(overrides: Partial<ProyectoDetalleDTO> = {}): ProyectoDetalleDTO {
   return {
@@ -229,5 +232,262 @@ describe('ProjectDetailClient — vista administrativa del líder (Sección 7-24
       'href',
       '/dashboard/projects/mine',
     );
+  });
+});
+
+// ── HU-154 (T-214/T-216): tarjetas compartidas del detalle ────────────────
+describe('Tarjetas compartidas del detalle de proyecto', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function renderHeader(props: Partial<Parameters<typeof ProjectHeaderCard>[0]> = {}) {
+    return render(
+      createElement(ProjectHeaderCard, {
+        breadcrumb: { href: '/dashboard/projects/mine', label: 'Mis proyectos' },
+        titulo: 'Proyecto de prueba',
+        descripcion: 'Descripción corta.',
+        tipoProyecto: 'ACADEMICO_HORAS_BECA',
+        estadoProyecto: 'EN_PROGRESO',
+        modalidadProyecto: 'MIXTA',
+        ...props,
+      }),
+    );
+  }
+
+  it('ProjectHeaderCard: ruta de vuelta, título h1, descripción y etiquetas de estado/tipo/modalidad', () => {
+    renderHeader({ etiquetas: ['Salud', 'Deporte'] });
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Volver a Mis proyectos' })).toHaveAttribute('href', '/dashboard/projects/mine');
+    expect(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    expect(screen.getByText('Descripción corta.')).toBeInTheDocument();
+    const resumen = screen.getByRole('region', { name: 'Resumen del proyecto' });
+    expect(within(resumen).getByText('En progreso')).toHaveClass('pill');
+    expect(within(resumen).getByText('Horas Beca')).toHaveClass('pill');
+    expect(within(resumen).getByText('Mixta')).toHaveClass('pill', 'pill-neutral');
+    const etiquetas = screen.getByRole('list', { name: 'Etiquetas del proyecto' });
+    expect(within(etiquetas).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Salud', 'Deporte']);
+  });
+
+  it('ProjectHeaderCard: sin descripción muestra el texto de respaldo y sin etiquetas no hay lista', () => {
+    renderHeader({ descripcion: null });
+    expect(screen.getByText('Sin descripción disponible.')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Etiquetas del proyecto' })).not.toBeInTheDocument();
+  });
+
+  it('ProjectHeaderCard: solo con líder muestra «Líder del proyecto» y «Eres el responsable del proyecto»', () => {
+    renderHeader({ lider: { nombre: 'Ana', apellido: 'Lopez' } });
+    expect(screen.getByText('Líder del proyecto')).toBeInTheDocument();
+    expect(screen.getByText('Eres el responsable del proyecto')).toBeInTheDocument();
+    expect(screen.getByText('AL')).toBeInTheDocument();
+
+    cleanup();
+    renderHeader();
+    expect(screen.queryByText('Líder del proyecto')).not.toBeInTheDocument();
+    expect(screen.queryByText('Eres el responsable del proyecto')).not.toBeInTheDocument();
+  });
+
+  it('ProjectHeaderCard: renderiza la acción principal recibida', () => {
+    renderHeader({ acciones: createElement('a', { href: '/x' }, 'Acción principal') });
+    expect(screen.getByRole('link', { name: 'Acción principal' })).toHaveAttribute('href', '/x');
+  });
+
+  it('ProjectClosureAction: habilitada es un enlace; bloqueada es un botón deshabilitado que explica el motivo', () => {
+    render(createElement(ProjectClosureAction, { action: { href: '/dashboard/projects/42/cierre', enabled: true, reason: null } }));
+    expect(screen.getByRole('link', { name: /preparar cierre del proyecto/i })).toHaveAttribute(
+      'href',
+      '/dashboard/projects/42/cierre',
+    );
+
+    cleanup();
+    render(createElement(ProjectClosureAction, { action: { href: '/x', enabled: false, reason: 'Faltan 2 de 16 comprobaciones' } }));
+    expect(screen.getByRole('button', { name: /preparar cierre del proyecto/i })).toBeDisabled();
+    expect(screen.getByLabelText('Faltan 2 de 16 comprobaciones')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('ProjectOwnerCard: responsable con iniciales y correo; «Chat» solo si se ofrece y llama al callback', () => {
+    const onChat = vi.fn();
+    render(createElement(ProjectOwnerCard, { nombre: 'Valeria', apellido: 'Ortiz', correo: 's6.lider@uvg.edu.gt', onChat }));
+
+    const card = screen.getByRole('region', { name: 'Responsable del proyecto' });
+    expect(within(card).getByText('Valeria Ortiz')).toBeInTheDocument();
+    expect(within(card).getByText('s6.lider@uvg.edu.gt')).toBeInTheDocument();
+    expect(within(card).getByText('VO')).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole('button', { name: 'Chat' }));
+    expect(onChat).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    render(createElement(ProjectOwnerCard, { nombre: 'Valeria', apellido: 'Ortiz' }));
+    expect(screen.queryByRole('button', { name: 'Chat' })).not.toBeInTheDocument();
+  });
+
+  it('ProjectDescriptionCard: descripción completa y objetivos en una sola tarjeta', () => {
+    render(createElement(ProjectDescriptionCard, { descripcion: 'Texto\ncompleto', objetivos: ['Uno', 'Dos'] }));
+
+    const card = screen.getByRole('region', { name: 'Descripción y objetivos' });
+    expect(within(card).getByRole('heading', { level: 2, name: 'Descripción del proyecto' })).toBeInTheDocument();
+    expect(within(card).getByRole('heading', { level: 3, name: 'Objetivos del proyecto' })).toBeInTheDocument();
+    expect(within(card).getByText(/Texto\s+completo/)).toBeInTheDocument();
+    expect(within(card).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Uno', 'Dos']);
+  });
+
+  it('ProjectDescriptionCard: sin descripción (undefined) es solo de objetivos; vacía muestra el estado vacío', () => {
+    render(createElement(ProjectDescriptionCard, { objetivos: [] }));
+
+    const card = screen.getByRole('region', { name: 'Objetivos del proyecto' });
+    expect(within(card).getByRole('heading', { level: 2, name: 'Objetivos del proyecto' })).toBeInTheDocument();
+    expect(within(card).queryByText('Descripción del proyecto')).not.toBeInTheDocument();
+    expect(within(card).getByText('No se han registrado objetivos para este proyecto.')).toBeInTheDocument();
+  });
+
+  it('ProjectDescriptionCard: descripción null muestra el texto de respaldo', () => {
+    render(createElement(ProjectDescriptionCard, { descripcion: null, objetivos: ['Uno'] }));
+    expect(screen.getByText('Sin descripción disponible.')).toBeInTheDocument();
+  });
+});
+
+describe('ProjectDetailClient — responsable en la tarjeta compartida', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: proyecto(), isLoading: false, error: null, refetch: vi.fn() });
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    (useProjectMembers as any).mockReturnValue({ members: [] });
+    mockRoles([rol()]);
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('el líder ve al responsable (nombre y correo reales) sin botón de chat', () => {
+    renderPage();
+    const card = screen.getByRole('region', { name: 'Responsable del proyecto' });
+    expect(within(card).getByText('Ana Lopez')).toBeInTheDocument();
+    expect(within(card).getByText('ana@uvg.edu.gt')).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Chat' })).not.toBeInTheDocument();
+  });
+});
+
+// ── HU-154 (T-216): esqueleto compartido del líder ───────────────────────
+describe('ProjectDetailClient — esqueleto 8/4 del líder', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: proyecto(), isLoading: false, error: null, refetch: vi.fn() });
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    (useProjectMembers as any).mockReturnValue({ members: [{ idUsuario: 1 }, { idUsuario: 5 }] });
+    mockRoles([rol({ isMine: true })]);
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function slot(container: HTMLElement, nombre: string) {
+    return container.querySelector(`[data-slot="${nombre}"]`) as HTMLElement;
+  }
+
+  it('usa la rejilla compartida: encabezado, principal y lateral, en ese orden', () => {
+    const { container } = renderPage();
+
+    const grid = slot(container, 'project-content-grid');
+    expect(grid).toBeInTheDocument();
+    expect(Array.from(grid.children).map((el) => el.getAttribute('data-slot'))).toEqual([
+      'project-grid-full',
+      'project-grid-main',
+      'project-grid-aside',
+    ]);
+    expect(grid.className).not.toContain('max-w-[1400px]');
+  });
+
+  it('encabezado a ancho completo con la ruta de vuelta a Mis proyectos', () => {
+    const { container } = renderPage();
+
+    const full = slot(container, 'project-grid-full');
+    expect(within(full).getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    expect(within(full).getByRole('link', { name: 'Volver a Mis proyectos' })).toHaveAttribute('href', '/dashboard/projects/mine');
+  });
+
+  it('la columna principal tiene «Descripción y objetivos» y luego los roles', () => {
+    const { container } = renderPage();
+
+    const main = slot(container, 'project-grid-main');
+    const descripcion = within(main).getByRole('region', { name: 'Descripción y objetivos' });
+    expect(within(descripcion).getByText('Descripción real del proyecto.')).toBeInTheDocument();
+    expect(within(descripcion).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Objetivo uno', 'Objetivo dos']);
+    const rolesTitulo = within(main).getByText(/Roles del proyecto/);
+    // La descripción precede a los roles en el orden del documento.
+    expect(descripcion.compareDocumentPosition(rolesTitulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('la columna lateral reúne responsable, detalles y resumen del equipo', () => {
+    renderPage();
+
+    const aside = screen.getByRole('complementary', { name: 'Información del proyecto' });
+    expect(within(aside).getByRole('region', { name: 'Responsable del proyecto' })).toBeInTheDocument();
+    expect(within(aside).getByText('Detalles del proyecto')).toBeInTheDocument();
+    expect(within(aside).getByText('Resumen del equipo')).toBeInTheDocument();
+  });
+
+  it('?openRoles=1 sigue abriendo la gestión de roles y limpia la URL', () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('openRoles=1'));
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Gestionar roles' })).toBeInTheDocument();
+    expect(replaceMock).toHaveBeenCalledWith('/dashboard/projects/42');
+  });
+});
+
+// ── HU-154: la lista de roles del líder decide sus columnas por contenedor ──
+describe('ProjectDetailClient — lista de roles por contenedor', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: proyecto(), isLoading: false, error: null, refetch: vi.fn() });
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    (useProjectMembers as any).mockReturnValue({ members: [] });
+    mockRoles([rol(), rol({ idRolProyecto: 2, nombreRol: 'Backend' })]);
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('las tarjetas van en una rejilla de 2 columnas solo cuando la lista mide al menos 42rem', () => {
+    renderPage();
+
+    const tarjeta = screen.getByRole('heading', { level: 3, name: 'Frontend' });
+    const rejilla = tarjeta.closest('.grid') as HTMLElement;
+    expect(rejilla).toHaveClass('grid-cols-1', '@2xl/roles:grid-cols-2');
+    expect(rejilla.className).not.toMatch(/(^|\s)(sm|md|lg|xl):grid-cols-/);
+    expect(rejilla.parentElement).toHaveClass('@container/roles');
+    expect(within(rejilla).getByRole('heading', { level: 3, name: 'Backend' })).toBeInTheDocument();
+  });
+});
+
+// «Agregar rol» usa la misma escala secundaria que las acciones de cada rol.
+describe('ProjectDetailClient — tamaño de «Agregar rol»', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: proyecto(), isLoading: false, error: null, refetch: vi.fn() });
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    (useProjectMembers as any).mockReturnValue({ members: [] });
+    mockRoles([rol()]);
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('usa type-meta y conserva su color de acento', () => {
+    renderPage();
+
+    const boton = screen.getByRole('button', { name: /agregar rol/i });
+    expect(boton).toHaveClass('type-meta', 'text-primary', 'border-primary');
   });
 });

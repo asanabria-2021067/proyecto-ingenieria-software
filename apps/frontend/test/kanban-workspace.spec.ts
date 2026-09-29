@@ -246,17 +246,20 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     );
   });
 
-  it('el breadcrumb enlaza a Mis proyectos y al detalle real; muestra estado/tipo/modalidad', () => {
+  it('el encabezado «Tablero» va fuera de la tarjeta, con la vuelta al detalle real; la tarjeta muestra estado/tipo/modalidad', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks();
 
     renderWorkspace();
 
-    expect(screen.getByRole('link', { name: 'Mis proyectos' })).toHaveAttribute(
-      'href',
-      '/dashboard/projects/mine',
-    );
-    expect(screen.getByRole('link', { name: 'Proyecto de prueba' })).toHaveAttribute(
+    const titulo = screen.getByRole('heading', { level: 1, name: 'Tablero' });
+    expect(titulo.closest('[data-slot="project-page-header"]')).not.toBeNull();
+    expect(screen.getByText('Workspace del proyecto').closest('[data-slot="project-page-header"]')).not.toBeNull();
+    // el nombre del proyecto es contenido de la tarjeta resumen, no el título de la página
+    expect(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    // una sola vuelta al proyecto (ya no hay botón duplicado dentro de la tarjeta)
+    expect(screen.getAllByRole('link', { name: /volver al proyecto/i })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/42',
     );
@@ -404,6 +407,21 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     renderWorkspace();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
     expect(screen.queryByRole('button', { name: /agregar hito/i })).not.toBeInTheDocument();
+  });
+
+  it('en Hitos, las acciones de creación van juntas: «Gestionar etiquetas», «Agregar hito» y «Nueva tarea» contiguos', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    renderWorkspace();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
+
+    const etiquetas = screen.getByRole('button', { name: /gestionar etiquetas/i });
+    const hito = screen.getByRole('button', { name: /agregar hito/i });
+    const tarea = screen.getByRole('button', { name: /nueva tarea/i });
+    expect(etiquetas.nextElementSibling).toBe(hito);
+    expect(hito.nextElementSibling).toBe(tarea);
+    expect(hito.parentElement).toHaveClass('gap-2');
   });
 
   it('"Agregar hito" no se muestra en la pestaña Tablero', () => {

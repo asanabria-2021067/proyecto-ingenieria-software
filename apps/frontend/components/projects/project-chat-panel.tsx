@@ -88,28 +88,36 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
   if (!habilitado) return null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col border-t border-outline-variant">
-      <div className="flex items-center justify-between px-4 py-2.5">
-        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-tertiary">
-          Chats
+    // Sección propia, fija abajo en la sidebar del proyecto: borde superior,
+    // aire arriba y una lista con alto máximo para no empujar el menú.
+    <section
+      aria-labelledby="chat-del-proyecto-titulo"
+      className="flex max-h-[45%] min-h-0 shrink-0 flex-col border-t border-outline-variant pt-stack"
+    >
+      <div className="flex items-center justify-between px-stack pb-tight">
+        <h2
+          id="chat-del-proyecto-titulo"
+          className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wider text-text-secondary"
+        >
+          Chat del proyecto
           <span
             role="status"
             title={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
             aria-label={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
-            className={`size-1.5 shrink-0 rounded-full ${isConnected ? 'bg-primary' : 'animate-pulse bg-destructive'}`}
+            className={`size-2 shrink-0 rounded-full ${isConnected ? 'bg-primary' : 'animate-pulse bg-destructive'}`}
           />
-        </span>
+        </h2>
         <button
           type="button"
           onClick={() => setNuevoChatAbierto(true)}
           aria-label="Nuevo chat"
-          className="rounded-md p-1 text-tertiary hover:bg-surface-container-high hover:text-on-surface"
+          className="rounded-control p-1 text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary"
         >
           <MessageSquarePlus className="size-4" aria-hidden="true" />
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
+      <div className="min-h-0 flex-1 space-y-micro overflow-y-auto px-inline pb-stack">
         {isLoading && <p className="px-2 text-xs text-tertiary">Cargando chats…</p>}
         {!isLoading && conversations.length === 0 && (
           <p className="px-2 text-xs text-tertiary">Sin chats todavía. Crea uno con el ícono de arriba.</p>
@@ -121,8 +129,8 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
             onClick={() => abrirConversacion(c.idConversacion)}
             className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors ${
               activeId === c.idConversacion
-                ? 'bg-primary/10 text-primary'
-                : 'text-on-surface hover:bg-surface-container-high'
+                ? 'bg-on-surface/8 font-semibold text-text-primary'
+                : 'text-text-primary hover:bg-on-surface/5'
             }`}
           >
             {c.tipo === 'GRUPAL' ? (
@@ -173,7 +181,7 @@ export function ProjectChatPanel({ idProyecto, habilitado, currentUserId, member
           if (!open) setActiveId(null);
         }}
       />
-    </div>
+    </section>
   );
 }
 

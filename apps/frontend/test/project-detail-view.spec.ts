@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 
 // La vista de detalle administrativa ya NO contiene el tablero (Sección 19):
@@ -140,7 +140,8 @@ describe('ProjectDetailClient — vista administrativa (Sección 19/21)', () => 
     renderPage();
 
     expect(screen.queryByRole('link', { name: /tablero/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /postularme/i })).toBeInTheDocument();
+    // HU-154 (D-02): antes era un botón sin acción; ahora lleva a los roles con postulación.
+    expect(screen.getByRole('link', { name: /postularme/i })).toHaveAttribute('href', '/dashboard/proyectos/42');
   });
 
   it('redirige la URL antigua ?tab=tablero al workspace conservando taskId', async () => {
@@ -157,8 +158,13 @@ describe('ProjectDetailClient — vista administrativa (Sección 19/21)', () => 
     (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Proyecto de prueba' })).toBeInTheDocument();
-    expect(screen.getByText('Una descripción de al menos veinte caracteres.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
+    // HU-154: la descripción completa vive en su tarjeta (el encabezado solo muestra un resumen recortado).
+    expect(
+      within(screen.getByRole('region', { name: 'Descripción y objetivos' })).getByText(
+        'Una descripción de al menos veinte caracteres.',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText('Detalles del proyecto')).toBeInTheDocument();
   });
 
@@ -260,5 +266,74 @@ describe('ProjectDetailClient — S7: preparar cierre según CloseReadinessSumma
     renderPage();
 
     expect(screen.queryByText(/preparar cierre del proyecto/i)).not.toBeInTheDocument();
+  });
+});
+
+// ─── HU-154 (D-02): la llamada a postularse deja de ser un botón muerto ───
+describe('ProjectDetailClient — «Ver roles y postularme» (D-02)', () => {
+  beforeEach(() => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+    mockMembers([]);
+    mockSprints([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('un visitante recibe un enlace real a los roles del proyecto, dentro del encabezado', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    renderPage();
+
+    const cta = screen.getByRole('link', { name: 'Ver roles y postularme' });
+    expect(cta).toHaveAttribute('href', '/dashboard/proyectos/42');
+    expect(screen.getByRole('region', { name: 'Resumen del proyecto' })).toContainElement(cta);
+    expect(screen.queryByRole('button', { name: /postularme/i })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['el líder', { idUsuario: 1 }, []],
+    ['un integrante', { idUsuario: 2 }, [{ idUsuario: 2, idRolProyecto: 7 }]],
+    ['un administrador', { idUsuario: 999, roles: ['administrador'] }, []],
+  ])('%s no ve la llamada a postularse (misma condición que antes)', (_, usuario, miembros) => {
+    (useCurrentUser as any).mockReturnValue({ data: usuario });
+    mockMembers(miembros as any);
+    renderPage();
+
+    expect(screen.queryByRole('link', { name: /postularme/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /postularme/i })).not.toBeInTheDocument();
+  });
+
+  it('en un proyecto CERRADO tampoco se ofrece a un visitante (solo lectura)', () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    (useProjectDetail as any).mockReturnValue({
+      data: { ...proyectoFixture, estadoProyecto: 'CERRADO' },
+      isLoading: false,
+      error: null,
+    });
+    renderPage();
+
+    expect(screen.queryByRole('link', { name: /postularme/i })).not.toBeInTheDocument();
+  });
+
+  it('el banner de cierre en revisión va a ancho completo, bajo el encabezado', async () => {
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    (useProjectDetail as any).mockReturnValue({
+      data: { ...proyectoFixture, estadoProyecto: 'EN_SOLICITUD_CIERRE' },
+      isLoading: false,
+      error: null,
+    });
+    (getClosureRevisions as any).mockResolvedValue({
+      page: 1, limit: 20, total: 1,
+      items: [{ idRevisionCierre: 5, numeroRevision: 1, estadoRevision: 'ENVIADA', comentarioRevisor: null, documentosEnviados: [], informeOficial: null, puedeEditar: false, puedeEnviar: false, puedeResolver: false }],
+    });
+    const { container } = renderPage();
+
+    const banner = await screen.findByText(/Solicitud de cierre en revisión/);
+    const full = container.querySelector('[data-slot="project-grid-full"]') as HTMLElement;
+    expect(full).toContainElement(banner);
+    expect(full).toContainElement(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' }));
   });
 });

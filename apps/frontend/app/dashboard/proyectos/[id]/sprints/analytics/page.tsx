@@ -1,8 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { AlertCircle, ArrowLeft, BarChart3, Repeat } from 'lucide-react';
+import { AlertCircle, Repeat } from 'lucide-react';
 import { useSprintsAnalytics } from '@/hooks/use-project-sprints';
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,6 +15,7 @@ import {
 } from '@/components/ui/empty';
 import type { EstadoSprint, SprintComparativeAnalyticsItemDto } from '@/lib/types/sprints';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 /** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE` en `sprints/page.tsx`/`sprints/[sprintId]/page.tsx`. */
 const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
@@ -197,27 +197,13 @@ export default function SprintsAnalyticsPage() {
   const { sprints, isLoading, isError, error, refetch } = useSprintsAnalytics(idProyecto);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={`/dashboard/proyectos/${id}/sprints`}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver a Sprints
-      </Link>
-
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" aria-hidden="true" />
-            <h1 className="font-headline text-3xl font-extrabold text-on-surface">Analítica comparativa</h1>
-          </div>
-          <p className="mt-2 text-sm text-tertiary">
-            Cumplimiento y progreso de cada Sprint del proyecto, para comparar cómo avanza el equipo.
-          </p>
-        </div>
-        <ProjectExportButtons idProyecto={idProyecto} />
-      </div>
+    <ProjectPageShell>
+      <ProjectPageHeader
+        back={{ href: `/dashboard/proyectos/${id}/sprints`, label: 'Volver a Sprints' }}
+        title="Analítica comparativa"
+        description="Cumplimiento y progreso de cada Sprint del proyecto, para comparar cómo avanza el equipo."
+        actions={<ProjectExportButtons idProyecto={idProyecto} />}
+      />
 
       {isLoading && (
         <div className="space-y-4">
@@ -263,6 +249,6 @@ export default function SprintsAnalyticsPage() {
       )}
 
       {!isLoading && !isError && sprints.length > 0 && <ComparativeContent sprints={sprints} />}
-    </div>
+    </ProjectPageShell>
   );
 }

@@ -21,6 +21,7 @@ import {
   type Notificacion,
 } from '@/lib/services/notifications';
 import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
@@ -78,7 +79,7 @@ export default function NotificacionesPage() {
   const unreadCount = notificaciones.filter((n) => !n.leidaEn).length;
 
   return (
-      <div className="mx-auto max-w-[1400px] px-8 py-8">
+      <div className={dashboardPage('py-8')}>
         <div className="flex items-start justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2">

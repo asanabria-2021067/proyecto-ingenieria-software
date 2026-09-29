@@ -53,6 +53,7 @@ import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import { useFeedSocial } from '@/hooks/use-social';
 import { SocialProjectCard } from '@/components/social/social-project-card';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 /**
  * S7 (VIEW-08): las horas llegan como string decimal del backend; se formatean
@@ -315,7 +316,7 @@ function DashboardSkeleton() {
       baseColor="var(--color-surface-container)"
       highlightColor="var(--color-surface-container-high)"
     >
-      <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
+      <div className={dashboardPage('py-section lg:py-page')}>
         <section className="mb-section">
           <Skeleton width={150} height={16} className="mb-2" />
           <Skeleton width={300} height={48} />
@@ -428,7 +429,7 @@ export default function DashboardPage() {
         }}
       />
 
-      <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
+      <div className={dashboardPage('py-section lg:py-page')}>
         {/* Welcome + Stats */}
         <section className="relative mb-section overflow-hidden rounded-card bg-primary p-card text-on-primary shadow-card">
           <div className="absolute -right-10 -bottom-10 h-56 w-56 rounded-full bg-on-primary/10 blur-3xl" />

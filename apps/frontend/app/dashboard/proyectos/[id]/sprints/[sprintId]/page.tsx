@@ -4,13 +4,10 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
-  ArrowLeft,
-  BarChart3,
   Calendar,
   CheckCircle2,
   Clock,
   Flag,
-  History,
   ListChecks,
   Lock,
   MessageCircle,
@@ -46,6 +43,7 @@ import type {
   SprintDetailTareaDto,
   SprintHistoryUsuarioDto,
 } from '@/lib/types/sprints';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -294,17 +292,18 @@ export default function SprintDetailPage() {
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
   const volverHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
 
-  return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al proyecto
-      </Link>
+  const sinAcceso = !cargandoProyecto && !cargandoUsuario && !isLeader;
 
-      {!cargandoProyecto && !cargandoUsuario && !isLeader ? (
+  return (
+    <ProjectPageShell>
+      {/* El líder vuelve a la lista de Sprints; quien no tiene acceso a ella, al proyecto. */}
+      {sinAcceso ? (
+        <ProjectBackLink href={volverHref} label="Volver al proyecto" className="mb-card" />
+      ) : (
+        <ProjectBackLink href={`/dashboard/proyectos/${id}/sprints`} label="Volver a Sprints" className="mb-card" />
+      )}
+
+      {sinAcceso ? (
         <LeaderOnlyNotice description="No puedes acceder al detalle de este Sprint." />
       ) : (
         <>
@@ -335,7 +334,7 @@ export default function SprintDetailPage() {
           )}
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }
 
@@ -353,57 +352,47 @@ function SprintDetailContent({
 
   return (
     <div className="space-y-6">
-      {/* ENCABEZADO */}
-      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <History className="h-6 w-6 text-primary" aria-hidden="true" />
-            <h1 className="font-headline text-3xl font-extrabold text-on-surface">Sprint {detail.numero}</h1>
-            <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
-            >
-              {estiloEstado.label}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {cerrado && (
-              <Button
-                asChild
-                variant="outline"
-                className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-              >
-                <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/finalizar`}>
-                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  Horas acreditadas
-                </Link>
-              </Button>
-            )}
+      {/* ENCABEZADO de página fuera de la tarjeta (la vuelta la pone la página) */}
+      <ProjectPageHeader
+        title={`Sprint ${detail.numero}`}
+        description={
+          cerrado
+            ? 'Resumen histórico del sprint y sus contribuciones registradas.'
+            : 'Resumen histórico del trabajo, las contribuciones y los hitos de este Sprint.'
+        }
+        actions={
+          cerrado && (
             <Button
               asChild
               variant="outline"
               className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
             >
-              <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/analytics`}>
-                <BarChart3 className="size-3.5" aria-hidden="true" />
-                Ver analítica
+              <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/finalizar`}>
+                <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                Horas acreditadas
               </Link>
             </Button>
-          </div>
+          )
+        }
+      >
+        <div className="mt-tight flex flex-wrap items-center gap-x-inline gap-y-micro">
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
+          >
+            {estiloEstado.label}
+          </span>
+          {cerrado && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
+              <Lock className="size-3.5" aria-hidden="true" />
+              Sprint cerrado: vista de solo lectura. Las horas acreditadas se consultan en el resumen de cierre.
+            </span>
+          )}
         </div>
-        <p className="mt-2 text-sm text-tertiary">
-          {cerrado
-            ? 'Resumen histórico del sprint y sus contribuciones registradas.'
-            : 'Resumen histórico del trabajo, las contribuciones y los hitos de este Sprint.'}
-        </p>
-        {cerrado && (
-          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-tertiary">
-            <Lock className="size-3.5" aria-hidden="true" />
-            Sprint cerrado: vista de solo lectura. Las horas acreditadas se consultan en el resumen de cierre.
-          </p>
-        )}
+      </ProjectPageHeader>
 
-        {/* METADATA HISTÓRICA — solo campos que el DTO realmente entrega */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-outline-variant/30 pt-4 text-sm">
+      {/* METADATA HISTÓRICA — solo campos que el DTO realmente entrega */}
+      <div className="card-base">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           <span className="inline-flex items-center gap-1.5 text-tertiary">
             <Calendar className="size-4" aria-hidden="true" />
             Fecha de inicio:{' '}

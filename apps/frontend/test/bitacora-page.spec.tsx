@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { EventoBitacoraDto } from '../lib/types/bitacora';
@@ -74,6 +74,20 @@ function renderPage() {
   return render(createElement(BitacoraPage));
 }
 
+// Los filtros son Select del sistema (Radix), como en Mis Proyectos: jsdom no
+// implementa captura de puntero ni scrollIntoView, que Radix usa al abrirlos.
+beforeAll(() => {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+});
+
+/** Abre el Select del filtro (teclado, como un usuario) y elige una opción. */
+function elegir(filtro: string, opcion: string) {
+  fireEvent.keyDown(screen.getByRole('combobox', { name: filtro }), { key: 'Enter' });
+  fireEvent.click(screen.getByRole('option', { name: opcion }));
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -123,6 +137,26 @@ describe('BitacoraPage — autorización (exclusiva del líder)', () => {
 
     expect(screen.queryByText('¡No eres líder!')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Bitácora' })).toBeInTheDocument();
+  });
+
+  it('los iconos de evento son neutros y sin fondo, al par del título (como en Mis Horas)', () => {
+    mockLeader(true);
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+
+    const iconos = document.querySelectorAll('[data-slot="icono-evento"]');
+    expect(iconos.length).toBeGreaterThan(0);
+    for (const icono of iconos) {
+      expect(icono).toHaveClass('size-5', 'text-text-primary');
+      expect(icono).not.toHaveClass('text-primary');
+      // sin caja de color alrededor: comparte fila con la categoría y el título
+      expect(icono.parentElement).toHaveClass('flex', 'items-center');
+      expect(icono.parentElement!.className).not.toMatch(/bg-primary/);
+      expect(icono.nextElementSibling).toHaveClass('pill');
+    }
   });
 
   it('un no-líder NUNCA dispara la petición al backend (useProjectBitacora recibe habilitado=false)', () => {
@@ -350,7 +384,7 @@ describe('BitacoraPage — filtros', () => {
 
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
-    fireEvent.change(screen.getByLabelText('Filtrar por sprint'), { target: { value: '3' } });
+    elegir('Filtrar por sprint', 'Sprint 3');
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
     expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ idSprint: 3, page: 1 }));
@@ -363,12 +397,73 @@ describe('BitacoraPage — filtros', () => {
     mockBitacora();
 
     renderPage();
-    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
-      target: { value: 'SPRINT_STARTED' },
-    });
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
     expect(ultimaLlamada[1]).toEqual(expect.objectContaining({ tipoEvento: 'SPRINT_STARTED' }));
+  });
+});
+
+describe('BitacoraPage — misma barra de filtros que Mis Proyectos', () => {
+  it('usa el buscador del dashboard y los Select del sistema, sin selects nativos', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers();
+    mockBitacora();
+
+    const { container } = renderPage();
+
+    // Buscador compartido (DashboardSearchField): ocupa el espacio libre y mide 46 px.
+    const buscador = screen.getByRole('textbox', { name: 'Buscar por persona' });
+    expect(buscador).toHaveClass('h-11.5', 'rounded-lg', 'border-outline-variant', 'pl-10');
+    expect(buscador.parentElement).toHaveClass('flex-1');
+
+    // Los tres filtros son el Select del sistema con el disparador de Mis Proyectos.
+    expect(container.querySelector('select')).toBeNull();
+    for (const nombre of ['Filtrar por sprint', 'Filtrar por integrante', 'Filtrar por tipo de evento']) {
+      const filtro = screen.getByRole('combobox', { name: nombre });
+      expect(filtro, nombre).toHaveClass('h-11.5', 'rounded-lg', 'border-outline-variant', 'bg-surface-container-lowest');
+    }
+    expect(screen.getByRole('combobox', { name: 'Filtrar por sprint' })).toHaveTextContent('Todos los sprints');
+
+    // Buscador y selects comparten fila (en columna si el contenedor es angosto).
+    const fila = buscador.parentElement!.parentElement!;
+    expect(fila).toHaveClass('flex-col', '@3xl/project:flex-row');
+    expect(fila).toContainElement(screen.getByRole('combobox', { name: 'Filtrar por tipo de evento' }));
+
+    // Las fechas usan la misma caja que el buscador y los selects.
+    for (const fecha of [screen.getByLabelText('Filtrar desde'), screen.getByLabelText('Filtrar hasta')]) {
+      expect(fecha).toHaveClass('h-11.5', 'rounded-lg', 'border-outline-variant', 'bg-surface-container-lowest');
+    }
+  });
+
+  it('elegir «Todos los sprints» después de un sprint vuelve a quitar ese filtro', () => {
+    mockLeader();
+    mockSprints([{ idSprint: 3, numero: 3 }]);
+    mockMembers();
+    mockBitacora();
+
+    renderPage();
+    elegir('Filtrar por sprint', 'Sprint 3');
+    expect((useProjectBitacora as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ idSprint: 3 }));
+
+    elegir('Filtrar por sprint', 'Todos los sprints');
+    expect((useProjectBitacora as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ idSprint: undefined }));
+  });
+
+  it('el filtro de integrante se aplica con el id del miembro elegido', () => {
+    mockLeader();
+    mockSprints();
+    mockMembers([
+      { idUsuario: 1, nombre: 'Ana', apellido: 'Lopez' },
+      { idUsuario: 7, nombre: 'Carlos', apellido: 'Diaz' },
+    ]);
+    mockBitacora();
+
+    renderPage();
+    elegir('Filtrar por integrante', 'Carlos Diaz');
+
+    expect((useProjectBitacora as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ idActor: 7, page: 1 }));
   });
 });
 
@@ -500,10 +595,8 @@ describe('BitacoraPage — pastillas de filtros activos (T-246)', () => {
     mockBitacora();
 
     renderPage();
-    fireEvent.change(screen.getByLabelText('Filtrar por sprint'), { target: { value: '3' } });
-    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
-      target: { value: 'SPRINT_STARTED' },
-    });
+    elegir('Filtrar por sprint', 'Sprint 3');
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
 
     const contenedor = screen.getByLabelText('Filtros aplicados');
     expect(within(contenedor).getByText('Sprint 3')).toBeInTheDocument();
@@ -517,10 +610,8 @@ describe('BitacoraPage — pastillas de filtros activos (T-246)', () => {
     mockBitacora();
 
     renderPage();
-    fireEvent.change(screen.getByLabelText('Filtrar por sprint'), { target: { value: '3' } });
-    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
-      target: { value: 'SPRINT_STARTED' },
-    });
+    elegir('Filtrar por sprint', 'Sprint 3');
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
     fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro Sprint 3' }));
 
     const ultimaLlamada = (useProjectBitacora as any).mock.calls.at(-1);
@@ -536,10 +627,8 @@ describe('BitacoraPage — pastillas de filtros activos (T-246)', () => {
     mockBitacora();
 
     renderPage();
-    fireEvent.change(screen.getByLabelText('Filtrar por sprint'), { target: { value: '3' } });
-    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
-      target: { value: 'SPRINT_STARTED' },
-    });
+    elegir('Filtrar por sprint', 'Sprint 3');
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
     fireEvent.click(screen.getByRole('button', { name: 'Limpiar todo' }));
 
     expect(screen.queryByLabelText('Filtros aplicados')).not.toBeInTheDocument();
@@ -558,9 +647,7 @@ describe('BitacoraPage — vacío con filtros aplicados (T-246)', () => {
     mockBitacora({ eventos: [], total: 0 });
 
     renderPage();
-    fireEvent.change(screen.getByLabelText('Filtrar por tipo de evento'), {
-      target: { value: 'SPRINT_STARTED' },
-    });
+    elegir('Filtrar por tipo de evento', 'Sprint iniciado');
 
     expect(screen.getByText('Ningún evento coincide con estos filtros.')).toBeInTheDocument();
     expect(screen.queryByText('Todavía no hay eventos registrados.')).not.toBeInTheDocument();

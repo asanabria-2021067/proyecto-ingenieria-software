@@ -335,3 +335,87 @@ describe('PersonasPage', () => {
     );
   });
 });
+
+// Regla de radios: los botones de acción usan el radio medio de «Ver
+// proyecto» (rounded-md); las etiquetas informativas siguen como pill.
+describe('PersonasPage — radio de los botones de acción', () => {
+  beforeEach(() => {
+    getSolicitudesPendientesMock.mockResolvedValue([]);
+    getAmigosMock.mockResolvedValue([]);
+  });
+
+  it('«Agregar como amigo» y «Solicitud enviada» usan radio medio, no cápsula', async () => {
+    buscarUsuariosMock.mockResolvedValue({
+      items: [
+        usuario({ idUsuario: 10, nombre: 'Carla', mismaCarrera: true, semestre: 6 }),
+        usuario({ idUsuario: 11, nombre: 'Diego', solicitudPendiente: { direccion: 'enviada' } }),
+      ],
+      hasMore: false,
+    });
+    await renderPersonas();
+
+    for (const nombre of ['Agregar como amigo', 'Solicitud enviada']) {
+      const boton = await screen.findByRole('button', { name: nombre });
+      expect(boton, nombre).toHaveClass('rounded-md');
+      expect(boton, nombre).not.toHaveClass('rounded-pill');
+    }
+  });
+});
+
+// Pestañas con radio medio (no cápsula) y estados vacíos en tarjeta blanca,
+// con el mismo criterio que Chats archivados.
+describe('PersonasPage — pestañas y estados vacíos', () => {
+  beforeEach(() => {
+    getSolicitudesPendientesMock.mockResolvedValue([]);
+    getAmigosMock.mockResolvedValue([]);
+    buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
+  });
+
+  it('las cuatro pestañas usan radio medio y el activo conserva verde con texto blanco', async () => {
+    await renderPersonas();
+
+    const pestanas = screen.getAllByRole('tab');
+    expect(pestanas.map((t) => t.textContent)).toEqual(['Todos', 'Amigos de amigos', 'Mi carrera', 'Mis amigos']);
+    for (const t of pestanas) {
+      expect(t).toHaveClass('rounded-md', 'data-[state=active]:bg-primary', 'data-[state=active]:text-on-primary');
+      expect(t).not.toHaveClass('rounded-pill');
+    }
+  });
+
+  it.each([
+    ['Mis amigos', 'Todavía no tenés amigos', 'Buscá compañeros en la pestaña Todos y agregalos.'],
+    ['Amigos de amigos', 'Agregá a tu primer amigo', 'Cuando tengas amigos vas a empezar a ver también a los suyos acá.'],
+  ])('en «%s» el vacío es una tarjeta blanca con sus textos intactos y sin acción nueva', async (pestana, titulo, descripcion) => {
+    await renderPersonas();
+    clickTab(pestana);
+
+    const tituloEl = await screen.findByText(titulo);
+    const tarjeta = tituloEl.closest('[data-slot="empty"]') as HTMLElement;
+    expect(tarjeta).toHaveClass('bg-surface-container-lowest', 'border-outline-variant/70', 'rounded-2xl', 'shadow-sm');
+    expect(tarjeta).not.toHaveClass('border-dashed');
+    expect(tarjeta).not.toHaveClass('bg-surface-container-low');
+    expect(within(tarjeta).getByText(descripcion)).toBeInTheDocument();
+    expect(within(tarjeta).queryByRole('button')).not.toBeInTheDocument();
+    const icono = tarjeta.querySelector('[data-slot="empty-icon"]') as HTMLElement;
+    expect(icono).toHaveClass('text-text-secondary', 'border-transparent');
+  });
+});
+
+// «Sin recomendaciones por ahora» usa la misma tarjeta blanca que los demás vacíos.
+describe('PersonasPage — vacío de recomendaciones', () => {
+  beforeEach(() => {
+    getSolicitudesPendientesMock.mockResolvedValue([]);
+    getAmigosMock.mockResolvedValue([]);
+    buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
+  });
+
+  it('se muestra en tarjeta blanca con su texto intacto y el icono neutro', async () => {
+    await renderPersonas();
+
+    const tarjeta = (await screen.findByText('Sin recomendaciones por ahora')).closest('[data-slot="empty"]') as HTMLElement;
+    expect(tarjeta).toHaveClass('bg-surface-container-lowest', 'border-outline-variant/70', 'rounded-2xl', 'shadow-sm');
+    expect(tarjeta).not.toHaveClass('border-dashed');
+    expect(within(tarjeta).getByText('Agrega amigos o completa tu perfil para que te sugiramos personas.')).toBeInTheDocument();
+    expect(tarjeta.querySelector('[data-slot="empty-icon"]')).toHaveClass('text-text-secondary', 'border-transparent');
+  });
+});

@@ -25,6 +25,7 @@ import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { SafeExternalLink } from '@/components/profile/safe-external-link';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
+import { dashboardPage } from '@/components/layout/dashboard-page';
 
 function initials(nombre: string, apellido: string) {
   return `${nombre?.[0] ?? ''}${apellido?.[0] ?? ''}`.toUpperCase() || 'U';
@@ -101,7 +102,7 @@ export default function PerfilPage() {
   }
 
   return (
-      <div className="mx-auto max-w-[1400px] px-8 py-8">
+      <div className={dashboardPage('py-8')}>
         <div className="mb-6 flex items-center justify-end">
           <button
             onClick={() => router.push('/dashboard/perfil/editar')}

@@ -6,7 +6,6 @@ import Link from 'next/link';
 import {
   AlertCircle,
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
   ArrowUpDown,
   CheckCircle2,
@@ -16,6 +15,7 @@ import {
   UserCheck,
   UserMinus,
   Users,
+  type LucideIcon,
 } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -53,6 +53,8 @@ import { PendingPostulationsCard } from '@/components/projects/pending-postulati
 import { PendingExitRequestsCard } from '@/components/projects/pending-exit-requests-card';
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
+import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'nombre', label: 'Integrante' },
@@ -141,26 +143,13 @@ function MetricTile({
   value,
   isLoading,
 }: {
-  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  icon: LucideIcon;
   label: string;
   value: string;
   isLoading: boolean;
 }) {
-  return (
-    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 flex items-center gap-3">
-      <div className="flex items-center justify-center size-11 rounded-xl bg-primary/10 shrink-0">
-        <Icon aria-hidden className="w-5 h-5 text-primary" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-bold text-tertiary uppercase tracking-wide">{label}</p>
-        {isLoading ? (
-          <Skeleton className="h-7 w-12 rounded mt-1 bg-surface-container-high" />
-        ) : (
-          <p className="text-2xl font-headline font-extrabold text-on-surface">{value}</p>
-        )}
-      </div>
-    </div>
-  );
+  // Mismo KPI que Mis Horas: icono neutro al par de la etiqueta, cifra grande.
+  return <HoursKpiCard variante="en-linea" icon={Icon} label={label} value={value} isLoading={isLoading} />;
 }
 
 function MiembroRow({
@@ -402,43 +391,33 @@ export default function MiembrosProyectoPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Link
-        href={volverAlProyectoHref}
-        className="inline-flex items-center gap-1.5 text-sm text-tertiary hover:text-primary mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Volver al proyecto
-      </Link>
-
+    <ProjectPageShell>
       {!cargandoPermisos && !isLeader ? (
-        <LeaderOnlyNotice description="No puedes acceder a los miembros de este proyecto." />
+        <>
+          <ProjectBackLink href={volverAlProyectoHref} label="Volver al proyecto" className="mb-card" />
+          <LeaderOnlyNotice description="No puedes acceder a los miembros de este proyecto." />
+        </>
       ) : (
         <>
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-6 h-6 text-primary" />
-            <h1 className="font-headline font-extrabold text-3xl text-on-surface">Miembros</h1>
-          </div>
-          <p className="text-tertiary text-sm">
-            Integrantes del proyecto organizados por su estado y contribución.
-          </p>
-          {lider && (
-            <p className="text-tertiary text-sm mt-1">
-              Líder: <span className="font-medium text-on-surface">{lider.nombre} {lider.apellido}</span>
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-col items-end gap-3">
-          <ProjectExportButtons idProyecto={idProyecto} />
-          <div className="flex flex-col gap-3 sm:flex-row">
+      <ProjectPageHeader
+        back={{ href: volverAlProyectoHref, label: 'Volver al proyecto' }}
+        title="Miembros"
+        description="Integrantes del proyecto organizados por su estado y contribución."
+        actions={
+          // Una sola fila: exportar a la izquierda de Postulaciones / Solicitudes de salida.
+          <div data-slot="acciones-miembros" className="flex flex-wrap items-start gap-2 @3xl/project:justify-end">
+            <ProjectExportButtons idProyecto={idProyecto} />
             <PendingPostulationsCard idProyecto={idProyecto} />
             <PendingExitRequestsCard idProyecto={idProyecto} />
           </div>
-        </div>
-      </div>
+        }
+      >
+        {lider && (
+          <p className="type-body mt-micro text-text-secondary">
+            Líder: <span className="font-medium text-text-primary">{lider.nombre} {lider.apellido}</span>
+          </p>
+        )}
+      </ProjectPageHeader>
 
       {isExitRequestsError && (
         <div
@@ -575,6 +554,6 @@ export default function MiembrosProyectoPage() {
       )}
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }
