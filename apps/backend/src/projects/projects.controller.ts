@@ -228,6 +228,28 @@ export class ProjectsController {
     return this.projectsService.assignHitoTasks(id, idHito, user.userId, data.idsTareas);
   }
 
+  // ---------- GUARDAR (bookmark personal, distinto de postularse) ----------
+
+  @Post(':id/guardar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  guardar(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.guardarProyecto(id, user.userId);
+  }
+
+  @Delete(':id/guardar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  desguardar(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.desguardarProyecto(id, user.userId);
+  }
+
   // ---------- POSTULACIONES DEL PROYECTO ----------
 
   @Get(':id/postulaciones')
