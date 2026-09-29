@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { ChatListPopover } from '@/components/chat-dock/chat-list-popover';
@@ -18,6 +18,16 @@ export function ChatDock() {
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
   const { conversations } = useAllConversations();
   useGlobalChatSocket(windows.map((w) => w.idConversacion));
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!listOpen) return;
+    const cerrarSiEsAfuera = (event: MouseEvent) => {
+      if (!listRef.current?.contains(event.target as Node)) setListOpen(false);
+    };
+    document.addEventListener('mousedown', cerrarSiEsAfuera);
+    return () => document.removeEventListener('mousedown', cerrarSiEsAfuera);
+  }, [listOpen]);
 
   const totalNoLeidos = conversations.reduce((total, c) => total + c.noLeidos, 0);
 
@@ -38,7 +48,7 @@ export function ChatDock() {
         ))}
       </div>
 
-      <div className="pointer-events-auto relative shrink-0">
+      <div ref={listRef} className="pointer-events-auto relative shrink-0">
         {listOpen && (
           <div className="absolute bottom-full right-0 mb-2">
             <ChatListPopover onClose={() => setListOpen(false)} />
