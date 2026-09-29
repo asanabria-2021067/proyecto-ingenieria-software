@@ -4,9 +4,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AccountAttemptsService, RECOVERY_ATTEMPTS, RECOVERY_ATTEMPT_POLICY } from './account-attempts.service';
 import { JwtStrategy } from './jwt.strategy';
 import { NotificationsModule } from '../notifications/notifications.module';
-import { requireJwtSecret } from '../config/jwt-secret';
+import { getJwtSecretFromConfig } from '../config/jwt-secret';
 
 @Module({
   imports: [
@@ -14,14 +15,20 @@ import { requireJwtSecret } from '../config/jwt-secret';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: requireJwtSecret(config.get<string>('JWT_SECRET')),
+        secret: getJwtSecretFromConfig(config),
         signOptions: { expiresIn: '24h' },
       }),
     }),
     NotificationsModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    // G04 (OWASP25-C036): una sola instancia por proceso con la política base.
+    { provide: AccountAttemptsService, useFactory: () => new AccountAttemptsService() },
+    { provide: RECOVERY_ATTEMPTS, useFactory: () => new AccountAttemptsService(RECOVERY_ATTEMPT_POLICY) },
+  ],
   exports: [JwtModule],
 })
 export class AuthModule {}

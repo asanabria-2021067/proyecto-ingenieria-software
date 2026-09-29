@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { loadWorkflow } from './helpers/workflow-yaml';
 
 /**
  * T-128 (IESUC-286). Lee los archivos de Compose versionados como texto
@@ -107,5 +110,81 @@ describe('Puertos publicados en docker-compose — solo loopback o allowlist exp
 
     expect(mappings.length).toBeGreaterThan(0);
     expect(mappings.every((m) => isLoopbackRestricted(m.raw))).toBe(true);
+  });
+});
+
+/**
+ * G04-C10 (OWASP25-C021 + P5/T19). Resuelve `${VAR:-default}` como Compose
+ * (valor definido y no vacío, o el default). Suficiente para las líneas de
+ * `ports:` de este repo; la verificación con `docker compose config` real
+ * queda en la evidencia del gate.
+ */
+export function resolveComposeValue(raw: string, env: Record<string, string | undefined>): string {
+  return raw.replace(/\$\{(\w+):-([^}]*)\}/g, (_match, name: string, fallback: string) => {
+    const value = env[name];
+    return value !== undefined && value !== '' ? value : fallback;
+  });
+}
+
+describe('G04-C10: binds de backend/frontend parametrizados', () => {
+  const root = COMPOSE_FILES.find((f) => f.relativePath === 'docker-compose.yml')!;
+  const mappingOf = (service: string) => extractPortMappings(root.source).filter((m) => m.service === service);
+
+  it('backend y frontend publican su puerto con BACKEND_BIND / FRONTEND_BIND y default 0.0.0.0', () => {
+    expect(mappingOf('backend').map((m) => m.raw)).toEqual(['${BACKEND_BIND:-0.0.0.0}:3001:3001']);
+    expect(mappingOf('frontend').map((m) => m.raw)).toEqual(['${FRONTEND_BIND:-0.0.0.0}:3000:3000']);
+  });
+
+  it('sin variables (o vacías) se conserva la exposición actual en todas las interfaces', () => {
+    for (const env of [{}, { BACKEND_BIND: '', FRONTEND_BIND: '' }]) {
+      expect(mappingOf('backend').map((m) => resolveComposeValue(m.raw, env))).toEqual(['0.0.0.0:3001:3001']);
+      expect(mappingOf('frontend').map((m) => resolveComposeValue(m.raw, env))).toEqual(['0.0.0.0:3000:3000']);
+    }
+  });
+
+  it('la variante 127.0.0.1 deja ambos servicios solo en loopback', () => {
+    const env = { BACKEND_BIND: '127.0.0.1', FRONTEND_BIND: '127.0.0.1' };
+    for (const service of ['backend', 'frontend']) {
+      const resolved = mappingOf(service).map((m) => resolveComposeValue(m.raw, env));
+      expect(resolved.every(isLoopbackRestricted), service).toBe(true);
+    }
+  });
+
+  describe('deploy: flags con default actual y valores acotados', () => {
+    const step = loadWorkflow('deploy.yml').jobs.deploy.steps?.find((s) => s.name === 'Transferir .env de produccion por stdin');
+
+    it('los flags existen con default 0.0.0.0 y se escriben en el .env', () => {
+      expect(step?.env?.BACKEND_BIND).toBe("${{ vars.BACKEND_BIND || '0.0.0.0' }}");
+      expect(step?.env?.FRONTEND_BIND).toBe("${{ vars.FRONTEND_BIND || '0.0.0.0' }}");
+      expect(step?.run).toContain(`printf 'BACKEND_BIND=%s\\n' "$BACKEND_BIND"`);
+      expect(step?.run).toContain(`printf 'FRONTEND_BIND=%s\\n' "$FRONTEND_BIND"`);
+    });
+
+    it.each([
+      ['BACKEND_BIND', '192.168.1.10'],
+      ['FRONTEND_BIND', '0.0.0.0:80'],
+      ['BACKEND_BIND', '127.0.0.1; rm -rf /'],
+    ])('rechaza %s=%s antes de escribir el .env', (name, value) => {
+      const runnerTemp = mkdtempSync(join(tmpdir(), 'g04-bind-'));
+      try {
+        const env: Record<string, string> = { PATH: process.env.PATH ?? '', RUNNER_TEMP: runnerTemp };
+        for (const key of Object.keys(step?.env ?? {})) {
+          env[key] = `synthetic-${key.toLowerCase()}`;
+        }
+        // G06-C07: COOKIE_SECURE también se valida en el paso; recibe su default.
+        Object.assign(env, { TRUST_PROXY_HOPS: '0', COOKIE_SECURE: 'false', BACKEND_BIND: '0.0.0.0', FRONTEND_BIND: '0.0.0.0', [name]: value });
+        const result = spawnSync('bash', ['-c', step?.run ?? 'exit 99'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('solo admiten 0.0.0.0 o 127.0.0.1');
+        expect(spawnSync('test', ['-e', join(runnerTemp, 'deploy-env')]).status).not.toBe(0);
+      } finally {
+        rmSync(runnerTemp, { recursive: true, force: true });
+      }
+    });
+
+    it('ningún test exige que producción ya use loopback: el default versionado sigue siendo 0.0.0.0', () => {
+      expect(readFileSync(join(REPO_ROOT, '.env.example'), 'utf-8')).toMatch(/^BACKEND_BIND=0\.0\.0\.0$/m);
+      expect(readFileSync(join(REPO_ROOT, '.env.example'), 'utf-8')).toMatch(/^FRONTEND_BIND=0\.0\.0\.0$/m);
+    });
   });
 });

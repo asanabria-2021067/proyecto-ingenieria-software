@@ -26,6 +26,7 @@ import {
   type ProfileBootstrap 
 } from '@/lib/services/users';
 import uvgSwal from '@/lib/swal';
+import { normalizeUrlInput } from '@/lib/security/safe-url';
 import { createHabilidad, createInteres, createCualidad } from '@/lib/services/catalogs';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 
@@ -272,10 +273,11 @@ export default function EditarPerfilPage() {
         disponibilidadHorasSemana: disponibilidadHorasSemana ? Number(disponibilidadHorasSemana) : undefined,
         horasBecaRequeridas: horasBecaRequeridas !== null ? Number(horasBecaRequeridas) : null,
         horasExtensionRequeridas: horasExtensionRequeridas !== null ? Number(horasExtensionRequeridas) : null,
-        enlacePortafolio: enlacePortafolio || undefined,
-        githubUrl: githubUrl || undefined,
-        linkedinUrl: linkedinUrl || undefined,
-        urlCv: urlCv || undefined,
+        // G07 (OWASP25-C027): sin espacios y sin cadenas en blanco.
+        enlacePortafolio: normalizeUrlInput(enlacePortafolio),
+        githubUrl: normalizeUrlInput(githubUrl),
+        linkedinUrl: normalizeUrlInput(linkedinUrl),
+        urlCv: normalizeUrlInput(urlCv),
       });
 
       // 2. Update skills

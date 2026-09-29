@@ -3,7 +3,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import {
   EstadoHoras,
@@ -16,6 +18,10 @@ import {
   TipoProyecto,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SecurityEventsService } from '../security-events/security-events.service';
+import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
+import type { SecurityRequestContext } from '../security-events/request-context';
+import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from '../ws-auth/account-access.events';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 
 const RESET_TOKEN_TTL = '1h';
@@ -25,6 +31,10 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    // G05: writer best-effort de eventos de seguridad; el default (tests) usa el mismo PrismaService.
+    private readonly securityEvents: SecurityEventsService = new SecurityEventsService(prisma),
+    // G07: EventEmitter global de la app; ausente en instancias manuales (tests).
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   // ─── Guards ──────────────────────────────────────────────────────────────────
@@ -554,7 +564,7 @@ export class AdminService {
 
   // ─── Cambio de estado de usuario (T-89) ───────────────────────────────────────
 
-  async updateUsuarioEstado(callerId: number, targetId: number, estado: EstadoUsuario) {
+  async updateUsuarioEstado(callerId: number, targetId: number, estado: EstadoUsuario, origen?: SecurityRequestContext) {
     await this.requireAdmin(callerId);
 
     if (callerId === targetId) {
@@ -599,6 +609,27 @@ export class AdminService {
       },
     });
 
+    // G05 (OWASP25-C037): cambio privilegiado de estado de cuenta. Solo actor,
+    // cuenta y transición; el log técnico de AuditInterceptor no guarda el
+    // estado anterior. Sin cambio real (mismo estado) no hay evento.
+    if (user.estado !== updated.estado) {
+      await this.securityEvents.record({
+        tipo: TipoEventoSeguridad.USER_STATUS_CHANGED,
+        origen,
+        idActor: callerId,
+        idUsuarioAfectado: targetId,
+        detalle: { estadoAnterior: user.estado, estadoNuevo: updated.estado },
+      });
+    }
+
+    // G07 (OWASP25-C025): al dejar de estar ACTIVO se cierran sus sockets
+    // abiertos (los gateways escuchan el evento; este servicio no los conoce).
+    // Las conexiones nuevas ya las rechaza la política del handshake.
+    if (user.estado !== updated.estado && updated.estado !== EstadoUsuario.ACTIVO) {
+      const revoked: AccountAccessRevokedEvent = { idUsuario: targetId };
+      this.events?.emit(ACCOUNT_ACCESS_REVOKED, revoked);
+    }
+
     return {
       idUsuario: updated.idUsuario,
       nombre: updated.nombre,
@@ -640,7 +671,7 @@ export class AdminService {
     }));
   }
 
-  async generarEnlaceRecuperacion(callerId: number, idSolicitud: number) {
+  async generarEnlaceRecuperacion(callerId: number, idSolicitud: number, origen?: SecurityRequestContext) {
     await this.requireAdmin(callerId);
 
     const solicitud = await this.prisma.solicitudRecuperacion.findUnique({
@@ -686,6 +717,16 @@ export class AdminService {
         atendidaEn: new Date(),
         atendidaPor: callerId,
       },
+    });
+
+    // G05 (OWASP25-C037): emisión privilegiada de un enlace de recuperación.
+    // Solo IDs y vencimiento: nunca el token ni la URL.
+    await this.securityEvents.record({
+      tipo: TipoEventoSeguridad.PASSWORD_RESET_ISSUED,
+      origen,
+      idActor: callerId,
+      idUsuarioAfectado: solicitud.usuario.idUsuario,
+      detalle: { idSolicitud, expiraEn },
     });
 
     return { resetUrl, resetToken, expiraEn };

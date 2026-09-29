@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/test';
 
 // Proyecto 1 "Plataforma de Tutorías UVG" viene del seed (prisma/seed.ts),
 // siempre PUBLICADO. El backend solo valida cupos si el proyecto está

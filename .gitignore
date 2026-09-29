@@ -12,6 +12,9 @@ build/
 .env
 .env.local
 .env.*.local
+# G01 (FASE2-N08): cualquier variante de .env con valores reales.
+.env.*
+!.env.example
 
 # ── Docker ────────────────────────────────────────────────
 docker-compose.override.yml
@@ -53,3 +56,19 @@ k6/results/*
 
 pnpm-lock.yaml
 apps/frontend/e2e/support/.auth-cache/
+
+# ── G01 (FASE2-N08): dumps, backups y material de clave ───
+# Nunca dentro del árbol del repositorio: los backups de BD contienen PII y
+# viven cifrados fuera de él. Las migraciones .sql de Prisma NO se ignoran.
+*.dump
+*.dump.*
+*.pgdump
+*.backup
+*.sql.gz
+backups/
+backup/
+owasp-wip/
+*.pem
+*.key
+*.p12
+*.pfx

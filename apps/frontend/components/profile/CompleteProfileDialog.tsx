@@ -30,6 +30,7 @@ import {
 } from '@/lib/services/users';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { normalizeUrlInput } from '@/lib/security/safe-url';
 
 interface Props {
   open: boolean;
@@ -331,9 +332,10 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
           urlCv = res.url;
         }
         await updateProfile({
-          githubUrl: githubUrl || undefined,
-          linkedinUrl: linkedinUrl || undefined,
-          enlacePortafolio: enlacePortafolio || undefined,
+          // G07 (OWASP25-C027): sin espacios y sin cadenas en blanco.
+          githubUrl: normalizeUrlInput(githubUrl),
+          linkedinUrl: normalizeUrlInput(linkedinUrl),
+          enlacePortafolio: normalizeUrlInput(enlacePortafolio),
           ...(urlCv && { urlCv }),
         });
         for (const exp of experiencias) {
