@@ -123,8 +123,11 @@ export function useChatSocket(idProyecto: number, activeConversationId: number |
   const queryClient = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
   const activeConversationIdRef = useRef<number | null>(activeConversationId);
-  activeConversationIdRef.current = activeConversationId;
   const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
