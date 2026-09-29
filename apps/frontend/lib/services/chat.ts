@@ -5,6 +5,7 @@ import type {
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
+  UpdateConversationPayload,
 } from '@/lib/types/chat';
 
 export function listConversations(idProyecto: number): Promise<ChatConversacion[]> {
@@ -38,6 +39,17 @@ export function sendMessage(
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes`, {
     method: 'POST',
     body: JSON.stringify({ contenido }),
+  });
+}
+
+export function updateConversation(
+  idProyecto: number,
+  idConversacion: number,
+  payload: UpdateConversationPayload,
+): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
   });
 }
 
