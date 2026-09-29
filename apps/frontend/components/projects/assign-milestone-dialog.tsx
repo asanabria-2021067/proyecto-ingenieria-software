@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { getApiErrorMessage } from '@/components/projects/api-error';
-import uvgSwal from '@/lib/swal';
+import { toast } from 'sonner';
 import type { useProjectMilestones } from '@/hooks/use-project-milestones';
 
 type MilestonesHook = ReturnType<typeof useProjectMilestones>;
@@ -132,18 +132,10 @@ export function AssignMilestoneDialog({
         });
       }
 
-      void uvgSwal.fire({
-        toast: true,
-        backdrop: false,
-        icon: 'success',
-        title: 'Hito asignado',
-        text: `Se asignó ${nombreDestino ?? 'el hito'} a ${cantidad} ${
+      toast.success('Hito asignado', {
+        description: `Se asignó ${nombreDestino ?? 'el hito'} a ${cantidad} ${
           cantidad === 1 ? 'tarea' : 'tareas'
         }.`,
-        position: 'top-end',
-        timer: 2000,
-        timerProgressBar: true,
-        showConfirmButton: false,
       });
 
       onAsignado();
