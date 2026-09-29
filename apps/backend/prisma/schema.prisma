@@ -1453,6 +1453,11 @@ model Conversacion {
   nombre         String?          @db.VarChar(255)
   creadaPor      Int              @map("creada_por")
   creadaEn       DateTime         @default(now()) @map("creada_en")
+  // T-xxx: menú de 3 puntos del chat — renombrar/archivar/favorito. Aditivas,
+  // nullable/default para no tocar filas existentes.
+  nombrePersonalizado String?     @db.VarChar(120) @map("nombre_personalizado")
+  esFavorita          Boolean     @default(false) @map("es_favorita")
+  archivadaEn         DateTime?   @map("archivada_en")
 
   proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto])
   creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
