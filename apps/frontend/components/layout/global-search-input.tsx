@@ -172,9 +172,14 @@ export function GlobalSearchInput({
     [todos, pestana],
   );
 
-  useEffect(() => {
+  // Reinicia el indice activo cuando cambian los resultados o la pestana,
+  // ajustando el estado durante el render (sin efecto) para no disparar un
+  // segundo render en cascada tras cada busqueda.
+  const [ultimoReset, setUltimoReset] = useState({ data, pestana });
+  if (ultimoReset.data !== data || ultimoReset.pestana !== pestana) {
+    setUltimoReset({ data, pestana });
     setActiveIndex(-1);
-  }, [data, pestana]);
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
