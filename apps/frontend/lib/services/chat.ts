@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   ChatConversacion,
+  ChatConversacionGlobal,
   ChatMensaje,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
@@ -57,6 +58,18 @@ export function markConversationRead(idProyecto: number, idConversacion: number)
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/leido`, {
     method: 'POST',
   });
+}
+
+export function deleteConversation(idProyecto: number, idConversacion: number): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}`, {
+    method: 'DELETE',
+  });
+}
+
+/** Dock global de chat: cruza todos los proyectos del usuario. */
+export function listAllConversations(q?: string): Promise<ChatConversacionGlobal[]> {
+  const params = q ? `?q=${encodeURIComponent(q)}` : '';
+  return apiFetch(`/chats${params}`);
 }
 
 /** T-236: cruza todos los proyectos del usuario, no uno solo. */
