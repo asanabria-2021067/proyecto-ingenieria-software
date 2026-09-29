@@ -28,6 +28,7 @@ import {
   flattenNavEntries,
   type NavEntry,
 } from '@/components/dashboard/SidebarNav';
+import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
@@ -108,6 +109,7 @@ export default function DashboardLayout({
     useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const { collapsed: sidebarCollapsed } = useDashboardSidebarCollapsed();
 
   useEffect(() => {
     if (!allowAdmin && !isLoading && isAdminUser(user)) {
@@ -166,16 +168,20 @@ export default function DashboardLayout({
       </a>
 
       {/* Sidebar - Desktop Only */}
-      <aside className="sidebar-scale-lock hidden h-full shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex">
-        <div className="flex items-center gap-inline border-b border-outline-variant px-card py-stack">
-          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
-          <span className="type-section text-text-primary">UVGenius</span>
+      <aside
+        className={`${sidebarCollapsed ? 'sidebar-scale-lock-collapsed' : 'sidebar-scale-lock'} hidden h-full shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex`}
+      >
+        <div
+          className={`flex items-center gap-inline border-b border-outline-variant py-stack ${sidebarCollapsed ? 'justify-center px-tight' : 'px-card'}`}
+        >
+          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto shrink-0" />
+          {!sidebarCollapsed && <span className="type-section text-text-primary">UVGenius</span>}
         </div>
 
-        <SidebarNav entries={navEntries} />
+        <SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />
 
-        <div className="border-t border-outline-variant px-inline py-stack">
-          <UserMenu user={user} onLogout={handleLogout} variant="sidebar" />
+        <div className={`border-t border-outline-variant py-stack ${sidebarCollapsed ? 'flex justify-center px-tight' : 'px-inline'}`}>
+          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} />
         </div>
       </aside>
 
