@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { FolderKanban, ListChecks, Loader2, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -164,6 +165,8 @@ export function GlobalSearchInput({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [pestana, setPestana] = useState<Pestana>('todo');
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
 
   const { data, isFetching, isDebouncing } = useGlobalSearch(query);
   const todos = useMemo(() => aplanar(data), [data]);
@@ -183,7 +186,10 @@ export function GlobalSearchInput({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const dentroDelInput = containerRef.current?.contains(target);
+      const dentroDelDropdown = dropdownRef.current?.contains(target);
+      if (!dentroDelInput && !dentroDelDropdown) {
         setOpen(false);
       }
     }
@@ -227,6 +233,26 @@ export function GlobalSearchInput({
   const showDropdown = open && hayTexto;
   const cargando = isFetching || isDebouncing;
   const sinResultadosTodavia = !cargando && flat.length === 0;
+
+  // El dropdown se porta a document.body (ver mas abajo): el header es un
+  // stacking context propio (z-30 dentro de un layout flex), asi que ningun
+  // z-index dentro de el puede ganarle a un overlay de body como el tour de
+  // onboarding (react-joyride, zIndex 10000) por mas alto que sea el numero.
+  // Al portarlo, hay que calcular su posicion a mano en vez de `absolute`.
+  useLayoutEffect(() => {
+    if (!showDropdown || !containerRef.current) return;
+    function actualizarPosicion() {
+      const rect = containerRef.current!.getBoundingClientRect();
+      setCoords({ top: rect.bottom + 8, left: rect.left + rect.width / 2, width: rect.width });
+    }
+    actualizarPosicion();
+    window.addEventListener('resize', actualizarPosicion);
+    window.addEventListener('scroll', actualizarPosicion, true);
+    return () => {
+      window.removeEventListener('resize', actualizarPosicion);
+      window.removeEventListener('scroll', actualizarPosicion, true);
+    };
+  }, [showDropdown]);
 
   const grupos: { tipo: Tipo; items: ResultadoAplanado[]; hasMore: boolean }[] = [
     { tipo: 'proyecto', items: flat.filter((r) => r.tipo === 'proyecto'), hasMore: data?.proyectos.hasMore ?? false },
@@ -301,11 +327,20 @@ export function GlobalSearchInput({
         )}
       </div>
 
-      {/* z-index por encima del overlay del tour de onboarding (react-joyride,
-          zIndex 10000 en OnboardingTour.tsx) — si no, el tour intercepta los
-          clicks de este dropdown mientras esta activo (T-231). */}
-      {showDropdown && (
-        <div className="absolute left-1/2 top-full z-[10050] mt-2 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-card border border-outline-variant bg-card shadow-raised">
+      {/* Portado a document.body: un z-index dentro del header (stacking
+          context propio, z-30) nunca puede ganarle a un overlay montado en
+          body como el tour de onboarding (react-joyride, zIndex 10000) sin
+          importar el numero — solo escapando via portal compite de verdad
+          por encima de el (T-231). La posicion se calcula a mano porque ya
+          no hay `position: absolute` relativo al input. */}
+      {showDropdown &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            style={{ top: coords.top, left: coords.left, width: `min(30rem, calc(100vw - 2rem))` }}
+            className="fixed z-[10050] -translate-x-1/2 overflow-hidden rounded-card border border-outline-variant bg-card shadow-raised"
+          >
           <div
             role="tablist"
             aria-label="Filtrar resultados por tipo"
@@ -391,8 +426,9 @@ export function GlobalSearchInput({
               </div>
             )}
           </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
