@@ -72,7 +72,7 @@ const selectClass =
 // T-274 (OWASP): mensaje neutro para cualquier fallo del backend. Antes se
 // mostraba error.message crudo (p. ej. "El correo ya esta registrado"), lo
 // que permitia enumerar cuentas existentes.
-function mensajeError(error: (Error & { statusCode?: number }) | null): string {
+export function mensajeError(error: (Error & { statusCode?: number }) | null): string {
   if (!error) return '';
   if (error.statusCode === 429) {
     return 'Demasiados intentos. Espera un minuto antes de volver a intentarlo.';
