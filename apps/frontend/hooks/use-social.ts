@@ -30,6 +30,7 @@ import {
 import { seleccionarRecomendaciones } from '@/lib/social/recomendaciones';
 import type { BuscarUsuariosFiltros, UsuarioBusquedaDto } from '@/lib/types/social';
 import uvgSwal from '@/lib/swal';
+import { aviso } from '@/lib/mensajes';
 
 function invalidateSocialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: amigosQueryKey() });
@@ -140,8 +141,12 @@ export function useCrearSolicitudAmistad() {
       if (context?.previas) {
         queryClient.setQueryData(recomendacionesQueryKey(), context.previas);
       }
+      aviso.error('No se pudo enviar la solicitud', 'Intenta de nuevo en un momento.');
     },
-    onSuccess: () => invalidateSocialQueries(queryClient),
+    onSuccess: () => {
+      invalidateSocialQueries(queryClient);
+      aviso.exito('Solicitud de amistad enviada');
+    },
   });
 }
 
