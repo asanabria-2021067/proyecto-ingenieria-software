@@ -1,5 +1,8 @@
 import { apiFetch } from '@/lib/api/client';
 
+/** Modalidad de la sesión de un evento — mismos 3 valores que ModalidadProyecto, enum propio. */
+export type ModalidadEvento = 'PRESENCIAL' | 'VIRTUAL' | 'MIXTA';
+
 /** HU-169 (T-263): evento de calendario de un proyecto. */
 export interface EventoProyectoDTO {
   idEvento: number;
@@ -9,6 +12,13 @@ export interface EventoProyectoDTO {
   fechaInicio: string;
   fechaFin: string;
   antelacionMinutos: number;
+  modalidad: ModalidadEvento;
+  ubicacionLat: number | null;
+  ubicacionLng: number | null;
+  ubicacionNombre: string | null;
+  linkSesion: string | null;
+  /** idRolProyecto destinatarios; [] = visible para todos los participantes. */
+  rolesDestino: number[];
 }
 
 /** GET /usuarios/me/eventos incluye el proyecto para poder agruparlo en la vista global. */
@@ -22,6 +32,12 @@ export interface EventPayload {
   fechaInicio: string;
   fechaFin: string;
   antelacionMinutos?: number;
+  modalidad?: ModalidadEvento;
+  ubicacionLat?: number;
+  ubicacionLng?: number;
+  ubicacionNombre?: string;
+  linkSesion?: string;
+  rolesDestino?: number[];
 }
 
 /** Eventos de todos los proyectos del usuario (líder o integrante activo) en un rango — GET /usuarios/me/eventos */
