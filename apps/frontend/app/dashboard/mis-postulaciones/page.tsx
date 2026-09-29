@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, ChevronRight, ClipboardList, Clock, Trash2, XCircle } from 'lucide-react';
+import { useState } from 'react';
 import { apiFetch } from '@/lib/api/client';
 import { deletePostulacion } from '@/lib/services/applications';
 import { Postulacion, EstadoPostulacion } from '@/types';
@@ -18,6 +19,14 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const ESTADO_CONFIG: Record<
   EstadoPostulacion,
@@ -42,12 +51,32 @@ const ESTADO_CONFIG: Record<
 
 export default function MisPostulacionesPage() {
   const queryClient = useQueryClient();
+  const [busqueda, setBusqueda] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoPostulacion | ''>('');
 
   const { data: postulaciones = [], isLoading, isError, refetch } = useQuery<Postulacion[]>({
     queryKey: ['mis-postulaciones'],
     queryFn: () => apiFetch('/postulaciones/mis-postulaciones'),
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+  });
+
+  const conteoPorEstado = postulaciones.reduce<Record<EstadoPostulacion, number>>(
+    (acc, p) => {
+      acc[p.estadoPostulacion] = (acc[p.estadoPostulacion] ?? 0) + 1;
+      return acc;
+    },
+    { PENDIENTE: 0, ACEPTADA: 0, RECHAZADA: 0 },
+  );
+
+  const filtradas = postulaciones.filter((p) => {
+    const texto = busqueda.trim().toLowerCase();
+    const coincideTexto =
+      !texto ||
+      p.rolProyecto.nombreRol.toLowerCase().includes(texto) ||
+      p.rolProyecto.proyecto.tituloProyecto.toLowerCase().includes(texto);
+    const coincideEstado = !estadoFiltro || p.estadoPostulacion === estadoFiltro;
+    return coincideTexto && coincideEstado;
   });
 
   const deleteMutation = useMutation({
@@ -89,14 +118,81 @@ export default function MisPostulacionesPage() {
 
   return (
       <div className={dashboardPage('py-8')}>
-        <div className="mb-8">
-          <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
-            Mis Postulaciones
-          </h1>
-          <p className="text-tertiary text-sm">
-            Aquí puedes ver el estado de todas tus postulaciones enviadas.
-          </p>
+        <div className="mb-6 flex flex-col gap-stack lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
+              Mis Postulaciones
+            </h1>
+            <p className="text-tertiary text-sm">
+              Aquí puedes ver el estado de todas tus postulaciones enviadas.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/proyectos"
+            className="inline-flex shrink-0 items-center gap-2 self-start rounded-control border border-outline-variant bg-card px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-container lg:self-center"
+          >
+            Explorar proyectos
+            <ChevronRight aria-hidden="true" className="h-4 w-4" />
+          </Link>
         </div>
+
+        {!isLoading && !isError && postulaciones.length > 0 && (
+          <div className="mb-section grid grid-cols-2 gap-tight sm:grid-cols-4">
+            <div className="card-base">
+              <p className="type-meta text-text-secondary">Total enviadas</p>
+              <p className="type-display mt-tight">{postulaciones.length}</p>
+            </div>
+            <div className="card-base">
+              <p className="type-meta text-text-secondary">Pendientes</p>
+              <p className="type-display mt-tight text-tertiary">{conteoPorEstado.PENDIENTE}</p>
+            </div>
+            <div className="card-base">
+              <p className="type-meta text-text-secondary">Aceptadas</p>
+              <p className="type-display mt-tight text-primary">{conteoPorEstado.ACEPTADA}</p>
+            </div>
+            <div className="card-base">
+              <p className="type-meta text-text-secondary">Rechazadas</p>
+              <p className="type-display mt-tight text-error">{conteoPorEstado.RECHAZADA}</p>
+            </div>
+          </div>
+        )}
+
+        {!isLoading && !isError && postulaciones.length > 0 && (
+          <div className="mb-section flex flex-col gap-stack sm:flex-row">
+            <DashboardSearchField
+              containerClassName="flex-1"
+              aria-label="Buscar postulaciones por rol o proyecto"
+              placeholder="Buscar por rol o proyecto..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            <Select
+              value={estadoFiltro || '__ALL__'}
+              onValueChange={(v) => setEstadoFiltro(v === '__ALL__' ? '' : (v as EstadoPostulacion))}
+            >
+              <SelectTrigger
+                aria-label="Filtrar postulaciones por estado"
+                className={`w-full sm:w-50 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="z-50">
+                <SelectItem value="__ALL__" className="focus:bg-primary focus:text-on-primary">
+                  Todos los estados
+                </SelectItem>
+                <SelectItem value="PENDIENTE" className="focus:bg-primary focus:text-on-primary">
+                  Pendiente
+                </SelectItem>
+                <SelectItem value="ACEPTADA" className="focus:bg-primary focus:text-on-primary">
+                  Aceptada
+                </SelectItem>
+                <SelectItem value="RECHAZADA" className="focus:bg-primary focus:text-on-primary">
+                  Rechazada
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {isLoading && (
           <div className="text-center py-16 text-tertiary text-sm" role="status">
@@ -150,8 +246,34 @@ export default function MisPostulacionesPage() {
           </Empty>
         )}
 
+        {!isLoading && !isError && postulaciones.length > 0 && filtradas.length === 0 && (
+          <Empty tone="muted" className="surface-enter" aria-live="polite">
+            <EmptyMedia variant="icon">
+              <ClipboardList aria-hidden="true" className="h-7 w-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>Sin resultados</EmptyTitle>
+              <EmptyDescription>
+                No encontramos postulaciones que coincidan con los filtros seleccionados.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <button
+                type="button"
+                onClick={() => {
+                  setBusqueda('');
+                  setEstadoFiltro('');
+                }}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Limpiar filtros
+              </button>
+            </EmptyContent>
+          </Empty>
+        )}
+
         <div className="space-y-4">
-          {postulaciones.map((p, index) => {
+          {filtradas.map((p, index) => {
             const config = ESTADO_CONFIG[p.estadoPostulacion];
             const Icon = config.icon;
             return (
