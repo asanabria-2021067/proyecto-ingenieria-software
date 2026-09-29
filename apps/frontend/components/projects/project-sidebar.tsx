@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { MessageSquarePlus, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ProjectChatPanel } from '@/components/projects/project-chat-panel';
+import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
 import { ProjectActionsMenu } from '@/components/projects/navigation/project-actions-menu';
 import { ProjectNavList } from '@/components/projects/navigation/project-nav-list';
 import {
@@ -47,6 +47,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
   const activeHref = resolveActiveHref(groups, pathname);
   const puedeChatear = nav.actor !== 'visitor';
   const navId = `project-nav-${idProyecto}`;
+  const [nuevoChatAbierto, setNuevoChatAbierto] = useState(false);
 
   // Al alternar, el botón pulsado desaparece y aparece su opuesto en el
   // mismo lugar: el foco se mueve a él para no perderse.
@@ -135,35 +136,45 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         <ProjectNavList id={navId} groups={groups} activeHref={activeHref} variant={collapsed ? 'rail' : 'full'} />
       </nav>
 
-      {collapsed && puedeChatear && (
-        <div className="flex justify-center border-t border-outline-variant py-inline">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => alternar(false)}
-                aria-label="Mostrar chats del proyecto"
-                className={TOGGLE_CLASS}
-              >
-                <MessageSquare className="size-4" aria-hidden="true" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Chat del proyecto</TooltipContent>
-          </Tooltip>
+      {/* Los chats del proyecto viven en el dock global (esquina inferior
+          derecha, cualquier página del dashboard) — acá solo queda el
+          punto de entrada para iniciar uno nuevo. */}
+      {puedeChatear && (
+        <div className={collapsed ? 'flex justify-center border-t border-outline-variant py-inline' : 'border-t border-outline-variant px-inline py-inline'}>
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setNuevoChatAbierto(true)}
+                  aria-label="Nuevo chat del proyecto"
+                  className={TOGGLE_CLASS}
+                >
+                  <MessageSquarePlus className="size-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Nuevo chat</TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNuevoChatAbierto(true)}
+              className="flex w-full items-center gap-2 rounded-control px-2 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary"
+            >
+              <MessageSquarePlus className="size-4" aria-hidden="true" />
+              Nuevo chat del proyecto
+            </button>
+          )}
         </div>
       )}
 
-      {/* El panel sigue montado aunque la sidebar esté colapsada: el botón
-          «Chat» del responsable (requestChatWith) abre la conversación en un
-          Sheet con portal, que no depende de que la lista sea visible. */}
-      <div className={collapsed ? 'hidden' : 'contents'}>
-        <ProjectChatPanel
-          idProyecto={idProyecto}
-          habilitado={puedeChatear}
-          currentUserId={nav.currentUserId}
-          members={nav.members}
-        />
-      </div>
+      <NewChatDialog
+        open={nuevoChatAbierto}
+        onOpenChange={setNuevoChatAbierto}
+        idProyecto={idProyecto}
+        members={nav.members}
+        currentUserId={nav.currentUserId}
+      />
     </aside>
   );
 }
