@@ -1,49 +1,22 @@
-import uvgSwal from '@/lib/swal';
+import { toast } from 'sonner';
 
 export type TipoAviso = 'exito' | 'error' | 'advertencia';
 
-const AVISOS = {
-  exito: { icon: 'success', etiqueta: 'Listo', clase: 'pill-success', duracion: 2500 },
-  advertencia: { icon: 'warning', etiqueta: 'Atención', clase: 'pill-warning', duracion: 4500 },
-  error: { icon: 'error', etiqueta: 'Error', clase: 'pill-error', duracion: 6000 },
-} as const;
+const DURACION_MS: Record<TipoAviso, number> = {
+  exito: 2500,
+  advertencia: 4500,
+  error: 6000,
+};
 
-export function escaparHtml(texto: string): string {
-  return texto
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function mostrarAviso(tipo: TipoAviso, titulo: string, texto?: string) {
-  const config = AVISOS[tipo];
-  const etiqueta = `<span class="pill ${config.clase}">${config.etiqueta}</span>`;
-  const cuerpo = texto ? `<p class="mt-micro">${escaparHtml(texto)}</p>` : '';
-  return uvgSwal.fire({
-    toast: true,
-    position: 'top-end',
-    backdrop: false,
-    icon: config.icon,
-    title: titulo,
-    html: `${etiqueta}${cuerpo}`,
-    timer: config.duracion,
-    timerProgressBar: true,
-    showConfirmButton: false,
-    showCloseButton: true,
-    closeButtonAriaLabel: 'Cerrar aviso',
-    didOpen: (popup: HTMLElement) => {
-      popup.addEventListener('mouseenter', () => uvgSwal.stopTimer());
-      popup.addEventListener('mouseleave', () => uvgSwal.resumeTimer());
-    },
-  });
-}
-
+// Avisos rapidos (no bloquean, se apilan y desaparecen solos): Sonner. Los
+// dialogs de confirmacion/resultado que SI requieren que el usuario los
+// atienda siguen en SweetAlert2 (ver lib/swal.ts) — dos sistemas, cada uno
+// para su caso, no uno sustituye al otro.
 export const aviso = {
-  exito: (titulo: string, texto?: string) => mostrarAviso('exito', titulo, texto),
-  error: (titulo: string, texto?: string) => mostrarAviso('error', titulo, texto),
-  advertencia: (titulo: string, texto?: string) => mostrarAviso('advertencia', titulo, texto),
+  exito: (titulo: string, texto?: string) => toast.success(titulo, { description: texto, duration: DURACION_MS.exito }),
+  error: (titulo: string, texto?: string) => toast.error(titulo, { description: texto, duration: DURACION_MS.error }),
+  advertencia: (titulo: string, texto?: string) =>
+    toast.warning(titulo, { description: texto, duration: DURACION_MS.advertencia }),
 };
 
 export interface OpcionesConfirmar {
