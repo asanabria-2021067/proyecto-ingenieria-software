@@ -28,15 +28,23 @@ async function desactivarTour(page: Page) {
 }
 
 
+/**
+ * Abre (o crea, si no existe todavía) la conversación individual con
+ * `nombreOtro`. La lista de chats vive en el dock global (botón "Mensajes",
+ * abajo a la derecha), no en el sidebar del proyecto — crear uno nuevo sí
+ * sigue siendo una acción del proyecto ("Nuevo chat del proyecto").
+ */
 async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  const existente = page.locator('aside').getByRole('button', { name: new RegExp(nombreOtro) });
+  await page.getByRole('button', { name: /^mensajes/i }).click();
+  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
 
   if (await existente.count()) {
     await existente.first().click();
     return;
   }
 
-  await page.getByLabel('Nuevo chat').click();
+  await page.getByRole('button', { name: /^mensajes/i }).click(); // cierra la lista, vacía
+  await page.getByRole('button', { name: /nuevo chat/i }).click();
   await page.getByRole('button', { name: 'Individual' }).click();
   await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
   await page.getByRole('button', { name: 'Crear chat' }).click();
@@ -90,7 +98,7 @@ test('concurrencia: ningún mensaje se pierde cuando ambos escriben casi al mism
   }
 });
 
-test('navegación: cambiar de pestaña del proyecto no cierra el chat ni pierde el historial', async ({ page }) => {
+test('navegación: cambiar de página no cierra el chat ni pierde el historial', async ({ page }) => {
   test.setTimeout(60_000);
   await desactivarTour(page);
   await login(page, 'maria.lopez@uvg.edu.gt');
@@ -103,12 +111,12 @@ test('navegación: cambiar de pestaña del proyecto no cierra el chat ni pierde 
   await enviarMensaje(page, mensaje);
   await expect(page.getByText(mensaje).first()).toBeVisible();
 
-  // El panel de chat vive en el layout del proyecto (sidebar), no en la
-  // página — navegar a otra pestaña del mismo proyecto no debe desmontarlo.
+  // El dock de chat es global (vive en el layout del dashboard, no en el
+  // del proyecto): navegar a otra página, incluso fuera del proyecto, no
+  // debe cerrar la ventana ni perder el historial ya cargado.
   await page.goto(`/dashboard/projects/${PROYECTO_ID}/kanban`);
-  await expect(page.getByRole('heading', { name: 'Chat del proyecto' })).toBeVisible();
+  await expect(page.getByText(mensaje).first()).toBeVisible();
 
-  await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
-  await abrirChatIndividualCon(page, 'José');
+  await page.goto('/dashboard/personas');
   await expect(page.getByText(mensaje).first()).toBeVisible();
 });
