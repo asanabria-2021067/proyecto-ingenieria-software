@@ -200,6 +200,7 @@ export function GlobalSearchInput({
   function irA(resultado: ResultadoAplanado) {
     setQuery('');
     setOpen(false);
+    setActiveIndex(-1);
     router.push(resultado.href);
     onNavigate?.();
   }
@@ -208,6 +209,7 @@ export function GlobalSearchInput({
     setQuery('');
     setPestana('todo');
     setOpen(false);
+    setActiveIndex(-1);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -300,7 +302,7 @@ export function GlobalSearchInput({
           aria-expanded={showDropdown}
           aria-controls={listboxId}
           aria-autocomplete="list"
-          aria-activedescendant={activeIndex >= 0 ? `${uid}-${flat[activeIndex].id}` : undefined}
+          aria-activedescendant={activeIndex >= 0 && flat[activeIndex] ? `${uid}-${flat[activeIndex].id}` : undefined}
           role="combobox"
           placeholder="Buscar…"
           onChange={(e) => {
