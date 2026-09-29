@@ -359,6 +359,7 @@ export function GlobalSearchInput({
                             role="option"
                             aria-selected={activo}
                             onMouseEnter={() => setActiveIndex(globalIndex)}
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => irA(r)}
                             className={`flex w-full items-center gap-inline rounded-control px-tight py-inline text-left transition-colors ${
                               activo ? 'bg-surface-container-high' : 'hover:bg-surface-container-high'
