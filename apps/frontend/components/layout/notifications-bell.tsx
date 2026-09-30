@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { Bell, BellOff, CheckCheck } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   useNotificaciones,
   useConteoNoLeidas,
@@ -132,7 +131,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
         </div>
 
         {/* Lista */}
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {recientes.length === 0 ? (
             <div className="surface-enter px-4 py-10 text-center" role="status">
               <BellOff aria-hidden="true" className="w-8 h-8 text-outline mx-auto mb-2" />
@@ -214,7 +213,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
               })}
             </ul>
           )}
-        </ScrollArea>
+        </div>
 
         <div className="shrink-0 border-t border-outline-variant bg-surface-container-lowest px-4 py-3">
           <Link
