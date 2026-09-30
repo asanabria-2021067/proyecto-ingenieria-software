@@ -59,7 +59,7 @@ export function ChatDock() {
           onClick={() => setListOpen((open) => !open)}
           aria-label={totalNoLeidos > 0 ? `Mensajes, ${totalNoLeidos} sin leer` : 'Mensajes'}
           aria-expanded={listOpen}
-          className="flex h-11 items-center gap-2 rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest px-4 text-sm font-semibold text-on-surface shadow-raised transition-colors hover:bg-surface-container-high"
+          className="flex h-12 w-72 items-center gap-2 rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest px-5 text-sm font-semibold text-on-surface shadow-raised transition-colors hover:bg-surface-container-high"
         >
           <span className="relative">
             <MessageCircle className="size-4" aria-hidden="true" />
