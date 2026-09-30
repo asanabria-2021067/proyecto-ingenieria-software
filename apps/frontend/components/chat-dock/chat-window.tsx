@@ -111,7 +111,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const titulo = conversacion ? nombreConversacion(conversacion, currentUserId) : 'Chat';
 
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]">
+    <div className="flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]">
       <div className="flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2">
         {conversacion?.tipo === 'GRUPAL' ? (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
@@ -189,7 +189,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
 
       {!minimized && (
         <>
-          <div ref={listRef} className="h-80 min-h-0 space-y-3 overflow-y-auto px-3 py-3">
+          <div ref={listRef} className="h-[40rem] max-h-[60vh] min-h-0 space-y-3 overflow-y-auto px-3 py-3">
             {isLoading && <p className="text-xs text-tertiary">Cargando historial…</p>}
             {!isLoading && messages.length === 0 && (
               <p className="text-xs text-tertiary">Todavía no hay mensajes. Sé el primero en escribir.</p>
