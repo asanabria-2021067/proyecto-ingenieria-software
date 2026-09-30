@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -14,33 +15,66 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useCreateConversation } from '@/hooks/use-chat';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
-import type { MiembroProyecto } from '@/hooks/use-project-members';
+import { useProjectMembers, type MiembroProyecto } from '@/hooks/use-project-members';
+import { getMyProjects, getContributorProjects } from '@/lib/services/projects';
 
 interface NewChatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  idProyecto: number;
-  members: MiembroProyecto[];
+  /** Fijo (sidebar de un proyecto): salta el selector de proyecto. Sin
+   * especificar (dock global): el diálogo deja elegir entre los proyectos
+   * donde el usuario participa. */
+  idProyecto?: number;
+  members?: MiembroProyecto[];
   currentUserId: number | null;
 }
 
-/** Crea un chat individual o grupal dentro de un proyecto y lo abre en el dock global. */
-export function NewChatDialog({ open, onOpenChange, idProyecto, members, currentUserId }: NewChatDialogProps) {
+/** Cualquier proyecto donde el usuario puede iniciar un chat: propios (líder)
+ * + donde colabora, sin duplicados y sin los ya cerrados (el backend rechaza
+ * crear conversaciones nuevas ahí). Solo se usa desde el dock global — el
+ * flujo desde el sidebar de un proyecto ya trae su `idProyecto` fijo. */
+function useProyectosParaChatear(habilitado: boolean) {
+  return useQuery({
+    queryKey: ['chat-dock-proyectos-para-chatear'],
+    queryFn: async () => {
+      const [propios, colaborador] = await Promise.all([getMyProjects(), getContributorProjects()]);
+      const vistos = new Set<number>();
+      return [...propios, ...colaborador].filter((p) => {
+        if (p.estadoProyecto === 'CERRADO' || vistos.has(p.idProyecto)) return false;
+        vistos.add(p.idProyecto);
+        return true;
+      });
+    },
+    enabled: habilitado,
+  });
+}
+
+/** Crea un chat individual o grupal y lo abre en el dock global. */
+export function NewChatDialog({ open, onOpenChange, idProyecto: idProyectoFijo, members: membersFijos, currentUserId }: NewChatDialogProps) {
+  const [idProyectoElegido, setIdProyectoElegido] = useState<number | null>(null);
   const [tipo, setTipo] = useState<'GRUPAL' | 'INDIVIDUAL'>('INDIVIDUAL');
   const [nombre, setNombre] = useState('');
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const crear = useCreateConversation(idProyecto);
+
+  const idProyecto = idProyectoFijo ?? idProyectoElegido;
+  const { data: proyectosParaElegir, isLoading: cargandoProyectos } = useProyectosParaChatear(open && idProyectoFijo == null);
+  const { members: membersDelProyectoElegido } = useProjectMembers(idProyectoFijo == null ? (idProyectoElegido ?? 0) : 0);
+  const members = idProyectoFijo != null ? (membersFijos ?? []) : membersDelProyectoElegido;
+
+  const crear = useCreateConversation(idProyecto ?? 0);
   const { abrirChat } = useChatDock();
 
   const otrosMiembros = members.filter((m) => m.idUsuario !== currentUserId);
 
   const handleOpenChange = (next: boolean) => {
     if (!next) {
+      setIdProyectoElegido(null);
       setTipo('INDIVIDUAL');
       setNombre('');
       setSeleccionados([]);
@@ -58,6 +92,10 @@ export function NewChatDialog({ open, onOpenChange, idProyecto, members, current
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (idProyecto == null) {
+      setError('Elige un proyecto.');
+      return;
+    }
     if (seleccionados.length === 0) {
       setError('Selecciona al menos un integrante.');
       return;
@@ -88,6 +126,37 @@ export function NewChatDialog({ open, onOpenChange, idProyecto, members, current
           </DialogHeader>
 
           <div className="space-y-4 px-6 py-5">
+            {idProyectoFijo == null && (
+              <div>
+                <label htmlFor="chat-proyecto" className="text-xs font-semibold text-on-surface">
+                  Proyecto
+                </label>
+                <Select
+                  value={idProyectoElegido != null ? String(idProyectoElegido) : ''}
+                  onValueChange={(value) => {
+                    // Cambiar de proyecto trae gente de un equipo distinto:
+                    // la selección anterior no debería sobrevivir.
+                    setIdProyectoElegido(Number(value));
+                    setSeleccionados([]);
+                  }}
+                >
+                  <SelectTrigger id="chat-proyecto" className="mt-1 h-10 w-full rounded-md border-outline-variant text-sm">
+                    <SelectValue placeholder={cargandoProyectos ? 'Cargando proyectos…' : 'Elige un proyecto'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(proyectosParaElegir ?? []).map((p) => (
+                      <SelectItem key={p.idProyecto} value={String(p.idProyecto)}>
+                        {p.tituloProyecto}
+                      </SelectItem>
+                    ))}
+                    {!cargandoProyectos && (proyectosParaElegir ?? []).length === 0 && (
+                      <p className="px-2 py-1.5 text-xs text-tertiary">No participas en ningún proyecto activo.</p>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -133,7 +202,10 @@ export function NewChatDialog({ open, onOpenChange, idProyecto, members, current
                 {tipo === 'INDIVIDUAL' ? 'Con quién' : 'Integrantes'}
               </p>
               <div className="mt-2 max-h-56 space-y-1.5 overflow-y-auto">
-                {otrosMiembros.length === 0 && (
+                {idProyecto == null && (
+                  <p className="text-xs text-tertiary">Elige un proyecto para ver a su equipo.</p>
+                )}
+                {idProyecto != null && otrosMiembros.length === 0 && (
                   <p className="text-xs text-tertiary">No hay más integrantes en este proyecto.</p>
                 )}
                 {otrosMiembros.map((m) => (
