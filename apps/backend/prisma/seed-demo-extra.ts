@@ -149,6 +149,63 @@ async function ensureRolProyecto(data: { idProyecto: number; nombreRol: string; 
   return prisma.rolProyecto.create({ data });
 }
 
+/** Postulacion ACEPTADA + ParticipacionProyecto — sin esto la persona hace
+ * tareas en el proyecto (AsignacionTarea) pero nunca aparece en la página de
+ * Equipo/Miembros, que lee ParticipacionProyecto, no AsignacionTarea. */
+async function ensureParticipacion(idUsuario: number, idRolProyecto: number, resueltaPor: number, justificacion: string) {
+  let postulacion = await prisma.postulacion.findFirst({ where: { idUsuarioPostulante: idUsuario, idRolProyecto } });
+  if (!postulacion) {
+    postulacion = await prisma.postulacion.create({
+      data: { idUsuarioPostulante: idUsuario, idRolProyecto, justificacion, estadoPostulacion: 'ACEPTADA', resueltaPor, fechaResolucion: new Date() },
+    });
+  } else if (postulacion.estadoPostulacion !== 'ACEPTADA') {
+    postulacion = await prisma.postulacion.update({
+      where: { idPostulacion: postulacion.idPostulacion },
+      data: { estadoPostulacion: 'ACEPTADA', resueltaPor, fechaResolucion: new Date() },
+    });
+  }
+
+  const existente = await prisma.participacionProyecto.findFirst({ where: { idUsuario, idRolProyecto } });
+  if (existente) return existente;
+  return prisma.participacionProyecto.create({
+    data: { idUsuario, idRolProyecto, idPostulacion: postulacion.idPostulacion, estadoParticipacion: 'ACTIVO' },
+  });
+}
+
+/** Mismo formato que BitacoraEventosService.registrarEvento (bitacora-eventos.service.ts),
+ * pero escrito directo por prisma (no hay transacción de dominio que envolver
+ * aquí). `tipoEvento`/`tipoEntidad` son los literales de TipoEventoBitacora —
+ * duplicados a mano en vez de importar src/ desde prisma/ para no acoplar el
+ * runner de seeds (tsx) a la compilación de Nest. */
+async function ensureBitacoraEvento(params: {
+  idProyecto: number;
+  idSprint?: number | null;
+  idActor: number;
+  tipoEvento: string;
+  tipoEntidad: string;
+  idEntidad: number;
+  valorNuevo?: Record<string, unknown> | null;
+}) {
+  const existente = await prisma.bitacoraAuditoria.findFirst({
+    where: { accion: params.tipoEvento, tipoObjeto: params.tipoEntidad, idObjeto: String(params.idEntidad) },
+  });
+  if (existente) return existente;
+  return prisma.bitacoraAuditoria.create({
+    data: {
+      idUsuario: params.idActor,
+      accion: params.tipoEvento,
+      tipoObjeto: params.tipoEntidad,
+      idObjeto: String(params.idEntidad),
+      detalleJson: {
+        idProyecto: params.idProyecto,
+        idSprint: params.idSprint ?? null,
+        valorAnterior: null,
+        valorNuevo: params.valorNuevo ?? null,
+      } as Prisma.InputJsonValue,
+    },
+  });
+}
+
 /** Amistad.@@unique es direccional (solicitante, receptor); una amistad ya
  * aceptada en cualquier sentido cuenta como existente. */
 async function ensureAmistad(idA: number, idB: number) {
@@ -198,6 +255,7 @@ async function ensureClosedSprintWithBurndown(params: {
   const puntosPlanificados = params.tareas.reduce((acc, t) => acc + t.puntos, 0);
   const puntosCompletados = params.tareas.filter((t) => t.hecha).reduce((acc, t) => acc + t.puntos, 0);
 
+  const idActor = params.tareas[0]?.creadaPor;
   const sprint = await prisma.sprint.create({
     data: {
       idProyecto: params.idProyecto,
@@ -206,6 +264,7 @@ async function ensureClosedSprintWithBurndown(params: {
       fechaInicio,
       fechaFinPlaneada: fechaCierre,
       fechaCierre,
+      cerradoPor: idActor,
       tareasPlanificadasCierre: planificadas,
       tareasCompletadasCierre: completadas,
       tareasArrastradasCierre: arrastradas,
@@ -216,6 +275,20 @@ async function ensureClosedSprintWithBurndown(params: {
       puntosHistoriaCompletadosCierre: puntosCompletados,
     },
   });
+
+  // Bitácora (T-163/HU-140): sin esto la página de bitácora del proyecto
+  // queda vacía aunque el sprint sí tenga historial real.
+  if (idActor) {
+    await ensureBitacoraEvento({
+      idProyecto: params.idProyecto,
+      idSprint: sprint.idSprint,
+      idActor,
+      tipoEvento: 'SPRINT_CLOSED',
+      tipoEntidad: 'SPRINT',
+      idEntidad: sprint.idSprint,
+      valorNuevo: { estado: 'CERRADO', tareasArrastradas: arrastradas },
+    });
+  }
 
   for (const t of params.tareas) {
     const tarea = await prisma.tarea.create({
@@ -582,7 +655,7 @@ async function main() {
   const rolReservasBackend = await ensureRolProyecto({ idProyecto: pReservas.idProyecto, nombreRol: 'Backend Developer', descripcionRolProyecto: 'API de disponibilidad y reservas', cupos: 2 });
   await ensureRolProyecto({ idProyecto: pReservas.idProyecto, nombreRol: 'Frontend Developer', descripcionRolProyecto: 'Calendario de reservas', cupos: 2 });
   const rolApoyoCoordinador = await ensureRolProyecto({ idProyecto: pApoyoPares.idProyecto, nombreRol: 'Coordinador de Voluntarios', descripcionRolProyecto: 'Capacitación y asignación de pares', cupos: 1 });
-  await ensureRolProyecto({ idProyecto: pApoyoPares.idProyecto, nombreRol: 'Desarrollador Web', descripcionRolProyecto: 'Formulario de solicitud y match', cupos: 1 });
+  const rolApoyoWeb = await ensureRolProyecto({ idProyecto: pApoyoPares.idProyecto, nombreRol: 'Desarrollador Web', descripcionRolProyecto: 'Formulario de solicitud y match', cupos: 1 });
 
   const [sprintReservas, sprintApoyo] = await Promise.all([
     resolveSprint(pReservas.idProyecto, 1),
@@ -768,6 +841,38 @@ async function main() {
   await ensureAsignacion(tareaBolsa1.idTarea, vernel.idUsuario, vernel.idUsuario);
   await ensureAsignacion(tareaBolsa2.idTarea, sofia.idUsuario, vernel.idUsuario);
   await ensureAsignacion(tareaBolsa3.idTarea, carlos.idUsuario, vernel.idUsuario);
+
+  await ensureEvento({
+    idProyecto: pBiblioteca.idProyecto, idCreador: angel.idUsuario,
+    tituloEvento: 'Revisión de contenido subido esta semana', descripcionEvento: 'Repaso de calidad y duplicados antes de publicar.',
+    fechaInicio: enDiasHora(3, 15, 0), fechaFin: enDiasHora(3, 16, 0), modalidad: 'VIRTUAL',
+    linkSesion: 'https://meet.google.com/biblioteca-digital-revision',
+  });
+  await ensureEvento({
+    idProyecto: pBolsaEmpleo.idProyecto, idCreador: vernel.idUsuario,
+    tituloEvento: 'Llamada con empresas aliadas piloto', descripcionEvento: 'Alinear el formato de vacantes antes de abrir postulaciones.',
+    fechaInicio: enDiasHora(6, 9, 0), fechaFin: enDiasHora(6, 10, 0), modalidad: 'VIRTUAL',
+    linkSesion: 'https://meet.google.com/bolsa-empleo-empresas',
+  });
+
+  // ─── Miembros reales (ParticipacionProyecto), no solo tareas asignadas:
+  // sin esto, quien ya trabaja en el proyecto (arriba, via ensureAsignacion)
+  // nunca aparece en la página de Equipo/Miembros del proyecto. ───────────
+  const rolBiblioteca = await ensureRolProyecto({ idProyecto: pBiblioteca.idProyecto, nombreRol: 'Colaborador de Contenido', descripcionRolProyecto: 'Curaduría y moderación de recursos subidos', cupos: 2 });
+  const rolBolsaEmpleo = await ensureRolProyecto({ idProyecto: pBolsaEmpleo.idProyecto, nombreRol: 'Colaborador', descripcionRolProyecto: 'Gestión de vacantes y postulantes', cupos: 2 });
+  await ensureParticipacion(maria.idUsuario, rolBiblioteca.idRolProyecto, angel.idUsuario, 'Tengo experiencia moderando contenido de estudiantes.');
+  await ensureParticipacion(jose.idUsuario, rolBiblioteca.idRolProyecto, angel.idUsuario, 'Quiero ayudar a organizar el catálogo por carrera.');
+  await ensureParticipacion(sofia.idUsuario, rolBolsaEmpleo.idRolProyecto, vernel.idUsuario, 'Me interesa dar seguimiento a las empresas aliadas.');
+  await ensureParticipacion(carlos.idUsuario, rolBolsaEmpleo.idRolProyecto, vernel.idUsuario, 'Puedo ayudar con el sistema de postulaciones.');
+  await ensureParticipacion(carlos.idUsuario, rolReservasBackend.idRolProyecto, vernel.idUsuario, 'Tengo tiempo disponible para apoyar con el backend de reservas.');
+  await ensureParticipacion(jose.idUsuario, rolApoyoCoordinador.idRolProyecto, vernel.idUsuario, 'He sido monitor de curso y me interesa coordinar el programa de pares.');
+  await ensureParticipacion(sofia.idUsuario, rolApoyoWeb.idRolProyecto, vernel.idUsuario, 'Puedo encargarme del formulario de solicitud.');
+
+  // ─── Vernel también aplica a un proyecto ajeno (no solo recibe postulaciones) ─
+  await ensurePostulacion({
+    idUsuarioPostulante: vernel.idUsuario, idRolProyecto: 15,
+    justificacion: 'Me interesa apoyar con las visualizaciones del dashboard deportivo.',
+  });
 
   // ─── Sprints cerrados: cada proyecto de la demo llega a al menos 3 sprints
   // (2 cerrados con backlog + el activo de arriba), y cada uno alimenta el
