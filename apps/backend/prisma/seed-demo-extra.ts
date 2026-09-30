@@ -267,6 +267,72 @@ async function ensureClosedSprintWithBurndown(params: {
   return sprint;
 }
 
+/**
+ * Sin esto, el Sprint ACTIVO que crea `resolveSprint` (fechaInicio = hoy,
+ * cero instantaneas) siempre muestra "Aún no hay suficientes datos para el
+ * burndown" en la demo, sin importar cuántas tareas tenga: el AC exige
+ * fechaInicio en el pasado Y al menos 2 instantáneas (ver
+ * BurndownChart/computeSprintBurndown). Atrasa fechaInicio/fechaFinPlaneada
+ * si hace falta y genera la serie histórica hasta hoy con las tareas
+ * REALES del sprint (mismo cálculo que SprintSnapshotsService, para que la
+ * última fila coincida con lo que ya se ve en el tablero).
+ */
+async function ensureActiveSprintBurndown(idProyecto: number, diasInicio: number) {
+  const sprint = await prisma.sprint.findFirst({
+    where: { idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
+  });
+  if (!sprint) return;
+
+  const fechaInicio = enDias(diasInicio);
+  const fechaFinPlaneada = sprint.fechaFinPlaneada ?? enDias(diasInicio + 14);
+  if (sprint.fechaInicio > fechaInicio || !sprint.fechaFinPlaneada) {
+    await prisma.sprint.update({
+      where: { idSprint: sprint.idSprint },
+      data: { fechaInicio, fechaFinPlaneada },
+    });
+  }
+
+  const tareas = await prisma.tarea.findMany({
+    where: { idProyecto, idSprint: sprint.idSprint, eliminadoEn: null },
+    select: { estadoTarea: true, puntosHistoria: true },
+  });
+  const totalTareas = tareas.length;
+  const completadasHoy = tareas.filter((t) => t.estadoTarea === 'HECHO').length;
+  const puntosTotal = tareas.reduce((acc, t) => acc + (t.puntosHistoria ?? 0), 0);
+  const puntosRestantesHoy = tareas
+    .filter((t) => t.estadoTarea !== 'HECHO')
+    .reduce((acc, t) => acc + (t.puntosHistoria ?? 0), 0);
+
+  const duracionDias = Math.max(2, Math.round((enDias(0).getTime() - fechaInicio.getTime()) / 86_400_000));
+  for (let i = 0; i <= duracionDias; i++) {
+    const esHoy = i === duracionDias;
+    const progreso = i / duracionDias;
+    const completadasAlDia = esHoy ? completadasHoy : Math.min(completadasHoy, Math.round(progreso * completadasHoy));
+    const puntosRestantesAlDia = esHoy
+      ? puntosRestantesHoy
+      : Math.max(puntosRestantesHoy, Math.round(puntosTotal * (1 - progreso)));
+    const dia = new Date(fechaInicio);
+    dia.setDate(dia.getDate() + i);
+    await prisma.instantaneaSprint.upsert({
+      where: { idSprint_fecha: { idSprint: sprint.idSprint, fecha: dia } },
+      update: esHoy
+        ? {
+            tareasPendientes: totalTareas - completadasAlDia,
+            tareasCompletadas: completadasAlDia,
+            puntosHistoriaRestantes: puntosRestantesAlDia,
+          }
+        : {},
+      create: {
+        idSprint: sprint.idSprint,
+        fecha: dia,
+        tareasPendientes: totalTareas - completadasAlDia,
+        tareasCompletadas: completadasAlDia,
+        puntosHistoriaRestantes: puntosRestantesAlDia,
+      },
+    });
+  }
+}
+
 async function main() {
   const usuario = (correo: string) => prisma.usuario.findUniqueOrThrow({ where: { correo } });
 
@@ -645,33 +711,249 @@ async function main() {
   await ensureMensaje(convApoyo.idConversacion, vernel.idUsuario, 'Sofía, ¿el formulario de solicitud ya está listo para revisión?');
   await ensureMensaje(convApoyo.idConversacion, sofia.idUsuario, 'Sí, lo subí ayer. Quedo atenta a tus comentarios.');
 
-  // ─── Sprints ya cerrados: datos reales para Analitica/Burndown/Velocidad ─
-  await ensureClosedSprintWithBurndown({
-    idProyecto: pGestionAcademica.idProyecto,
-    numero: 0,
-    diasInicio: -28,
-    diasFin: -14,
-    tareas: [
-      { titulo: 'Levantamiento de requisitos con Asuntos Estudiantiles', puntos: 8, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
-      { titulo: 'Diseño de wireframes del panel de cursos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
-      { titulo: 'Definición del modelo de datos de cursos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
-      { titulo: 'Setup de repositorio y CI', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
-      { titulo: 'Prototipo de autenticación institucional', puntos: 3, hecha: false, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
-    ],
+  // ─── Dos proyectos más (uno de Angel, uno de Vernel) — la demo necesitaba
+  // más variedad para san24725 y vernel, no solo los 4+2 ya existentes ────
+  const pBiblioteca = await ensureProyecto({
+    tituloProyecto: 'Biblioteca Digital de Recursos Académicos',
+    descripcionProyecto: 'Repositorio central donde estudiantes suben y buscan apuntes, guías y exámenes pasados por curso y carrera.',
+    tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+    estadoProyecto: 'EN_PROGRESO',
+    creadoPor: angel.idUsuario,
+    fechaInicio: enDias(-35),
+    fechaFinEstimada: enDias(100),
   });
-  await ensureClosedSprintWithBurndown({
-    idProyecto: pReservas.idProyecto,
-    numero: 0,
-    diasInicio: -30,
-    diasFin: -16,
-    tareas: [
-      { titulo: 'Entrevistas con encargados de laboratorios', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
-      { titulo: 'Modelado inicial de disponibilidad', puntos: 8, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
-      { titulo: 'Investigación de librerías de calendario', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: carlos.idUsuario },
-      { titulo: 'Mockups del flujo de reserva', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
-      { titulo: 'Validación legal de retención de datos de uso', puntos: 2, hecha: false, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
-    ],
+  const pBolsaEmpleo = await ensureProyecto({
+    tituloProyecto: 'Bolsa de Empleo y Prácticas Estudiantiles',
+    descripcionProyecto: 'Conecta vacantes de empresas aliadas con estudiantes por carrera y semestre, con seguimiento de postulaciones.',
+    tipoProyecto: 'ACADEMICO_HORAS_BECA',
+    estadoProyecto: 'PUBLICADO',
+    creadoPor: vernel.idUsuario,
+    fechaInicio: enDias(-25),
+    fechaFinEstimada: enDias(110),
   });
+
+  const [sprintBiblioteca, sprintBolsa] = await Promise.all([
+    resolveSprint(pBiblioteca.idProyecto, 1),
+    resolveSprint(pBolsaEmpleo.idProyecto, 1),
+  ]);
+
+  const tareaBiblioteca1 = await ensureTarea({
+    idProyecto: pBiblioteca.idProyecto, idSprint: sprintBiblioteca.idSprint,
+    tituloTarea: 'Catálogo de recursos por curso', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: angel.idUsuario,
+  });
+  const tareaBiblioteca2 = await ensureTarea({
+    idProyecto: pBiblioteca.idProyecto, idSprint: sprintBiblioteca.idSprint,
+    tituloTarea: 'Buscador con filtros por carrera y semestre', estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', creadaPor: angel.idUsuario, fechaLimite: enDias(5),
+  });
+  const tareaBiblioteca3 = await ensureTarea({
+    idProyecto: pBiblioteca.idProyecto, idSprint: sprintBiblioteca.idSprint,
+    tituloTarea: 'Subida de apuntes por estudiantes', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: angel.idUsuario, fechaLimite: enDias(11),
+  });
+  await ensureAsignacion(tareaBiblioteca1.idTarea, angel.idUsuario, angel.idUsuario);
+  await ensureAsignacion(tareaBiblioteca2.idTarea, maria.idUsuario, angel.idUsuario);
+  await ensureAsignacion(tareaBiblioteca3.idTarea, jose.idUsuario, angel.idUsuario);
+
+  const tareaBolsa1 = await ensureTarea({
+    idProyecto: pBolsaEmpleo.idProyecto, idSprint: sprintBolsa.idSprint,
+    tituloTarea: 'Listado de vacantes por carrera', estadoTarea: 'HECHO', prioridad: 'ALTA', creadaPor: vernel.idUsuario,
+  });
+  const tareaBolsa2 = await ensureTarea({
+    idProyecto: pBolsaEmpleo.idProyecto, idSprint: sprintBolsa.idSprint,
+    tituloTarea: 'Perfil de estudiante con CV', estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', creadaPor: vernel.idUsuario, fechaLimite: enDias(4),
+  });
+  const tareaBolsa3 = await ensureTarea({
+    idProyecto: pBolsaEmpleo.idProyecto, idSprint: sprintBolsa.idSprint,
+    tituloTarea: 'Sistema de postulación a vacantes', estadoTarea: 'POR_HACER', prioridad: 'MEDIA', creadaPor: vernel.idUsuario, fechaLimite: enDias(9),
+  });
+  await ensureAsignacion(tareaBolsa1.idTarea, vernel.idUsuario, vernel.idUsuario);
+  await ensureAsignacion(tareaBolsa2.idTarea, sofia.idUsuario, vernel.idUsuario);
+  await ensureAsignacion(tareaBolsa3.idTarea, carlos.idUsuario, vernel.idUsuario);
+
+  // ─── Sprints cerrados: cada proyecto de la demo llega a al menos 3 sprints
+  // (2 cerrados con backlog + el activo de arriba), y cada uno alimenta el
+  // burndown con su propia serie de instantáneas (T-238) — sin esto, casi
+  // todos mostraban "Aún no hay suficientes datos para el burndown". ──────
+  const sprintsCerrados: Parameters<typeof ensureClosedSprintWithBurndown>[0][] = [
+    {
+      idProyecto: pGestionAcademica.idProyecto, numero: -1, diasInicio: -42, diasFin: -29,
+      tareas: [
+        { titulo: 'Investigación de plataformas similares (benchmark)', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Entrevistas con coordinadores académicos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+        { titulo: 'Definición del alcance del MVP', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Selección de stack tecnológico', puntos: 2, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Borrador de cronograma del proyecto', puntos: 2, hecha: false, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pGestionAcademica.idProyecto, numero: 0, diasInicio: -28, diasFin: -14,
+      tareas: [
+        { titulo: 'Levantamiento de requisitos con Asuntos Estudiantiles', puntos: 8, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Diseño de wireframes del panel de cursos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+        { titulo: 'Definición del modelo de datos de cursos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Setup de repositorio y CI', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Prototipo de autenticación institucional', puntos: 3, hecha: false, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pSaludMental.idProyecto, numero: -1, diasInicio: -42, diasFin: -29,
+      tareas: [
+        { titulo: 'Investigación con psicólogos del CAE', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: ana.idUsuario },
+        { titulo: 'Definir métricas de bienestar a trackear', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Wireframes de la app de check-in', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: jose.idUsuario },
+        { titulo: 'Setup del proyecto móvil', puntos: 2, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Piloto de encuesta inicial de ánimo', puntos: 2, hecha: false, creadaPor: angel.idUsuario, asignadoA: ana.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pSaludMental.idProyecto, numero: 0, diasInicio: -28, diasFin: -14,
+      tareas: [
+        { titulo: 'Validación de tono y lenguaje inclusivo', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: ana.idUsuario },
+        { titulo: 'Sistema de recordatorios locales', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: jose.idUsuario },
+        { titulo: 'Pantalla de historial emocional', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: ana.idUsuario },
+        { titulo: 'Ajustes de accesibilidad (contraste, texto)', puntos: 2, hecha: true, creadaPor: angel.idUsuario, asignadoA: jose.idUsuario },
+        { titulo: 'Cierre de hallazgos con Bienestar Estudiantil', puntos: 2, hecha: false, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pELearning.idProyecto, numero: -1, diasInicio: -42, diasFin: -29,
+      tareas: [
+        { titulo: 'Análisis de plataformas de e-learning existentes', puntos: 3, hecha: true, creadaPor: luis.idUsuario, asignadoA: luis.idUsuario },
+        { titulo: 'Definir rúbrica de evaluación automática', puntos: 5, hecha: true, creadaPor: luis.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Diseño de arquitectura del motor de correcciones', puntos: 5, hecha: true, creadaPor: luis.idUsuario, asignadoA: luis.idUsuario },
+        { titulo: 'Setup del entorno de pruebas', puntos: 2, hecha: true, creadaPor: luis.idUsuario, asignadoA: luis.idUsuario },
+        { titulo: 'Piloto con banco de preguntas de prueba', puntos: 3, hecha: false, creadaPor: luis.idUsuario, asignadoA: angel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pELearning.idProyecto, numero: 0, diasInicio: -28, diasFin: -14,
+      tareas: [
+        { titulo: 'Integración con banco de preguntas real', puntos: 5, hecha: true, creadaPor: luis.idUsuario, asignadoA: luis.idUsuario },
+        { titulo: 'Reporte de resultados por estudiante', puntos: 5, hecha: true, creadaPor: luis.idUsuario, asignadoA: luis.idUsuario },
+        { titulo: 'Pruebas de carga del motor de evaluación', puntos: 3, hecha: true, creadaPor: luis.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Documentación técnica del motor', puntos: 2, hecha: true, creadaPor: luis.idUsuario, asignadoA: luis.idUsuario },
+        { titulo: 'Feedback de dos profesores piloto', puntos: 2, hecha: false, creadaPor: luis.idUsuario, asignadoA: angel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pDashboardDeportivo.idProyecto, numero: -1, diasInicio: -42, diasFin: -29,
+      tareas: [
+        { titulo: 'Recolección de datos históricos de partidos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Definir métricas clave por equipo', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Wireframes del dashboard', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Setup del proyecto de visualización', puntos: 2, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Piloto con datos de una sola temporada', puntos: 2, hecha: false, creadaPor: angel.idUsuario, asignadoA: sofia.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pDashboardDeportivo.idProyecto, numero: 0, diasInicio: -28, diasFin: -14,
+      tareas: [
+        { titulo: 'Normalización del dataset histórico', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Gráficas de tendencia por jugador', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Filtros por temporada y equipo', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Exportación de reportes en PDF (borrador)', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Revisión con comité deportivo', puntos: 2, hecha: false, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pReservas.idProyecto, numero: -1, diasInicio: -44, diasFin: -31,
+      tareas: [
+        { titulo: 'Levantamiento de requisitos con Biblioteca y CIT', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Definir reglas de choque de horarios', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: carlos.idUsuario },
+        { titulo: 'Wireframes del calendario de reservas', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Setup del proyecto backend', puntos: 2, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Prototipo de reglas de reserva por rol', puntos: 3, hecha: false, creadaPor: vernel.idUsuario, asignadoA: carlos.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pReservas.idProyecto, numero: 0, diasInicio: -30, diasFin: -16,
+      tareas: [
+        { titulo: 'Entrevistas con encargados de laboratorios', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Modelado inicial de disponibilidad', puntos: 8, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Investigación de librerías de calendario', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: carlos.idUsuario },
+        { titulo: 'Mockups del flujo de reserva', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Validación legal de retención de datos de uso', puntos: 2, hecha: false, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pApoyoPares.idProyecto, numero: -1, diasInicio: -42, diasFin: -29,
+      tareas: [
+        { titulo: 'Investigación de programas de apoyo entre pares', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Entrevistas con Bienestar Estudiantil', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Definir perfil de voluntario ideal', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Wireframes del formulario de match', puntos: 2, hecha: true, creadaPor: vernel.idUsuario, asignadoA: ana.idUsuario },
+        { titulo: 'Piloto con 5 voluntarios', puntos: 2, hecha: false, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pApoyoPares.idProyecto, numero: 0, diasInicio: -28, diasFin: -14,
+      tareas: [
+        { titulo: 'Validación de guía de capacitación con psicólogos', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Sistema de seguimiento de casos', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Métricas de satisfacción del programa', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: ana.idUsuario },
+        { titulo: 'Ajustes de privacidad de datos sensibles', puntos: 2, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Cierre de piloto con primer grupo de pares', puntos: 2, hecha: false, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pBiblioteca.idProyecto, numero: -1, diasInicio: -35, diasFin: -22,
+      tareas: [
+        { titulo: 'Encuesta de necesidades a estudiantes', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+        { titulo: 'Definir taxonomía de categorías por carrera', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Wireframes del catálogo de recursos', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: jose.idUsuario },
+        { titulo: 'Setup del proyecto', puntos: 2, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Piloto con apuntes de un solo curso', puntos: 2, hecha: false, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pBiblioteca.idProyecto, numero: 0, diasInicio: -21, diasFin: -8,
+      tareas: [
+        { titulo: 'Sistema de calificación de recursos subidos', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: jose.idUsuario },
+        { titulo: 'Moderación de contenido subido', puntos: 3, hecha: true, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+        { titulo: 'Integración con cuentas institucionales', puntos: 5, hecha: true, creadaPor: angel.idUsuario, asignadoA: maria.idUsuario },
+        { titulo: 'Panel de recursos más vistos', puntos: 2, hecha: true, creadaPor: angel.idUsuario, asignadoA: jose.idUsuario },
+        { titulo: 'Revisión legal de derechos de autor', puntos: 2, hecha: false, creadaPor: angel.idUsuario, asignadoA: angel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pBolsaEmpleo.idProyecto, numero: -1, diasInicio: -25, diasFin: -18,
+      tareas: [
+        { titulo: 'Entrevistas con Oficina de Egresados', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Definir campos del perfil de estudiante', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Wireframes del listado de vacantes', puntos: 2, hecha: true, creadaPor: vernel.idUsuario, asignadoA: carlos.idUsuario },
+        { titulo: 'Setup del proyecto', puntos: 2, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Piloto con 3 empresas aliadas', puntos: 3, hecha: false, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+      ],
+    },
+    {
+      idProyecto: pBolsaEmpleo.idProyecto, numero: 0, diasInicio: -17, diasFin: -6,
+      tareas: [
+        { titulo: 'Notificaciones de vacantes afines por carrera', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: carlos.idUsuario },
+        { titulo: 'Panel de seguimiento para empresas', puntos: 5, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Exportar postulantes a CSV', puntos: 2, hecha: true, creadaPor: vernel.idUsuario, asignadoA: sofia.idUsuario },
+        { titulo: 'Pruebas con estudiantes de último año', puntos: 3, hecha: true, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+        { titulo: 'Revisión de términos y condiciones', puntos: 2, hecha: false, creadaPor: vernel.idUsuario, asignadoA: vernel.idUsuario },
+      ],
+    },
+  ];
+  for (const def of sprintsCerrados) {
+    await ensureClosedSprintWithBurndown(def);
+  }
+
+  // ─── Instantáneas del Sprint ACTIVO de cada proyecto — sin esto el
+  // burndown del sprint EN CURSO (el que de verdad se mira en la demo)
+  // seguía mostrando "sin datos suficientes" aunque los cerrados sí tuvieran. ─
+  for (const idProyecto of [
+    pGestionAcademica.idProyecto,
+    pSaludMental.idProyecto,
+    pELearning.idProyecto,
+    pDashboardDeportivo.idProyecto,
+    pReservas.idProyecto,
+    pApoyoPares.idProyecto,
+    pBiblioteca.idProyecto,
+    pBolsaEmpleo.idProyecto,
+  ]) {
+    await ensureActiveSprintBurndown(idProyecto, -5);
+  }
 
   console.log('Demo extra seed completed successfully');
 }
