@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Users as UsersIcon } from 'lucide-react';
+import { Search, SquarePen, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
+import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
@@ -36,6 +37,7 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [tab, setTab] = useState<'prioritarios' | 'otros'>('prioritarios');
+  const [nuevoChatAbierto, setNuevoChatAbierto] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300);
@@ -52,7 +54,18 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
   return (
     <div className="flex h-[28rem] w-80 max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-raised">
       <div className="shrink-0 border-b border-outline-variant px-3 pb-2 pt-3">
-        <p className="px-1 pb-2 text-sm font-bold text-on-surface">Mensajes</p>
+        <div className="flex items-center justify-between px-1 pb-2">
+          <p className="text-sm font-bold text-on-surface">Mensajes</p>
+          <button
+            type="button"
+            onClick={() => setNuevoChatAbierto(true)}
+            aria-label="Nuevo chat"
+            title="Nuevo chat"
+            className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
+          >
+            <SquarePen className="size-4" aria-hidden="true" />
+          </button>
+        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" aria-hidden="true" />
           <Input
@@ -132,6 +145,8 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
           );
         })}
       </div>
+
+      <NewChatDialog open={nuevoChatAbierto} onOpenChange={setNuevoChatAbierto} currentUserId={currentUserId} />
     </div>
   );
 }
