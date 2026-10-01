@@ -116,11 +116,10 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
           <button
             type="button"
             aria-label={user ? `Cuenta de ${user.nombre} ${user.apellido}` : 'Cuenta'}
-            className={
-              isAdmin
-                ? 'admin-nav-inactive flex h-12 w-12 items-center justify-center rounded-xl outline-none transition-colors'
-                : 'flex h-12 w-12 items-center justify-center rounded-control outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary/30'
-            }
+            // Vive en la barra inferior móvil, que es clara también para el
+            // administrador: hover y foco de superficie clara; el avatar
+            // conserva el verde institucional del tema admin.
+            className="flex h-12 w-12 items-center justify-center rounded-control outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             <UserAvatar user={user} theme={theme} />
           </button>

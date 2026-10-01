@@ -188,3 +188,22 @@ describe('Pie de cuenta del administrador', () => {
     expect(screen.getByText('AU')).not.toHaveClass('admin-account-avatar');
   });
 });
+
+describe('Cuenta en la barra móvil (superficie clara)', () => {
+  afterEach(() => cleanup());
+
+  it('el disparador compacto del admin usa hover/foco de superficie clara y conserva el avatar verde', () => {
+    render(
+      <UserMenu
+        user={{ nombre: 'Admin', apellido: 'UVG', correo: 'admin@uvg.edu.gt' }}
+        onLogout={vi.fn()}
+        variant="compact"
+        theme="admin"
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Cuenta de Admin UVG' });
+    expect(trigger).toHaveClass('hover:bg-muted', 'focus-visible:ring-2');
+    expect(trigger).not.toHaveClass('admin-nav-inactive');
+    expect(screen.getByText('AU')).toHaveClass('admin-account-avatar');
+  });
+});
