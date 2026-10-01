@@ -48,3 +48,25 @@ describe('Tokens del tema graphite del administrador', () => {
     }
   });
 });
+
+describe('Superficie graphite de la sidebar', () => {
+  it('los tokens de superficie y texto apuntan a la paleta graphite en ambos temas', () => {
+    expect(token('--admin-bg')).toBe('var(--admin-graphite)');
+    expect(token('--admin-border')).toBe('var(--admin-graphite-border)');
+    expect(token('--admin-text')).toBe('var(--admin-ink)');
+    expect(token('--admin-text-dim')).toBe('var(--admin-ink-muted)');
+    expect(token('--admin-text-muted')).toBe('var(--admin-ink-secondary)');
+    const oscuro = bloques('.dark').join('\n');
+    for (const nombre of ['--admin-bg', '--admin-border', '--admin-text', '--admin-text-dim', '--admin-text-muted']) {
+      expect(oscuro).not.toContain(`${nombre}:`);
+    }
+  });
+
+  it('`.admin-sidebar` pinta fondo, borde y texto por defecto; los iconos inactivos usan --admin-icon', () => {
+    const carcasa = bloques('.admin-sidebar')[0];
+    expect(carcasa).toContain('background-color: var(--admin-bg)');
+    expect(carcasa).toContain('border-right: 1px solid var(--admin-border)');
+    expect(carcasa).toContain('color: var(--admin-text-dim)');
+    expect(bloques('.admin-sidebar .admin-nav-inactive svg')[0]).toContain('color: var(--admin-icon)');
+  });
+});
