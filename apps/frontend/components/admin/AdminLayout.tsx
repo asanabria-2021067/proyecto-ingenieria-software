@@ -126,8 +126,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="h-screen bg-surface flex overflow-hidden">
       {/* Sidebar - Desktop Only */}
       <aside
-        className="hidden md:flex w-64 h-screen flex-col shrink-0 overflow-y-auto"
-        style={{ backgroundColor: 'var(--admin-bg)', borderRight: '1px solid var(--admin-border)' }}
+        data-slot="admin-sidebar"
+        className="admin-sidebar hidden md:flex w-64 h-screen flex-col shrink-0 overflow-y-auto"
       >
         <div className="px-6 py-5 flex items-center gap-3" style={{ borderBottom: '1px solid var(--admin-border)' }}>
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />

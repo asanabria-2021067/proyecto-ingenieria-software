@@ -537,13 +537,13 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Admin sidebar CSS variables - change automatically with dark mode */
+/* Admin sidebar CSS variables. Superficie y textos: graphite fijo (ver abajo). */
 :root {
-  --admin-bg:           #054526;
-  --admin-border:       rgba(255, 255, 255, 0.1);
-  --admin-text:         #ffffff;
-  --admin-text-muted:   rgba(255, 255, 255, 0.65);
-  --admin-text-dim:     rgba(255, 255, 255, 0.75);
+  --admin-bg:           var(--admin-graphite);
+  --admin-border:       var(--admin-graphite-border);
+  --admin-text:         var(--admin-ink);
+  --admin-text-muted:   var(--admin-ink-secondary);
+  --admin-text-dim:     var(--admin-ink-muted);
   --admin-selector-bg:  #5AB33E;
   --admin-selector-fg:  #ffffff;
   --admin-hover-bg:     rgba(255, 255, 255, 0.08);
@@ -568,11 +568,6 @@ button:disabled {
 }
 
 .dark {
-  --admin-bg:           var(--color-surface-container-low);
-  --admin-border:       var(--color-outline-variant);
-  --admin-text:         var(--color-on-surface);
-  --admin-text-muted:   var(--color-tertiary);
-  --admin-text-dim:     var(--color-on-surface);
   --admin-selector-bg:  var(--color-primary);
   --admin-selector-fg:  var(--color-on-primary);
   --admin-hover-bg:     var(--color-surface-container-high);
@@ -582,6 +577,18 @@ button:disabled {
 
 .admin-nav-inactive:hover {
   background-color: var(--admin-hover-bg);
+}
+
+/* Carcasa graphite de la sidebar del administrador: texto neutro por defecto
+   e iconos inactivos en gris claro. */
+.admin-sidebar {
+  background-color: var(--admin-bg);
+  border-right: 1px solid var(--admin-border);
+  color: var(--admin-text-dim);
+}
+
+.admin-sidebar .admin-nav-inactive svg {
+  color: var(--admin-icon);
 }
 
 @media (prefers-reduced-motion: reduce) {

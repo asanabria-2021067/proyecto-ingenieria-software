@@ -125,3 +125,14 @@ describe('AdminLayout — shell administrativo S7 (F011)', () => {
     expect(flattenNavEntries(adminNavEntries).length).toBeGreaterThan(5);
   });
 });
+
+// Sidebar «Enterprise Control Panel»: clases y estados de la variante admin.
+describe('AdminLayout — sidebar graphite', () => {
+  it('la sidebar de escritorio usa la carcasa graphite, sin estilos en línea', () => {
+    renderShell();
+    const aside = document.querySelector('aside') as HTMLElement;
+    expect(aside).toHaveClass('admin-sidebar');
+    expect(aside).toHaveAttribute('data-slot', 'admin-sidebar');
+    expect(aside.getAttribute('style')).toBeNull();
+  });
+});
