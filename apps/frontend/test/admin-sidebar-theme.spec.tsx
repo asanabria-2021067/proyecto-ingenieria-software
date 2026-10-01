@@ -207,3 +207,38 @@ describe('Cuenta en la barra móvil (superficie clara)', () => {
     expect(screen.getByText('AU')).toHaveClass('admin-account-avatar');
   });
 });
+
+describe('Foco y contraste (WCAG AA)', () => {
+  function luminancia(hex: string): number {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  }
+  function contraste(a: string, b: string): number {
+    const [l1, l2] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
+    return (l1 + 0.05) / (l2 + 0.05);
+  }
+  const P = PALETA_ADMIN;
+
+  it.each([
+    ['texto inactivo / fondo', P['--admin-ink-muted'], P['--admin-graphite'], 4.5],
+    ['etiqueta y correo / fondo', P['--admin-ink-secondary'], P['--admin-graphite'], 4.5],
+    ['texto hover / hover', P['--admin-ink'], P['--admin-graphite-hover'], 4.5],
+    ['texto activo / activo', P['--admin-ink'], P['--admin-graphite-active'], 4.5],
+    ['grupo abierto / superficie', P['--admin-ink'], P['--admin-graphite-surface'], 4.5],
+    ['chevron cerrado / superficie', P['--admin-ink-secondary'], P['--admin-graphite-surface'], 3],
+    ['iniciales / avatar verde', P['--admin-ink'], P['--admin-green'], 4.5],
+    ['icono inactivo / fondo', P['--admin-icon'], P['--admin-graphite'], 3],
+    ['barra y foco lima / activo', P['--admin-lime'], P['--admin-graphite-active'], 3],
+    ['foco lima / fondo', P['--admin-lime'], P['--admin-graphite'], 3],
+  ])('%s cumple %s:1 o más', (_nombre, frente, fondo, minimo) => {
+    expect(contraste(frente, fondo)).toBeGreaterThanOrEqual(minimo as number);
+  });
+
+  it('items, subitems y cuenta tienen foco visible lima, distinto del hover', () => {
+    expect(CSS).toMatch(
+      /\.admin-sidebar \.admin-nav-item:focus-visible,\s*\.admin-sidebar \.admin-nav-subitem:focus-visible,\s*\.admin-sidebar \.admin-account-trigger:focus-visible \{\s*outline: 2px solid var\(--admin-lime\);/,
+    );
+    expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).not.toContain('outline');
+  });
+});

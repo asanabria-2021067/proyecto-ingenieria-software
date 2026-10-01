@@ -748,6 +748,15 @@ button:disabled {
   color: var(--admin-text-muted);
 }
 
+/* Foco de teclado: contorno lima (≥3:1 sobre graphite), distinto del hover
+   (solo fondo) y del activo (fondo + barra). */
+.admin-sidebar .admin-nav-item:focus-visible,
+.admin-sidebar .admin-nav-subitem:focus-visible,
+.admin-sidebar .admin-account-trigger:focus-visible {
+  outline: 2px solid var(--admin-lime);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
