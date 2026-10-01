@@ -591,6 +591,16 @@ button:disabled {
   color: var(--admin-icon);
 }
 
+/* Encabezado de marca: mismo logo y nombre, en blanco sobre graphite y
+   separado del menú por un divisor sutil. */
+.admin-sidebar-brand {
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-sidebar-brand-name {
+  color: var(--admin-text);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

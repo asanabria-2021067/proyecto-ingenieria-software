@@ -135,4 +135,13 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(aside).toHaveAttribute('data-slot', 'admin-sidebar');
     expect(aside.getAttribute('style')).toBeNull();
   });
+
+  it('el encabezado conserva logo y nombre, en blanco y con divisor sutil', () => {
+    renderShell();
+    const marca = document.querySelector('[data-slot="admin-sidebar-brand"]') as HTMLElement;
+    expect(marca).toHaveClass('admin-sidebar-brand');
+    expect(within(marca).getByRole('img', { name: 'UVGENIUS' })).toBeInTheDocument();
+    expect(within(marca).getByText('UVGenius')).toHaveClass('admin-sidebar-brand-name', 'font-headline');
+    expect(marca.querySelector('[style]')).toBeNull();
+  });
 });

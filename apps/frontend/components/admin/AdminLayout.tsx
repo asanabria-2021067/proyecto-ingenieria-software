@@ -129,9 +129,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         data-slot="admin-sidebar"
         className="admin-sidebar hidden md:flex w-64 h-screen flex-col shrink-0 overflow-y-auto"
       >
-        <div className="px-6 py-5 flex items-center gap-3" style={{ borderBottom: '1px solid var(--admin-border)' }}>
-          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
-          <span className="font-headline font-extrabold text-xl" style={{ color: 'var(--admin-text)' }}>UVGenius</span>
+        <div data-slot="admin-sidebar-brand" className="admin-sidebar-brand flex items-center gap-3 px-5 py-5">
+          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto shrink-0" />
+          <span className="admin-sidebar-brand-name font-headline text-xl font-bold tracking-tight">UVGenius</span>
         </div>
 
         <div className="px-3 pt-3 pb-1">
