@@ -110,16 +110,14 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
               aria-current={active ? 'page' : undefined}
               className={
                 isAdmin
-                  ? `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`
+                  ? `admin-nav-item ${!active ? 'admin-nav-inactive' : ''}`
                   : `flex items-center gap-inline rounded-control px-inline py-tight text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
                       active ? LEAF_ACTIVE_CLASS : LEAF_INACTIVE_CLASS
                     }`
               }
               style={
-                isAdmin
-                  ? active
-                    ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
-                    : { color: 'var(--admin-text-dim)' }
+                isAdmin && active
+                  ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
                   : undefined
               }
             >
@@ -178,8 +176,8 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
               onClick={() =>
                 setExpandedOverrides((current) => ({ ...current, [entry.label]: !expanded }))
               }
-              className="admin-nav-inactive flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium outline-none transition-all duration-200"
-              style={{ color: groupActiveByRoute ? 'var(--admin-selector-bg)' : 'var(--admin-text-dim)' }}
+              className="admin-nav-item admin-nav-inactive w-full"
+              style={groupActiveByRoute ? { color: 'var(--admin-selector-bg)' } : undefined}
             >
               <GroupIcon className="w-5 h-5 shrink-0" />
               <span className="flex-1 text-left">{entry.label}</span>

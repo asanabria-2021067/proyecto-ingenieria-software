@@ -606,6 +606,37 @@ button:disabled {
   color: var(--admin-text-muted);
 }
 
+/* Destinos raíz (Panel Admin) y encabezados de grupo: mismo alto, radio del
+   sistema, iconos alineados y hover graphite con texto e icono en blanco. */
+.admin-nav-item {
+  align-items: center;
+  border-radius: var(--radius-control);
+  color: var(--admin-text-dim);
+  display: flex;
+  font-size: 0.875rem;
+  font-weight: 500;
+  gap: 0.75rem;
+  line-height: 1.25rem;
+  min-height: 2.5rem;
+  outline: none;
+  padding: 0.5rem 0.75rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.admin-nav-item svg {
+  flex-shrink: 0;
+  transition: color 150ms ease;
+}
+
+.admin-sidebar .admin-nav-item:hover {
+  background-color: var(--admin-graphite-hover);
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-item:hover svg {
+  color: var(--admin-ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

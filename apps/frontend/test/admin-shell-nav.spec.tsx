@@ -153,4 +153,19 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(etiqueta).not.toHaveClass('font-black');
     expect(etiqueta.getAttribute('style')).toBeNull();
   });
+
+  it('Panel Admin y los encabezados de grupo comparten `.admin-nav-item`; inactivos, sin color en línea', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin/usuarios');
+    renderShell();
+    const nav = desktopNav();
+
+    const panel = nav.getByRole('link', { name: 'Panel Admin' });
+    expect(panel).toHaveClass('admin-nav-item', 'admin-nav-inactive');
+    expect(panel.getAttribute('style')).toBeNull();
+    for (const grupo of ['Proyectos', 'Gobernanza']) {
+      const boton = nav.getByRole('button', { name: new RegExp(grupo) });
+      expect(boton).toHaveClass('admin-nav-item', 'w-full');
+      expect(boton.getAttribute('style')).toBeNull();
+    }
+  });
 });
