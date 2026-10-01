@@ -118,3 +118,20 @@ describe('Estado activo de los destinos raíz', () => {
     );
   });
 });
+
+describe('Grupos desplegados', () => {
+  it('el padre abierto usa la superficie graphite y texto blanco, nunca verde', () => {
+    const abierto = bloques(".admin-sidebar .admin-nav-group[data-state='open']")[0];
+    expect(abierto).toContain('background-color: var(--admin-graphite-surface)');
+    expect(abierto).toContain('color: var(--admin-ink)');
+    expect(abierto).not.toMatch(/--admin-(green|lime|selector-bg)/);
+  });
+
+  it('chevron gris cerrado, blanco abierto; hover propio sobre el grupo abierto', () => {
+    expect(bloques('.admin-sidebar .admin-nav-group .admin-nav-chevron')[0]).toContain('color: var(--admin-text-muted)');
+    expect(CSS).toMatch(/\.admin-nav-group\[data-state='open'\] \.admin-nav-chevron \{\s*color: var\(--admin-ink\)/);
+    expect(bloques(".admin-sidebar .admin-nav-group[data-state='open']:hover")[0]).toContain(
+      'background-color: var(--admin-graphite-hover)',
+    );
+  });
+});
