@@ -77,3 +77,9 @@ describe('Encabezado de marca', () => {
     expect(bloques('.admin-sidebar-brand-name')[0]).toContain('color: var(--admin-text)');
   });
 });
+
+describe('Etiquetas de sección', () => {
+  it('usan el gris secundario, no el verde', () => {
+    expect(bloques('.admin-nav-section-label')[0]).toContain('color: var(--admin-text-muted)');
+  });
+});
