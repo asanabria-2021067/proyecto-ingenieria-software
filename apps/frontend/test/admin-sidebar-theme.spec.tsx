@@ -1,7 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { UserMenu } from '../components/dashboard/UserMenu';
 
 // Sidebar del administrador «Enterprise Control Panel»: graphite + verde
 // institucional + acento lima. La del estudiante no cambia.
@@ -148,5 +150,41 @@ describe('Destinos anidados', () => {
     expect(activo).toContain('box-shadow: inset 3px 0 0 var(--admin-lime)');
     expect(activo).toContain('font-weight: 600');
     expect(bloques('.admin-nav-subitem')[0]).toContain('border-radius: var(--radius-control)');
+  });
+});
+
+describe('Pie de cuenta del administrador', () => {
+  afterEach(() => cleanup());
+  const admin = { nombre: 'Admin', apellido: 'UVG', correo: 'admin@uvg.edu.gt', fotoUrl: null };
+
+  it('avatar verde institucional con iniciales blancas, nunca lima', () => {
+    expect(token('--admin-avatar-bg')).toBe('var(--admin-green)');
+    expect(token('--admin-avatar-fg')).toBe('var(--admin-ink)');
+    expect(bloques('.dark').join('\n')).not.toContain('--admin-avatar-bg:');
+    expect(bloques('.admin-account-avatar')[0]).toContain('background-color: var(--admin-avatar-bg)');
+  });
+
+  it('nombre blanco, correo gris secundario, borde superior sutil y hover graphite', () => {
+    expect(bloques('.admin-sidebar-footer')[0]).toContain('border-top: 1px solid var(--admin-border)');
+    expect(bloques('.admin-account-name')[0]).toContain('color: var(--admin-text)');
+    expect(CSS).toMatch(/\.admin-account-email,\s*\.admin-account-chevron \{\s*color: var\(--admin-text-muted\)/);
+    expect(bloques('.admin-sidebar .admin-account-trigger:hover')[0]).toContain('background-color: var(--admin-graphite-hover)');
+  });
+
+  it('el menú de cuenta admin conserva datos e interacción y ya no usa estilos en línea', () => {
+    const { container } = render(<UserMenu user={admin} onLogout={vi.fn()} variant="sidebar" theme="admin" />);
+    const trigger = screen.getByRole('button');
+    expect(trigger).toHaveClass('admin-account-trigger', 'rounded-control');
+    expect(screen.getByText('AU')).toHaveClass('admin-account-avatar', 'rounded-full');
+    expect(screen.getByText('Admin UVG')).toHaveClass('admin-account-name');
+    expect(screen.getByText('admin@uvg.edu.gt')).toHaveClass('admin-account-email');
+    expect(container.querySelector('[style]')).toBeNull();
+  });
+
+  it('el menú de cuenta del estudiante no cambia', () => {
+    render(<UserMenu user={admin} onLogout={vi.fn()} variant="sidebar" />);
+    expect(screen.getByRole('button')).toHaveClass('hover:bg-muted', 'rounded-control');
+    expect(screen.getByText('AU')).toHaveClass('bg-accent', 'text-on-accent');
+    expect(screen.getByText('AU')).not.toHaveClass('admin-account-avatar');
   });
 });
