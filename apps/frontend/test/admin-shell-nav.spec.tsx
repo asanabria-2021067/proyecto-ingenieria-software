@@ -196,4 +196,24 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(gobernanza).toHaveAttribute('data-state', 'closed');
     expect(gobernanza.querySelector('.admin-nav-chevron')).not.toHaveClass('rotate-180');
   });
+
+  it('solo el hijo activo se destaca; sus hermanos quedan inactivos y nada lleva color en línea', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin/proyectos');
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=activos'));
+    renderShell();
+    const nav = desktopNav();
+
+    const activos = nav.getByRole('link', { name: 'Activos' });
+    expect(activos).toHaveAttribute('aria-current', 'page');
+    expect(activos).toHaveClass('admin-nav-subitem');
+    expect(activos).not.toHaveClass('admin-nav-inactive');
+    for (const hermano of ['Revisiones', 'Solicitudes de cierre', 'Cerrados']) {
+      const enlace = nav.getByRole('link', { name: hermano });
+      expect(enlace).toHaveClass('admin-nav-subitem', 'admin-nav-inactive');
+      expect(enlace).not.toHaveAttribute('aria-current');
+    }
+    const guia = activos.parentElement as HTMLElement;
+    expect(guia).toHaveClass('admin-nav-children');
+    expect(guia.closest('aside')?.querySelectorAll('nav [style]')).toHaveLength(0);
+  });
 });

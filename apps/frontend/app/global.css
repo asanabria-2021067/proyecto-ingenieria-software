@@ -672,6 +672,52 @@ button:disabled {
   background-color: var(--admin-graphite-hover);
 }
 
+/* Hijos de un grupo: guía vertical discreta, hover propio y el mismo activo
+   que los destinos raíz (graphite + barra lima), sin iluminar al padre. */
+.admin-nav-children {
+  border-left: 1px solid var(--admin-graphite-border);
+}
+
+.admin-nav-subitem {
+  align-items: center;
+  border-radius: var(--radius-control);
+  color: var(--admin-text-dim);
+  display: flex;
+  font-size: 0.875rem;
+  font-weight: 500;
+  gap: 0.625rem;
+  line-height: 1.25rem;
+  min-height: 2.25rem;
+  outline: none;
+  padding: 0.375rem 0.75rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.admin-nav-subitem svg {
+  flex-shrink: 0;
+  transition: color 150ms ease;
+}
+
+.admin-sidebar .admin-nav-subitem:hover {
+  background-color: var(--admin-graphite-hover);
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-subitem:hover svg {
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-subitem[aria-current='page'] {
+  background-color: var(--admin-graphite-active);
+  box-shadow: inset 3px 0 0 var(--admin-lime);
+  color: var(--admin-ink);
+  font-weight: 600;
+}
+
+.admin-sidebar .admin-nav-subitem[aria-current='page'] svg {
+  color: var(--admin-ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

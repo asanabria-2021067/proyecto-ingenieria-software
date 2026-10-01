@@ -182,7 +182,8 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
               />
             </button>
             {expanded && (
-              <div id={groupId} className="ml-4 space-y-1 border-l border-outline-variant/50 pl-3">
+              // Guía vertical alineada bajo el icono del padre (padding 0.75rem + mitad del icono).
+              <div id={groupId} className="admin-nav-children ml-[1.375rem] mt-0.5 space-y-0.5 pl-2.5">
                 {entry.items.map((item) => {
                   const active = isLeafActive(pathname, item, search);
                   const ItemIcon = item.icon;
@@ -192,12 +193,7 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
                       href={item.href}
                       id={`nav-item-${slug(item.label)}`}
                       aria-current={active ? 'page' : undefined}
-                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`}
-                      style={
-                        active
-                          ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
-                          : { color: 'var(--admin-text-muted)' }
-                      }
+                      className={`admin-nav-subitem ${!active ? 'admin-nav-inactive' : ''}`}
                     >
                       <ItemIcon className="w-4 h-4 shrink-0" />
                       {item.label}
