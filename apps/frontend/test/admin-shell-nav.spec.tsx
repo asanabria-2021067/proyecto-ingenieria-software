@@ -225,4 +225,13 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(within(pie).getByTestId('user-menu-sidebar')).toBeInTheDocument();
     expect(pie.parentElement?.lastElementChild).toBe(pie);
   });
+
+  it('la marca mide lo mismo que la topbar (h-16) para que ambos bordes continúen; sin scroll horizontal', () => {
+    renderShell();
+    const marca = document.querySelector('[data-slot="admin-sidebar-brand"]') as HTMLElement;
+    expect(marca).toHaveClass('h-16', 'shrink-0');
+    expect(marca).not.toHaveClass('py-5');
+    expect(document.querySelector('main header')).toHaveClass('h-16');
+    expect(document.querySelector('aside')).toHaveClass('overflow-x-hidden', 'overflow-y-auto', 'w-64');
+  });
 });
