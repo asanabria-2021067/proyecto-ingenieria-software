@@ -235,9 +235,9 @@ describe('Foco y contraste (WCAG AA)', () => {
     expect(contraste(frente, fondo)).toBeGreaterThanOrEqual(minimo as number);
   });
 
-  it('items, subitems y cuenta tienen foco visible lima, distinto del hover', () => {
+  it('items, subitems, cuenta y controles de colapsar tienen foco visible lima, distinto del hover', () => {
     expect(CSS).toMatch(
-      /\.admin-sidebar \.admin-nav-item:focus-visible,\s*\.admin-sidebar \.admin-nav-subitem:focus-visible,\s*\.admin-sidebar \.admin-account-trigger:focus-visible \{\s*outline: 2px solid var\(--admin-lime\);/,
+      /\.admin-sidebar \.admin-nav-item:focus-visible,\s*\.admin-sidebar \.admin-nav-subitem:focus-visible,\s*\.admin-sidebar \.admin-account-trigger:focus-visible,\s*\.admin-sidebar \.admin-collapse-toggle:focus-visible,\s*\.admin-sidebar \[data-slot='account-compact-trigger'\]:focus-visible \{\s*outline: 2px solid var\(--admin-lime\);/,
     );
     expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).not.toContain('outline');
   });
@@ -249,5 +249,21 @@ describe('Sin tokens heredados de la sidebar verde', () => {
     expect(CSS).not.toContain('.admin-nav-inactive:hover');
     expect(CSS).not.toContain('#5AB33E');
     expect(CSS).not.toContain('#054526');
+  });
+});
+
+describe('Modo colapsado (CSS)', () => {
+  it('iconos en cuadros de 40px centrados y divisores graphite', () => {
+    const icono = bloques('.admin-nav-icon')[0];
+    expect(icono).toContain('width: 2.5rem');
+    expect(icono).toContain('justify-content: center');
+    expect(icono).toContain('padding: 0');
+    expect(bloques('.admin-nav-separator')[0]).toContain('background-color: var(--admin-border)');
+  });
+
+  it('el botón de colapsar y la cuenta compacta tienen hover graphite dentro de la sidebar', () => {
+    expect(CSS).toMatch(
+      /\.admin-sidebar \.admin-collapse-toggle:hover,\s*\.admin-sidebar \[data-slot='account-compact-trigger'\]:hover \{\s*background-color: var\(--admin-graphite-hover\);/,
+    );
   });
 });
