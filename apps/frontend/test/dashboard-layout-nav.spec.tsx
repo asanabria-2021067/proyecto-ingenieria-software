@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // HU-158 (T-232): «Mis Horas» entra en «Mi trabajo» justo después de «Mis
@@ -132,5 +132,71 @@ describe('DashboardLayout — «Explorar Proyectos» solo en su lista', () => {
       }
     }
     expect(escritorio.querySelector('[aria-current="page"]')).toBeNull();
+  });
+});
+
+// Sidebar global del estudiante: secciones fijas (sin acordeón), un único
+// destino activo por ruta y «Colapsar» como control del sidebar, no como
+// elemento de navegación. La sidebar contextual del proyecto es otra cosa.
+describe('DashboardLayout — navegación global del estudiante', () => {
+  afterEach(() => {
+    cleanup();
+    try {
+      window.localStorage.clear();
+    } catch {
+      /* sin almacenamiento */
+    }
+  });
+
+  const DESTINOS = [
+    ['Dashboard', '/dashboard'],
+    ['Personas', '/dashboard/personas'],
+    ['Explorar Proyectos', '/dashboard/proyectos'],
+    ['Mis Proyectos', '/dashboard/projects/mine'],
+    ['Mis Tareas', '/dashboard/mis-tareas'],
+    ['Mis Horas', '/dashboard/mis-horas'],
+    ['Calendario', '/dashboard/calendario'],
+    ['Mis Postulaciones', '/dashboard/mis-postulaciones'],
+    ['Chats archivados', '/dashboard/chats/archivados'],
+  ] as const;
+
+  it('Dashboard y Personas sueltos; PROYECTOS y MI TRABAJO como secciones fijas sin desplegables', () => {
+    const { escritorio } = renderLayout('/dashboard');
+
+    expect(escritorio).toHaveAttribute('aria-label', 'Navegación principal');
+    expect(within(escritorio).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual(
+      DESTINOS.map(([nombre, href]) => [nombre, href]),
+    );
+    expect(escritorio.querySelectorAll('[aria-expanded]')).toHaveLength(0);
+
+    const proyectos = within(escritorio).getByRole('group', { name: 'Proyectos' });
+    expect(within(proyectos).getAllByRole('link').map((a) => a.textContent)).toEqual(['Explorar Proyectos', 'Mis Proyectos']);
+    const trabajo = within(escritorio).getByRole('group', { name: 'Mi trabajo' });
+    expect(within(trabajo).getAllByRole('link')).toHaveLength(5);
+    expect(escritorio.querySelector('#nav-group-proyectos-label')).toHaveClass('uppercase');
+  });
+
+  it.each(DESTINOS)('en %s solo ese destino queda activo', (nombre, href) => {
+    const { escritorio } = renderLayout(href);
+    const activos = escritorio.querySelectorAll('[aria-current="page"]');
+    expect(activos).toHaveLength(1);
+    expect(activos[0]).toHaveTextContent(nombre);
+  });
+
+  it('«Colapsar» es un control del encabezado del sidebar, no un elemento de la navegación', () => {
+    const { escritorio } = renderLayout('/dashboard');
+    const aside = escritorio.closest('aside') as HTMLElement;
+
+    expect(within(escritorio).queryByRole('button', { name: /colapsar/i })).not.toBeInTheDocument();
+    expect(within(escritorio).queryByText('Colapsar')).not.toBeInTheDocument();
+    const control = within(aside).getByRole('button', { name: 'Colapsar barra lateral' });
+    expect(control).toHaveAttribute('aria-controls', escritorio.id);
+    expect(control).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(control);
+    expect(within(aside).getByRole('button', { name: 'Expandir barra lateral' })).toBeInTheDocument();
+    expect(within(aside).queryByRole('button', { name: 'Colapsar barra lateral' })).not.toBeInTheDocument();
+    // Colapsada conserva los mismos destinos, solo con iconos.
+    expect(within(aside.querySelector('nav') as HTMLElement).getAllByRole('link')).toHaveLength(DESTINOS.length);
   });
 });

@@ -52,6 +52,9 @@ function slug(label: string): string {
   return label.toLowerCase().replace(/\s+/g, '-');
 }
 
+/** Id de la navegación global: el control de colapsar del encabezado la referencia. */
+export const DASHBOARD_NAV_ID = 'dashboard-global-nav';
+
 const LEAF_ACTIVE_CLASS = 'bg-action text-on-action shadow-card';
 const LEAF_INACTIVE_CLASS = 'text-text-secondary hover:bg-muted hover:text-text-primary';
 
@@ -89,18 +92,11 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
   }
 
   return (
-    <nav className="flex-1 space-y-1 px-3 py-4">
-      {!isAdmin && (
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label="Colapsar barra lateral"
-          className={`mb-1 flex w-full items-center gap-inline rounded-control px-inline py-tight text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${LEAF_INACTIVE_CLASS}`}
-        >
-          <PanelLeftClose className="size-4 shrink-0" aria-hidden="true" />
-          Colapsar
-        </button>
-      )}
+    <nav
+      id={isAdmin ? undefined : DASHBOARD_NAV_ID}
+      aria-label={isAdmin ? undefined : 'Navegación principal'}
+      className="flex-1 space-y-1 px-3 py-4"
+    >
 
       {entries.map((entry) => {
         if (entry.type !== 'group') {
@@ -263,7 +259,11 @@ function CollapsedSidebarNav({ entries, pathname, search, pinned, onExpand }: Co
   const leaves = flattenNavEntries(entries);
 
   return (
-    <nav className="flex flex-1 flex-col items-center gap-micro px-2 py-4">
+    <nav
+      id={DASHBOARD_NAV_ID}
+      aria-label="Navegación principal"
+      className="flex flex-1 flex-col items-center gap-micro px-2 py-4"
+    >
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -323,5 +323,30 @@ function CollapsedSidebarNav({ entries, pathname, search, pinned, onExpand }: Co
         </>
       )}
     </nav>
+  );
+}
+
+/**
+ * Control del sidebar global (no es un destino de navegación): vive en el
+ * encabezado junto a la marca, como el de la sidebar contextual del proyecto.
+ */
+export function DashboardSidebarCollapseButton() {
+  const { toggleCollapsed } = useDashboardSidebarCollapsed();
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label="Colapsar barra lateral"
+          aria-expanded={true}
+          aria-controls={DASHBOARD_NAV_ID}
+          className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <PanelLeftClose className="size-4" aria-hidden="true" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right">Colapsar</TooltipContent>
+    </Tooltip>
   );
 }

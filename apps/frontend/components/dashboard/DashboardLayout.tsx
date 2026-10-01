@@ -24,6 +24,7 @@ import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { GlobalSearchInput } from '@/components/layout/global-search-input';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import {
+  DashboardSidebarCollapseButton,
   SidebarNav,
   flattenNavEntries,
   type NavEntry,
@@ -166,6 +167,7 @@ export default function DashboardLayout({
         >
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto shrink-0" />
           {!sidebarCollapsed && <span className="type-section text-text-primary">UVGenius</span>}
+          {!sidebarCollapsed && <DashboardSidebarCollapseButton />}
         </div>
 
         <SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />
