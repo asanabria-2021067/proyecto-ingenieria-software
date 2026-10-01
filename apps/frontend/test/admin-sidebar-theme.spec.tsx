@@ -83,3 +83,19 @@ describe('Etiquetas de sección', () => {
     expect(bloques('.admin-nav-section-label')[0]).toContain('color: var(--admin-text-muted)');
   });
 });
+
+describe('Destinos raíz', () => {
+  it('`.admin-nav-item`: radio del sistema, texto neutro y alto mínimo común', () => {
+    const base = bloques('.admin-nav-item')[0];
+    expect(base).toContain('border-radius: var(--radius-control)');
+    expect(base).toContain('color: var(--admin-text-dim)');
+    expect(base).toContain('min-height: 2.5rem');
+    expect(base).toContain('gap: 0.75rem');
+  });
+
+  it('hover graphite con texto e icono en blanco', () => {
+    expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).toContain('background-color: var(--admin-graphite-hover)');
+    expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).toContain('color: var(--admin-ink)');
+    expect(bloques('.admin-sidebar .admin-nav-item:hover svg')[0]).toContain('color: var(--admin-ink)');
+  });
+});
