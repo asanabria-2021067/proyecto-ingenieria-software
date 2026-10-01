@@ -144,4 +144,13 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(within(marca).getByText('UVGenius')).toHaveClass('admin-sidebar-brand-name', 'font-headline');
     expect(marca.querySelector('[style]')).toBeNull();
   });
+
+  it('la etiqueta «Administración» es pequeña, en mayúsculas, semibold y en gris secundario', () => {
+    renderShell();
+    const etiqueta = document.querySelector('[data-slot="admin-nav-section-label"]') as HTMLElement;
+    expect(etiqueta).toHaveTextContent('Administración');
+    expect(etiqueta).toHaveClass('admin-nav-section-label', 'uppercase', 'font-semibold', 'tracking-wider', 'text-[11px]');
+    expect(etiqueta).not.toHaveClass('font-black');
+    expect(etiqueta.getAttribute('style')).toBeNull();
+  });
 });

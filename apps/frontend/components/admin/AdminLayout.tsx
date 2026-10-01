@@ -134,11 +134,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <span className="admin-sidebar-brand-name font-headline text-xl font-bold tracking-tight">UVGenius</span>
         </div>
 
-        <div className="px-3 pt-3 pb-1">
-          <span className="px-3 text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--admin-text-muted)' }}>
-            Administración
-          </span>
-        </div>
+        <p
+          data-slot="admin-nav-section-label"
+          className="admin-nav-section-label px-6 pt-6 text-[11px] font-semibold uppercase tracking-wider"
+        >
+          Administración
+        </p>
 
         <Suspense fallback={<SidebarNav entries={adminNavEntries} theme="admin" />}>
           <AdminSidebarNav />

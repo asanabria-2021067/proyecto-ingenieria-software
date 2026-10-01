@@ -601,6 +601,11 @@ button:disabled {
   color: var(--admin-text);
 }
 
+/* Etiqueta de sección: discreta pero legible (gris secundario, no verde). */
+.admin-nav-section-label {
+  color: var(--admin-text-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
