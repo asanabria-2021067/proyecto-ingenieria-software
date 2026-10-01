@@ -177,4 +177,23 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(panel).not.toHaveClass('admin-nav-inactive');
     expect(panel.getAttribute('style')).toBeNull();
   });
+
+  it('el grupo desplegado expone su estado y no se pinta de verde aunque contenga la ruta activa', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin/proyectos');
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=activos'));
+    renderShell();
+    const nav = desktopNav();
+
+    const proyectos = nav.getByRole('button', { name: /Proyectos/ });
+    expect(proyectos).toHaveAttribute('aria-expanded', 'true');
+    expect(proyectos).toHaveAttribute('data-state', 'open');
+    expect(proyectos).toHaveClass('admin-nav-group');
+    expect(proyectos.getAttribute('style')).toBeNull();
+    expect(proyectos).not.toHaveAttribute('aria-current');
+    expect(proyectos.querySelector('.admin-nav-chevron')).toHaveClass('rotate-180');
+
+    const gobernanza = nav.getByRole('button', { name: /Gobernanza/ });
+    expect(gobernanza).toHaveAttribute('data-state', 'closed');
+    expect(gobernanza.querySelector('.admin-nav-chevron')).not.toHaveClass('rotate-180');
+  });
 });

@@ -651,6 +651,27 @@ button:disabled {
   color: var(--admin-ink);
 }
 
+/* Grupos (Proyectos, Gobernanza, Administración): el padre desplegado se
+   aclara apenas y pasa a blanco; nunca un bloque verde. El chevron queda
+   visible en gris y en blanco al abrir. */
+.admin-sidebar .admin-nav-group .admin-nav-chevron {
+  color: var(--admin-text-muted);
+}
+
+.admin-sidebar .admin-nav-group[data-state='open'] {
+  background-color: var(--admin-graphite-surface);
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-group[data-state='open'] svg,
+.admin-sidebar .admin-nav-group[data-state='open'] .admin-nav-chevron {
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-group[data-state='open']:hover {
+  background-color: var(--admin-graphite-hover);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

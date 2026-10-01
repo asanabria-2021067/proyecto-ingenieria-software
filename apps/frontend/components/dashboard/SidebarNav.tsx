@@ -171,13 +171,13 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
               onClick={() =>
                 setExpandedOverrides((current) => ({ ...current, [entry.label]: !expanded }))
               }
-              className="admin-nav-item admin-nav-inactive w-full"
-              style={groupActiveByRoute ? { color: 'var(--admin-selector-bg)' } : undefined}
+              data-state={expanded ? 'open' : 'closed'}
+              className="admin-nav-item admin-nav-group admin-nav-inactive w-full"
             >
               <GroupIcon className="w-5 h-5 shrink-0" />
               <span className="flex-1 text-left">{entry.label}</span>
               <ChevronDown
-                className={`size-4 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+                className={`admin-nav-chevron size-4 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
                 aria-hidden="true"
               />
             </button>
