@@ -135,3 +135,18 @@ describe('Grupos desplegados', () => {
     );
   });
 });
+
+describe('Destinos anidados', () => {
+  it('guía vertical con el borde graphite', () => {
+    expect(bloques('.admin-nav-children')[0]).toContain('border-left: 1px solid var(--admin-graphite-border)');
+  });
+
+  it('hover propio y activo con graphite elevado + barra lima, igual que la raíz', () => {
+    expect(bloques('.admin-sidebar .admin-nav-subitem:hover')[0]).toContain('background-color: var(--admin-graphite-hover)');
+    const activo = bloques(".admin-sidebar .admin-nav-subitem[aria-current='page']")[0];
+    expect(activo).toContain('background-color: var(--admin-graphite-active)');
+    expect(activo).toContain('box-shadow: inset 3px 0 0 var(--admin-lime)');
+    expect(activo).toContain('font-weight: 600');
+    expect(bloques('.admin-nav-subitem')[0]).toContain('border-radius: var(--radius-control)');
+  });
+});
