@@ -70,3 +70,10 @@ describe('Superficie graphite de la sidebar', () => {
     expect(bloques('.admin-sidebar .admin-nav-inactive svg')[0]).toContain('color: var(--admin-icon)');
   });
 });
+
+describe('Encabezado de marca', () => {
+  it('divisor con el borde graphite y nombre en tinta clara', () => {
+    expect(bloques('.admin-sidebar-brand')[0]).toContain('border-bottom: 1px solid var(--admin-border)');
+    expect(bloques('.admin-sidebar-brand-name')[0]).toContain('color: var(--admin-text)');
+  });
+});
