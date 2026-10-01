@@ -6,7 +6,10 @@ import { usePathname } from 'next/navigation';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
+import {
+  useAdminSidebarCollapsed,
+  useDashboardSidebarCollapsed,
+} from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { usePinnedProjects, type PinnedProject } from '@/hooks/use-pinned-projects';
 
 export interface NavLeaf {
@@ -54,6 +57,8 @@ function slug(label: string): string {
 
 /** Id de la navegación global: el control de colapsar del encabezado la referencia. */
 export const DASHBOARD_NAV_ID = 'dashboard-global-nav';
+/** Id de la navegación del administrador (mismo propósito). */
+export const ADMIN_NAV_ID = 'admin-global-nav';
 
 const LEAF_ACTIVE_CLASS = 'bg-action text-on-action shadow-card';
 const LEAF_INACTIVE_CLASS = 'text-text-secondary hover:bg-muted hover:text-text-primary';
@@ -69,17 +74,23 @@ interface SidebarNavProps {
 }
 
 /** Sidebar de escritorio: tema `default` usa encabezados de sección sutiles
- *  (no colapsables) + colapsado a solo iconos + "Proyectos anclados" al
- *  final; tema `admin` conserva sus grupos expandibles con chevron.
- *  Reutilizado por DashboardLayout y AdminLayout. */
+ *  (no colapsables) + "Proyectos anclados" al final; tema `admin` conserva
+ *  sus grupos expandibles con chevron. Ambos se colapsan a solo iconos, cada
+ *  uno con su propia preferencia. Reutilizado por DashboardLayout y AdminLayout. */
 export function SidebarNav({ entries, theme = 'default', search = null, idUsuario = null }: SidebarNavProps) {
   const pathname = usePathname();
   const isAdmin = theme === 'admin';
   const [expandedOverrides, setExpandedOverrides] = useState<Record<string, boolean>>({});
-  const { collapsed, toggleCollapsed } = useDashboardSidebarCollapsed();
+  const dashboardSidebar = useDashboardSidebarCollapsed();
+  const adminSidebar = useAdminSidebarCollapsed();
+  const { collapsed, toggleCollapsed } = isAdmin ? adminSidebar : dashboardSidebar;
   const { pinned } = usePinnedProjects(idUsuario);
 
-  if (!isAdmin && collapsed) {
+  if (isAdmin && collapsed) {
+    return <AdminCollapsedSidebarNav entries={entries} pathname={pathname} search={search} onExpand={toggleCollapsed} />;
+  }
+
+  if (collapsed) {
     return (
       <CollapsedSidebarNav
         entries={entries}
@@ -93,8 +104,8 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
 
   return (
     <nav
-      id={isAdmin ? undefined : DASHBOARD_NAV_ID}
-      aria-label={isAdmin ? undefined : 'Navegación principal'}
+      id={isAdmin ? ADMIN_NAV_ID : DASHBOARD_NAV_ID}
+      aria-label={isAdmin ? 'Navegación administrativa' : 'Navegación principal'}
       className="flex-1 space-y-1 px-3 py-4"
     >
 
@@ -318,9 +329,14 @@ function CollapsedSidebarNav({ entries, pathname, search, pinned, onExpand }: Co
 /**
  * Control del sidebar global (no es un destino de navegación): vive en el
  * encabezado junto a la marca, como el de la sidebar contextual del proyecto.
+ * `admin` usa la preferencia y los colores graphite de la sidebar del
+ * administrador.
  */
-export function DashboardSidebarCollapseButton() {
-  const { toggleCollapsed } = useDashboardSidebarCollapsed();
+export function DashboardSidebarCollapseButton({ theme = 'default' }: { theme?: 'default' | 'admin' }) {
+  const dashboardSidebar = useDashboardSidebarCollapsed();
+  const adminSidebar = useAdminSidebarCollapsed();
+  const isAdmin = theme === 'admin';
+  const { toggleCollapsed } = isAdmin ? adminSidebar : dashboardSidebar;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -329,13 +345,90 @@ export function DashboardSidebarCollapseButton() {
           onClick={toggleCollapsed}
           aria-label="Colapsar barra lateral"
           aria-expanded={true}
-          aria-controls={DASHBOARD_NAV_ID}
-          className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          aria-controls={isAdmin ? ADMIN_NAV_ID : DASHBOARD_NAV_ID}
+          className={
+            isAdmin
+              ? 'admin-collapse-toggle ml-auto flex size-8 shrink-0 items-center justify-center rounded-control transition-colors'
+              : 'ml-auto flex size-8 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
+          }
         >
           <PanelLeftClose className="size-4" aria-hidden="true" />
         </button>
       </TooltipTrigger>
       <TooltipContent side="right">Colapsar</TooltipContent>
     </Tooltip>
+  );
+}
+
+interface AdminCollapsedSidebarNavProps {
+  entries: NavEntry[];
+  pathname: string;
+  search: string | null;
+  onExpand: () => void;
+}
+
+/**
+ * Sidebar del administrador reducida a solo iconos: todos los destinos
+ * (los de cada grupo, separados por un divisor) con tooltip y el mismo
+ * activo graphite + barra lima.
+ */
+function AdminCollapsedSidebarNav({ entries, pathname, search, onExpand }: AdminCollapsedSidebarNavProps) {
+  const renderLeaf = (leaf: NavLeaf) => {
+    const active = isLeafActive(pathname, leaf, search);
+    const Icon = leaf.icon;
+    return (
+      <Tooltip key={leaf.href}>
+        <TooltipTrigger asChild>
+          <Link
+            href={leaf.href}
+            id={`nav-item-${slug(leaf.label)}`}
+            aria-label={leaf.label}
+            aria-current={active ? 'page' : undefined}
+            className={`admin-nav-item admin-nav-icon ${!active ? 'admin-nav-inactive' : ''}`}
+          >
+            <Icon className="size-4.5" aria-hidden="true" />
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right">{leaf.label}</TooltipContent>
+      </Tooltip>
+    );
+  };
+
+  return (
+    <nav
+      id={ADMIN_NAV_ID}
+      aria-label="Navegación administrativa"
+      className="flex flex-1 flex-col items-center gap-1 px-2 py-4"
+    >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label="Expandir barra lateral"
+            aria-expanded={false}
+            aria-controls={ADMIN_NAV_ID}
+            className="admin-nav-item admin-nav-icon admin-nav-inactive"
+          >
+            <PanelLeftOpen className="size-4.5" aria-hidden="true" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Expandir</TooltipContent>
+      </Tooltip>
+
+      {entries.map((entry) =>
+        entry.type === 'group' ? (
+          <div key={entry.label} role="group" aria-label={entry.label} className="flex flex-col items-center gap-1">
+            <div role="separator" aria-hidden="true" className="admin-nav-separator my-1 h-px w-8" />
+            {entry.items.map(renderLeaf)}
+          </div>
+        ) : (
+          <div key={entry.href} className="flex flex-col items-center gap-1">
+            <div role="separator" aria-hidden="true" className="admin-nav-separator my-1 h-px w-8" />
+            {renderLeaf(entry)}
+          </div>
+        ),
+      )}
+    </nav>
   );
 }

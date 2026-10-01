@@ -115,6 +115,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            data-slot="account-compact-trigger"
             aria-label={user ? `Cuenta de ${user.nombre} ${user.apellido}` : 'Cuenta'}
             // Vive en la barra inferior móvil, que es clara también para el
             // administrador: hover y foco de superficie clara; el avatar

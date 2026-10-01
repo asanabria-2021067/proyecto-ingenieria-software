@@ -735,11 +735,37 @@ button:disabled {
   color: var(--admin-text-muted);
 }
 
+/* Sidebar colapsada a solo iconos: cuadros de 40px centrados, divisores
+   entre secciones y la cuenta compacta con hover graphite. */
+.admin-nav-icon {
+  height: 2.5rem;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0;
+  width: 2.5rem;
+}
+
+.admin-nav-separator {
+  background-color: var(--admin-border);
+}
+
+.admin-collapse-toggle {
+  color: var(--admin-text-muted);
+}
+
+.admin-sidebar .admin-collapse-toggle:hover,
+.admin-sidebar [data-slot='account-compact-trigger']:hover {
+  background-color: var(--admin-graphite-hover);
+  color: var(--admin-ink);
+}
+
 /* Foco de teclado: contorno lima (≥3:1 sobre graphite), distinto del hover
    (solo fondo) y del activo (fondo + barra). */
 .admin-sidebar .admin-nav-item:focus-visible,
 .admin-sidebar .admin-nav-subitem:focus-visible,
-.admin-sidebar .admin-account-trigger:focus-visible {
+.admin-sidebar .admin-account-trigger:focus-visible,
+.admin-sidebar .admin-collapse-toggle:focus-visible,
+.admin-sidebar [data-slot='account-compact-trigger']:focus-visible {
   outline: 2px solid var(--admin-lime);
   outline-offset: 2px;
 }

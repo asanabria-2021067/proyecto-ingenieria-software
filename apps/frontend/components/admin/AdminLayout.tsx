@@ -22,7 +22,13 @@ import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { UserMenu } from '@/components/dashboard/UserMenu';
-import { SidebarNav, type NavEntry, type NavLeaf } from '@/components/dashboard/SidebarNav';
+import {
+  DashboardSidebarCollapseButton,
+  SidebarNav,
+  type NavEntry,
+  type NavLeaf,
+} from '@/components/dashboard/SidebarNav';
+import { useAdminSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
 
@@ -89,6 +95,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { data: user, isLoading, isError } = useCurrentUser();
   const handleLogout = useLogout();
+  const { collapsed } = useAdminSidebarCollapsed();
 
   useEffect(() => {
     if (!isLoading && isError) {
@@ -127,27 +134,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar - Desktop Only */}
       <aside
         data-slot="admin-sidebar"
-        className="admin-sidebar hidden md:flex w-64 h-screen flex-col shrink-0 overflow-y-auto overflow-x-hidden"
+        data-collapsed={collapsed || undefined}
+        className={`admin-sidebar hidden md:flex ${collapsed ? 'w-[72px]' : 'w-64'} h-screen flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200`}
       >
         {/* h-16 = alto de la topbar: el divisor de la marca continúa su borde inferior. */}
-        <div data-slot="admin-sidebar-brand" className="admin-sidebar-brand flex h-16 shrink-0 items-center gap-3 px-5">
+        <div
+          data-slot="admin-sidebar-brand"
+          className={`admin-sidebar-brand flex h-16 shrink-0 items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-5'}`}
+        >
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto shrink-0" />
-          <span className="admin-sidebar-brand-name font-headline text-xl font-bold tracking-tight">UVGenius</span>
+          {!collapsed && (
+            <>
+              <span className="admin-sidebar-brand-name font-headline text-xl font-bold tracking-tight">UVGenius</span>
+              <DashboardSidebarCollapseButton theme="admin" />
+            </>
+          )}
         </div>
 
-        <p
-          data-slot="admin-nav-section-label"
-          className="admin-nav-section-label px-6 pt-6 text-[11px] font-semibold uppercase tracking-wider"
-        >
-          Administración
-        </p>
+        {!collapsed && (
+          <p
+            data-slot="admin-nav-section-label"
+            className="admin-nav-section-label px-6 pt-6 text-[11px] font-semibold uppercase tracking-wider"
+          >
+            Administración
+          </p>
+        )}
 
         <Suspense fallback={<SidebarNav entries={adminNavEntries} theme="admin" />}>
           <AdminSidebarNav />
         </Suspense>
 
-        <div data-slot="admin-sidebar-footer" className="admin-sidebar-footer px-3 py-4">
-          <UserMenu user={user} onLogout={handleLogout} variant="sidebar" theme="admin" />
+        <div
+          data-slot="admin-sidebar-footer"
+          className={`admin-sidebar-footer py-4 ${collapsed ? 'flex justify-center px-2' : 'px-3'}`}
+        >
+          <UserMenu user={user} onLogout={handleLogout} variant={collapsed ? 'compact' : 'sidebar'} theme="admin" />
         </div>
       </aside>
 

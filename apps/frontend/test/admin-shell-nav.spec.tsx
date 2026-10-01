@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/dashboard/admin'));
 const searchParamsMock = vi.hoisted(() => vi.fn(() => new URLSearchParams()));
@@ -43,6 +43,11 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  try {
+    window.localStorage.clear();
+  } catch {
+    /* sin almacenamiento */
+  }
 });
 
 describe('AdminLayout — shell administrativo S7 (F011)', () => {
@@ -233,5 +238,79 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(marca).not.toHaveClass('py-5');
     expect(document.querySelector('main header')).toHaveClass('h-16');
     expect(document.querySelector('aside')).toHaveClass('overflow-x-hidden', 'overflow-y-auto', 'w-64');
+  });
+});
+
+// Misma opción de colapsar que la sidebar del estudiante, con su propia
+// preferencia y el lenguaje graphite.
+describe('AdminLayout — sidebar colapsable', () => {
+  const DESTINOS = [
+    'Panel Admin',
+    'Activos',
+    'Revisiones',
+    'Solicitudes de cierre',
+    'Cerrados',
+    'Apelaciones',
+    'Gestión de Usuarios',
+    'Recuperación de contraseña',
+  ];
+
+  function colapsar() {
+    const aside = document.querySelector('aside') as HTMLElement;
+    fireEvent.click(within(aside).getByRole('button', { name: 'Colapsar barra lateral' }));
+    return aside;
+  }
+
+  it('expandida: el control de colapsar vive en el encabezado de marca y controla la navegación', () => {
+    renderShell();
+    const marca = document.querySelector('[data-slot="admin-sidebar-brand"]') as HTMLElement;
+    const control = within(marca).getByRole('button', { name: 'Colapsar barra lateral' });
+    expect(control).toHaveClass('admin-collapse-toggle');
+    expect(control).toHaveAttribute('aria-controls', 'admin-global-nav');
+    expect(document.getElementById('admin-global-nav')).toHaveAttribute('aria-label', 'Navegación administrativa');
+    expect(document.querySelector('aside')).toHaveClass('w-64');
+  });
+
+  it('colapsada: 72px, solo logo, sin etiqueta de sección y todos los destinos como iconos con nombre', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin/proyectos');
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cierres'));
+    renderShell();
+    const aside = colapsar();
+
+    expect(aside).toHaveClass('w-[72px]');
+    expect(aside).toHaveAttribute('data-collapsed', 'true');
+    expect(within(aside).queryByText('UVGenius')).not.toBeInTheDocument();
+    expect(aside.querySelector('[data-slot="admin-nav-section-label"]')).toBeNull();
+
+    const nav = within(aside.querySelector('nav') as HTMLElement);
+    const enlaces = nav.getAllByRole('link');
+    expect(enlaces.map((a) => a.getAttribute('aria-label'))).toEqual(DESTINOS);
+    for (const enlace of enlaces) expect(enlace).toHaveClass('admin-nav-item', 'admin-nav-icon');
+    // El destino activo se conserva y sigue identificable.
+    expect(nav.getByRole('link', { name: 'Solicitudes de cierre' })).toHaveAttribute('aria-current', 'page');
+    expect(nav.getByRole('link', { name: 'Activos' })).not.toHaveAttribute('aria-current');
+    expect(nav.getByRole('group', { name: 'Proyectos' })).toBeInTheDocument();
+    expect(nav.getByRole('group', { name: 'Gobernanza' })).toBeInTheDocument();
+  });
+
+  it('colapsada: el pie usa la cuenta compacta y «Expandir» devuelve la sidebar completa', () => {
+    renderShell();
+    const aside = colapsar();
+    const pie = aside.querySelector('[data-slot="admin-sidebar-footer"]') as HTMLElement;
+    expect(within(pie).getByTestId('user-menu-compact')).toBeInTheDocument();
+
+    const expandir = within(aside).getByRole('button', { name: 'Expandir barra lateral' });
+    expect(expandir).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(expandir);
+    expect(aside).toHaveClass('w-64');
+    expect(within(aside).getByText('UVGenius')).toBeInTheDocument();
+    expect(within(pie).getByTestId('user-menu-sidebar')).toBeInTheDocument();
+  });
+
+  it('la preferencia del administrador es independiente de la del estudiante', () => {
+    renderShell();
+    colapsar();
+    expect(window.localStorage.getItem('uvg-collab-admin-sidebar')).toBe('collapsed');
+    expect(window.localStorage.getItem('uvg-collab-dashboard-sidebar')).toBeNull();
   });
 });
