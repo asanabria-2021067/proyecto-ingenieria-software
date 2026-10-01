@@ -549,6 +549,22 @@ button:disabled {
   --admin-hover-bg:     rgba(255, 255, 255, 0.08);
   --admin-avatar-bg:    #5AB33E;
   --admin-avatar-fg:    #ffffff;
+
+  /* «Enterprise Control Panel»: la sidebar del administrador es graphite en
+     ambos temas, así que estos valores son fijos (los `--color-primary` /
+     `--color-secondary-container` cambian en modo oscuro y no sirven aquí).
+     Verde institucional para estados; lima solo como acento puntual. */
+  --admin-graphite:          #191d20;
+  --admin-graphite-surface:  #20252a;
+  --admin-graphite-hover:    #262b30;
+  --admin-graphite-active:   #2d352f;
+  --admin-graphite-border:   #30363b;
+  --admin-ink:               #f7f8f9;
+  --admin-ink-muted:         #d1d5db;
+  --admin-ink-secondary:     #9ca3af;
+  --admin-icon:              #c4c8cc;
+  --admin-green:             #007a3d;
+  --admin-lime:              #a3e635;
 }
 
 .dark {
