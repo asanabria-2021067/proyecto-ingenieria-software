@@ -242,3 +242,12 @@ describe('Foco y contraste (WCAG AA)', () => {
     expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).not.toContain('outline');
   });
 });
+
+describe('Sin tokens heredados de la sidebar verde', () => {
+  it('ya no existen el selector verde ni el hover translúcido anteriores', () => {
+    expect(CSS).not.toMatch(/--admin-selector-(bg|fg)|--admin-hover-bg/);
+    expect(CSS).not.toContain('.admin-nav-inactive:hover');
+    expect(CSS).not.toContain('#5AB33E');
+    expect(CSS).not.toContain('#054526');
+  });
+});

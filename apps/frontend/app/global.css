@@ -544,9 +544,6 @@ button:disabled {
   --admin-text:         var(--admin-ink);
   --admin-text-muted:   var(--admin-ink-secondary);
   --admin-text-dim:     var(--admin-ink-muted);
-  --admin-selector-bg:  #5AB33E;
-  --admin-selector-fg:  #ffffff;
-  --admin-hover-bg:     rgba(255, 255, 255, 0.08);
   --admin-avatar-bg:    var(--admin-green);
   --admin-avatar-fg:    var(--admin-ink);
 
@@ -565,16 +562,6 @@ button:disabled {
   --admin-icon:              #c4c8cc;
   --admin-green:             #007a3d;
   --admin-lime:              #a3e635;
-}
-
-.dark {
-  --admin-selector-bg:  var(--color-primary);
-  --admin-selector-fg:  var(--color-on-primary);
-  --admin-hover-bg:     var(--color-surface-container-high);
-}
-
-.admin-nav-inactive:hover {
-  background-color: var(--admin-hover-bg);
 }
 
 /* Carcasa graphite de la sidebar del administrador: texto neutro por defecto
