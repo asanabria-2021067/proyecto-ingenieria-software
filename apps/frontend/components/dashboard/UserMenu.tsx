@@ -37,8 +37,7 @@ function UserAvatar({ user, theme }: { user: UserMenuUser | null | undefined; th
         alt=""
         width={32}
         height={32}
-        className="h-8 w-8 shrink-0 rounded-full object-cover"
-        style={theme === 'admin' ? { border: '1px solid var(--admin-border)' } : undefined}
+        className={`h-8 w-8 shrink-0 rounded-full object-cover ${theme === 'admin' ? 'admin-account-photo' : ''}`}
       />
     );
   }
@@ -47,13 +46,8 @@ function UserAvatar({ user, theme }: { user: UserMenuUser | null | undefined; th
     <div
       className={
         theme === 'admin'
-          ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold'
+          ? 'admin-account-avatar flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold'
           : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-accent text-meta font-medium text-on-accent'
-      }
-      style={
-        theme === 'admin'
-          ? { backgroundColor: 'var(--admin-avatar-bg)', color: 'var(--admin-avatar-fg)' }
-          : undefined
       }
     >
       {initials}
@@ -143,31 +137,23 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
           type="button"
           className={
             isAdmin
-              ? 'admin-nav-inactive flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left outline-none transition-colors'
+              ? 'admin-account-trigger flex w-full items-center gap-3 rounded-control px-3 py-2 text-left outline-none transition-colors'
               : 'flex w-full items-center gap-inline rounded-control px-inline py-tight text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary/30'
           }
-          style={isAdmin ? { color: 'var(--admin-text)' } : undefined}
         >
           <UserAvatar user={user} theme={theme} />
           {user && (
             <div className="min-w-0 flex-1">
-              <p
-                className={isAdmin ? 'truncate text-sm font-medium' : 'type-body truncate font-medium text-text-primary'}
-                style={isAdmin ? { color: 'var(--admin-text)' } : undefined}
-              >
+              <p className={isAdmin ? 'admin-account-name truncate text-sm font-semibold' : 'type-body truncate font-medium text-text-primary'}>
                 {user.nombre} {user.apellido}
               </p>
-              <p
-                className={isAdmin ? 'truncate text-xs' : 'type-meta truncate'}
-                style={isAdmin ? { color: 'var(--admin-text-muted)' } : undefined}
-              >
+              <p className={isAdmin ? 'admin-account-email truncate text-xs' : 'type-meta truncate'}>
                 {user.correo}
               </p>
             </div>
           )}
           <ChevronsUpDown
-            className={isAdmin ? 'size-4 shrink-0' : 'size-4 shrink-0 text-tertiary'}
-            style={isAdmin ? { color: 'var(--admin-text-muted)' } : undefined}
+            className={isAdmin ? 'admin-account-chevron size-4 shrink-0' : 'size-4 shrink-0 text-tertiary'}
             aria-hidden="true"
           />
         </button>

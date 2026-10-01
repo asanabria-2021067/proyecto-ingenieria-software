@@ -547,8 +547,8 @@ button:disabled {
   --admin-selector-bg:  #5AB33E;
   --admin-selector-fg:  #ffffff;
   --admin-hover-bg:     rgba(255, 255, 255, 0.08);
-  --admin-avatar-bg:    #5AB33E;
-  --admin-avatar-fg:    #ffffff;
+  --admin-avatar-bg:    var(--admin-green);
+  --admin-avatar-fg:    var(--admin-ink);
 
   /* «Enterprise Control Panel»: la sidebar del administrador es graphite en
      ambos temas, así que estos valores son fijos (los `--color-primary` /
@@ -571,8 +571,6 @@ button:disabled {
   --admin-selector-bg:  var(--color-primary);
   --admin-selector-fg:  var(--color-on-primary);
   --admin-hover-bg:     var(--color-surface-container-high);
-  --admin-avatar-bg:    var(--color-primary-container);
-  --admin-avatar-fg:    var(--color-on-primary-container);
 }
 
 .admin-nav-inactive:hover {
@@ -716,6 +714,38 @@ button:disabled {
 
 .admin-sidebar .admin-nav-subitem[aria-current='page'] svg {
   color: var(--admin-ink);
+}
+
+/* Pie de cuenta: avatar verde institucional (nunca lima) con iniciales
+   blancas, nombre en blanco, correo en gris secundario y hover discreto. */
+.admin-sidebar-footer {
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-account-avatar {
+  background-color: var(--admin-avatar-bg);
+  color: var(--admin-avatar-fg);
+}
+
+.admin-account-photo {
+  border: 1px solid var(--admin-border);
+}
+
+.admin-account-trigger {
+  color: var(--admin-text);
+}
+
+.admin-sidebar .admin-account-trigger:hover {
+  background-color: var(--admin-graphite-hover);
+}
+
+.admin-account-name {
+  color: var(--admin-text);
+}
+
+.admin-account-email,
+.admin-account-chevron {
+  color: var(--admin-text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

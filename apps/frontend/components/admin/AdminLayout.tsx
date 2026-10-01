@@ -145,7 +145,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminSidebarNav />
         </Suspense>
 
-        <div className="px-3 py-4" style={{ borderTop: '1px solid var(--admin-border)' }}>
+        <div data-slot="admin-sidebar-footer" className="admin-sidebar-footer px-3 py-4">
           <UserMenu user={user} onLogout={handleLogout} variant="sidebar" theme="admin" />
         </div>
       </aside>

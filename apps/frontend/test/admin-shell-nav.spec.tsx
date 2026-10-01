@@ -216,4 +216,13 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(guia).toHaveClass('admin-nav-children');
     expect(guia.closest('aside')?.querySelectorAll('nav [style]')).toHaveLength(0);
   });
+
+  it('el pie de cuenta va al final de la sidebar, con su divisor y sin estilos en línea', () => {
+    renderShell();
+    const pie = document.querySelector('[data-slot="admin-sidebar-footer"]') as HTMLElement;
+    expect(pie).toHaveClass('admin-sidebar-footer');
+    expect(pie.getAttribute('style')).toBeNull();
+    expect(within(pie).getByTestId('user-menu-sidebar')).toBeInTheDocument();
+    expect(pie.parentElement?.lastElementChild).toBe(pie);
+  });
 });
