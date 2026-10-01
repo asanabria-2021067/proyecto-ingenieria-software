@@ -637,6 +637,20 @@ button:disabled {
   color: var(--admin-ink);
 }
 
+/* Activo: graphite elevado, texto/icono blancos y barra lima de 3px a la
+   izquierda (forma + peso, no solo color). Va después del hover para
+   prevalecer con la misma especificidad. */
+.admin-sidebar .admin-nav-item[aria-current='page'] {
+  background-color: var(--admin-graphite-active);
+  box-shadow: inset 3px 0 0 var(--admin-lime);
+  color: var(--admin-ink);
+  font-weight: 600;
+}
+
+.admin-sidebar .admin-nav-item[aria-current='page'] svg {
+  color: var(--admin-ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

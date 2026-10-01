@@ -115,11 +115,6 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
                       active ? LEAF_ACTIVE_CLASS : LEAF_INACTIVE_CLASS
                     }`
               }
-              style={
-                isAdmin && active
-                  ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
-                  : undefined
-              }
             >
               <Icon className="w-5 h-5 shrink-0" />
               {entry.label}

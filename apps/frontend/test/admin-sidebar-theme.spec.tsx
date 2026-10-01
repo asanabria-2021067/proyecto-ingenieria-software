@@ -99,3 +99,22 @@ describe('Destinos raíz', () => {
     expect(bloques('.admin-sidebar .admin-nav-item:hover svg')[0]).toContain('color: var(--admin-ink)');
   });
 });
+
+describe('Estado activo de los destinos raíz', () => {
+  const activo = () => bloques(".admin-sidebar .admin-nav-item[aria-current='page']")[0];
+
+  it('graphite elevado, blanco, semibold y barra lima de 3px (no un bloque lima/verde)', () => {
+    expect(activo()).toContain('background-color: var(--admin-graphite-active)');
+    expect(activo()).toContain('box-shadow: inset 3px 0 0 var(--admin-lime)');
+    expect(activo()).toContain('color: var(--admin-ink)');
+    expect(activo()).toContain('font-weight: 600');
+    expect(activo()).not.toMatch(/background-color: var\(--admin-(lime|green|selector-bg)\)/);
+    expect(bloques(".admin-sidebar .admin-nav-item[aria-current='page'] svg")[0]).toContain('color: var(--admin-ink)');
+  });
+
+  it('se declara después del hover para que el activo no cambie al pasar el cursor', () => {
+    expect(CSS.indexOf(".admin-sidebar .admin-nav-item[aria-current='page'] {")).toBeGreaterThan(
+      CSS.indexOf('.admin-sidebar .admin-nav-item:hover {'),
+    );
+  });
+});

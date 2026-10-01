@@ -168,4 +168,13 @@ describe('AdminLayout — sidebar graphite', () => {
       expect(boton.getAttribute('style')).toBeNull();
     }
   });
+
+  it('Panel Admin activo: aria-current, clase de item y sin bloque verde en línea', () => {
+    renderShell();
+    const panel = desktopNav().getByRole('link', { name: 'Panel Admin' });
+    expect(panel).toHaveAttribute('aria-current', 'page');
+    expect(panel).toHaveClass('admin-nav-item');
+    expect(panel).not.toHaveClass('admin-nav-inactive');
+    expect(panel.getAttribute('style')).toBeNull();
+  });
 });
