@@ -879,6 +879,30 @@ async function main() {
       fechaAprobacion: new Date('2026-03-10'),
     },
   });
+  await prisma.asistenciaActividad.upsert({
+    where: { idActividad_idUsuario: { idActividad: actividadTutoria1.idActividad, idUsuario: maria.idUsuario } },
+    update: {},
+    create: {
+      idActividad: actividadTutoria1.idActividad,
+      idUsuario: maria.idUsuario,
+      asistio: true,
+      confirmadoPor: carlos.idUsuario,
+      confirmadoEn: new Date('2026-03-10'),
+      idRegistroHoras: horasMaria.idRegistroHoras,
+    },
+  });
+  await prisma.asistenciaActividad.upsert({
+    where: { idActividad_idUsuario: { idActividad: actividadTutoria1.idActividad, idUsuario: jose.idUsuario } },
+    update: {},
+    create: {
+      idActividad: actividadTutoria1.idActividad,
+      idUsuario: jose.idUsuario,
+      asistio: true,
+      confirmadoPor: carlos.idUsuario,
+      confirmadoEn: new Date('2026-03-10'),
+      idRegistroHoras: horasJose.idRegistroHoras,
+    },
+  });
 
   // ─── Certificados ───────────────────────────────────────
   const certData = [
