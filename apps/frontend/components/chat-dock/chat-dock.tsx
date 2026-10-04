@@ -17,7 +17,7 @@ export function ChatDock() {
   const [listOpen, setListOpen] = useState(false);
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
   const { conversations } = useAllConversations();
-  useGlobalChatSocket(windows.map((w) => w.idConversacion));
+  const { isConnected: chatConnected } = useGlobalChatSocket(windows.map((w) => w.idConversacion));
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
