@@ -75,3 +75,5 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
   entrar a `docs/security/owasp-top10-2025.md` (filas de "Operaciones
   externas" y la tabla de controles de la Fase 2 — busca las filas C021,
   P1/T13, C039, C038 del documento actual).
+
+## Pendiente de Angel
