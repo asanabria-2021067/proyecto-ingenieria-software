@@ -62,3 +62,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 2. Aplicado el site versionado (`infra/nginx/sites-enabled/uvg-collab`, ya
    era el estado objetivo con P1) — agrega `location /socket.io/` y upstreams
    `127.0.0.1` en `/` y `/api`.
+3. `sudo nginx -t` → ok (los únicos warnings, "conflicting server name", son
+   preexistentes del host compartido, no de este cambio) → `systemctl reload
+   nginx`.
