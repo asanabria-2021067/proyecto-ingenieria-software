@@ -42,3 +42,8 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
    producción antes de esta tarea (`prisma migrate status` mostraba las 50
    migraciones al día) — no hizo falta `pg_dump` previo a una migración
    porque no se corrió ninguna.
+4. **CSP_MODE=enforce:** GitHub Variable seteada (`gh variable set
+   CSP_MODE enforce`). Es build-time del frontend (nueva variante inmutable
+   de imagen): toma efecto en el próximo deploy desde `main`. **No se pudo
+   verificar visualmente "que no se rompa nada"** porque eso exige ese
+   deploy — queda pendiente para quien mezcle a `main`.
