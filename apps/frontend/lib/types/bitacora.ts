@@ -96,6 +96,8 @@ export class TipoEventoBitacora {
     'LEGACY_HOURS_RECONCILED',
     'PROJECT_EXPORT_CSV_GENERATED',
     'PROJECT_EXPORT_PDF_GENERATED',
+    'ACTIVITY_CREATED',
+    'ATTENDANCE_MARKED',
   ] as const;
 }
 
