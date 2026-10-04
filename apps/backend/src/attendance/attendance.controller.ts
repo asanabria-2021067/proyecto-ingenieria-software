@@ -45,4 +45,17 @@ export class AttendanceController {
   ) {
     return this.attendanceService.crearActividad(projectId, user.userId, dto);
   }
+
+  @Patch(':actividadId/asistencia/:usuarioId')
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(ACTIVITY_WRITE)
+  markAttendance(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('actividadId', ParseIntPipe) actividadId: number,
+    @Param('usuarioId', ParseIntPipe) usuarioId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: MarkAttendanceDto,
+  ) {
+    return this.attendanceService.marcarAsistencia(projectId, user.userId, actividadId, usuarioId, dto);
+  }
 }
