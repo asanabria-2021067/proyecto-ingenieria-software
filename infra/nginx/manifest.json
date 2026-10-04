@@ -1,7 +1,7 @@
 {
   "gate": "G02-C16",
   "control": "OWASP25-C047",
-  "description": "Baseline versionado del nginx de produccion de UVG Collab (G02-C16). Desde G04-C11 el site versionado incluye P1 (location /socket.io/) y upstreams explicitos 127.0.0.1: es el estado OBJETIVO; liveSha256 sigue siendo la captura previa a P1 hasta que el administrador lo aplique en la VM.",
+  "description": "Baseline versionado del nginx de produccion de UVG Collab (G02-C16). Desde G04-C11 el site versionado incluye P1 (location /socket.io/) y upstreams explicitos 127.0.0.1. T-332/HU-187 (2026-10-04) aplico P1 en la VM: liveSha256 ya refleja el site en produccion con P1 aplicado.",
   "capture": {
     "date": "2026-09-27",
     "host": "uvg-collab-server",
