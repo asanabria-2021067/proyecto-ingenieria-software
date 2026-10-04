@@ -68,3 +68,16 @@ export interface AsistenciaPublica {
 function toDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
+
+function mapActividad(row: ActividadRow): ActividadPublica {
+  return {
+    idActividad: row.idActividad,
+    idProyecto: row.idProyecto,
+    tituloActividad: row.tituloActividad,
+    tipoActividad: row.tipoActividad,
+    fechaActividad: toDateOnly(row.fechaActividad),
+    horasValor: row.horasValor.toNumber(),
+    creadoPor: row.creadoPor,
+    creadoEn: row.creadoEn.toISOString(),
+  };
+}
