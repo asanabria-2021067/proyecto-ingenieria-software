@@ -148,6 +148,7 @@ export class TipoEventoBitacora {
     'DOCUMENTO_CIERRE',
     'POSTULACION',
     'SOLICITUD_SALIDA',
+    'ACTIVIDAD',
   ] as const;
 
   /**
