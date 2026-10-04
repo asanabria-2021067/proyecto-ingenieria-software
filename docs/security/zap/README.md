@@ -29,3 +29,7 @@ El backend (Helmet) y el frontend no envían `Cross-Origin-Embedder-Policy`. Ese
 ### Ruido del spider (no son hallazgos)
 
 Varias URLs reportadas en 404 (`robots.txt`, rutas con `%2F` y query strings de `next/image` tipo `...jpg&w=384&q=75`) son el spider de ZAP mal-parseando atributos `srcset`/`sizes` de `next/image` como URLs completas, no asset reales de la app. El backend/frontend responde 404 limpio a esas URLs (sin stack trace, sin información sensible) — comportamiento correcto, no se actúa.
+
+## Qué NO se corrigió y por qué
+
+No hay hallazgos "altos" ni "medios" reales que corregir: los 3 WARN son, en orden, (1) ya resuelto por el cambio de configuración de T-309 pendiente de deploy, (2) metodológico, (3) un header de aislamiento que no aplica a esta arquitectura. `docs/security/owasp-top10-2025.md` ya trae R2 (CSP `unsafe-inline`) como riesgo residual conocido; no se duplica aquí.
