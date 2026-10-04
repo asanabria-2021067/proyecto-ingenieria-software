@@ -51,3 +51,5 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
    `BACKEND_BIND=127.0.0.1`, `FRONTEND_BIND=127.0.0.1`,
    `TRUST_PROXY_HOPS=1`, `SECURITY_ALERTS_ENABLED=true` — para que el
    próximo deploy desde `main` no revierta lo ya aplicado a mano en la VM.
+
+## T-311 — Escaneo OWASP ZAP
