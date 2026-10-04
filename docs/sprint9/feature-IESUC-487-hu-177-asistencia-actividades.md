@@ -34,3 +34,8 @@ escrituras de proyecto. Las lecturas usan el scope `'asistencia'` de
 `ATTENDANCE_MARKED`) queda en la bitácora del proyecto.
 
 ## T-297 — Suma automática de horas de extensión
+
+`AttendanceService.marcarAsistencia`: confirmar asistencia crea/actualiza
+(nunca duplica) una fila de `HorasParticipacion` (`estadoHoras: APROBADA`) —
+el mismo modelo que ya lee "Mis horas" (HU-158), vía `idRegistroHoras` en
+`AsistenciaActividad` como ancla de idempotencia.
