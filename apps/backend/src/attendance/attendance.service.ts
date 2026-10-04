@@ -188,5 +188,19 @@ export class AttendanceService {
         select: { idUsuario: true, asistio: true, confirmadoEn: true },
       }),
     ]);
+
+    const asistenciaPorUsuario = new Map(asistencias.map((a) => [a.idUsuario, a]));
+
+    return {
+      ...mapActividad(actividad),
+      integrantes: integrantes.map(({ usuario }) => {
+        const fila = asistenciaPorUsuario.get(usuario.idUsuario);
+        return {
+          ...usuario,
+          asistio: fila?.asistio ?? false,
+          confirmadoEn: fila?.confirmadoEn ? fila.confirmadoEn.toISOString() : null,
+        };
+      }),
+    };
   }
 }
