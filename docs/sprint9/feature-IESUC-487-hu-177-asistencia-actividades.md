@@ -38,4 +38,6 @@ escrituras de proyecto. Las lecturas usan el scope `'asistencia'` de
 `AttendanceService.marcarAsistencia`: confirmar asistencia crea/actualiza
 (nunca duplica) una fila de `HorasParticipacion` (`estadoHoras: APROBADA`) —
 el mismo modelo que ya lee "Mis horas" (HU-158), vía `idRegistroHoras` en
-`AsistenciaActividad` como ancla de idempotencia.
+`AsistenciaActividad` como ancla de idempotencia. Quitar la asistencia borra
+esa fila. Todo corre dentro de la transacción con lock que abre
+`ProjectTransactionService.run`.
