@@ -84,6 +84,7 @@ const ALL_SCOPES: readonly ReadScope[] = [
   'liderazgo',
   'historico',
   'exportacion',
+  'asistencia',
 ];
 
 @Injectable()
