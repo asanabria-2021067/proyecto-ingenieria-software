@@ -388,7 +388,15 @@ export class SprintsService {
         idSprint: sprintCreado.idSprint,
         tipoEntidad: 'SPRINT',
         idEntidad: sprintCreado.idSprint,
-        valorNuevo: { numero: sprintCreado.numero },
+        // El plan inicial queda en la bitácora: `fechaFinPlaneada` no se
+        // puede cambiar después, así que este evento es su registro de origen.
+        // Instante ISO para el inicio y día calendario para el plan, igual
+        // que sus columnas (timestamp y DATE).
+        valorNuevo: {
+          numero: sprintCreado.numero,
+          fechaInicio: fechaInicio.toISOString(),
+          fechaFinPlaneada,
+        },
       });
 
       await tx.tarea.updateMany({

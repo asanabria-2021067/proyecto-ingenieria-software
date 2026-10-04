@@ -49,8 +49,15 @@ describe('SprintsService.startSprint — instrumentación de bitácora (T-164)',
     const notifications = {} as unknown as NotificationsService;
     const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), bitacora);
 
-    await service.startSprint(5, 9);
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-04T02:00:00.000Z'));
+      await service.startSprint(5, 9, '2026-10-18');
+    } finally {
+      vi.useRealTimers();
+    }
 
+    expect(bitacora.registrarEvento).toHaveBeenCalledTimes(1);
     expect(bitacora.registrarEvento).toHaveBeenCalledWith(
       expect.objectContaining({
         tx,
@@ -60,9 +67,40 @@ describe('SprintsService.startSprint — instrumentación de bitácora (T-164)',
         idSprint: 10,
         tipoEntidad: 'SPRINT',
         idEntidad: 10,
-        valorNuevo: { numero: 1 },
+        // El plan inicial queda trazado: instante de inicio del servidor y
+        // día calendario planeado, exactamente los valores persistidos.
+        valorNuevo: {
+          numero: 1,
+          fechaInicio: '2026-10-04T02:00:00.000Z',
+          fechaFinPlaneada: '2026-10-18',
+        },
       }),
     );
+    expect(tx.sprint.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        fechaInicio: new Date('2026-10-04T02:00:00.000Z'),
+        fechaFinPlaneada: new Date('2026-10-18T00:00:00.000Z'),
+      }),
+    });
+  });
+
+  it('el evento SPRINT_STARTED solo lleva número y fechas del plan, nada operativo', async () => {
+    const tx = makeTx();
+    const prisma = makePrisma(tx);
+    const bitacora = makeBitacora();
+    const context = {
+      assertProjectLeader: vi.fn().mockResolvedValue(undefined),
+      getCurrentSprint: vi.fn().mockResolvedValue(null),
+    } as unknown as SprintsContextService;
+    const authorization = { assertCanStartSprint: vi.fn().mockResolvedValue(undefined) } as unknown as SprintsAuthorizationService;
+    const notifications = {} as unknown as NotificationsService;
+    const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), bitacora);
+
+    await service.startSprint(5, 9, '2026-10-18');
+
+    const evento = bitacora.registrarEvento.mock.calls[0][0];
+    expect(Object.keys(evento.valorNuevo).sort()).toEqual(['fechaFinPlaneada', 'fechaInicio', 'numero']);
+    expect(evento.valorAnterior).toBeUndefined();
   });
 
   it('sin BitacoraEventosService inyectado, startSprint sigue funcionando (dependencia opcional)', async () => {
@@ -76,7 +114,7 @@ describe('SprintsService.startSprint — instrumentación de bitácora (T-164)',
     const notifications = {} as unknown as NotificationsService;
     const service = new SprintsService(prisma, context, authorization, notifications, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-    await expect(service.startSprint(5, 9)).resolves.toEqual(
+    await expect(service.startSprint(5, 9, '2026-10-18')).resolves.toEqual(
       expect.objectContaining({ idSprint: 10 }),
     );
   });
