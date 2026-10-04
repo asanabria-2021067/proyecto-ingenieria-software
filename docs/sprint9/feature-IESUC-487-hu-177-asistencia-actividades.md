@@ -54,3 +54,5 @@ esa fila. Todo corre dentro de la transacción con lock que abre
   horas, corrección que no duplica, quitar que resta, rechazo a no líder) es
   la subtarea de Samuel; el servicio ya expone el comportamiento descrito
   arriba, listo para que la pruebe.
+
+## Para Saúl y Samuel
