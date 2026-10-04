@@ -60,3 +60,7 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
 - Detalle y justificación de cada WARN en `docs/security/zap/README.md`;
   reporte HTML completo en
   `docs/security/zap/zap-baseline-158.23.57.118.nip.io-20261004.html`.
+- El único WARN con causa de código (CSP sin fallback aplicado) ya queda
+  resuelto por `CSP_MODE=enforce` (T-309), pendiente de su próximo deploy;
+  los otros dos (COEP ausente, "Modern Web Application") son aceptados — no
+  aplican a esta arquitectura o son metodológicos.
