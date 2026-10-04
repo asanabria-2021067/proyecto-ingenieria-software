@@ -42,3 +42,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   del seed). Carlos comenta la tarea; María ve el toast "Nuevo comentario"
   sin recargar — recipient real de `COMENTARIO_TAREA` según
   `getTaskCommentRecipientIds`.
+- El E2E de mensaje de chat (`chat-mensajeria.spec.ts`) ya existía (Fase 3.3)
+  y cubre el otro flujo pedido (mensaje sin recargar); no se duplicó.
