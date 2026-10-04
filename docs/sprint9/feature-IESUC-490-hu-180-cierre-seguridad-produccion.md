@@ -14,3 +14,7 @@ Verificado vía `gh api` (no ejecutado por mí, es tarea manual en GitHub
 Settings → Rules):
 
 - Existen rulesets llamados `develop` (id 14616829) y `main` (id 12281716).
+- **Ambos siguen con `enforcement: disabled`.** Un push directo a `develop` o
+  `main` hoy NO se rechaza. Falta habilitarlos (exigir PR + checks de
+  `ci.yml` en verde + 1 aprobación + bloqueo de force-push) y tomar la
+  captura para el informe.
