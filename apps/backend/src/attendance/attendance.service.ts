@@ -81,3 +81,23 @@ function mapActividad(row: ActividadRow): ActividadPublica {
     creadoEn: row.creadoEn.toISOString(),
   };
 }
+
+/**
+ * T-295/T-296/T-297 (HU-177): el líder crea actividades (reunión, jornada,
+ * taller) con un valor fijo de horas y marca la asistencia de cada
+ * integrante. Confirmar asistencia acredita esas horas en HorasParticipacion
+ * — el mismo modelo que lee "Mis horas" (HU-158, ver
+ * ProjectHoursSummaryService) — en vez de inventar un sistema paralelo.
+ */
+@Injectable()
+export class AttendanceService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectTx: ProjectTransactionService,
+    private readonly policy: ProjectPolicyService,
+    private readonly readPolicy: ProjectReadPolicyService,
+    // Opcional por el mismo motivo que en TimeRecordsService: las suites
+    // unitarias instancian el servicio con argumentos posicionales.
+    private readonly bitacoraEventos?: BitacoraEventosService,
+  ) {}
+}
