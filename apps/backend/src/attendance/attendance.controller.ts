@@ -33,4 +33,16 @@ export class AttendanceController {
   ) {
     return this.attendanceService.obtenerActividad(projectId, user.userId, actividadId);
   }
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(ACTIVITY_WRITE)
+  create(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: CreateActividadDto,
+  ) {
+    return this.attendanceService.crearActividad(projectId, user.userId, dto);
+  }
 }
