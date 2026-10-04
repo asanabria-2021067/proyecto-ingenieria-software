@@ -54,6 +54,24 @@ describe('useRealtimeNotifications — deshabilitado', () => {
   });
 });
 
+describe('useRealtimeNotifications — T-333 reconexión', () => {
+  it('al conectar (incluida una reconexión), invalida la lista y el conteo de no leídas', async () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
+
+    act(() => {
+      socket.__emit('connect');
+    });
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['notificaciones'] }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['notificaciones', 'conteo'] });
+  });
+});
+
 describe('useRealtimeNotifications — evento "notification" existente (regresión)', () => {
   it('sigue actualizando latestNotification sin que F6 lo haya afectado', async () => {
     const socket = createMockSocket();
