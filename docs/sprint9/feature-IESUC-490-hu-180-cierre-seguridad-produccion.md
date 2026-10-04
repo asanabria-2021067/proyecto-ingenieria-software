@@ -64,3 +64,5 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
   resuelto por `CSP_MODE=enforce` (T-309), pendiente de su próximo deploy;
   los otros dos (COEP ausente, "Modern Web Application") son aceptados — no
   aplican a esta arquitectura o son metodológicos.
+
+## Para Vernel y Samuel
