@@ -642,7 +642,7 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
       const matches = fs.readFileSync(file, 'utf8').match(/@ProjectWrite\(/g);
       return total + (matches?.length ?? 0);
     }, 0);
-    expect(declaraciones).toBe(67);
+    expect(declaraciones).toBe(69);
 
     // ── Ninguna ruta participante depende del default restrictivo.
     //
