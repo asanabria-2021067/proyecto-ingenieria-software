@@ -144,4 +144,25 @@ export class AttendanceService {
       return mapActividad(actividad);
     });
   }
+
+  async listarActividades(projectId: number, userId: number): Promise<ActividadResumen[]> {
+    await this.readPolicy.assertRead(undefined, { projectId, actorId: userId, scope: 'asistencia' });
+
+    const [actividades, totalIntegrantes] = await Promise.all([
+      this.prisma.actividadProyecto.findMany({
+        where: { idProyecto: projectId },
+        orderBy: [{ fechaActividad: 'desc' }, { idActividad: 'desc' }],
+        select: { ...ACTIVIDAD_SELECT, asistencias: { select: { asistio: true } } },
+      }),
+      this.prisma.participacionProyecto.count({
+        where: { estadoParticipacion: EstadoParticipacion.ACTIVO, rolProyecto: { idProyecto: projectId } },
+      }),
+    ]);
+
+    return actividades.map(({ asistencias, ...actividad }) => ({
+      ...mapActividad(actividad),
+      totalIntegrantes,
+      totalAsistieron: asistencias.filter((a) => a.asistio).length,
+    }));
+  }
 }
