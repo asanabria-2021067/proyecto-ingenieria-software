@@ -37,6 +37,7 @@
       "change": "P1: location /socket.io/ + upstreams 127.0.0.1 en / y /api",
       "appliedInProduction": true,
       "appliedDate": "2026-10-04",
+      "backupPath": "/etc/nginx/sites-enabled/uvg-collab.bak-20261004-0753",
       "owner": "Gate Admin (sudoer con copia fechada, nginx -t y reload)"
     }
   ]
