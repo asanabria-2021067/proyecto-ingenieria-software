@@ -16,3 +16,5 @@ quitaron: cada quien las agrega con sus propios commits sobre esta base.
   una base local.
 - Seed actualizado con 2 actividades de ejemplo en el Proyecto 1 (una con
   asistencia ya confirmada y acreditada, otra pendiente).
+
+## T-296 — Endpoints de actividades y marcado de asistencia
