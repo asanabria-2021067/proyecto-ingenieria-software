@@ -45,3 +45,6 @@ esa fila. Todo corre dentro de la transacción con lock que abre
 ## Verificación
 
 - Migración y seed corren limpios contra una base local recién creada.
+- `npm run build`, `eslint src/attendance` y `tsc --noEmit` (sin errores
+  nuevos; el resto de errores de `tsc` son preexistentes y ajenos a esta
+  rama) en verde.
