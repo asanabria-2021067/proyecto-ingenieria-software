@@ -31,3 +31,7 @@ test('un usuario comenta una tarea y el asignado ve la notificación sin recarga
   const pageB = await contextB.newPage();
   await desactivarTour(pageA);
   await desactivarTour(pageB);
+
+  try {
+    await login(pageA, CORREO_LIDER);
+    await login(pageB, CORREO_ASIGNADA);
