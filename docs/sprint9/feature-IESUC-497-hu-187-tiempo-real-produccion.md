@@ -68,3 +68,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 4. Verificación:
    - `curl -sk "https://158.23.57.118.nip.io/socket.io/?EIO=4&transport=polling"`
      → `0{"sid":"...","upgrades":["websocket"],...}` (antes 404 HTML).
+   - `node infra/nginx/compare-live.mjs` contra una copia fresca de la VM:
+     el único diff reportado es CRLF/LF (checkout de Windows), contenido
+     línea a línea idéntico — confirma que lo aplicado es exactamente P1.
