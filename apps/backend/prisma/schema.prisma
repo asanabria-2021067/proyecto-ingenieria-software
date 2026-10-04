@@ -356,6 +356,9 @@ model Usuario {
   mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
+  actividadesCreadas               ActividadProyecto[]
+  asistencias                      AsistenciaActividad[]      @relation("AsistenciaUsuario")
+  asistenciasConfirmadas           AsistenciaActividad[]      @relation("AsistenciaConfirmador")
 
   @@map("usuario")
 }
