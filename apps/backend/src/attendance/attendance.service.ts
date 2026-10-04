@@ -36,3 +36,8 @@ export interface ActividadPublica {
   creadoPor: number;
   creadoEn: string;
 }
+
+export interface ActividadResumen extends ActividadPublica {
+  totalIntegrantes: number;
+  totalAsistieron: number;
+}
