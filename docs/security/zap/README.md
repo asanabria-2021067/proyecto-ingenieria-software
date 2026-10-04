@@ -9,3 +9,5 @@ Reporte completo: `zap-baseline-158.23.57.118.nip.io-20261004.html`.
 ```
 FAIL-NEW: 0   FAIL-INPROG: 0   WARN-NEW: 8   WARN-INPROG: 0   INFO: 0   IGNORE: 0   PASS: 59
 ```
+
+**Cero hallazgos altos o fallidos.** Los 8 "WARN" se agrupan en 3 reglas:
