@@ -24,4 +24,13 @@ export class AttendanceController {
   findAll(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }) {
     return this.attendanceService.listarActividades(projectId, user.userId);
   }
+
+  @Get(':actividadId')
+  findOne(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('actividadId', ParseIntPipe) actividadId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.attendanceService.obtenerActividad(projectId, user.userId, actividadId);
+  }
 }
