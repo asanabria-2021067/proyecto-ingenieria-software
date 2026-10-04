@@ -37,3 +37,4 @@ No hay hallazgos "altos" ni "medios" reales que corregir: los 3 WARN son, en ord
 ## Pendiente
 
 - Re-correr este mismo escaneo contra producción después de que el deploy desde `main` aplique `CSP_MODE=enforce`, para confirmar 0 WARN de CSP.
+- Un escaneo "full" (activo) queda fuera de esta tarea — el baseline es no intrusivo; uno activo podría generar carga/efectos secundarios en producción y requiere autorización explícita adicional.
