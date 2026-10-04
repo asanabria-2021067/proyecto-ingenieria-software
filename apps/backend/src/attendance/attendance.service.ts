@@ -50,3 +50,7 @@ export interface IntegranteAsistencia {
   asistio: boolean;
   confirmadoEn: string | null;
 }
+
+export interface ActividadDetalle extends ActividadPublica {
+  integrantes: IntegranteAsistencia[];
+}
