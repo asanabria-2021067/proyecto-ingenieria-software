@@ -32,3 +32,5 @@ Solo el líder del proyecto puede crear actividades y marcar asistencia:
 escrituras de proyecto. Las lecturas usan el scope `'asistencia'` de
 `ProjectReadPolicyService`. Cada escritura (`ACTIVITY_CREATED`,
 `ATTENDANCE_MARKED`) queda en la bitácora del proyecto.
+
+## T-297 — Suma automática de horas de extensión
