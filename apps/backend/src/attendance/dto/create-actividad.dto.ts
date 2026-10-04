@@ -14,4 +14,7 @@ export class CreateActividadDto {
 
   @IsIn(TIPOS_ACTIVIDAD, { message: `tipoActividad debe ser uno de: ${TIPOS_ACTIVIDAD.join(', ')}` })
   tipoActividad!: TipoActividad;
+
+  @IsDateString({}, { message: 'fechaActividad debe ser una fecha válida (YYYY-MM-DD)' })
+  fechaActividad!: string;
 }
