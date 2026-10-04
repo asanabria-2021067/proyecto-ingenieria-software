@@ -92,3 +92,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 - Tras ese deploy, repetir la verificación de la sección 3 del prompt
   (`docker compose logs backend | grep NotificationsGateway|ChatGateway`)
   para confirmar `connected as user` en vivo.
+- Correr `realtime-notificacion.spec.ts` y `chat-mensajeria.spec.ts` en
+  `infra/staging` (T-334, subtarea 3).
