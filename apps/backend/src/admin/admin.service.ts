@@ -21,6 +21,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ADMIN_ACTIVE_PROJECT_STATES } from '../common/project-policy/admin-active-project-states';
 import { SecurityEventsService } from '../security-events/security-events.service';
 import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
 import type { SecurityRequestContext } from '../security-events/request-context';
@@ -82,7 +83,7 @@ export class AdminService {
     ] = await Promise.all([
       this.prisma.proyecto.count({
         where: {
-          estadoProyecto: { in: [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO] },
+          estadoProyecto: { in: [...ADMIN_ACTIVE_PROJECT_STATES] },
           eliminadoEn: null,
         },
       }),
@@ -506,11 +507,7 @@ export class AdminService {
     return {
       proyectosDondeParticipa: proyectos.length,
       estudiantesMentorizados: 0, // fallback: no hay relación mentor-estudiante explícita en el schema
-      proyectosActivos: proyectos.filter((p) =>
-        ([EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO] as EstadoProyecto[]).includes(
-          p.estadoProyecto,
-        ),
-      ).length,
+      proyectosActivos: proyectos.filter((p) => ADMIN_ACTIVE_PROJECT_STATES.includes(p.estadoProyecto)).length,
       proyectosCerrados: proyectos.filter((p) => p.estadoProyecto === EstadoProyecto.CERRADO)
         .length,
       proyectosAsociados: proyectos.slice(0, 5).map((p) => ({
@@ -531,7 +528,7 @@ export class AdminService {
         this.prisma.proyecto.count({
           where: {
             creadoPor: userId,
-            estadoProyecto: { in: [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO] },
+            estadoProyecto: { in: [...ADMIN_ACTIVE_PROJECT_STATES] },
             eliminadoEn: null,
           },
         }),
@@ -628,11 +625,7 @@ export class AdminService {
 
     return {
       proyectosSupervisados: proyectos.length,
-      proyectosActivos: proyectos.filter((p) =>
-        ([EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO] as EstadoProyecto[]).includes(
-          p.estadoProyecto,
-        ),
-      ).length,
+      proyectosActivos: proyectos.filter((p) => ADMIN_ACTIVE_PROJECT_STATES.includes(p.estadoProyecto)).length,
       proyectosCerrados: proyectos.filter((p) => p.estadoProyecto === EstadoProyecto.CERRADO)
         .length,
       estudiantesVinculados,

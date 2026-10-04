@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { ProjectHoursSummaryService } from '../sprints/project-hours-summary.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ADMIN_ACTIVE_PROJECT_STATES } from '../common/project-policy/admin-active-project-states';
 import {
   ADMIN_PROJECTS_DEFAULT_LIMIT,
   ADMIN_PROJECTS_DEFAULT_PAGE,
@@ -19,7 +20,7 @@ const GRUPOS: Readonly<
   Record<AdminProjectGroup, { estados: EstadoProyecto[]; accion: string }>
 > = {
   activos: {
-    estados: [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO],
+    estados: [...ADMIN_ACTIVE_PROJECT_STATES],
     accion: 'MONITOREAR',
   },
   revision: {
