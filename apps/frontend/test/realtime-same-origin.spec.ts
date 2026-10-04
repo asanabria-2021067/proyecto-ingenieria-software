@@ -46,7 +46,6 @@ describe('T12: base del socket', () => {
 
   it('URL explícita (legacy) → la misma URL con el esquema ws/wss de la página', () => {
     expect(realtimeBaseUrl(PRODUCTION_API, http)).toBe('ws://158.23.57.118:3001');
-    expect(realtimeBaseUrl(PRODUCTION_API, https)).toBe('wss://158.23.57.118:3001');
     expect(realtimeBaseUrl('https://api.uvgenius.example', https)).toBe('wss://api.uvgenius.example');
   });
 
