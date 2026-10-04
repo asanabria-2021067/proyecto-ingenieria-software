@@ -21,3 +21,7 @@ FAIL-NEW: 0   FAIL-INPROG: 0   WARN-NEW: 8   WARN-INPROG: 0   INFO: 0   IGNORE: 
 ### 2. Modern Web Application (×5 URLs)
 
 Alerta informativa de ZAP (nivel WARN en el baseline) que recomienda usar el spider Ajax/moderno porque detectó una SPA. No es una vulnerabilidad — es una sugerencia de metodología de escaneo. **Aceptado sin acción de código.** Las URLs donde aparece son además artefactos del spider sobre `next/image` (ver más abajo).
+
+### 3. Cross-Origin-Embedder-Policy Header Missing or Invalid (×9)
+
+El backend (Helmet) y el frontend no envían `Cross-Origin-Embedder-Policy`. Ese header solo importa para aislar el origen cuando la app usa APIs que requieren "cross-origin isolation" (p. ej. `SharedArrayBuffer`, `performance.measureUserAgentSpecificMemory`) — UVG Collab no usa ninguna. Activarlo sin necesidad puede romper la carga de imágenes de Cloudinary (que no envían `Cross-Origin-Resource-Policy`) sin ganar protección real. **Aceptado (`RESIDUAL_CODE_RISK`), sin owner nuevo** — revisar si el frontend empieza a usar Web Workers con memoria compartida.
