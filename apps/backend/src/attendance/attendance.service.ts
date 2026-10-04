@@ -280,5 +280,19 @@ export class AttendanceService {
     },
   ): Promise<AsistenciaPublica> {
     const { projectId, actividad, targetUserId, leaderId, asistio } = input;
+
+    const participacion = await tx.participacionProyecto.findFirst({
+      where: {
+        idUsuario: targetUserId,
+        estadoParticipacion: EstadoParticipacion.ACTIVO,
+        rolProyecto: { idProyecto: projectId },
+      },
+      select: { idParticipacion: true },
+    });
+    if (!participacion) {
+      throw new BadRequestException(
+        'El integrante no tiene una participación activa en el proyecto de esta actividad',
+      );
+    }
   }
 }
