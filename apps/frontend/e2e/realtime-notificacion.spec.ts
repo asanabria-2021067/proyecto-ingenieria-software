@@ -46,3 +46,4 @@ test('un usuario comenta una tarea y el asignado ve la notificación sin recarga
     const comentario = `Revisado ${marca}`;
     await pageA.getByPlaceholder('Escribe un comentario...').fill(comentario);
     await pageA.getByRole('button', { name: 'Comentar' }).click();
+    await expect(pageA.getByText(comentario).first()).toBeVisible();
