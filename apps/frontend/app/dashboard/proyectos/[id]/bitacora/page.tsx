@@ -118,6 +118,10 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
   LEGACY_HOURS_RECONCILED: { label: 'Horas heredadas reconciliadas', icon: Clock },
   PROJECT_EXPORT_CSV_GENERATED: { label: 'Exportación CSV generada', icon: FileSpreadsheet },
   PROJECT_EXPORT_PDF_GENERATED: { label: 'Reporte PDF generado', icon: FileText },
+
+  // ---- T-295/T-296 (HU-177): actividades y asistencia del líder. ----
+  ACTIVITY_CREATED: { label: 'Actividad creada', icon: CalendarPlus },
+  ATTENDANCE_MARKED: { label: 'Asistencia marcada', icon: UserCheck },
 };
 
 /**
