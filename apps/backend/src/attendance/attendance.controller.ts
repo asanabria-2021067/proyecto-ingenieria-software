@@ -14,3 +14,9 @@ const ACTIVITY_WRITE: ProjectWriteMetadata = {
   sprint: 'ANY',
   family: 'ACTIVIDAD_ASISTENCIA',
 };
+
+@Controller('proyectos/:projectId/actividades')
+@UseGuards(JwtAuthGuard)
+export class AttendanceController {
+  constructor(private readonly attendanceService: AttendanceService) {}
+}
