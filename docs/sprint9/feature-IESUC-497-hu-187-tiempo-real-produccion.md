@@ -36,3 +36,9 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   (reconexión invalida las queries correctas).
 
 ## T-334 — E2E de tiempo real
+
+- Nuevo `apps/frontend/e2e/realtime-notificacion.spec.ts`: dos contextos de
+  Playwright (carlos.mendoza líder, maria.lopez asignada activa a la tarea 1
+  del seed). Carlos comenta la tarea; María ve el toast "Nuevo comentario"
+  sin recargar — recipient real de `COMENTARIO_TAREA` según
+  `getTaskCommentRecipientIds`.
