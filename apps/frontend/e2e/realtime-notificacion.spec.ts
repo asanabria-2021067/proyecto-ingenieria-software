@@ -47,3 +47,12 @@ test('un usuario comenta una tarea y el asignado ve la notificación sin recarga
     await pageA.getByPlaceholder('Escribe un comentario...').fill(comentario);
     await pageA.getByRole('button', { name: 'Comentar' }).click();
     await expect(pageA.getByText(comentario).first()).toBeVisible();
+
+    // B nunca recarga: el aviso debe llegarle por el socket de
+    // /notifications (toast) sin que la página se vuelva a cargar.
+    await expect(pageB.getByText('Nuevo comentario').first()).toBeVisible({ timeout: 15_000 });
+  } finally {
+    await contextA.close();
+    await contextB.close();
+  }
+});
