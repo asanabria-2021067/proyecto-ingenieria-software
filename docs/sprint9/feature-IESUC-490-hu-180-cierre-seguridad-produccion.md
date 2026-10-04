@@ -1,3 +1,9 @@
 # HU-180 — Cierre de seguridad en producción
 
 Rama: `feature/IESUC-490-hu-180-cierre-seguridad-produccion`
+
+Esta rama contiene **solo las subtareas de Angel** (T-308, T-309, T-311).
+T-310 (visor de eventos, Vernel) y T-312 (actualizar
+`docs/security/owasp-top10-2025.md`, Samuel) se quitaron: cada quien las
+agrega con sus propios commits — ninguna de las dos depende del código de
+esta rama.
