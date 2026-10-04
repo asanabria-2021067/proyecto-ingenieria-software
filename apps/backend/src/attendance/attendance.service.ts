@@ -126,6 +126,21 @@ export class AttendanceService {
         select: ACTIVIDAD_SELECT,
       });
 
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.ACTIVITY_CREATED,
+        idActor: userId,
+        idProyecto: projectId,
+        tipoEntidad: 'ACTIVIDAD',
+        idEntidad: actividad.idActividad,
+        valorNuevo: {
+          tituloActividad: actividad.tituloActividad,
+          tipoActividad: actividad.tipoActividad,
+          fechaActividad: toDateOnly(actividad.fechaActividad),
+          horasValor: dto.horasValor,
+        },
+      });
+
       return mapActividad(actividad);
     });
   }
