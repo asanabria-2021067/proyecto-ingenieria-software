@@ -843,6 +843,43 @@ async function main() {
     },
   });
 
+  // Asistencia ya confirmada a la actividad 1: cada fila acredita sus horas una
+  // sola vez a través de su propia HorasParticipacion (idRegistroHoras) — el
+  // mismo patrón idempotente que aplica AttendanceService.marcarAsistencia. La
+  // actividad 2 (jornada) queda sin marcar para mostrar el estado pendiente.
+  const horasMaria = await prisma.horasParticipacion.upsert({
+    where: { idRegistroHoras: 8 },
+    update: {},
+    create: {
+      idRegistroHoras: 8,
+      idParticipacion: participaciones[0].idParticipacion,
+      periodoInicio: new Date('2026-03-10'),
+      periodoFin: new Date('2026-03-10'),
+      horasReportadas: 2,
+      horasCalculadas: 2,
+      horasAprobadas: 2,
+      estadoHoras: 'APROBADA',
+      aprobadoPor: carlos.idUsuario,
+      fechaAprobacion: new Date('2026-03-10'),
+    },
+  });
+  const horasJose = await prisma.horasParticipacion.upsert({
+    where: { idRegistroHoras: 9 },
+    update: {},
+    create: {
+      idRegistroHoras: 9,
+      idParticipacion: participaciones[1].idParticipacion,
+      periodoInicio: new Date('2026-03-10'),
+      periodoFin: new Date('2026-03-10'),
+      horasReportadas: 2,
+      horasCalculadas: 2,
+      horasAprobadas: 2,
+      estadoHoras: 'APROBADA',
+      aprobadoPor: carlos.idUsuario,
+      fechaAprobacion: new Date('2026-03-10'),
+    },
+  });
+
   // ─── Certificados ───────────────────────────────────────
   const certData = [
     { idParticipacion: participaciones[0].idParticipacion, tipoCertificado: 'HORAS_BECA' as const, horasCertificadas: 12, emitidoPor: luis.idUsuario, codigoVerificacion: 'CERT-2026-001' },
