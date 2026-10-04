@@ -41,3 +41,6 @@ test('un usuario comenta una tarea y el asignado ve la notificación sin recarga
     await pageB.goto('/dashboard');
 
     await pageA.goto(`/dashboard/projects/${PROYECTO_ID}/kanban/tasks/${TAREA_ID}?section=comments`);
+
+    const marca = `${test.info().workerIndex}-${test.info().repeatEachIndex}-${Math.random().toString(36).slice(2)}`;
+    const comentario = `Revisado ${marca}`;
