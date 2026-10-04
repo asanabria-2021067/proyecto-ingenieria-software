@@ -80,9 +80,10 @@ describe('G02-C16: baseline nginx versionado', () => {
    * /socket.io/ y que los upstreams fueran `localhost`: era el contrato de
    * "baseline sin adelantar P1" de G02. G04 versiona P1 a propósito; lo que
    * sigue exigiéndose es que P1 sea aditivo (sin redirect, HSTS ni cambios de
-   * TLS) y que el manifiesto declare que aún no está aplicado en la VM.
+   * TLS). T-332 (HU-187) lo aplicó en la VM: el manifiesto ahora declara
+   * `appliedInProduction: true` con fecha y respaldo previo.
    */
-  it('G04-C11: P1 versionado y aditivo, pendiente de aplicar en producción', () => {
+  it('G04-C11: P1 versionado y aditivo, ya aplicado en producción (T-332)', () => {
     const socket = /location \/socket\.io\/ \{([\s\S]*?)\n {4}\}/.exec(SITE)?.[1] ?? '';
     expect(socket).toContain('proxy_pass http://127.0.0.1:3001;');
     expect(socket).toContain('proxy_set_header Upgrade $http_upgrade;');
