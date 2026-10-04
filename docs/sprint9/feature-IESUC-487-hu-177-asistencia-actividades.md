@@ -43,3 +43,5 @@ esa fila. Todo corre dentro de la transacción con lock que abre
 `ProjectTransactionService.run`.
 
 ## Verificación
+
+- Migración y seed corren limpios contra una base local recién creada.
