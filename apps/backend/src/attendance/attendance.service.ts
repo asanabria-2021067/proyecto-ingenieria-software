@@ -255,4 +255,30 @@ export class AttendanceService {
       return resultado;
     });
   }
+
+  /**
+   * T-297 (HU-177): núcleo transaccional de marcar/corregir/quitar
+   * asistencia. Separado de `marcarAsistencia` para poder probarlo con un
+   * `tx` simulado, sin pasar por el lock del proyecto (mismo patrón que
+   * `HoursRecognitionService.recognizeParticipationHours`).
+   *
+   * Idempotente por diseño: la fila de AsistenciaActividad guarda el ÚNICO
+   * `idRegistroHoras` que esa asistencia acreditó. Confirmar `asistio: true`
+   * dos veces ACTUALIZA esa misma fila de HorasParticipacion (nunca crea una
+   * segunda); quitar la asistencia la BORRA; volver a confirmar crea una
+   * fila nueva. En ningún punto hay dos filas de horas vivas para la misma
+   * asistencia.
+   */
+  async markAttendanceTx(
+    tx: Prisma.TransactionClient,
+    input: {
+      projectId: number;
+      actividad: { idActividad: number; horasValor: Prisma.Decimal; fechaActividad: Date };
+      targetUserId: number;
+      leaderId: number;
+      asistio: boolean;
+    },
+  ): Promise<AsistenciaPublica> {
+    const { projectId, actividad, targetUserId, leaderId, asistio } = input;
+  }
 }
