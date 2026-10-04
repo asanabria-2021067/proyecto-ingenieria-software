@@ -14,6 +14,7 @@ import { GenerateReportDto } from '../../src/project-closure/dto/closure.dto';
 import { createIntegrationAdmin } from './setup/leadership';
 import { flowAStack } from './setup/flow-a';
 import { createIntegrationProject } from './setup/fixtures';
+import { plannedEndDate } from './setup/sprint-plan';
 import { CLOSURE_GENERATOR_VERSION } from '../../src/project-closure/project-close-readiness.service';
 
 const pipe = new ValidationPipe({
@@ -125,7 +126,7 @@ describeIntegration('S7 frescura del informe de cierre', () => {
     await expectStatus(409, () => documentos.service.detach(f.project.idProyecto, f.leader.idUsuario, f.dto.revisionId, evidence));
     await expectStatus(409, () => documentos.service.detach(f.project.idProyecto, f.leader.idUsuario, corrected.revisionId, links[0].idDocumentoCierre));
     expect(await closure.getRevision(f.project.idProyecto, admin.idUsuario, 1)).toEqual(old);
-    await expectStatus(409, () => flowAStack(db).service.startSprint(f.project.idProyecto, f.leader.idUsuario));
+    await expectStatus(409, () => flowAStack(db).service.startSprint(f.project.idProyecto, f.leader.idUsuario, plannedEndDate()));
     expect(await db.notificacion.count({ where: { idUsuario: f.leader.idUsuario, tipoNotificacion: 'CIERRE_CORRECCION_DOCUMENTAL' } })).toBe(1);
     expect(await db.bitacoraAuditoria.count({ where: { idUsuario: f.leader.idUsuario, accion: 'CLOSURE_DOCUMENT_REMOVED' } })).toBe(1);
     expect(gateway.emitToUsers.mock.calls.map((call) => call[0])).toEqual(['CLOSURE_REVIEW_UPDATED']);

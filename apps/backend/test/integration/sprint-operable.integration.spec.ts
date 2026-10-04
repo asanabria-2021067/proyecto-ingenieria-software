@@ -4,6 +4,7 @@ import { ConflictException } from '@nestjs/common';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import { createIntegrationUser, createIntegrationProject } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
+import { plannedEndDate } from './setup/sprint-plan';
 import { SprintsService } from '../../src/sprints/sprints.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
@@ -70,8 +71,8 @@ describeIntegration(
       // previo (ni operable ni cerrado) para este proyecto.
 
       const [r1, r2] = await Promise.allSettled([
-        service.startSprint(project.idProyecto, leader.idUsuario),
-        service.startSprint(project.idProyecto, leader.idUsuario),
+        service.startSprint(project.idProyecto, leader.idUsuario, plannedEndDate()),
+        service.startSprint(project.idProyecto, leader.idUsuario, plannedEndDate()),
       ]);
 
       const fulfilled = [r1, r2].filter((r) => r.status === 'fulfilled');
@@ -112,7 +113,7 @@ describeIntegration(
       const project = await createIntegrationProject(prisma, leader.idUsuario, { estadoProyecto: 'EN_PROGRESO' });
       scope.projectIds = [project.idProyecto];
 
-      const primero = await service.startSprint(project.idProyecto, leader.idUsuario);
+      const primero = await service.startSprint(project.idProyecto, leader.idUsuario, plannedEndDate());
       expect(primero.numero).toBe(1);
       expect(primero.estado).toBe('ACTIVO');
 
@@ -121,7 +122,7 @@ describeIntegration(
         data: { estado: 'CERRADO' },
       });
 
-      const segundo = await service.startSprint(project.idProyecto, leader.idUsuario);
+      const segundo = await service.startSprint(project.idProyecto, leader.idUsuario, plannedEndDate());
       scope.sprintIds = [primero.idSprint, segundo.idSprint];
 
       expect(segundo.numero).toBe(2);

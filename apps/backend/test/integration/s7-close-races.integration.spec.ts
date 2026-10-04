@@ -21,6 +21,7 @@ import {
   closureReadyFixture,
 } from './setup/closure-lifecycle';
 import { pdfFixture, type ClosureCleanupScope } from './setup/closure-storage';
+import { plannedEndDate } from './setup/sprint-plan';
 
 async function expectStatus(status: number, fn: () => Promise<unknown>): Promise<unknown> {
   try {
@@ -135,7 +136,7 @@ describeIntegration('S7 carreras y preparación del cierre', () => {
         });
         const request = f.stack.closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto);
         await withDeadline(entered.wait(), 5000);
-        await withDeadline(Promise.all([request, expectStatus(409, () => sprintStack.service.startSprint(f.project.idProyecto, f.leader.idUsuario))]), 10000);
+        await withDeadline(Promise.all([request, expectStatus(409, () => sprintStack.service.startSprint(f.project.idProyecto, f.leader.idUsuario, plannedEndDate()))]), 10000);
         expect(await db.sprint.count({ where: { idProyecto: f.project.idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } } })).toBe(0);
       } else {
         const record = sprintStack.audit.registrarEvento.bind(sprintStack.audit);
@@ -146,7 +147,7 @@ describeIntegration('S7 carreras y preparación del cierre', () => {
         vi.spyOn(f.stack.runner, 'run').mockImplementationOnce(async (...args) => {
           await contender.arrive(); return run(...args);
         });
-        const start = sprintStack.service.startSprint(f.project.idProyecto, f.leader.idUsuario);
+        const start = sprintStack.service.startSprint(f.project.idProyecto, f.leader.idUsuario, plannedEndDate());
         await withDeadline(entered.wait(), 5000);
         const [sprint, error] = await withDeadline(Promise.all([start, expectStatus(409, () => f.stack.closure.requestClose(f.project.idProyecto, f.leader.idUsuario, f.dto))]), 10000);
         scope.sprintIds = [...scope.sprintIds!, sprint.idSprint];
