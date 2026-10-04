@@ -337,5 +337,18 @@ export class AttendanceService {
       await tx.horasParticipacion.delete({ where: { idRegistroHoras } });
       idRegistroHoras = null;
     }
+
+    const asistencia = await tx.asistenciaActividad.upsert({
+      where: { idActividad_idUsuario: { idActividad: actividad.idActividad, idUsuario: targetUserId } },
+      update: { asistio, confirmadoPor: leaderId, confirmadoEn: ahora, idRegistroHoras },
+      create: {
+        idActividad: actividad.idActividad,
+        idUsuario: targetUserId,
+        asistio,
+        confirmadoPor: leaderId,
+        confirmadoEn: ahora,
+        idRegistroHoras,
+      },
+    });
   }
 }
