@@ -56,3 +56,9 @@ esa fila. Todo corre dentro de la transacción con lock que abre
   arriba, listo para que la pruebe.
 
 ## Para Saúl y Samuel
+
+- **Saúl (T-298):** el backend ya expone todo lo que la pantalla de
+  "Asistencia" necesita — las 4 rutas de arriba. `obtenerActividad` devuelve
+  la actividad con la lista de participantes y su estado de asistencia
+  (revisa `AttendanceService.obtenerActividad` para la forma exacta del
+  DTO). Falta solo el componente de frontend.
