@@ -12,3 +12,5 @@ esta rama.
 
 Verificado vía `gh api` (no ejecutado por mí, es tarea manual en GitHub
 Settings → Rules):
+
+- Existen rulesets llamados `develop` (id 14616829) y `main` (id 12281716).
