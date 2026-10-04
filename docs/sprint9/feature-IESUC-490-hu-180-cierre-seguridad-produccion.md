@@ -53,3 +53,7 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
    próximo deploy desde `main` no revierta lo ya aplicado a mano en la VM.
 
 ## T-311 — Escaneo OWASP ZAP
+
+- `zap-baseline.py` (Docker `zaproxy/zap-stable`) contra
+  `https://158.23.57.118.nip.io`. Resultado: `FAIL-NEW: 0`, `WARN-NEW: 8`,
+  `PASS: 59`. Cero hallazgos altos o medios reales.
