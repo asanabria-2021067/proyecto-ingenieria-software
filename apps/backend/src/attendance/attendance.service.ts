@@ -228,6 +228,16 @@ export class AttendanceService {
         where: { idActividad_idUsuario: { idActividad: actividadId, idUsuario: targetUserId } },
         select: { asistio: true },
       });
+
+      const resultado = await this.markAttendanceTx(tx, {
+        projectId,
+        actividad,
+        targetUserId,
+        leaderId,
+        asistio: dto.asistio,
+      });
+
+      return resultado;
     });
   }
 }
