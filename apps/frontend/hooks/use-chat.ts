@@ -203,6 +203,9 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       // abiertas y la lista global en vez de esperar un recargo de página.
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
       for (const idConversacion of openIdsRef.current) {
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes',
+        });
         joinConversationReliably(socket, idConversacion, () => !openIdsRef.current.includes(idConversacion));
       }
     };
