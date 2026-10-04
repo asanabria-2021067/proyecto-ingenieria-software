@@ -25,3 +25,7 @@ Alerta informativa de ZAP (nivel WARN en el baseline) que recomienda usar el spi
 ### 3. Cross-Origin-Embedder-Policy Header Missing or Invalid (×9)
 
 El backend (Helmet) y el frontend no envían `Cross-Origin-Embedder-Policy`. Ese header solo importa para aislar el origen cuando la app usa APIs que requieren "cross-origin isolation" (p. ej. `SharedArrayBuffer`, `performance.measureUserAgentSpecificMemory`) — UVG Collab no usa ninguna. Activarlo sin necesidad puede romper la carga de imágenes de Cloudinary (que no envían `Cross-Origin-Resource-Policy`) sin ganar protección real. **Aceptado (`RESIDUAL_CODE_RISK`), sin owner nuevo** — revisar si el frontend empieza a usar Web Workers con memoria compartida.
+
+### Ruido del spider (no son hallazgos)
+
+Varias URLs reportadas en 404 (`robots.txt`, rutas con `%2F` y query strings de `next/image` tipo `...jpg&w=384&q=75`) son el spider de ZAP mal-parseando atributos `srcset`/`sizes` de `next/image` como URLs completas, no asset reales de la app. El backend/frontend responde 404 limpio a esas URLs (sin stack trace, sin información sensible) — comportamiento correcto, no se actúa.
