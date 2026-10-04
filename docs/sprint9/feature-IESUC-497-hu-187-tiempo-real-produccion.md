@@ -34,3 +34,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   igual criterio visual que el de notificaciones.
 - Pruebas: `test/use-chat.spec.ts` y `test/use-realtime-notifications.spec.ts`
   (reconexión invalida las queries correctas).
+
+## T-334 — E2E de tiempo real
