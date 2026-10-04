@@ -1,3 +1,14 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+
+// T-334 (HU-187): notificación en tiempo real entre dos usuarios reales,
+// mismo patrón de dos contextos que chat-mensajeria.spec.ts. carlos.mendoza
+// (líder del Proyecto 1) comenta la tarea 1 ("Crear mockups en Figma"),
+// cuyo único asignado activo en el seed es maria.lopez — el comentario
+// notifica al asignado activo (ver getTaskCommentRecipientIds en
+// comentarios.service.ts), nunca al autor.
+const PROYECTO_ID = 1;
+const TAREA_ID = 1;
+const CORREO_LIDER = 'carlos.mendoza@uvg.edu.gt';
+const CORREO_ASIGNADA = 'maria.lopez@uvg.edu.gt';
