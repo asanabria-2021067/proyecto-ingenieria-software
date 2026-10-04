@@ -62,3 +62,10 @@ esa fila. Todo corre dentro de la transacción con lock que abre
   la actividad con la lista de participantes y su estado de asistencia
   (revisa `AttendanceService.obtenerActividad` para la forma exacta del
   DTO). Falta solo el componente de frontend.
+- **Samuel (T-299):** `AttendanceService` (constructor inyecta
+  `PrismaService`, `BitacoraEventosService`, `ProjectTransactionService`) ya
+  sigue el mismo estilo de prueba que el resto del repo (Prisma simulado a
+  mano con `vi.fn()`, ver `apps/backend/test/g05-user-status-events.spec.ts`
+  como referencia). Los casos a cubrir: asistencia nueva suma horas,
+  corrección no duplica, quitar asistencia resta, rechazo a quien no es
+  líder.
