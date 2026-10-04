@@ -34,3 +34,5 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
    frontend`). Verificado: `curl` directo a `http://158.23.57.118:3000` y
    `:3001` ya no responde desde fuera; el sitio y Socket.IO siguen
    funcionando normal vía nginx.
+2. **TRUST_PROXY_HOPS=1:** aplicado después de cerrar los puertos. Backend
+   recreado, arrancó sano; login vía nginx responde 401 esperado (no 500).
