@@ -80,3 +80,5 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
 
 - Habilitar los rulesets de `develop`/`main` (T-308) y tomar la captura.
 - Revisar visualmente CSP enforce tras el próximo deploy desde `main`.
+- Re-correr el escaneo ZAP después de ese deploy para confirmar que el WARN
+  de CSP desaparece.
