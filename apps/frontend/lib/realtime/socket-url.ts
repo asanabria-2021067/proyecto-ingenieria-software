@@ -20,6 +20,9 @@ export function realtimeBaseUrl(
   if (!apiUrl) {
     return page.origin;
   }
+  if (page.protocol === 'https:' && apiUrl.startsWith('http:')) {
+    return page.origin;
+  }
   const wsScheme = page.protocol === 'https:' ? 'wss' : 'ws';
   return apiUrl.replace(/^https?/, wsScheme);
 }
