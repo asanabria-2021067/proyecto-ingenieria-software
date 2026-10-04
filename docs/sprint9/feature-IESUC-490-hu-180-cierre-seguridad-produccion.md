@@ -20,3 +20,9 @@ Settings → Rules):
   captura para el informe.
 
 ## T-309 — Cerrar puertos, CSP enforce, alertas de seguridad en la VM
+
+Todo esto es configuración de la VM y de GitHub Variables — **no genera
+cambios versionables en el repo** (`.env.example` ya documentaba
+`BACKEND_BIND`, `FRONTEND_BIND`, `TRUST_PROXY_HOPS`, `SECURITY_ALERTS_ENABLED`
+y `CSP_MODE` con sus valores por defecto antes de esta tarea; lo que cambió
+son los valores reales en la VM y en GitHub, no el código). Evidencia:
