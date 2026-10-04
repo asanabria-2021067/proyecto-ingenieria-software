@@ -66,3 +66,8 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
   aplican a esta arquitectura o son metodológicos.
 
 ## Para Vernel y Samuel
+
+- **Vernel (T-310):** el catálogo de eventos de seguridad
+  (`TipoEventoSeguridad` en `apps/backend/src/security-events/`) y
+  `SecurityEventsService` ya existían antes de esta rama — no dependen de
+  nada de T-308/309/311. Puede construir el visor directo sobre `develop`.
