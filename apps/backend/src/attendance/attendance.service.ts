@@ -203,4 +203,31 @@ export class AttendanceService {
       }),
     };
   }
+
+  async marcarAsistencia(
+    projectId: number,
+    leaderId: number,
+    actividadId: number,
+    targetUserId: number,
+    dto: MarkAttendanceDto,
+  ): Promise<AsistenciaPublica> {
+    return this.projectTx.run(projectId, leaderId, 'attendance.marcarAsistencia', async (ctx) => {
+      const { tx } = ctx;
+      const project = this.lockedProject(ctx);
+      await this.policy.assertWriteTx(tx, project, 'ACTIVIDAD_ASISTENCIA', leaderId);
+
+      const actividad = await tx.actividadProyecto.findFirst({
+        where: { idActividad: actividadId, idProyecto: projectId },
+        select: { idActividad: true, horasValor: true, fechaActividad: true },
+      });
+      if (!actividad) {
+        throw new NotFoundException(`Actividad con id ${actividadId} no encontrada en el proyecto ${projectId}`);
+      }
+
+      const anterior = await tx.asistenciaActividad.findUnique({
+        where: { idActividad_idUsuario: { idActividad: actividadId, idUsuario: targetUserId } },
+        select: { asistio: true },
+      });
+    });
+  }
 }
