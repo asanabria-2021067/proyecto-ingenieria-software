@@ -333,6 +333,9 @@ export class AttendanceService {
         });
         idRegistroHoras = creado.idRegistroHoras;
       }
+    } else if (idRegistroHoras) {
+      await tx.horasParticipacion.delete({ where: { idRegistroHoras } });
+      idRegistroHoras = null;
     }
   }
 }
