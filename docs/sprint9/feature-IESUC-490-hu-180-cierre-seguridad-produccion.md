@@ -9,3 +9,6 @@ agrega con sus propios commits — ninguna de las dos depende del código de
 esta rama.
 
 ## T-308 — Protección de ramas develop y main
+
+Verificado vía `gh api` (no ejecutado por mí, es tarea manual en GitHub
+Settings → Rules):
