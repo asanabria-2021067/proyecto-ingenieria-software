@@ -84,7 +84,8 @@ export type ProjectWriteFamily =
   | 'CIERRE_EVIDENCIAS'
   | 'CIERRE_ENVIO'
   | 'CIERRE_VEREDICTO'
-  | 'CIERRE_LIMPIEZA';
+  | 'CIERRE_LIMPIEZA'
+  | 'ACTIVIDAD_ASISTENCIA';
 
 export interface ProjectWriteMetadata {
   /** Fuente(s) enumerada(s) del identificador de proyecto; se usa la primera presente. */
