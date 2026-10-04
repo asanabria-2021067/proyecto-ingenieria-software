@@ -14,3 +14,5 @@ quitaron: cada quien las agrega con sus propios commits sobre esta base.
   `schema.prisma`.
 - Migración `20261004084555_add_actividad_asistencia`, probada limpia contra
   una base local.
+- Seed actualizado con 2 actividades de ejemplo en el Proyecto 1 (una con
+  asistencia ya confirmada y acreditada, otra pendiente).
