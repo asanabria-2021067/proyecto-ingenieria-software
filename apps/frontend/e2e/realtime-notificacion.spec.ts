@@ -44,3 +44,5 @@ test('un usuario comenta una tarea y el asignado ve la notificación sin recarga
 
     const marca = `${test.info().workerIndex}-${test.info().repeatEachIndex}-${Math.random().toString(36).slice(2)}`;
     const comentario = `Revisado ${marca}`;
+    await pageA.getByPlaceholder('Escribe un comentario...').fill(comentario);
+    await pageA.getByRole('button', { name: 'Comentar' }).click();
