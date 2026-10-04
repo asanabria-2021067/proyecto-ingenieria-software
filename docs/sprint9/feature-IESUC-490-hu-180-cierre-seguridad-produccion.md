@@ -7,3 +7,5 @@ T-310 (visor de eventos, Vernel) y T-312 (actualizar
 `docs/security/owasp-top10-2025.md`, Samuel) se quitaron: cada quien las
 agrega con sus propios commits — ninguna de las dos depende del código de
 esta rama.
+
+## T-308 — Protección de ramas develop y main
