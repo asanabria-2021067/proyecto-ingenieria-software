@@ -95,7 +95,7 @@ describe('G02-C16: baseline nginx versionado', () => {
     expect(SITE).not.toMatch(/add_header|return 301/);
     const pending = (manifest as unknown as { pendingLiveChanges?: Array<{ gate: string; appliedInProduction: boolean }> })
       .pendingLiveChanges;
-    expect(pending).toEqual([expect.objectContaining({ gate: 'G04-C11', appliedInProduction: false })]);
+    expect(pending).toEqual([expect.objectContaining({ gate: 'G04-C11', appliedInProduction: true })]);
   });
 
   it('G04-C11: contra la configuración viva previa a P1, el comparador reporta la diferencia (no la esconde)', () => {
