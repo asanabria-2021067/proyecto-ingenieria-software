@@ -35,3 +35,7 @@ test('un usuario comenta una tarea y el asignado ve la notificación sin recarga
   try {
     await login(pageA, CORREO_LIDER);
     await login(pageB, CORREO_ASIGNADA);
+
+    // B se queda en el dashboard: el socket de /notifications vive en
+    // DashboardLayout, montado en cualquier página del área /dashboard.
+    await pageB.goto('/dashboard');
