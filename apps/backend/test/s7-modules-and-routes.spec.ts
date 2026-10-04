@@ -624,7 +624,7 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
     expect(ausentes).toEqual([]);
     expect(CANONICAL_OPERATIONS).toHaveLength(118);
   }, 30_000);
-  it('C158: toda ruta de escritura participante declara su policy explícita y la cobertura son 66 usos', async () => {
+  it('C158: toda ruta de escritura participante declara su policy explícita y la cobertura son 69 usos', async () => {
     const { AppModule } = await import('../src/app.module');
     const { PROJECT_WRITE_METADATA_KEY } = await import(
       '../src/common/guards/project-write.metadata'
