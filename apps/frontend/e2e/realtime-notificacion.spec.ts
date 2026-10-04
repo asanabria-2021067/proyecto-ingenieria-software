@@ -12,3 +12,13 @@ const PROYECTO_ID = 1;
 const TAREA_ID = 1;
 const CORREO_LIDER = 'carlos.mendoza@uvg.edu.gt';
 const CORREO_ASIGNADA = 'maria.lopez@uvg.edu.gt';
+
+async function desactivarTour(page: Page) {
+  await page.addInitScript(() => {
+    const originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key: string) {
+      if (typeof key === 'string' && key.startsWith('onboarding_seen_')) return 'true';
+      return originalGetItem.call(this, key);
+    };
+  });
+}
