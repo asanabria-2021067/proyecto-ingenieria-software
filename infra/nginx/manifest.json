@@ -35,7 +35,7 @@
     {
       "gate": "G04-C11",
       "change": "P1: location /socket.io/ + upstreams 127.0.0.1 en / y /api",
-      "appliedInProduction": false,
+      "appliedInProduction": true,
       "owner": "Gate Admin (sudoer con copia fechada, nginx -t y reload)"
     }
   ]
