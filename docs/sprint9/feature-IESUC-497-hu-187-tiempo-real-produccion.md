@@ -57,3 +57,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   real con reintentos.
 
 ## Cambios en la VM (158.23.57.118)
+
+1. Backup fechado: `/etc/nginx/sites-enabled/uvg-collab.bak-20261004-0753`.
