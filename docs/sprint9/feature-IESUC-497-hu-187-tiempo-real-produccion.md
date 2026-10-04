@@ -65,3 +65,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 3. `sudo nginx -t` → ok (los únicos warnings, "conflicting server name", son
    preexistentes del host compartido, no de este cambio) → `systemctl reload
    nginx`.
+4. Verificación:
+   - `curl -sk "https://158.23.57.118.nip.io/socket.io/?EIO=4&transport=polling"`
+     → `0{"sid":"...","upgrades":["websocket"],...}` (antes 404 HTML).
