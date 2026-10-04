@@ -39,3 +39,5 @@ test('un usuario comenta una tarea y el asignado ve la notificación sin recarga
     // B se queda en el dashboard: el socket de /notifications vive en
     // DashboardLayout, montado en cualquier página del área /dashboard.
     await pageB.goto('/dashboard');
+
+    await pageA.goto(`/dashboard/projects/${PROYECTO_ID}/kanban/tasks/${TAREA_ID}?section=comments`);
