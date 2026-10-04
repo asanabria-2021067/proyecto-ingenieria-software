@@ -176,5 +176,17 @@ export class AttendanceService {
     if (!actividad) {
       throw new NotFoundException(`Actividad con id ${actividadId} no encontrada en el proyecto ${projectId}`);
     }
+
+    const [integrantes, asistencias] = await Promise.all([
+      this.prisma.participacionProyecto.findMany({
+        where: { estadoParticipacion: EstadoParticipacion.ACTIVO, rolProyecto: { idProyecto: projectId } },
+        select: { usuario: { select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } } },
+        distinct: ['idUsuario'],
+      }),
+      this.prisma.asistenciaActividad.findMany({
+        where: { idActividad: actividadId },
+        select: { idUsuario: true, asistio: true, confirmadoEn: true },
+      }),
+    ]);
   }
 }
