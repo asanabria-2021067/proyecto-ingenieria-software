@@ -302,5 +302,37 @@ export class AttendanceService {
 
     const ahora = new Date();
     let idRegistroHoras: number | null = existente?.idRegistroHoras ?? null;
+
+    if (asistio) {
+      if (idRegistroHoras) {
+        await tx.horasParticipacion.update({
+          where: { idRegistroHoras },
+          data: {
+            horasReportadas: actividad.horasValor,
+            horasCalculadas: actividad.horasValor,
+            horasAprobadas: actividad.horasValor,
+            estadoHoras: 'APROBADA',
+            aprobadoPor: leaderId,
+            fechaAprobacion: ahora,
+          },
+        });
+      } else {
+        const creado = await tx.horasParticipacion.create({
+          data: {
+            idParticipacion: participacion.idParticipacion,
+            periodoInicio: actividad.fechaActividad,
+            periodoFin: actividad.fechaActividad,
+            horasReportadas: actividad.horasValor,
+            horasCalculadas: actividad.horasValor,
+            horasAprobadas: actividad.horasValor,
+            estadoHoras: 'APROBADA',
+            aprobadoPor: leaderId,
+            fechaAprobacion: ahora,
+          },
+          select: { idRegistroHoras: true },
+        });
+        idRegistroHoras = creado.idRegistroHoras;
+      }
+    }
   }
 }
