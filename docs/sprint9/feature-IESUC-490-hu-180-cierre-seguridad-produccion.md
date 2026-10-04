@@ -18,3 +18,5 @@ Settings → Rules):
   `main` hoy NO se rechaza. Falta habilitarlos (exigir PR + checks de
   `ci.yml` en verde + 1 aprobación + bloqueo de force-push) y tomar la
   captura para el informe.
+
+## T-309 — Cerrar puertos, CSP enforce, alertas de seguridad en la VM
