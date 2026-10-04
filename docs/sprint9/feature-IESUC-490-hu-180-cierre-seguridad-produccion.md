@@ -26,3 +26,11 @@ cambios versionables en el repo** (`.env.example` ya documentaba
 `BACKEND_BIND`, `FRONTEND_BIND`, `TRUST_PROXY_HOPS`, `SECURITY_ALERTS_ENABLED`
 y `CSP_MODE` con sus valores por defecto antes de esta tarea; lo que cambió
 son los valores reales en la VM y en GitHub, no el código). Evidencia:
+
+1. **Binds loopback:** `.env` de la VM (`~/proyecto-ingenieria-software/.env`,
+   backup previo `.env.bak-20261004-0802`) → `BACKEND_BIND=127.0.0.1`,
+   `FRONTEND_BIND=127.0.0.1`. Contenedores recreados
+   (`docker compose --profile app up -d --no-deps --no-build backend
+   frontend`). Verificado: `curl` directo a `http://158.23.57.118:3000` y
+   `:3001` ya no responde desde fuera; el sitio y Socket.IO siguen
+   funcionando normal vía nginx.
