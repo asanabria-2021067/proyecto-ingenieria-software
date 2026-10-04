@@ -55,3 +55,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   sobre contención). **Pendiente:** correrlo en CI y en `infra/staging` como
   pide la subtarea 3; no se forzó aquí para no enmascarar un posible flake
   real con reintentos.
+
+## Cambios en la VM (158.23.57.118)
