@@ -84,3 +84,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
    el fix de T-332 todavía — ese código solo se publica cuando esta rama se
    mezcle a `main` y corra `deploy.yml`). Por eso los logs del gateway no
    muestran conexiones nuevas todavía: nadie ha cargado el bundle corregido.
+
+## Pendiente / siguiente paso
