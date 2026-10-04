@@ -17,4 +17,8 @@ export class CreateActividadDto {
 
   @IsDateString({}, { message: 'fechaActividad debe ser una fecha válida (YYYY-MM-DD)' })
   fechaActividad!: string;
+
+  @IsNumber({ allowInfinity: false, allowNaN: false })
+  @Min(0.01, { message: 'horasValor debe ser mayor a 0' })
+  horasValor!: number;
 }
