@@ -71,3 +71,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
    - `node infra/nginx/compare-live.mjs` contra una copia fresca de la VM:
      el único diff reportado es CRLF/LF (checkout de Windows), contenido
      línea a línea idéntico — confirma que lo aplicado es exactamente P1.
+   - Certificado: válido hasta 2026-11-19, timer `snap.certbot.renew.timer`
+     activo (renovación automática ok).
