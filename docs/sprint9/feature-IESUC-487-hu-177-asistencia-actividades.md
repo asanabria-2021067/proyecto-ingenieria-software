@@ -25,3 +25,8 @@ Módulo `apps/backend/src/attendance/`, montado en `AppModule`. Rutas reales:
 - `GET /proyectos/:projectId/actividades/:actividadId` — detalle con asistencia por integrante.
 - `POST /proyectos/:projectId/actividades` — crea actividad (solo líder).
 - `PATCH /proyectos/:projectId/actividades/:actividadId/asistencia/:usuarioId` — marca/corrige/quita asistencia (solo líder).
+
+Solo el líder del proyecto puede crear actividades y marcar asistencia:
+`ProjectWriteGuard` + nueva familia `ACTIVIDAD_ASISTENCIA` en
+`ProjectPolicyService` (actor `LIDER`), mismo patrón que el resto de
+escrituras de proyecto.
