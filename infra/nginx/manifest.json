@@ -22,7 +22,7 @@
       "path": "sites-enabled/uvg-collab",
       "livePath": "/etc/nginx/sites-enabled/uvg-collab",
       "liveMode": "644 root:root",
-      "liveSha256": "ea10d072d3bf5ea4710000d4cf311b7fcd4ed4b1b4dfeb055eb2c46733b80148",
+      "liveSha256": "d3ca2793be22d244d53f27b8ad6ab4a36cf0a6521aed2488a03e8cb96a42fb8d",
       "versionedSha256": "9365ad3e149a09b8373ab6828873c101475e413815afe3655f0ca23a9992f301",
       "mode": "sanitized",
       "owner": "UVG Collab (locations /, /api y /.well-known/acme-challenge/ del server compartido)",
