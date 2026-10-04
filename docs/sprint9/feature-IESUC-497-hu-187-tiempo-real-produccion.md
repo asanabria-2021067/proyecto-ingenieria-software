@@ -14,3 +14,8 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   variable, página http) no cambia.
 - VM: aplicado P1 en `/etc/nginx/sites-enabled/uvg-collab` (location
   `/socket.io/`, upstreams `127.0.0.1`). Ver sección "Cambios en la VM".
+- GitHub Actions Variable `PUBLIC_API_URL` puesta en `same-origin`: el
+  próximo build desde `main` hornea `NEXT_PUBLIC_API_URL=''` y ya no la IP.
+  Con el fix de T-332, la variante `direct` actual también queda corregida
+  (detecta el mismatch http/https), pero `same-origin` es la forma limpia
+  de no quemar la IP, pedida en el prompt.
