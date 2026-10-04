@@ -356,6 +356,9 @@ model Usuario {
   mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
+  actividadesCreadas               ActividadProyecto[]
+  asistencias                      AsistenciaActividad[]      @relation("AsistenciaUsuario")
+  asistenciasConfirmadas           AsistenciaActividad[]      @relation("AsistenciaConfirmador")
 
   @@map("usuario")
 }
@@ -613,6 +616,7 @@ model Proyecto {
   documentosCierre     DocumentoCierre[]
   eventos              EventoProyecto[]
   guardadoPor          ProyectoGuardado[]
+  actividades          ActividadProyecto[]
 
   @@map("proyecto")
 }
@@ -1299,9 +1303,63 @@ model HorasParticipacion {
   participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion])
   aprobador     Usuario?              @relation(fields: [aprobadoPor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
   sprint        Sprint?               @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict, onUpdate: Cascade)
+  /// T-297 (HU-177): presente cuando esta fila fue generada por confirmar asistencia a una actividad, no por reconocimiento de Sprint.
+  asistencia    AsistenciaActividad?
 
   @@index([idSprint])
   @@map("horas_participacion")
+}
+
+/// T-295 (HU-177): tipo de actividad del proyecto a la que el líder registra asistencia.
+enum TipoActividad {
+  REUNION
+  JORNADA
+  TALLER
+  OTRO
+}
+
+/// T-295 (HU-177): actividad (reunión, jornada, taller) creada por el líder del
+/// proyecto (`Proyecto.creadoPor`) con un valor fijo de horas; la asistencia
+/// confirmada de cada integrante (`AsistenciaActividad`) es lo que acredita esas
+/// horas en HorasParticipacion/"Mis horas" (HU-158), no la actividad en sí.
+model ActividadProyecto {
+  idActividad     Int           @id @default(autoincrement()) @map("id_actividad")
+  idProyecto      Int           @map("id_proyecto")
+  tituloActividad String        @map("titulo_actividad") @db.VarChar(200)
+  tipoActividad   TipoActividad @map("tipo_actividad")
+  fechaActividad  DateTime      @map("fecha_actividad") @db.Date
+  horasValor      Decimal       @map("horas_valor") @db.Decimal(6, 2)
+  creadoPor       Int           @map("creado_por")
+  creadoEn        DateTime      @default(now()) @map("creado_en")
+
+  proyecto    Proyecto              @relation(fields: [idProyecto], references: [idProyecto])
+  creador     Usuario               @relation(fields: [creadoPor], references: [idUsuario])
+  asistencias AsistenciaActividad[]
+
+  @@index([idProyecto, fechaActividad])
+  @@map("actividad_proyecto")
+}
+
+/// T-295/T-297 (HU-177): asistencia de UN integrante a UNA actividad. `idRegistroHoras`
+/// enlaza la fila de HorasParticipacion que esta asistencia acreditó (si `asistio` es
+/// true); al corregir o quitar la asistencia se reutiliza/borra esa misma fila en vez
+/// de crear una nueva, lo que garantiza que las horas nunca se dupliquen.
+model AsistenciaActividad {
+  idAsistencia    Int       @id @default(autoincrement()) @map("id_asistencia")
+  idActividad     Int       @map("id_actividad")
+  idUsuario       Int       @map("id_usuario")
+  asistio         Boolean   @default(false)
+  confirmadoPor   Int?      @map("confirmado_por")
+  confirmadoEn    DateTime? @map("confirmado_en")
+  idRegistroHoras Int?      @unique @map("id_registro_horas")
+
+  actividad     ActividadProyecto   @relation(fields: [idActividad], references: [idActividad])
+  usuario       Usuario             @relation("AsistenciaUsuario", fields: [idUsuario], references: [idUsuario])
+  confirmador   Usuario?            @relation("AsistenciaConfirmador", fields: [confirmadoPor], references: [idUsuario])
+  registroHoras HorasParticipacion? @relation(fields: [idRegistroHoras], references: [idRegistroHoras])
+
+  @@unique([idActividad, idUsuario])
+  @@map("asistencia_actividad")
 }
 
 model Certificado {

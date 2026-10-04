@@ -23,7 +23,8 @@ export type ReadScope =
   | 'bitacora'
   | 'liderazgo'
   | 'historico'
-  | 'exportacion';
+  | 'exportacion'
+  | 'asistencia';
 
 export type ReaderProfile =
   | 'LIDER'
@@ -83,6 +84,7 @@ const ALL_SCOPES: readonly ReadScope[] = [
   'liderazgo',
   'historico',
   'exportacion',
+  'asistencia',
 ];
 
 @Injectable()

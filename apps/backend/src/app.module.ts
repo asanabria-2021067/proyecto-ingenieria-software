@@ -41,6 +41,7 @@ import { GlobalSearchModule } from './search/global-search.module';
 import { ExportsModule } from './exports/exports.module';
 import { SecurityEventsModule } from './security-events/security-events.module';
 import { EventsModule } from './events/events.module';
+import { AttendanceModule } from './attendance/attendance.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { EventsModule } from './events/events.module';
     // G05 (OWASP25-C037): writer best-effort de eventos de seguridad (global).
     SecurityEventsModule,
     EventsModule,
+    AttendanceModule,
   ],
   controllers: [AppController],
   providers: [

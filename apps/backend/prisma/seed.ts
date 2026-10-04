@@ -815,6 +815,95 @@ async function main() {
     });
   }
 
+  // ─── Actividades y asistencia (T-295/HU-177) ─────────────
+  const actividadTutoria1 = await prisma.actividadProyecto.upsert({
+    where: { idActividad: 1 },
+    update: {},
+    create: {
+      idActividad: 1,
+      idProyecto: pTutorias.idProyecto,
+      tituloActividad: 'Reunión semanal de seguimiento',
+      tipoActividad: 'REUNION',
+      fechaActividad: new Date('2026-03-10'),
+      horasValor: 2,
+      creadoPor: carlos.idUsuario,
+    },
+  });
+  await prisma.actividadProyecto.upsert({
+    where: { idActividad: 2 },
+    update: {},
+    create: {
+      idActividad: 2,
+      idProyecto: pTutorias.idProyecto,
+      tituloActividad: 'Jornada de diseño UX',
+      tipoActividad: 'JORNADA',
+      fechaActividad: new Date('2026-03-20'),
+      horasValor: 4,
+      creadoPor: carlos.idUsuario,
+    },
+  });
+
+  // Asistencia ya confirmada a la actividad 1: cada fila acredita sus horas una
+  // sola vez a través de su propia HorasParticipacion (idRegistroHoras) — el
+  // mismo patrón idempotente que aplica AttendanceService.marcarAsistencia. La
+  // actividad 2 (jornada) queda sin marcar para mostrar el estado pendiente.
+  const horasMaria = await prisma.horasParticipacion.upsert({
+    where: { idRegistroHoras: 8 },
+    update: {},
+    create: {
+      idRegistroHoras: 8,
+      idParticipacion: participaciones[0].idParticipacion,
+      periodoInicio: new Date('2026-03-10'),
+      periodoFin: new Date('2026-03-10'),
+      horasReportadas: 2,
+      horasCalculadas: 2,
+      horasAprobadas: 2,
+      estadoHoras: 'APROBADA',
+      aprobadoPor: carlos.idUsuario,
+      fechaAprobacion: new Date('2026-03-10'),
+    },
+  });
+  const horasJose = await prisma.horasParticipacion.upsert({
+    where: { idRegistroHoras: 9 },
+    update: {},
+    create: {
+      idRegistroHoras: 9,
+      idParticipacion: participaciones[1].idParticipacion,
+      periodoInicio: new Date('2026-03-10'),
+      periodoFin: new Date('2026-03-10'),
+      horasReportadas: 2,
+      horasCalculadas: 2,
+      horasAprobadas: 2,
+      estadoHoras: 'APROBADA',
+      aprobadoPor: carlos.idUsuario,
+      fechaAprobacion: new Date('2026-03-10'),
+    },
+  });
+  await prisma.asistenciaActividad.upsert({
+    where: { idActividad_idUsuario: { idActividad: actividadTutoria1.idActividad, idUsuario: maria.idUsuario } },
+    update: {},
+    create: {
+      idActividad: actividadTutoria1.idActividad,
+      idUsuario: maria.idUsuario,
+      asistio: true,
+      confirmadoPor: carlos.idUsuario,
+      confirmadoEn: new Date('2026-03-10'),
+      idRegistroHoras: horasMaria.idRegistroHoras,
+    },
+  });
+  await prisma.asistenciaActividad.upsert({
+    where: { idActividad_idUsuario: { idActividad: actividadTutoria1.idActividad, idUsuario: jose.idUsuario } },
+    update: {},
+    create: {
+      idActividad: actividadTutoria1.idActividad,
+      idUsuario: jose.idUsuario,
+      asistio: true,
+      confirmadoPor: carlos.idUsuario,
+      confirmadoEn: new Date('2026-03-10'),
+      idRegistroHoras: horasJose.idRegistroHoras,
+    },
+  });
+
   // ─── Certificados ───────────────────────────────────────
   const certData = [
     { idParticipacion: participaciones[0].idParticipacion, tipoCertificado: 'HORAS_BECA' as const, horasCertificadas: 12, emitidoPor: luis.idUsuario, codigoVerificacion: 'CERT-2026-001' },
