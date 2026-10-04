@@ -12,3 +12,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 - `apps/frontend/test/realtime-same-origin.spec.ts`: actualizado para
   esperar `page.origin` en ese caso; el resto de casos (API ya https, sin
   variable, página http) no cambia.
+- VM: aplicado P1 en `/etc/nginx/sites-enabled/uvg-collab` (location
+  `/socket.io/`, upstreams `127.0.0.1`). Ver sección "Cambios en la VM".
