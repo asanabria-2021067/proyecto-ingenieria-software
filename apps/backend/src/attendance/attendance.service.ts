@@ -64,3 +64,7 @@ export interface AsistenciaPublica {
   confirmadoEn: string | null;
   idRegistroHoras: number | null;
 }
+
+function toDateOnly(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
