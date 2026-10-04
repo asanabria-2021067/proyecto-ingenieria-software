@@ -249,6 +249,13 @@ export const PROJECT_WRITE_POLICY_CATALOG: Readonly<Record<ProjectWriteFamily, P
     entity: 'ANY',
     descripcion: 'Reserva/finalización de purga por admin o job técnico; solo documentos sin referencias',
   },
+  ACTIVIDAD_ASISTENCIA: {
+    actor: 'LIDER',
+    states: OPERATIVE,
+    sprint: 'ANY',
+    entity: 'ANY',
+    descripcion: 'Crear actividad y marcar asistencia (HU-177): exclusivo del líder; no depende del Sprint ambiente',
+  },
 };
 
 export interface WriteEntityContext {

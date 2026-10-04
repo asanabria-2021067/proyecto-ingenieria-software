@@ -17,7 +17,7 @@ export function ChatDock() {
   const [listOpen, setListOpen] = useState(false);
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
   const { conversations } = useAllConversations();
-  useGlobalChatSocket(windows.map((w) => w.idConversacion));
+  const { isConnected: chatConnected } = useGlobalChatSocket(windows.map((w) => w.idConversacion));
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,6 +70,14 @@ export function ChatDock() {
             )}
           </span>
           Mensajes
+          <span
+            role="status"
+            title={chatConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
+            aria-label={chatConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
+            className={`size-2 shrink-0 rounded-full ${
+              chatConnected ? 'bg-status-success' : 'animate-pulse bg-status-warning'
+            }`}
+          />
         </button>
       </div>
     </div>

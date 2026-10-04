@@ -55,7 +55,7 @@ function liveFixture(versioned: string): string {
 describe('G02-C16: baseline nginx versionado', () => {
   it('los hashes registrados son los del baseline productivo del plan', () => {
     expect(entry('verbatim').liveSha256).toBe('48c6a4ec1e1fd28ccf968490f07e34a1d7f755793b2108a3ed8670b1ee2a0aa2');
-    expect(site.liveSha256).toBe('ea10d072d3bf5ea4710000d4cf311b7fcd4ed4b1b4dfeb055eb2c46733b80148');
+    expect(site.liveSha256).toBe('d3ca2793be22d244d53f27b8ad6ab4a36cf0a6521aed2488a03e8cb96a42fb8d');
   });
 
   it('cada archivo versionado coincide con su SHA-256 del manifiesto; nginx.conf es verbatim', () => {
@@ -80,9 +80,10 @@ describe('G02-C16: baseline nginx versionado', () => {
    * /socket.io/ y que los upstreams fueran `localhost`: era el contrato de
    * "baseline sin adelantar P1" de G02. G04 versiona P1 a propósito; lo que
    * sigue exigiéndose es que P1 sea aditivo (sin redirect, HSTS ni cambios de
-   * TLS) y que el manifiesto declare que aún no está aplicado en la VM.
+   * TLS). T-332 (HU-187) lo aplicó en la VM: el manifiesto ahora declara
+   * `appliedInProduction: true` con fecha y respaldo previo.
    */
-  it('G04-C11: P1 versionado y aditivo, pendiente de aplicar en producción', () => {
+  it('G04-C11: P1 versionado y aditivo, ya aplicado en producción (T-332)', () => {
     const socket = /location \/socket\.io\/ \{([\s\S]*?)\n {4}\}/.exec(SITE)?.[1] ?? '';
     expect(socket).toContain('proxy_pass http://127.0.0.1:3001;');
     expect(socket).toContain('proxy_set_header Upgrade $http_upgrade;');
@@ -94,7 +95,7 @@ describe('G02-C16: baseline nginx versionado', () => {
     expect(SITE).not.toMatch(/add_header|return 301/);
     const pending = (manifest as unknown as { pendingLiveChanges?: Array<{ gate: string; appliedInProduction: boolean }> })
       .pendingLiveChanges;
-    expect(pending).toEqual([expect.objectContaining({ gate: 'G04-C11', appliedInProduction: false })]);
+    expect(pending).toEqual([expect.objectContaining({ gate: 'G04-C11', appliedInProduction: true })]);
   });
 
   it('G04-C11: contra la configuración viva previa a P1, el comparador reporta la diferencia (no la esconde)', () => {

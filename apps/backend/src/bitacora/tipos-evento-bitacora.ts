@@ -84,6 +84,12 @@ export class TipoEventoBitacora {
   /** Exports.pdf — proyecto, actor/fecha, sin datos de terceros en el detalle (T-261/HU-164). */
   static readonly PROJECT_EXPORT_PDF_GENERATED = 'PROJECT_EXPORT_PDF_GENERATED' as const;
 
+  // ---- T-295/T-296 (HU-177): actividades y asistencia del líder. ----
+  /** Activities.create — actividad, título/tipo/fecha/horas. */
+  static readonly ACTIVITY_CREATED = 'ACTIVITY_CREATED' as const;
+  /** Activities.markAttendance — actividad/integrante, asistió antes/después, horas acreditadas. */
+  static readonly ATTENDANCE_MARKED = 'ATTENDANCE_MARKED' as const;
+
   static readonly VALORES = [
     'TASK_CREATED',
     'TASK_UPDATED',
@@ -122,6 +128,8 @@ export class TipoEventoBitacora {
     'LEGACY_HOURS_RECONCILED',
     'PROJECT_EXPORT_CSV_GENERATED',
     'PROJECT_EXPORT_PDF_GENERATED',
+    'ACTIVITY_CREATED',
+    'ATTENDANCE_MARKED',
   ] as const;
 
   /**
@@ -140,6 +148,7 @@ export class TipoEventoBitacora {
     'DOCUMENTO_CIERRE',
     'POSTULACION',
     'SOLICITUD_SALIDA',
+    'ACTIVIDAD',
   ] as const;
 
   /**

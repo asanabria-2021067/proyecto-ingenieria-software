@@ -198,7 +198,14 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
     // "conectado" a simple vista.
     const handleConnect = () => {
       setIsConnected(true);
+      // T-333: tras una reconexión puede haber mensajes o actualizaciones
+      // que no llegaron por el socket; se vuelven a pedir las ventanas
+      // abiertas y la lista global en vez de esperar un recargo de página.
+      queryClient.invalidateQueries({ queryKey: ['chats-global'] });
       for (const idConversacion of openIdsRef.current) {
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes',
+        });
         joinConversationReliably(socket, idConversacion, () => !openIdsRef.current.includes(idConversacion));
       }
     };

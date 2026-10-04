@@ -1,7 +1,7 @@
 {
   "gate": "G02-C16",
   "control": "OWASP25-C047",
-  "description": "Baseline versionado del nginx de produccion de UVG Collab (G02-C16). Desde G04-C11 el site versionado incluye P1 (location /socket.io/) y upstreams explicitos 127.0.0.1: es el estado OBJETIVO; liveSha256 sigue siendo la captura previa a P1 hasta que el administrador lo aplique en la VM.",
+  "description": "Baseline versionado del nginx de produccion de UVG Collab (G02-C16). Desde G04-C11 el site versionado incluye P1 (location /socket.io/) y upstreams explicitos 127.0.0.1. T-332/HU-187 (2026-10-04) aplico P1 en la VM: liveSha256 ya refleja el site en produccion con P1 aplicado.",
   "capture": {
     "date": "2026-09-27",
     "host": "uvg-collab-server",
@@ -22,7 +22,7 @@
       "path": "sites-enabled/uvg-collab",
       "livePath": "/etc/nginx/sites-enabled/uvg-collab",
       "liveMode": "644 root:root",
-      "liveSha256": "ea10d072d3bf5ea4710000d4cf311b7fcd4ed4b1b4dfeb055eb2c46733b80148",
+      "liveSha256": "d3ca2793be22d244d53f27b8ad6ab4a36cf0a6521aed2488a03e8cb96a42fb8d",
       "versionedSha256": "9365ad3e149a09b8373ab6828873c101475e413815afe3655f0ca23a9992f301",
       "mode": "sanitized",
       "owner": "UVG Collab (locations /, /api y /.well-known/acme-challenge/ del server compartido)",
@@ -35,7 +35,9 @@
     {
       "gate": "G04-C11",
       "change": "P1: location /socket.io/ + upstreams 127.0.0.1 en / y /api",
-      "appliedInProduction": false,
+      "appliedInProduction": true,
+      "appliedDate": "2026-10-04",
+      "backupPath": "/etc/nginx/sites-enabled/uvg-collab.bak-20261004-0753",
       "owner": "Gate Admin (sudoer con copia fechada, nginx -t y reload)"
     }
   ]

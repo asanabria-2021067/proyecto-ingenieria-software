@@ -13,7 +13,7 @@ Los SHA-256 vivos y versionados, la fecha de captura y las exclusiones declarada
 
 - Este directorio **no se despliega**: la VM no lo lee. Aplicar un cambio en producción lo hace el sudoer con copia fechada previa, `nginx -t` y reload (runbooks de G04/G06).
 - El server es compartido ("un nginx, tres dueños"). Los `location` ajenos no se versionan ni se modifican desde aquí. Todo cambio a nivel `server` (redirección H4, HSTS H7) requiere `REQUIRES_TEAM_APPROVAL`.
-- P1 (G04-C11) **está versionado pero no aplicado** en la VM (`pendingLiveChanges` en `manifest.json`): `location /socket.io/` hacia el backend con Upgrade/Connection y timeouts de 120s, y upstreams explícitos `127.0.0.1` en `/` y `/api` (antes `localhost`). No toca redirecciones, HSTS, TLS, `nginx.conf` ni los `location` ajenos. Aplicarlo es del administrador: copia fechada, `nginx -t` y reload.
+- P1 (G04-C11) **está aplicado en la VM** desde 2026-10-04 (T-332/HU-187; ver `pendingLiveChanges` en `manifest.json`): `location /socket.io/` hacia el backend con Upgrade/Connection y timeouts de 120s, y upstreams explícitos `127.0.0.1` en `/` y `/api` (antes `localhost`). No tocó redirecciones, HSTS, TLS, `nginx.conf` ni los `location` ajenos. Copia fechada previa: `/etc/nginx/sites-enabled/uvg-collab.bak-20261004-0753`.
 
 ## Verificar que la copia viva sigue igual
 

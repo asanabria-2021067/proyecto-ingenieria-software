@@ -54,6 +54,10 @@ export class TipoEventoBitacora {
   static readonly PROJECT_EXPORT_CSV_GENERATED = 'PROJECT_EXPORT_CSV_GENERATED' as const;
   static readonly PROJECT_EXPORT_PDF_GENERATED = 'PROJECT_EXPORT_PDF_GENERATED' as const;
 
+  // ---- T-295/T-296 (HU-177): actividades y asistencia del líder. ----
+  static readonly ACTIVITY_CREATED = 'ACTIVITY_CREATED' as const;
+  static readonly ATTENDANCE_MARKED = 'ATTENDANCE_MARKED' as const;
+
   static readonly VALORES = [
     'TASK_CREATED',
     'TASK_UPDATED',
@@ -92,6 +96,8 @@ export class TipoEventoBitacora {
     'LEGACY_HOURS_RECONCILED',
     'PROJECT_EXPORT_CSV_GENERATED',
     'PROJECT_EXPORT_PDF_GENERATED',
+    'ACTIVITY_CREATED',
+    'ATTENDANCE_MARKED',
   ] as const;
 }
 
