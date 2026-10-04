@@ -109,6 +109,7 @@ import { AttendanceModule } from './attendance/attendance.module';
     // G05 (OWASP25-C037): writer best-effort de eventos de seguridad (global).
     SecurityEventsModule,
     EventsModule,
+    AttendanceModule,
   ],
   controllers: [AppController],
   providers: [
