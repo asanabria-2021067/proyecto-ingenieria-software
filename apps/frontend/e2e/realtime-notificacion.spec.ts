@@ -22,3 +22,12 @@ async function desactivarTour(page: Page) {
     };
   });
 }
+
+test('un usuario comenta una tarea y el asignado ve la notificación sin recargar', async ({ browser }) => {
+  test.setTimeout(60_000);
+  const contextA = await browser.newContext();
+  const contextB = await browser.newContext();
+  const pageA = await contextA.newPage();
+  const pageB = await contextB.newPage();
+  await desactivarTour(pageA);
+  await desactivarTour(pageB);
