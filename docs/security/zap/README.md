@@ -11,3 +11,5 @@ FAIL-NEW: 0   FAIL-INPROG: 0   WARN-NEW: 8   WARN-INPROG: 0   INFO: 0   IGNORE: 
 ```
 
 **Cero hallazgos altos o fallidos.** Los 8 "WARN" se agrupan en 3 reglas:
+
+### 1. CSP: Failure to Define Directive with No Fallback (×20 URLs)
