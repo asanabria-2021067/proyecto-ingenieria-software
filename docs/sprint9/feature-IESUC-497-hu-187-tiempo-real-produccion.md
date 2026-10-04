@@ -9,3 +9,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   variante `direct`), ahora devuelve `page.origin` en vez de `wss://<host de
   la API>` — ese host (IP:3001) no tiene TLS y la cookie `access_token` del
   dominio nip.io no viajaría.
+- `apps/frontend/test/realtime-same-origin.spec.ts`: actualizado para
+  esperar `page.origin` en ese caso; el resto de casos (API ya https, sin
+  variable, página http) no cambia.
