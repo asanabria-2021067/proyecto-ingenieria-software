@@ -44,3 +44,14 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   `getTaskCommentRecipientIds`.
 - El E2E de mensaje de chat (`chat-mensajeria.spec.ts`) ya existía (Fase 3.3)
   y cubre el otro flujo pedido (mensaje sin recargar); no se duplicó.
+- Corrido localmente contra un stack de dev (postgres/redis en Docker,
+  backend `start:dev`, frontend `next dev`, seed aplicado): mi test nuevo
+  pasa. `chat-mensajeria.spec.ts` falló en este entorno ad-hoc por una
+  condición de carrera no relacionada con este cambio (quedó en pantalla de
+  login tras reusar una cookie cacheada vencida de una corrida anterior al
+  27-sep.; al limpiar `.auth-cache` sigue fallando de forma intermitente en
+  este entorno local de un solo proceso, no en el "servidor de dev
+  compartido de CI" para el que está escrito — ver sus propios comentarios
+  sobre contención). **Pendiente:** correrlo en CI y en `infra/staging` como
+  pide la subtarea 3; no se forzó aquí para no enmascarar un posible flake
+  real con reintentos.
