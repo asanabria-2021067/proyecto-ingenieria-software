@@ -1340,6 +1340,20 @@ model ActividadProyecto {
   @@map("actividad_proyecto")
 }
 
+/// T-295/T-297 (HU-177): asistencia de UN integrante a UNA actividad. `idRegistroHoras`
+/// enlaza la fila de HorasParticipacion que esta asistencia acreditó (si `asistio` es
+/// true); al corregir o quitar la asistencia se reutiliza/borra esa misma fila en vez
+/// de crear una nueva, lo que garantiza que las horas nunca se dupliquen.
+model AsistenciaActividad {
+  idAsistencia    Int       @id @default(autoincrement()) @map("id_asistencia")
+  idActividad     Int       @map("id_actividad")
+  idUsuario       Int       @map("id_usuario")
+  asistio         Boolean   @default(false)
+  confirmadoPor   Int?      @map("confirmado_por")
+  confirmadoEn    DateTime? @map("confirmado_en")
+  idRegistroHoras Int?      @unique @map("id_registro_horas")
+}
+
 model Certificado {
   idCertificado      Int             @id @default(autoincrement()) @map("id_certificado")
   idParticipacion    Int             @map("id_participacion")
