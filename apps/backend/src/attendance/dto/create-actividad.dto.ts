@@ -6,4 +6,9 @@ const TIPOS_ACTIVIDAD: TipoActividad[] = ['REUNION', 'JORNADA', 'TALLER', 'OTRO'
 
 /** T-295/T-296 (HU-177): alta de una actividad del proyecto, exclusiva del líder. */
 export class CreateActividadDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MinLength(1, { message: 'tituloActividad no puede estar vacío' })
+  @MaxLength(200)
+  tituloActividad!: string;
 }
