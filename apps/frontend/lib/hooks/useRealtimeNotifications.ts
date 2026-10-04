@@ -93,8 +93,13 @@ export function useRealtimeNotifications(enabled: boolean) {
       transports: ['websocket', 'polling'],
     });
 
+    // T-333: una reconexión (red inestable, hop del proxy, etc.) puede haber
+    // dejado notificaciones sin emitir al cliente; se vuelven a pedir en vez
+    // de esperar a que el usuario recargue la página.
     const handleConnect = () => {
       setIsConnected(true);
+      queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
     };
 
     const handleDisconnect = () => {

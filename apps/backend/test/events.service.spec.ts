@@ -30,8 +30,8 @@ function proyectoActivo(overrides: Record<string, unknown> = {}) {
 function dto(overrides: Record<string, unknown> = {}) {
   return {
     tituloEvento: 'Reunión de avance',
-    fechaInicio: '2026-10-01T14:00:00.000Z',
-    fechaFin: '2026-10-01T15:00:00.000Z',
+    fechaInicio: '2030-10-01T14:00:00.000Z',
+    fechaFin: '2030-10-01T15:00:00.000Z',
     ...overrides,
   };
 }
@@ -94,7 +94,7 @@ describe('EventsService — creación (T-263)', () => {
     const service = new EventsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, dto({ fechaInicio: '2026-10-01T15:00:00.000Z', fechaFin: '2026-10-01T14:00:00.000Z' })),
+      service.create(PROJECT_ID, LEADER_ID, dto({ fechaInicio: '2030-10-01T15:00:00.000Z', fechaFin: '2030-10-01T14:00:00.000Z' })),
     ).rejects.toThrow(new BadRequestException('La fecha y hora de fin debe ser posterior a la fecha y hora de inicio'));
     expect(prisma.eventoProyecto.create).not.toHaveBeenCalled();
   });
@@ -105,7 +105,7 @@ describe('EventsService — creación (T-263)', () => {
     const service = new EventsService(prisma);
 
     await expect(
-      service.create(PROJECT_ID, LEADER_ID, dto({ fechaInicio: '2026-10-01T14:00:00.000Z', fechaFin: '2026-10-01T14:00:00.000Z' })),
+      service.create(PROJECT_ID, LEADER_ID, dto({ fechaInicio: '2030-10-01T14:00:00.000Z', fechaFin: '2030-10-01T14:00:00.000Z' })),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
@@ -164,8 +164,8 @@ describe('EventsService — edición (PATCH, T-263/T-265)', () => {
       idProyecto: PROJECT_ID,
       tituloEvento: 'Reunión',
       descripcionEvento: null,
-      fechaInicio: new Date('2026-10-01T14:00:00.000Z'),
-      fechaFin: new Date('2026-10-01T15:00:00.000Z'),
+      fechaInicio: new Date('2030-10-01T14:00:00.000Z'),
+      fechaFin: new Date('2030-10-01T15:00:00.000Z'),
       antelacionMinutos: 60,
       ...overrides,
     };
@@ -214,11 +214,11 @@ describe('EventsService — edición (PATCH, T-263/T-265)', () => {
     prisma.eventoProyecto.update.mockResolvedValue(eventoActual());
     const service = new EventsService(prisma);
 
-    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { fechaInicio: '2026-10-01T13:00:00.000Z' });
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { fechaInicio: '2030-10-01T13:00:00.000Z' });
 
     const data = prisma.eventoProyecto.update.mock.calls[0][0].data;
     expect(data.recordatorioEnviadoEn).toBeNull();
-    expect(data.fechaInicio).toEqual(new Date('2026-10-01T13:00:00.000Z'));
+    expect(data.fechaInicio).toEqual(new Date('2030-10-01T13:00:00.000Z'));
   });
 
   it('nueva fechaInicio posterior a la fechaFin existente produce 400', async () => {
@@ -228,7 +228,7 @@ describe('EventsService — edición (PATCH, T-263/T-265)', () => {
     const service = new EventsService(prisma);
 
     await expect(
-      service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { fechaInicio: '2026-10-01T16:00:00.000Z' }),
+      service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { fechaInicio: '2030-10-01T16:00:00.000Z' }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.eventoProyecto.update).not.toHaveBeenCalled();
   });

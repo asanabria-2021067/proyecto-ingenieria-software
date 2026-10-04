@@ -46,8 +46,14 @@ describe('T12: base del socket', () => {
 
   it('URL explícita (legacy) → la misma URL con el esquema ws/wss de la página', () => {
     expect(realtimeBaseUrl(PRODUCTION_API, http)).toBe('ws://158.23.57.118:3001');
-    expect(realtimeBaseUrl(PRODUCTION_API, https)).toBe('wss://158.23.57.118:3001');
     expect(realtimeBaseUrl('https://api.uvgenius.example', https)).toBe('wss://api.uvgenius.example');
+  });
+
+  it('T-332: página https con API http → mismo origen de la página, no wss://<ip>:3001', () => {
+    const base = realtimeBaseUrl(PRODUCTION_API, https);
+    expect(base).toBe('https://uvgenius.example');
+    expect(base).not.toContain(':3001');
+    expect(base).not.toMatch(IPV4);
   });
 
   it('sin variable: backend local en desarrollo/test y mismo origen en un build de producción', () => {
