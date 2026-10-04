@@ -12,3 +12,5 @@ quitaron: cada quien las agrega con sus propios commits sobre esta base.
   `AsistenciaActividad` (actividad, usuario, asistió, confirmado por, con FK
   opcional a `HorasParticipacion` para la idempotencia de T-297) en
   `schema.prisma`.
+- Migración `20261004084555_add_actividad_asistencia`, probada limpia contra
+  una base local.
