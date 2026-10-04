@@ -6,13 +6,15 @@ import { SprintsService } from './sprints.service';
 import { HoursRecognitionService } from './hours-recognition.service';
 import { ProjectHoursSummaryService } from './project-hours-summary.service';
 import { SprintSnapshotsService } from './sprint-snapshots.service';
+import { AdminSprintsController } from './admin-sprints.controller';
+import { AdminSprintsCalendarService } from './admin-sprints-calendar.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BitacoraModule } from '../bitacora/bitacora.module';
 import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
 
 @Module({
   imports: [NotificationsModule, BitacoraModule, ProjectPolicyModule],
-  controllers: [SprintsController],
+  controllers: [SprintsController, AdminSprintsController],
   providers: [
     SprintsContextService,
     SprintsAuthorizationService,
@@ -20,6 +22,7 @@ import { ProjectPolicyModule } from '../common/project-policy/project-policy.mod
     HoursRecognitionService,
     ProjectHoursSummaryService,
     SprintSnapshotsService,
+    AdminSprintsCalendarService,
   ],
   exports: [
     SprintsContextService,
