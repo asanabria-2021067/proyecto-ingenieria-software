@@ -13,3 +13,5 @@ FAIL-NEW: 0   FAIL-INPROG: 0   WARN-NEW: 8   WARN-INPROG: 0   INFO: 0   IGNORE: 
 **Cero hallazgos altos o fallidos.** Los 8 "WARN" se agrupan en 3 reglas:
 
 ### 1. CSP: Failure to Define Directive with No Fallback (×20 URLs)
+
+**Causa real:** en el momento del escaneo, la VM seguía con `CSP_MODE=report-only` (comportamiento previo a esta tarea): la cabecera `Content-Security-Policy` **aplicada** solo trae `frame-ancestors 'none'`; la política completa (que sí define `default-src 'self'` como fallback — ver `apps/frontend/lib/security/csp.ts`) viaja únicamente en `Content-Security-Policy-Report-Only`, que ZAP no evalúa como aplicada.
