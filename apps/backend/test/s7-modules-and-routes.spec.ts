@@ -632,10 +632,12 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
     const graph = await collectModuleGraph(AppModule as Type<unknown>);
     const routes = collectRoutes(graph.modules);
 
-    // ── El inventario de cobertura de §41: sesenta y siete usos explícitos
-    //    (66 de Sprint 7 más POST /:id/hitos/:idHito/tareas, HU-147/T-185).
-    //    Se cuenta sobre el código fuente, no sobre la metadata resuelta, para
-    //    que el número describa decisiones escritas por alguien.
+    // ── El inventario de cobertura de §41: sesenta y nueve usos explícitos
+    //    (66 de Sprint 7 más POST /:id/hitos/:idHito/tareas de HU-147/T-185,
+    //    más POST /actividades y PATCH /actividades/:id/asistencia/:id de
+    //    HU-177/T-296). Se cuenta sobre el código fuente, no sobre la
+    //    metadata resuelta, para que el número describa decisiones escritas
+    //    por alguien.
     const declaraciones = listTypeScriptFiles(SRC_ROOT).reduce((total, file) => {
       const matches = fs.readFileSync(file, 'utf8').match(/@ProjectWrite\(/g);
       return total + (matches?.length ?? 0);
