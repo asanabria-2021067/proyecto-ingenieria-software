@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma, type TipoNotificacion, type ModalidadEvento } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
+import { addDaysToDay, todayInGuatemala } from '../src/common/utils/guatemala-date';
 
 const prisma = new PrismaClient();
 
@@ -408,6 +409,119 @@ async function ensureActiveSprintBurndown(idProyecto: number, diasInicio: number
       },
     });
   }
+}
+
+/**
+ * Escenarios del calendario administrativo de Sprints: una situación
+ * temporal por Sprint, con fechas RELATIVAS al día actual de Guatemala para
+ * que la demo muestre siempre lo mismo sin importar cuándo se corra.
+ *
+ *   A EN_CURSO          ACTIVO, plan mañana
+ *   B VENCE_HOY         ACTIVO, plan hoy (un Sprint iniciado días atrás)
+ *   C PLAN_VENCIDO      ACTIVO, plan hace 5 días
+ *   D EN_FINALIZACION   plan hace 2 días, finalización iniciada ayer (+1)
+ *   E SIN_FECHA         ACTIVO sin plan, como un Sprint anterior a la
+ *                       planificación obligatoria
+ *   F FINALIZADO_ANTES  CERRADO, finalización 2 días antes del plan
+ *   G FINALIZADO_EN_FECHA  CERRADO, finalización el día del plan
+ *   H FINALIZADO_DESPUES   CERRADO, finalización 2 días después del plan
+ *
+ * A–E viven cada uno en su propio proyecto PUBLICADO/EN_PROGRESO: solo puede
+ * haber un Sprint operable por proyecto (`sprint_operable_unique`). F–H son
+ * tres Sprints cerrados consecutivos de un mismo proyecto, que además queda
+ * como ejemplo de proyecto activo sin Sprint en curso.
+ *
+ * Idempotente y auto-actualizable: el Sprint se localiza por
+ * (proyecto, número) y en cada corrida se le reescriben estado y fechas, así
+ * que volver a sembrar otro día recoloca los escenarios respecto al nuevo hoy.
+ */
+async function ensureSprintCalendarScenarios(idLider: number) {
+  const hoy = todayInGuatemala();
+  /** Día calendario de Guatemala como columna `@db.Date` (medianoche UTC). */
+  const dia = (n: number) => new Date(`${addDaysToDay(hoy, n)}T00:00:00.000Z`);
+  /** Mediodía de Guatemala (18:00Z) del día indicado: un instante sin ambigüedad de día. */
+  const mediodia = (n: number) => new Date(`${addDaysToDay(hoy, n)}T18:00:00.000Z`);
+
+  const ensureSprint = async (
+    idProyecto: number,
+    numero: number,
+    data: Omit<Prisma.SprintUncheckedCreateInput, 'idProyecto' | 'numero'>,
+  ) => {
+    const existente = await prisma.sprint.findFirst({ where: { idProyecto, numero } });
+    if (existente) return prisma.sprint.update({ where: { idSprint: existente.idSprint }, data });
+    return prisma.sprint.create({ data: { idProyecto, numero, ...data } });
+  };
+
+  const proyecto = (
+    sufijo: string,
+    estadoProyecto: 'PUBLICADO' | 'EN_PROGRESO',
+    descripcionProyecto: string,
+    diasInicio: number,
+  ) =>
+    ensureProyecto({
+      tituloProyecto: `Calendario de Sprints — ${sufijo}`,
+      descripcionProyecto,
+      tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+      estadoProyecto,
+      creadoPor: idLider,
+      fechaInicio: enDias(diasInicio),
+      fechaFinEstimada: enDias(90),
+    });
+
+  const operable = { fechaFinalizacionIniciada: null, fechaCierre: null, cerradoPor: null } as const;
+
+  // A — EN_CURSO
+  const pEnCurso = await proyecto('En curso', 'PUBLICADO', 'Escenario de demo: Sprint activo cuyo plan vence mañana.', -6);
+  await ensureSprint(pEnCurso.idProyecto, 1, {
+    estado: 'ACTIVO', fechaInicio: mediodia(-6), fechaFinPlaneada: dia(1), ...operable,
+  });
+
+  // B — VENCE_HOY
+  const pVenceHoy = await proyecto('Vence hoy', 'EN_PROGRESO', 'Escenario de demo: Sprint activo cuya fecha esperada de finalización es hoy.', -14);
+  await ensureSprint(pVenceHoy.idProyecto, 1, {
+    estado: 'ACTIVO', fechaInicio: mediodia(-14), fechaFinPlaneada: dia(0), ...operable,
+  });
+
+  // C — PLAN_VENCIDO
+  const pVencido = await proyecto('Plan vencido', 'EN_PROGRESO', 'Escenario de demo: Sprint que sigue activo cinco días después de su plan.', -19);
+  await ensureSprint(pVencido.idProyecto, 1, {
+    estado: 'ACTIVO', fechaInicio: mediodia(-19), fechaFinPlaneada: dia(-5), ...operable,
+  });
+
+  // D — EN_FINALIZACION (desviación +1)
+  const pFinalizando = await proyecto('En finalización', 'EN_PROGRESO', 'Escenario de demo: Sprint que inició su finalización un día después del plan y aún no cierra.', -16);
+  await ensureSprint(pFinalizando.idProyecto, 1, {
+    estado: 'EN_FINALIZACION', fechaInicio: mediodia(-16), fechaFinPlaneada: dia(-2),
+    fechaFinalizacionIniciada: mediodia(-1), fechaCierre: null, cerradoPor: null,
+  });
+
+  // E — SIN_FECHA (compatibilidad con Sprints anteriores a la planificación obligatoria)
+  const pSinFecha = await proyecto('Sin fecha planificada', 'PUBLICADO', 'Escenario de demo: Sprint activo sin fecha esperada de finalización.', -10);
+  await ensureSprint(pSinFecha.idProyecto, 1, {
+    estado: 'ACTIVO', fechaInicio: mediodia(-10), fechaFinPlaneada: null, ...operable,
+  });
+
+  // F, G, H — histórico: plan frente a finalización real
+  const pHistorico = await proyecto('Histórico', 'EN_PROGRESO', 'Escenario de demo: Sprints cerrados antes, en fecha y después de lo planificado.', -60);
+  const congelado = {
+    tareasPlanificadasCierre: 0, tareasCompletadasCierre: 0, tareasArrastradasCierre: 0,
+    hitosTotalesCierre: 0, hitosCompletadosCierre: 0, porcentajeCumplimientoCierre: 0,
+  };
+  // F — FINALIZADO_ANTES: plan X = hoy-46, finalización X-2
+  await ensureSprint(pHistorico.idProyecto, 1, {
+    estado: 'CERRADO', fechaInicio: mediodia(-60), fechaFinPlaneada: dia(-46),
+    fechaFinalizacionIniciada: mediodia(-48), fechaCierre: mediodia(-47), cerradoPor: idLider, ...congelado,
+  });
+  // G — FINALIZADO_EN_FECHA: plan X = hoy-31, finalización X
+  await ensureSprint(pHistorico.idProyecto, 2, {
+    estado: 'CERRADO', fechaInicio: mediodia(-45), fechaFinPlaneada: dia(-31),
+    fechaFinalizacionIniciada: mediodia(-31), fechaCierre: mediodia(-30), cerradoPor: idLider, ...congelado,
+  });
+  // H — FINALIZADO_DESPUES: plan X = hoy-16, finalización X+2
+  await ensureSprint(pHistorico.idProyecto, 3, {
+    estado: 'CERRADO', fechaInicio: mediodia(-29), fechaFinPlaneada: dia(-16),
+    fechaFinalizacionIniciada: mediodia(-14), fechaCierre: mediodia(-13), cerradoPor: idLider, ...congelado,
+  });
 }
 
 async function main() {
@@ -1063,6 +1177,9 @@ async function main() {
   ]) {
     await ensureActiveSprintBurndown(idProyecto, -5);
   }
+
+  // ─── Escenarios temporales del calendario administrativo de Sprints ──────
+  await ensureSprintCalendarScenarios(vernel.idUsuario);
 
   console.log('Demo extra seed completed successfully');
 }
