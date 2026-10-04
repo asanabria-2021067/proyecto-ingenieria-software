@@ -107,4 +107,26 @@ export class AttendanceService {
     }
     return ctx.project;
   }
+
+  async crearActividad(projectId: number, userId: number, dto: CreateActividadDto): Promise<ActividadPublica> {
+    return this.projectTx.run(projectId, userId, 'attendance.crearActividad', async (ctx) => {
+      const { tx } = ctx;
+      const project = this.lockedProject(ctx);
+      await this.policy.assertWriteTx(tx, project, 'ACTIVIDAD_ASISTENCIA', userId);
+
+      const actividad = await tx.actividadProyecto.create({
+        data: {
+          idProyecto: projectId,
+          tituloActividad: dto.tituloActividad,
+          tipoActividad: dto.tipoActividad,
+          fechaActividad: new Date(`${dto.fechaActividad}T00:00:00.000Z`),
+          horasValor: dto.horasValor,
+          creadoPor: userId,
+        },
+        select: ACTIVIDAD_SELECT,
+      });
+
+      return mapActividad(actividad);
+    });
+  }
 }
