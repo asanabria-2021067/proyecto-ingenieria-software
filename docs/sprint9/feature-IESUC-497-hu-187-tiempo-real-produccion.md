@@ -29,3 +29,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 - `apps/frontend/hooks/use-chat.ts` (`useGlobalChatSocket`): `handleConnect`
   ahora invalida `['chats-global']` y los mensajes de las conversaciones con
   ventana abierta, antes de re-unirse a sus rooms.
+- `apps/frontend/components/chat-dock/chat-dock.tsx`: nuevo indicador
+  (`role="status"`, punto verde/ámbar) junto al botón "Mensajes" del dock,
+  igual criterio visual que el de notificaciones.
