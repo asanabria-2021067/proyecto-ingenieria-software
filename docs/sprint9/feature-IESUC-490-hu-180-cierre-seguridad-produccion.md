@@ -77,3 +77,5 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
   P1/T13, C039, C038 del documento actual).
 
 ## Pendiente de Angel
+
+- Habilitar los rulesets de `develop`/`main` (T-308) y tomar la captura.
