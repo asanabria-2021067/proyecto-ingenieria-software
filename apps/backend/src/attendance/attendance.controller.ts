@@ -19,4 +19,9 @@ const ACTIVITY_WRITE: ProjectWriteMetadata = {
 @UseGuards(JwtAuthGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
+
+  @Get()
+  findAll(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }) {
+    return this.attendanceService.listarActividades(projectId, user.userId);
+  }
 }
