@@ -6,3 +6,11 @@ import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/projec
 import { AttendanceService } from './attendance.service';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
+
+/** HU-177: crear actividad y marcar asistencia son exclusivos del líder (Proyecto.creadoPor). */
+const ACTIVITY_WRITE: ProjectWriteMetadata = {
+  source: { kind: 'param', name: 'projectId' },
+  states: ['P', 'E'],
+  sprint: 'ANY',
+  family: 'ACTIVIDAD_ASISTENCIA',
+};
