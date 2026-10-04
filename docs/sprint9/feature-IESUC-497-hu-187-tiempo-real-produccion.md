@@ -80,3 +80,7 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 5. `infra/nginx/manifest.json` y `infra/nginx/README.md` actualizados:
    `liveSha256` real post-cambio, `pendingLiveChanges[0].appliedInProduction:
    true`.
+6. Backend/frontend en producción siguen en la imagen `:latest` actual (sin
+   el fix de T-332 todavía — ese código solo se publica cuando esta rama se
+   mezcle a `main` y corra `deploy.yml`). Por eso los logs del gateway no
+   muestran conexiones nuevas todavía: nadie ha cargado el bundle corregido.
