@@ -1310,6 +1310,14 @@ model HorasParticipacion {
   @@map("horas_participacion")
 }
 
+/// T-295 (HU-177): tipo de actividad del proyecto a la que el líder registra asistencia.
+enum TipoActividad {
+  REUNION
+  JORNADA
+  TALLER
+  OTRO
+}
+
 model Certificado {
   idCertificado      Int             @id @default(autoincrement()) @map("id_certificado")
   idParticipacion    Int             @map("id_participacion")
