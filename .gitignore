@@ -1,3 +1,6 @@
+# ── Configuracion local de Claude Code (nunca se versiona) ──
+.claude/
+
 # ── Dependencias ──────────────────────────────────────────
 node_modules/
 .pnpm-store/
