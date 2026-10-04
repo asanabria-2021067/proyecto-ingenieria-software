@@ -47,3 +47,7 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
    de imagen): toma efecto en el próximo deploy desde `main`. **No se pudo
    verificar visualmente "que no se rompa nada"** porque eso exige ese
    deploy — queda pendiente para quien mezcle a `main`.
+5. GitHub Variables adicionales relacionadas (mismo paquete de T-309):
+   `BACKEND_BIND=127.0.0.1`, `FRONTEND_BIND=127.0.0.1`,
+   `TRUST_PROXY_HOPS=1`, `SECURITY_ALERTS_ENABLED=true` — para que el
+   próximo deploy desde `main` no revierta lo ya aplicado a mano en la VM.
