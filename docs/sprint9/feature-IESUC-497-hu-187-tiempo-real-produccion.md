@@ -59,3 +59,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 ## Cambios en la VM (158.23.57.118)
 
 1. Backup fechado: `/etc/nginx/sites-enabled/uvg-collab.bak-20261004-0753`.
+2. Aplicado el site versionado (`infra/nginx/sites-enabled/uvg-collab`, ya
+   era el estado objetivo con P1) — agrega `location /socket.io/` y upstreams
+   `127.0.0.1` en `/` y `/api`.
