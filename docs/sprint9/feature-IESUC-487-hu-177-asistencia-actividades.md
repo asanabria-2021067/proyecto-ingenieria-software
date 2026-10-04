@@ -48,3 +48,5 @@ esa fila. Todo corre dentro de la transacción con lock que abre
 - `npm run build`, `eslint src/attendance` y `tsc --noEmit` (sin errores
   nuevos; el resto de errores de `tsc` son preexistentes y ajenos a esta
   rama) en verde.
+- `test/s7-modules-and-routes.spec.ts` (el `AppModule` completo, incluido
+  `AttendanceModule`, resuelve sin ciclos) en verde.
