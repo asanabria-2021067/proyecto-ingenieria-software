@@ -36,3 +36,9 @@ son los valores reales en la VM y en GitHub, no el código). Evidencia:
    funcionando normal vía nginx.
 2. **TRUST_PROXY_HOPS=1:** aplicado después de cerrar los puertos. Backend
    recreado, arrancó sano; login vía nginx responde 401 esperado (no 500).
+3. **SECURITY_ALERTS_ENABLED=true:** aplicado en el `.env` de la VM. La
+   migración `ALERTA_SEGURIDAD`
+   (`20260927230000_security_alert_notification_type`) ya estaba aplicada en
+   producción antes de esta tarea (`prisma migrate status` mostraba las 50
+   migraciones al día) — no hizo falta `pg_dump` previo a una migración
+   porque no se corrió ninguna.
