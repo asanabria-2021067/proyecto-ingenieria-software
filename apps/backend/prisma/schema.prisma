@@ -1352,6 +1352,14 @@ model AsistenciaActividad {
   confirmadoPor   Int?      @map("confirmado_por")
   confirmadoEn    DateTime? @map("confirmado_en")
   idRegistroHoras Int?      @unique @map("id_registro_horas")
+
+  actividad     ActividadProyecto   @relation(fields: [idActividad], references: [idActividad])
+  usuario       Usuario             @relation("AsistenciaUsuario", fields: [idUsuario], references: [idUsuario])
+  confirmador   Usuario?            @relation("AsistenciaConfirmador", fields: [confirmadoPor], references: [idUsuario])
+  registroHoras HorasParticipacion? @relation(fields: [idRegistroHoras], references: [idRegistroHoras])
+
+  @@unique([idActividad, idUsuario])
+  @@map("asistencia_actividad")
 }
 
 model Certificado {
