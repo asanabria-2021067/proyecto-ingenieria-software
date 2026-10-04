@@ -23,7 +23,8 @@ export type ReadScope =
   | 'bitacora'
   | 'liderazgo'
   | 'historico'
-  | 'exportacion';
+  | 'exportacion'
+  | 'asistencia';
 
 export type ReaderProfile =
   | 'LIDER'
