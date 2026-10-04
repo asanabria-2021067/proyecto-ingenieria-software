@@ -33,3 +33,5 @@ Varias URLs reportadas en 404 (`robots.txt`, rutas con `%2F` y query strings de 
 ## Qué NO se corrigió y por qué
 
 No hay hallazgos "altos" ni "medios" reales que corregir: los 3 WARN son, en orden, (1) ya resuelto por el cambio de configuración de T-309 pendiente de deploy, (2) metodológico, (3) un header de aislamiento que no aplica a esta arquitectura. `docs/security/owasp-top10-2025.md` ya trae R2 (CSP `unsafe-inline`) como riesgo residual conocido; no se duplica aquí.
+
+## Pendiente
