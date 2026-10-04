@@ -19,3 +19,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   Con el fix de T-332, la variante `direct` actual también queda corregida
   (detecta el mismatch http/https), pero `same-origin` es la forma limpia
   de no quemar la IP, pedida en el prompt.
+
+## T-333 — Indicador de conexión y recarga al reconectar
