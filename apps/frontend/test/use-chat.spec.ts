@@ -99,6 +99,24 @@ describe('useGlobalChatSocket — join de ventanas abiertas', () => {
 
     await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalledWith('joinConversation', { idConversacion: 5 }));
   });
+
+  it('T-333: al reconectar, invalida la lista global y los mensajes de las ventanas abiertas', async () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(({ ids }) => useGlobalChatSocket(ids), { wrapper, initialProps: { ids: [5] } });
+    await waitFor(() => expect(socket.emitWithAck).toHaveBeenCalled());
+    invalidateSpy.mockClear();
+
+    act(() => {
+      socket.__emit('connect');
+    });
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chats-global'] }));
+    expect(invalidateSpy).toHaveBeenCalledWith(expect.objectContaining({ predicate: expect.any(Function) }));
+  });
 });
 
 describe('useGlobalChatSocket — newMessage sin actualizar cache en silencio', () => {
