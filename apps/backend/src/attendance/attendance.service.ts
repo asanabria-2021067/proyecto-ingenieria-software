@@ -294,5 +294,13 @@ export class AttendanceService {
         'El integrante no tiene una participación activa en el proyecto de esta actividad',
       );
     }
+
+    const existente = await tx.asistenciaActividad.findUnique({
+      where: { idActividad_idUsuario: { idActividad: actividad.idActividad, idUsuario: targetUserId } },
+      select: { idRegistroHoras: true },
+    });
+
+    const ahora = new Date();
+    let idRegistroHoras: number | null = existente?.idRegistroHoras ?? null;
   }
 }
