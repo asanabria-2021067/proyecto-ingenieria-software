@@ -1318,6 +1318,21 @@ enum TipoActividad {
   OTRO
 }
 
+/// T-295 (HU-177): actividad (reunión, jornada, taller) creada por el líder del
+/// proyecto (`Proyecto.creadoPor`) con un valor fijo de horas; la asistencia
+/// confirmada de cada integrante (`AsistenciaActividad`) es lo que acredita esas
+/// horas en HorasParticipacion/"Mis horas" (HU-158), no la actividad en sí.
+model ActividadProyecto {
+  idActividad     Int           @id @default(autoincrement()) @map("id_actividad")
+  idProyecto      Int           @map("id_proyecto")
+  tituloActividad String        @map("titulo_actividad") @db.VarChar(200)
+  tipoActividad   TipoActividad @map("tipo_actividad")
+  fechaActividad  DateTime      @map("fecha_actividad") @db.Date
+  horasValor      Decimal       @map("horas_valor") @db.Decimal(6, 2)
+  creadoPor       Int           @map("creado_por")
+  creadoEn        DateTime      @default(now()) @map("creado_en")
+}
+
 model Certificado {
   idCertificado      Int             @id @default(autoincrement()) @map("id_certificado")
   idParticipacion    Int             @map("id_participacion")
