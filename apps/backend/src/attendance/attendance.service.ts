@@ -54,3 +54,13 @@ export interface IntegranteAsistencia {
 export interface ActividadDetalle extends ActividadPublica {
   integrantes: IntegranteAsistencia[];
 }
+
+export interface AsistenciaPublica {
+  idAsistencia: number;
+  idActividad: number;
+  idUsuario: number;
+  asistio: boolean;
+  confirmadoPor: number | null;
+  confirmadoEn: string | null;
+  idRegistroHoras: number | null;
+}
