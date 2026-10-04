@@ -98,6 +98,7 @@ export function useRealtimeNotifications(enabled: boolean) {
     // de esperar a que el usuario recargue la página.
     const handleConnect = () => {
       setIsConnected(true);
+      queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
     };
 
     const handleDisconnect = () => {
