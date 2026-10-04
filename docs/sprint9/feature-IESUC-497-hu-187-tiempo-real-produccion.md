@@ -86,3 +86,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
    muestran conexiones nuevas todavía: nadie ha cargado el bundle corregido.
 
 ## Pendiente / siguiente paso
+
+- Mezclar esta rama a `develop` y de ahí a `main` para que el deploy hornee
+  el frontend con `PUBLIC_API_URL=same-origin` y el fix de `socket-url.ts`.
