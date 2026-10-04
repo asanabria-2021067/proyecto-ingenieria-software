@@ -29,4 +29,6 @@ Módulo `apps/backend/src/attendance/`, montado en `AppModule`. Rutas reales:
 Solo el líder del proyecto puede crear actividades y marcar asistencia:
 `ProjectWriteGuard` + nueva familia `ACTIVIDAD_ASISTENCIA` en
 `ProjectPolicyService` (actor `LIDER`), mismo patrón que el resto de
-escrituras de proyecto.
+escrituras de proyecto. Las lecturas usan el scope `'asistencia'` de
+`ProjectReadPolicyService`. Cada escritura (`ACTIVITY_CREATED`,
+`ATTENDANCE_MARKED`) queda en la bitácora del proyecto.
