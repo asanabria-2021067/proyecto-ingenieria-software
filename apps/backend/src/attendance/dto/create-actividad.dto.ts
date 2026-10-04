@@ -11,4 +11,7 @@ export class CreateActividadDto {
   @MinLength(1, { message: 'tituloActividad no puede estar vacío' })
   @MaxLength(200)
   tituloActividad!: string;
+
+  @IsIn(TIPOS_ACTIVIDAD, { message: `tipoActividad debe ser uno de: ${TIPOS_ACTIVIDAD.join(', ')}` })
+  tipoActividad!: TipoActividad;
 }
