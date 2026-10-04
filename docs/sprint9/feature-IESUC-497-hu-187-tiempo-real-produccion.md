@@ -77,3 +77,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
      preexistente (el `server` comparte el bloque 80/443 sin redirect) y, por
      `infra/nginx/README.md`, un cambio a nivel `server` (redirección H4)
      requiere `REQUIRES_TEAM_APPROVAL`: no se tocó aquí.
+5. `infra/nginx/manifest.json` y `infra/nginx/README.md` actualizados:
+   `liveSha256` real post-cambio, `pendingLiveChanges[0].appliedInProduction:
+   true`.
