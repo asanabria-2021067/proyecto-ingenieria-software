@@ -99,6 +99,7 @@ export function useRealtimeNotifications(enabled: boolean) {
     const handleConnect = () => {
       setIsConnected(true);
       queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
     };
 
     const handleDisconnect = () => {
