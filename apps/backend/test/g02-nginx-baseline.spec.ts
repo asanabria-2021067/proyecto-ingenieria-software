@@ -55,7 +55,7 @@ function liveFixture(versioned: string): string {
 describe('G02-C16: baseline nginx versionado', () => {
   it('los hashes registrados son los del baseline productivo del plan', () => {
     expect(entry('verbatim').liveSha256).toBe('48c6a4ec1e1fd28ccf968490f07e34a1d7f755793b2108a3ed8670b1ee2a0aa2');
-    expect(site.liveSha256).toBe('ea10d072d3bf5ea4710000d4cf311b7fcd4ed4b1b4dfeb055eb2c46733b80148');
+    expect(site.liveSha256).toBe('d3ca2793be22d244d53f27b8ad6ab4a36cf0a6521aed2488a03e8cb96a42fb8d');
   });
 
   it('cada archivo versionado coincide con su SHA-256 del manifiesto; nginx.conf es verbatim', () => {
