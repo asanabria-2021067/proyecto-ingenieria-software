@@ -616,6 +616,7 @@ model Proyecto {
   documentosCierre     DocumentoCierre[]
   eventos              EventoProyecto[]
   guardadoPor          ProyectoGuardado[]
+  actividades          ActividadProyecto[]
 
   @@map("proyecto")
 }
