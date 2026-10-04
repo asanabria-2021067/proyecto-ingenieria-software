@@ -41,3 +41,12 @@ export interface ActividadResumen extends ActividadPublica {
   totalIntegrantes: number;
   totalAsistieron: number;
 }
+
+export interface IntegranteAsistencia {
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  fotoUrl: string | null;
+  asistio: boolean;
+  confirmadoEn: string | null;
+}
