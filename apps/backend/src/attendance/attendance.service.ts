@@ -350,5 +350,15 @@ export class AttendanceService {
         idRegistroHoras,
       },
     });
+
+    return {
+      idAsistencia: asistencia.idAsistencia,
+      idActividad: asistencia.idActividad,
+      idUsuario: asistencia.idUsuario,
+      asistio: asistencia.asistio,
+      confirmadoPor: asistencia.confirmadoPor,
+      confirmadoEn: asistencia.confirmadoEn ? asistencia.confirmadoEn.toISOString() : null,
+      idRegistroHoras: asistencia.idRegistroHoras,
+    };
   }
 }
