@@ -20,3 +20,5 @@ quitaron: cada quien las agrega con sus propios commits sobre esta base.
 ## T-296 — Endpoints de actividades y marcado de asistencia
 
 Módulo `apps/backend/src/attendance/`, montado en `AppModule`. Rutas reales:
+
+- `GET /proyectos/:projectId/actividades` — lista actividades del proyecto.
