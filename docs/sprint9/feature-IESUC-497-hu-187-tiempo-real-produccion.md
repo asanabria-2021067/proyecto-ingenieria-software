@@ -32,3 +32,5 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 - `apps/frontend/components/chat-dock/chat-dock.tsx`: nuevo indicador
   (`role="status"`, punto verde/ámbar) junto al botón "Mensajes" del dock,
   igual criterio visual que el de notificaciones.
+- Pruebas: `test/use-chat.spec.ts` y `test/use-realtime-notifications.spec.ts`
+  (reconexión invalida las queries correctas).
