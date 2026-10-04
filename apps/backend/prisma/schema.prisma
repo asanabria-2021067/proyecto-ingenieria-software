@@ -1303,6 +1303,8 @@ model HorasParticipacion {
   participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion])
   aprobador     Usuario?              @relation(fields: [aprobadoPor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
   sprint        Sprint?               @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict, onUpdate: Cascade)
+  /// T-297 (HU-177): presente cuando esta fila fue generada por confirmar asistencia a una actividad, no por reconocimiento de Sprint.
+  asistencia    AsistenciaActividad?
 
   @@index([idSprint])
   @@map("horas_participacion")
