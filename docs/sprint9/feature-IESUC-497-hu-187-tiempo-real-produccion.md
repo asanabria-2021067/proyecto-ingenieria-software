@@ -73,3 +73,7 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
      línea a línea idéntico — confirma que lo aplicado es exactamente P1.
    - Certificado: válido hasta 2026-11-19, timer `snap.certbot.renew.timer`
      activo (renovación automática ok).
+   - `http://` **no** redirige a `https://` (devuelve 200 directo) — esto es
+     preexistente (el `server` comparte el bloque 80/443 sin redirect) y, por
+     `infra/nginx/README.md`, un cambio a nivel `server` (redirección H4)
+     requiere `REQUIRES_TEAM_APPROVAL`: no se tocó aquí.
