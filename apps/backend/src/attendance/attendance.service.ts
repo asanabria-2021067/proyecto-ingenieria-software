@@ -100,4 +100,11 @@ export class AttendanceService {
     // unitarias instancian el servicio con argumentos posicionales.
     private readonly bitacoraEventos?: BitacoraEventosService,
   ) {}
+
+  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
+    if (!ctx.project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    return ctx.project;
+  }
 }
