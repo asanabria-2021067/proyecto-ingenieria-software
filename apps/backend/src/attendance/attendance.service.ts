@@ -165,4 +165,16 @@ export class AttendanceService {
       totalAsistieron: asistencias.filter((a) => a.asistio).length,
     }));
   }
+
+  async obtenerActividad(projectId: number, userId: number, actividadId: number): Promise<ActividadDetalle> {
+    await this.readPolicy.assertRead(undefined, { projectId, actorId: userId, scope: 'asistencia' });
+
+    const actividad = await this.prisma.actividadProyecto.findFirst({
+      where: { idActividad: actividadId, idProyecto: projectId },
+      select: ACTIVIDAD_SELECT,
+    });
+    if (!actividad) {
+      throw new NotFoundException(`Actividad con id ${actividadId} no encontrada en el proyecto ${projectId}`);
+    }
+  }
 }
