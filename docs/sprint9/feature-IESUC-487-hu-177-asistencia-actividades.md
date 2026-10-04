@@ -24,3 +24,4 @@ Módulo `apps/backend/src/attendance/`, montado en `AppModule`. Rutas reales:
 - `GET /proyectos/:projectId/actividades` — lista actividades del proyecto.
 - `GET /proyectos/:projectId/actividades/:actividadId` — detalle con asistencia por integrante.
 - `POST /proyectos/:projectId/actividades` — crea actividad (solo líder).
+- `PATCH /proyectos/:projectId/actividades/:actividadId/asistencia/:usuarioId` — marca/corrige/quita asistencia (solo líder).
