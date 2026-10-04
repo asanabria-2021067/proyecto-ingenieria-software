@@ -21,3 +21,8 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
   de no quemar la IP, pedida en el prompt.
 
 ## T-333 — Indicador de conexión y recarga al reconectar
+
+- `apps/frontend/lib/hooks/useRealtimeNotifications.ts`: `handleConnect`
+  ahora invalida `['notificaciones']` y `['notificaciones', 'conteo']` (el
+  indicador de notificaciones ya existía en `DashboardLayout.tsx`, de un
+  trabajo previo — no se duplicó).
