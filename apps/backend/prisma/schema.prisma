@@ -1331,6 +1331,13 @@ model ActividadProyecto {
   horasValor      Decimal       @map("horas_valor") @db.Decimal(6, 2)
   creadoPor       Int           @map("creado_por")
   creadoEn        DateTime      @default(now()) @map("creado_en")
+
+  proyecto    Proyecto              @relation(fields: [idProyecto], references: [idProyecto])
+  creador     Usuario               @relation(fields: [creadoPor], references: [idUsuario])
+  asistencias AsistenciaActividad[]
+
+  @@index([idProyecto, fechaActividad])
+  @@map("actividad_proyecto")
 }
 
 model Certificado {
