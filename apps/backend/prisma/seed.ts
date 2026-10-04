@@ -815,6 +815,34 @@ async function main() {
     });
   }
 
+  // ─── Actividades y asistencia (T-295/HU-177) ─────────────
+  const actividadTutoria1 = await prisma.actividadProyecto.upsert({
+    where: { idActividad: 1 },
+    update: {},
+    create: {
+      idActividad: 1,
+      idProyecto: pTutorias.idProyecto,
+      tituloActividad: 'Reunión semanal de seguimiento',
+      tipoActividad: 'REUNION',
+      fechaActividad: new Date('2026-03-10'),
+      horasValor: 2,
+      creadoPor: carlos.idUsuario,
+    },
+  });
+  await prisma.actividadProyecto.upsert({
+    where: { idActividad: 2 },
+    update: {},
+    create: {
+      idActividad: 2,
+      idProyecto: pTutorias.idProyecto,
+      tituloActividad: 'Jornada de diseño UX',
+      tipoActividad: 'JORNADA',
+      fechaActividad: new Date('2026-03-20'),
+      horasValor: 4,
+      creadoPor: carlos.idUsuario,
+    },
+  });
+
   // ─── Certificados ───────────────────────────────────────
   const certData = [
     { idParticipacion: participaciones[0].idParticipacion, tipoCertificado: 'HORAS_BECA' as const, horasCertificadas: 12, emitidoPor: luis.idUsuario, codigoVerificacion: 'CERT-2026-001' },
