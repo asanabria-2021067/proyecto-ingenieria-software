@@ -89,3 +89,6 @@ Rama: `feature/IESUC-497-hu-187-tiempo-real-produccion`
 
 - Mezclar esta rama a `develop` y de ahí a `main` para que el deploy hornee
   el frontend con `PUBLIC_API_URL=same-origin` y el fix de `socket-url.ts`.
+- Tras ese deploy, repetir la verificación de la sección 3 del prompt
+  (`docker compose logs backend | grep NotificationsGateway|ChatGateway`)
+  para confirmar `connected as user` en vivo.
