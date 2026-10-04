@@ -596,7 +596,13 @@ async function main() {
       where: { idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
     });
     if (operable) return operable;
-    return prisma.sprint.create({ data: { idProyecto, numero, estado: 'ACTIVO' } });
+    // Un Sprint nuevo siempre nace con su fecha esperada de finalización,
+    // igual que al iniciarlo por la API (aquí, a dos semanas). El Sprint
+    // CERRADO de un proyecto terminal de arriba es de compatibilidad y se
+    // queda sin plan a propósito: no hay una planificación real que registrar.
+    return prisma.sprint.create({
+      data: { idProyecto, numero, estado: 'ACTIVO', fechaFinPlaneada: enDias(14) },
+    });
   }
 
   const [sprintTutorias, sprintAmbiental, sprintNeural, sprintEmpleo] = await Promise.all([

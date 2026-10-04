@@ -27,7 +27,11 @@ async function resolveSprint(idProyecto: number, numero: number) {
     where: { idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
   });
   if (existente) return existente;
-  return prisma.sprint.create({ data: { idProyecto, numero, estado: 'ACTIVO' } });
+  // Todo Sprint nuevo nace con su fecha esperada de finalización, igual que
+  // al iniciarlo por la API (aquí, a dos semanas).
+  return prisma.sprint.create({
+    data: { idProyecto, numero, estado: 'ACTIVO', fechaFinPlaneada: enDias(14) },
+  });
 }
 
 async function ensureTarea(data: {
