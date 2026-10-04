@@ -117,6 +117,24 @@ describe('useGlobalChatSocket — join de ventanas abiertas', () => {
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chats-global'] }));
     expect(invalidateSpy).toHaveBeenCalledWith(expect.objectContaining({ predicate: expect.any(Function) }));
   });
+
+  it('expone isConnected: true tras el evento connect', async () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(({ ids }) => useGlobalChatSocket(ids), {
+      wrapper,
+      initialProps: { ids: [] as number[] },
+    });
+    expect(result.current.isConnected).toBe(false);
+
+    act(() => {
+      socket.__emit('connect');
+    });
+
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+  });
 });
 
 describe('useGlobalChatSocket — newMessage sin actualizar cache en silencio', () => {
