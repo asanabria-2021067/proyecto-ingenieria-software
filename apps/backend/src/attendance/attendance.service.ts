@@ -25,3 +25,14 @@ const ACTIVIDAD_SELECT = {
 } satisfies Prisma.ActividadProyectoSelect;
 
 type ActividadRow = Prisma.ActividadProyectoGetPayload<{ select: typeof ACTIVIDAD_SELECT }>;
+
+export interface ActividadPublica {
+  idActividad: number;
+  idProyecto: number;
+  tituloActividad: string;
+  tipoActividad: TipoActividad;
+  fechaActividad: string;
+  horasValor: number;
+  creadoPor: number;
+  creadoEn: string;
+}
