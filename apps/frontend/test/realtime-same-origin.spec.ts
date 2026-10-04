@@ -49,6 +49,13 @@ describe('T12: base del socket', () => {
     expect(realtimeBaseUrl('https://api.uvgenius.example', https)).toBe('wss://api.uvgenius.example');
   });
 
+  it('T-332: página https con API http → mismo origen de la página, no wss://<ip>:3001', () => {
+    const base = realtimeBaseUrl(PRODUCTION_API, https);
+    expect(base).toBe('https://uvgenius.example');
+    expect(base).not.toContain(':3001');
+    expect(base).not.toMatch(IPV4);
+  });
+
   it('sin variable: backend local en desarrollo/test y mismo origen en un build de producción', () => {
     expect(realtimeBaseUrl(undefined, http)).toBe('ws://localhost:3001');
     vi.stubEnv('NODE_ENV', 'production');
