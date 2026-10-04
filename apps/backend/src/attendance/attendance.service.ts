@@ -237,6 +237,21 @@ export class AttendanceService {
         asistio: dto.asistio,
       });
 
+      await this.bitacoraEventos?.registrarEvento({
+        tx,
+        tipoEvento: TipoEventoBitacora.ATTENDANCE_MARKED,
+        idActor: leaderId,
+        idProyecto: projectId,
+        tipoEntidad: 'ACTIVIDAD',
+        idEntidad: actividadId,
+        valorAnterior: { idUsuario: targetUserId, asistio: anterior?.asistio ?? false },
+        valorNuevo: {
+          idUsuario: targetUserId,
+          asistio: dto.asistio,
+          horasAcreditadas: dto.asistio ? actividad.horasValor.toFixed(2) : '0.00',
+        },
+      });
+
       return resultado;
     });
   }
