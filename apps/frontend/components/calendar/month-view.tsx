@@ -1,7 +1,7 @@
 'use client';
 
-import { Clock } from 'lucide-react';
 import { getMonthMatrix, WEEKDAY_LABELS_ES } from '@/lib/calendar/utils';
+import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
 import type { AgendaItem } from '@/lib/calendar/agenda';
 
 const MAX_VISIBLE_POR_DIA = 3;
@@ -70,21 +70,28 @@ export function MonthView({
                     {day.date.getDate()}
                   </span>
                   <div className="flex flex-1 flex-col gap-0.5 overflow-hidden">
-                    {visibles.map((item) => (
-                      <span
-                        key={`${item.kind}-${item.id}`}
-                        className="flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta"
-                      >
-                        {item.kind === 'evento' ? (
-                          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent">
-                            <Clock className="h-2.5 w-2.5" aria-hidden="true" />
-                          </span>
-                        ) : (
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-pill bg-primary" aria-hidden="true" />
-                        )}
-                        <span className="truncate">{item.titulo}</span>
-                      </span>
-                    ))}
+                    {visibles.map((item) => {
+                      const estilo = item.kind === 'evento' ? MODALIDAD_ESTILO[item.modalidad] : null;
+                      return (
+                        <span
+                          key={`${item.kind}-${item.id}`}
+                          className="flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta"
+                        >
+                          {estilo ? (
+                            <span
+                              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control ${estilo.relleno}`}
+                              title={estilo.label}
+                            >
+                              <estilo.icon className="h-2.5 w-2.5" aria-hidden="true" />
+                              <span className="sr-only">{estilo.label}</span>
+                            </span>
+                          ) : (
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-pill bg-primary" aria-hidden="true" />
+                          )}
+                          <span className="truncate">{item.titulo}</span>
+                        </span>
+                      );
+                    })}
                     {restantes > 0 && (
                       <span className="type-meta px-1">+{restantes} más</span>
                     )}
