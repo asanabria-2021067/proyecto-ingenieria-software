@@ -35,6 +35,17 @@ describe('buildEventFormSchema (HU-184 T-323)', () => {
     expect(mensajes(valores({ tituloEvento: '   ' })).tituloEvento).toBe('El título no puede estar vacío.');
   });
 
+  it('con todo vacío reporta título y fechas a la vez', () => {
+    const errores = mensajes(
+      valores({ tituloEvento: '', fechaInicio: undefined, horaInicio: '', fechaFin: undefined, horaFin: '' }),
+    );
+    expect(errores.tituloEvento).toBeDefined();
+    expect(errores.fechaInicio).toBeDefined();
+    expect(errores.horaInicio).toBeDefined();
+    expect(errores.fechaFin).toBeDefined();
+    expect(errores.horaFin).toBeDefined();
+  });
+
   it('al crear exige proyecto', () => {
     expect(mensajes(valores({ idProyecto: '' })).idProyecto).toBe('Selecciona un proyecto.');
   });

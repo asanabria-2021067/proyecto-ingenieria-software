@@ -138,11 +138,9 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
   return z
     .object({
       idProyecto: z.string(),
-      tituloEvento: z
-        .string()
-        .trim()
-        .min(1, 'El título no puede estar vacío.')
-        .max(200, 'El título no puede exceder 200 caracteres.'),
+      // "No vacío" se valida en superRefine: si fallara aquí, zod no corre el
+      // superRefine y el usuario no vería los errores de fecha al mismo tiempo.
+      tituloEvento: z.string().max(200, 'El título no puede exceder 200 caracteres.'),
       descripcionEvento: z.string().max(5000, 'La descripción no puede exceder 5000 caracteres.'),
       fechaInicio: z.date().optional(),
       horaInicio: z.string(),
@@ -157,6 +155,10 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
       antelacionMinutos: z.number().int().min(0).max(10080),
     })
     .superRefine((values, ctx) => {
+      if (values.tituloEvento.trim().length === 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tituloEvento'], message: 'El título no puede estar vacío.' });
+      }
+
       if (mode === 'create' && !Number(values.idProyecto)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['idProyecto'], message: 'Selecciona un proyecto.' });
       }
