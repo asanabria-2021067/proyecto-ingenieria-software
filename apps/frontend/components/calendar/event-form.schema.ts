@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { EventoProyectoDTO, EventPayload, ModalidadEvento } from '@/lib/services/events';
+import { safeExternalHref } from '@/lib/security/safe-url';
 
 const HORA_FORMAT = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -27,15 +28,6 @@ export function requiereUbicacion(modalidad: ModalidadEvento): boolean {
 
 export function requiereLink(modalidad: ModalidadEvento): boolean {
   return modalidad === 'VIRTUAL' || modalidad === 'MIXTA';
-}
-
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }
 
 function pad(n: number): string {
@@ -211,7 +203,8 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
         const link = values.linkSesion.trim();
         if (link.length === 0) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['linkSesion'], message: 'Ingresa el link de la sesión.' });
-        } else if (!isValidHttpUrl(link)) {
+        } else if (!safeExternalHref(link)) {
+          // Mismo criterio que decide si el link es clicable en el detalle del evento.
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['linkSesion'],
