@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Clock } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import type { AgendaItem } from '@/lib/calendar/agenda';
+import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
 
 const ESTADO_TAREA_LABEL: Record<string, string> = {
   POR_HACER: 'Por hacer',
@@ -31,9 +32,9 @@ const PRIORIDAD_BORDE: Record<string, string> = {
  * HU-169 (T-264): una fila de agenda, tarea o evento. Tareas y eventos se
  * distinguen por forma (ícono en cuadro vs. punto de prioridad) y etiqueta
  * de texto ("Evento" vs. estado de la tarea), nunca solo por color. El
- * acento del sistema de diseño marca únicamente el ícono del evento (fondo +
- * `on-accent`, la única cosa destacada del bloque); la pill "Evento" usa
- * `pill-neutral`, nunca como color de letra.
+ * ícono del evento lleva el color de su modalidad (HU-184, T-324, ver
+ * lib/calendar/modalidad.ts) y la pill nombra la modalidad en texto; la pill
+ * usa `pill-neutral`, nunca un color de letra.
  */
 export function AgendaItemRow({
   item,
@@ -62,17 +63,18 @@ export function AgendaItemRow({
     );
   }
 
+  const estilo = MODALIDAD_ESTILO[item.modalidad];
   const contenido = (
     <>
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent">
-        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-control ${estilo.relleno}`}>
+        <estilo.icon className="h-3.5 w-3.5" aria-hidden="true" />
       </span>
       <span className="min-w-[10rem] flex-1 truncate text-sm text-on-surface">{item.titulo}</span>
       <span className="shrink-0 text-xs text-tertiary">
         {item.horaInicio}–{item.horaFin}
       </span>
       <span className="shrink-0 text-xs text-tertiary">{item.projectTitle}</span>
-      <span className="pill pill-neutral shrink-0">Evento</span>
+      <span className="pill pill-neutral shrink-0">Evento · {estilo.label}</span>
       <ChevronRight className="h-4 w-4 shrink-0 text-tertiary" aria-hidden="true" />
     </>
   );
