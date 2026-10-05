@@ -48,6 +48,29 @@ export async function getAdminStats(): Promise<AdminStats> {
   return apiFetch<AdminStats>('/admin/estadisticas');
 }
 
+// ─── GET /admin/metricas (HU-178) ─────────────────────────────────────────────
+
+export type AdminMetricasPeriodo = 'semana' | 'mes';
+
+export interface AdminMetricasPunto {
+  /** Fecha (YYYY-MM-DD, hora de Guatemala) en que inicia el periodo. */
+  inicio: string;
+  usuariosNuevos: number;
+  usuariosActivos: number;
+  proyectosCreados: number;
+  tareasCompletadas: number;
+  horasConfirmadas: number;
+}
+
+export interface AdminMetricas {
+  periodo: AdminMetricasPeriodo;
+  serie: AdminMetricasPunto[];
+}
+
+export async function getAdminMetricas(periodo: AdminMetricasPeriodo): Promise<AdminMetricas> {
+  return apiFetch<AdminMetricas>(`/admin/metricas?periodo=${periodo}`);
+}
+
 // ─── GET /admin/usuarios ──────────────────────────────────────────────────────
 
 export interface ListAdminUsersParams {
