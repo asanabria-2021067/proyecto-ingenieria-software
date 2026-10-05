@@ -6,12 +6,24 @@ import type { AgendaItem } from '@/lib/calendar/agenda';
 
 const MAX_VISIBLE_POR_DIA = 3;
 
+function puntoDe(item: AgendaItem): string {
+  return item.kind === 'evento' ? MODALIDAD_ESTILO[item.modalidad].punto : 'bg-primary';
+}
+
+function etiquetaDia(date: Date, total: number, isToday: boolean): string {
+  const fecha = date.toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long' });
+  const actividad = total === 0 ? 'sin actividad' : total === 1 ? '1 actividad' : `${total} actividades`;
+  return `${isToday ? 'Hoy, ' : ''}${fecha}, ${actividad}`;
+}
+
 /**
  * HU-169 (T-264): vista mensual, extendida a partir de la rejilla existente
  * (`getMonthMatrix`/`WEEKDAY_LABELS_ES`, ya usada por MiniCalendar) — no se
  * rehace. Un día con más de MAX_VISIBLE_POR_DIA ítems se agrupa con un
  * indicador "+N más" en vez de desbordar la celda; seleccionar el día
  * (mismo patrón que antes) muestra el detalle completo debajo.
+ * HU-184 (T-324): en móvil la celda no alcanza para títulos; muestra solo
+ * puntos con el color de cada ítem y el detalle queda en la lista de abajo.
  */
 export function MonthView({
   year,
@@ -31,7 +43,7 @@ export function MonthView({
   const weeks = getMonthMatrix(year, month);
 
   return (
-    <div className="card-base">
+    <div className="card-base max-sm:p-tight">
       <div className="mb-tight grid grid-cols-7 gap-1">
         {WEEKDAY_LABELS_ES.map((label, i) => (
           <div key={i} className="type-meta py-tight text-center uppercase">
@@ -56,7 +68,8 @@ export function MonthView({
                   onClick={() => onSelectDay(day.key)}
                   aria-current={isToday ? 'date' : undefined}
                   aria-pressed={isSelected}
-                  className={`flex min-h-[92px] flex-col items-stretch gap-1 rounded-control border p-1 text-left transition-colors ${
+                  aria-label={etiquetaDia(day.date, items.length, isToday)}
+                  className={`flex min-h-[52px] min-w-0 flex-col items-stretch gap-1 rounded-control border p-0.5 text-left transition-colors sm:min-h-[92px] sm:p-1 ${
                     isToday
                       ? 'border-primary'
                       : day.inCurrentMonth
@@ -64,7 +77,7 @@ export function MonthView({
                         : 'border-transparent opacity-50'
                   } ${isSelected ? 'bg-surface-container-high' : 'bg-surface-container-lowest hover:bg-surface-container'}`}
                 >
-                  <span className="flex items-center justify-end gap-1">
+                  <span className="flex items-center justify-center gap-1 sm:justify-end">
                     {isToday && <span className="type-meta hidden font-bold text-text-primary sm:inline">Hoy</span>}
                     <span
                       className={`type-meta flex h-6 min-w-6 items-center justify-center rounded-pill px-1 ${
@@ -76,7 +89,13 @@ export function MonthView({
                       {day.date.getDate()}
                     </span>
                   </span>
-                  <div className="flex flex-1 flex-col gap-0.5 overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-center gap-0.5 sm:hidden" aria-hidden="true">
+                    {visibles.map((item) => (
+                      <span key={`${item.kind}-${item.id}`} className={`h-1.5 w-1.5 rounded-pill ${puntoDe(item)}`} />
+                    ))}
+                    {restantes > 0 && <span className="type-meta leading-none">+{restantes}</span>}
+                  </div>
+                  <div className="hidden flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
                     {visibles.map((item) => {
                       const estilo = item.kind === 'evento' ? MODALIDAD_ESTILO[item.modalidad] : null;
                       return (
