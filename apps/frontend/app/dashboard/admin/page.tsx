@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AdminMetricsSection } from '@/components/admin/AdminMetricsSection';
 import {
   getAdminStats,
   type AdminStats,
@@ -380,7 +381,10 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
           </div>
         </section>
 
-        {/* Sección 4: Actividad y alertas */}
+        {/* Sección 4: Tendencias de uso (HU-178) */}
+        <AdminMetricsSection />
+
+        {/* Sección 5: Actividad y alertas */}
         <section>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
             <ActividadRecienteCard items={stats.actividadReciente} />
