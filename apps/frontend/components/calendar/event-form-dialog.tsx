@@ -28,6 +28,7 @@ import { createEvent, deleteEvent, updateEvent, type EventoProyectoDTO, type Mod
 import { DatePicker } from './date-picker';
 import {
   MODALIDAD_OPTIONS,
+  RECORDATORIO_OPTIONS,
   buildEventFormSchema,
   buildEventPayload,
   emptyEventForm,
@@ -45,6 +46,16 @@ const EventLocationPicker = dynamic(() => import('./event-location-picker'), {
 export interface LedProjectOption {
   idProyecto: number;
   tituloProyecto: string;
+}
+
+/**
+ * Un evento creado antes de HU-184 pudo guardar cualquier número de minutos:
+ * si no coincide con una opción fija, se agrega como opción propia para no
+ * cambiarlo sin que el usuario lo note.
+ */
+function opcionesRecordatorio(actual: number) {
+  if (RECORDATORIO_OPTIONS.some((opt) => opt.value === actual)) return RECORDATORIO_OPTIONS;
+  return [...RECORDATORIO_OPTIONS, { value: actual, label: `${actual} minutos antes` }].sort((a, b) => a.value - b.value);
 }
 
 function hoyInicioDelDia(): Date {
@@ -466,19 +477,26 @@ export function EventFormDialog({
                 name="antelacionMinutos"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Recordatorio (minutos antes)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={10080}
-                        value={field.value}
-                        disabled={isPending}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                        className="h-10 w-full rounded-md border-outline-variant text-sm"
-                      />
-                    </FormControl>
-                    <FormDescription className="type-meta">Por defecto, 60 minutos antes del inicio.</FormDescription>
+                    <FormLabel>Recordatorio</FormLabel>
+                    <Select
+                      value={String(field.value)}
+                      onValueChange={(v) => field.onChange(Number(v))}
+                      disabled={isPending}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-10 w-full border-outline-variant">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {opcionesRecordatorio(field.value).map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="type-meta">Se avisa a los participantes antes del inicio.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
