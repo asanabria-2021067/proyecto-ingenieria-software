@@ -70,6 +70,7 @@ const MIGRATED_FILES = [
   // Panel de administración: resumen de planificación de Sprints.
   'components/calendar/mini-calendar.tsx',
   'components/admin/dashboard/sprint-planning-widget.tsx',
+  'components/admin/dashboard/attention-queue.tsx',
   'lib/admin/sprint-calendar.ts',
 ];
 

@@ -4,15 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import {
   FolderKanban,
   Users,
-  ClipboardList,
-  Clock,
-  AlertTriangle,
   AlertCircle,
   Calendar,
   GraduationCap,
   Activity,
 } from 'lucide-react';
 import Link from 'next/link';
+import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminMetricsSection } from '@/components/admin/AdminMetricsSection';
 import {
@@ -81,60 +79,6 @@ function StatCard({
   );
 }
 
-const ACTION_CARD_TONES = {
-  warning: {
-    card: 'border-outline-variant bg-status-warning/20',
-    icon: 'bg-status-warning text-on-status-warning',
-    badge: 'bg-status-warning text-on-status-warning',
-  },
-  error: {
-    card: 'border-outline-variant bg-status-error/10',
-    icon: 'bg-status-error text-on-status-error',
-    badge: 'bg-status-error text-on-status-error',
-  },
-} as const;
-
-function ActionCard({
-  label,
-  value,
-  subtexto,
-  badgeLabel,
-  icon: Icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  subtexto: string;
-  badgeLabel: string;
-  icon: React.ElementType;
-  tone: keyof typeof ACTION_CARD_TONES;
-}) {
-  const tones = ACTION_CARD_TONES[tone];
-  return (
-    <div className={`flex flex-col gap-4 rounded-xl border p-6 ${tones.card}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <span className="type-meta font-black uppercase tracking-widest text-text-secondary">
-            {label}
-          </span>
-          <p className="mt-1 text-4xl font-black tracking-tighter text-text-primary">
-            {value}
-          </p>
-        </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tones.icon}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-      <div className="flex items-center justify-between">
-        <p className="type-meta text-text-secondary">{subtexto}</p>
-        <span className={`rounded-full px-2 py-0.5 type-meta font-black uppercase ${tones.badge}`}>
-          {badgeLabel}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 // ─── Skeleton loaders ─────────────────────────────────────────────────────────
 
 function AdminStatsSkeleton() {
@@ -156,11 +100,7 @@ function AdminStatsSkeleton() {
 
         <div className="mb-8">
           <Skeleton className="mb-4 h-5 w-36 rounded" />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Skeleton className="h-32 rounded-xl" />
-            <Skeleton className="h-32 rounded-xl" />
-            <Skeleton className="h-32 rounded-xl" />
-          </div>
+          <Skeleton className="h-64 rounded-card" />
         </div>
 
         <div className="mb-8">
@@ -320,40 +260,13 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
         {/* Sección 2: Requieren acción */}
         <section className="mb-10">
           <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
-            Requieren acción
+            Operación
           </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <ActionCard
-              label="En Revisión"
-              value={stats.enRevision}
-              subtexto="Proyectos pendientes de revisión"
-              badgeLabel="Pendiente"
-              icon={ClipboardList}
-              tone="warning"
-            />
-            <Link
-              href="/dashboard/admin/proyectos?grupo=cierres"
-              aria-label="Ver solicitudes de cierre pendientes"
-              className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              <ActionCard
-                label="Cierre Pendiente"
-                value={stats.cierrePendiente}
-                subtexto="Solicitudes de cierre por aprobar"
-                badgeLabel="Acción requerida"
-                icon={Clock}
-                tone="warning"
-              />
-            </Link>
-            <ActionCard
-              label="Bloqueados"
-              value={stats.usuariosBloqueados}
-              subtexto="Usuarios con acceso restringido"
-              badgeLabel="Revisar"
-              icon={AlertTriangle}
-              tone="error"
-            />
-          </div>
+          <AdminAttentionQueue
+            enRevision={stats.enRevision}
+            cierrePendiente={stats.cierrePendiente}
+            usuariosBloqueados={stats.usuariosBloqueados}
+          />
         </section>
 
         {/* Sección 3: Datos 2026 */}
