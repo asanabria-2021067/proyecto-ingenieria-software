@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, CalendarDays, ClipboardList, Clock, Plus, Target } from 'lucide-react';
+import { AlertCircle, CalendarDays, ClipboardList, Plus, Target } from 'lucide-react';
 import {
   Empty,
   EmptyContent,
@@ -38,6 +38,7 @@ import {
   tareaToAgendaItem,
   type AgendaItem,
 } from '@/lib/calendar/agenda';
+import { MODALIDAD_ESTILO, MODALIDADES_EN_ORDEN } from '@/lib/calendar/modalidad';
 import { MonthView } from '@/components/calendar/month-view';
 import { WeekView } from '@/components/calendar/week-view';
 import { AgendaItemRow } from '@/components/calendar/agenda-item-row';
@@ -195,18 +196,24 @@ export default function CalendarioPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-gap">
-          <div className="flex items-center gap-tight">
-            <span className="flex items-center gap-1 type-meta">
+          {/* HU-184 (T-324): leyenda de lo que distingue cada marca del calendario. */}
+          <ul className="flex flex-wrap items-center gap-x-gap gap-y-1" aria-label="Leyenda del calendario">
+            <li className="flex items-center gap-1 type-meta">
               <span className="h-1.5 w-1.5 rounded-pill bg-primary" aria-hidden="true" />
               Fecha límite de tarea
-            </span>
-            <span className="flex items-center gap-1 type-meta">
-              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-control bg-accent text-on-accent">
-                <Clock className="h-2.5 w-2.5" aria-hidden="true" />
-              </span>
-              Evento
-            </span>
-          </div>
+            </li>
+            {MODALIDADES_EN_ORDEN.map((modalidad) => {
+              const estilo = MODALIDAD_ESTILO[modalidad];
+              return (
+                <li key={modalidad} className="flex items-center gap-1 type-meta">
+                  <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-control ${estilo.relleno}`}>
+                    <estilo.icon className="h-2.5 w-2.5" aria-hidden="true" />
+                  </span>
+                  Evento {estilo.label.toLowerCase()}
+                </li>
+              );
+            })}
+          </ul>
 
           <ButtonGroup>
             <Button
