@@ -31,6 +31,7 @@ export function DatePicker({
   onChange: (date: Date | undefined) => void;
   /** Días anteriores a este quedan deshabilitados en el calendario. */
   disabledBefore?: Date;
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
 
