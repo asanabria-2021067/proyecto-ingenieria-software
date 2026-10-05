@@ -31,7 +31,9 @@ function EventoIcono({ modalidad }: { modalidad: ModalidadEvento }) {
  * los ítems del día ya cargados por el rango visible. Mismos ítems y misma
  * fuente que MonthView (AgendaItem), sin recargar al cambiar de vista.
  * HU-184 (T-324): un clic en un evento abre su detalle (`onSelectEvento`),
- * sea o no del proyecto que lidera el usuario.
+ * sea o no del proyecto que lidera el usuario. En móvil (días apilados) se
+ * ocultan los días sin actividad, salvo hoy, para no hacer scroll por
+ * tarjetas vacías.
  */
 export function WeekView({
   days,
@@ -44,16 +46,24 @@ export function WeekView({
   itemsByDay: Map<string, AgendaItem[]>;
   onSelectEvento: (item: Extract<AgendaItem, { kind: 'evento' }>) => void;
 }) {
+  const semanaVacia = days.every((day) => (itemsByDay.get(day.key) ?? []).length === 0);
+
   return (
-    <div className="grid grid-cols-1 gap-gap md:grid-cols-7">
+    <div className="grid grid-cols-1 gap-tight md:grid-cols-7 md:gap-gap">
+      {semanaVacia && (
+        <p className="type-meta card-base py-3 text-center md:hidden">Sin actividad esta semana</p>
+      )}
       {days.map((day) => {
         const items = itemsByDay.get(day.key) ?? [];
         const isToday = day.key === todayKey;
+        const ocultarEnMovil = items.length === 0 && !isToday;
         return (
           <div
             key={day.key}
             aria-current={isToday ? 'date' : undefined}
-            className={`card-base flex flex-col gap-tight ${isToday ? 'border-primary' : ''}`}
+            className={`card-base flex flex-col gap-tight max-md:p-stack ${isToday ? 'border-primary' : ''} ${
+              ocultarEnMovil ? 'max-md:hidden' : ''
+            }`}
           >
             <div
               className={`type-meta flex items-center justify-between rounded-control px-tight py-1 ${
