@@ -22,7 +22,7 @@ function tarea(id: number, key: string, titulo: string): AgendaItem {
   };
 }
 
-function evento(id: number, key: string, titulo: string): AgendaItem {
+function evento(id: number, key: string, titulo: string, modalidad: 'PRESENCIAL' | 'VIRTUAL' | 'MIXTA' = 'VIRTUAL'): AgendaItem {
   return {
     kind: 'evento',
     key,
@@ -31,7 +31,7 @@ function evento(id: number, key: string, titulo: string): AgendaItem {
     projectId: 1,
     titulo,
     descripcion: null,
-    modalidad: 'VIRTUAL',
+    modalidad,
     projectTitle: 'Proyecto',
     href: '/dashboard/projects/1',
     horaInicio: '09:00',
@@ -118,5 +118,53 @@ describe('MonthView (HU-169 T-264)', () => {
     );
 
     expect(screen.queryByText(/más$/)).not.toBeInTheDocument();
+  });
+
+  it('marca hoy con aria-current y el texto "Hoy" (HU-184 T-324)', () => {
+    render(
+      <MonthView
+        year={2026}
+        month={8}
+        todayKey="2026-09-27"
+        selectedKey={null}
+        itemsByDay={new Map()}
+        onSelectDay={() => {}}
+      />,
+    );
+
+    const hoy = screen.getByRole('button', { name: /^Hoy, domingo, 27 de septiembre/ });
+    expect(hoy).toHaveAttribute('aria-current', 'date');
+    expect(hoy).toHaveTextContent('Hoy');
+    expect(screen.getAllByText('Hoy')).toHaveLength(1);
+  });
+
+  it('cada evento lleva el color e ícono de su modalidad, con su nombre en texto (HU-184 T-324)', () => {
+    const key = '2026-09-10';
+    const itemsByDay = new Map<string, AgendaItem[]>([
+      [key, [evento(1, key, 'Visita', 'PRESENCIAL'), evento(2, key, 'Llamada', 'VIRTUAL'), evento(3, key, 'Taller', 'MIXTA')]],
+    ]);
+
+    const { container } = render(
+      <MonthView year={2026} month={8} todayKey="2026-09-27" selectedKey={null} itemsByDay={itemsByDay} onSelectDay={() => {}} />,
+    );
+
+    expect(screen.getByText('Presencial')).toBeInTheDocument();
+    expect(screen.getByText('Virtual')).toBeInTheDocument();
+    expect(screen.getByText('Mixta')).toBeInTheDocument();
+    // Puntos de la vista compacta (móvil): uno por ítem con el color de su modalidad.
+    expect(container.querySelector('span.bg-status-success.h-1\\.5')).not.toBeNull();
+    expect(container.querySelector('span.bg-accent.h-1\\.5')).not.toBeNull();
+    expect(container.querySelector('span.bg-action.h-1\\.5')).not.toBeNull();
+  });
+
+  it('el nombre accesible del día dice cuántas actividades tiene (los títulos no caben en móvil)', () => {
+    const key = '2026-09-10';
+    const itemsByDay = new Map<string, AgendaItem[]>([[key, [tarea(1, key, 'T1'), evento(2, key, 'E1')]]]);
+
+    render(
+      <MonthView year={2026} month={8} todayKey="2026-09-27" selectedKey={null} itemsByDay={itemsByDay} onSelectDay={() => {}} />,
+    );
+
+    expect(screen.getByRole('button', { name: /10 de septiembre, 2 actividades$/ })).toBeInTheDocument();
   });
 });
