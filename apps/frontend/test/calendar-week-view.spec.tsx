@@ -40,6 +40,7 @@ function evento(id: number, key: string): AgendaItem {
     projectId: 1,
     titulo: 'Reunión de equipo',
     descripcion: null,
+    modalidad: 'VIRTUAL',
     projectTitle: 'Proyecto',
     href: '/dashboard/projects/1',
     horaInicio: '09:00',

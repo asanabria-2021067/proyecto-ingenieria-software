@@ -1,5 +1,5 @@
 import type { MiTareaDTO } from '@/lib/services/users';
-import type { MiEventoDTO } from '@/lib/services/events';
+import type { MiEventoDTO, ModalidadEvento } from '@/lib/services/events';
 import { addDays, formatTime, parseFechaSolo, toDateKey } from './utils';
 
 /**
@@ -27,6 +27,8 @@ export type AgendaItem =
       projectId: number;
       titulo: string;
       descripcion: string | null;
+      /** HU-184 (T-324): define color e ícono del evento en las vistas. */
+      modalidad: ModalidadEvento;
       projectTitle: string;
       href: string;
       horaInicio: string;
@@ -62,6 +64,7 @@ export function eventoToAgendaItem(evento: MiEventoDTO): AgendaItem {
     projectId: evento.proyecto.idProyecto,
     titulo: evento.tituloEvento,
     descripcion: evento.descripcionEvento,
+    modalidad: evento.modalidad,
     projectTitle: evento.proyecto.tituloProyecto,
     href: `/dashboard/projects/${evento.proyecto.idProyecto}`,
     horaInicio,

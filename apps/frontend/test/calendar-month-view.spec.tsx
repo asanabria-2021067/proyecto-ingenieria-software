@@ -31,6 +31,7 @@ function evento(id: number, key: string, titulo: string): AgendaItem {
     projectId: 1,
     titulo,
     descripcion: null,
+    modalidad: 'VIRTUAL',
     projectTitle: 'Proyecto',
     href: '/dashboard/projects/1',
     horaInicio: '09:00',

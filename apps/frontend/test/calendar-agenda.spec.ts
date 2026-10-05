@@ -54,6 +54,11 @@ describe('calendar/agenda — mapeo a AgendaItem', () => {
     expect(item.sortKey).not.toBe('24:00');
     expect(item.sortKey).toMatch(/^\d{2}:\d{2}$/);
   });
+  it('eventoToAgendaItem conserva la modalidad para colorear el evento (HU-184 T-324)', () => {
+    const item = eventoToAgendaItem(evento({ modalidad: 'PRESENCIAL' }));
+    if (item.kind !== 'evento') throw new Error('unreachable');
+    expect(item.modalidad).toBe('PRESENCIAL');
+  });
 });
 
 describe('calendar/agenda — eventoToAgendaItems (evento multi-día, T-264)', () => {
