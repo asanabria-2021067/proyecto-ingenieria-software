@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,10 +21,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { useCancelEvent } from '@/hooks/use-cancel-event';
 import { useProjectRoles } from '@/hooks/use-project-roles';
-import uvgSwal from '@/lib/swal';
-import { toast } from 'sonner';
-import { createEvent, deleteEvent, updateEvent, type EventoProyectoDTO, type ModalidadEvento } from '@/lib/services/events';
+import { aviso } from '@/lib/mensajes';
+import { createEvent, updateEvent, type EventoProyectoDTO, type ModalidadEvento } from '@/lib/services/events';
 import { DatePicker } from './date-picker';
 import {
   MODALIDAD_OPTIONS,
@@ -88,7 +88,6 @@ export function EventFormDialog({
   initialDate?: Date;
 }) {
   const isEditing = Boolean(editingEvent);
-  const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const schema = useMemo(
@@ -110,7 +109,6 @@ export function EventFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
     form.reset(editingEvent ? eventFormFromEvento(editingEvent) : emptyEventForm(defaultProjectId, initialDate));
     // Solo al abrir: no queremos pisar lo que el usuario está escribiendo en cada render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,10 +131,10 @@ export function EventFormDialog({
       createEvent(Number(values.idProyecto), buildEventPayload(values, { keepEmptyDescripcion: false })),
     onSuccess: () => {
       invalidate();
-      toast.success('Evento creado');
+      aviso.exito('Evento creado');
       onOpenChange(false);
     },
-    onError: (err) => setError(getApiErrorMessage(err, 'calendar')),
+    onError: (err) => aviso.error('No se pudo crear el evento', getApiErrorMessage(err, 'calendar')),
   });
 
   const editar = useMutation({
@@ -144,37 +142,28 @@ export function EventFormDialog({
       updateEvent(editingEvent!.idProyecto, editingEvent!.idEvento, buildEventPayload(values, { keepEmptyDescripcion: true })),
     onSuccess: () => {
       invalidate();
+      aviso.exito('Evento actualizado');
       onOpenChange(false);
     },
-    onError: (err) => setError(getApiErrorMessage(err, 'calendar')),
+    onError: (err) => aviso.error('No se pudo guardar el evento', getApiErrorMessage(err, 'calendar')),
   });
 
-  const cancelar = useMutation({
-    mutationFn: () => deleteEvent(editingEvent!.idProyecto, editingEvent!.idEvento),
-    onSuccess: () => {
-      invalidate();
-      onOpenChange(false);
-    },
-    onError: (err) => setError(getApiErrorMessage(err, 'calendar')),
-  });
+  const { cancelarEvento, isPending: isCancelling } = useCancelEvent();
 
-  const isPending = crear.isPending || editar.isPending || cancelar.isPending;
+  const isPending = crear.isPending || editar.isPending || isCancelling;
 
   const confirmarCancelacion = async () => {
-    const { isConfirmed } = await uvgSwal.fire({
-      icon: 'warning',
-      title: '¿Cancelar este evento?',
-      text: 'Se eliminará del calendario del proyecto. Esta acción no se puede deshacer.',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, cancelar',
-      cancelButtonText: 'Volver',
-    });
-    if (!isConfirmed) return;
-    cancelar.mutate();
+    if (!editingEvent) return;
+    if (await cancelarEvento(editingEvent)) onOpenChange(false);
+  };
+
+  // Con el formulario largo (sobre todo en móvil) el campo con error puede
+  // quedar fuera de vista: el aviso dice que hay algo que corregir.
+  const onInvalid = () => {
+    aviso.advertencia('Revisa los campos marcados', 'Hay datos del evento que faltan o no son válidos.');
   };
 
   const onSubmit = (values: EventFormValues) => {
-    setError(null);
     if (isEditing) {
       editar.mutate(values);
       return;
@@ -186,7 +175,7 @@ export function EventFormDialog({
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent className="flex max-h-[90vh] w-[96vw] max-w-[720px] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="flex max-h-[90vh] min-h-0 flex-col">
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} noValidate className="flex max-h-[90vh] min-h-0 flex-col">
             <DialogHeader className="shrink-0 border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
               <DialogTitle className="text-xl font-bold text-on-surface">
                 {isEditing ? 'Editar evento' : 'Nuevo evento'}
@@ -501,12 +490,6 @@ export function EventFormDialog({
                   </FormItem>
                 )}
               />
-
-              {error && (
-                <p role="alert" className="text-xs text-status-error">
-                  {error}
-                </p>
-              )}
             </div>
 
             <DialogFooter className="shrink-0 gap-2 border-t border-outline-variant/35 px-6 py-4 sm:justify-between">
@@ -518,7 +501,7 @@ export function EventFormDialog({
                   onClick={() => void confirmarCancelacion()}
                   className="h-10 gap-1.5 rounded-md border-outline-variant text-xs font-bold text-status-error"
                 >
-                  {cancelar.isPending ? (
+                  {isCancelling ? (
                     <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                   ) : (
                     <Trash2 className="size-3.5" aria-hidden="true" />
