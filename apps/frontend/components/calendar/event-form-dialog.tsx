@@ -173,10 +173,10 @@ export function EventFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
-      <DialogContent className="flex max-h-[90vh] w-[96vw] max-w-[720px] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0">
+      <DialogContent className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[720px]">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} noValidate className="flex max-h-[90vh] min-h-0 flex-col">
-            <DialogHeader className="shrink-0 border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} noValidate className="flex max-h-[90dvh] min-h-0 flex-col">
+            <DialogHeader className="shrink-0 border-b border-outline-variant/35 px-4 pb-4 pt-5 pr-12 text-left sm:px-6">
               <DialogTitle className="text-xl font-bold text-on-surface">
                 {isEditing ? 'Editar evento' : 'Nuevo evento'}
               </DialogTitle>
@@ -185,7 +185,7 @@ export function EventFormDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
               {!isEditing && (
                 <FormField
                   control={form.control}
@@ -261,96 +261,98 @@ export function EventFormDialog({
                 )}
               />
 
-              <fieldset className="space-y-3">
-                <legend className="text-sm font-medium text-on-surface">Inicio</legend>
-                <div className="grid grid-cols-[1fr_8rem] gap-3">
-                  <FormField
-                    control={form.control}
-                    name="fechaInicio"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="sr-only">Fecha de inicio</FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            value={field.value}
-                            onChange={(date) => {
-                              field.onChange(date);
-                              // El fin nunca debe quedar en un día anterior al nuevo inicio.
-                              const fechaFin = form.getValues('fechaFin');
-                              if (date && fechaFin && fechaFin < date) form.setValue('fechaFin', date);
-                            }}
-                            disabledBefore={isEditing ? undefined : hoyInicioDelDia()}
-                            disabled={isPending}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="horaInicio"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="sr-only">Hora de inicio</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="time"
-                            step={300}
-                            disabled={isPending}
-                            className="h-10 rounded-md border-outline-variant text-sm"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </fieldset>
-
-              <fieldset className="space-y-3">
-                <legend className="text-sm font-medium text-on-surface">Fin</legend>
-                <div className="grid grid-cols-[1fr_8rem] gap-3">
-                  <FormField
-                    control={form.control}
-                    name="fechaFin"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="sr-only">Fecha de fin</FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            value={field.value}
-                            onChange={field.onChange}
-                            disabledBefore={fechaInicio}
-                            disabled={isPending}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="horaFin"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="sr-only">Hora de fin</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="time"
-                            step={300}
-                            disabled={isPending}
-                            className="h-10 rounded-md border-outline-variant text-sm"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </fieldset>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <fieldset className="min-w-0 space-y-2">
+                  <legend className="text-sm font-medium text-on-surface">Inicio</legend>
+                  <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                    <FormField
+                      control={form.control}
+                      name="fechaInicio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="sr-only">Fecha de inicio</FormLabel>
+                          <FormControl>
+                            <DatePicker
+                              value={field.value}
+                              onChange={(date) => {
+                                field.onChange(date);
+                                // El fin nunca debe quedar en un día anterior al nuevo inicio.
+                                const fechaFin = form.getValues('fechaFin');
+                                if (date && fechaFin && fechaFin < date) form.setValue('fechaFin', date);
+                              }}
+                              disabledBefore={isEditing ? undefined : hoyInicioDelDia()}
+                              disabled={isPending}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="horaInicio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="sr-only">Hora de inicio</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="time"
+                              step={300}
+                              disabled={isPending}
+                              className="h-10 rounded-md border-outline-variant text-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </fieldset>
+  
+                <fieldset className="min-w-0 space-y-2">
+                  <legend className="text-sm font-medium text-on-surface">Fin</legend>
+                  <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                    <FormField
+                      control={form.control}
+                      name="fechaFin"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="sr-only">Fecha de fin</FormLabel>
+                          <FormControl>
+                            <DatePicker
+                              value={field.value}
+                              onChange={field.onChange}
+                              disabledBefore={fechaInicio}
+                              disabled={isPending}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="horaFin"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="sr-only">Hora de fin</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="time"
+                              step={300}
+                              disabled={isPending}
+                              className="h-10 rounded-md border-outline-variant text-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </fieldset>
+              </div>
 
               <FormField
                 control={form.control}
@@ -492,7 +494,7 @@ export function EventFormDialog({
               />
             </div>
 
-            <DialogFooter className="shrink-0 gap-2 border-t border-outline-variant/35 px-6 py-4 sm:justify-between">
+            <DialogFooter className="shrink-0 gap-2 border-t border-outline-variant/35 px-4 py-4 sm:justify-between sm:px-6">
               {isEditing ? (
                 <Button
                   type="button"
@@ -509,9 +511,9 @@ export function EventFormDialog({
                   Cancelar evento
                 </Button>
               ) : (
-                <span />
+                <span className="hidden sm:block" />
               )}
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex">
                 <Button
                   type="button"
                   variant="outline"
