@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
+import { MetricasQueryDto } from './dto/metricas-query.dto';
 import { UpdateAdminUserStatusDto } from './dto/update-admin-user-status.dto';
 import { securityRequestContext } from '../security-events/request-context';
 
@@ -26,6 +27,14 @@ export class AdminController {
   @Get('estadisticas')
   getEstadisticas(@CurrentUser() user: { userId: number }) {
     return this.adminService.getEstadisticas(user.userId);
+  }
+
+  @Get('metricas')
+  getMetricas(
+    @CurrentUser() user: { userId: number },
+    @Query() query: MetricasQueryDto,
+  ) {
+    return this.adminService.getMetricas(user.userId, query.periodo);
   }
 
   @Get('usuarios')
