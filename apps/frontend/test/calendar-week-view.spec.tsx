@@ -92,4 +92,35 @@ describe('WeekView (HU-169 T-264)', () => {
     screen.getByText('Reunión de equipo').closest('button')!.click();
     expect(onSelectEvento).toHaveBeenCalledWith(expect.objectContaining({ kind: 'evento', id: 1 }));
   });
+
+  it('resalta el día de hoy (HU-184 T-324)', () => {
+    const { container } = render(
+      <WeekView days={days()} todayKey="2026-09-09" itemsByDay={new Map()} onSelectEvento={() => {}} />,
+    );
+
+    const hoy = container.querySelector('[aria-current="date"]');
+    expect(hoy).not.toBeNull();
+    expect(hoy).toHaveTextContent('Hoy');
+    expect(container.querySelectorAll('[aria-current="date"]')).toHaveLength(1);
+  });
+
+  it('en móvil oculta los días vacíos salvo hoy, y avisa si la semana entera está vacía', () => {
+    const key = '2026-09-10';
+    const { container, rerender } = render(
+      <WeekView
+        days={days()}
+        todayKey="2026-09-09"
+        itemsByDay={new Map([[key, [tarea(1, key)]]])}
+        onSelectEvento={() => {}}
+      />,
+    );
+
+    // 7 días: 1 con actividad + hoy visibles, los otros 5 ocultos en móvil.
+    expect(container.querySelectorAll('.max-md\\:hidden')).toHaveLength(5);
+    expect(screen.queryByText('Sin actividad esta semana')).not.toBeInTheDocument();
+
+    rerender(<WeekView days={days()} todayKey="2026-09-09" itemsByDay={new Map()} onSelectEvento={() => {}} />);
+    expect(screen.getByText('Sin actividad esta semana')).toBeInTheDocument();
+  });
 });
+
