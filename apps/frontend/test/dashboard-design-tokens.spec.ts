@@ -67,6 +67,10 @@ const MIGRATED_FILES = [
   'components/hours/hours-kpi-card.tsx',
   'components/hours/my-hours-requirements.tsx',
   'components/hours/my-hours-project-list.tsx',
+  // Panel de administración: resumen de planificación de Sprints.
+  'components/calendar/mini-calendar.tsx',
+  'components/admin/dashboard/sprint-planning-widget.tsx',
+  'lib/admin/sprint-calendar.ts',
 ];
 
 describe('Tokens de color (HU-163)', () => {

@@ -25,7 +25,7 @@ export const SITUACION_SPRINT_LABEL: Record<AdminSprintSituacion, string> = {
 export const SITUACION_SPRINT_TONE: Record<AdminSprintSituacion, string> = {
   EN_CURSO: 'pill-success',
   VENCE_HOY: 'pill-accent',
-  PLAN_VENCIDO: 'bg-attention/15 text-attention-strong',
+  PLAN_VENCIDO: 'bg-attention/15 text-attention-strong dark:text-attention',
   EN_FINALIZACION: 'pill-neutral',
   SIN_FECHA: 'pill-neutral',
 };
