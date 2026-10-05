@@ -57,17 +57,24 @@ export function MonthView({
                   aria-current={isToday ? 'date' : undefined}
                   aria-pressed={isSelected}
                   className={`flex min-h-[92px] flex-col items-stretch gap-1 rounded-control border p-1 text-left transition-colors ${
-                    day.inCurrentMonth ? 'border-outline-variant/40' : 'border-transparent opacity-50'
+                    isToday
+                      ? 'border-primary'
+                      : day.inCurrentMonth
+                        ? 'border-outline-variant/40'
+                        : 'border-transparent opacity-50'
                   } ${isSelected ? 'bg-surface-container-high' : 'bg-surface-container-lowest hover:bg-surface-container'}`}
                 >
-                  <span
-                    className={`type-meta self-end rounded-pill px-1.5 ${
-                      // El acento queda reservado para el ícono de evento (una sola cosa
-                      // destacada por bloque): "hoy" se marca con borde, no relleno.
-                      isToday ? 'border border-outline-variant font-bold text-on-surface' : ''
-                    }`}
-                  >
-                    {day.date.getDate()}
+                  <span className="flex items-center justify-end gap-1">
+                    {isToday && <span className="type-meta hidden font-bold text-text-primary sm:inline">Hoy</span>}
+                    <span
+                      className={`type-meta flex h-6 min-w-6 items-center justify-center rounded-pill px-1 ${
+                        // HU-184 (T-324): "hoy" con relleno primario (no acento: el
+                        // acento es de los eventos virtuales) + borde de la celda.
+                        isToday ? 'bg-primary font-bold text-on-primary' : ''
+                      }`}
+                    >
+                      {day.date.getDate()}
+                    </span>
                   </span>
                   <div className="flex flex-1 flex-col gap-0.5 overflow-hidden">
                     {visibles.map((item) => {

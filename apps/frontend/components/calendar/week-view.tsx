@@ -50,15 +50,22 @@ export function WeekView({
         const items = itemsByDay.get(day.key) ?? [];
         const isToday = day.key === todayKey;
         return (
-          <div key={day.key} className="card-base flex flex-col gap-tight">
+          <div
+            key={day.key}
+            aria-current={isToday ? 'date' : undefined}
+            className={`card-base flex flex-col gap-tight ${isToday ? 'border-primary' : ''}`}
+          >
             <div
               className={`type-meta flex items-center justify-between rounded-control px-tight py-1 ${
-                // El acento queda reservado para el ícono de evento (una sola cosa
-                // destacada por bloque): "hoy" se marca con borde, no relleno.
-                isToday ? 'border border-outline-variant font-bold text-on-surface' : ''
+                // HU-184 (T-324): "hoy" con relleno primario (no acento: el
+                // acento es de los eventos virtuales) + borde de la tarjeta.
+                isToday ? 'bg-primary font-bold text-on-primary' : ''
               }`}
             >
-              <span className="capitalize">{day.date.toLocaleDateString('es-GT', { weekday: 'short' })}</span>
+              <span className="capitalize">
+                {day.date.toLocaleDateString('es-GT', { weekday: 'short' })}
+                {isToday && ' · Hoy'}
+              </span>
               <span>{day.date.getDate()}</span>
             </div>
 
