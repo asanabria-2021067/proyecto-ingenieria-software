@@ -1,15 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock } from 'lucide-react';
 import type { CalendarDay } from '@/lib/calendar/utils';
 import type { AgendaItem } from '@/lib/calendar/agenda';
+import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
+import type { ModalidadEvento } from '@/lib/services/events';
 
 const PRIORIDAD_DOT: Record<string, string> = {
   ALTA: 'bg-status-error',
   MEDIA: 'bg-status-warning',
   BAJA: 'bg-outline-variant',
 };
+
+/** HU-184 (T-324): ícono del evento con el color de su modalidad (y su nombre para lectores de pantalla). */
+function EventoIcono({ modalidad }: { modalidad: ModalidadEvento }) {
+  const estilo = MODALIDAD_ESTILO[modalidad];
+  return (
+    <span
+      className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control ${estilo.relleno}`}
+      title={estilo.label}
+    >
+      <estilo.icon className="h-2.5 w-2.5" aria-hidden="true" />
+      <span className="sr-only">{estilo.label}</span>
+    </span>
+  );
+}
 
 /**
  * HU-169 (T-264): vista semanal — 7 columnas (una fila apilada en móvil) con
@@ -71,9 +86,7 @@ export function WeekView({
                     onClick={() => onEditEvento(item)}
                     className="flex items-start gap-1.5 rounded-control bg-surface-container-low px-1.5 py-1 text-left transition-colors hover:bg-surface-container"
                   >
-                    <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent">
-                      <Clock className="h-2.5 w-2.5" aria-hidden="true" />
-                    </span>
+                    <EventoIcono modalidad={item.modalidad} />
                     <span className="flex min-w-0 flex-col">
                       <span className="type-body truncate text-text-primary">{item.titulo}</span>
                       <span className="type-meta">{item.horaInicio}</span>
@@ -85,9 +98,7 @@ export function WeekView({
                     href={item.href}
                     className="flex items-start gap-1.5 rounded-control bg-surface-container-low px-1.5 py-1 transition-colors hover:bg-surface-container"
                   >
-                    <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent">
-                      <Clock className="h-2.5 w-2.5" aria-hidden="true" />
-                    </span>
+                    <EventoIcono modalidad={item.modalidad} />
                     <span className="flex min-w-0 flex-col">
                       <span className="type-body truncate text-text-primary">{item.titulo}</span>
                       <span className="type-meta">{item.horaInicio}</span>
