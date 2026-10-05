@@ -38,13 +38,11 @@ const PRIORIDAD_BORDE: Record<string, string> = {
  */
 export function AgendaItemRow({
   item,
-  editable = false,
-  onEditEvento,
+  onSelectEvento,
 }: {
   item: AgendaItem;
-  /** El usuario lidera el proyecto del evento: el click abre edición en vez de navegar. */
-  editable?: boolean;
-  onEditEvento?: (item: Extract<AgendaItem, { kind: 'evento' }>) => void;
+  /** HU-184 (T-324): el clic en un evento abre su detalle. */
+  onSelectEvento?: (item: Extract<AgendaItem, { kind: 'evento' }>) => void;
 }) {
   if (item.kind === 'tarea') {
     return (
@@ -64,8 +62,12 @@ export function AgendaItemRow({
   }
 
   const estilo = MODALIDAD_ESTILO[item.modalidad];
-  const contenido = (
-    <>
+  return (
+    <button
+      type="button"
+      onClick={() => onSelectEvento?.(item)}
+      className="flex w-full flex-wrap items-center gap-3 rounded-xl border-l-4 border-l-outline-variant bg-surface-container-low px-4 py-3 text-left transition-colors hover:bg-surface-container"
+    >
       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-control ${estilo.relleno}`}>
         <estilo.icon className="h-3.5 w-3.5" aria-hidden="true" />
       </span>
@@ -76,27 +78,6 @@ export function AgendaItemRow({
       <span className="shrink-0 text-xs text-tertiary">{item.projectTitle}</span>
       <span className="pill pill-neutral shrink-0">Evento · {estilo.label}</span>
       <ChevronRight className="h-4 w-4 shrink-0 text-tertiary" aria-hidden="true" />
-    </>
-  );
-
-  if (editable) {
-    return (
-      <button
-        type="button"
-        onClick={() => onEditEvento?.(item)}
-        className="flex w-full flex-wrap items-center gap-3 rounded-xl border-l-4 border-l-outline-variant bg-surface-container-low px-4 py-3 text-left transition-colors hover:bg-surface-container"
-      >
-        {contenido}
-      </button>
-    );
-  }
-
-  return (
-    <Link
-      href={item.href}
-      className="flex flex-wrap items-center gap-3 rounded-xl border-l-4 border-l-outline-variant bg-surface-container-low px-4 py-3 transition-colors hover:bg-surface-container"
-    >
-      {contenido}
-    </Link>
+    </button>
   );
 }

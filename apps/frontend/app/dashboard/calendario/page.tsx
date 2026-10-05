@@ -43,6 +43,7 @@ import { MonthView } from '@/components/calendar/month-view';
 import { WeekView } from '@/components/calendar/week-view';
 import { AgendaItemRow } from '@/components/calendar/agenda-item-row';
 import { EventFormDialog } from '@/components/calendar/event-form-dialog';
+import { EventDetailDialog } from '@/components/calendar/event-detail-dialog';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 
 type Vista = 'mes' | 'semana';
@@ -88,6 +89,8 @@ export default function CalendarioPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventoProyectoDTO | null>(null);
+  const [detailEvent, setDetailEvent] = useState<MiEventoDTO | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -142,9 +145,17 @@ export default function CalendarioPage() {
   const isLoading = isLoadingTareas || isLoadingEventos;
   const isError = isErrorTareas || isErrorEventos;
 
-  const handleEditEvento = (item: Extract<AgendaItem, { kind: 'evento' }>) => {
+  // HU-184 (T-324): todo clic en un evento abre primero su detalle; desde
+  // ahí, quien lidera el proyecto pasa a editar.
+  const handleSelectEvento = (item: Extract<AgendaItem, { kind: 'evento' }>) => {
     const evento = eventosPorId.get(item.id);
     if (!evento) return;
+    setDetailEvent(evento);
+    setDetailOpen(true);
+  };
+
+  const handleEditarDesdeDetalle = (evento: MiEventoDTO) => {
+    setDetailOpen(false);
     setEditingEvent(evento);
     setDialogOpen(true);
   };
@@ -312,8 +323,7 @@ export default function CalendarioPage() {
               days={weekDays}
               todayKey={hoyKey}
               itemsByDay={itemsByDay}
-              isEventEditable={isEventEditable}
-              onEditEvento={handleEditEvento}
+              onSelectEvento={handleSelectEvento}
             />
           )}
 
@@ -378,8 +388,7 @@ export default function CalendarioPage() {
                     <AgendaItemRow
                       key={`${item.kind}-${item.id}-${item.key}`}
                       item={item}
-                      editable={item.kind === 'evento' && isEventEditable(item.projectId)}
-                      onEditEvento={handleEditEvento}
+                      onSelectEvento={handleSelectEvento}
                     />
                   ))}
                 </div>
@@ -443,6 +452,14 @@ export default function CalendarioPage() {
           </Link>
         </div>
       </div>
+
+      <EventDetailDialog
+        evento={detailEvent}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        editable={detailEvent !== null && isEventEditable(detailEvent.idProyecto)}
+        onEditar={handleEditarDesdeDetalle}
+      />
 
       <EventFormDialog
         open={dialogOpen}

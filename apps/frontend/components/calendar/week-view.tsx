@@ -30,19 +30,19 @@ function EventoIcono({ modalidad }: { modalidad: ModalidadEvento }) {
  * HU-169 (T-264): vista semanal — 7 columnas (una fila apilada en móvil) con
  * los ítems del día ya cargados por el rango visible. Mismos ítems y misma
  * fuente que MonthView (AgendaItem), sin recargar al cambiar de vista.
+ * HU-184 (T-324): un clic en un evento abre su detalle (`onSelectEvento`),
+ * sea o no del proyecto que lidera el usuario.
  */
 export function WeekView({
   days,
   todayKey,
   itemsByDay,
-  isEventEditable,
-  onEditEvento,
+  onSelectEvento,
 }: {
   days: CalendarDay[];
   todayKey: string;
   itemsByDay: Map<string, AgendaItem[]>;
-  isEventEditable: (projectId: number) => boolean;
-  onEditEvento: (item: Extract<AgendaItem, { kind: 'evento' }>) => void;
+  onSelectEvento: (item: Extract<AgendaItem, { kind: 'evento' }>) => void;
 }) {
   return (
     <div className="grid grid-cols-1 gap-gap md:grid-cols-7">
@@ -86,11 +86,11 @@ export function WeekView({
                     />
                     <span className="type-body truncate text-text-primary">{item.titulo}</span>
                   </Link>
-                ) : isEventEditable(item.projectId) ? (
+                ) : (
                   <button
                     key={`evento-${item.id}`}
                     type="button"
-                    onClick={() => onEditEvento(item)}
+                    onClick={() => onSelectEvento(item)}
                     className="flex items-start gap-1.5 rounded-control bg-surface-container-low px-1.5 py-1 text-left transition-colors hover:bg-surface-container"
                   >
                     <EventoIcono modalidad={item.modalidad} />
@@ -99,18 +99,6 @@ export function WeekView({
                       <span className="type-meta">{item.horaInicio}</span>
                     </span>
                   </button>
-                ) : (
-                  <Link
-                    key={`evento-${item.id}`}
-                    href={item.href}
-                    className="flex items-start gap-1.5 rounded-control bg-surface-container-low px-1.5 py-1 transition-colors hover:bg-surface-container"
-                  >
-                    <EventoIcono modalidad={item.modalidad} />
-                    <span className="flex min-w-0 flex-col">
-                      <span className="type-body truncate text-text-primary">{item.titulo}</span>
-                      <span className="type-meta">{item.horaInicio}</span>
-                    </span>
-                  </Link>
                 ),
               )}
             </div>
