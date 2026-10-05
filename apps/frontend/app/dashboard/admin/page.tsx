@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   FolderKanban,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queue';
+import { AdminSprintPlanningWidget } from '@/components/admin/dashboard/sprint-planning-widget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminMetricsSection } from '@/components/admin/AdminMetricsSection';
 import {
@@ -19,6 +21,9 @@ import {
   type AdminActividadRecienteItem,
   type AdminEstudianteEnRiesgo,
 } from '@/lib/services/admin';
+
+/** Mismo contenedor que el resto de bandejas administrativas (1400 px centrado). */
+const PAGE_CLASS = 'mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -34,15 +39,39 @@ function timeAgo(dateStr: string | null): string {
 function estadoBadgeClasses(estado: string): string {
   const e = estado.toUpperCase();
   if (e.includes('ACTIVO') || e.includes('PUBLICADO')) {
-    return 'bg-status-success text-on-status-success';
+    return 'pill-success';
   }
   if (e.includes('REVISION') || e.includes('REVISIÓN')) {
-    return 'bg-status-warning text-on-status-warning';
+    return 'pill-warning';
   }
-  return 'bg-surface-container-high text-text-secondary';
+  return 'pill-neutral';
+}
+
+/** `EN_SOLICITUD_CIERRE` → `EN SOLICITUD CIERRE`: mismo estado, legible y con corte de línea. */
+function estadoLegible(estado: string): string {
+  return estado.replaceAll('_', ' ');
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+/** Encabezado de sección: la jerarquía del panel se lee por estos cuatro títulos. */
+function DashboardSection({
+  titulo,
+  children,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id}>
+      <h2 id={id} className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
+        {titulo}
+      </h2>
+      {children}
+    </section>
+  );
+}
 
 function StatCard({
   label,
@@ -60,21 +89,21 @@ function StatCard({
   iconColor?: string;
 }) {
   return (
-    <div className="flex flex-col gap-4 rounded-xl bg-surface-container-lowest border border-outline-variant p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-tertiary">
+    <div role="group" aria-label={label} className="card-base flex flex-col gap-stack">
+      <div className="flex items-start justify-between gap-inline">
+        <div className="min-w-0">
+          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
             {label}
           </span>
-          <p className="mt-1 text-4xl font-black tracking-tighter text-on-surface">
+          <p className="mt-micro font-headline text-4xl font-black tracking-tighter tabular-nums text-text-primary">
             {value}
           </p>
         </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
-          <Icon className={`h-5 w-5 ${iconColor}`} />
+        <div className={`flex size-10 shrink-0 items-center justify-center rounded-control ${iconBg}`}>
+          <Icon className={`size-5 ${iconColor}`} aria-hidden="true" />
         </div>
       </div>
-      <p className="text-xs text-tertiary">{subtexto}</p>
+      <p className="type-meta">{subtexto}</p>
     </div>
   );
 }
@@ -83,77 +112,83 @@ function StatCard({
 
 function AdminStatsSkeleton() {
   return (
-      <div className="px-4 pb-12 pt-8 md:px-8">
-        <section className="mb-10">
-          <Skeleton className="mb-2 h-3 w-28 rounded" />
-          <Skeleton className="h-10 w-72 rounded" />
-          <Skeleton className="mt-2 h-5 w-96 rounded" />
-        </section>
+    <div className={PAGE_CLASS} role="status" aria-label="Cargando el panel de administración">
+      <section className="mb-10">
+        <Skeleton className="mb-2 h-3 w-28 rounded" />
+        <Skeleton className="h-10 w-72 max-w-full rounded" />
+        <Skeleton className="mt-2 h-5 w-96 max-w-full rounded" />
+      </section>
 
-        <div className="mb-8">
+      <div className="flex flex-col gap-10">
+        <div>
           <Skeleton className="mb-4 h-5 w-20 rounded" />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Skeleton className="h-32 rounded-xl" />
-            <Skeleton className="h-32 rounded-xl" />
+          <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
+            <Skeleton className="h-36 rounded-card" />
+            <Skeleton className="h-36 rounded-card" />
           </div>
         </div>
 
-        <div className="mb-8">
-          <Skeleton className="mb-4 h-5 w-36 rounded" />
-          <Skeleton className="h-64 rounded-card" />
-        </div>
-
-        <div className="mb-8">
+        <div>
           <Skeleton className="mb-4 h-5 w-28 rounded" />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Skeleton className="h-32 rounded-xl" />
-            <Skeleton className="h-32 rounded-xl" />
+          <div className="grid grid-cols-1 gap-grid lg:grid-cols-5">
+            <Skeleton className="h-72 rounded-card lg:col-span-3" />
+            <Skeleton className="h-72 rounded-card lg:col-span-2" />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Skeleton className="h-64 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
+        <div>
+          <Skeleton className="mb-4 h-5 w-32 rounded" />
+          <div className="grid grid-cols-1 gap-grid lg:grid-cols-2">
+            <Skeleton className="h-64 rounded-card" />
+            <Skeleton className="h-64 rounded-card" />
+          </div>
+        </div>
+
+        <div>
+          <Skeleton className="mb-4 h-5 w-28 rounded" />
+          <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
+            <Skeleton className="h-36 rounded-card" />
+            <Skeleton className="h-36 rounded-card" />
+          </div>
         </div>
       </div>
+    </div>
   );
 }
 
 // ─── Activity list ────────────────────────────────────────────────────────────
 
 function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] }) {
+  const tituloId = useId();
   return (
-    <div className="flex h-full flex-col gap-4 rounded-xl border border-outline-variant bg-card p-6">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-status-success">
-          <Activity className="h-5 w-5 text-on-status-success" />
+    <section aria-labelledby={tituloId} className="card-base flex h-full flex-col overflow-hidden p-0">
+      <header className="flex items-center gap-inline border-b border-outline-variant/50 px-card py-stack">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-status-success">
+          <Activity className="size-5 text-on-status-success" aria-hidden="true" />
         </div>
-        <h3 className="type-subtitle font-headline font-black tracking-tight text-text-primary">
+        <h3 id={tituloId} className="type-subtitle font-headline font-black tracking-tight">
           Actividad reciente
         </h3>
-      </div>
+      </header>
       {items.length === 0 ? (
-        <p className="type-body text-text-secondary">No hay actividad reciente</p>
+        <p className="type-body px-card py-stack text-text-secondary">No hay actividad reciente</p>
       ) : (
-        <ul className="divide-y divide-outline-variant">
+        <ul className="divide-y divide-outline-variant/50">
           {items.map((item) => (
-            <li key={item.idProyecto} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-              <div className="min-w-0 flex-1">
-                <p className="type-body font-semibold line-clamp-1 text-text-primary">
-                  {item.tituloProyecto}
-                </p>
-                <p className="type-meta mt-0.5 text-text-secondary">
-                  {timeAgo(item.fechaActualizacion)}
-                </p>
+            <li
+              key={item.idProyecto}
+              className="flex flex-wrap items-center gap-x-inline gap-y-tight px-card py-inline transition-colors hover:bg-surface-container-low"
+            >
+              <div className="min-w-0 flex-1 basis-full sm:basis-48">
+                <p className="type-body line-clamp-1 font-semibold">{item.tituloProyecto}</p>
+                <p className="type-meta mt-micro">{timeAgo(item.fechaActualizacion)}</p>
               </div>
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 type-meta font-bold uppercase ${estadoBadgeClasses(item.estadoProyecto)}`}
-              >
-                {item.estadoProyecto}
+              <span className={`pill shrink-0 uppercase ${estadoBadgeClasses(item.estadoProyecto)}`}>
+                {estadoLegible(item.estadoProyecto)}
               </span>
               <Link
                 href={`/dashboard/proyectos/${item.idProyecto}`}
-                className="shrink-0 rounded-xl bg-surface-container-high px-4 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+                className="shrink-0 rounded-control bg-surface-container-high px-stack py-1.5 text-xs font-bold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 Ver proyecto
               </Link>
@@ -161,60 +196,72 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
 
 // ─── Risk students list ───────────────────────────────────────────────────────
 
 function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) {
+  const tituloId = useId();
   return (
-    <div className="flex h-full flex-col gap-4 rounded-xl border border-outline-variant bg-card p-6">
-      <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-status-error">
-          <GraduationCap className="h-5 w-5 text-on-status-error" />
+    <section aria-labelledby={tituloId} className="card-base flex h-full flex-col overflow-hidden p-0">
+      <header className="flex items-start gap-inline border-b border-outline-variant/50 px-card py-stack">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-status-error">
+          <GraduationCap className="size-5 text-on-status-error" aria-hidden="true" />
         </div>
-        <div>
-          <h3 className="type-subtitle font-headline font-black tracking-tight text-text-primary">
+        <div className="min-w-0">
+          <h3 id={tituloId} className="type-subtitle font-headline font-black tracking-tight">
             Estudiantes en riesgo de horas
           </h3>
-          <p className="type-meta text-text-secondary">
+          <p className="type-meta">
             Estudiantes del semestre 7 en adelante con pocas horas acumuladas
           </p>
         </div>
-      </div>
+      </header>
       {items.length === 0 ? (
-        <p className="type-body text-text-secondary">No hay estudiantes en riesgo</p>
+        <p className="type-body px-card py-stack text-text-secondary">No hay estudiantes en riesgo</p>
       ) : (
         <>
-          <ul className="divide-y divide-outline-variant">
+          <div
+            aria-hidden="true"
+            className="flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold text-text-secondary"
+          >
+            <span className="min-w-0 flex-1">Estudiante</span>
+            <span className="w-16 shrink-0 text-center">Semestre</span>
+            <span className="w-28 shrink-0 text-right">Horas</span>
+          </div>
+          <ul className="divide-y divide-outline-variant/50">
             {items.map((est) => (
-              <li key={est.idUsuario} className="flex items-center py-3 first:pt-0 last:pb-0">
-                <p className="type-body flex-1 font-medium text-text-primary">
+              <li
+                key={est.idUsuario}
+                className="flex items-center gap-inline px-card py-inline transition-colors hover:bg-surface-container-low"
+              >
+                <p className="type-body min-w-0 flex-1 truncate font-medium">
                   {est.nombre} {est.apellido}
                 </p>
-                {est.semestre !== null && (
-                  <span className="type-body w-16 text-center font-medium text-text-secondary">
-                    S{est.semestre}
+                <span className="type-body w-16 shrink-0 text-center font-medium text-text-secondary">
+                  {est.semestre !== null ? `S${est.semestre}` : '—'}
+                </span>
+                <span className="flex w-28 shrink-0 justify-end">
+                  <span className="pill pill-error whitespace-nowrap font-bold tabular-nums">
+                    {est.horasExtension} / {est.horasExtensionRequeridas} hrs
                   </span>
-                )}
-                <span className="ml-3 shrink-0 rounded-full bg-status-error px-3 py-0.5 type-meta font-bold text-on-status-error">
-                  {est.horasExtension} / {est.horasExtensionRequeridas} hrs
                 </span>
               </li>
             ))}
           </ul>
-          <div className="pt-1">
+          <div className="mt-auto border-t border-outline-variant/50 px-card py-inline">
             <Link
               href="/dashboard/admin/usuarios?riesgo=horas"
-              className="font-label text-xs font-bold uppercase tracking-widest text-primary transition-all hover:underline"
+              className="font-label text-xs font-bold uppercase tracking-widest text-primary outline-none transition-all hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               Ver todos
             </Link>
           </div>
         </>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -222,26 +269,24 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
 
 function AdminPanelContent({ stats }: { stats: AdminStats }) {
   return (
-      <div className="px-4 pb-12 pt-8 md:px-8">
-        {/* Header */}
-        <section className="mb-10">
-          <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
-            Administración
-          </span>
-          <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
-            Panel de Administración
-          </h1>
-          <p className="mt-2 max-w-2xl text-base text-tertiary">
-            Resumen general de actividad, usuarios y proyectos en UVGENIOS.
-          </p>
-        </section>
+    <div className={PAGE_CLASS}>
+      {/* Header */}
+      <section className="mb-10">
+        <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
+          Administración
+        </span>
+        <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
+          Panel de Administración
+        </h1>
+        <p className="mt-2 max-w-2xl text-base text-tertiary">
+          Resumen general de actividad, usuarios y proyectos en UVGenius.
+        </p>
+      </section>
 
-        {/* Sección 1: Global */}
-        <section className="mb-10">
-          <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
-            Global
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="flex flex-col gap-10">
+        {/* 1. Estado general */}
+        <DashboardSection titulo="Global">
+          <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
             <StatCard
               label="Proyectos Activos"
               value={stats.proyectosActivos}
@@ -255,26 +300,40 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               icon={Users}
             />
           </div>
-        </section>
+        </DashboardSection>
 
-        {/* Sección 2: Requieren acción */}
-        <section className="mb-10">
-          <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
-            Operación
-          </h2>
-          <AdminAttentionQueue
-            enRevision={stats.enRevision}
-            cierrePendiente={stats.cierrePendiente}
-            usuariosBloqueados={stats.usuariosBloqueados}
-          />
-        </section>
+        {/* 2. Operación: qué espera una decisión y qué Sprints deberían terminar pronto.
+            El widget de Sprints consulta por su cuenta: si falla, el resto del panel sigue. */}
+        <DashboardSection titulo="Operación">
+          <div className="grid grid-cols-1 gap-grid lg:grid-cols-5 lg:items-stretch">
+            <div className="min-w-0 lg:col-span-3">
+              <AdminAttentionQueue
+                enRevision={stats.enRevision}
+                cierrePendiente={stats.cierrePendiente}
+                usuariosBloqueados={stats.usuariosBloqueados}
+              />
+            </div>
+            <div className="min-w-0 lg:col-span-2">
+              <AdminSprintPlanningWidget />
+            </div>
+          </div>
+        </DashboardSection>
 
-        {/* Sección 3: Datos 2026 */}
-        <section className="mb-10">
-          <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
-            Datos 2026
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* 3. Seguimiento */}
+        <DashboardSection titulo="Seguimiento">
+          <div className="grid grid-cols-1 gap-grid lg:grid-cols-2 lg:items-stretch">
+            <div className="min-w-0">
+              <ActividadRecienteCard items={stats.actividadReciente} />
+            </div>
+            <div className="min-w-0">
+              <EstudiantesRiesgoCard items={stats.estudiantesEnRiesgo} />
+            </div>
+          </div>
+        </DashboardSection>
+
+        {/* 4. Datos del período: históricos, al final para no competir con la operación. */}
+        <DashboardSection titulo="Datos 2026">
+          <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
             <StatCard
               label="Nuevos Inactivos"
               value={stats.nuevosInactivos2026}
@@ -292,19 +351,12 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               iconColor="text-tertiary"
             />
           </div>
-        </section>
+        </DashboardSection>
 
-        {/* Sección 4: Tendencias de uso (HU-178) */}
+        {/* 5. Tendencias de uso (HU-178): históricas, después de la operación. */}
         <AdminMetricsSection />
-
-        {/* Sección 5: Actividad y alertas */}
-        <section>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
-            <ActividadRecienteCard items={stats.actividadReciente} />
-            <EstudiantesRiesgoCard items={stats.estudiantesEnRiesgo} />
-          </div>
-        </section>
       </div>
+    </div>
   );
 }
 
@@ -324,14 +376,14 @@ export default function AdminPanelPage() {
 
   if (isError || !stats) {
     return (
-        <div className="px-4 pt-8 md:px-8">
-          <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-8 text-center">
-            <AlertCircle className="mx-auto mb-3 h-8 w-8 text-error" />
-            <p className="text-sm font-medium text-on-surface">
-              No se pudieron cargar las estadísticas administrativas.
-            </p>
-          </div>
+      <div className={PAGE_CLASS}>
+        <div role="alert" className="card-base text-center">
+          <AlertCircle className="mx-auto mb-3 size-8 text-error" aria-hidden="true" />
+          <p className="type-body font-medium">
+            No se pudieron cargar las estadísticas administrativas.
+          </p>
         </div>
+      </div>
     );
   }
 

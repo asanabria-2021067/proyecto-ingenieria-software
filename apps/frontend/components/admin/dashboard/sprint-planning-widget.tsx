@@ -161,10 +161,12 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
           próxima en vez de enlazar a una ruta que respondería 404. */}
       <p
         aria-disabled="true"
-        className="type-body mt-auto flex items-center justify-center gap-tight text-center font-medium text-text-disabled"
+        className="type-body mt-auto flex flex-wrap items-center justify-center gap-tight text-center font-medium text-text-disabled"
       >
-        Ver calendario de Sprints
-        <ArrowRight className="size-4" aria-hidden="true" />
+        <span className="inline-flex items-center gap-tight whitespace-nowrap">
+          Ver calendario de Sprints
+          <ArrowRight className="size-4" aria-hidden="true" />
+        </span>
         <span className="pill pill-neutral">Próximamente</span>
       </p>
     </>
