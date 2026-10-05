@@ -38,6 +38,31 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     await login(page, CORREO_LIDER);
   });
 
+  test('no envía con campos vacíos ni con el fin antes del inicio', async ({ page }) => {
+    const dialogo = await abrirNuevoEvento(page);
+    const crear = dialogo.getByRole('button', { name: 'Crear evento' });
+
+    // Campos vacíos: título y link (la modalidad por defecto es virtual).
+    await crear.click();
+    await expect(dialogo.getByText('El título no puede estar vacío.')).toBeVisible();
+    await expect(dialogo.getByText('Ingresa el link de la sesión.')).toBeVisible();
+    await expect(dialogo).toBeVisible();
+
+    // Fin antes del inicio, mismo día.
+    await dialogo.getByLabel('Título').fill('Evento que no debe crearse');
+    await dialogo.getByLabel('Link de la sesión').fill(LINK);
+    await dialogo.getByLabel('Hora de inicio').fill('10:00');
+    await dialogo.getByLabel('Hora de fin').fill('09:00');
+    await crear.click();
+    await expect(dialogo.getByText('El fin debe ser posterior al inicio.')).toBeVisible();
+    await expect(dialogo.getByText('El título no puede estar vacío.')).toHaveCount(0);
+    await expect(dialogo).toBeVisible();
+
+    await dialogo.getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await expect(dialogo).toBeHidden();
+    await expect(page.getByRole('button', { name: /Evento que no debe crearse/ })).toHaveCount(0);
+  });
+
   test('crea, edita y borra un evento desde el diálogo', async ({ page }) => {
     const titulo = `E2E HU-184 ${Date.now()}`;
     const tituloEditado = `${titulo} editado`;
