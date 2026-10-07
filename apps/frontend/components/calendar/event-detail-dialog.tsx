@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { AlignLeft, Bell, CalendarDays, ExternalLink, Link2, Loader2, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { AlignLeft, Bell, CalendarDays, Eye, ExternalLink, Link2, Loader2, MapPin, Pencil, Trash2, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { SafeExternalLink } from '@/components/profile/safe-external-link';
 import { useCancelEvent } from '@/hooks/use-cancel-event';
+import { useProjectMembers } from '@/hooks/use-project-members';
 import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
+import { TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
 import { formatTime, toDateKey } from '@/lib/calendar/utils';
 import type { MiEventoDTO } from '@/lib/services/events';
 import { RECORDATORIO_OPTIONS, requiereLink, requiereUbicacion } from './event-form.schema';
@@ -32,6 +34,7 @@ export function formatRangoEvento(inicio: Date, fin: Date): string {
 }
 
 function textoRecordatorio(minutos: number): string {
+  if (minutos === 0) return 'Sin recordatorio';
   return RECORDATORIO_OPTIONS.find((opt) => opt.value === minutos)?.label ?? `${minutos} minutos antes`;
 }
 
@@ -53,7 +56,9 @@ function Fila({ icon, label, children }: { icon: ReactNode; label: string; child
  * HU-184 (T-324): detalle de un evento al hacer clic en el calendario. Antes
  * el clic abría directo el formulario (líder) o navegaba al proyecto (resto);
  * ahora todos ven primero qué, cuándo, dónde y cómo, y solo quien lidera el
- * proyecto tiene "Editar" y "Cancelar evento".
+ * proyecto tiene "Editar" y "Eliminar evento". Un evento de un calendario
+ * compartido se ve en solo lectura y sin enlace al proyecto (quien lo ve
+ * puede no ser integrante).
  */
 export function EventDetailDialog({
   evento,
@@ -61,6 +66,7 @@ export function EventDetailDialog({
   onOpenChange,
   editable,
   onEditar,
+  compartidoPor = null,
 }: {
   evento: MiEventoDTO | null;
   open: boolean;
@@ -68,12 +74,22 @@ export function EventDetailDialog({
   /** El usuario lidera el proyecto del evento. */
   editable: boolean;
   onEditar: (evento: MiEventoDTO) => void;
+  /** HU-184: el evento viene del calendario que esta persona me compartió. */
+  compartidoPor?: { nombre: string } | null;
 }) {
   const { cancelarEvento, isPending } = useCancelEvent();
+  // Nombres de los invitados: solo si soy del proyecto (en uno compartido no tengo acceso al equipo).
+  const idProyectoEquipo = evento && !compartidoPor && evento.invitados.length > 0 ? evento.idProyecto : 0;
+  const { members } = useProjectMembers(idProyectoEquipo);
 
   if (!evento) return null;
 
   const estilo = MODALIDAD_ESTILO[evento.modalidad];
+  const tipo = TIPO_EVENTO_ESTILO[evento.tipoEvento];
+  const puedeEditar = editable && !compartidoPor;
+  const nombresInvitados = idProyectoEquipo === 0 ? [] : [
+    ...new Map(members.filter((m) => evento.invitados.includes(m.idUsuario)).map((m) => [m.idUsuario, `${m.nombre} ${m.apellido}`])).values(),
+  ];
   const inicio = new Date(evento.fechaInicio);
   const fin = new Date(evento.fechaFin);
   const tieneUbicacion = requiereUbicacion(evento.modalidad) && evento.ubicacionLat !== null && evento.ubicacionLng !== null;
@@ -89,12 +105,24 @@ export function EventDetailDialog({
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[520px]">
         <DialogHeader className="shrink-0 gap-2 border-b border-outline-variant/35 px-4 pb-4 pt-5 pr-12 text-left sm:px-6">
-          <span className={`pill inline-flex w-fit items-center gap-1 ${estilo.relleno}`}>
-            <estilo.icon className="size-3" aria-hidden="true" />
-            {estilo.label}
-          </span>
+          <div className="flex flex-wrap gap-tight">
+            <span className={`pill inline-flex w-fit items-center gap-1 ${TONO_CLASES[tipo.tono].bloque}`}>
+              <tipo.icon className="size-3" aria-hidden="true" />
+              {tipo.label}
+            </span>
+            <span className="pill pill-neutral inline-flex w-fit items-center gap-1">
+              <estilo.icon className="size-3" aria-hidden="true" />
+              {estilo.label}
+            </span>
+          </div>
           <DialogTitle className="text-xl font-bold break-words text-on-surface">{evento.tituloEvento}</DialogTitle>
           <DialogDescription className="text-sm text-on-surface-variant">{evento.proyecto.tituloProyecto}</DialogDescription>
+          {compartidoPor && (
+            <p className="type-meta inline-flex items-center gap-1">
+              <Eye className="size-3.5" aria-hidden="true" />
+              Calendario de {compartidoPor.nombre} · solo lectura
+            </p>
+          )}
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
@@ -131,6 +159,14 @@ export function EventDetailDialog({
             </Fila>
           )}
 
+          <Fila icon={<Users className="size-4" />} label="Para quién">
+            {evento.invitados.length === 0
+              ? 'Todo el proyecto'
+              : nombresInvitados.length > 0
+                ? nombresInvitados.join(', ')
+                : `${evento.invitados.length} ${evento.invitados.length === 1 ? 'invitado' : 'invitados'}`}
+          </Fila>
+
           <Fila icon={<Bell className="size-4" />} label="Recordatorio">
             {textoRecordatorio(evento.antelacionMinutos)}
           </Fila>
@@ -143,7 +179,16 @@ export function EventDetailDialog({
         </div>
 
         <DialogFooter className="shrink-0 gap-2 border-t border-outline-variant/35 px-4 py-4 sm:justify-between sm:px-6">
-          {editable ? (
+          {compartidoPor ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="h-10 rounded-md border-outline-variant text-xs font-bold sm:ml-auto"
+            >
+              Cerrar
+            </Button>
+          ) : puedeEditar ? (
             <>
               <Button
                 type="button"
@@ -157,7 +202,7 @@ export function EventDetailDialog({
                 ) : (
                   <Trash2 className="size-3.5" aria-hidden="true" />
                 )}
-                Cancelar evento
+                Eliminar evento
               </Button>
               <Button
                 type="button"
