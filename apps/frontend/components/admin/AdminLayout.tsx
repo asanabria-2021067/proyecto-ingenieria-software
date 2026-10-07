@@ -14,7 +14,6 @@ import {
   KeyRound,
   LayoutDashboard,
   Settings2,
-  ShieldAlert,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -90,34 +89,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { data: user, isLoading, isError } = useCurrentUser();
   const handleLogout = useLogout();
 
-  useEffect(() => {
-    if (!isLoading && isError) {
-      router.replace('/login');
-    }
-  }, [isLoading, isError, router]);
+  const esAdmin = isAdminUser(user);
 
-  if (isLoading || isError) {
+  useEffect(() => {
+    if (isLoading) return;
+    if (isError) {
+      router.replace('/login');
+    } else if (!esAdmin) {
+      // HU-178 (T-302): quien no es administrador vuelve a su dashboard.
+      router.replace('/dashboard');
+    }
+  }, [isLoading, isError, esAdmin, router]);
+
+  if (isLoading || isError || !esAdmin) {
     return (
       <div className="h-screen bg-surface flex items-center justify-center">
         <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
-  if (!isAdminUser(user)) {
-    return (
-      <div className="h-screen bg-surface flex flex-col items-center justify-center gap-4 text-center px-6">
-        <ShieldAlert className="w-12 h-12 text-error" />
-        <h2 className="font-headline text-2xl font-black text-on-surface">Acceso restringido</h2>
-        <p className="text-sm text-tertiary max-w-xs">
-          No tienes permisos para acceder a esta sección.
-        </p>
-        <Link
-          href="/dashboard"
-          className="rounded-xl bg-primary text-on-primary px-6 py-2.5 text-sm font-bold transition-colors hover:bg-primary/90"
-        >
-          Volver al Dashboard
-        </Link>
       </div>
     );
   }
