@@ -213,7 +213,7 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
           <GraduationCap className="size-5 text-on-status-error" aria-hidden="true" />
         </div>
         <div className="min-w-0">
-          <h3 id={tituloId} className="type-subtitle font-semibold">
+          <h3 id={tituloId} className="type-subtitle font-semibold text-balance">
             Estudiantes en riesgo de horas
           </h3>
           <p className="type-meta">
@@ -278,7 +278,7 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
         <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
           Administración
         </span>
-        <h1 className="font-headline text-4xl font-black tracking-tight text-on-surface">
+        <h1 className="font-headline text-4xl font-black tracking-tight text-balance text-on-surface">
           Panel de Administración
         </h1>
         <p className="mt-tight max-w-2xl text-base text-tertiary">

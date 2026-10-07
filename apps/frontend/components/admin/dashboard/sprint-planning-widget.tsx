@@ -42,7 +42,7 @@ export function AdminSprintPlanningWidget() {
           <CalendarRange className="size-5" aria-hidden="true" />
         </div>
         <div className="min-w-0">
-          <h3 id={tituloId} className="type-subtitle font-semibold">
+          <h3 id={tituloId} className="type-subtitle font-semibold text-balance">
             Próximas finalizaciones de Sprint
           </h3>
           <p className="type-meta">Supervisa las fechas esperadas de los Sprints activos.</p>
