@@ -33,6 +33,16 @@ const EVENT_SELECT = {
 } as const;
 
 /**
+ * HU-184: un evento con invitados solo lo ven ellos y el líder del proyecto;
+ * sin invitados lo ve todo el proyecto (comportamiento previo).
+ */
+export function filtroVisibilidadEvento(userId: number): Prisma.EventoProyectoWhereInput {
+  return {
+    OR: [{ invitados: { isEmpty: true } }, { invitados: { has: userId } }, { proyecto: { creadoPor: userId } }],
+  };
+}
+
+/**
  * HU-169 (T-263): CRUD de EventoProyecto. Mismo patrón de permisos que
  * LabelsService (líder crea/edita/cancela; líder o participante ACTIVO ve),
  * sin ProjectTransactionService: un evento de calendario no comparte las
@@ -45,7 +55,7 @@ export class EventsService {
   async findAllForProject(projectId: number, userId: number) {
     await this.assertCanRead(projectId, userId);
     return this.prisma.eventoProyecto.findMany({
-      where: { idProyecto: projectId, eliminadoEn: null },
+      where: { idProyecto: projectId, eliminadoEn: null, ...filtroVisibilidadEvento(userId) },
       select: EVENT_SELECT,
       orderBy: { fechaInicio: 'asc' },
     });
@@ -64,6 +74,7 @@ export class EventsService {
         // termine el rango y termina después de que empiece.
         fechaInicio: { lte: new Date(hasta) },
         fechaFin: { gte: new Date(desde) },
+        ...filtroVisibilidadEvento(userId),
       },
       select: {
         ...EVENT_SELECT,
