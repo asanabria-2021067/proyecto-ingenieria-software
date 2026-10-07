@@ -19,6 +19,8 @@ export interface ClasesTono {
   borde: string;
   /** Punto o marca sólida (leyendas, vista compacta). */
   punto: string;
+  /** Anillo alrededor del avatar de un calendario compartido. */
+  anillo: string;
 }
 
 /**
@@ -26,12 +28,12 @@ export interface ClasesTono {
  * escritas completas en el código, así que no se arman con plantillas.
  */
 export const TONO_CLASES: Record<TonoCalendario, ClasesTono> = {
-  1: { bloque: 'bg-cal-1 text-on-cal-1', borde: 'border-l-cal-1-strong', punto: 'bg-cal-1-strong' },
-  2: { bloque: 'bg-cal-2 text-on-cal-2', borde: 'border-l-cal-2-strong', punto: 'bg-cal-2-strong' },
-  3: { bloque: 'bg-cal-3 text-on-cal-3', borde: 'border-l-cal-3-strong', punto: 'bg-cal-3-strong' },
-  4: { bloque: 'bg-cal-4 text-on-cal-4', borde: 'border-l-cal-4-strong', punto: 'bg-cal-4-strong' },
-  5: { bloque: 'bg-cal-5 text-on-cal-5', borde: 'border-l-cal-5-strong', punto: 'bg-cal-5-strong' },
-  6: { bloque: 'bg-cal-6 text-on-cal-6', borde: 'border-l-cal-6-strong', punto: 'bg-cal-6-strong' },
+  1: { bloque: 'bg-cal-1 text-on-cal-1', borde: 'border-l-cal-1-strong', punto: 'bg-cal-1-strong', anillo: 'ring-cal-1-strong' },
+  2: { bloque: 'bg-cal-2 text-on-cal-2', borde: 'border-l-cal-2-strong', punto: 'bg-cal-2-strong', anillo: 'ring-cal-2-strong' },
+  3: { bloque: 'bg-cal-3 text-on-cal-3', borde: 'border-l-cal-3-strong', punto: 'bg-cal-3-strong', anillo: 'ring-cal-3-strong' },
+  4: { bloque: 'bg-cal-4 text-on-cal-4', borde: 'border-l-cal-4-strong', punto: 'bg-cal-4-strong', anillo: 'ring-cal-4-strong' },
+  5: { bloque: 'bg-cal-5 text-on-cal-5', borde: 'border-l-cal-5-strong', punto: 'bg-cal-5-strong', anillo: 'ring-cal-5-strong' },
+  6: { bloque: 'bg-cal-6 text-on-cal-6', borde: 'border-l-cal-6-strong', punto: 'bg-cal-6-strong', anillo: 'ring-cal-6-strong' },
 };
 
 /** Proyectos y calendarios compartidos reciben tono por orden de aparición, en ciclo. */

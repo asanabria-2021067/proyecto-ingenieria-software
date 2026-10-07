@@ -36,6 +36,7 @@ describe('calendar/paleta (HU-184)', () => {
     for (let n = 1 as 1 | 2 | 3 | 4 | 5 | 6; n <= 6; n = (n + 1) as typeof n) {
       expect(TONO_CLASES[n].bloque).toBe(`bg-cal-${n} text-on-cal-${n}`);
       expect(TONO_CLASES[n].punto).toBe(`bg-cal-${n}-strong`);
+      expect(TONO_CLASES[n].anillo).toBe(`ring-cal-${n}-strong`);
     }
   });
 
