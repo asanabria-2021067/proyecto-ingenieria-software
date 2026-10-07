@@ -1,5 +1,5 @@
 import { Injectable, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LEADERSHIP_CHANGED, NotificationsGateway, SPRINT_HOURS_ADJUSTED } from './notifications.gateway';
 import {
@@ -255,6 +255,28 @@ export class NotificationsService {
       data: { leidaEn: new Date() },
     });
     return { actualizadas: result.count };
+  }
+
+  /** HU-185 (T-326): un tipo sin fila guardada se reporta como activo. */
+  async getPreferences(userId: number): Promise<{ tipo: TipoNotificacion; activa: boolean }[]> {
+    const guardadas = await this.prisma.preferenciaNotificacion.findMany({
+      where: { idUsuario: userId },
+      select: { tipoNotificacion: true, activa: true },
+    });
+    const estado = new Map(guardadas.map((p) => [p.tipoNotificacion, p.activa]));
+    return Object.values(TipoNotificacion).map((tipo) => ({
+      tipo,
+      activa: estado.get(tipo) ?? true,
+    }));
+  }
+
+  async updatePreference(userId: number, tipo: TipoNotificacion, activa: boolean) {
+    await this.prisma.preferenciaNotificacion.upsert({
+      where: { idUsuario_tipoNotificacion: { idUsuario: userId, tipoNotificacion: tipo } },
+      update: { activa },
+      create: { idUsuario: userId, tipoNotificacion: tipo, activa },
+    });
+    return this.getPreferences(userId);
   }
 
   async isAdmin(userId: number, tx?: TxClient): Promise<boolean> {
