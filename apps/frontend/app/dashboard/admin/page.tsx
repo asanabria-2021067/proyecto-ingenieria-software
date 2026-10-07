@@ -227,7 +227,7 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
         <>
           <div
             aria-hidden="true"
-            className="flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold uppercase tracking-wide text-text-secondary"
+            className="flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold text-text-secondary"
           >
             <span className="min-w-0 flex-1">Estudiante</span>
             <span className="w-14 shrink-0 text-center">Semestre</span>
