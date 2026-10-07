@@ -13,6 +13,7 @@ import {
   EstadoPostulacion,
   EstadoProyecto,
   EstadoSolicitudRecuperacion,
+  EstadoTarea,
   EstadoUsuario,
   Prisma,
   TipoProyecto,
@@ -23,6 +24,8 @@ import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
 import type { SecurityRequestContext } from '../security-events/request-context';
 import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from '../ws-auth/account-access.events';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
+import type { PeriodoMetricas } from './dto/metricas-query.dto';
+import { construirPeriodos, indicePeriodo } from './metricas-periodos.util';
 
 const RESET_TOKEN_TTL = '1h';
 
@@ -164,6 +167,69 @@ export class AdminService {
       actividadReciente,
       estudiantesEnRiesgo,
     };
+  }
+
+  // ─── Métricas por periodo (HU-178, T-300) ─────────────────────────────────────
+
+  async getMetricas(userId: number, periodo: PeriodoMetricas = 'semana') {
+    await this.requireAdmin(userId);
+
+    const periodos = construirPeriodos(periodo);
+    const rango = { gte: periodos[0].inicio, lt: periodos[periodos.length - 1].fin };
+
+    const [usuariosNuevos, usuariosActivos, proyectos, tareas, horas] = await Promise.all([
+      this.prisma.usuario.findMany({
+        where: { fechaCreacion: rango },
+        select: { fechaCreacion: true },
+      }),
+      // fechaUltimaSesion solo guarda el último login: cada usuario cuenta
+      // una vez, en el periodo de su sesión más reciente.
+      this.prisma.usuario.findMany({
+        where: { fechaUltimaSesion: rango },
+        select: { fechaUltimaSesion: true },
+      }),
+      this.prisma.proyecto.findMany({
+        where: { fechaCreacion: rango, eliminadoEn: null },
+        select: { fechaCreacion: true },
+      }),
+      // Tarea no tiene fecha de completado: actualizadaEn es el proxy, igual
+      // que fechaActualizacion para proyectosCerrados2026.
+      this.prisma.tarea.findMany({
+        where: { estadoTarea: EstadoTarea.HECHO, eliminadoEn: null, actualizadaEn: rango },
+        select: { actualizadaEn: true },
+      }),
+      this.prisma.horasParticipacion.findMany({
+        where: { estadoHoras: EstadoHoras.APROBADA, fechaAprobacion: rango },
+        select: { fechaAprobacion: true, horasAprobadas: true },
+      }),
+    ]);
+
+    const serie = periodos.map((p) => ({
+      inicio: p.etiqueta,
+      usuariosNuevos: 0,
+      usuariosActivos: 0,
+      proyectosCreados: 0,
+      tareasCompletadas: 0,
+      horasConfirmadas: 0,
+    }));
+
+    const sumar = (fecha: Date | null, campo: Exclude<keyof (typeof serie)[number], 'inicio'>, valor = 1) => {
+      if (!fecha) return;
+      const i = indicePeriodo(fecha, periodos);
+      if (i >= 0) serie[i][campo] += valor;
+    };
+
+    for (const u of usuariosNuevos) sumar(u.fechaCreacion, 'usuariosNuevos');
+    for (const u of usuariosActivos) sumar(u.fechaUltimaSesion, 'usuariosActivos');
+    for (const p of proyectos) sumar(p.fechaCreacion, 'proyectosCreados');
+    for (const t of tareas) sumar(t.actualizadaEn, 'tareasCompletadas');
+    for (const h of horas) sumar(h.fechaAprobacion, 'horasConfirmadas', Number(h.horasAprobadas ?? 0));
+
+    for (const punto of serie) {
+      punto.horasConfirmadas = Math.round(punto.horasConfirmadas * 100) / 100;
+    }
+
+    return { periodo, serie };
   }
 
   // ─── Lista de usuarios (T-89) ─────────────────────────────────────────────────
