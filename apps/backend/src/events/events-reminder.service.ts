@@ -52,6 +52,7 @@ export class EventsReminderService {
         tituloEvento: true,
         fechaInicio: true,
         antelacionMinutos: true,
+        invitados: true,
         proyecto: { select: { tituloProyecto: true, creadoPor: true } },
       },
     });
@@ -71,10 +72,16 @@ export class EventsReminderService {
     idProyecto: number;
     tituloEvento: string;
     fechaInicio: Date;
+    invitados: number[];
     proyecto: { tituloProyecto: string; creadoPor: number };
   }): Promise<void> {
     try {
-      const destinatarios = await this.integrantesDelProyecto(evento.idProyecto, evento.proyecto.creadoPor);
+      const integrantes = await this.integrantesDelProyecto(evento.idProyecto, evento.proyecto.creadoPor);
+      // HU-184: con invitados, solo ellos (si siguen en el proyecto) y el líder.
+      const destinatarios =
+        evento.invitados.length === 0
+          ? integrantes
+          : integrantes.filter((id) => id === evento.proyecto.creadoPor || evento.invitados.includes(id));
       if (destinatarios.length > 0) {
         await this.notifications.notifyFromTemplate(destinatarios, 'RECORDATORIO_EVENTO', {
           eventTitle: evento.tituloEvento,
