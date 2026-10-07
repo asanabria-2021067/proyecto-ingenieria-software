@@ -375,9 +375,12 @@ export function ActiveProjectsBoard() {
       <section aria-label="Filtros de proyectos activos" className={BARRA_FILTROS}>
         <DashboardSearchField
           containerClassName="@xl/bandeja:col-span-2 @4xl/bandeja:col-span-4 @7xl/bandeja:flex-1"
+          name="busqueda"
+          autoComplete="off"
+          spellCheck={false}
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar proyecto o líder..."
+          placeholder="Buscar proyecto o líder…"
           aria-label="Buscar proyectos por nombre o líder"
         />
 
@@ -557,6 +560,7 @@ export function ActiveProjectsBoard() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* ponytail: filas sin virtualizar; añadir `content-visibility: auto` si la población activa supera unos cientos. */}
               {filasVisibles.map((row) => (
                 <FilaProyecto
                   key={row.project.idProyecto}
