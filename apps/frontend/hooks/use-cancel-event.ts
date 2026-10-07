@@ -8,7 +8,7 @@ import { deleteEvent, type EventoProyectoDTO } from '@/lib/services/events';
 type EventoCancelable = Pick<EventoProyectoDTO, 'idEvento' | 'idProyecto' | 'tituloEvento'>;
 
 /**
- * HU-184 (T-323/T-324): cancelar (borrar) un evento del calendario con la
+ * HU-184 (T-323/T-324): eliminar un evento del calendario con la
  * confirmación y los avisos del módulo común (lib/mensajes.ts). Lo comparten
  * el diálogo de edición y el panel de detalle para que ambos pregunten y
  * avisen igual.
@@ -23,22 +23,22 @@ export function useCancelEvent() {
     },
   });
 
-  /** Resuelve true solo si el evento quedó cancelado. */
+  /** Resuelve true solo si el evento quedó eliminado (soft delete en el backend). */
   const cancelarEvento = async (evento: EventoCancelable): Promise<boolean> => {
     const ok = await confirmar({
-      titulo: `¿Cancelar el evento «${evento.tituloEvento}»?`,
+      titulo: `¿Eliminar el evento «${evento.tituloEvento}»?`,
       descripcion: 'Sale del calendario del proyecto y los participantes ya no lo verán.',
-      textoAccion: 'Cancelar evento',
+      textoAccion: 'Eliminar evento',
       destructiva: true,
     });
     if (!ok) return false;
 
     try {
       await mutation.mutateAsync(evento);
-      aviso.exito('Evento cancelado');
+      aviso.exito('Evento eliminado');
       return true;
     } catch (err) {
-      aviso.error('No se pudo cancelar el evento', getApiErrorMessage(err, 'calendar'));
+      aviso.error('No se pudo eliminar el evento', getApiErrorMessage(err, 'calendar'));
       return false;
     }
   };
