@@ -22,6 +22,7 @@ npm run k6:project-listing
 npm run k6:kanban
 npm run k6:socket-io
 npm run k6:socket-io:trigger
+npm run k6:baseline
 ```
 
 Cada comando (`scripts/run-k6.js`) prepara primero un fixture propio de k6
@@ -35,6 +36,15 @@ Para escalar carga (más VUs/iteraciones) o apuntar a otro backend:
 npm run k6:project-listing -- -e K6_VUS=10 -e K6_ITERATIONS=50
 npm run k6:project-listing -- -e K6_BASE_URL=http://staging:3001
 ```
+
+## Medición base sin limitador
+
+`k6:baseline` (`scenarios/baseline-endpoints.js`) mide solo lecturas: listado
+de proyectos, tablero, chat y notificaciones. Para que mida la aplicación y no
+el limitador de peticiones, el backend local se levanta con
+`THROTTLER_DISABLED=true`. La variable solo acepta el valor exacto `true`, por
+defecto el limitador sigue activo y con `NODE_ENV=production` se ignora
+siempre. El escenario falla si recibe algún 429.
 
 ## Dónde queda la evidencia
 

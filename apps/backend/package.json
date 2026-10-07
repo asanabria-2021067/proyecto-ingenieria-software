@@ -23,7 +23,8 @@
     "k6:project-listing": "node scripts/run-k6.js project-listing",
     "k6:kanban": "node scripts/run-k6.js kanban-operations",
     "k6:socket-io": "node scripts/run-k6.js socket-io",
-    "k6:socket-io:trigger": "node scripts/run-k6.js socket-io --trigger"
+    "k6:socket-io:trigger": "node scripts/run-k6.js socket-io --trigger",
+    "k6:baseline": "node scripts/run-k6.js baseline-endpoints"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

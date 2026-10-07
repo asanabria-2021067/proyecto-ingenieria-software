@@ -7,6 +7,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import * as redisStore from 'cache-manager-redis-store';
 import { buildEnvOptions } from './config/env.options';
+import { isThrottlerDisabled } from './config/throttler';
 import { AppController } from './app.controller';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
@@ -43,6 +44,8 @@ import { SecurityEventsModule } from './security-events/security-events.module';
 import { EventsModule } from './events/events.module';
 import { AttendanceModule } from './attendance/attendance.module';
 
+const skipThrottling = () => isThrottlerDisabled();
+
 @Module({
   imports: [
     ConfigModule.forRoot(buildEnvOptions()),
@@ -54,16 +57,19 @@ import { AttendanceModule } from './attendance/attendance.module';
         name: 'short',
         ttl: 1000,
         limit: 10,
+        skipIf: skipThrottling,
       },
       {
         name: 'medium',
         ttl: 10000,
         limit: 50,
+        skipIf: skipThrottling,
       },
       {
         name: 'long',
         ttl: 60000,
         limit: 200,
+        skipIf: skipThrottling,
       },
     ]),
     CacheModule.registerAsync({
