@@ -54,6 +54,9 @@ export function getNotificationLink(n: {
     // conteos) y se muestra como texto; datosJson nunca se renderiza.
     case 'ALERTA_SEGURIDAD':
       return '/dashboard/admin/usuarios';
+    // HU-184: alguien compartió su calendario; se activa desde la columna izquierda del calendario.
+    case 'CALENDARIO_COMPARTIDO':
+      return '/dashboard/calendario';
     default:
       return null;
   }
