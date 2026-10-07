@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BadRequestException, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { TipoNotificacion } from '@prisma/client';
@@ -207,5 +207,25 @@ describe('UpdatePreferenciaNotificacionDto (T-326)', () => {
     await expect(parse({ tipo: 'TAREA_ASIGNADA', activa: false, idUsuario: 2 })).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  // esbuild no emite `design:type`; `nest build` sí, y con él la conversión
+  // implícita convertiría "false" en true. Se simula ese metadato aquí.
+  describe('con el metadato que emite el build de producción', () => {
+    beforeAll(() => {
+      Reflect.defineMetadata('design:type', Boolean, UpdatePreferenciaNotificacionDto.prototype, 'activa');
+    });
+    afterAll(() => {
+      Reflect.deleteMetadata('design:type', UpdatePreferenciaNotificacionDto.prototype, 'activa');
+    });
+
+    it.each(['false', 'true', 'no', 1, 0])('rechaza activa=%j en vez de convertirlo', async (activa) => {
+      await expect(parse({ tipo: 'TAREA_ASIGNADA', activa })).rejects.toThrow(BadRequestException);
+    });
+
+    it('conserva los booleanos reales', async () => {
+      await expect(parse({ tipo: 'TAREA_ASIGNADA', activa: false })).resolves.toMatchObject({ activa: false });
+      await expect(parse({ tipo: 'TAREA_ASIGNADA', activa: true })).resolves.toMatchObject({ activa: true });
+    });
   });
 });
