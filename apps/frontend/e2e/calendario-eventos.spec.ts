@@ -32,9 +32,17 @@ async function abrirNuevoEvento(page: Page, proyecto = PROYECTO) {
   return dialogo;
 }
 
-/** Bloque del evento en la cuadrícula por horas (vista Semana en escritorio). */
+/**
+ * Bloque del evento en la cuadrícula por horas. Se busca en la vista Día:
+ * en Semana, si a esa hora hay más de 2 eventos (otras corridas sobre la
+ * misma base), se resumen en "+N" y el bloque no se dibuja.
+ */
 function bloqueEvento(page: Page, titulo: string) {
   return page.getByRole('button', { name: new RegExp(`^${titulo}, 09:00 a 10:00`) });
+}
+
+async function verDia(page: Page) {
+  await page.getByRole('radio', { name: 'Día' }).click();
 }
 
 test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
@@ -84,6 +92,7 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     await expect(dialogo).toBeHidden();
 
     // El bloque de la cuadrícula abre el detalle del evento.
+    await verDia(page);
     const bloque = bloqueEvento(page, titulo);
     await expect(bloque).toBeVisible({ timeout: 15_000 });
     await bloque.click();

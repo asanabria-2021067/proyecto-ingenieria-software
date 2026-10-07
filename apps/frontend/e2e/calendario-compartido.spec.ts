@@ -64,6 +64,8 @@ test.describe('Calendario: compartir agenda (HU-184)', () => {
       await fijarRelojMananaTemprano(paginaMaria);
       await login(paginaMaria, CORREO_INVITADA);
       await paginaMaria.goto('/dashboard/calendario');
+      // En Día se ven todos los eventos de la hora (en Semana, más de 2 solapados se resumen en "+N").
+      await paginaMaria.getByRole('radio', { name: 'Día' }).click();
 
       const bloque = paginaMaria.getByRole('button', {
         name: new RegExp(`^${titulo}, 09:00 a 10:00, calendario de Carlos Mendoza`),
@@ -89,6 +91,7 @@ test.describe('Calendario: compartir agenda (HU-184)', () => {
     await page.keyboard.press('Escape');
 
     // ...y elimina el evento de prueba para no dejarlo en la base.
+    await page.getByRole('radio', { name: 'Día' }).click();
     await page.getByRole('button', { name: new RegExp(`^${titulo}, 09:00 a 10:00`) }).click();
     await page.getByRole('dialog', { name: titulo }).getByRole('button', { name: 'Eliminar evento' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Eliminar evento' }).click();
