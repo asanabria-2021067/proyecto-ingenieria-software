@@ -153,7 +153,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
-          className="w-[96vw] max-w-[440px] gap-0 border-outline-variant bg-surface-container-lowest p-0"
+          className="w-[96vw] max-w-[440px] gap-0 overscroll-contain border-outline-variant bg-surface-container-lowest p-0"
           onOpenAutoFocus={(event) => {
             // Radix enfocaría el primer control (la X); el foco útil es el campo.
             event.preventDefault();
@@ -168,7 +168,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
               className={PASO_ENTER_FORM}
             >
               <DialogHeader className="border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
-                <DialogTitle className="text-xl font-bold text-on-surface">Iniciar Sprint</DialogTitle>
+                <DialogTitle className="text-xl font-bold text-balance text-on-surface">Iniciar Sprint</DialogTitle>
                 <DialogDescription className="text-sm text-on-surface-variant">
                   Define la planificación inicial del nuevo Sprint.
                 </DialogDescription>
@@ -203,7 +203,9 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
                   <Input
                     ref={fechaInputRef}
                     id="sprint-fecha-fin-planeada"
+                    name="fechaFinPlaneada"
                     type="date"
+                    autoComplete="off"
                     required
                     min={limites.min}
                     max={limites.max}
@@ -211,7 +213,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
                     aria-invalid={fechaFueraDeRango || undefined}
                     aria-describedby={`sprint-fecha-fin-ayuda${fechaFueraDeRango ? ' sprint-fecha-fin-error' : ''}`}
                     onChange={(event) => setFechaFinPlaneada(event.target.value)}
-                    className={`mt-1 h-10 rounded-md text-sm ${fechaFueraDeRango ? 'border-error' : 'border-outline-variant'}`}
+                    className={`mt-1 h-10 rounded-md ${fechaFueraDeRango ? 'border-error' : 'border-outline-variant'}`}
                   />
                   <p id="sprint-fecha-fin-ayuda" className="mt-1.5 text-xs text-tertiary">
                     Fecha en la que se espera terminar el trabajo del Sprint. El cierre formal puede realizarse
@@ -249,7 +251,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
                 <DialogTitle
                   ref={confirmTitleRef}
                   tabIndex={-1}
-                  className="text-xl font-bold text-on-surface outline-none"
+                  className="rounded-sm text-xl font-bold text-balance text-on-surface outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   ¿Seguro que quieres iniciar este Sprint?
                 </DialogTitle>
@@ -299,7 +301,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
                   className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
                 >
                   {startSprint.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
-                  {startSprint.isPending ? 'Iniciando...' : 'Sí, iniciar Sprint'}
+                  {startSprint.isPending ? 'Iniciando…' : 'Sí, iniciar Sprint'}
                 </Button>
               </DialogFooter>
             </div>

@@ -232,8 +232,8 @@ describe('StartSprintButton — confirmación', () => {
     const confirmar = screen.getByRole('button', { name: 'Sí, iniciar Sprint' });
     fireEvent.click(confirmar);
     fireEvent.click(confirmar);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Iniciando...' })).toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Iniciando...' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Iniciando…' })).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciando…' }));
 
     expect(startSprintMock).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled();
@@ -248,7 +248,7 @@ describe('StartSprintButton — confirmación', () => {
     irAConfirmacion(dia(14));
 
     fireEvent.click(screen.getByRole('button', { name: 'Sí, iniciar Sprint' }));
-    await screen.findByRole('button', { name: 'Iniciando...' });
+    await screen.findByRole('button', { name: 'Iniciando…' });
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
