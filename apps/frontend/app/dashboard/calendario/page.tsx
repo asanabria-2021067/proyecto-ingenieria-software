@@ -443,7 +443,18 @@ export default function CalendarioPage() {
             <>
               {/* En móvil 7 columnas de horas no caben: la semana se ve como lista de días. */}
               <div className="hidden md:block">
-                <TimeGridView days={rango.days} todayKey={hoyKey} itemsByDay={itemsByDay} onSelectEvento={handleSelectEvento} ahora={ahora} />
+                <TimeGridView
+                  days={rango.days}
+                  todayKey={hoyKey}
+                  itemsByDay={itemsByDay}
+                  onSelectEvento={handleSelectEvento}
+                  onVerDia={(key) => {
+                    const [y, m, d] = key.split('-').map(Number);
+                    irA(new Date(y, m - 1, d));
+                    setVista('dia');
+                  }}
+                  ahora={ahora}
+                />
               </div>
               <div className="md:hidden">
                 <WeekView days={rango.days} todayKey={hoyKey} itemsByDay={itemsByDay} onSelectEvento={handleSelectEvento} />

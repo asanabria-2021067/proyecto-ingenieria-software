@@ -12,6 +12,7 @@ import {
   layoutDia,
   posicionAhora,
   tonoDeEvento,
+  type BloqueEvento,
   type EventoItem,
 } from '@/lib/calendar/time-grid';
 
@@ -63,6 +64,32 @@ function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEve
 }
 
 /**
+ * En Semana la columna de un día es angosta: si un grupo de eventos
+ * solapados necesita más de 2 columnas, se muestra solo la primera (a media
+ * columna) y el resto queda en un "+N" que abre el día (como Teams/Outlook).
+ * En Día hay espacio para todas las columnas.
+ */
+function bloquesVisibles(bloques: BloqueEvento[], semana: boolean): BloqueEvento[] {
+  if (!semana) return bloques;
+  return bloques
+    .filter((b) => b.columnas <= 2 || b.columna === 0)
+    .map((b) => (b.columnas > 2 ? { ...b, columnas: 2 } : b));
+}
+
+function gruposDesbordados(bloques: BloqueEvento[]) {
+  const grupos = new Map<number, { grupo: number; top: number; bottom: number; ocultos: number }>();
+  for (const b of bloques) {
+    if (b.columnas <= 2) continue;
+    const g = grupos.get(b.grupo) ?? { grupo: b.grupo, top: b.top, bottom: b.top + b.height, ocultos: 0 };
+    g.top = Math.min(g.top, b.top);
+    g.bottom = Math.max(g.bottom, b.top + b.height);
+    if (b.columna > 0) g.ocultos += 1;
+    grupos.set(b.grupo, g);
+  }
+  return [...grupos.values()].map((g) => ({ grupo: g.grupo, top: g.top, height: g.bottom - g.top, ocultos: g.ocultos }));
+}
+
+/**
  * HU-184 (T-324): vista Día/Semana como cuadrícula por horas (maqueta del
  * equipo). Los eventos se ubican por su hora y se reparten en columnas si se
  * solapan; las fechas límite de tareas y los eventos de varios días van en la
@@ -74,18 +101,22 @@ export function TimeGridView({
   todayKey,
   itemsByDay,
   onSelectEvento,
+  onVerDia,
   ahora,
 }: {
   days: CalendarDay[];
   todayKey: string;
   itemsByDay: Map<string, AgendaItem[]>;
   onSelectEvento: (item: EventoItem) => void;
+  /** Semana: el "+N" de un horario muy cargado abre ese día en la vista Día. */
+  onVerDia?: (dayKey: string) => void;
   ahora: Date;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = HORA_INICIAL_VISIBLE * HORA_ALTO_PX;
+    // Un poco antes de la hora para que su etiqueta (centrada en la línea) no quede cortada.
+    if (scrollRef.current) scrollRef.current.scrollTop = HORA_INICIAL_VISIBLE * HORA_ALTO_PX - 12;
   }, []);
 
   const columnas = useMemo(
@@ -175,7 +206,7 @@ export function TimeGridView({
                   />
                 ))}
 
-                {bloques.map(({ item, top, height, columna, columnas: total }) => {
+                {bloquesVisibles(bloques, days.length > 1).map(({ item, top, height, columna, columnas: total }) => {
                   const tono = TONO_CLASES[tonoDeEvento(item)];
                   const Modalidad = MODALIDAD_ESTILO[item.modalidad].icon;
                   const compacto = height < HORA_ALTO_PX;
@@ -212,6 +243,20 @@ export function TimeGridView({
                     </button>
                   );
                 })}
+
+                {days.length > 1 &&
+                  gruposDesbordados(bloques).map(({ grupo, top, height, ocultos }) => (
+                    <button
+                      key={`mas-${grupo}`}
+                      type="button"
+                      onClick={() => onVerDia?.(day.key)}
+                      aria-label={`${ocultos} eventos más a esta hora, ver el día`}
+                      className="absolute flex items-start justify-center rounded-control border border-dashed border-outline-variant bg-surface-container-lowest px-1 py-1 text-xs font-bold text-text-primary shadow-card hover:bg-surface-container"
+                      style={{ top: top + 1, height: height - 2, left: 'calc(50% + 2px)', width: 'calc(50% - 4px)' }}
+                    >
+                      +{ocultos}
+                    </button>
+                  ))}
 
                 {isToday && (
                   <div
