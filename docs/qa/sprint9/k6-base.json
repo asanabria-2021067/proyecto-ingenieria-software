@@ -1,0 +1,297 @@
+{
+    "setup_data": {
+        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIzNjYsImNvcnJlbyI6Ims2LmxpZGVyQHV2Zy5lZHUuZ3QiLCJ0aXBvIjoiYWNjZXNzIiwiaWF0IjoxNzkxMzM5NzM1LCJleHAiOjE3OTEzNDMzMzV9.5X1T9cZygRzawmpqtXVxBD8fU7olB8PgfH-wPxvMYgc",
+        "projectId": 1259
+    },
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "setup": {
+                "checks": {
+                    "login: status es 201": {
+                        "path": "::setup::login: status es 201",
+                        "id": "5870cf3dce53efd1b927ae67690ea3a8",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "login: status es 201"
+                    }
+                },
+                "name": "setup",
+                "path": "::setup",
+                "id": "5c0f8025f7e0b6654089e5b00e950f1a",
+                "groups": {}
+            }
+        },
+        "checks": {
+            "listado de proyectos: status es 200": {
+                "name": "listado de proyectos: status es 200",
+                "path": "::listado de proyectos: status es 200",
+                "id": "66ea56e1d43c1875c15900fdc7afdc48",
+                "passes": 300,
+                "fails": 0
+            },
+            "listado de proyectos: respuesta es JSON parseable": {
+                "name": "listado de proyectos: respuesta es JSON parseable",
+                "path": "::listado de proyectos: respuesta es JSON parseable",
+                "id": "d329eea3b6d06599eb9cf6e3099e0cfa",
+                "passes": 300,
+                "fails": 0
+            },
+            "tablero: status es 200": {
+                "fails": 0,
+                "name": "tablero: status es 200",
+                "path": "::tablero: status es 200",
+                "id": "a1e9b3e9dc06c1cb8354f89d55b808b2",
+                "passes": 300
+            },
+            "tablero: respuesta es JSON parseable": {
+                "fails": 0,
+                "name": "tablero: respuesta es JSON parseable",
+                "path": "::tablero: respuesta es JSON parseable",
+                "id": "b1a05426566d199477cbc9eb6031d967",
+                "passes": 300
+            },
+            "chat del proyecto: status es 200": {
+                "fails": 0,
+                "name": "chat del proyecto: status es 200",
+                "path": "::chat del proyecto: status es 200",
+                "id": "39ad82de12dea0f8e73d21ef60edf64d",
+                "passes": 300
+            },
+            "chat del proyecto: respuesta es JSON parseable": {
+                "fails": 0,
+                "name": "chat del proyecto: respuesta es JSON parseable",
+                "path": "::chat del proyecto: respuesta es JSON parseable",
+                "id": "d98ef508095f2659c6fa603617cda0dc",
+                "passes": 300
+            },
+            "chat global: status es 200": {
+                "name": "chat global: status es 200",
+                "path": "::chat global: status es 200",
+                "id": "4277140a55d58b2bd162a0867d4fd6e5",
+                "passes": 300,
+                "fails": 0
+            },
+            "chat global: respuesta es JSON parseable": {
+                "name": "chat global: respuesta es JSON parseable",
+                "path": "::chat global: respuesta es JSON parseable",
+                "id": "b3ad8e7427361c312cdf71bbe11880d2",
+                "passes": 300,
+                "fails": 0
+            },
+            "notificaciones: status es 200": {
+                "name": "notificaciones: status es 200",
+                "path": "::notificaciones: status es 200",
+                "id": "26b1cdaef55610913a34c2cd7db107d0",
+                "passes": 300,
+                "fails": 0
+            },
+            "notificaciones: respuesta es JSON parseable": {
+                "path": "::notificaciones: respuesta es JSON parseable",
+                "id": "14ede6fbe8c737cf5027f60d93424f36",
+                "passes": 300,
+                "fails": 0,
+                "name": "notificaciones: respuesta es JSON parseable"
+            },
+            "conteo de no leídas: status es 200": {
+                "name": "conteo de no leídas: status es 200",
+                "path": "::conteo de no leídas: status es 200",
+                "id": "6a492e8cc561cc8e78d321187e0d0d0d",
+                "passes": 300,
+                "fails": 0
+            },
+            "conteo de no leídas: respuesta es JSON parseable": {
+                "path": "::conteo de no leídas: respuesta es JSON parseable",
+                "id": "d8185e241fbfbdae19f14678e7ed73d2",
+                "passes": 300,
+                "fails": 0,
+                "name": "conteo de no leídas: respuesta es JSON parseable"
+            }
+        },
+        "name": "",
+        "path": ""
+    },
+    "metrics": {
+        "http_req_duration{expected_response:true}": {
+            "avg": 47.72892645252646,
+            "min": 8.683591,
+            "med": 27.87734,
+            "max": 2242.314582,
+            "p(90)": 52.701031,
+            "p(95)": 65.515938,
+            "p(99)": 152.628566
+        },
+        "vus": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "duration_chat_dock": {
+            "max": 54.89779,
+            "p(90)": 33.12672470000002,
+            "p(95)": 38.51712195,
+            "p(99)": 47.11165860999999,
+            "avg": 24.273211390000007,
+            "min": 12.031832,
+            "med": 22.5687275
+        },
+        "duration_board": {
+            "med": 37.172586499999994,
+            "max": 137.403348,
+            "p(90)": 55.58186140000001,
+            "p(95)": 61.38388060000004,
+            "p(99)": 89.06530026999998,
+            "avg": 40.87345089000001,
+            "min": 20.906847
+        },
+        "duration_chat_project": {
+            "min": 18.481702,
+            "med": 28.616621,
+            "max": 62.910257,
+            "p(90)": 40.7555326,
+            "p(95)": 44.651452500000005,
+            "p(99)": 51.47412961999998,
+            "avg": 30.662627363333335
+        },
+        "duration_notifications": {
+            "avg": 23.190322206666668,
+            "min": 9.051611,
+            "med": 20.741355499999997,
+            "max": 81.836286,
+            "p(90)": 29.029491600000025,
+            "p(95)": 40.38828390000001,
+            "p(99)": 75.74955374999998
+        },
+        "http_req_duration": {
+            "min": 8.683591,
+            "med": 27.87734,
+            "max": 2242.314582,
+            "p(90)": 52.701031,
+            "p(95)": 65.515938,
+            "p(99)": 152.628566,
+            "avg": 47.72892645252646
+        },
+        "http_req_sending": {
+            "p(90)": 0.077594,
+            "p(95)": 0.085787,
+            "p(99)": 0.176439,
+            "avg": 0.03854986229872288,
+            "min": 0.010871,
+            "med": 0.022056,
+            "max": 1.088707
+        },
+        "data_received": {
+            "count": 3687216,
+            "rate": 411132.12137439684
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "duration_notifications_unread_count": {
+            "avg": 23.171919400000007,
+            "min": 8.683591,
+            "med": 19.9379925,
+            "max": 88.565515,
+            "p(90)": 30.37225070000001,
+            "p(95)": 35.32549740000006,
+            "p(99)": 79.43188027999997
+        },
+        "http_req_waiting": {
+            "max": 2241.827364,
+            "p(90)": 52.269481,
+            "p(95)": 65.075281,
+            "p(99)": 152.211106,
+            "avg": 47.4494358323154,
+            "min": 8.541125,
+            "med": 27.7094
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 1801,
+            "value": 0
+        },
+        "http_reqs": {
+            "count": 1801,
+            "rate": 200.81518158830096
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 0
+        },
+        "http_req_receiving": {
+            "avg": 0.24094075791227096,
+            "min": 0.0503,
+            "med": 0.163392,
+            "max": 26.839452,
+            "p(90)": 0.349538,
+            "p(95)": 0.600528,
+            "p(99)": 1.283743
+        },
+        "data_sent": {
+            "rate": 73280.81597310117,
+            "count": 657215
+        },
+        "rate_limited_responses": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_req_blocked": {
+            "p(90)": 0.0103,
+            "p(95)": 0.011862,
+            "p(99)": 0.073848,
+            "avg": 0.05263964963908929,
+            "min": 0.003755,
+            "med": 0.007514,
+            "max": 16.977439
+        },
+        "iteration_duration": {
+            "min": 131.71002,
+            "med": 183.5918555,
+            "max": 2566.420732,
+            "p(90)": 282.99833750000005,
+            "p(95)": 389.4843144,
+            "p(99)": 2555.64273278,
+            "avg": 288.4142661966666
+        },
+        "http_req_connecting": {
+            "p(95)": 0,
+            "p(99)": 0,
+            "avg": 0.03529618212104387,
+            "min": 0,
+            "med": 0,
+            "max": 7.350608,
+            "p(90)": 0
+        },
+        "iterations": {
+            "count": 300,
+            "rate": 33.45061325735163
+        },
+        "checks": {
+            "passes": 3601,
+            "fails": 0,
+            "thresholds": {
+                "rate==1.0": false
+            },
+            "value": 1
+        },
+        "duration_project_list": {
+            "p(99)": 2223.45823767,
+            "avg": 143.5606488133334,
+            "min": 35.15545,
+            "med": 50.498402999999996,
+            "max": 2242.314582,
+            "p(90)": 104.18070610000002,
+            "p(95)": 166.01466945000013
+        }
+    }
+}
