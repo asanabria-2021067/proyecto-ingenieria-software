@@ -150,7 +150,7 @@ describe('MonthView (HU-169 T-264)', () => {
 
     expect(screen.getByText('Presencial')).toBeInTheDocument();
     expect(screen.getByText('Virtual')).toBeInTheDocument();
-    expect(screen.getByText('Mixta')).toBeInTheDocument();
+    expect(screen.getByText('Híbrida')).toBeInTheDocument();
     // Puntos de la vista compacta (móvil): uno por ítem con el color de su modalidad.
     expect(container.querySelector('span.bg-status-success.h-1\\.5')).not.toBeNull();
     expect(container.querySelector('span.bg-accent.h-1\\.5')).not.toBeNull();

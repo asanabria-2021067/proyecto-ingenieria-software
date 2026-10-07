@@ -7,7 +7,7 @@ const HORA_FORMAT = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const MODALIDAD_OPTIONS: { value: ModalidadEvento; label: string }[] = [
   { value: 'PRESENCIAL', label: 'Presencial' },
   { value: 'VIRTUAL', label: 'Virtual' },
-  { value: 'MIXTA', label: 'Mixta' },
+  { value: 'MIXTA', label: 'Híbrida' },
 ];
 
 /** HU-184 (T-323): opciones fijas del recordatorio, en minutos antes del inicio. */

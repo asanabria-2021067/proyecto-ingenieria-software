@@ -30,7 +30,7 @@ export const MODALIDAD_ESTILO: Record<ModalidadEvento, ModalidadEstilo> = {
     punto: 'bg-accent',
   },
   MIXTA: {
-    label: 'Mixta',
+    label: 'Híbrida',
     icon: Users,
     relleno: 'bg-action text-on-action',
     punto: 'bg-action',

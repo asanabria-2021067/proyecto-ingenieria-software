@@ -55,7 +55,7 @@ describe('EventDetailDialog (HU-184 T-324)', () => {
 
     expect(screen.getByRole('heading', { name: 'Taller de diseño' })).toBeInTheDocument();
     expect(screen.getByText('App de tutorías')).toBeInTheDocument();
-    expect(screen.getByText('Mixta')).toBeInTheDocument();
+    expect(screen.getByText('Híbrida')).toBeInTheDocument();
     expect(screen.getByText(/09:00–10:30/)).toBeInTheDocument();
     expect(screen.getByText('Edificio CIT, salón 210')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Abrir en el mapa/ })).toHaveAttribute(
