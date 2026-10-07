@@ -146,8 +146,8 @@ describe('Panel de Administración (/dashboard/admin)', () => {
     const actividad = within(seguimiento).getByRole('region', { name: 'Actividad reciente' });
 
     expect(within(actividad).getByText('Sistema de Tutorías Académicas')).toBeInTheDocument();
-    expect(within(actividad).getByText('EN PROGRESO')).toBeInTheDocument();
-    expect(within(actividad).getByText('EN SOLICITUD CIERRE')).toBeInTheDocument();
+    expect(within(actividad).getByText('En progreso')).toBeInTheDocument();
+    expect(within(actividad).getByText('En solicitud cierre')).toBeInTheDocument();
     const enlaces = within(actividad).getAllByRole('link', { name: 'Ver proyecto' });
     expect(enlaces.map((enlace) => enlace.getAttribute('href'))).toEqual([
       '/dashboard/proyectos/36',

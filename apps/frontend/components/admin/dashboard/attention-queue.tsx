@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronRight, ClipboardList, Clock, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, ChevronRight, ClipboardList, Clock, Inbox, type LucideIcon } from 'lucide-react';
 
 type AttentionTone = 'atencion' | 'bloqueo';
 
@@ -80,9 +80,14 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
   return (
     <section aria-labelledby={tituloId} className="card-base flex flex-col overflow-hidden p-0">
       <header className="flex items-center justify-between gap-inline border-b border-outline-variant/50 px-card py-stack">
-        <h3 id={tituloId} className="type-subtitle font-semibold">
-          Requieren atención
-        </h3>
+        <div className="flex min-w-0 items-center gap-inline">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
+            <Inbox className="size-5" aria-hidden="true" />
+          </div>
+          <h3 id={tituloId} className="type-subtitle font-semibold">
+            Requieren atención
+          </h3>
+        </div>
         <span className="type-meta tabular-nums">
           {total === 0 ? 'Todo al día' : total === 1 ? '1 pendiente' : `${total} pendientes`}
         </span>

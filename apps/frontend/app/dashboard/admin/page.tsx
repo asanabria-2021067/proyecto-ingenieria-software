@@ -48,9 +48,10 @@ function estadoBadgeClasses(estado: string): string {
   return 'pill-neutral';
 }
 
-/** `EN_SOLICITUD_CIERRE` → `EN SOLICITUD CIERRE`: mismo estado, legible y con corte de línea. */
+/** `EN_SOLICITUD_CIERRE` → `En solicitud cierre`: mismo estado, legible y con corte de línea. */
 function estadoLegible(estado: string): string {
-  return estado.replaceAll('_', ' ');
+  const texto = estado.replaceAll('_', ' ').toLowerCase();
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -100,7 +101,7 @@ function StatCard({
             {value}
           </p>
         </div>
-        <div className={`flex size-10 shrink-0 items-center justify-center rounded-control ${iconBg}`}>
+        <div className={`flex size-9 shrink-0 items-center justify-center rounded-control ${iconBg}`}>
           <Icon className={`size-5 ${iconColor}`} aria-hidden="true" />
         </div>
       </div>
@@ -164,8 +165,8 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
   return (
     <section aria-labelledby={tituloId} className="card-base flex h-full flex-col overflow-hidden p-0">
       <header className="flex items-center gap-inline border-b border-outline-variant/50 px-card py-stack">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-status-success">
-          <Activity className="size-5 text-on-status-success" aria-hidden="true" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10">
+          <Activity className="size-5 text-primary" aria-hidden="true" />
         </div>
         <h3 id={tituloId} className="type-subtitle font-semibold">
           Actividad reciente
@@ -189,7 +190,7 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
               </span>
               <Link
                 href={`/dashboard/proyectos/${item.idProyecto}`}
-                className="shrink-0 rounded-control bg-surface-container-high px-stack py-1.5 text-xs font-semibold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="shrink-0 rounded-control bg-surface-container-high px-stack py-tight text-xs font-semibold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 Ver proyecto
               </Link>
@@ -255,7 +256,7 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
           <div className="mt-auto border-t border-outline-variant/50 px-card py-inline">
             <Link
               href="/dashboard/admin/usuarios?riesgo=horas"
-              className="type-meta inline-flex items-center gap-micro rounded-control font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="type-meta -my-tight inline-flex items-center gap-micro rounded-control py-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               Ver todos
               <ArrowRight className="size-3.5" aria-hidden="true" />

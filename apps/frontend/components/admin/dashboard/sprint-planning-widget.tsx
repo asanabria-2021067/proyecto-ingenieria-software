@@ -161,7 +161,7 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
           próxima en vez de enlazar a una ruta que respondería 404. */}
       <p
         aria-disabled="true"
-        className="type-body mt-auto flex flex-wrap items-center justify-center gap-tight text-center font-medium text-text-disabled"
+        className="type-body mt-auto flex flex-wrap items-center justify-center gap-tight text-center font-medium text-text-secondary"
       >
         <span className="inline-flex items-center gap-tight whitespace-nowrap">
           Ver calendario de Sprints
@@ -203,7 +203,7 @@ function NextFinalization({ item }: { item: AdminSprintCalendarItem | null }) {
         </p>
         <Link
           href={`/dashboard/admin/proyectos/${item.idProyecto}`}
-          className="type-meta mt-tight inline-flex items-center gap-micro rounded-control font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="type-meta -mb-tight mt-micro inline-flex items-center gap-micro rounded-control py-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           Ver proyecto
           <ArrowRight className="size-3.5" aria-hidden="true" />
