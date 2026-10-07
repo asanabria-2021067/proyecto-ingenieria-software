@@ -55,6 +55,13 @@ describe('calendar/time-grid layoutDia (HU-184 T-324)', () => {
     expect(porId[1].columnas).toBe(2);
   });
 
+  it('numera los grupos de solapamiento', () => {
+    const bloques = layoutDia([evento(1, [9, 0], [10, 0]), evento(2, [9, 30], [10, 30]), evento(3, [12, 0], [13, 0])]);
+    const porId = Object.fromEntries(bloques.map((b) => [b.item.id, b.grupo]));
+    expect(porId[1]).toBe(porId[2]);
+    expect(porId[3]).not.toBe(porId[1]);
+  });
+
   it('un evento muy corto se dibuja con un mínimo legible', () => {
     const [bloque] = layoutDia([evento(1, [9, 0], [9, 10])]);
     expect(bloque.height).toBe(0.5 * HORA_ALTO_PX);

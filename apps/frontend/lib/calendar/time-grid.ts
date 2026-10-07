@@ -18,6 +18,8 @@ export interface BloqueEvento {
   /** Columna dentro de su grupo de eventos solapados (0..columnas-1). */
   columna: number;
   columnas: number;
+  /** Grupo de eventos encadenados por solapamiento (los que comparten columnas). */
+  grupo: number;
 }
 
 function minutosDelDia(fecha: Date): number {
@@ -44,6 +46,7 @@ export function layoutDia(eventos: EventoItem[]): BloqueEvento[] {
   const bloques: BloqueEvento[] = [];
   let grupo: { item: EventoItem; inicio: number; fin: number; columna: number }[] = [];
   let finGrupo = -1;
+  let numeroGrupo = 0;
 
   const cerrarGrupo = () => {
     const columnas = grupo.reduce((max, e) => Math.max(max, e.columna + 1), 1);
@@ -54,9 +57,11 @@ export function layoutDia(eventos: EventoItem[]): BloqueEvento[] {
         height: ((e.fin - e.inicio) / 60) * HORA_ALTO_PX,
         columna: e.columna,
         columnas,
+        grupo: numeroGrupo,
       });
     }
     grupo = [];
+    numeroGrupo += 1;
   };
 
   for (const evento of ordenados) {
