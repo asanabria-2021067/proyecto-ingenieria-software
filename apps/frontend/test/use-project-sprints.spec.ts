@@ -135,18 +135,7 @@ describe('useStartSprint', () => {
     vi.clearAllMocks();
   });
 
-  it('invoca el service exactamente una vez con el projectId correcto', async () => {
-    (startSprint as any).mockResolvedValue(sprint());
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useStartSprint(7), { wrapper });
-
-    result.current.mutate(undefined);
-
-    await waitFor(() => expect(startSprint).toHaveBeenCalledTimes(1));
-    expect(startSprint).toHaveBeenCalledWith(7, undefined);
-  });
-
-  it('HU-160: pasa fechaFinPlaneada al service cuando se envía explícita', async () => {
+  it('invoca el service exactamente una vez con el projectId y la fecha planeada', async () => {
     (startSprint as any).mockResolvedValue(sprint());
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
@@ -163,7 +152,7 @@ describe('useStartSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
 
-    result.current.mutate(undefined);
+    result.current.mutate('2026-12-01');
 
     await waitFor(() => expect(startSprint).toHaveBeenCalledTimes(1));
     await waitFor(() =>
@@ -178,7 +167,7 @@ describe('useStartSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
 
-    await expect(result.current.mutateAsync(undefined)).rejects.toThrow('409');
+    await expect(result.current.mutateAsync('2026-12-01')).rejects.toThrow('409');
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });
