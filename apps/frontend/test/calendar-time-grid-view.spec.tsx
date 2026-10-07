@@ -164,4 +164,34 @@ describe('TimeGridView (HU-184 T-324)', () => {
     expect(screen.getByRole('button', { name: /^Evento 1/ }).style.width).toBe('calc(50% - 4px)');
     expect(screen.getByRole('button', { name: /^Evento 2/ }).style.left).toBe('calc(50% + 2px)');
   });
+
+  it('en Semana, más de 2 eventos solapados se resumen en "+N" que abre el día; en Día se ven todos', () => {
+    const key = '2026-10-07';
+    const tres = new Map<string, AgendaItem[]>([
+      [
+        key,
+        [
+          evento(1, key),
+          evento(2, key, { fechaInicio: new Date(`${key}T09:15:00`), horaInicio: '09:15' }),
+          evento(3, key, { fechaInicio: new Date(`${key}T09:30:00`), horaInicio: '09:30' }),
+        ],
+      ],
+    ]);
+    const onVerDia = vi.fn();
+    const { rerender } = render(
+      <TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={tres} onSelectEvento={() => {}} onVerDia={onVerDia} ahora={AHORA} />,
+    );
+
+    expect(screen.getByRole('button', { name: /^Evento 1/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Evento 2/ })).not.toBeInTheDocument();
+    const mas = screen.getByRole('button', { name: '2 eventos más a esta hora, ver el día' });
+    expect(mas).toHaveTextContent('+2');
+    fireEvent.click(mas);
+    expect(onVerDia).toHaveBeenCalledWith(key);
+
+    const dia = semana().filter((d) => d.key === key);
+    rerender(<TimeGridView days={dia} todayKey="2026-10-06" itemsByDay={tres} onSelectEvento={() => {}} ahora={AHORA} />);
+    expect(screen.getAllByRole('button', { name: /^Evento \d/ })).toHaveLength(3);
+    expect(screen.queryByRole('button', { name: /eventos más/ })).not.toBeInTheDocument();
+  });
 });
