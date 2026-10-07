@@ -111,6 +111,28 @@
   --color-inverse-on-surface: #eef1f7;
   --color-inverse-primary: #72dc93;
 
+  /* HU-184: paleta del calendario (tipos de evento, proyectos y calendarios
+     compartidos). Cada tono: fondo suave, texto on-* y borde/punto -strong.
+     Solo para el calendario; ver docs/design-system.md. */
+  --color-cal-1: #efe7fb;
+  --color-on-cal-1: #4b2a86;
+  --color-cal-1-strong: #7c4dcc;
+  --color-cal-2: #e3f6e8;
+  --color-on-cal-2: #14532d;
+  --color-cal-2-strong: #2f9e5a;
+  --color-cal-3: #e2eefc;
+  --color-on-cal-3: #173d74;
+  --color-cal-3-strong: #3b7dd8;
+  --color-cal-4: #fdf3d6;
+  --color-on-cal-4: #6b4a00;
+  --color-cal-4-strong: #c99700;
+  --color-cal-5: #fce4ee;
+  --color-on-cal-5: #7a1f45;
+  --color-cal-5-strong: #d94b86;
+  --color-cal-6: #dcf3f3;
+  --color-on-cal-6: #0f4c4c;
+  --color-cal-6-strong: #2a9d9d;
+
   --font-family-headline: var(--font-manrope, 'Manrope'), sans-serif;
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
 }
@@ -168,6 +190,26 @@
   --color-inverse-surface: #eef1f7;
   --color-inverse-on-surface: #1a1f24;
   --color-inverse-primary: #006735;
+
+  /* HU-184: paleta del calendario en oscuro (mismo orden de tonos). */
+  --color-cal-1: #2e2445;
+  --color-on-cal-1: #e3d4ff;
+  --color-cal-1-strong: #a98bf0;
+  --color-cal-2: #1c3324;
+  --color-on-cal-2: #c4f0d0;
+  --color-cal-2-strong: #5cc982;
+  --color-cal-3: #1d2b40;
+  --color-on-cal-3: #cfe0fb;
+  --color-cal-3-strong: #6fa4ec;
+  --color-cal-4: #3a3218;
+  --color-on-cal-4: #fbe7a6;
+  --color-cal-4-strong: #e6bd3a;
+  --color-cal-5: #3d2230;
+  --color-on-cal-5: #fbd0e2;
+  --color-cal-5-strong: #ee7fac;
+  --color-cal-6: #183535;
+  --color-on-cal-6: #c6efef;
+  --color-cal-6-strong: #57c3c3;
 
   --gradient-color: #224a33;
   --sparkles-color: #72dc93;
