@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -13,11 +13,20 @@ vi.mock('../lib/mensajes', () => mensajesMock);
 const eventsMock = vi.hoisted(() => ({ deleteEvent: vi.fn() }));
 vi.mock('../lib/services/events', () => eventsMock);
 
+const membersMock = vi.hoisted(() => ({ useProjectMembers: vi.fn() }));
+vi.mock('../hooks/use-project-members', () => membersMock);
+
 import { EventDetailDialog, formatRangoEvento } from '../components/calendar/event-detail-dialog';
 import type { MiEventoDTO } from '../lib/services/events';
 
 afterEach(() => {
   cleanup();
+});
+
+beforeEach(() => {
+  membersMock.useProjectMembers.mockReturnValue({
+    members: [{ idUsuario: 4, nombre: 'Ana', apellido: 'García', correo: 'a@uvg.edu.gt', fotoUrl: null, idRolProyecto: 1 }],
+  });
 });
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -40,7 +49,7 @@ function evento(overrides: Partial<MiEventoDTO> = {}): MiEventoDTO {
     ubicacionNombre: 'Edificio CIT, salón 210',
     linkSesion: 'https://meet.google.com/abc',
     rolesDestino: [],
-    tipoEvento: 'OTRO',
+    tipoEvento: 'TUTORIA',
     invitados: [],
     proyecto: { idProyecto: 3, tituloProyecto: 'App de tutorías' },
     ...overrides,
@@ -106,7 +115,7 @@ describe('EventDetailDialog (HU-184 T-324)', () => {
 
     expect(screen.getByRole('link', { name: 'Ver proyecto' })).toHaveAttribute('href', '/dashboard/projects/3');
     expect(screen.queryByRole('button', { name: /Editar evento/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Cancelar evento/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Eliminar evento/ })).not.toBeInTheDocument();
   });
 
   it('el líder puede pasar a editar', () => {
@@ -117,7 +126,7 @@ describe('EventDetailDialog (HU-184 T-324)', () => {
     expect(onEditar).toHaveBeenCalledWith(expect.objectContaining({ idEvento: 7 }));
   });
 
-  it('el líder puede cancelar el evento tras confirmar', async () => {
+  it('el líder puede eliminar el evento tras confirmar', async () => {
     mensajesMock.confirmar.mockResolvedValueOnce(true);
     eventsMock.deleteEvent.mockResolvedValueOnce(undefined);
     const onOpenChange = vi.fn();
@@ -125,7 +134,7 @@ describe('EventDetailDialog (HU-184 T-324)', () => {
       wrapper,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Cancelar evento/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar evento/ }));
     await waitFor(() => expect(eventsMock.deleteEvent).toHaveBeenCalledWith(3, 7));
     expect(mensajesMock.confirmar.mock.calls[0][0]).toMatchObject({ destructiva: true });
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
@@ -136,5 +145,46 @@ describe('EventDetailDialog (HU-184 T-324)', () => {
     expect(texto).toContain('22:00');
     expect(texto).toContain('01:00');
     expect(texto).toContain(' – ');
+  });
+
+  it('muestra el tipo con su color y para quién es (todo el proyecto o los invitados por nombre)', () => {
+    const { rerender } = render(
+      <EventDetailDialog evento={evento()} open onOpenChange={vi.fn()} editable={false} onEditar={vi.fn()} />,
+      { wrapper },
+    );
+    expect(screen.getByText('Tutoría')).toHaveClass('bg-cal-1');
+    expect(screen.getByText('Todo el proyecto')).toBeInTheDocument();
+
+    rerender(<EventDetailDialog evento={evento({ invitados: [4] })} open onOpenChange={vi.fn()} editable={false} onEditar={vi.fn()} />);
+    expect(screen.getByText('Ana García')).toBeInTheDocument();
+  });
+
+  it('un recordatorio en 0 se muestra como "Sin recordatorio"', () => {
+    render(<EventDetailDialog evento={evento({ antelacionMinutos: 0 })} open onOpenChange={vi.fn()} editable onEditar={vi.fn()} />, {
+      wrapper,
+    });
+    expect(screen.getByText('Sin recordatorio')).toBeInTheDocument();
+  });
+
+  it('un evento de un calendario compartido es de solo lectura, sin enlace al proyecto ni edición', () => {
+    render(
+      <EventDetailDialog
+        evento={evento({ invitados: [4] })}
+        open
+        onOpenChange={vi.fn()}
+        editable
+        onEditar={vi.fn()}
+        compartidoPor={{ nombre: 'Luis Hernández' }}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText('Calendario de Luis Hernández · solo lectura')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Editar evento/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Eliminar evento/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ver proyecto' })).not.toBeInTheDocument();
+    // Sin acceso al equipo del proyecto: no se consulta y se muestra solo el conteo.
+    expect(membersMock.useProjectMembers).toHaveBeenLastCalledWith(0);
+    expect(screen.getByText('1 invitado')).toBeInTheDocument();
   });
 });
