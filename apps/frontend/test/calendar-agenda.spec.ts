@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { eventoToAgendaItem, eventoToAgendaItems, groupAgendaItemsByDay, tareaToAgendaItem } from '@/lib/calendar/agenda';
+import {
+  agendaItemKey,
+  eventoToAgendaItem,
+  eventoToAgendaItems,
+  groupAgendaItemsByDay,
+  tareaCompartidaToAgendaItem,
+  tareaToAgendaItem,
+} from '@/lib/calendar/agenda';
 import type { MiTareaDTO } from '@/lib/services/users';
 import type { MiEventoDTO } from '@/lib/services/events';
 
@@ -117,5 +124,49 @@ describe('calendar/agenda — groupAgendaItemsByDay', () => {
 
   it('sin ítems produce un mapa vacío', () => {
     expect(groupAgendaItemsByDay([]).size).toBe(0);
+  });
+});
+
+describe('calendar/agenda — calendarios compartidos y tipo (HU-184)', () => {
+  const origen = { idUsuario: 7, nombre: 'Ana García', tono: 3 as const };
+
+  it('el evento lleva su tipo y si dura varios días', () => {
+    const corto = eventoToAgendaItem(evento({ tipoEvento: 'TUTORIA' }));
+    if (corto.kind !== 'evento') throw new Error('unreachable');
+    expect(corto.tipo).toBe('TUTORIA');
+    expect(corto.multiDia).toBe(false);
+
+    const largo = eventoToAgendaItem(evento({ fechaFin: '2026-09-25T16:00:00.000Z' }));
+    if (largo.kind !== 'evento') throw new Error('unreachable');
+    expect(largo.multiDia).toBe(true);
+  });
+
+  it('un evento de un calendario compartido conserva de quién es', () => {
+    const [item] = eventoToAgendaItems(evento(), new Date(2026, 8, 1), new Date(2026, 9, 1), origen);
+    expect(item.compartidoPor).toEqual(origen);
+    expect(eventoToAgendaItem(evento()).compartidoPor).toBeUndefined();
+  });
+
+  it('la tarea compartida no es navegable y usa el día de su fecha límite', () => {
+    const item = tareaCompartidaToAgendaItem(
+      {
+        idTarea: 3,
+        tituloTarea: 'Informe',
+        estadoTarea: 'EN_PROGRESO',
+        prioridad: 'ALTA',
+        fechaLimite: '2026-09-23T00:00:00.000Z',
+        proyecto: { idProyecto: 10, tituloProyecto: 'Proyecto X' },
+      },
+      origen,
+    );
+    expect(item.key).toBe('2026-09-23');
+    expect(item.href).toBe('');
+    expect(item.compartidoPor).toEqual(origen);
+  });
+
+  it('agendaItemKey distingue el mismo evento visto en mi calendario y en uno compartido', () => {
+    const mio = eventoToAgendaItem(evento());
+    const compartido = eventoToAgendaItem(evento(), origen);
+    expect(agendaItemKey(mio)).not.toBe(agendaItemKey(compartido));
   });
 });
