@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Trash2 } from 'lucide-react';
+import { CalendarCheck2, Link2, Loader2, MapPin, Plus, SlidersHorizontal, Trash2, Type, Video } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,19 +18,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useCancelEvent } from '@/hooks/use-cancel-event';
-import { useProjectRoles } from '@/hooks/use-project-roles';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { aviso } from '@/lib/mensajes';
-import { createEvent, updateEvent, type EventoProyectoDTO, type ModalidadEvento } from '@/lib/services/events';
+import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
+import { TIPO_EVENTO_ESTILO, TIPOS_EVENTO_EN_ORDEN, TONO_CLASES } from '@/lib/calendar/paleta';
+import { createEvent, updateEvent, type EventoProyectoDTO, type ModalidadEvento, type TipoEvento } from '@/lib/services/events';
 import { DatePicker } from './date-picker';
+import { InvitadosField } from './invitados-field';
 import {
   MODALIDAD_OPTIONS,
   RECORDATORIO_OPTIONS,
   buildEventFormSchema,
   buildEventPayload,
+  duracionTexto,
   emptyEventForm,
   eventFormFromEvento,
   requiereLink,
@@ -46,7 +50,15 @@ const EventLocationPicker = dynamic(() => import('./event-location-picker'), {
 export interface LedProjectOption {
   idProyecto: number;
   tituloProyecto: string;
+  /** Para la marca "Horas beca" junto al selector de proyecto. */
+  tipoProyecto?: string;
 }
+
+const MODALIDAD_AYUDA: Record<ModalidadEvento, string> = {
+  PRESENCIAL: 'Presencial: requiere el lugar en el mapa',
+  VIRTUAL: 'Virtual: requiere el enlace de la sesión',
+  MIXTA: 'Híbrida: requiere enlace virtual y lugar físico',
+};
 
 /**
  * Un evento creado antes de HU-184 pudo guardar cualquier número de minutos:
@@ -63,13 +75,23 @@ function hoyInicioDelDia(): Date {
   return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 }
 
+function esLinkDeMeet(link: string): boolean {
+  try {
+    return new URL(link.trim()).hostname === 'meet.google.com';
+  } catch {
+    return false;
+  }
+}
+
+const LABEL_CLASS = 'flex items-center gap-1.5 text-sm font-medium text-on-surface';
+
 /**
- * HU-169 (T-263/T-264), rediseñado en HU-184 (T-323): crear o editar un
- * evento de calendario. Solo accesible al líder de un proyecto (la lista
- * `ledProjects` ya viene filtrada por el caller a GET /proyectos/mine).
- * Campos en el orden en que se piensa un evento: qué, cuándo, cómo/dónde,
- * para quién y cuándo avisar. Valida con `buildEventFormSchema` antes de
- * enviar, con el mensaje debajo de cada campo.
+ * HU-169 (T-263/T-264), rediseñado en HU-184 (T-323) según la maqueta del
+ * equipo: qué (título y tipo), de qué proyecto, cuándo (una fecha, hora de
+ * inicio y fin con su duración), cómo (modalidad con su enlace y/o lugar en
+ * el mapa), para quién (invitados del proyecto) y si se envía recordatorio.
+ * Solo accesible al líder del proyecto (`ledProjects` viene de
+ * GET /proyectos/mine). Valida con `buildEventFormSchema` antes de enviar.
  */
 export function EventFormDialog({
   open,
@@ -88,7 +110,9 @@ export function EventFormDialog({
   initialDate?: Date;
 }) {
   const isEditing = Boolean(editingEvent);
+  const [mostrarDescripcion, setMostrarDescripcion] = useState(false);
   const queryClient = useQueryClient();
+  const { data: usuario } = useCurrentUser();
 
   const schema = useMemo(
     () =>
@@ -110,17 +134,25 @@ export function EventFormDialog({
   useEffect(() => {
     if (!open) return;
     form.reset(editingEvent ? eventFormFromEvento(editingEvent) : emptyEventForm(defaultProjectId, initialDate));
+    setMostrarDescripcion(Boolean(editingEvent?.descripcionEvento));
     // Solo al abrir: no queremos pisar lo que el usuario está escribiendo en cada render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingEvent?.idEvento]);
 
   const modalidad = form.watch('modalidad');
   const idProyectoForm = form.watch('idProyecto');
-  const fechaInicio = form.watch('fechaInicio');
+  const linkSesion = form.watch('linkSesion');
+  const recordatorioActivo = form.watch('recordatorioActivo');
+  const fechaFinOriginal = form.watch('fechaFinOriginal');
+  const duracion = duracionTexto({
+    fecha: form.watch('fecha'),
+    horaInicio: form.watch('horaInicio'),
+    horaFin: form.watch('horaFin'),
+    fechaFinOriginal,
+  });
 
-  // Roles del proyecto activo (el que se está creando/editando), para el multi-select.
   const idProyectoActivo = isEditing ? (editingEvent?.idProyecto ?? 0) : Number(idProyectoForm) || 0;
-  const { roles } = useProjectRoles(idProyectoActivo, { enabled: open && idProyectoActivo > 0 });
+  const proyectoActivo = ledProjects.find((p) => p.idProyecto === idProyectoActivo);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['mis-eventos'] });
@@ -131,10 +163,10 @@ export function EventFormDialog({
       createEvent(Number(values.idProyecto), buildEventPayload(values, { keepEmptyDescripcion: false })),
     onSuccess: () => {
       invalidate();
-      aviso.exito('Evento creado');
+      aviso.exito('Evento agendado');
       onOpenChange(false);
     },
-    onError: (err) => aviso.error('No se pudo crear el evento', getApiErrorMessage(err, 'calendar')),
+    onError: (err) => aviso.error('No se pudo agendar el evento', getApiErrorMessage(err, 'calendar')),
   });
 
   const editar = useMutation({
@@ -152,7 +184,7 @@ export function EventFormDialog({
 
   const isPending = crear.isPending || editar.isPending || isCancelling;
 
-  const confirmarCancelacion = async () => {
+  const confirmarEliminacion = async () => {
     if (!editingEvent) return;
     if (await cancelarEvento(editingEvent)) onOpenChange(false);
   };
@@ -173,36 +205,130 @@ export function EventFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
-      <DialogContent className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[720px]">
+      <DialogContent className="flex max-h-[92dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[600px]">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} noValidate className="flex max-h-[90dvh] min-h-0 flex-col">
-            <DialogHeader className="shrink-0 border-b border-outline-variant/35 px-4 pb-4 pt-5 pr-12 text-left sm:px-6">
-              <DialogTitle className="text-xl font-bold text-on-surface">
-                {isEditing ? 'Editar evento' : 'Nuevo evento'}
-              </DialogTitle>
-              <DialogDescription className="text-sm text-on-surface-variant">
-                Reuniones, entregas u otras actividades del proyecto con fecha y hora.
-              </DialogDescription>
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} noValidate className="flex max-h-[92dvh] min-h-0 flex-col">
+            <DialogHeader className="shrink-0 flex-row items-start gap-3 space-y-0 px-4 pb-3 pt-5 pr-12 text-left sm:px-6">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary">
+                <CalendarCheck2 className="size-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg font-bold text-on-surface sm:text-xl">
+                  {isEditing ? 'Editar evento' : 'Nuevo evento o sesión'}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-on-surface-variant sm:text-sm">
+                  Programa tutorías, reuniones, revisiones o entregas de tus proyectos.
+                </DialogDescription>
+              </div>
             </DialogHeader>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
-              {!isEditing && (
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-5 pt-2 sm:px-6">
+              <FormField
+                control={form.control}
+                name="tituloEvento"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={LABEL_CLASS}>
+                      <Type className="size-3.5 text-primary" aria-hidden="true" />
+                      Título del evento o actividad
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        maxLength={200}
+                        disabled={isPending}
+                        placeholder="Ej. Tutoría de Algoritmos y Estructura de Datos"
+                        className="h-10 rounded-md border-outline-variant bg-surface-container-low text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {mostrarDescripcion ? (
+                <FormField
+                  control={form.control}
+                  name="descripcionEvento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={LABEL_CLASS}>Descripción (opcional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          rows={2}
+                          maxLength={5000}
+                          disabled={isPending}
+                          placeholder="Detalles del evento"
+                          className="rounded-md border-outline-variant text-sm"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMostrarDescripcion(true)}
+                  className="-mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Agregar descripción
+                </button>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="tipoEvento"
+                  render={({ field }) => (
+                    <FormItem className="min-w-0">
+                      <FormLabel className={LABEL_CLASS}>Tipo de actividad</FormLabel>
+                      <Select value={field.value} onValueChange={(v) => field.onChange(v as TipoEvento)} disabled={isPending}>
+                        <FormControl>
+                          <SelectTrigger className="h-10 w-full border-outline-variant bg-surface-container-low">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {TIPOS_EVENTO_EN_ORDEN.map((tipo) => {
+                            const estilo = TIPO_EVENTO_ESTILO[tipo];
+                            return (
+                              <SelectItem key={tipo} value={tipo}>
+                                <span className={`size-2 shrink-0 rounded-pill ${TONO_CLASES[estilo.tono].punto}`} aria-hidden="true" />
+                                {estilo.label}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="idProyecto"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Proyecto</FormLabel>
+                    <FormItem className="min-w-0">
+                      <div className="flex items-center justify-between gap-tight">
+                        <FormLabel className={LABEL_CLASS}>Proyecto</FormLabel>
+                        {proyectoActivo?.tipoProyecto === 'ACADEMICO_HORAS_BECA' && (
+                          <span className="text-xs font-semibold text-primary">+ Horas beca</span>
+                        )}
+                      </div>
                       <Select
-                        value={field.value}
+                        value={isEditing ? String(editingEvent?.idProyecto ?? '') : field.value}
                         onValueChange={(v) => {
                           field.onChange(v);
-                          form.setValue('rolesDestino', []);
+                          form.setValue('invitados', []);
                         }}
-                        disabled={isPending}
+                        disabled={isPending || isEditing}
                       >
                         <FormControl>
-                          <SelectTrigger className="h-10 w-full border-outline-variant">
+                          <SelectTrigger className="h-10 w-full border-outline-variant bg-surface-container-low">
                             <SelectValue placeholder="Selecciona un proyecto que lideras" />
                           </SelectTrigger>
                         </FormControl>
@@ -218,140 +344,86 @@ export function EventFormDialog({
                     </FormItem>
                   )}
                 />
-              )}
+              </div>
 
-              <FormField
-                control={form.control}
-                name="tituloEvento"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Título</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        maxLength={200}
-                        disabled={isPending}
-                        placeholder="Ej. Reunión de avance"
-                        className="h-10 rounded-md border-outline-variant text-sm"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <div className="rounded-card border border-outline-variant/60 bg-surface-container-low p-stack">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                  <FormField
+                    control={form.control}
+                    name="fecha"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2 min-w-0 sm:col-span-1">
+                        <FormLabel className="text-xs font-medium text-on-surface-variant">Fecha</FormLabel>
+                        <FormControl>
+                          <DatePicker
+                            value={field.value}
+                            onChange={(date) => {
+                              field.onChange(date);
+                              // Cambiar la fecha convierte un evento viejo de varios días en uno de un día.
+                              form.setValue('fechaFinOriginal', null);
+                            }}
+                            disabledBefore={isEditing ? undefined : hoyInicioDelDia()}
+                            disabled={isPending}
+                            className="bg-surface-container-lowest"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="horaInicio"
+                    render={({ field }) => (
+                      <FormItem className="min-w-0">
+                        <FormLabel className="text-xs font-medium text-on-surface-variant">Hora de inicio</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="time"
+                            step={300}
+                            disabled={isPending}
+                            className="h-10 rounded-md border-outline-variant bg-surface-container-lowest text-sm"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="horaFin"
+                    render={({ field }) => (
+                      <FormItem className="min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <FormLabel className="text-xs font-medium text-on-surface-variant">Hora de fin</FormLabel>
+                          {duracion && (
+                            <span className="pill pill-success px-1.5 py-0 text-[11px]" aria-label={`Duración ${duracion}`}>
+                              {duracion}
+                            </span>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="time"
+                            step={300}
+                            disabled={isPending}
+                            className="h-10 rounded-md border-outline-variant bg-surface-container-lowest text-sm"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                {fechaFinOriginal && (
+                  <p className="type-meta mt-tight" role="note">
+                    Este evento termina el{' '}
+                    {fechaFinOriginal.toLocaleDateString('es-GT', { day: 'numeric', month: 'long' })}. Se conserva ese día
+                    de fin mientras no cambies la fecha.
+                  </p>
                 )}
-              />
-
-              <FormField
-                control={form.control}
-                name="descripcionEvento"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción (opcional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        rows={2}
-                        maxLength={5000}
-                        disabled={isPending}
-                        placeholder="Detalles del evento"
-                        className="rounded-md border-outline-variant text-sm"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <fieldset className="min-w-0 space-y-2">
-                  <legend className="text-sm font-medium text-on-surface">Inicio</legend>
-                  <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
-                    <FormField
-                      control={form.control}
-                      name="fechaInicio"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="sr-only">Fecha de inicio</FormLabel>
-                          <FormControl>
-                            <DatePicker
-                              value={field.value}
-                              onChange={(date) => {
-                                field.onChange(date);
-                                // El fin nunca debe quedar en un día anterior al nuevo inicio.
-                                const fechaFin = form.getValues('fechaFin');
-                                if (date && fechaFin && fechaFin < date) form.setValue('fechaFin', date);
-                              }}
-                              disabledBefore={isEditing ? undefined : hoyInicioDelDia()}
-                              disabled={isPending}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="horaInicio"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="sr-only">Hora de inicio</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="time"
-                              step={300}
-                              disabled={isPending}
-                              className="h-10 rounded-md border-outline-variant text-sm"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </fieldset>
-  
-                <fieldset className="min-w-0 space-y-2">
-                  <legend className="text-sm font-medium text-on-surface">Fin</legend>
-                  <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
-                    <FormField
-                      control={form.control}
-                      name="fechaFin"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="sr-only">Fecha de fin</FormLabel>
-                          <FormControl>
-                            <DatePicker
-                              value={field.value}
-                              onChange={field.onChange}
-                              disabledBefore={fechaInicio}
-                              disabled={isPending}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="horaFin"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="sr-only">Hora de fin</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="time"
-                              step={300}
-                              disabled={isPending}
-                              className="h-10 rounded-md border-outline-variant text-sm"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </fieldset>
               </div>
 
               <FormField
@@ -359,179 +431,217 @@ export function EventFormDialog({
                 name="modalidad"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Modalidad de la sesión</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={(v) => field.onChange(v as ModalidadEvento)}
-                      disabled={isPending}
+                    <div className="flex flex-wrap items-center justify-between gap-x-tight gap-y-1">
+                      <FormLabel className={LABEL_CLASS}>
+                        <SlidersHorizontal className="size-3.5 text-primary" aria-hidden="true" />
+                        Modalidad de la sesión
+                      </FormLabel>
+                      <span className="type-meta">{MODALIDAD_AYUDA[field.value]}</span>
+                    </div>
+                    <div
+                      role="radiogroup"
+                      aria-label="Modalidad de la sesión"
+                      className="grid grid-cols-3 gap-1 rounded-control bg-surface-container-low p-1"
                     >
-                      <FormControl>
-                        <SelectTrigger className="h-10 w-full border-outline-variant">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {MODALIDAD_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                      {MODALIDAD_OPTIONS.map((opt) => {
+                        const Icono = MODALIDAD_ESTILO[opt.value].icon;
+                        const activo = field.value === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={activo}
+                            disabled={isPending}
+                            onClick={() => field.onChange(opt.value)}
+                            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-control px-2 text-xs font-medium transition-colors sm:text-sm ${
+                              activo
+                                ? 'border border-primary/60 bg-surface-container-lowest text-on-surface shadow-card'
+                                : 'text-on-surface-variant hover:text-on-surface'
+                            }`}
+                          >
+                            <Icono className="size-4 shrink-0" aria-hidden="true" />
+                            <span className="truncate">{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </FormItem>
                 )}
               />
 
-              {requiereUbicacion(modalidad) && (
-                <FormField
-                  control={form.control}
-                  name="ubicacionLat"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>Ubicación de la sesión</FormLabel>
-                      <EventLocationPicker
-                        lat={form.watch('ubicacionLat')}
-                        lng={form.watch('ubicacionLng')}
-                        nombre={form.watch('ubicacionNombre')}
-                        onNombreChange={(v) => form.setValue('ubicacionNombre', v)}
-                        onPositionChange={(lat, lng) => {
-                          form.setValue('ubicacionLng', lng);
-                          form.setValue('ubicacionLat', lat, { shouldValidate: form.formState.isSubmitted });
-                        }}
-                        disabled={isPending}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {requiereLink(modalidad) && (
-                <FormField
-                  control={form.control}
-                  name="linkSesion"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Link de la sesión</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="url"
-                          inputMode="url"
-                          maxLength={500}
-                          disabled={isPending}
-                          placeholder="https://meet.google.com/..."
-                          className="h-10 rounded-md border-outline-variant text-sm"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {roles.length > 0 && (
-                <FormField
-                  control={form.control}
-                  name="rolesDestino"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Para qué roles es la sesión</FormLabel>
-                      <FormDescription className="type-meta">Vacío = visible para todos los participantes.</FormDescription>
-                      <div className="max-h-32 space-y-1.5 overflow-y-auto rounded-md border border-outline-variant p-2">
-                        {roles.map((rol) => (
-                          <label key={rol.idRolProyecto} className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
-                            <Checkbox
-                              checked={field.value.includes(rol.idRolProyecto)}
-                              disabled={isPending}
-                              onCheckedChange={() =>
-                                field.onChange(
-                                  field.value.includes(rol.idRolProyecto)
-                                    ? field.value.filter((id) => id !== rol.idRolProyecto)
-                                    : [...field.value, rol.idRolProyecto],
-                                )
-                              }
+              {(requiereLink(modalidad) || requiereUbicacion(modalidad)) && (
+                <div className="space-y-4 rounded-card border border-outline-variant/60 bg-surface-container-low p-stack">
+                  {requiereLink(modalidad) && (
+                    <FormField
+                      control={form.control}
+                      name="linkSesion"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center justify-between gap-tight">
+                            <FormLabel className={LABEL_CLASS}>
+                              <Link2 className="size-3.5 text-primary" aria-hidden="true" />
+                              Enlace de conexión virtual
+                            </FormLabel>
+                            {esLinkDeMeet(linkSesion) && <span className="pill pill-neutral">Google Meet</span>}
+                          </div>
+                          <div className="relative">
+                            <Video
+                              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-on-surface-variant"
+                              aria-hidden="true"
                             />
-                            {rol.nombreRol}
-                          </label>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="url"
+                                inputMode="url"
+                                maxLength={500}
+                                disabled={isPending}
+                                placeholder="https://meet.google.com/..."
+                                className="h-10 rounded-md border-outline-variant bg-surface-container-lowest pl-9 text-sm"
+                              />
+                            </FormControl>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
+
+                  {requiereUbicacion(modalidad) && (
+                    <FormField
+                      control={form.control}
+                      name="ubicacionLat"
+                      render={() => (
+                        <FormItem>
+                          <div className="flex items-center justify-between gap-tight">
+                            <FormLabel className={LABEL_CLASS}>
+                              <MapPin className="size-3.5 text-primary" aria-hidden="true" />
+                              Ubicación presencial
+                            </FormLabel>
+                            {form.watch('ubicacionLat') !== null && (
+                              <span className="pill pill-success">Punto marcado</span>
+                            )}
+                          </div>
+                          {/* Nombre del lugar arriba y el mapa debajo, como pidió el equipo. */}
+                          <EventLocationPicker
+                            lat={form.watch('ubicacionLat')}
+                            lng={form.watch('ubicacionLng')}
+                            nombre={form.watch('ubicacionNombre')}
+                            onNombreChange={(v) => form.setValue('ubicacionNombre', v)}
+                            onPositionChange={(lat, lng) => {
+                              form.setValue('ubicacionLng', lng);
+                              form.setValue('ubicacionLat', lat, { shouldValidate: form.formState.isSubmitted });
+                            }}
+                            disabled={isPending}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
               )}
 
               <FormField
                 control={form.control}
-                name="antelacionMinutos"
+                name="invitados"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Recordatorio</FormLabel>
-                    <Select
-                      value={String(field.value)}
-                      onValueChange={(v) => field.onChange(Number(v))}
+                    <InvitadosField
+                      idProyecto={idProyectoActivo}
+                      value={field.value}
+                      onChange={field.onChange}
+                      lider={usuario ?? null}
                       disabled={isPending}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-10 w-full border-outline-variant">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {opcionesRecordatorio(field.value).map((opt) => (
-                          <SelectItem key={opt.value} value={String(opt.value)}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription className="type-meta">Se avisa a los participantes antes del inicio.</FormDescription>
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            <DialogFooter className="shrink-0 gap-2 border-t border-outline-variant/35 px-4 py-4 sm:justify-between sm:px-6">
-              {isEditing ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isPending}
-                  onClick={() => void confirmarCancelacion()}
-                  className="h-10 gap-1.5 rounded-md border-outline-variant text-xs font-bold text-status-error"
-                >
-                  {isCancelling ? (
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Trash2 className="size-3.5" aria-hidden="true" />
+            <DialogFooter className="shrink-0 flex-col gap-3 border-t border-outline-variant/35 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <FormField
+                  control={form.control}
+                  name="recordatorioActivo"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          disabled={isPending}
+                          onCheckedChange={(checked) => field.onChange(checked === true)}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-xs font-normal text-on-surface">Enviar recordatorio</FormLabel>
+                    </FormItem>
                   )}
-                  Cancelar evento
-                </Button>
-              ) : (
-                <span className="hidden sm:block" />
-              )}
-              <div className="grid grid-cols-2 gap-2 sm:flex">
+                />
+                {recordatorioActivo && (
+                  <FormField
+                    control={form.control}
+                    name="antelacionMinutos"
+                    render={({ field }) => (
+                      <FormItem className="space-y-0">
+                        <Select value={String(field.value)} onValueChange={(v) => field.onChange(Number(v))} disabled={isPending}>
+                          <FormControl>
+                            <SelectTrigger aria-label="Cuándo enviar el recordatorio" className="h-8 w-auto border-outline-variant text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {opcionesRecordatorio(field.value).map((opt) => (
+                              <SelectItem key={opt.value} value={String(opt.value)}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {isEditing && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={isPending}
+                    onClick={() => void confirmarEliminacion()}
+                    className="h-10 gap-1.5 rounded-md text-xs font-bold text-status-error hover:text-status-error"
+                  >
+                    {isCancelling ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                    )}
+                    Eliminar evento
+                  </Button>
+                )}
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   disabled={isPending}
                   onClick={() => onOpenChange(false)}
-                  className="h-10 rounded-md border-outline-variant text-xs font-bold"
+                  className="h-10 rounded-md text-xs font-bold"
                 >
-                  Cerrar
+                  Cancelar
                 </Button>
                 <Button
                   type="submit"
                   disabled={isPending}
-                  className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
+                  className="h-10 gap-1.5 rounded-pill bg-primary px-5 text-xs font-bold text-on-primary hover:bg-primary/90"
                 >
-                  {(crear.isPending || editar.isPending) && (
+                  {crear.isPending || editar.isPending ? (
                     <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <CalendarCheck2 className="size-4" aria-hidden="true" />
                   )}
-                  {isEditing ? 'Guardar cambios' : 'Crear evento'}
+                  {isEditing ? 'Guardar cambios' : 'Agendar evento'}
                 </Button>
               </div>
             </DialogFooter>
