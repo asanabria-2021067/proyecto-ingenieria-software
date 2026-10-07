@@ -92,7 +92,9 @@ const META_SPRINT = '@md/bandeja:hidden';
 const META_USUARIOS = '@xl/bandeja:hidden';
 const META_LIDER = '@3xl/bandeja:hidden';
 
-const TH = 'h-auto px-stack py-tight text-xs font-semibold text-text-secondary';
+// Encabezados como etiquetas: pequeños, en versalitas y semibold, para que no
+// compitan con los nombres de proyecto (body semibold) de las filas.
+const TH = 'h-auto px-stack py-tight text-xs font-semibold uppercase tracking-wide text-text-secondary';
 const TD = 'px-stack py-inline align-top';
 
 function getInitials(nombre: string, apellido: string): string {

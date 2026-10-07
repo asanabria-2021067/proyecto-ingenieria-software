@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ChevronLeft, ChevronRight, FolderKanban } from 'lucide-react';
-import { useAdminProjects } from '@/hooks/use-admin-projects';
+import { useAdminProjects, useAllActiveAdminProjects } from '@/hooks/use-admin-projects';
 import { ActiveProjectsBoard } from './active-projects-board';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
@@ -113,6 +113,9 @@ export default function AdminProjectsClient() {
     limit,
     !esActivos,
   );
+  // Misma consulta (y misma caché) que usa el tablero: aquí solo para el contador del título.
+  const activos = useAllActiveAdminProjects(esActivos);
+  const totalEncabezado = esActivos ? activos.data?.total : data?.total;
 
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -125,7 +128,7 @@ export default function AdminProjectsClient() {
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
       <Breadcrumb className="mb-4">
-        <BreadcrumbList className="text-[13px]">
+        <BreadcrumbList className="text-sm">
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link href="/dashboard/admin" className="text-tertiary hover:text-on-surface">
@@ -143,18 +146,21 @@ export default function AdminProjectsClient() {
       {/* El grupo activo se elige en la sidebar administrativa: la página no
           repite esa navegación, solo declara en qué grupo está parada. */}
       <section className="mb-6">
-        <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">Administración</span>
-        <div className="flex flex-wrap items-baseline gap-3">
-          <h1 className="font-headline text-3xl font-black tracking-tighter text-on-surface md:text-4xl">
+        {/* Misma jerarquía que el panel de administración: un solo nivel pesado (el título). */}
+        <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
+          Administración
+        </span>
+        <div className="flex flex-wrap items-baseline gap-inline">
+          <h1 className="font-headline text-3xl font-black tracking-tight text-balance text-on-surface md:text-4xl">
             {ADMIN_PROJECT_GROUP_LABEL[grupo]}
           </h1>
-          {data && (
-            <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-sm font-semibold text-on-surface-variant">
-              {data.total} {data.total === 1 ? 'proyecto' : 'proyectos'}
+          {totalEncabezado !== undefined && (
+            <span className="rounded-pill bg-surface-container-high px-inline py-micro text-sm font-medium tabular-nums text-on-surface-variant">
+              {totalEncabezado} {totalEncabezado === 1 ? 'proyecto' : 'proyectos'}
             </span>
           )}
         </div>
-        <p className="mt-2 max-w-2xl text-sm text-tertiary">{DESCRIPCION_GRUPO[grupo]}</p>
+        <p className="mt-tight max-w-2xl text-base text-tertiary">{DESCRIPCION_GRUPO[grupo]}</p>
       </section>
 
       {esActivos ? (
