@@ -125,5 +125,20 @@ describe('WeekView (HU-169 T-264)', () => {
     rerender(<WeekView days={days()} todayKey="2026-09-09" itemsByDay={new Map()} onSelectEvento={() => {}} />);
     expect(screen.getByText('Sin actividad esta semana')).toBeInTheDocument();
   });
+
+  it('una tarea de un calendario compartido no es un enlace y dice de quién es (HU-184)', () => {
+    const key = '2026-09-10';
+    const compartida: AgendaItem = {
+      ...tarea(3, key),
+      href: '',
+      compartidoPor: { idUsuario: 9, nombre: 'Ana García', tono: 2 },
+    };
+    render(
+      <WeekView days={days()} todayKey="2026-09-27" itemsByDay={new Map([[key, [compartida]]])} onSelectEvento={() => {}} />,
+    );
+
+    expect(screen.getByText('Ana García')).toBeInTheDocument();
+    expect(screen.getByText('Entregar avance').closest('a')).toBeNull();
+  });
 });
 
