@@ -86,5 +86,12 @@ test.describe('Calendario: compartir agenda (HU-184)', () => {
     compartir = await abrirCompartir(page);
     await compartir.getByRole('button', { name: 'Dejar de compartir con María López' }).click();
     await expect(page.getByText('Dejaste de compartir tu agenda')).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // ...y elimina el evento de prueba para no dejarlo en la base.
+    await page.getByRole('button', { name: new RegExp(`^${titulo}, 09:00 a 10:00`) }).click();
+    await page.getByRole('dialog', { name: titulo }).getByRole('button', { name: 'Eliminar evento' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Eliminar evento' }).click();
+    await expect(page.getByText('Evento eliminado')).toBeVisible();
   });
 });
