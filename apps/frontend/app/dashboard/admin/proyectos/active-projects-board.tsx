@@ -79,23 +79,38 @@ const BARRA_FILTROS = 'grid grid-cols-1 gap-stack @xl/bandeja:grid-cols-2 @4xl/b
 const FILTRO_TRIGGER = `w-full ${DASHBOARD_FILTER_TRIGGER_CLASS}`;
 
 /**
- * Columnas por ancho de la tarjeta. Siempre: Proyecto, Finalización esperada
- * y Abrir. Desde 28rem aparece Sprint actual, desde 36rem Usuarios activos y
- * desde 48rem Líder. Lo que se oculta como columna reaparece como metadata
- * bajo el nombre del proyecto, así ninguna fila pierde información.
+ * Columnas por ancho de la tarjeta (no del viewport: con la sidebar abierta
+ * una tablet deja ~28rem de contenido). Siempre: Proyecto, Finalización
+ * esperada y Abrir. Desde 36rem aparece Sprint actual, desde 48rem Usuarios
+ * activos y desde 64rem Líder. Lo que se oculta como columna reaparece como
+ * metadata bajo el nombre del proyecto, así ninguna fila pierde información.
  */
-const COL_SPRINT = '@md/bandeja:table-cell';
-const COL_USUARIOS = '@xl/bandeja:table-cell';
-const COL_LIDER = '@3xl/bandeja:table-cell';
+const COL_SPRINT = '@xl/bandeja:table-cell';
+const COL_USUARIOS = '@3xl/bandeja:table-cell';
+const COL_LIDER = '@5xl/bandeja:table-cell';
 // Metadata bajo el nombre: visible exactamente mientras su columna no lo es.
-const META_SPRINT = '@md/bandeja:hidden';
-const META_USUARIOS = '@xl/bandeja:hidden';
-const META_LIDER = '@3xl/bandeja:hidden';
+const META_SPRINT = '@xl/bandeja:hidden';
+const META_USUARIOS = '@3xl/bandeja:hidden';
+const META_LIDER = '@5xl/bandeja:hidden';
 
 // Encabezados como etiquetas: pequeños, en versalitas y semibold, para que no
 // compitan con los nombres de proyecto (body semibold) de las filas.
-const TH = 'h-auto px-stack py-tight text-xs font-semibold uppercase tracking-wide text-text-secondary';
-const TD = 'px-stack py-inline align-top';
+const TH =
+  'h-auto whitespace-normal px-stack py-tight text-xs font-semibold uppercase tracking-wide text-text-secondary';
+// Anchos fijos (la tabla es `table-fixed`): la columna Proyecto absorbe el
+// resto y los títulos largos se parten en vez de empujar las demás columnas
+// fuera de la tarjeta. En móvil Finalización y Abrir se estrechan.
+const W_LIDER = 'w-[22%]';
+const W_USUARIOS = 'w-24';
+const W_SPRINT = 'w-36';
+const W_FIN = 'w-32 @xl/bandeja:w-40';
+const W_ABRIR = 'w-14 @xl/bandeja:w-24';
+// `whitespace-normal` anula el `nowrap` por defecto de la celda shadcn: aquí
+// los títulos y nombres largos se parten en lugar de invadir la columna vecina.
+const TD_BASE = 'whitespace-normal py-tight align-top';
+const TD = `${TD_BASE} px-stack`;
+// La celda de Abrir cede su relleno en móvil para que el objetivo táctil de 44 px quepa en 56 px.
+const TD_ABRIR = `${TD_BASE} px-micro @xl/bandeja:px-stack`;
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -138,7 +153,7 @@ function SprintActual({ project }: { project: AdminProjectListItem }) {
   return (
     <span className="flex flex-col items-start gap-micro">
       <span className="type-body font-medium text-text-primary">Sprint {sprint.numero}</span>
-      <span className="pill pill-neutral">{SPRINT_ESTADO_LABEL[sprint.estado] ?? sprint.estado}</span>
+      <span className="pill pill-neutral whitespace-nowrap">{SPRINT_ESTADO_LABEL[sprint.estado] ?? sprint.estado}</span>
     </span>
   );
 }
@@ -198,7 +213,9 @@ function FinalizacionEsperada({
     );
   }
   const fecha = (
-    <span className="type-body tabular-nums text-text-primary">{formatFecha(sprint.fechaFinPlaneada)}</span>
+    <span className="type-body whitespace-nowrap tabular-nums text-text-primary">
+      {formatFecha(sprint.fechaFinPlaneada)}
+    </span>
   );
   if (sprint.situacion === 'EN_CURSO') {
     return (
@@ -213,12 +230,12 @@ function FinalizacionEsperada({
   return (
     <span className="flex flex-col items-start gap-micro">
       {fecha}
-      <span className={`pill ${SITUACION_SPRINT_TONE[sprint.situacion]}`}>
+      <span className={`pill whitespace-nowrap ${SITUACION_SPRINT_TONE[sprint.situacion]}`}>
         {SITUACION_SPRINT_LABEL[sprint.situacion]}
-        {sprint.situacion === 'PLAN_VENCIDO' && sprint.diasRestantes !== null && (
-          <span className="font-normal">· {formatDiasRestantes(sprint.diasRestantes)}</span>
-        )}
       </span>
+      {sprint.situacion === 'PLAN_VENCIDO' && sprint.diasRestantes !== null && (
+        <span className="type-meta">{capitalizar(formatDiasRestantes(sprint.diasRestantes))}</span>
+      )}
     </span>
   );
 }
@@ -238,7 +255,10 @@ function FilaProyecto({
   return (
     <TableRow className="border-outline-variant/50 hover:bg-surface-container-low">
       <TableCell className={`${TD} min-w-0`}>
-        <Link href={href} className="type-body font-semibold text-text-primary hover:text-primary hover:underline">
+        <Link
+          href={href}
+          className="type-body break-words font-semibold text-text-primary hover:text-primary hover:underline"
+        >
           {project.tituloProyecto}
         </Link>
         <div className="mt-micro flex flex-wrap items-center gap-x-tight gap-y-micro">
@@ -271,14 +291,14 @@ function FilaProyecto({
       <TableCell className={TD}>
         <FinalizacionEsperada row={row} calendarioCargando={calendarioCargando} calendarioFallido={calendarioFallido} />
       </TableCell>
-      <TableCell className={`${TD} text-right`}>
+      <TableCell className={`${TD_ABRIR} text-right`}>
         <Link
           href={href}
           aria-label={`Abrir ${project.tituloProyecto}`}
-          className="inline-flex min-h-11 items-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary hover:underline"
+          className="ml-auto flex min-h-11 w-fit min-w-11 items-center justify-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary hover:underline"
         >
-          Abrir
-          <ChevronRight className="size-3.5" aria-hidden="true" />
+          <span className="hidden @xl/bandeja:inline">Abrir</span>
+          <ChevronRight className="size-4 @xl/bandeja:size-3.5" aria-hidden="true" />
         </Link>
       </TableCell>
     </TableRow>
@@ -298,9 +318,9 @@ function TablaSkeleton() {
               <Skeleton className="h-4 w-2/3" />
               <Skeleton className="h-5 w-24 rounded-pill" />
             </div>
-            <Skeleton className="hidden h-4 w-32 @3xl/bandeja:block" />
-            <Skeleton className="hidden h-4 w-8 @xl/bandeja:block" />
-            <Skeleton className="hidden h-4 w-20 @md/bandeja:block" />
+            <Skeleton className="hidden h-4 w-32 @5xl/bandeja:block" />
+            <Skeleton className="hidden h-4 w-8 @3xl/bandeja:block" />
+            <Skeleton className="hidden h-4 w-20 @xl/bandeja:block" />
             <Skeleton className="h-4 w-24" />
           </div>
         ))}
@@ -513,25 +533,25 @@ export function ActiveProjectsBoard() {
         </Empty>
       ) : (
         <div className="card-base overflow-hidden p-0">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow className="border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low">
                 <TableHead scope="col" className={TH}>
                   Proyecto
                 </TableHead>
-                <TableHead scope="col" className={`${TH} hidden ${COL_LIDER}`}>
+                <TableHead scope="col" className={`${TH} ${W_LIDER} hidden ${COL_LIDER}`}>
                   Líder
                 </TableHead>
-                <TableHead scope="col" className={`${TH} hidden text-right ${COL_USUARIOS}`}>
+                <TableHead scope="col" className={`${TH} ${W_USUARIOS} hidden text-right ${COL_USUARIOS}`}>
                   Usuarios activos
                 </TableHead>
-                <TableHead scope="col" className={`${TH} hidden ${COL_SPRINT}`}>
+                <TableHead scope="col" className={`${TH} ${W_SPRINT} hidden ${COL_SPRINT}`}>
                   Sprint actual
                 </TableHead>
-                <TableHead scope="col" className={TH}>
+                <TableHead scope="col" className={`${TH} ${W_FIN}`}>
                   Finalización esperada
                 </TableHead>
-                <TableHead scope="col" className={`${TH} text-right`}>
+                <TableHead scope="col" className={`${TH} ${W_ABRIR} text-right`}>
                   <span className="sr-only">Abrir</span>
                 </TableHead>
               </TableRow>

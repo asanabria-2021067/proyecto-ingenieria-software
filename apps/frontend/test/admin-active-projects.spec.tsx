@@ -132,7 +132,7 @@ describe('ActiveProjectsBoard — tabla de supervisión', () => {
     // VENCE_HOY y PLAN_VENCIDO: píldora con texto, no solo color.
     expect(within(filas[1]).getByText('Vence hoy')).toBeInTheDocument();
     expect(within(filas[2]).getByText(/Plan vencido/)).toBeInTheDocument();
-    expect(within(filas[2]).getByText(/hace 2 días/)).toBeInTheDocument();
+    expect(within(filas[2]).getByText('Hace 2 días')).toBeInTheDocument();
     // EN_FINALIZACION conserva la fecha planificada como referencia.
     expect(within(filas[3]).getByText(/6 sept? 2026/)).toBeInTheDocument();
     expect(within(filas[3]).getAllByText('En finalización').length).toBeGreaterThan(0);
