@@ -65,7 +65,7 @@ function DashboardSection({
   const id = useId();
   return (
     <section aria-labelledby={id}>
-      <h2 id={id} className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
+      <h2 id={id} className="mb-stack font-headline text-lg font-black tracking-tight text-on-surface">
         {titulo}
       </h2>
       {children}
@@ -113,15 +113,15 @@ function StatCard({
 function AdminStatsSkeleton() {
   return (
     <div className={PAGE_CLASS} role="status" aria-label="Cargando el panel de administración">
-      <section className="mb-10">
-        <Skeleton className="mb-2 h-3 w-28 rounded" />
+      <section className="mb-section">
+        <Skeleton className="mb-tight h-3 w-28 rounded" />
         <Skeleton className="h-10 w-72 max-w-full rounded" />
-        <Skeleton className="mt-2 h-5 w-96 max-w-full rounded" />
+        <Skeleton className="mt-tight h-5 w-96 max-w-full rounded" />
       </section>
 
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-section">
         <div>
-          <Skeleton className="mb-4 h-5 w-20 rounded" />
+          <Skeleton className="mb-stack h-5 w-20 rounded" />
           <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
             <Skeleton className="h-36 rounded-card" />
             <Skeleton className="h-36 rounded-card" />
@@ -129,15 +129,15 @@ function AdminStatsSkeleton() {
         </div>
 
         <div>
-          <Skeleton className="mb-4 h-5 w-28 rounded" />
-          <div className="grid grid-cols-1 gap-grid lg:grid-cols-5">
+          <Skeleton className="mb-stack h-5 w-28 rounded" />
+          <div className="grid grid-cols-1 gap-grid lg:grid-cols-5 lg:items-start">
             <Skeleton className="h-72 rounded-card lg:col-span-3" />
-            <Skeleton className="h-72 rounded-card lg:col-span-2" />
+            <Skeleton className="h-96 rounded-card lg:col-span-2" />
           </div>
         </div>
 
         <div>
-          <Skeleton className="mb-4 h-5 w-32 rounded" />
+          <Skeleton className="mb-stack h-5 w-32 rounded" />
           <div className="grid grid-cols-1 gap-grid lg:grid-cols-2">
             <Skeleton className="h-64 rounded-card" />
             <Skeleton className="h-64 rounded-card" />
@@ -145,7 +145,7 @@ function AdminStatsSkeleton() {
         </div>
 
         <div>
-          <Skeleton className="mb-4 h-5 w-28 rounded" />
+          <Skeleton className="mb-stack h-5 w-28 rounded" />
           <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
             <Skeleton className="h-36 rounded-card" />
             <Skeleton className="h-36 rounded-card" />
@@ -228,8 +228,8 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
             className="flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold text-text-secondary"
           >
             <span className="min-w-0 flex-1">Estudiante</span>
-            <span className="w-16 shrink-0 text-center">Semestre</span>
-            <span className="w-28 shrink-0 text-right">Horas</span>
+            <span className="w-14 shrink-0 text-center">Semestre</span>
+            <span className="w-24 shrink-0 text-right">Horas</span>
           </div>
           <ul className="divide-y divide-outline-variant/50">
             {items.map((est) => (
@@ -240,10 +240,10 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
                 <p className="type-body min-w-0 flex-1 truncate font-medium">
                   {est.nombre} {est.apellido}
                 </p>
-                <span className="type-body w-16 shrink-0 text-center font-medium text-text-secondary">
+                <span className="type-body w-14 shrink-0 text-center font-medium text-text-secondary">
                   {est.semestre !== null ? `S${est.semestre}` : '—'}
                 </span>
-                <span className="flex w-28 shrink-0 justify-end">
+                <span className="flex w-24 shrink-0 justify-end">
                   <span className="pill pill-error whitespace-nowrap font-bold tabular-nums">
                     {est.horasExtension} / {est.horasExtensionRequeridas} hrs
                   </span>
@@ -271,19 +271,19 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
   return (
     <div className={PAGE_CLASS}>
       {/* Header */}
-      <section className="mb-10">
-        <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
+      <section className="mb-section">
+        <span className="mb-tight block text-xs font-black uppercase tracking-widest text-primary">
           Administración
         </span>
         <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
           Panel de Administración
         </h1>
-        <p className="mt-2 max-w-2xl text-base text-tertiary">
+        <p className="mt-tight max-w-2xl text-base text-tertiary">
           Resumen general de actividad, usuarios y proyectos en UVGenius.
         </p>
       </section>
 
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-section">
         {/* 1. Estado general */}
         <DashboardSection titulo="Global">
           <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
@@ -305,7 +305,7 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
         {/* 2. Operación: qué espera una decisión y qué Sprints deberían terminar pronto.
             El widget de Sprints consulta por su cuenta: si falla, el resto del panel sigue. */}
         <DashboardSection titulo="Operación">
-          <div className="grid grid-cols-1 gap-grid lg:grid-cols-5 lg:items-stretch">
+          <div className="grid grid-cols-1 gap-grid lg:grid-cols-5 lg:items-start">
             <div className="min-w-0 lg:col-span-3">
               <AdminAttentionQueue
                 enRevision={stats.enRevision}

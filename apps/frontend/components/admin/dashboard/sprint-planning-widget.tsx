@@ -143,7 +143,7 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
       </div>
 
       {(enFinalizacion > 0 || sinFecha > 0) && (
-        <ul className="flex flex-wrap justify-center gap-tight" aria-label="Otros Sprints en supervisión">
+        <ul className="flex flex-wrap gap-tight" aria-label="Otros Sprints en supervisión">
           {enFinalizacion > 0 && (
             <li className={`pill ${SITUACION_SPRINT_TONE.EN_FINALIZACION}`}>
               {enFinalizacion} en finalización
@@ -176,16 +176,16 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
 function NextFinalization({ item }: { item: AdminSprintCalendarItem | null }) {
   if (!item || item.fechaFinPlaneada === null || item.diasRestantes === null) {
     return (
-      <p className="type-body rounded-control bg-surface-container-low p-inline text-center text-text-secondary">
+      <p className="type-body border-t border-outline-variant/50 pt-stack text-text-secondary">
         No hay finalizaciones próximas.
       </p>
     );
   }
 
   return (
-    <div className="flex items-start gap-inline rounded-control bg-surface-container-low p-inline">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary">
-        <CalendarClock className="size-4" aria-hidden="true" />
+    <div className="flex items-start gap-inline border-t border-outline-variant/50 pt-stack">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
+        <CalendarClock className="size-5" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="type-meta font-semibold uppercase tracking-wider text-primary">Próxima finalización</p>

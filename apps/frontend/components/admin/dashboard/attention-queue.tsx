@@ -78,7 +78,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
   const total = filas.reduce((suma, fila) => suma + fila.valor, 0);
 
   return (
-    <section aria-labelledby={tituloId} className="card-base flex h-full flex-col overflow-hidden p-0">
+    <section aria-labelledby={tituloId} className="card-base flex flex-col overflow-hidden p-0">
       <header className="flex items-center justify-between gap-inline border-b border-outline-variant/50 px-card py-stack">
         <h3 id={tituloId} className="type-subtitle font-headline font-black tracking-tight">
           Requieren atención
@@ -88,7 +88,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
         </span>
       </header>
 
-      <ul className="flex flex-1 flex-col divide-y divide-outline-variant/50">
+      <ul className="divide-y divide-outline-variant/50">
         {filas.map((fila) => {
           const Icono = fila.icono;
           const tono = TONO[fila.tono];
@@ -96,7 +96,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
             <li
               key={fila.clave}
               data-fila={fila.clave}
-              className="relative flex flex-1 items-center gap-inline px-card py-stack transition-colors hover:bg-surface-container-low"
+              className="relative flex items-center gap-inline px-card py-stack transition-colors hover:bg-surface-container-low"
             >
               <div className={`flex size-9 shrink-0 items-center justify-center rounded-control ${tono.icono}`}>
                 <Icono className="size-5" aria-hidden="true" />
@@ -111,8 +111,8 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
                 </Link>
                 <p className="type-meta">{fila.descripcion}</p>
               </div>
-              {fila.valor > 0 && <span className={`pill hidden shrink-0 sm:inline-flex ${tono.pill}`}>{fila.accion}</span>}
-              <span className="w-10 shrink-0 text-right font-headline text-3xl font-bold tabular-nums text-text-primary">
+              {fila.valor > 0 && <span className={`pill hidden shrink-0 sm:inline-flex lg:hidden xl:inline-flex ${tono.pill}`}>{fila.accion}</span>}
+              <span className="w-10 shrink-0 text-right font-headline text-2xl font-bold tabular-nums text-text-primary">
                 {fila.valor}
               </span>
               <ChevronRight className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
