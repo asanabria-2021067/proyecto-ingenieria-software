@@ -270,6 +270,7 @@ describe('StartSprintButton — confirmación', () => {
     expect(alerta.textContent).toBeTruthy();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sí, iniciar Sprint' })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sí, iniciar Sprint' })).toHaveFocus());
 
     startSprintMock.mockResolvedValue({ idSprint: 1 } as never);
     fireEvent.click(screen.getByRole('button', { name: 'Sí, iniciar Sprint' }));

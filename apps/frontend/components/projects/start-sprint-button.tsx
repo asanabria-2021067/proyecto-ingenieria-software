@@ -43,6 +43,16 @@ const FORMATO_DIA = /^\d{4}-\d{2}-\d{2}$/;
 type Paso = 'planificacion' | 'confirmacion';
 
 /**
+ * Cambio de paso dentro del mismo diálogo: un fundido corto con 8 px de
+ * desplazamiento en la dirección del avance (adelante hacia la confirmación,
+ * atrás hacia el formulario). Solo transform/opacity, ease-out, 150 ms; con
+ * `prefers-reduced-motion` la regla global lo deja en un corte seco.
+ */
+const PASO_ENTER_BASE = 'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-150 motion-safe:ease-out';
+const PASO_ENTER_CONFIRM = `${PASO_ENTER_BASE} motion-safe:slide-in-from-right-2`;
+const PASO_ENTER_FORM = `${PASO_ENTER_BASE} motion-safe:slide-in-from-left-2`;
+
+/**
  * Acción del líder para iniciar el Sprint de trabajo desde el Tablero, en
  * dos pasos dentro del mismo diálogo: planificación (fecha esperada de
  * finalización, obligatoria) y confirmación. El Sprint se crea únicamente al
@@ -61,6 +71,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
   const [error, setError] = useState<string | null>(null);
   const fechaInputRef = useRef<HTMLInputElement>(null);
   const confirmTitleRef = useRef<HTMLHeadingElement>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
   // `isPending` de React Query se actualiza en el siguiente render: dos clics
   // en el mismo tick pasarían ambos. Este ref cierra esa ventana.
   const enviandoRef = useRef(false);
@@ -80,6 +91,13 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
     if (paso === 'confirmacion') confirmTitleRef.current?.focus();
     else fechaInputRef.current?.focus();
   }, [open, paso]);
+
+  // Tras un error, el botón estuvo deshabilitado durante la petición y el foco
+  // se perdió: vuelve a él en cuanto se reactiva, para leer el error en
+  // contexto y poder reintentar.
+  useEffect(() => {
+    if (error && !startSprint.isPending) confirmButtonRef.current?.focus();
+  }, [error, startSprint.isPending]);
 
   const abrir = () => {
     setLimites({ hoy: diaDesdeHoy(0), min: diaDesdeHoy(1), max: diaDesdeHoy(SPRINT_PLAN_MAX_DIAS) });
@@ -143,7 +161,12 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
           }}
         >
           {paso === 'planificacion' ? (
-            <form onSubmit={continuar} noValidate data-paso="planificacion">
+            <form
+              onSubmit={continuar}
+              noValidate
+              data-paso="planificacion"
+              className={PASO_ENTER_FORM}
+            >
               <DialogHeader className="border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
                 <DialogTitle className="text-xl font-bold text-on-surface">Iniciar Sprint</DialogTitle>
                 <DialogDescription className="text-sm text-on-surface-variant">
@@ -221,7 +244,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
               </DialogFooter>
             </form>
           ) : (
-            <div data-paso="confirmacion">
+            <div data-paso="confirmacion" className={PASO_ENTER_CONFIRM}>
               <DialogHeader className="border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
                 <DialogTitle
                   ref={confirmTitleRef}
@@ -268,6 +291,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
                   Cancelar
                 </Button>
                 <Button
+                  ref={confirmButtonRef}
                   type="button"
                   disabled={startSprint.isPending}
                   aria-busy={startSprint.isPending || undefined}
