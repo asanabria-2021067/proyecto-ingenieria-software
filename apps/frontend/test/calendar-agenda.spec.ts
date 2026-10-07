@@ -31,6 +31,8 @@ function evento(overrides: Partial<MiEventoDTO> = {}): MiEventoDTO {
     ubicacionNombre: null,
     linkSesion: null,
     rolesDestino: [],
+    tipoEvento: 'OTRO',
+    invitados: [],
     proyecto: { idProyecto: 10, tituloProyecto: 'Proyecto X' },
     ...overrides,
   };

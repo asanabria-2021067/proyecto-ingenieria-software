@@ -40,6 +40,8 @@ function evento(overrides: Partial<MiEventoDTO> = {}): MiEventoDTO {
     ubicacionNombre: 'Edificio CIT, salón 210',
     linkSesion: 'https://meet.google.com/abc',
     rolesDestino: [],
+    tipoEvento: 'OTRO',
+    invitados: [],
     proyecto: { idProyecto: 3, tituloProyecto: 'App de tutorías' },
     ...overrides,
   };

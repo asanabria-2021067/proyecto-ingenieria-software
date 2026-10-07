@@ -137,6 +137,8 @@ describe('helpers del formulario de evento', () => {
       ubicacionNombre: null,
       linkSesion: 'https://meet.google.com/x',
       rolesDestino: [2],
+      tipoEvento: 'OTRO',
+      invitados: [],
     };
     const payload = buildEventPayload(eventFormFromEvento(evento), { keepEmptyDescripcion: true });
     expect(payload.fechaInicio).toBe(evento.fechaInicio);

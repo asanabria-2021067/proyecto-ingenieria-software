@@ -78,6 +78,8 @@ function evento(overrides: Partial<EventoProyectoDTO> = {}): EventoProyectoDTO {
     ubicacionNombre: null,
     linkSesion: 'https://meet.google.com/abc',
     rolesDestino: [],
+    tipoEvento: 'OTRO',
+    invitados: [],
     ...overrides,
   };
 }
