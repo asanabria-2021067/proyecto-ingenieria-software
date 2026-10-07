@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import type { ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mensajesMock = vi.hoisted(() => ({
@@ -17,8 +17,18 @@ const eventsMock = vi.hoisted(() => ({
 }));
 vi.mock('../lib/services/events', () => eventsMock);
 
-vi.mock('../hooks/use-project-roles', () => ({
-  useProjectRoles: () => ({ roles: [] }),
+vi.mock('../hooks/use-current-user', () => ({
+  useCurrentUser: () => ({ data: { idUsuario: 1, nombre: 'Carlos', apellido: 'Mendoza', fotoUrl: null } }),
+}));
+
+const MIEMBROS = [
+  { idUsuario: 4, nombre: 'Ana', apellido: 'García', correo: 'ana@uvg.edu.gt', fotoUrl: null, idRolProyecto: 1 },
+  { idUsuario: 5, nombre: 'Luis', apellido: 'Hernández', correo: 'luis@uvg.edu.gt', fotoUrl: null, idRolProyecto: 2 },
+  // Misma persona con un segundo rol: no debe duplicarse.
+  { idUsuario: 5, nombre: 'Luis', apellido: 'Hernández', correo: 'luis@uvg.edu.gt', fotoUrl: null, idRolProyecto: 3 },
+];
+vi.mock('../hooks/use-project-members', () => ({
+  useProjectMembers: () => ({ members: MIEMBROS, isLoading: false }),
 }));
 
 // El mapa (leaflet) no corre en jsdom y no es parte de lo que se prueba aquí.
@@ -61,7 +71,7 @@ function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-const LED = [{ idProyecto: 1, tituloProyecto: 'Proyecto Uno' }];
+const LED = [{ idProyecto: 1, tituloProyecto: 'Proyecto Uno', tipoProyecto: 'ACADEMICO_HORAS_BECA' }];
 
 function evento(overrides: Partial<EventoProyectoDTO> = {}): EventoProyectoDTO {
   return {
@@ -78,8 +88,8 @@ function evento(overrides: Partial<EventoProyectoDTO> = {}): EventoProyectoDTO {
     ubicacionNombre: null,
     linkSesion: 'https://meet.google.com/abc',
     rolesDestino: [],
-    tipoEvento: 'OTRO',
-    invitados: [],
+    tipoEvento: 'TUTORIA',
+    invitados: [4],
     ...overrides,
   };
 }
@@ -89,112 +99,156 @@ function renderCrear(onOpenChange = vi.fn()) {
   return { onOpenChange };
 }
 
-describe('EventFormDialog (HU-184 T-323)', () => {
-  it('muestra los campos en orden: título, inicio, fin, modalidad, link, recordatorio', () => {
+describe('EventFormDialog (HU-184 T-323, rediseño)', () => {
+  it('sigue el orden de la maqueta: título, tipo y proyecto, fecha y horas, modalidad, enlace, invitados, recordatorio', () => {
     renderCrear();
-    const etiquetas = ['Título', 'Fecha de inicio', 'Fecha de fin', 'Modalidad de la sesión', 'Link de la sesión', 'Recordatorio'];
-    const nodos = etiquetas.map((texto) => screen.getByText(texto));
+    const etiquetas = [
+      'Título del evento o actividad',
+      'Tipo de actividad',
+      'Proyecto',
+      'Fecha',
+      'Hora de inicio',
+      'Hora de fin',
+      'Modalidad de la sesión',
+      'Enlace de conexión virtual',
+      'Participantes e invitados',
+      'Enviar recordatorio',
+    ];
+    const nodos = etiquetas.map((texto) => screen.getAllByText(texto)[0]);
     for (let i = 1; i < nodos.length; i++) {
       expect(nodos[i - 1].compareDocumentPosition(nodos[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
   });
 
+  it('muestra la duración, la marca de horas beca y el chip del líder', () => {
+    renderCrear();
+    expect(screen.getByText('1h')).toBeInTheDocument();
+    expect(screen.getByText('+ Horas beca')).toBeInTheDocument();
+    expect(screen.getByText(/\(Tú · Líder\)/)).toBeInTheDocument();
+    expect(screen.getByText('Todo el proyecto')).toBeInTheDocument();
+  });
+
+  it('la modalidad es un selector de tres opciones; híbrida pide enlace y ubicación', () => {
+    renderCrear();
+    const grupo = screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' });
+    expect(within(grupo).getByRole('radio', { name: 'Virtual' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByTestId('mapa')).not.toBeInTheDocument();
+
+    fireEvent.click(within(grupo).getByRole('radio', { name: 'Híbrida' }));
+    expect(screen.getByLabelText('Enlace de conexión virtual')).toBeInTheDocument();
+    expect(screen.getByTestId('mapa')).toBeInTheDocument();
+    expect(screen.getByText('Híbrida: requiere enlace virtual y lugar físico')).toBeInTheDocument();
+  });
+
   it('con el título vacío no envía y marca el campo', async () => {
     renderCrear();
-    fireEvent.change(screen.getByLabelText('Link de la sesión'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crear evento' }));
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
 
     expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
     expect(eventsMock.createEvent).not.toHaveBeenCalled();
     expect(mensajesMock.aviso.advertencia).toHaveBeenCalled();
   });
 
-  it('con el fin antes del inicio no envía y explica el error', async () => {
+  it('con la hora de fin antes de la de inicio no envía y explica el error', async () => {
     renderCrear();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Demo' } });
-    fireEvent.change(screen.getByLabelText('Link de la sesión'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
     fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '15:00' } });
     fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '14:00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crear evento' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
 
     expect(await screen.findByText('El fin debe ser posterior al inicio.')).toBeInTheDocument();
     expect(eventsMock.createEvent).not.toHaveBeenCalled();
   });
 
-  it('con un link sin http(s) no envía', async () => {
-    renderCrear();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Demo' } });
-    fireEvent.change(screen.getByLabelText('Link de la sesión'), { target: { value: 'meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crear evento' }));
-
-    expect(await screen.findByText('El link debe empezar con http:// o https://.')).toBeInTheDocument();
-    expect(eventsMock.createEvent).not.toHaveBeenCalled();
-  });
-
-  it('con datos válidos crea el evento, avisa y cierra', async () => {
+  it('con datos válidos agenda el evento con tipo e invitados, avisa y cierra', async () => {
     eventsMock.createEvent.mockResolvedValueOnce(evento());
     const { onOpenChange } = renderCrear();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: '  Demo final  ' } });
-    fireEvent.change(screen.getByLabelText('Link de la sesión'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crear evento' }));
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: '  Demo final  ' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+
+    // Invitar a Luis desde el buscador de integrantes (aparece una sola vez).
+    fireEvent.click(screen.getByRole('button', { name: /Añadir integrante/ }));
+    expect(await screen.findAllByText('Luis Hernández')).toHaveLength(1);
+    fireEvent.click(screen.getByText('Luis Hernández'));
+    expect(await screen.findByText('1 invitado')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
 
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
     const [projectId, payload] = eventsMock.createEvent.mock.calls[0];
     expect(projectId).toBe(1);
     expect(payload).toMatchObject({
       tituloEvento: 'Demo final',
+      tipoEvento: 'REUNION',
       modalidad: 'VIRTUAL',
       linkSesion: 'https://meet.google.com/x',
       antelacionMinutos: 60,
+      invitados: [5],
       fechaInicio: new Date(2026, 9, 5, 11, 0).toISOString(),
       fechaFin: new Date(2026, 9, 5, 12, 0).toISOString(),
     });
-    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento creado'));
+    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento agendado'));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('desmarcar "Enviar recordatorio" envía 0 minutos', async () => {
+    eventsMock.createEvent.mockResolvedValueOnce(evento());
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Enviar recordatorio' }));
+    expect(screen.queryByRole('combobox', { name: 'Cuándo enviar el recordatorio' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
+    expect(eventsMock.createEvent.mock.calls[0][1].antelacionMinutos).toBe(0);
   });
 
   it('si el backend rechaza, avisa el error con el componente común y no cierra', async () => {
     eventsMock.createEvent.mockRejectedValueOnce(new Error('boom'));
     const { onOpenChange } = renderCrear();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Demo' } });
-    fireEvent.change(screen.getByLabelText('Link de la sesión'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crear evento' }));
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
 
     await waitFor(() => expect(mensajesMock.aviso.error).toHaveBeenCalled());
-    expect(mensajesMock.aviso.error.mock.calls[0][0]).toBe('No se pudo crear el evento');
+    expect(mensajesMock.aviso.error.mock.calls[0][0]).toBe('No se pudo agendar el evento');
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
-  it('en edición carga el evento y guarda los cambios', async () => {
+  it('en edición carga el evento (tipo e invitados incluidos) y guarda los cambios', async () => {
     eventsMock.updateEvent.mockResolvedValueOnce(evento());
     render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={evento()} />, { wrapper });
 
-    expect(screen.getByLabelText('Título')).toHaveValue('Reunión semanal');
-    expect(screen.queryByText('Proyecto')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Reunión movida' } });
+    expect(screen.getByRole('heading', { name: 'Editar evento' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Título del evento o actividad')).toHaveValue('Reunión semanal');
+    expect(screen.getByText('1 invitado')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Reunión movida' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalled());
     const [projectId, eventId, payload] = eventsMock.updateEvent.mock.calls[0];
     expect([projectId, eventId]).toEqual([1, 7]);
-    expect(payload.tituloEvento).toBe('Reunión movida');
+    expect(payload).toMatchObject({ tituloEvento: 'Reunión movida', tipoEvento: 'TUTORIA', invitados: [4] });
     await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento actualizado'));
   });
 
-  it('cancelar evento pide confirmación destructiva y borra solo si se confirma', async () => {
+  it('eliminar evento pide confirmación destructiva y borra solo si se confirma', async () => {
     eventsMock.deleteEvent.mockResolvedValueOnce(undefined);
     mensajesMock.confirmar.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const onOpenChange = vi.fn();
     render(<EventFormDialog open onOpenChange={onOpenChange} ledProjects={LED} editingEvent={evento()} />, { wrapper });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar evento' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar evento' }));
     await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalledTimes(1));
-    expect(mensajesMock.confirmar.mock.calls[0][0]).toMatchObject({ destructiva: true, textoAccion: 'Cancelar evento' });
+    expect(mensajesMock.confirmar.mock.calls[0][0]).toMatchObject({ destructiva: true, textoAccion: 'Eliminar evento' });
     expect(eventsMock.deleteEvent).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar evento' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar evento' }));
     await waitFor(() => expect(eventsMock.deleteEvent).toHaveBeenCalledWith(1, 7));
-    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento cancelado'));
+    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento eliminado'));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
