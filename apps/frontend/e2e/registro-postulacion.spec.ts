@@ -8,12 +8,12 @@ const PROYECTO_TUTORIAS_ID = 1;
 // smoke: registro y postulación (T-125, flujo 1)
 test('un usuario nuevo se registra, entra a proyectos, elige uno y se postula', async ({ page }) => {
   const marca = Date.now();
-  const correo = `e2e.${marca}@uvg.edu.gt`;
+  const correo = `smo${marca}@uvg.edu.gt`;
 
   await page.goto('/registro');
   await page.getByPlaceholder('Juan').fill('E2E');
-  await page.getByPlaceholder('Perez').fill(`Smoke${marca}`);
-  await page.getByPlaceholder('24000').fill(`E2E${marca}`);
+  await page.getByPlaceholder('Perez').fill('Smoke');
+  await page.getByPlaceholder('24000').fill(`${marca}`);
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(correo);
   await page.getByTestId('registro-carrera-select').selectOption({ index: 1 });
   await page.getByPlaceholder('Minimo 8 caracteres').fill('Passw0rd!');

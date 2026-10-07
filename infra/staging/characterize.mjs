@@ -312,12 +312,13 @@ export async function characterizeTls({ host = '127.0.0.1', httpsPort, carreraId
     results.push({ id: 'T21', title: `HSTS exacto sin preload en ${path} (${api.status})`, failures: verifyHsts(api.headers) });
   }
   const suffix = randomBytes(4).toString('hex');
+  const carne = String(randomBytes(4).readUInt32BE(0));
   const body = JSON.stringify({
-    correo: `t18-${suffix}@uvg.edu.gt`,
+    correo: `pru${carne}@uvg.edu.gt`,
     contrasena: `T18-sintetica-${suffix}`,
     nombre: 'Sintetico',
-    apellido: 'T18',
-    carne: `T18${suffix}`,
+    apellido: 'Prueba',
+    carne,
     idCarrera: Number(carreraId),
     semestre: 1,
   });

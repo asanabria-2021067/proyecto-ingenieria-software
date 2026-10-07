@@ -14,6 +14,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { correoCoincideConIdentidad, correoInstitucionalEsperado, normalizarCorreo } from "./correo-institucional.util";
 import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, REFRESH_TOKEN_MAX_AGE_MS } from "./cookie.util";
 import { getJwtSecret } from "../config/jwt-secret";
 import {
@@ -173,8 +174,16 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
+    const correo = normalizarCorreo(registerDto.correo);
+    if (!correoCoincideConIdentidad(correo, registerDto.apellido, registerDto.carne)) {
+      const correoEsperado = correoInstitucionalEsperado(registerDto.apellido, registerDto.carne);
+      throw new BadRequestException(
+        `El correo no coincide con tu apellido y carné. Tu correo debería ser ${correoEsperado}`,
+      );
+    }
+
     const existente = await this.prisma.usuario.findUnique({
-      where: { correo: registerDto.correo },
+      where: { correo },
     });
 
     if (existente) {
@@ -186,7 +195,7 @@ export class AuthService {
     const usuario = await this.prisma.$transaction(async (tx) => {
       const user = await tx.usuario.create({
         data: {
-          correo: registerDto.correo,
+          correo,
           contrasena: contrasenaHash,
           nombre: registerDto.nombre,
           apellido: registerDto.apellido,
