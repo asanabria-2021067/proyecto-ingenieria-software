@@ -150,7 +150,7 @@ describe('EventsService — listado (GET)', () => {
 
     expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { idProyecto: PROJECT_ID, eliminadoEn: null },
+        where: expect.objectContaining({ idProyecto: PROJECT_ID, eliminadoEn: null }),
         orderBy: { fechaInicio: 'asc' },
       }),
     );
@@ -373,5 +373,38 @@ describe('EventsService — tipo e invitados (HU-184)', () => {
     await expect(
       service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { invitados: [EXTERNO_ID] }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('EventsService — visibilidad por invitados (HU-184)', () => {
+  const FILTRO_PARTICIPANTE = {
+    OR: [{ invitados: { isEmpty: true } }, { invitados: { has: PARTICIPANT_ID } }, { proyecto: { creadoPor: PARTICIPANT_ID } }],
+  };
+
+  it('GET /usuarios/me/eventos solo trae eventos sin invitados, donde está invitado o que lidera', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: PROJECT_ID }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findForUserInRange(PARTICIPANT_ID, '2026-10-01T00:00:00.000Z', '2026-10-31T23:59:59.000Z');
+
+    expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(FILTRO_PARTICIPANTE) }),
+    );
+  });
+
+  it('GET /proyectos/:id/eventos aplica el mismo filtro', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findAllForProject(PROJECT_ID, PARTICIPANT_ID);
+
+    expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(FILTRO_PARTICIPANTE) }),
+    );
   });
 });
