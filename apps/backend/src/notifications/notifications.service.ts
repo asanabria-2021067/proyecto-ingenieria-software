@@ -68,7 +68,7 @@ export class NotificationsService {
     payload: NotificationInput,
     effects?: PostCommitEffectSink,
   ): Promise<{ count: number }> {
-    const recipients = [...new Set(userIds)];
+    const recipients = await this.filterEnabledRecipients(tx, [...new Set(userIds)], payload.tipoNotificacion);
     if (recipients.length === 0) {
       return { count: 0 };
     }
@@ -194,6 +194,24 @@ export class NotificationsService {
       mensajeNotificacion: message,
       datosJson: JSON.parse(JSON.stringify(data)) as Prisma.InputJsonValue,
     };
+  }
+
+  /**
+   * HU-185 (T-327): descarta a quien desactivó este tipo, con una sola
+   * consulta para todos los destinatarios. Sin fila = habilitado.
+   */
+  private async filterEnabledRecipients(
+    db: TxClient | PrismaService,
+    userIds: number[],
+    tipo: NotificationInput['tipoNotificacion'],
+  ): Promise<number[]> {
+    if (userIds.length === 0) return userIds;
+    const bloqueados = await db.preferenciaNotificacion.findMany({
+      where: { idUsuario: { in: [...new Set(userIds)] }, tipoNotificacion: tipo, activa: false },
+      select: { idUsuario: true },
+    });
+    const ids = new Set(bloqueados.map((p) => p.idUsuario));
+    return userIds.filter((id) => !ids.has(id));
   }
 
   private async emitNotification(userIds: number[], payload: NotificationInput): Promise<void> {
@@ -349,8 +367,11 @@ export class NotificationsService {
     if (userIds.length === 0) return;
     const db = tx ?? this.prisma;
 
+    const recipients = await this.filterEnabledRecipients(db, userIds, payload.tipoNotificacion);
+    if (recipients.length === 0) return;
+
     const notifications = await db.notificacion.createMany({
-      data: userIds.map((idUsuario) => ({
+      data: recipients.map((idUsuario) => ({
         idUsuario,
         tipoNotificacion: payload.tipoNotificacion,
         tituloNotificacion: payload.tituloNotificacion,
@@ -361,7 +382,7 @@ export class NotificationsService {
     });
 
     if (this.gateway?.server) {
-      await this.gateway.notifyUsers(userIds, payload);
+      await this.gateway.notifyUsers(recipients, payload);
     }
 
     return notifications;

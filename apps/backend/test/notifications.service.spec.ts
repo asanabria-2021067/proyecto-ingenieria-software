@@ -19,6 +19,7 @@ function makePrisma() {
     },
     usuarioRolAcceso: { findFirst: vi.fn(), findMany: vi.fn() },
     participacionProyecto: { findMany: vi.fn() },
+    preferenciaNotificacion: { findMany: vi.fn().mockResolvedValue([]) },
   };
   return prisma as typeof prisma & PrismaService;
 }
