@@ -1,19 +1,36 @@
 'use client';
 
 import { getMonthMatrix, WEEKDAY_LABELS_ES } from '@/lib/calendar/utils';
-import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
-import type { AgendaItem } from '@/lib/calendar/agenda';
+import { TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
+import { tonoDeEvento } from '@/lib/calendar/time-grid';
+import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
 
 const MAX_VISIBLE_POR_DIA = 3;
 
+/** HU-184: evento con el color de su tipo (o de la persona, si es compartido); tarea propia en primario. */
 function puntoDe(item: AgendaItem): string {
-  return item.kind === 'evento' ? MODALIDAD_ESTILO[item.modalidad].punto : 'bg-primary';
+  if (item.kind === 'evento') return TONO_CLASES[tonoDeEvento(item)].punto;
+  return item.compartidoPor ? TONO_CLASES[item.compartidoPor.tono].punto : 'bg-primary';
 }
 
 function etiquetaDia(date: Date, total: number, isToday: boolean): string {
   const fecha = date.toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long' });
   const actividad = total === 0 ? 'sin actividad' : total === 1 ? '1 actividad' : `${total} actividades`;
   return `${isToday ? 'Hoy, ' : ''}${fecha}, ${actividad}`;
+}
+
+/** Cuadro del color del evento con el ícono y el nombre (para lectores) de su tipo. */
+function IconoEvento({ item }: { item: Extract<AgendaItem, { kind: 'evento' }> }) {
+  const estilo = TIPO_EVENTO_ESTILO[item.tipo];
+  return (
+    <span
+      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control ${TONO_CLASES[tonoDeEvento(item)].bloque}`}
+      title={estilo.label}
+    >
+      <estilo.icon className="h-2.5 w-2.5" aria-hidden="true" />
+      <span className="sr-only">{estilo.label}</span>
+    </span>
+  );
 }
 
 /**
@@ -91,33 +108,24 @@ export function MonthView({
                   </span>
                   <div className="flex flex-wrap items-center justify-center gap-0.5 sm:hidden" aria-hidden="true">
                     {visibles.map((item) => (
-                      <span key={`${item.kind}-${item.id}`} className={`h-1.5 w-1.5 rounded-pill ${puntoDe(item)}`} />
+                      <span key={agendaItemKey(item)} className={`h-1.5 w-1.5 rounded-pill ${puntoDe(item)}`} />
                     ))}
                     {restantes > 0 && <span className="type-meta leading-none">+{restantes}</span>}
                   </div>
                   <div className="hidden flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
-                    {visibles.map((item) => {
-                      const estilo = item.kind === 'evento' ? MODALIDAD_ESTILO[item.modalidad] : null;
-                      return (
-                        <span
-                          key={`${item.kind}-${item.id}`}
-                          className="flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta"
-                        >
-                          {estilo ? (
-                            <span
-                              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control ${estilo.relleno}`}
-                              title={estilo.label}
-                            >
-                              <estilo.icon className="h-2.5 w-2.5" aria-hidden="true" />
-                              <span className="sr-only">{estilo.label}</span>
-                            </span>
-                          ) : (
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-pill bg-primary" aria-hidden="true" />
-                          )}
-                          <span className="truncate">{item.titulo}</span>
-                        </span>
-                      );
-                    })}
+                    {visibles.map((item) => (
+                      <span
+                        key={agendaItemKey(item)}
+                        className="flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta"
+                      >
+                        {item.kind === 'evento' ? (
+                          <IconoEvento item={item} />
+                        ) : (
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-pill ${puntoDe(item)}`} aria-hidden="true" />
+                        )}
+                        <span className="truncate">{item.titulo}</span>
+                      </span>
+                    ))}
                     {restantes > 0 && (
                       <span className="type-meta px-1">+{restantes} más</span>
                     )}

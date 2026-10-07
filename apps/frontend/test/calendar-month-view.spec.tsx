@@ -23,7 +23,7 @@ function tarea(id: number, key: string, titulo: string): AgendaItem {
   };
 }
 
-function evento(id: number, key: string, titulo: string, modalidad: 'PRESENCIAL' | 'VIRTUAL' | 'MIXTA' = 'VIRTUAL'): AgendaItem {
+function evento(id: number, key: string, titulo: string, tipo: 'TUTORIA' | 'REUNION' | 'ENTREGA' | 'OTRO' = 'OTRO'): AgendaItem {
   return {
     kind: 'evento',
     key,
@@ -32,8 +32,8 @@ function evento(id: number, key: string, titulo: string, modalidad: 'PRESENCIAL'
     projectId: 1,
     titulo,
     descripcion: null,
-    modalidad,
-    tipo: 'OTRO',
+    modalidad: 'VIRTUAL',
+    tipo,
     multiDia: false,
     projectTitle: 'Proyecto',
     href: '/dashboard/projects/1',
@@ -141,23 +141,23 @@ describe('MonthView (HU-169 T-264)', () => {
     expect(screen.getAllByText('Hoy')).toHaveLength(1);
   });
 
-  it('cada evento lleva el color e ícono de su modalidad, con su nombre en texto (HU-184 T-324)', () => {
+  it('cada evento lleva el color e ícono de su tipo, con su nombre en texto (HU-184)', () => {
     const key = '2026-09-10';
     const itemsByDay = new Map<string, AgendaItem[]>([
-      [key, [evento(1, key, 'Visita', 'PRESENCIAL'), evento(2, key, 'Llamada', 'VIRTUAL'), evento(3, key, 'Taller', 'MIXTA')]],
+      [key, [evento(1, key, 'Clase', 'TUTORIA'), evento(2, key, 'Llamada', 'REUNION'), evento(3, key, 'Informe', 'ENTREGA')]],
     ]);
 
     const { container } = render(
       <MonthView year={2026} month={8} todayKey="2026-09-27" selectedKey={null} itemsByDay={itemsByDay} onSelectDay={() => {}} />,
     );
 
-    expect(screen.getByText('Presencial')).toBeInTheDocument();
-    expect(screen.getByText('Virtual')).toBeInTheDocument();
-    expect(screen.getByText('Híbrida')).toBeInTheDocument();
-    // Puntos de la vista compacta (móvil): uno por ítem con el color de su modalidad.
-    expect(container.querySelector('span.bg-status-success.h-1\\.5')).not.toBeNull();
-    expect(container.querySelector('span.bg-accent.h-1\\.5')).not.toBeNull();
-    expect(container.querySelector('span.bg-action.h-1\\.5')).not.toBeNull();
+    expect(screen.getByText('Tutoría')).toBeInTheDocument();
+    expect(screen.getByText('Reunión')).toBeInTheDocument();
+    expect(screen.getByText('Entrega')).toBeInTheDocument();
+    // Puntos de la vista compacta (móvil): uno por ítem con el color de su tipo.
+    expect(container.querySelector('span.bg-cal-1-strong.h-1\\.5')).not.toBeNull();
+    expect(container.querySelector('span.bg-cal-3-strong.h-1\\.5')).not.toBeNull();
+    expect(container.querySelector('span.bg-cal-4-strong.h-1\\.5')).not.toBeNull();
   });
 
   it('el nombre accesible del día dice cuántas actividades tiene (los títulos no caben en móvil)', () => {
