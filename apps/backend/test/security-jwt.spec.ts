@@ -222,7 +222,7 @@ describe('AuthService — contenido del payload emitido', () => {
     );
 
     await service.register({
-      correo: 'n@uvg.edu.gt',
+      correo: 'use1@uvg.edu.gt',
       contrasena: '123456',
       nombre: 'Nuevo',
       apellido: 'User',

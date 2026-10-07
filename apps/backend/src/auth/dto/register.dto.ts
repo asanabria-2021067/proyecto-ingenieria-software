@@ -8,10 +8,15 @@ import {
   MinLength,
   Matches,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { FORMATO_CORREO_INSTITUCIONAL, normalizarCorreo } from '../correo-institucional.util';
 
 export class RegisterDto {
+  @Transform(({ value }) => (typeof value === 'string' ? normalizarCorreo(value) : value))
   @IsEmail()
-  @Matches(/@uvg\.edu\.gt$/, { message: 'El correo debe ser @uvg.edu.gt' })
+  @Matches(FORMATO_CORREO_INSTITUCIONAL, {
+    message: 'El correo debe tener las primeras letras de tu apellido, tu carné y terminar en @uvg.edu.gt',
+  })
   correo!: string;
 
   @IsString()

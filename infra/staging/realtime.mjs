@@ -147,10 +147,10 @@ const sql = (ctx, query) => compose(ctx, ['exec', '-T', 'postgres', 'psql', '-U'
 
 async function registerUser(ctx, label) {
   const suffix = randomBytes(4).toString('hex');
-  const correo = `t14-${label}-${suffix}@uvg.edu.gt`;
-  const carne = `T14${label.slice(0, 1).toUpperCase()}${suffix}`;
+  const carne = String(randomBytes(4).readUInt32BE(0));
+  const correo = `pru${carne}@uvg.edu.gt`;
   const response = await request(ctx, 'POST', '/api/auth/register', {
-    body: { correo, contrasena: `T14-sintetica-${suffix}`, nombre: 'Sintetico', apellido: `T14 ${label}`, carne, idCarrera: Number(ctx.carreraId), semestre: 1 },
+    body: { correo, contrasena: `T14-sintetica-${suffix}`, nombre: 'Sintetico', apellido: 'Prueba', carne, idCarrera: Number(ctx.carreraId), semestre: 1 },
   });
   if (response.status !== 201) {
     throw new Error(`registro ${label}: status ${response.status}`);

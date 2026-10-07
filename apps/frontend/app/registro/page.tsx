@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useRegister } from '@/hooks/use-register';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
 import { z } from 'zod';
+import { correoInstitucionalEsperado, FORMATO_CORREO_INSTITUCIONAL } from '@/lib/validators/correo-institucional';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,7 @@ const registerSchema = z
     correo: z
       .string({ required_error: 'El correo es obligatorio' })
       .trim()
+      .toLowerCase()
       .min(1, 'El correo es obligatorio')
       .email('El correo es inválido')
       .refine((value) => value.endsWith('@uvg.edu.gt'), {
@@ -58,13 +60,18 @@ const registerSchema = z
   .refine((data) => data.contrasena === data.confirmar, {
     message: 'Las contraseñas no coinciden',
     path: ['confirmar'],
+  })
+  .superRefine((data, ctx) => {
+    const correoEsperado = correoInstitucionalEsperado(data.apellido, data.carne);
+    if (data.correo === correoEsperado) return;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['correo'],
+      message: FORMATO_CORREO_INSTITUCIONAL.test(correoEsperado)
+        ? `Tu correo debería ser ${correoEsperado}`
+        : 'Revisa tu apellido y tu carnet: el correo lleva las 3 primeras letras del apellido y el número de carnet',
+    });
   });
-
-// toma las primeras 3 letras del apellido + el carnet tal cual
-function generarCorreoSugerido(apellido: string, carne: string): string {
-  const primerasTresLetras = apellido.trim().substring(0, 3).toLowerCase();
-  return `${primerasTresLetras}${carne.trim()}@uvg.edu.gt`;
-}
 
 const selectClass =
   'w-full rounded-control border border-outline-variant bg-card px-inline py-tight type-body transition-colors focus-visible:border-primary';
@@ -126,7 +133,7 @@ export default function RegistroPage() {
   useEffect(() => {
     if (correoEditadoManualmente) return;
     if (apellido.trim() && carne.trim()) {
-      const correoSugerido = generarCorreoSugerido(apellido, carne);
+      const correoSugerido = correoInstitucionalEsperado(apellido, carne);
       const timeoutId = window.setTimeout(() => setCorreo(correoSugerido), 0);
       return () => window.clearTimeout(timeoutId);
     }
