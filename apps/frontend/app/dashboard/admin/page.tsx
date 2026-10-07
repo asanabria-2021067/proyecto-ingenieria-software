@@ -9,6 +9,7 @@ import {
   Calendar,
   GraduationCap,
   Activity,
+  ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queue';
@@ -65,7 +66,7 @@ function DashboardSection({
   const id = useId();
   return (
     <section aria-labelledby={id}>
-      <h2 id={id} className="mb-stack font-headline text-lg font-black tracking-tight text-on-surface">
+      <h2 id={id} className="type-section mb-stack">
         {titulo}
       </h2>
       {children}
@@ -95,7 +96,7 @@ function StatCard({
           <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
             {label}
           </span>
-          <p className="mt-micro font-headline text-4xl font-black tracking-tighter tabular-nums text-text-primary">
+          <p className="mt-micro font-headline text-4xl font-bold tracking-tight tabular-nums text-text-primary">
             {value}
           </p>
         </div>
@@ -166,7 +167,7 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
         <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-status-success">
           <Activity className="size-5 text-on-status-success" aria-hidden="true" />
         </div>
-        <h3 id={tituloId} className="type-subtitle font-headline font-black tracking-tight">
+        <h3 id={tituloId} className="type-subtitle font-semibold">
           Actividad reciente
         </h3>
       </header>
@@ -183,12 +184,12 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
                 <p className="type-body line-clamp-1 font-semibold">{item.tituloProyecto}</p>
                 <p className="type-meta mt-micro">{timeAgo(item.fechaActualizacion)}</p>
               </div>
-              <span className={`pill shrink-0 uppercase ${estadoBadgeClasses(item.estadoProyecto)}`}>
+              <span className={`pill shrink-0 ${estadoBadgeClasses(item.estadoProyecto)}`}>
                 {estadoLegible(item.estadoProyecto)}
               </span>
               <Link
                 href={`/dashboard/proyectos/${item.idProyecto}`}
-                className="shrink-0 rounded-control bg-surface-container-high px-stack py-1.5 text-xs font-bold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="shrink-0 rounded-control bg-surface-container-high px-stack py-1.5 text-xs font-semibold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 Ver proyecto
               </Link>
@@ -211,7 +212,7 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
           <GraduationCap className="size-5 text-on-status-error" aria-hidden="true" />
         </div>
         <div className="min-w-0">
-          <h3 id={tituloId} className="type-subtitle font-headline font-black tracking-tight">
+          <h3 id={tituloId} className="type-subtitle font-semibold">
             Estudiantes en riesgo de horas
           </h3>
           <p className="type-meta">
@@ -225,7 +226,7 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
         <>
           <div
             aria-hidden="true"
-            className="flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold text-text-secondary"
+            className="flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold uppercase tracking-wide text-text-secondary"
           >
             <span className="min-w-0 flex-1">Estudiante</span>
             <span className="w-14 shrink-0 text-center">Semestre</span>
@@ -244,7 +245,7 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
                   {est.semestre !== null ? `S${est.semestre}` : '—'}
                 </span>
                 <span className="flex w-24 shrink-0 justify-end">
-                  <span className="pill pill-error whitespace-nowrap font-bold tabular-nums">
+                  <span className="pill pill-error whitespace-nowrap tabular-nums">
                     {est.horasExtension} / {est.horasExtensionRequeridas} hrs
                   </span>
                 </span>
@@ -254,9 +255,10 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
           <div className="mt-auto border-t border-outline-variant/50 px-card py-inline">
             <Link
               href="/dashboard/admin/usuarios?riesgo=horas"
-              className="font-label text-xs font-bold uppercase tracking-widest text-primary outline-none transition-all hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="type-meta inline-flex items-center gap-micro rounded-control font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               Ver todos
+              <ArrowRight className="size-3.5" aria-hidden="true" />
             </Link>
           </div>
         </>
@@ -272,10 +274,10 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
     <div className={PAGE_CLASS}>
       {/* Header */}
       <section className="mb-section">
-        <span className="mb-tight block text-xs font-black uppercase tracking-widest text-primary">
+        <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
           Administración
         </span>
-        <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
+        <h1 className="font-headline text-4xl font-black tracking-tight text-on-surface">
           Panel de Administración
         </h1>
         <p className="mt-tight max-w-2xl text-base text-tertiary">

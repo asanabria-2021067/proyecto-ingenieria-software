@@ -42,7 +42,7 @@ export function AdminSprintPlanningWidget() {
           <CalendarRange className="size-5" aria-hidden="true" />
         </div>
         <div className="min-w-0">
-          <h3 id={tituloId} className="type-subtitle font-headline font-black tracking-tight">
+          <h3 id={tituloId} className="type-subtitle font-semibold">
             Próximas finalizaciones de Sprint
           </h3>
           <p className="type-meta">Supervisa las fechas esperadas de los Sprints activos.</p>
@@ -188,7 +188,7 @@ function NextFinalization({ item }: { item: AdminSprintCalendarItem | null }) {
         <CalendarClock className="size-5" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="type-meta font-semibold uppercase tracking-wider text-primary">Próxima finalización</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Próxima finalización</p>
         <p className="mt-micro flex flex-wrap items-center gap-tight">
           <span className="type-body font-semibold">Sprint {item.numero}</span>
           <span className={`pill ${SITUACION_SPRINT_TONE[item.situacion]}`}>

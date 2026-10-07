@@ -80,7 +80,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
   return (
     <section aria-labelledby={tituloId} className="card-base flex flex-col overflow-hidden p-0">
       <header className="flex items-center justify-between gap-inline border-b border-outline-variant/50 px-card py-stack">
-        <h3 id={tituloId} className="type-subtitle font-headline font-black tracking-tight">
+        <h3 id={tituloId} className="type-subtitle font-semibold">
           Requieren atención
         </h3>
         <span className="type-meta tabular-nums">
