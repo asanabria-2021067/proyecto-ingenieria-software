@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { EstadoProyecto, EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
@@ -11,6 +11,12 @@ import {
   type AdminProjectGroup,
   type AdminProjectsQueryDto,
 } from './dto/admin-projects-query.dto';
+import {
+  SITUACIONES_SOLICITUD_CIERRE,
+  clasificarSolicitudCierre,
+  type RevisionCierreResumen,
+  type SituacionSolicitudCierre,
+} from './closure-request-situation';
 
 /**
  * §46: los cuatro grupos de la bandeja administrativa mapean estados
@@ -56,10 +62,17 @@ export interface AdminProjectsPage {
   total: number;
   page: number;
   limit: number;
+  /**
+   * Solo en `grupo=cierres`: cuántas solicitudes hay en cada situación, sobre
+   * TODA la población del grupo. Sus valores suman `total`.
+   */
+  resumenCierre?: Record<SituacionSolicitudCierre, number>;
 }
 
 @Injectable()
 export class HistoricalProjectReadService {
+  private readonly logger = new Logger(HistoricalProjectReadService.name);
+
   constructor(
     protected readonly prisma: PrismaService,
     protected readonly readPolicy: ProjectReadPolicyService,
@@ -73,10 +86,19 @@ export class HistoricalProjectReadService {
    * El Sprint ambiente viaja como RESUMEN —identificador, número y estado—
    * y nunca como detalle: el administrador supervisa el avance, no opera
    * dentro del Sprint de un equipo.
+   *
+   * `grupo=cierres` es una bandeja de trabajo por etapas: cada proyecto lleva
+   * la situación de su solicitud (bloque `cierre`) y la respuesta trae el
+   * conteo por situación. Ese grupo NO se pagina —`page` y `limit` se ignoran
+   * y se devuelve entero— porque con una página mixta una etapa parecería
+   * vacía solo por tener sus solicitudes en otra página, y los contadores no
+   * cuadrarían con lo visible. La población es acotada: son los proyectos
+   * detenidos a la espera de un veredicto.
    */
   async adminList(actorId: number, query: AdminProjectsQueryDto): Promise<AdminProjectsPage> {
     await this.policy.assertAdminTx(this.prisma as unknown as Prisma.TransactionClient, actorId);
-    const page = query.page ?? ADMIN_PROJECTS_DEFAULT_PAGE;
+    const esCierres = query.grupo === 'cierres';
+    const page = esCierres ? ADMIN_PROJECTS_DEFAULT_PAGE : (query.page ?? ADMIN_PROJECTS_DEFAULT_PAGE);
     const limit = query.limit ?? ADMIN_PROJECTS_DEFAULT_LIMIT;
     const grupo = GRUPOS[query.grupo];
 
@@ -94,8 +116,7 @@ export class HistoricalProjectReadService {
         // se sella en cada cambio de estado, así que un cierre recién pedido
         // encabeza su grupo; el id desempata y cubre a los que nunca se tocaron.
         orderBy: [{ fechaActualizacion: { sort: 'desc', nulls: 'last' } }, { idProyecto: 'desc' }],
-        skip: (page - 1) * limit,
-        take: limit,
+        ...(esCierres ? {} : { skip: (page - 1) * limit, take: limit }),
         select: {
           idProyecto: true,
           tituloProyecto: true,
@@ -118,6 +139,9 @@ export class HistoricalProjectReadService {
       }),
     ]);
 
+    // Una sola consulta para las revisiones de todo el grupo: nunca una por proyecto.
+    const cierres = esCierres ? await this.clasificarCierres(proyectos.map((p) => p.idProyecto)) : null;
+
     return {
       items: proyectos.map((proyecto) => ({
         idProyecto: proyecto.idProyecto,
@@ -137,11 +161,59 @@ export class HistoricalProjectReadService {
               }
             : null,
         accion: grupo.accion,
+        ...(cierres ? { cierre: cierres.porProyecto.get(proyecto.idProyecto) } : {}),
       })),
       total,
       page,
-      limit,
+      limit: esCierres ? Math.max(proyectos.length, 1) : limit,
+      ...(cierres ? { resumenCierre: cierres.resumen } : {}),
     };
+  }
+
+  /**
+   * Situación de la solicitud de cierre de cada proyecto y su conteo global.
+   *
+   * Solo viaja lo que la bandeja muestra: ni la huella de la entrega, ni el
+   * comentario del revisor, ni los documentos. Eso pertenece al detalle.
+   */
+  protected async clasificarCierres(idsProyecto: number[]) {
+    const filas =
+      idsProyecto.length === 0
+        ? []
+        : await this.prisma.revisionCierreProyecto.findMany({
+            where: { idProyecto: { in: idsProyecto } },
+            select: {
+              idProyecto: true,
+              idRevisionCierre: true,
+              numeroRevision: true,
+              estadoRevision: true,
+              enviadaEn: true,
+              resueltaEn: true,
+            },
+            orderBy: [{ idProyecto: 'asc' }, { numeroRevision: 'asc' }],
+          });
+    const cadenas = new Map<number, RevisionCierreResumen[]>();
+    for (const fila of filas) {
+      const cadena = cadenas.get(fila.idProyecto) ?? [];
+      cadena.push(fila);
+      cadenas.set(fila.idProyecto, cadena);
+    }
+
+    const resumen = Object.fromEntries(SITUACIONES_SOLICITUD_CIERRE.map((s) => [s, 0])) as Record<
+      SituacionSolicitudCierre,
+      number
+    >;
+    const porProyecto = new Map<number, ReturnType<typeof clasificarSolicitudCierre>>();
+    for (const idProyecto of idsProyecto) {
+      const clasificada = clasificarSolicitudCierre(cadenas.get(idProyecto) ?? []);
+      porProyecto.set(idProyecto, clasificada);
+      resumen[clasificada.situacion] += 1;
+      if (clasificada.situacion === 'SIN_CLASIFICACION') {
+        // Dato inconsistente: se muestra aparte y se deja rastro, sin tocar la fila.
+        this.logger.warn(`Solicitud de cierre sin clasificación: proyecto ${idProyecto}`);
+      }
+    }
+    return { porProyecto, resumen };
   }
 
   /**
