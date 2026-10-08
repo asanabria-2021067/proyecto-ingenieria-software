@@ -116,6 +116,7 @@ export class AdminService {
       select: {
         idProyecto: true,
         tituloProyecto: true,
+        tipoProyecto: true,
         estadoProyecto: true,
         fechaActualizacion: true,
       },

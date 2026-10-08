@@ -11,6 +11,9 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
+import { IconoTipo } from '@/components/hours/my-hours-project-list';
+import { GOLD_BADGE, estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
+import { Button } from '@/components/ui/button';
 import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queue';
 import { AdminSprintPlanningWidget } from '@/components/admin/dashboard/sprint-planning-widget';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,23 +37,6 @@ function timeAgo(dateStr: string | null): string {
   if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`;
   if (diff < 86400) return `Hace ${Math.floor(diff / 3600)} h`;
   return `Hace ${Math.floor(diff / 86400)} d`;
-}
-
-function estadoBadgeClasses(estado: string): string {
-  const e = estado.toUpperCase();
-  if (e.includes('ACTIVO') || e.includes('PUBLICADO')) {
-    return 'pill-success';
-  }
-  if (e.includes('REVISION') || e.includes('REVISIÓN')) {
-    return 'pill-warning';
-  }
-  return 'pill-neutral';
-}
-
-/** `EN_SOLICITUD_CIERRE` → `En solicitud cierre`: mismo estado, legible y con corte de línea. */
-function estadoLegible(estado: string): string {
-  const texto = estado.replaceAll('_', ' ').toLowerCase();
-  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -215,8 +201,11 @@ function AdminStatsSkeleton() {
 
 // Anchos compartidos por el encabezado de columnas y las filas (desde `sm`;
 // en móvil la fila se apila y el encabezado se oculta).
-const ACT_COL_ESTADO = 'flex shrink-0 sm:w-36 sm:justify-center';
+const ACT_COL_ESTADO = 'flex shrink-0 sm:w-44 sm:justify-center';
 const ACT_COL_ACCION = 'shrink-0 text-center sm:w-28';
+/** Misma etiqueta de estado que las tarjetas de «Proyectos»; el cierre solicitado va en dorado fijo. */
+const ACT_ETIQUETA = 'inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap';
+const actEstadoStyle = (estado: string) => (estado === 'EN_SOLICITUD_CIERRE' ? GOLD_BADGE : estadoBadgeStyle(estado));
 
 function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] }) {
   const tituloId = useId();
@@ -246,21 +235,21 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
                 key={item.idProyecto}
                 className="flex flex-wrap items-center gap-x-inline gap-y-tight px-card py-inline transition-colors hover:bg-surface-container-low"
               >
-                <div className="min-w-0 flex-1 basis-full sm:basis-48">
-                  <p className="type-body line-clamp-1 font-semibold">{item.tituloProyecto}</p>
-                  <p className="type-meta mt-micro">{timeAgo(item.fechaActualizacion)}</p>
+                <div className="flex min-w-0 flex-1 basis-full items-center gap-inline sm:basis-48">
+                  <IconoTipo tipo={item.tipoProyecto} />
+                  <div className="min-w-0">
+                    <p className="type-body line-clamp-1 font-semibold">{item.tituloProyecto}</p>
+                    <p className="type-meta mt-micro">{timeAgo(item.fechaActualizacion)}</p>
+                  </div>
                 </div>
                 <div className={ACT_COL_ESTADO}>
-                  <span className={`pill ${estadoBadgeClasses(item.estadoProyecto)}`}>
-                    {estadoLegible(item.estadoProyecto)}
+                  <span className={`${ACT_ETIQUETA} ${actEstadoStyle(item.estadoProyecto)}`}>
+                    {estadoBadgeLabel(item.estadoProyecto)}
                   </span>
                 </div>
-                <Link
-                  href={`/dashboard/proyectos/${item.idProyecto}`}
-                  className={`${ACT_COL_ACCION} rounded-control bg-surface-container-high px-stack py-tight text-xs font-semibold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40`}
-                >
-                  Ver proyecto
-                </Link>
+                <Button asChild size="sm" className={ACT_COL_ACCION}>
+                  <Link href={`/dashboard/proyectos/${item.idProyecto}`}>Ver proyecto</Link>
+                </Button>
               </li>
             ))}
           </ul>

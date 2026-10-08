@@ -32,7 +32,7 @@ const ESTADO_TAREA_TONE: Record<EstadoTarea, string> = {
 };
 
 /** Icono del tipo de proyecto: neutro y sin fondo, al par del título. */
-function IconoTipo({ tipo }: { tipo: TipoProyecto }) {
+export function IconoTipo({ tipo }: { tipo: TipoProyecto }) {
   const Icono = ICONO_TIPO[tipo] ?? FolderOpen;
   return <Icono data-slot="icono-tipo" className="size-5 shrink-0 text-text-primary" aria-hidden="true" />;
 }

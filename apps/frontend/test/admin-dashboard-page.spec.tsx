@@ -27,8 +27,8 @@ const STATS: AdminStats = {
   nuevosInactivos2026: 5,
   proyectosCerrados2026: 4,
   actividadReciente: [
-    { idProyecto: 36, tituloProyecto: 'Sistema de Tutorías Académicas', estadoProyecto: 'EN_PROGRESO', fechaActualizacion: null },
-    { idProyecto: 57, tituloProyecto: 'Laboratorio de reciclaje', estadoProyecto: 'EN_SOLICITUD_CIERRE', fechaActualizacion: null },
+    { idProyecto: 36, tituloProyecto: 'Sistema de Tutorías Académicas', tipoProyecto: 'ACADEMICO_HORAS_BECA', estadoProyecto: 'EN_PROGRESO', fechaActualizacion: null },
+    { idProyecto: 57, tituloProyecto: 'Laboratorio de reciclaje', tipoProyecto: 'EXTRACURRICULAR_EXTENSION', estadoProyecto: 'EN_SOLICITUD_CIERRE', fechaActualizacion: null },
   ],
   estudiantesEnRiesgo: [
     { idUsuario: 9, nombre: 'Diego', apellido: 'Morales', semestre: 7, horasExtension: 12, horasExtensionRequeridas: 100 },
@@ -153,7 +153,7 @@ describe('Panel de Administración (/dashboard/admin)', () => {
 
     expect(within(actividad).getByText('Sistema de Tutorías Académicas')).toBeInTheDocument();
     expect(within(actividad).getByText('En progreso')).toBeInTheDocument();
-    expect(within(actividad).getByText('En solicitud cierre')).toBeInTheDocument();
+    expect(within(actividad).getByText('En solicitud de cierre')).toBeInTheDocument();
     const enlaces = within(actividad).getAllByRole('link', { name: 'Ver proyecto' });
     expect(enlaces.map((enlace) => enlace.getAttribute('href'))).toEqual([
       '/dashboard/proyectos/36',

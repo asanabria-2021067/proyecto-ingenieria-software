@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api/client';
+import type { TipoProyecto } from '@/types';
 
 // ─── Base types ───────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ export type EstadoProyectoAdmin = string;
 export interface AdminActividadRecienteItem {
   idProyecto: number;
   tituloProyecto: string;
+  tipoProyecto: TipoProyecto;
   estadoProyecto: string;
   fechaActualizacion: string | null;
 }
