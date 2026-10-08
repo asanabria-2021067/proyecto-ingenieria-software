@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, AlertCircle, Copy, Link2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -195,6 +196,7 @@ export default function AdminSolicitudesRecuperacionPage() {
 
   return (
       <div className="px-4 pb-12 pt-8 md:px-8">
+        <AdminBreadcrumb seccion="Administración" pagina="Recuperación de contraseña" />
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>

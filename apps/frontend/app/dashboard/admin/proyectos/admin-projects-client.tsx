@@ -14,14 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
+import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
   ADMIN_PROJECT_GROUP_LABEL,
@@ -127,29 +120,11 @@ export default function AdminProjectsClient() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList className="text-sm">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard/admin" className="text-tertiary hover:text-on-surface">
-                Dashboard
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={adminProjectsGroupHref('activos')} className="text-tertiary hover:text-on-surface">
-                Proyectos
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="font-medium text-on-surface">{ADMIN_PROJECT_GROUP_LABEL[grupo]}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+      <AdminBreadcrumb
+        seccion="Proyectos"
+        seccionHref={adminProjectsGroupHref('activos')}
+        pagina={ADMIN_PROJECT_GROUP_LABEL[grupo]}
+      />
 
       {/* El grupo activo se elige en la sidebar administrativa: la página no
           repite esa navegación, solo declara en qué grupo está parada. */}

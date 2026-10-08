@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -125,6 +125,27 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
       expect(
         screen.queryByRole('link', { name: ADMIN_PROJECT_GROUP_LABEL[otro] }),
       ).not.toBeInTheDocument();
+    }
+  });
+
+  it('la miga de pan empieza en la sección Proyectos, sin Dashboard, en los tres grupos', async () => {
+    for (const [grupo, etiqueta] of [
+      ['activos', 'Activos'],
+      ['cierres', 'Solicitudes de cierre'],
+      ['cerrados', 'Cerrados'],
+    ] as const) {
+      searchParamsMock.mockReturnValue(new URLSearchParams(`grupo=${grupo}`));
+      (getAdminProjects as any).mockResolvedValue(pagina([item()]));
+      const { unmount } = renderPage();
+      const miga = within(screen.getByRole('navigation', { name: /breadcrumb/i }));
+
+      expect(miga.getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Proyectos', etiqueta]);
+      expect(miga.queryByText('Dashboard')).not.toBeInTheDocument();
+      expect(miga.getByRole('link', { name: 'Proyectos' })).toHaveAttribute(
+        'href',
+        '/dashboard/admin/proyectos?grupo=activos',
+      );
+      unmount();
     }
   });
 

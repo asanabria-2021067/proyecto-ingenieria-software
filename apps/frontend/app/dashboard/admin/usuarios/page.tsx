@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import {
@@ -247,6 +248,7 @@ export default function AdminUsuariosPage() {
   return (
     <>
       <div className="px-4 pb-12 pt-8 md:px-8">
+        <AdminBreadcrumb seccion="Administración" pagina="Gestión de Usuarios" />
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>

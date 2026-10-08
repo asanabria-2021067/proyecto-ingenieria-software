@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequest, CheckCheck, MessageSquareWarning } from 'lucide-react';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
@@ -72,6 +73,7 @@ export default function AdminReviewsInboxPage() {
   return (
     <>
       <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+        <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Revisiones" />
         {/* Header */}
         <section className="mb-6 flex items-start justify-between">
           <div>
