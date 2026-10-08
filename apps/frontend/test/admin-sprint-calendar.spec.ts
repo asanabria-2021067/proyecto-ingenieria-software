@@ -14,6 +14,14 @@ import {
   formatDiaLargo,
   formatDiasRestantes,
   pickNextSprintFinalization,
+  contarFinalizaciones,
+  filterSprintsBySituacion,
+  formatDiaConAnio,
+  formatDiaLargoConAnio,
+  formatInstanteGuatemala,
+  groupSprintsByPlannedDay,
+  searchSprints,
+  sortSprintsForSupervision,
 } from '../lib/admin/sprint-calendar';
 import type { AdminSprintCalendarItem } from '../lib/types/admin-sprints';
 
@@ -166,5 +174,51 @@ describe('formato', () => {
     }
     expect(SITUACION_SPRINT_TONE.PLAN_VENCIDO).toContain('attention');
     expect(SITUACION_SPRINT_TONE.PLAN_VENCIDO).not.toMatch(/error/);
+  });
+});
+
+describe('vista completa: búsqueda, filtro, orden y agrupación', () => {
+  const vencido = item({ idSprint: 501, tituloProyecto: 'Plataforma de Tutorías', fechaFinPlaneada: '2026-10-04', situacion: 'PLAN_VENCIDO', diasRestantes: -2 });
+  const hoy = item({ idSprint: 502, tituloProyecto: 'App de Monitoreo', fechaFinPlaneada: '2026-10-06', situacion: 'VENCE_HOY', diasRestantes: 0 });
+  const cursoLejos = item({ idSprint: 503, tituloProyecto: 'Portal Voluntariado', fechaFinPlaneada: '2026-10-12', situacion: 'EN_CURSO', diasRestantes: 6 });
+  const cursoCerca = item({ idSprint: 504, tituloProyecto: 'Biblioteca Digital', lider: { idUsuario: 9, nombre: 'Vernel', apellido: 'Hernández' }, fechaFinPlaneada: '2026-10-08', situacion: 'EN_CURSO', diasRestantes: 2 });
+  const cursoCercaB = item({ idSprint: 499, tituloProyecto: 'Huerto', fechaFinPlaneada: '2026-10-08', situacion: 'EN_CURSO', diasRestantes: 2 });
+  const finalizando = item({ idSprint: 505, estado: 'EN_FINALIZACION', fechaFinPlaneada: '2026-09-06', situacion: 'EN_FINALIZACION', diasRestantes: -30 });
+  const sinFecha = item({ idSprint: 506, fechaFinPlaneada: null, situacion: 'SIN_FECHA', diasRestantes: null });
+  const todos = [sinFecha, cursoLejos, finalizando, hoy, cursoCerca, vencido, cursoCercaB];
+
+  it('ordena por prioridad de supervisión, luego fecha más próxima y el id como desempate', () => {
+    expect(sortSprintsForSupervision(todos).map((s) => s.idSprint)).toEqual([501, 502, 499, 504, 503, 505, 506]);
+    // No muta la entrada.
+    expect(todos[0]).toBe(sinFecha);
+  });
+
+  it('busca por proyecto o líder sin distinguir mayúsculas ni tildes; vacío devuelve todo', () => {
+    expect(searchSprints(todos, '  TUTORIAS ').map((s) => s.idSprint)).toEqual([501]);
+    expect(searchSprints(todos, 'hernandez').map((s) => s.idSprint)).toEqual([504]);
+    expect(searchSprints(todos, '   ')).toHaveLength(todos.length);
+  });
+
+  it('filtra por la situación recibida y combina con la búsqueda', () => {
+    expect(filterSprintsBySituacion(todos, 'SIN_FECHA')).toEqual([sinFecha]);
+    expect(filterSprintsBySituacion(todos, null)).toHaveLength(todos.length);
+    expect(filterSprintsBySituacion(searchSprints(todos, 'biblioteca'), 'EN_CURSO')).toEqual([cursoCerca]);
+    expect(filterSprintsBySituacion(searchSprints(todos, 'biblioteca'), 'PLAN_VENCIDO')).toEqual([]);
+  });
+
+  it('agrupa por día planificado, varios Sprints por día, y deja fuera los que no tienen fecha', () => {
+    const porDia = groupSprintsByPlannedDay(todos);
+    expect(porDia.get('2026-10-08')?.map((s) => s.idSprint)).toEqual([499, 504]);
+    expect(porDia.get('2026-09-06')).toEqual([finalizando]);
+    expect([...porDia.values()].flat()).not.toContain(sinFecha);
+  });
+
+  it('formatea días e instantes sin correrlos de fecha', () => {
+    expect(contarFinalizaciones(1)).toBe('1 finalización planificada');
+    expect(contarFinalizaciones(3)).toBe('3 finalizaciones planificadas');
+    expect(formatDiaConAnio('2026-10-08')).toBe('8 oct 2026');
+    expect(formatDiaLargoConAnio('2026-10-08')).toBe('8 de octubre de 2026');
+    // 03:30 UTC del 1 de abril todavía es 31 de marzo en Guatemala (UTC-6).
+    expect(formatInstanteGuatemala('2026-04-01T03:30:00.000Z')).toBe('31 mar 2026');
   });
 });
