@@ -75,9 +75,6 @@ export default function AdminReviewsInboxPage() {
         {/* Header */}
         <section className="mb-6 flex items-start justify-between">
           <div>
-            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
-              Administración
-            </span>
             <h1 className="type-display text-balance">
               Revisiones
             </h1>

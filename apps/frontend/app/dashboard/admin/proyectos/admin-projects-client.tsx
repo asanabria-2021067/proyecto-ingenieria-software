@@ -132,6 +132,14 @@ export default function AdminProjectsClient() {
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link href="/dashboard/admin" className="text-tertiary hover:text-on-surface">
+                Dashboard
+              </Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href={adminProjectsGroupHref('activos')} className="text-tertiary hover:text-on-surface">
                 Proyectos
               </Link>
             </BreadcrumbLink>
@@ -147,9 +155,6 @@ export default function AdminProjectsClient() {
           repite esa navegación, solo declara en qué grupo está parada. */}
       <section className="mb-6">
         {/* Misma jerarquía que el panel de administración: un solo nivel pesado (el título). */}
-        <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
-          Administración
-        </span>
         <div className="flex flex-wrap items-baseline gap-inline">
           <h1 className="type-display text-balance">
             {ADMIN_PROJECT_GROUP_LABEL[grupo]}

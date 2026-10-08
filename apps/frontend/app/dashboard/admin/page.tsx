@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import { IconoTipo } from '@/components/hours/my-hours-project-list';
 import { GOLD_BADGE, estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queue';
 import { AdminSprintPlanningWidget } from '@/components/admin/dashboard/sprint-planning-widget';
@@ -331,9 +332,13 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
         {/* Encabezado: primera fila de la columna principal, para que la
             columna de Sprints arranque arriba y quede centrada desde el inicio. */}
         <header className={COL_PRINCIPAL}>
-          <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
-            Administración
-          </span>
+          <Breadcrumb className="mb-4">
+            <BreadcrumbList className="text-sm">
+              <BreadcrumbItem>
+                <BreadcrumbPage className="font-medium text-on-surface">Dashboard</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
           <h1 className="type-display text-balance">
             Panel de Administración
           </h1>

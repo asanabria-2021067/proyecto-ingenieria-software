@@ -198,9 +198,6 @@ export default function AdminSolicitudesRecuperacionPage() {
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
-              Administración
-            </span>
             <h1 className="type-display text-balance">
               Recuperación de contraseña
             </h1>

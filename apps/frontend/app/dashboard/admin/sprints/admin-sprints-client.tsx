@@ -157,9 +157,6 @@ export default function AdminSprintsClient() {
 
       <header className="mb-6 flex flex-wrap items-end justify-between gap-x-section gap-y-stack">
         <div className="min-w-0">
-          <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
-            Administración
-          </span>
           <h1 className="type-display text-balance">
             Calendario de Sprints
           </h1>
