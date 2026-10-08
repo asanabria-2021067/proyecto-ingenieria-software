@@ -113,7 +113,7 @@ export default function AdminReviewsInboxPage() {
       <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
         <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Solicitudes de publicación" />
         {/* Header */}
-        <section className="mb-6 flex items-start justify-between gap-4">
+        <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h1 className="type-display text-balance">
               Solicitudes de publicación
@@ -126,7 +126,7 @@ export default function AdminReviewsInboxPage() {
             type="button"
             onClick={() => void refresh()}
             disabled={loading}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+            className="flex shrink-0 items-center gap-2 self-start rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
             Actualizar
