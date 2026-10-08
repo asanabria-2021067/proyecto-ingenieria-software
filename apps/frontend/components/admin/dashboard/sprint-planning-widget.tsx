@@ -157,18 +157,13 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
 
       <NextFinalization item={proxima} />
 
-      {/* La vista completa del calendario todavía no existe: se anuncia como
-          próxima en vez de enlazar a una ruta que respondería 404. */}
-      <p
-        aria-disabled="true"
-        className="type-body mt-auto flex flex-wrap items-center justify-center gap-tight text-center font-medium text-text-secondary xl:text-[0.8125rem]"
+      <Link
+        href="/dashboard/admin/sprints"
+        className="type-body mt-auto inline-flex min-h-9 items-center justify-center gap-tight self-center rounded-control px-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40 xl:text-[0.8125rem]"
       >
-        <span className="inline-flex items-center gap-tight whitespace-nowrap">
-          Ver calendario de Sprints
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </span>
-        <span className="pill pill-neutral">Próximamente</span>
-      </p>
+        Ver calendario de Sprints
+        <ArrowRight className="size-4" aria-hidden="true" />
+      </Link>
     </>
   );
 }

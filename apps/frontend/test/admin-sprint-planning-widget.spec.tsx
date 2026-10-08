@@ -247,15 +247,15 @@ describe('AdminSprintPlanningWidget', () => {
     });
   });
 
-  it('el acceso a la vista completa se anuncia como próximo, sin enlazar a una ruta inexistente', async () => {
+  it('el acceso a la vista completa enlaza al calendario de Sprints, ya sin el aviso de «Próximamente»', async () => {
     getCalendarMock.mockResolvedValue(calendarioDemo());
     renderWidget();
 
-    const cta = (await screen.findByText('Ver calendario de Sprints')).closest('[aria-disabled="true"]');
-    expect(cta).not.toBeNull();
-    expect(within(cta as HTMLElement).getByText('Próximamente')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /calendario de Sprints/i })).not.toBeInTheDocument();
-    expect(document.querySelector('a[href="/dashboard/admin/sprints"]')).toBeNull();
+    expect(await screen.findByRole('link', { name: 'Ver calendario de Sprints' })).toHaveAttribute(
+      'href',
+      '/dashboard/admin/sprints',
+    );
+    expect(screen.queryByText('Próximamente')).not.toBeInTheDocument();
   });
 
   it('sin Sprints operables lo dice como estado vacío, no como error', async () => {
