@@ -33,9 +33,9 @@ export const NEUTRAL_BADGE = 'bg-surface-container-high text-on-surface-variant'
 const BLUE_BADGE = 'bg-[#DFEBFF] text-[#1659C7] dark:bg-[#13294d] dark:text-[#7fc4ff]';
 const PURPLE_BADGE = 'bg-[#EEE8FF] text-[#6448AE] dark:bg-[#2a1f4d] dark:text-[#c9a6ff]';
 const YELLOW_BADGE = 'bg-[#FFF1C4] text-[#956500] dark:bg-[#453405] dark:text-[#ffd873]';
-const GREEN_BADGE = 'bg-[#E2F1DD] text-[#286327] dark:bg-[#123a1a] dark:text-[#6fe08a]';
+export const GREEN_BADGE = 'bg-[#E2F1DD] text-[#286327] dark:bg-[#123a1a] dark:text-[#6fe08a]';
 const ORANGE_BADGE = 'bg-[#FBE8D5] text-[#A85A00] dark:bg-[#3a2308] dark:text-[#ffab5c]';
-const GOLD_BADGE = 'bg-[#F6E7B0] text-[#775700] dark:bg-[#453405] dark:text-[#ffd873]';
+export const GOLD_BADGE = 'bg-[#F6E7B0] text-[#775700] dark:bg-[#453405] dark:text-[#ffd873]';
 export const SLATE_BADGE = 'bg-[#E2E9F7] text-[#486386] dark:bg-[#182740] dark:text-[#9dc1ea]';
 
 const TIPO_BADGE_STYLE: Partial<Record<TipoProyecto, string>> = {

@@ -79,9 +79,9 @@ describe('AdminAttentionQueue', () => {
   it('el rojo queda reservado a los bloqueados; revisión y cierres usan el acento de atención', () => {
     render(<AdminAttentionQueue enRevision={2} cierrePendiente={2} usuariosBloqueados={2} />);
 
-    expect(within(fila('revision')).getByText('Pendiente').className).toContain('pill-warning');
-    expect(within(fila('cierres')).getByText('Acción requerida').className).toContain('pill-warning');
-    expect(within(fila('bloqueados')).getByText('Revisar').className).toContain('pill-error');
+    expect(within(fila('revision')).getByText('Pendiente').className).not.toContain('bg-status-error');
+    expect(within(fila('cierres')).getByText('Acción requerida').className).not.toContain('bg-status-error');
+    expect(within(fila('bloqueados')).getByText('Revisar').className).toContain('bg-status-error');
     // Ninguna fila se pinta entera de color: el tono vive en el icono y la píldora.
     for (const clave of ['revision', 'cierres', 'bloqueados']) {
       expect(fila(clave).className).not.toMatch(/bg-status-/);

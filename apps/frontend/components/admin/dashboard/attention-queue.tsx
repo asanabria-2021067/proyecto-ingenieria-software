@@ -1,21 +1,26 @@
 import { useId } from 'react';
 import Link from 'next/link';
+import { GOLD_BADGE, GREEN_BADGE } from '@/components/projects/available-project-card';
 import { AlertTriangle, ChevronRight, ClipboardList, Clock, type LucideIcon } from 'lucide-react';
 
 type AttentionTone = 'atencion' | 'cierre' | 'bloqueo';
 
-const TONO: Record<AttentionTone, { icono: string; pill: string }> = {
+// Etiqueta de estado: misma forma (radio, alto, tipografía) y la misma paleta
+// que las etiquetas de las tarjetas de proyecto.
+const ETIQUETA = 'flex h-6.25 w-full items-center justify-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap';
+
+const TONO: Record<AttentionTone, { icono: string; etiqueta: string }> = {
   // Acento del sistema (lima) para lo que espera una decisión.
-  atencion: { icono: 'text-secondary-fixed-dim dark:text-secondary-fixed', pill: 'pill-warning' },
-  // Los cierres comparten píldora; solo su icono va en dorado.
-  cierre: { icono: 'text-amber-500', pill: 'pill-warning' },
+  atencion: { icono: 'text-secondary-fixed-dim dark:text-secondary-fixed', etiqueta: GREEN_BADGE },
+  // Mismo dorado que la etiqueta de proyecto en solicitud de cierre.
+  cierre: { icono: 'text-[#775700] dark:text-[#ffd873]', etiqueta: GOLD_BADGE },
   // El rojo queda solo para accesos restringidos.
-  bloqueo: { icono: 'text-error', pill: 'pill-error' },
+  bloqueo: { icono: 'text-error', etiqueta: 'bg-status-error text-on-status-error' },
 };
 
 // Anchos compartidos por el encabezado de columnas y las filas. «Estado» se
 // oculta donde la tarjeta es estrecha (móvil y `lg`, con la sidebar abierta).
-const COL_ESTADO = 'hidden w-36 shrink-0 sm:block lg:hidden xl:block';
+const COL_ESTADO = 'hidden w-36 shrink-0 text-center sm:block lg:hidden xl:block';
 const COL_TOTAL = 'w-10 shrink-0 text-right';
 
 interface AttentionRow {
@@ -128,7 +133,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
                 <p className="type-meta">{fila.descripcion}</p>
               </div>
               <div className={COL_ESTADO}>
-                {fila.valor > 0 && <span className={`pill ${tono.pill}`}>{fila.accion}</span>}
+                {fila.valor > 0 && <span className={`${ETIQUETA} ${tono.etiqueta}`}>{fila.accion}</span>}
               </div>
               <span className={`${COL_TOTAL} font-headline text-2xl font-bold tabular-nums text-text-primary`}>
                 {fila.valor}
