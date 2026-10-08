@@ -6,15 +6,15 @@ const statusConfig: Record<
 > = {
   ACTIVO: {
     label: 'Activo',
-    classes: 'bg-primary/10 text-primary',
+    classes: 'pill-success',
   },
   INACTIVO: {
     label: 'Inactivo',
-    classes: 'bg-surface-container-high text-tertiary',
+    classes: 'pill-neutral',
   },
   BLOQUEADO: {
     label: 'Bloqueado',
-    classes: 'bg-error-container text-error',
+    classes: 'pill-error',
   },
   PENDIENTE_VERIFICACION: {
     label: 'Pendiente',
@@ -25,11 +25,11 @@ const statusConfig: Record<
 export function UserStatusBadge({ estado }: { estado: AdminUserStatus }) {
   const config = statusConfig[estado] ?? {
     label: estado,
-    classes: 'bg-surface-container-high text-on-surface',
+    classes: 'pill-neutral',
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide ${config.classes}`}
+      className={`pill whitespace-nowrap ${config.classes}`}
     >
       {config.label}
     </span>
