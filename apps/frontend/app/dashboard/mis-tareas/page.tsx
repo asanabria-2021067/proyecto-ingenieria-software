@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, AlertTriangle, ClipboardList, SearchX } from 'lucide-react';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -169,28 +170,6 @@ const FILTRO_TRIGGER = `w-full ${DASHBOARD_FILTER_TRIGGER_CLASS}`;
 
 function PuntoGrupo({ className }: { className: string }) {
   return <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${className}`} />;
-}
-
-function ResumenKpi({
-  label,
-  valor,
-  punto,
-  tonoValor = 'text-text-primary',
-}: {
-  label: string;
-  valor: number;
-  punto: string;
-  tonoValor?: string;
-}) {
-  return (
-    <div role="group" aria-label={label} className="card-base px-card py-stack">
-      <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-secondary">
-        <PuntoGrupo className={punto} />
-        {label}
-      </p>
-      <p className={`mt-tight font-headline text-3xl font-bold tabular-nums ${tonoValor}`}>{valor}</p>
-    </div>
-  );
 }
 
 function FilaTarea({ tarea }: { tarea: MiTareaDTO }) {

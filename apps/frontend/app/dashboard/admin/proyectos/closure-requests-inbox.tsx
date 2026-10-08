@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { AlertTriangle, ArrowRight, ClipboardList, FileQuestion, MessageSquareWarning, Repeat2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import {
   REQUEST_INBOX_ACTION,
   RequestInboxCard,
-  RequestInboxKpi,
   RequestInboxKpis,
   RequestInboxMeta,
   RequestInboxSection,
@@ -109,34 +109,10 @@ export function ClosureRequestsInbox({ data }: { data: AdminProjectsPage }) {
   return (
     <div className="space-y-10">
       <RequestInboxKpis columns={4}>
-        <RequestInboxKpi
-          icon={ClipboardList}
-          tone="primary"
-          label="Pendientes de evaluación"
-          value={conteo('PENDIENTE_DE_EVALUACION', pendientes.length)}
-          description="Entregadas, sin revisar"
-        />
-        <RequestInboxKpi
-          icon={Repeat2}
-          tone="amber"
-          label="Reenviadas para revisión"
-          value={conteo('REENVIADA_PARA_REVISION', reenviadas.length)}
-          description="Corregidas por el responsable"
-        />
-        <RequestInboxKpi
-          icon={MessageSquareWarning}
-          tone="orange"
-          label="En espera de correcciones"
-          value={conteo('EN_ESPERA_DE_CORRECCIONES', enEspera.length)}
-          description="Esperando al responsable"
-        />
-        <RequestInboxKpi
-          icon={FileQuestion}
-          tone="neutral"
-          label="Sin entrega formal"
-          value={conteo('SIN_ENTREGA_FORMAL', sinEntrega.length)}
-          description="Sin revisión de cierre registrada"
-        />
+        <ResumenKpi label="Pendientes de evaluación" valor={conteo('PENDIENTE_DE_EVALUACION', pendientes.length)} punto="bg-outline" />
+        <ResumenKpi label="Reenviadas para revisión" valor={conteo('REENVIADA_PARA_REVISION', reenviadas.length)} punto="bg-status-warning" />
+        <ResumenKpi label="En espera de correcciones" valor={conteo('EN_ESPERA_DE_CORRECCIONES', enEspera.length)} punto="bg-attention" />
+        <ResumenKpi label="Sin entrega formal" valor={conteo('SIN_ENTREGA_FORMAL', sinEntrega.length)} punto="bg-outline-variant" />
       </RequestInboxKpis>
 
       {sinClasificar.length > 0 && (

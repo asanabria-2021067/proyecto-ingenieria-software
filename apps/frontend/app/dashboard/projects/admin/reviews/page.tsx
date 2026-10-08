@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, Repeat2, CheckCheck, MessageSquareWarning } from 'lucide-react';
+import { RefreshCw, CheckCircle2, Eye, SendHorizonal, CheckCheck, MessageSquareWarning } from 'lucide-react';
+import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import {
   REQUEST_INBOX_ACTION,
   RequestInboxCard,
-  RequestInboxKpi,
   RequestInboxKpis,
   RequestInboxMeta,
   RequestInboxSection,
@@ -149,27 +149,9 @@ export default function AdminReviewsInboxPage() {
           <div className="space-y-10">
             {/* Resumen: solo publicación. */}
             <RequestInboxKpis columns={3}>
-              <RequestInboxKpi
-                icon={ClipboardList}
-                tone="primary"
-                label="Pendientes de revisión"
-                value={primerEnvio.length}
-                description="Primer envío, sin revisar"
-              />
-              <RequestInboxKpi
-                icon={Repeat2}
-                tone="amber"
-                label="Reenviadas para revisión"
-                value={reenviadas.length}
-                description="Corregidas por el estudiante"
-              />
-              <RequestInboxKpi
-                icon={MessageSquareWarning}
-                tone="orange"
-                label="En espera de correcciones"
-                value={enEsperaDeCorrecciones.length}
-                description="Esperando corrección del estudiante"
-              />
+              <ResumenKpi label="Pendientes de revisión" valor={primerEnvio.length} punto="bg-outline" />
+              <ResumenKpi label="Reenviadas para revisión" valor={reenviadas.length} punto="bg-status-warning" />
+              <ResumenKpi label="En espera de correcciones" valor={enEsperaDeCorrecciones.length} punto="bg-attention" />
             </RequestInboxKpis>
 
             {/* Primer envío: nadie lo ha revisado todavía. */}

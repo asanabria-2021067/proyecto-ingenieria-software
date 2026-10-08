@@ -1,58 +1,23 @@
 import type { ReactNode } from 'react';
-import { CheckCheck, type LucideIcon } from 'lucide-react';
+import { CheckCheck } from 'lucide-react';
 
 /**
  * Primitivas visuales de las bandejas administrativas por etapas
- * («Solicitudes de publicación» y «Solicitudes de cierre»): indicador
- * superior, sección por etapa y tarjeta horizontal de una solicitud.
+ * («Solicitudes de publicación» y «Solicitudes de cierre»): rejilla de
+ * indicadores, sección por etapa y tarjeta horizontal de una solicitud.
  *
  * Son solo presentación. Qué etapas existen, qué cuenta cada indicador y qué
  * acción admite cada solicitud lo decide cada bandeja con sus propias reglas.
  */
 
-const KPI_TONE = {
-  primary: 'bg-primary/10 text-primary',
-  amber: 'bg-amber-500/10 text-amber-600',
-  orange: 'bg-orange-500/10 text-orange-600',
-  neutral: 'bg-surface-container-high text-on-surface-variant',
-} as const;
-
-/** Rejilla de indicadores: una columna en móvil, dos en tablet y todas en escritorio. */
+/**
+ * Rejilla de indicadores: una columna en móvil, dos en tablet y todas en
+ * escritorio. Las tarjetas son las contadoras de «Mis Tareas» (`ResumenKpi`).
+ */
 export function RequestInboxKpis({ columns, children }: { columns: 3 | 4; children: ReactNode }) {
   return (
-    <div className={`grid grid-cols-1 gap-4 ${columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
+    <div className={`grid grid-cols-1 gap-stack ${columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
       {children}
-    </div>
-  );
-}
-
-export function RequestInboxKpi({
-  icon: Icon,
-  tone,
-  label,
-  value,
-  description,
-}: {
-  icon: LucideIcon;
-  tone: keyof typeof KPI_TONE;
-  label: string;
-  value: number;
-  description: string;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={label}
-      className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5"
-    >
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${KPI_TONE[tone]}`}>
-        <Icon className="h-6 w-6" aria-hidden="true" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">{label}</p>
-        <p className="text-3xl font-black tabular-nums tracking-tighter text-on-surface">{value}</p>
-        <p className="text-xs text-tertiary">{description}</p>
-      </div>
     </div>
   );
 }

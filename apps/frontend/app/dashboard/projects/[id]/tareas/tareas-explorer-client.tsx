@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { Button } from '@/components/ui/button';
@@ -120,33 +121,6 @@ function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
       <Icono className="size-3.5" aria-hidden="true" />
       {PRIORIDAD_LABEL[prioridad]}
     </span>
-  );
-}
-
-function PuntoResumen({ className }: { className: string }) {
-  return <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${className}`} />;
-}
-
-/** Mismo patrón de tarjeta KPI que "Mis Tareas" (ResumenKpi). */
-function ResumenKpi({
-  label,
-  valor,
-  punto,
-  tonoValor = 'text-text-primary',
-}: {
-  label: string;
-  valor: number;
-  punto: string;
-  tonoValor?: string;
-}) {
-  return (
-    <div role="group" aria-label={label} className="card-base px-card py-stack">
-      <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-secondary">
-        <PuntoResumen className={punto} />
-        {label}
-      </p>
-      <p className={`mt-tight font-headline text-3xl font-bold tabular-nums ${tonoValor}`}>{valor}</p>
-    </div>
   );
 }
 
