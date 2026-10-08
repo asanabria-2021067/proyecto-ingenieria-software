@@ -333,11 +333,7 @@ export default function AppealsInboxClient() {
 
       <section className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">Gobernanza</span>
-          <h1 className="type-display flex items-center gap-2">
-            <Gavel className="size-7 text-primary" aria-hidden="true" />
-            Apelaciones de liderazgo
-          </h1>
+          <h1 className="type-display">Apelaciones de liderazgo</h1>
           <p className="mt-2 max-w-2xl text-sm text-tertiary">
             Solicitudes de los líderes para transferir su liderazgo. La apelación es una solicitud, no una designación.
           </p>
