@@ -9,8 +9,8 @@ pendiente de **OWASP A01 (Broken Access Control)**.
 - **Alcance:** todos los controladores HTTP del backend y todas las páginas bajo `/dashboard`.
   Los gateways WebSocket (`chat.gateway.ts`, `notifications.gateway.ts`) quedan fuera: su
   handshake ya está cubierto por C025 (`ws-auth.service.ts`, ver `docs/security/owasp-top10-2025.md`).
-- **Estado:** refleja el código **antes** de T-286. La sección 6 indica qué cambia con T-286 y
-  qué queda para T-287.
+- **Estado:** refleja el código **después** de T-286 (2026-10-07). Las filas corregidas en T-286
+  lo indican en *Acción requerida*; la sección 6 resume qué se corrigió y qué queda para T-287.
 
 ---
 
@@ -64,6 +64,7 @@ Abreviaturas de *Protección actual*:
 | `Público` | Sin guard. |
 | `JWT` | `JwtAuthGuard` (solo autenticación: token `access` válido y usuario `ACTIVO`). |
 | `OptJWT` | `OptionalJwtAuthGuard` (personaliza si hay sesión, nunca bloquea). |
+| `Roles:admin` | `RolesGuard` + `@Roles('administrador')` (T-286): rol de acceso validado en BD tras `JwtAuthGuard`; 403 si no lo tiene. |
 | `PWG` | `ProjectWriteGuard` + `@ProjectWrite`: valida existencia y **estado** del proyecto y del Sprint ambiente. **No valida el actor.** |
 | `W:FAMILIA→ACTOR` | `ProjectPolicyService.assertWriteTx` en el service, tras el lock: valida el actor de la familia (`LIDER`, `ADMIN`, `PARTICIPANTE_ACTIVO`, `LIDER_O_PARTICIPANTE_ACTIVO`, `ACTOR_EXISTENTE` = regla específica del service). |
 | `R:scope` | `ProjectReadPolicyService.assertRead` con ese scope (perfiles líder / admin / participante activo / histórico / exlíder / externo). |
@@ -91,8 +92,8 @@ protección actual ya es correcta.
 | POST | `/auth/logout` | Cerrar sesión | ✅ | ✅ | ✅ | ✅ | ✅ | `Público` (revoca la cookie presente) | — |
 | GET | `/catalogs`, `/carreras`, `/habilidades`, `/intereses`, `/cualidades`, `/organizaciones` | Leer catálogos | ✅ | ✅ | ✅ | ✅ | ✅ | `Público` | — |
 | POST | `/habilidades`, `/intereses`, `/cualidades` | Alta idempotente de ítem de catálogo desde el editor de perfil | ✅ | ✅ | ✅ | ✅ | ✅ | `JWT` | — (diseño intencional: el editor de perfil permite proponer ítems nuevos; si ya existe devuelve el existente) |
-| GET | `/validaciones` | Stub sin implementar | ❌ | ❌ | ❌ | ❌ | ✅ | **`Público`** | **T-286** (H-02) |
-| POST | `/validaciones` | Stub sin implementar | ❌ | ❌ | ❌ | ❌ | ✅ | **`Público`** | **T-286** (H-02) |
+| GET | `/validaciones` | Stub sin implementar | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` | ✅ Corregido en T-286 (H-02) |
+| POST | `/validaciones` | Stub sin implementar | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` | ✅ Corregido en T-286 (H-02) |
 
 ### 2.2 Usuario autenticado, notificaciones, social, búsqueda y chat global
 
@@ -119,7 +120,7 @@ protección actual ya es correcta.
 | GET | `/proyectos/destacados` | Proyectos destacados | ✅ | ✅ | ✅ | ✅ | ✅ | `Público` | — |
 | GET | `/proyectos/:id` | Detalle público (solo estados con detalle público) | ✅ | ✅ | ✅ | ✅ | ✅ | `Público` (filtra por estado) | — |
 | GET | `/proyectos/mine`, `/proyectos/mis-proyectos`, `/proyectos/contributor` | Proyectos propios / en los que participa | ✅ | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` | — |
-| GET | `/proyectos/:id/admin` | Vista administrativa del proyecto | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `R:resumen` + `S:admin` | **T-286** (H-01) |
+| GET | `/proyectos/:id/admin` | Vista administrativa del proyecto | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `R:resumen` + `S:admin` | ✅ Corregido en T-286 (H-01) |
 | GET | `/proyectos/:id/owner` | Vista del dueño (editor) | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `R:resumen` + `S:owner` | — |
 | GET | `/proyectos/:id/avance` | Avance del proyecto | ⚠️ participante | ✅ | ⚠️ participante | ⚠️ participante | ⚠️ según `R:resumen` | `JWT` + `R:resumen` + check en service | — |
 | POST | `/proyectos` | Crear proyecto (el creador queda como líder) | ✅ | ✅ | ✅ | ✅ | ⚠️ ver H-06 | `JWT` | Decisión de producto (H-06) |
@@ -141,7 +142,7 @@ protección actual ya es correcta.
 | GET | `/postulaciones/:id` | Detalle de postulación | ⚠️ solo la propia | ✅ | ⚠️ solo la propia | ⚠️ solo la propia | ❌ | `JWT` + propia o `R:equipo` del líder | — |
 | PATCH | `/postulaciones/:id/estado` | Aceptar/rechazar postulación | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `S:owner` + `W:POSTULACION` | — |
 | DELETE | `/postulaciones/:id` | Retirar postulación | ⚠️ solo la propia | ⚠️ | ⚠️ solo la propia | ⚠️ solo la propia | ❌ | `JWT` + `PWG` + `W:POSTULACION→ACTOR_EXISTENTE` | — |
-| GET | `/proyectos/:projectId/roles` | Listar roles del proyecto | ✅ | ✅ | ✅ | ✅ | ✅ | **`JWT` sin política de lectura** | **T-286** (H-05) |
+| GET | `/proyectos/:projectId/roles` | Listar roles del proyecto | ⚠️ participante activo | ✅ | ⚠️ participante activo | ⚠️ participante activo | ❌ | `JWT` + `S:owner` o participación activa (403 en otro caso) | — |
 | POST/PATCH/DELETE | `/proyectos/:projectId/roles[/:roleId]` | CRUD de roles del proyecto | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `W:ROL_CRUD→LIDER` | — |
 | POST | `/proyectos/:projectId/roles/:roleId/participacion` | El líder se da de alta en un rol | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `W:ROL_ALTA_PARTICIPACION→LIDER` | — |
 | DELETE | `/proyectos/:projectId/roles/:roleId/participacion` | Retirarse de un rol propio | ⚠️ participante del rol | ⚠️ | ⚠️ participante del rol | ⚠️ participante del rol | ❌ | `JWT` + `PWG` + `W:ROL_RETIRO→ACTOR_EXISTENTE` | — |
@@ -230,29 +231,29 @@ protección actual ya es correcta.
 | POST | `/proyectos/:projectId/cierre/documentos`, `…/documentos/firma` | Subir / reservar evidencia | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `W:CIERRE_EVIDENCIAS→LIDER` | — |
 | DELETE | `/proyectos/:projectId/cierre/documentos/:documentId` | Quitar evidencia | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `W:CIERRE_EVIDENCIAS→LIDER` | — |
 | GET | `/proyectos/:projectId/cierre/documentos/:documentId/url`, `…/contenido` | Leer evidencia | ❌ | ✅ | ❌ | ❌ | ✅ | `JWT` + `R:documentos` | — |
-| POST | `/proyectos/:projectId/aprobar-cierre` | Aprobar cierre | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `PWG` + `W:CIERRE_VEREDICTO→ADMIN` | **T-286** (H-01) |
-| POST | `/proyectos/:projectId/rechazar-cierre` | Devolver a ejecución | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `PWG` + `W:CIERRE_VEREDICTO→ADMIN` | **T-286** (H-01) |
-| POST | `/proyectos/:projectId/cierre/correccion-documental` | Pedir corrección documental | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `PWG` + `W:CIERRE_VEREDICTO→ADMIN` | **T-286** (H-01) |
+| POST | `/proyectos/:projectId/aprobar-cierre` | Aprobar cierre | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `PWG` + `W:CIERRE_VEREDICTO→ADMIN` | ✅ Corregido en T-286 (H-01) |
+| POST | `/proyectos/:projectId/rechazar-cierre` | Devolver a ejecución | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `PWG` + `W:CIERRE_VEREDICTO→ADMIN` | ✅ Corregido en T-286 (H-01) |
+| POST | `/proyectos/:projectId/cierre/correccion-documental` | Pedir corrección documental | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `PWG` + `W:CIERRE_VEREDICTO→ADMIN` | ✅ Corregido en T-286 (H-01) |
 
 ### 2.10 Administración
 
 | Método | Endpoint | Acción | Estudiante | Líder | Mentor | Coordinador | Administración | Protección actual | Acción requerida |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/admin/estadisticas` | Estadísticas del panel | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` | **T-286** (H-01) |
-| GET | `/admin/metricas` | Tendencias de uso | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` | **T-286** (H-01) |
-| GET | `/admin/usuarios`, `/admin/usuarios/:id` | Listar / ver usuarios | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` | **T-286** (H-01) |
-| PATCH | `/admin/usuarios/:id/estado` | Activar / bloquear usuario | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` (+ no a sí mismo ni a otro admin) | **T-286** (H-01) |
-| GET | `/admin/password-reset-requests` | Solicitudes de recuperación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` | **T-286** (H-01) |
-| POST | `/admin/password-reset-requests/:id/generate-link` | Generar enlace de recuperación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` | **T-286** (H-01) |
-| GET | `/admin/proyectos`, `/admin/proyectos/:projectId` | Bandeja y detalle de proyectos | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` / `R:resumen` perfil ADMIN | **T-286** (H-01) |
-| POST | `/admin/storage/cierre/barrido` | Purga de documentos de cierre | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` | **T-286** (H-01) |
-| GET | `/admin/liderazgo/apelaciones` | Bandeja de apelaciones | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` | **T-286** (H-01) |
-| POST | `/admin/proyectos/:projectId/liderazgo/apelaciones/:appealId/aceptar`, `…/denegar` | Resolver apelación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `PWG` + `W:LIDERAZGO` + `S:admin` | **T-286** (H-01) |
-| POST | `/admin/proyectos/:projectId/liderazgo/cambiar` | Cambiar líder | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `PWG` + `W:LIDERAZGO` + `S:admin` | **T-286** (H-01) |
-| GET | `/revisiones/admin/bandeja` | Bandeja de revisión de publicaciones | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `S:admin` | **T-286** (H-01) |
+| GET | `/admin/estadisticas` | Estadísticas del panel | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| GET | `/admin/metricas` | Tendencias de uso | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| GET | `/admin/usuarios`, `/admin/usuarios/:id` | Listar / ver usuarios | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| PATCH | `/admin/usuarios/:id/estado` | Activar / bloquear usuario | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` (+ no a sí mismo ni a otro admin) | ✅ Corregido en T-286 (H-01) |
+| GET | `/admin/password-reset-requests` | Solicitudes de recuperación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| POST | `/admin/password-reset-requests/:id/generate-link` | Generar enlace de recuperación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| GET | `/admin/proyectos`, `/admin/proyectos/:projectId` | Bandeja y detalle de proyectos | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` / `R:resumen` perfil ADMIN | ✅ Corregido en T-286 (H-01) |
+| POST | `/admin/storage/cierre/barrido` | Purga de documentos de cierre | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| GET | `/admin/liderazgo/apelaciones` | Bandeja de apelaciones | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| POST | `/admin/proyectos/:projectId/liderazgo/apelaciones/:appealId/aceptar`, `…/denegar` | Resolver apelación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `PWG` + `W:LIDERAZGO` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| POST | `/admin/proyectos/:projectId/liderazgo/cambiar` | Cambiar líder | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `PWG` + `W:LIDERAZGO` + `S:admin` | ✅ Corregido en T-286 (H-01) |
+| GET | `/revisiones/admin/bandeja` | Bandeja de revisión de publicaciones | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
 | GET | `/revisiones/proyectos/:idProyecto` | Historial de revisiones del proyecto | ❌ | ✅ | ❌ | ❌ | ✅ | `JWT` + líder o admin en service | — |
-| POST | `/revisiones/proyectos/:idProyecto/reclamar` | Reclamar revisión | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `PWG` + `W:PUBLICACION_REVISION→ADMIN` | **T-286** (H-01) |
-| POST | `/revisiones/proyectos/:idProyecto/resolver` | Aprobar / observar publicación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `PWG` + `W:PUBLICACION_REVISION→ADMIN` | **T-286** (H-01) |
+| POST | `/revisiones/proyectos/:idProyecto/reclamar` | Reclamar revisión | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `PWG` + `W:PUBLICACION_REVISION→ADMIN` | ✅ Corregido en T-286 (H-01) |
+| POST | `/revisiones/proyectos/:idProyecto/resolver` | Aprobar / observar publicación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `PWG` + `W:PUBLICACION_REVISION→ADMIN` | ✅ Corregido en T-286 (H-01) |
 
 ---
 
@@ -328,12 +329,12 @@ Acciones que deben quedar ocultas o deshabilitadas por rol (estado actual):
 
 ### H-01 — Endpoints exclusivos de administración sin autorización declarativa por rol
 
-**Endpoints:** todos los marcados **T-286 (H-01)** en la sección 2 (21 rutas en `admin.controller`,
+**Endpoints:** todos los marcados **Corregido en T-286 (H-01)** en la sección 2 (21 rutas en `admin.controller`,
 `admin-projects.controller`, `closure-storage-admin.controller`, `leadership-admin.controller`,
 `revisiones.controller` [bandeja, reclamar, resolver], `project-closure.controller` [aprobar,
 rechazar, corrección documental] y `projects.controller` [`GET :id/admin`]).
 
-**Estado:** en el controlador **solo tienen `JwtAuthGuard`** (y `ProjectWriteGuard`, que no valida
+**Estado antes de T-286:** en el controlador **solo tenían `JwtAuthGuard`** (y `ProjectWriteGuard`, que no valida
 actor). La restricción a administración existe, pero **solo dentro del service** y con cinco
 implementaciones distintas del mismo check (`AdminService.requireAdmin`,
 `ProjectPolicyService.assertAdminTx`, `ProjectReadPolicyService.isAdmin`,
@@ -346,13 +347,21 @@ correctamente, pero:
   **después** de la política de lectura, y en las rutas con `ProjectWriteGuard` un no admin recibe
   primero 404/409 de estado antes que el 403 de rol.
 
-**No existe** ningún `RolesGuard`, `@Roles` ni metadata de roles en el backend.
+No existía ningún `RolesGuard`, `@Roles` ni metadata de roles en el backend.
+
+**Corregido en T-286:** las 21 rutas declaran `@Roles('administrador')` y ejecutan `RolesGuard`
+justo después de `JwtAuthGuard` y antes de `ProjectWriteGuard`, de modo que un usuario autenticado
+sin rol recibe **403** antes de cualquier 404/409 de estado. Se conservan `ProjectWriteGuard` y los
+checks de los services (defensa en profundidad).
 
 ### H-02 — `/validaciones` expuesto sin autenticación
 
 `ValidationController` (`GET` y `POST /validaciones`) no tiene ningún guard. Hoy el service es un
 stub que devuelve `Not implemented yet`, por lo que no expone datos, pero es una ruta pública que
 cualquier implementación futura heredaría abierta.
+
+**Corregido en T-286:** `JwtAuthGuard` + `RolesGuard` con `@Roles('administrador')` a nivel de
+controller (cerrado por defecto hasta que se implemente y se defina su audiencia real).
 
 ### H-03 — Endpoints que solo usan autenticación (revisados, correctos)
 
@@ -372,13 +381,12 @@ familia del catálogo, y está presente en **todas** las rutas de escritura revi
 cual. Solo las familias con actor `ADMIN` (`PUBLICACION_REVISION`, `CIERRE_VEREDICTO`) y las rutas
 de `leadership-admin.controller` necesitan además `RolesGuard` (ya incluidas en H-01).
 
-### H-05 — `GET /proyectos/:projectId/roles` sin política de lectura
+### H-05 — `GET /proyectos/:projectId/roles` (descartado tras verificación)
 
-`RolesService.listRoles` solo comprueba que el proyecto exista y no esté eliminado. Cualquier
-usuario autenticado puede listar los roles (nombre, descripción, cupos, requisitos) de un proyecto
-en `BORRADOR`, `EN_REVISION`, `OBSERVADO` o `CANCELADO` conociendo su id. Es una fuga menor de
-autorización a nivel de objeto (no de rol global): para proyectos sin detalle público, solo el líder
-(y quien la política de lectura admita) debería verlos.
+En la auditoría inicial se marcó como lectura sin política de acceso. Al revisarlo en T-286 se
+confirmó que **ya está protegido**: `RolesService.listRoles` lanza `ForbiddenException('No tienes
+acceso a los roles de este proyecto')` cuando el actor no es el líder ni tiene una participación
+activa en el proyecto. No requiere cambios; la fila de la sección 2.4 refleja la protección real.
 
 ### H-06 — Administración puede crear proyectos y postularse vía API
 
@@ -427,15 +435,22 @@ declararlo (`@Roles('coordinador_academico', 'administrador')`).
 
 | Hallazgo | Corrección | Tarea |
 | --- | --- | --- |
-| H-01 | Crear `RolesGuard` (`common/guards/roles.guard.ts`) y `@Roles(...)` (`common/decorators/roles.decorator.ts`). El guard lee los roles del usuario **desde BD** (`usuario_rol_acceso` → `rol_acceso.nombre_perfil`), porque el JWT no los lleva; sin `@Roles` deja pasar (no-op), y si el rol no coincide lanza `ForbiddenException` (403) con el mensaje existente `'Acceso restringido a administradores'` cuando se exige admin. Aplicar `@Roles('administrador')` + `RolesGuard` justo después de `JwtAuthGuard` en los controladores/rutas de H-01, **sin quitar** `ProjectWriteGuard` ni los checks de los services (defensa en profundidad). | **T-286** |
-| H-02 | Proteger `ValidationController` con `JwtAuthGuard` + `RolesGuard` y `@Roles('administrador')` (cerrado por defecto hasta que se implemente). | **T-286** |
+| H-01 | Creados `RolesGuard` (`common/guards/roles.guard.ts`) y `@Roles(...)` (`common/decorators/roles.decorator.ts`). El guard lee los roles del usuario **desde BD** (`usuario_rol_acceso` → `rol_acceso.nombre_perfil`), porque el JWT no los lleva; sin `@Roles` deja pasar (no-op), y si el rol no coincide lanza `ForbiddenException` (403) con el mensaje existente `'Acceso restringido a administradores'` cuando se exige admin (`'No tienes permisos para realizar esta acción'` para otras combinaciones). Aplicado `@Roles('administrador')` + `RolesGuard` justo después de `JwtAuthGuard` en las rutas de H-01, **sin quitar** `ProjectWriteGuard` ni los checks de los services. | ✅ T-286 |
+| H-02 | `ValidationController` protegido con `JwtAuthGuard` + `RolesGuard` y `@Roles('administrador')`. | ✅ T-286 |
 | H-03 | Sin cambios: autorización ya acotada por usuario/proyecto en el service. | — |
 | H-04 | Sin cambios en `ProjectWriteGuard`/`ProjectPolicyService`; `RolesGuard` se suma solo en rutas de actor `ADMIN` (cubiertas por H-01). | — |
-| H-05 | En `RolesService.listRoles`, para quien no sea el líder, aplicar la misma regla del detalle público (solo estados con detalle público) o la política de lectura del proyecto; responder 404 en caso contrario. | **T-286** |
+| H-05 | Descartado: ya protegido en `RolesService.listRoles`. | — |
 | H-06 | Ninguna hasta decisión de producto (se documenta). | Pendiente de decisión |
 | H-07 | Añadir `useIsProjectLeader` + `LeaderOnlyNotice` en las tres pantallas. | **T-287** |
 | H-08 | Incluir las rutas legacy en la redirección por rol (o retirarlas). | **T-287** |
 
-Pruebas previstas para T-286: unitarias de `RolesGuard` (rol autorizado pasa, rol no autorizado →
-403, sin `@Roles` pasa, usuario sin roles → 403 cuando se exigen) y verificación de que las rutas de
-H-01/H-02 declaran `JwtAuthGuard` antes de `RolesGuard` y conservan sus guards previos.
+Pruebas de T-286 (`apps/backend/test/roles.guard.spec.ts`):
+
+- Unitarias de `RolesGuard`: rol autorizado pasa; basta uno de varios roles; rol no autorizado y
+  usuario sin roles → 403; sin `@Roles` o con lista vacía es no-op y no consulta la BD; sin usuario en
+  el request → 403 (nunca 500); la metadata del handler prevalece sobre la del controller.
+- Metadata de rutas: cada ruta de H-01/H-02 declara `@Roles('administrador')`, ejecuta `JwtAuthGuard`
+  antes de `RolesGuard` y conserva `ProjectWriteGuard` donde ya lo tenía; las rutas de líder vecinas
+  no llevan `@Roles`.
+- Integración HTTP real con `JwtAuthGuard` + `JwtStrategy`: sin token → 401; autenticado sin rol →
+  403 con mensaje claro; autenticado con rol → 200.
