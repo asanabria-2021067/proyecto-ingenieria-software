@@ -7,7 +7,7 @@ type AttentionTone = 'atencion' | 'cierre' | 'bloqueo';
 
 // Etiqueta de estado: misma forma (radio, alto, tipografía) y la misma paleta
 // que las etiquetas de las tarjetas de proyecto.
-const ETIQUETA = 'flex h-6.25 w-full items-center justify-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap';
+const ETIQUETA = 'mx-auto flex h-6.25 w-36 items-center justify-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap';
 
 const TONO: Record<AttentionTone, { icono: string; etiqueta: string }> = {
   // Acento del sistema (lima) para lo que espera una decisión.
@@ -18,10 +18,11 @@ const TONO: Record<AttentionTone, { icono: string; etiqueta: string }> = {
   bloqueo: { icono: 'text-error', etiqueta: 'bg-status-error text-on-status-error' },
 };
 
-// Anchos compartidos por el encabezado de columnas y las filas. «Estado» se
-// oculta donde la tarjeta es estrecha (móvil y `lg`, con la sidebar abierta).
-const COL_ESTADO = 'hidden w-36 shrink-0 text-center sm:block lg:hidden xl:block';
-const COL_TOTAL = 'w-10 shrink-0 text-right';
+// Anchos compartidos por el encabezado de columnas y las filas, y los mismos
+// (11rem y 7rem, centradas) que las tablas de Seguimiento del panel, para que
+// las columnas caigan en la misma vertical. «Estado» se oculta en móvil.
+const COL_ESTADO = 'hidden w-44 shrink-0 text-center sm:block';
+const COL_TOTAL = 'relative w-16 shrink-0 text-center sm:w-28';
 
 interface AttentionRow {
   clave: string;
@@ -108,7 +109,6 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
         <span className="min-w-0 flex-1">Tipo</span>
         <span className={COL_ESTADO}>Estado</span>
         <span className={COL_TOTAL}>Total</span>
-        <span className="size-4 shrink-0" />
       </div>
 
       <ul className="divide-y divide-outline-variant/50">
@@ -135,10 +135,13 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
               <div className={COL_ESTADO}>
                 {fila.valor > 0 && <span className={`${ETIQUETA} ${tono.etiqueta}`}>{fila.accion}</span>}
               </div>
-              <span className={`${COL_TOTAL} font-headline text-2xl font-bold tabular-nums text-text-primary`}>
-                {fila.valor}
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
+              <div className={COL_TOTAL}>
+                <span className="font-headline text-2xl font-bold tabular-nums text-text-primary">{fila.valor}</span>
+                <ChevronRight
+                  className="absolute right-0 top-1/2 size-4 -translate-y-1/2 text-text-secondary"
+                  aria-hidden="true"
+                />
+              </div>
             </li>
           );
         })}

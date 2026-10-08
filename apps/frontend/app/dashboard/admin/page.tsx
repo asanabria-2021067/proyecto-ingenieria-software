@@ -7,7 +7,6 @@ import {
   Users,
   AlertCircle,
   Calendar,
-  GraduationCap,
   ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -200,7 +199,8 @@ function AdminStatsSkeleton() {
 // ─── Activity list ────────────────────────────────────────────────────────────
 
 // Anchos compartidos por el encabezado de columnas y las filas (desde `sm`;
-// en móvil la fila se apila y el encabezado se oculta).
+// en móvil la fila se apila y el encabezado se oculta). Las tres tablas del
+// panel usan 11rem y 7rem centradas para sus dos últimas columnas.
 const ACT_COL_ESTADO = 'flex shrink-0 sm:w-44 sm:justify-center';
 const ACT_COL_ACCION = 'shrink-0 text-center sm:w-28';
 /** Misma etiqueta de estado que las tarjetas de «Proyectos»; el cierre solicitado va en dorado fijo. */
@@ -260,23 +260,20 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
 }
 
 // ─── Risk students list ───────────────────────────────────────────────────────
+// Mismas dos columnas finales que el resto de tablas del panel; en móvil se
+// estrechan para dejar sitio al nombre.
+const RIESGO_COL_SEMESTRE = 'w-16 shrink-0 text-center sm:w-44';
+const RIESGO_COL_HORAS = 'flex w-24 shrink-0 justify-center sm:w-28';
 
 function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) {
   const tituloId = useId();
   return (
     <section aria-labelledby={tituloId} className="card-base flex h-full flex-col overflow-hidden p-0">
-      <header className="flex items-start gap-inline border-b border-outline-variant/50 px-card py-stack">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-status-error">
-          <GraduationCap className="size-5 text-on-status-error" aria-hidden="true" />
-        </div>
-        <div className="min-w-0">
-          <h3 id={tituloId} className="type-subtitle font-semibold text-balance">
-            Estudiantes en riesgo de horas
-          </h3>
-          <p className="type-meta">
-            Estudiantes del semestre 7 en adelante con pocas horas acumuladas
-          </p>
-        </div>
+      <header className="border-b border-outline-variant/50 px-card py-stack">
+        <h3 id={tituloId} className="type-subtitle text-lg font-semibold text-balance">
+          Estudiantes en riesgo de horas
+        </h3>
+        <p className="type-meta">Estudiantes del semestre 7 en adelante con pocas horas acumuladas</p>
       </header>
       {items.length === 0 ? (
         <p className="type-body px-card py-stack text-text-secondary">No hay estudiantes en riesgo</p>
@@ -284,11 +281,11 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
         <>
           <div
             aria-hidden="true"
-            className="flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold text-text-secondary"
+            className="flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight type-meta font-medium"
           >
             <span className="min-w-0 flex-1">Estudiante</span>
-            <span className="w-14 shrink-0 text-center">Semestre</span>
-            <span className="w-24 shrink-0 text-right">Horas</span>
+            <span className={RIESGO_COL_SEMESTRE}>Semestre</span>
+            <span className={RIESGO_COL_HORAS}>Horas</span>
           </div>
           <ul className="divide-y divide-outline-variant/50">
             {items.map((est) => (
@@ -299,10 +296,10 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
                 <p className="type-body min-w-0 flex-1 truncate font-medium">
                   {est.nombre} {est.apellido}
                 </p>
-                <span className="type-body w-14 shrink-0 text-center font-medium text-text-secondary">
+                <span className={`type-body ${RIESGO_COL_SEMESTRE} font-medium text-text-secondary`}>
                   {est.semestre !== null ? `S${est.semestre}` : '—'}
                 </span>
-                <span className="flex w-24 shrink-0 justify-end">
+                <span className={RIESGO_COL_HORAS}>
                   <span className="pill pill-error whitespace-nowrap tabular-nums">
                     {est.horasExtension} / {est.horasExtensionRequeridas} hrs
                   </span>
