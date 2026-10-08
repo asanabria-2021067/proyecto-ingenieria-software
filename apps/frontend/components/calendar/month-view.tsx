@@ -98,7 +98,7 @@ export function CalendarMonthGrid({
                   aria-current={isToday ? 'date' : undefined}
                   aria-pressed={isSelected}
                   aria-label={getDayLabel?.(day)}
-                  className={`flex min-w-0 flex-col items-stretch gap-1 rounded-control border text-left transition-colors ${
+                  className={`flex min-w-0 flex-col items-stretch gap-1 rounded-control border text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 ${
                     compacta ? 'min-h-[52px] p-0.5 sm:min-h-[92px] sm:p-1' : 'min-h-[92px] p-1'
                   } ${
                     hoyPrimario

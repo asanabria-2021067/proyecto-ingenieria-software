@@ -34,20 +34,26 @@ import type { AdminSprintCalendarItem } from '@/lib/types/admin-sprints';
  */
 export function SprintMonthView({
   hoy,
+  selectedKey,
+  onSelectDay,
   itemsByDay,
 }: {
   /** Día actual `YYYY-MM-DD` según el backend. */
   hoy: string;
+  /** Día seleccionado `YYYY-MM-DD`; lo lleva la página porque vive en la URL (`?fecha=`). */
+  selectedKey: string;
+  onSelectDay: (dia: string) => void;
   /** Sprints (ya filtrados) por día de finalización esperada. */
   itemsByDay: ReadonlyMap<string, AdminSprintCalendarItem[]>;
 }) {
-  const [cursor, setCursor] = useState(() => {
-    const fecha = parseFechaSolo(hoy);
-    return { year: fecha.getFullYear(), month: fecha.getMonth() };
-  });
-  // Se entra con hoy seleccionado, tenga o no finalizaciones: nunca se salta
-  // sola a una fecha pasada solo porque tenga datos.
-  const [selectedKey, setSelectedKey] = useState(hoy);
+  const [cursor, setCursor] = useState(() => mesDe(selectedKey));
+  // El mes sigue al día seleccionado (al llegar con `?fecha=`, al elegir un día
+  // del mes vecino o al pulsar «Hoy»), pero las flechas lo mueven libremente.
+  const [seguido, setSeguido] = useState(selectedKey);
+  if (seguido !== selectedKey) {
+    setSeguido(selectedKey);
+    setCursor(mesDe(selectedKey));
+  }
 
   const prefijoMes = `${cursor.year}-${String(cursor.month + 1).padStart(2, '0')}-`;
   let delMes = 0;
@@ -87,9 +93,9 @@ export function SprintMonthView({
       return { year: fecha.getFullYear(), month: fecha.getMonth() };
     });
   const irAHoy = () => {
-    const fecha = parseFechaSolo(hoy);
-    setCursor({ year: fecha.getFullYear(), month: fecha.getMonth() });
-    setSelectedKey(hoy);
+    // Si hoy ya estaba seleccionado, el mes no se movería solo.
+    setCursor(mesDe(hoy));
+    onSelectDay(hoy);
   };
 
   return (
@@ -122,7 +128,11 @@ export function SprintMonthView({
           <span className="type-meta tabular-nums">
             {delMes === 0 ? 'Sin finalizaciones planificadas este mes' : `${contarFinalizaciones(delMes)} este mes`}
           </span>
-          <button type="button" onClick={irAHoy} className="type-body font-medium text-primary hover:underline">
+          <button
+            type="button"
+            onClick={irAHoy}
+            className="type-body inline-flex min-h-8 items-center rounded-control px-tight font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
             Hoy
           </button>
         </div>
@@ -136,7 +146,7 @@ export function SprintMonthView({
             todayKey={hoy}
             todayTone="accent"
             selectedKey={selectedKey}
-            onSelectDay={setSelectedKey}
+            onSelectDay={onSelectDay}
             getDayLabel={(day) => {
               const items = itemsByDay.get(day.key) ?? [];
               return `${formatDiaLargoConAnio(day.key)}${day.key === hoy ? ', hoy' : ''}, ${
@@ -224,6 +234,11 @@ export function SprintMonthView({
       </div>
     </div>
   );
+}
+
+function mesDe(dia: string): { year: number; month: number } {
+  const fecha = parseFechaSolo(dia);
+  return { year: fecha.getFullYear(), month: fecha.getMonth() };
 }
 
 /** Tarjeta de un Sprint que finaliza el día elegido: proyecto, Sprint, situación, líder y fecha. */

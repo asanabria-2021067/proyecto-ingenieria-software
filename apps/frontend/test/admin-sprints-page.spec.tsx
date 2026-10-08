@@ -63,8 +63,10 @@ function calendario(items?: AdminSprintCalendarItem[]): AdminSprintCalendar {
   };
 }
 
-function renderPage(vista?: 'mes' | 'lista') {
-  searchParamsMock.mockReturnValue(new URLSearchParams(vista ? `vista=${vista}` : ''));
+function renderPage(vista?: 'mes' | 'lista', fecha?: string) {
+  const params = new URLSearchParams(vista ? `vista=${vista}` : '');
+  if (fecha !== undefined) params.set('fecha', fecha);
+  searchParamsMock.mockReturnValue(params);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
   return render(createElement(AdminSprintsClient), { wrapper });
@@ -330,5 +332,75 @@ describe('Calendario de Sprints — carga, vacío y error', () => {
     fireEvent.click(dia(/^8 de octubre de 2026,/));
     fireEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
     expect(getCalendarMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Calendario de Sprints — día en la URL (?fecha=)', () => {
+  it('?fecha= abre su mes, selecciona ese día y muestra sus finalizaciones sin tocar «hoy»', async () => {
+    renderPage('mes', '2026-09-06');
+    await screen.findByRole('heading', { level: 2, name: 'Septiembre 2026' });
+
+    expect(dia(/^6 de septiembre de 2026,/)).toHaveAttribute('aria-pressed', 'true');
+    const panel = within(detalle());
+    expect(panel.getByRole('heading', { level: 2, name: '6 de septiembre de 2026' })).toBeInTheDocument();
+    expect(panel.getByText('Feria tecnológica')).toBeInTheDocument();
+  });
+
+  it('una fecha sin Sprints lo dice en el panel', async () => {
+    renderPage('mes', '2026-11-20');
+    await screen.findByRole('heading', { level: 2, name: 'Noviembre 2026' });
+
+    expect(within(detalle()).getByText('No hay finalizaciones planificadas para este día.')).toBeInTheDocument();
+  });
+
+  it.each(['2026-02-30', '2026-13-01', 'hoy', '2026-1-5', ''])('fecha inválida «%s» cae en el hoy del servidor', async (fecha) => {
+    renderPage('mes', fecha);
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+
+    expect(dia(/^6 de octubre de 2026, hoy/)).toHaveAttribute('aria-pressed', 'true');
+    expect(within(detalle()).getByRole('heading', { level: 2, name: '6 de octubre de 2026' })).toBeInTheDocument();
+  });
+
+  it('elegir otro día actualiza la selección y reescribe ?fecha= sin navegar', async () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    renderPage('mes');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+
+    fireEvent.click(dia(/^8 de octubre de 2026,/));
+    expect(replaceState).toHaveBeenLastCalledWith(null, '', '/dashboard/admin/sprints?vista=mes&fecha=2026-10-08');
+    expect(dia(/^8 de octubre de 2026,/)).toHaveAttribute('aria-pressed', 'true');
+    // Hoy conserva su marca propia aunque ya no sea el día seleccionado.
+    expect(dia(/^6 de octubre de 2026, hoy/)).toHaveAttribute('aria-current', 'date');
+    replaceState.mockRestore();
+  });
+
+  it('«Hoy» vuelve al mes y al día actuales del servidor y actualiza la URL', async () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    renderPage('mes', '2026-09-06');
+    await screen.findByRole('heading', { level: 2, name: 'Septiembre 2026' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hoy' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Octubre 2026' })).toBeInTheDocument();
+    expect(dia(/^6 de octubre de 2026, hoy/)).toHaveAttribute('aria-pressed', 'true');
+    expect(replaceState).toHaveBeenLastCalledWith(null, '', '/dashboard/admin/sprints?vista=mes&fecha=2026-10-06');
+    replaceState.mockRestore();
+  });
+
+  it('elegir un día del mes vecino lleva el calendario a ese mes', async () => {
+    renderPage('mes');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+
+    fireEvent.click(dia(/^1 de noviembre de 2026,/));
+    expect(screen.getByRole('heading', { level: 2, name: 'Noviembre 2026' })).toBeInTheDocument();
+  });
+
+  it('el selector de vista conserva el día elegido', async () => {
+    renderPage('mes', '2026-10-08');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+
+    expect(screen.getByRole('link', { name: 'Lista' })).toHaveAttribute(
+      'href',
+      '/dashboard/admin/sprints?vista=lista&fecha=2026-10-08',
+    );
   });
 });

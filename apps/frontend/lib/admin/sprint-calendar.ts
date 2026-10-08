@@ -1,4 +1,4 @@
-import { parseFechaSolo } from '@/lib/calendar/utils';
+import { parseFechaSolo, toDateKey } from '@/lib/calendar/utils';
 import type { AdminSprintCalendarItem, AdminSprintSituacion } from '@/lib/types/admin-sprints';
 
 /**
@@ -101,13 +101,33 @@ export function formatDiaLargo(dia: string): string {
   return `${fecha.getDate()} de ${MESES[fecha.getMonth()]}`;
 }
 
-/** Nombre accesible de un día marcado: «8 de octubre, 3 finalizaciones planificadas». */
+/** Nombre accesible de un día: «8 de octubre, 3 finalizaciones planificadas» o «…, sin finalizaciones planificadas». */
 export function describePlannedDay(dia: string, cantidad: number): string {
-  const sufijo = cantidad === 1 ? '1 finalización planificada' : `${cantidad} finalizaciones planificadas`;
+  const sufijo =
+    cantidad === 0
+      ? 'sin finalizaciones planificadas'
+      : cantidad === 1
+        ? '1 finalización planificada'
+        : `${cantidad} finalizaciones planificadas`;
   return `${formatDiaLargo(dia)}, ${sufijo}`;
 }
 
 // ─── Vista completa (/dashboard/admin/sprints) ───────────────────────────────
+
+/**
+ * Día `YYYY-MM-DD` del parámetro `?fecha=`, o `null` si falta o no es un día
+ * real del calendario (`2026-02-30`, `hoy`, `2026-1-5`…). Quien lo usa cae en
+ * el «hoy» del servidor: un enlace roto nunca rompe la página.
+ */
+export function parseFechaParam(valor: string | null | undefined): string | null {
+  if (!valor || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return null;
+  return toDateKey(parseFechaSolo(valor)) === valor ? valor : null;
+}
+
+/** Enlace al calendario de Sprints en una vista y, si se indica, con un día seleccionado. */
+export function adminSprintsHref(vista: 'mes' | 'lista', fecha?: string | null): string {
+  return `/dashboard/admin/sprints?vista=${vista}${fecha ? `&fecha=${fecha}` : ''}`;
+}
 
 /** Etiqueta corta de la situación para filtros, tabla y detalle del día. */
 export const SITUACION_SPRINT_LABEL_CORTA: Record<AdminSprintSituacion, string> = {

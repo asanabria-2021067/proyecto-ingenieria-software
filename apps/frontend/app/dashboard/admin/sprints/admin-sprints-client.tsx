@@ -23,8 +23,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminSprintCalendar } from '@/hooks/use-admin-sprint-calendar';
 import {
   SITUACION_SPRINT_LABEL_CORTA,
+  adminSprintsHref,
   filterSprintsBySituacion,
   groupSprintsByPlannedDay,
+  parseFechaParam,
   searchSprints,
   sortSprintsForSupervision,
 } from '@/lib/admin/sprint-calendar';
@@ -40,21 +42,21 @@ import type { AdminSprintSituacion } from '@/lib/types/admin-sprints';
  * hoy o sigue en curso lo dice el backend (`situacion`). El administrador
  * supervisa: la única acción es abrir el detalle administrativo del proyecto.
  *
- * La vista vive en la URL (`?vista=mes|lista`, Mes por defecto); la búsqueda y
- * el filtro son estado local y se conservan al cambiar de vista.
+ * La vista y el día seleccionado viven en la URL (`?vista=mes|lista&fecha=
+ * YYYY-MM-DD`; Mes y el «hoy» del servidor por defecto): el mini calendario
+ * del panel enlaza a un día concreto. La búsqueda y el filtro son estado local
+ * y se conservan al cambiar de vista.
  */
 
 type Vista = 'mes' | 'lista';
 const FILTRO_TODAS = 'TODAS';
-const RUTA = '/dashboard/admin/sprints';
-const hrefVista = (vista: Vista) => `${RUTA}?vista=${vista}`;
 
 /**
  * Selector Mes | Lista, con el mismo grupo de botones del calendario del
  * estudiante. Son enlaces: la vista es navegable, compartible y sobrevive a
  * la recarga.
  */
-function SelectorVista({ vista }: { vista: Vista }) {
+function SelectorVista({ vista, fecha }: { vista: Vista; fecha: string | null }) {
   return (
     <nav aria-label="Vista del calendario">
       <ButtonGroup>
@@ -65,7 +67,7 @@ function SelectorVista({ vista }: { vista: Vista }) {
             variant={opcion === vista ? 'default' : 'outline'}
             className="h-9 rounded-md text-xs font-bold"
           >
-            <Link href={hrefVista(opcion)} aria-current={opcion === vista ? 'page' : undefined}>
+            <Link href={adminSprintsHref(opcion, fecha)} aria-current={opcion === vista ? 'page' : undefined}>
               {opcion === 'mes' ? 'Mes' : 'Lista'}
             </Link>
           </Button>
@@ -118,6 +120,22 @@ export default function AdminSprintsClient() {
   const searchParams = useSearchParams();
   const vista: Vista = searchParams.get('vista') === 'lista' ? 'lista' : 'mes';
   const { data, isPending, isError, isFetching, refetch } = useAdminSprintCalendar();
+
+  // Día elegido. Arranca en `?fecha=` (validada) y, si falta o no sirve, se
+  // usa el «hoy» del servidor al pintar. Elegir otro día actualiza el estado y
+  // reescribe la URL con la History API, que Next sincroniza sin pedir nada al
+  // servidor; si la URL cambia desde fuera (otro enlace), el estado la sigue.
+  const fechaParam = parseFechaParam(searchParams.get('fecha'));
+  const [fecha, setFecha] = useState(fechaParam);
+  const [fechaSeguida, setFechaSeguida] = useState(fechaParam);
+  if (fechaSeguida !== fechaParam) {
+    setFechaSeguida(fechaParam);
+    setFecha(fechaParam);
+  }
+  const seleccionarDia = (dia: string) => {
+    setFecha(dia);
+    window.history.replaceState(null, '', adminSprintsHref('mes', dia));
+  };
 
   const [busqueda, setBusqueda] = useState('');
   const [situacion, setSituacion] = useState<AdminSprintSituacion | null>(null);
@@ -178,7 +196,7 @@ export default function AdminSprintsClient() {
               </span>
             </div>
           )}
-          <SelectorVista vista={vista} />
+          <SelectorVista vista={vista} fecha={fecha} />
         </div>
       </header>
 
@@ -234,7 +252,7 @@ export default function AdminSprintsClient() {
               {/* Un Sprint sin fecha no cae en ningún día: en Mes se avisa y se lleva a la Lista. */}
               {vista === 'mes' && sinFecha > 0 && (
                 <Link
-                  href={hrefVista('lista')}
+                  href={adminSprintsHref('lista', fecha)}
                   onClick={() => setSituacion('SIN_FECHA')}
                   className="type-meta inline-flex min-h-8 items-center gap-micro rounded-control font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
@@ -298,7 +316,12 @@ export default function AdminSprintsClient() {
             </EmptyContent>
           </Empty>
         ) : vista === 'mes' ? (
-          <SprintMonthView hoy={data.hoy} itemsByDay={itemsByDay} />
+          <SprintMonthView
+            hoy={data.hoy}
+            selectedKey={fecha ?? data.hoy}
+            onSelectDay={seleccionarDia}
+            itemsByDay={itemsByDay}
+          />
         ) : (
           <SprintListView items={ordenados} />
         )}
