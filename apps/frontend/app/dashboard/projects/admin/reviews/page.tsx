@@ -78,7 +78,7 @@ export default function AdminReviewsInboxPage() {
             <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
               Administración
             </span>
-            <h1 className="font-headline text-3xl font-black tracking-tighter text-on-surface md:text-4xl">
+            <h1 className="type-display text-balance">
               Revisiones
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-tertiary">

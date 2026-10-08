@@ -334,7 +334,7 @@ export default function AppealsInboxClient() {
       <section className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">Gobernanza</span>
-          <h1 className="flex items-center gap-2 font-headline text-3xl font-black tracking-tighter text-on-surface md:text-4xl">
+          <h1 className="type-display flex items-center gap-2">
             <Gavel className="size-7 text-primary" aria-hidden="true" />
             Apelaciones de liderazgo
           </h1>

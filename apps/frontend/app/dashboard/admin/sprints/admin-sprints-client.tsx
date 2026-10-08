@@ -160,7 +160,7 @@ export default function AdminSprintsClient() {
           <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
             Administración
           </span>
-          <h1 className="font-headline text-3xl font-black tracking-tight text-balance text-on-surface md:text-4xl">
+          <h1 className="type-display text-balance">
             Calendario de Sprints
           </h1>
           <p className="mt-tight max-w-2xl text-base text-tertiary">

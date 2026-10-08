@@ -334,7 +334,7 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
           <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
             Administración
           </span>
-          <h1 className="font-headline text-4xl font-black tracking-tight text-balance text-on-surface">
+          <h1 className="type-display text-balance">
             Panel de Administración
           </h1>
           <p className="mt-tight max-w-2xl text-base text-tertiary">

@@ -253,7 +253,7 @@ export default function AdminUsuariosPage() {
             <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
               Administración
             </span>
-            <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
+            <h1 className="type-display text-balance">
               Gestión de Usuarios
             </h1>
             <p className="mt-2 max-w-2xl text-base text-tertiary">

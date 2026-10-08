@@ -151,7 +151,7 @@ export default function AdminProjectsClient() {
           Administración
         </span>
         <div className="flex flex-wrap items-baseline gap-inline">
-          <h1 className="font-headline text-3xl font-black tracking-tight text-balance text-on-surface md:text-4xl">
+          <h1 className="type-display text-balance">
             {ADMIN_PROJECT_GROUP_LABEL[grupo]}
           </h1>
           {totalEncabezado !== undefined && (
