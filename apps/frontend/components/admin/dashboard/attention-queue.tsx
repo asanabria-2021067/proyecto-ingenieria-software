@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import Link from 'next/link';
-import { GOLD_BADGE, GREEN_BADGE } from '@/components/projects/available-project-card';
+import { GOLD_BADGE, GOLD_ICON, GREEN_BADGE } from '@/components/projects/available-project-card';
 import { AlertTriangle, ChevronRight, ClipboardList, Clock, type LucideIcon } from 'lucide-react';
 
 type AttentionTone = 'atencion' | 'cierre' | 'bloqueo';
@@ -13,7 +13,7 @@ const TONO: Record<AttentionTone, { icono: string; etiqueta: string }> = {
   // Acento del sistema (lima) para lo que espera una decisión.
   atencion: { icono: 'text-secondary-fixed-dim dark:text-secondary-fixed', etiqueta: GREEN_BADGE },
   // Mismo dorado que la etiqueta de proyecto en solicitud de cierre.
-  cierre: { icono: 'text-[#775700] dark:text-[#ffd873]', etiqueta: GOLD_BADGE },
+  cierre: { icono: GOLD_ICON, etiqueta: GOLD_BADGE },
   // El rojo queda solo para accesos restringidos.
   bloqueo: { icono: 'text-error', etiqueta: 'bg-status-error text-on-status-error' },
 };

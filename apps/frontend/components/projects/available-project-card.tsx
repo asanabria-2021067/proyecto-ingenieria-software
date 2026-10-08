@@ -36,6 +36,8 @@ const YELLOW_BADGE = 'bg-[#FFF1C4] text-[#956500] dark:bg-[#453405] dark:text-[#
 export const GREEN_BADGE = 'bg-[#E2F1DD] text-[#286327] dark:bg-[#123a1a] dark:text-[#6fe08a]';
 const ORANGE_BADGE = 'bg-[#FBE8D5] text-[#A85A00] dark:bg-[#3a2308] dark:text-[#ffab5c]';
 export const GOLD_BADGE = 'bg-[#F6E7B0] text-[#775700] dark:bg-[#453405] dark:text-[#ffd873]';
+/** Tono de texto de `GOLD_BADGE`, para iconos dorados sin fondo. */
+export const GOLD_ICON = 'text-[#775700] dark:text-[#ffd873]';
 export const SLATE_BADGE = 'bg-[#E2E9F7] text-[#486386] dark:bg-[#182740] dark:text-[#9dc1ea]';
 
 const TIPO_BADGE_STYLE: Partial<Record<TipoProyecto, string>> = {
@@ -220,7 +222,7 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Lock,
-        secondaryIconClassName: 'text-[#775700] dark:text-[#ffd873]',
+        secondaryIconClassName: GOLD_ICON,
       };
     case 'EN_SOLICITUD_CIERRE':
       return {
