@@ -117,15 +117,36 @@ function getPrimaryRole(roles: string[]): string {
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
-/** Tarjeta de sección: misma tarjeta blanca y mismo rótulo que el perfil del estudiante. */
+/**
+ * Encabezado de sección del drawer: el título centrado en una caja pequeña,
+ * con una línea de 1 px a cada lado. Va ENCIMA de la tarjeta, no dentro. Es un
+ * rótulo, no un control: sin sombra, sin hover y sin forma de píldora.
+ */
+function DrawerSectionHeading({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-inline">
+      <span aria-hidden="true" className="h-px flex-1 bg-outline-variant/60" />
+      <h3 className="rounded-md border border-outline-variant/60 bg-surface-container-lowest px-inline py-micro text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {title}
+      </h3>
+      <span aria-hidden="true" className="h-px flex-1 bg-outline-variant/60" />
+    </div>
+  );
+}
+
+/**
+ * Sección del drawer: encabezado centrado y, debajo, su tarjeta blanca (la
+ * misma del perfil del estudiante). `aside` va dentro de la tarjeta, arriba a
+ * la derecha (p. ej. el contador de colaboraciones).
+ */
 function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="card-base p-stack">
-      <div className="mb-inline flex items-center justify-between gap-tight">
-        <h3 className="type-meta uppercase tracking-wide">{title}</h3>
-        {aside}
+    <section className="space-y-inline">
+      <DrawerSectionHeading title={title} />
+      <div className="card-base p-stack">
+        {aside && <div className="mb-inline flex justify-end">{aside}</div>}
+        {children}
       </div>
-      {children}
     </section>
   );
 }
@@ -187,7 +208,7 @@ function EstudianteContent({ user }: { user: AdminUserDetail }) {
     (actividad?.postulaciones.rechazadas ?? 0);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       {enRiesgo && (
         <div className="flex gap-tight rounded-control border border-attention/30 bg-attention/10 p-inline">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-attention-strong dark:text-attention" aria-hidden="true" />
@@ -264,7 +285,7 @@ function MentorContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadMentor;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       <Section title="Actividad como mentor">
         <div className="grid grid-cols-2 gap-2">
           <MetricCard label="Proyectos donde participa" value={act?.proyectosDondeParticipa ?? 0} />
@@ -302,7 +323,7 @@ function LiderContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadLider;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       <Section title="Actividad como líder">
         <div className="grid grid-cols-2 gap-2">
           <MetricCard label="Proyectos creados" value={act?.proyectosCreados ?? 0} />
@@ -372,7 +393,7 @@ function CoordinadorContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadCoordinador;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       <Section title="Actividad como coordinador">
         <div className="grid grid-cols-2 gap-2">
           <MetricCard label="Proyectos supervisados" value={act?.proyectosSupervisados ?? 0} />
@@ -417,7 +438,7 @@ function AdministradorContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadAdmin;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       <Section title="Permisos administrativos">
         <dl>
         <InfoRow
@@ -762,7 +783,7 @@ export function UserDetailSheet({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="space-y-stack p-stack">
+          <div className="space-y-card p-stack">
             {isLoading && <DrawerSkeleton />}
 
             {isError && (

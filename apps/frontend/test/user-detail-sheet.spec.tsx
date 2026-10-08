@@ -380,6 +380,29 @@ describe('UserDetailSheet — rediseño con el lenguaje del perfil del estudiant
     await waitFor(() => expect(getPerfilUsuarioMock).toHaveBeenCalledTimes(2));
   });
 
+  it('cada sección lleva su título encima de la tarjeta, no dentro, y el contador de proyectos queda dentro', async () => {
+    getPerfilUsuarioMock.mockResolvedValue({
+      proyectosActivos: [{ idProyecto: 7, tituloProyecto: 'Plataforma de Tutorías UVG', estadoProyecto: 'EN_PROGRESO', rolNombre: 'Colaborador' }],
+    });
+    renderSheet();
+    await screen.findByText('Plataforma de Tutorías UVG');
+
+    for (const titulo of ['Información institucional', 'Proyectos activos', 'Acciones administrativas']) {
+      const encabezado = screen.getByRole('heading', { level: 3, name: titulo });
+      const seccion = encabezado.closest('section') as HTMLElement;
+      const tarjeta = seccion.querySelector('.card-base') as HTMLElement;
+      expect(tarjeta).not.toBeNull();
+      expect(tarjeta).not.toContainElement(encabezado);
+      // El título precede a su tarjeta y va flanqueado por dos líneas decorativas.
+      expect(encabezado.compareDocumentPosition(tarjeta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(encabezado.parentElement?.querySelectorAll('span[aria-hidden="true"]')).toHaveLength(2);
+    }
+    const proyectos = proyectosActivos();
+    const contador = within(proyectos).getByText('1 colaboración');
+    expect(proyectos.querySelector('.card-base')).toContainElement(contador);
+    expect(screen.getByRole('heading', { level: 3, name: 'Proyectos activos' })).toHaveTextContent(/^Proyectos activos$/);
+  });
+
   it('no trae nada social del perfil del estudiante', async () => {
     renderSheet();
     await screen.findByText(/Información institucional/i);
