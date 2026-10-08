@@ -59,7 +59,7 @@ function SelectorVista({ vista }: { vista: Vista }) {
             key={opcion}
             href={hrefVista(opcion)}
             aria-current={activa ? 'page' : undefined}
-            className={`flex min-h-9 min-w-20 items-center justify-center rounded-[calc(var(--radius-control)-var(--spacing-micro))] px-stack text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 ${
+            className={`flex min-h-11 min-w-20 items-center sm:min-h-9 justify-center rounded-[calc(var(--radius-control)-var(--spacing-micro))] px-stack text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 ${
               activa
                 ? 'bg-surface-container-lowest text-text-primary shadow-card'
                 : 'text-text-secondary hover:text-text-primary'

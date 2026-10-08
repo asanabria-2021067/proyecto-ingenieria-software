@@ -74,26 +74,26 @@ export function SprintMonthView({
               type="button"
               variant="outline"
               size="icon-sm"
-              className="rounded-control"
+              className="size-11 rounded-control sm:size-8"
               aria-label="Mes anterior"
               onClick={() => mover(-1)}
             >
               <ChevronLeft className="size-4" aria-hidden="true" />
             </Button>
-            <h2 className="type-section min-w-40 text-center" aria-live="polite">
+            <h2 className="type-section min-w-36 text-center sm:min-w-40" aria-live="polite">
               {formatMonthLabel(cursor.year, cursor.month)}
             </h2>
             <Button
               type="button"
               variant="outline"
               size="icon-sm"
-              className="rounded-control"
+              className="size-11 rounded-control sm:size-8"
               aria-label="Mes siguiente"
               onClick={() => mover(1)}
             >
               <ChevronRight className="size-4" aria-hidden="true" />
             </Button>
-            <Button type="button" variant="ghost" size="sm" className="font-medium text-primary" onClick={irAHoy}>
+            <Button type="button" variant="ghost" size="sm" className="min-h-11 font-medium text-primary sm:min-h-8" onClick={irAHoy}>
               Hoy
             </Button>
           </div>
@@ -137,14 +137,14 @@ export function SprintMonthView({
                     } ${day.inCurrentMonth ? 'text-text-primary' : 'text-text-disabled'}`}
                   >
                     <span
-                      className={`flex size-6 items-center justify-center self-end rounded-pill text-xs font-medium tabular-nums ${
+                      className={`flex size-6 items-center justify-center self-end rounded-pill text-xs font-medium tabular-nums sm:text-sm ${
                         isToday ? 'bg-accent font-bold text-on-accent' : ''
                       }`}
                     >
                       {day.date.getDate()}
                     </span>
                     {items.length > 0 && (
-                      <span className="mt-auto flex items-center gap-micro text-xs font-semibold tabular-nums text-text-primary">
+                      <span className="mt-auto flex items-center gap-micro text-xs font-semibold leading-4 tabular-nums text-text-primary sm:text-sm sm:leading-4">
                         <span
                           aria-hidden="true"
                           className={`size-2 shrink-0 rounded-pill ${conVencido ? 'bg-attention' : 'bg-primary'}`}
