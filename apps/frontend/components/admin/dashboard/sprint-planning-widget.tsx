@@ -129,7 +129,7 @@ function Metric({
         {label}
       </p>
       <p
-        className={`mt-micro font-headline text-3xl font-bold tabular-nums xl:mt-0 xl:text-2xl ${
+        className={`mt-micro font-headline text-3xl font-bold tabular-nums xl:text-2xl ${
           atencion ? 'text-attention-strong dark:text-attention' : 'text-text-primary'
         }`}
       >
@@ -189,7 +189,7 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
         </div>
 
         {(enFinalizacion > 0 || sinFecha > 0) && (
-          <ul className="flex flex-wrap gap-tight" aria-label="Otros Sprints en supervisión">
+          <ul className="flex flex-wrap justify-end gap-tight" aria-label="Otros Sprints en supervisión">
             {enFinalizacion > 0 && (
               <li className={`pill ${SITUACION_SPRINT_TONE.EN_FINALIZACION}`}>{enFinalizacion} en finalización</li>
             )}
@@ -223,10 +223,8 @@ function NextFinalization({ item }: { item: AdminSprintCalendarItem | null }) {
   }
 
   return (
-    <div className="flex items-start gap-inline border-t border-outline-variant/50 pt-stack xl:pt-tight">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
-        <CalendarClock className="size-5" aria-hidden="true" />
-      </div>
+    <div className="flex items-start gap-inline border-t border-outline-variant/50 pt-stack">
+      <CalendarClock className="size-5 shrink-0 text-primary" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Próxima finalización</p>
         <p className="mt-micro flex flex-wrap items-center gap-tight">
