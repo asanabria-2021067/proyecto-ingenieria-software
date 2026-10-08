@@ -112,13 +112,19 @@ describe('Panel de Administración (/dashboard/admin)', () => {
     expect(within(kpi('Usuarios Activos')).getByText('30')).toBeInTheDocument();
   });
 
-  it('Operación reúne la cola de atención y el resumen de Sprints, en ese orden', async () => {
+  it('Operación tiene la cola de atención y el resumen de Sprints la sigue en su propia columna', async () => {
     renderPage();
     const operacion = await screen.findByRole('region', { name: 'Operación' });
 
     const cola = within(operacion).getByRole('region', { name: 'Requieren atención' });
-    const sprints = within(operacion).getByRole('region', { name: 'Próximas finalizaciones de Sprint' });
+    // El resumen de Sprints es una columna aparte (complementaria), no una celda de Operación…
+    const columna = screen.getByRole('complementary', { name: 'Planificación de Sprints' });
+    const sprints = within(columna).getByRole('region', { name: 'Próximas finalizaciones de Sprint' });
+    expect(operacion).not.toContainElement(sprints);
+    // …y en el documento va entre Operación y Seguimiento: ese es su orden en tablet y móvil.
+    const seguimiento = screen.getByRole('region', { name: 'Seguimiento' });
     expect(cola.compareDocumentPosition(sprints) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sprints.compareDocumentPosition(seguimiento) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     expect(within(cola).getByText('En revisión')).toBeInTheDocument();
     expect(within(cola).getByText('Cierre pendiente')).toBeInTheDocument();

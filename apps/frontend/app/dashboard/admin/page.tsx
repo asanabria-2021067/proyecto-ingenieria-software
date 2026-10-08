@@ -59,14 +59,16 @@ function estadoLegible(estado: string): string {
 /** Encabezado de sección: la jerarquía del panel se lee por estos cuatro títulos. */
 function DashboardSection({
   titulo,
+  className,
   children,
 }: {
   titulo: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   const id = useId();
   return (
-    <section aria-labelledby={id}>
+    <section aria-labelledby={id} className={className}>
       <h2 id={id} className="type-section mb-stack">
         {titulo}
       </h2>
@@ -110,43 +112,97 @@ function StatCard({
   );
 }
 
+/**
+ * Fila KPI del bloque «Global»: misma información que una `StatCard` (icono,
+ * etiqueta, valor y subtexto) en una sola línea, para apilar los dos totales
+ * en una tarjeta compacta en vez de dos tarjetas grandes lado a lado.
+ */
+function StatRow({
+  label,
+  value,
+  subtexto,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  subtexto: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <li role="group" aria-label={label} className="flex items-center gap-inline px-card py-stack">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10">
+        <Icon className="size-5 text-primary" aria-hidden="true" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="type-body font-semibold">{label}</p>
+        <p className="type-meta">{subtexto}</p>
+      </div>
+      <span className="shrink-0 font-headline text-3xl font-bold tracking-tight tabular-nums text-text-primary">
+        {value}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * Rejilla del panel. Desde `xl` son dos columnas (~69 % / ~31 %): las
+ * secciones fluyen a la izquierda y el resumen de Sprints ocupa la derecha a
+ * todo lo alto. Por debajo (tablet y móvil) es una sola columna en orden de
+ * documento. El corte es `xl` y no `lg` porque la sidebar del shell ya resta
+ * 16rem: a 1024 px la columna derecha quedaría en ~210 px.
+ * La columna derecha no baja de 21rem: es lo que necesita el pie del widget
+ * para caber en una línea.
+ */
+const PANEL_GRID = 'grid grid-cols-1 gap-section xl:grid-cols-[minmax(0,2.2fr)_minmax(21rem,1fr)] xl:gap-x-grid';
+const COL_PRINCIPAL = 'min-w-0 xl:col-start-1';
+// Los márgenes negativos cancelan el `pt-8`/`pb-12` de la página para que la
+// columna mida el scroll completo: sin ellos el widget arranca 32 px bajo el
+// centro y se despega en los últimos 48 px.
+const COL_SPRINTS = 'min-w-0 xl:col-start-2 xl:row-span-5 xl:row-start-1 xl:-mb-12 xl:-mt-8';
+/**
+ * El resumen de Sprints acompaña el scroll: una caja `sticky` del alto visible
+ * (viewport menos la topbar de 4rem; el scroll es del contenedor del shell,
+ * no de la ventana) que centra el widget con márgenes automáticos. Si el
+ * widget no cabe (ventanas bajas), los márgenes colapsan y la caja hace
+ * scroll propio en vez de recortarlo. Solo desde `xl`.
+ */
+const SPRINTS_STICKY = 'xl:sticky xl:top-0 xl:flex xl:h-[calc(100dvh-4rem)] xl:overflow-y-auto xl:py-tight';
+
 // ─── Skeleton loaders ─────────────────────────────────────────────────────────
 
 function AdminStatsSkeleton() {
   return (
     <div className={PAGE_CLASS} role="status" aria-label="Cargando el panel de administración">
-      <section className="mb-section">
-        <Skeleton className="mb-tight h-3 w-28 rounded" />
-        <Skeleton className="h-10 w-72 max-w-full rounded" />
-        <Skeleton className="mt-tight h-5 w-96 max-w-full rounded" />
-      </section>
+      <div className={PANEL_GRID}>
+        <div className={COL_PRINCIPAL}>
+          <Skeleton className="mb-tight h-3 w-28 rounded" />
+          <Skeleton className="h-10 w-72 max-w-full rounded" />
+          <Skeleton className="mt-tight h-5 w-96 max-w-full rounded" />
+        </div>
 
-      <div className="flex flex-col gap-section">
-        <div>
+        <div className={COL_PRINCIPAL}>
           <Skeleton className="mb-stack h-5 w-20 rounded" />
-          <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
-            <Skeleton className="h-36 rounded-card" />
-            <Skeleton className="h-36 rounded-card" />
-          </div>
+          <Skeleton className="h-40 rounded-card" />
         </div>
 
-        <div>
+        <div className={COL_PRINCIPAL}>
           <Skeleton className="mb-stack h-5 w-28 rounded" />
-          <div className="grid grid-cols-1 gap-grid lg:grid-cols-5 lg:items-start">
-            <Skeleton className="h-72 rounded-card lg:col-span-3" />
-            <Skeleton className="h-96 rounded-card lg:col-span-2" />
-          </div>
+          <Skeleton className="h-72 rounded-card" />
         </div>
 
-        <div>
+        <div className={COL_SPRINTS}>
+          <Skeleton className="h-96 rounded-card xl:h-[36rem]" />
+        </div>
+
+        <div className={COL_PRINCIPAL}>
           <Skeleton className="mb-stack h-5 w-32 rounded" />
-          <div className="grid grid-cols-1 gap-grid lg:grid-cols-2">
+          <div className="flex flex-col gap-grid">
             <Skeleton className="h-64 rounded-card" />
             <Skeleton className="h-64 rounded-card" />
           </div>
         </div>
 
-        <div>
+        <div className={COL_PRINCIPAL}>
           <Skeleton className="mb-stack h-5 w-28 rounded" />
           <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
             <Skeleton className="h-36 rounded-card" />
@@ -273,69 +329,72 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
 function AdminPanelContent({ stats }: { stats: AdminStats }) {
   return (
     <div className={PAGE_CLASS}>
-      {/* Header */}
-      <section className="mb-section">
-        <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
-          Administración
-        </span>
-        <h1 className="font-headline text-4xl font-black tracking-tight text-balance text-on-surface">
-          Panel de Administración
-        </h1>
-        <p className="mt-tight max-w-2xl text-base text-tertiary">
-          Resumen general de actividad, usuarios y proyectos en UVGenius.
-        </p>
-      </section>
+      <div className={PANEL_GRID}>
+        {/* Encabezado: primera fila de la columna principal, para que la
+            columna de Sprints arranque arriba y quede centrada desde el inicio. */}
+        <header className={COL_PRINCIPAL}>
+          <span className="mb-tight block text-xs font-semibold uppercase tracking-widest text-primary">
+            Administración
+          </span>
+          <h1 className="font-headline text-4xl font-black tracking-tight text-balance text-on-surface">
+            Panel de Administración
+          </h1>
+          <p className="mt-tight max-w-2xl text-base text-tertiary">
+            Resumen general de actividad, usuarios y proyectos en UVGenius.
+          </p>
+        </header>
 
-      <div className="flex flex-col gap-section">
-        {/* 1. Estado general */}
-        <DashboardSection titulo="Global">
-          <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
-            <StatCard
+        {/* 1. Estado general: dos totales apilados en una tarjeta compacta. */}
+        <DashboardSection titulo="Global" className={COL_PRINCIPAL}>
+          <ul className="card-base divide-y divide-outline-variant/50 overflow-hidden p-0">
+            <StatRow
               label="Proyectos Activos"
               value={stats.proyectosActivos}
               subtexto="Actualmente publicados o en progreso"
               icon={FolderKanban}
             />
-            <StatCard
+            <StatRow
               label="Usuarios Activos"
               value={stats.usuariosActivos}
               subtexto="Cuentas activas en la plataforma"
               icon={Users}
             />
-          </div>
+          </ul>
         </DashboardSection>
 
-        {/* 2. Operación: qué espera una decisión y qué Sprints deberían terminar pronto.
-            El widget de Sprints consulta por su cuenta: si falla, el resto del panel sigue. */}
-        <DashboardSection titulo="Operación">
-          <div className="grid grid-cols-1 gap-grid lg:grid-cols-5 lg:items-start">
-            <div className="min-w-0 lg:col-span-3">
-              <AdminAttentionQueue
-                enRevision={stats.enRevision}
-                cierrePendiente={stats.cierrePendiente}
-                usuariosBloqueados={stats.usuariosBloqueados}
-              />
-            </div>
-            <div className="min-w-0 lg:col-span-2">
+        {/* 2. Operación: lo que espera una decisión. La cola termina donde
+            termina su contenido; ya no comparte fila con el calendario. */}
+        <DashboardSection titulo="Operación" className={COL_PRINCIPAL}>
+          <AdminAttentionQueue
+            enRevision={stats.enRevision}
+            cierrePendiente={stats.cierrePendiente}
+            usuariosBloqueados={stats.usuariosBloqueados}
+          />
+        </DashboardSection>
+
+        {/* Planificación de Sprints. En el documento va tras Operación (ese es
+            su orden en tablet y móvil); desde `xl` ocupa la columna derecha.
+            Consulta por su cuenta: si falla, el resto del panel sigue. */}
+        <aside aria-label="Planificación de Sprints" className={COL_SPRINTS}>
+          <div className={SPRINTS_STICKY}>
+            <div className="w-full xl:my-auto">
               <AdminSprintPlanningWidget />
             </div>
           </div>
-        </DashboardSection>
+        </aside>
 
         {/* 3. Seguimiento */}
-        <DashboardSection titulo="Seguimiento">
-          <div className="grid grid-cols-1 gap-grid lg:grid-cols-2 lg:items-stretch">
-            <div className="min-w-0">
-              <ActividadRecienteCard items={stats.actividadReciente} />
-            </div>
-            <div className="min-w-0">
-              <EstudiantesRiesgoCard items={stats.estudiantesEnRiesgo} />
-            </div>
+        <DashboardSection titulo="Seguimiento" className={COL_PRINCIPAL}>
+          {/* Apiladas: en la columna principal cada lista necesita el ancho
+              completo para que sus filas se lean en una sola línea. */}
+          <div className="flex flex-col gap-grid">
+            <ActividadRecienteCard items={stats.actividadReciente} />
+            <EstudiantesRiesgoCard items={stats.estudiantesEnRiesgo} />
           </div>
         </DashboardSection>
 
         {/* 4. Datos del período: históricos, al final para no competir con la operación. */}
-        <DashboardSection titulo="Datos 2026">
+        <DashboardSection titulo="Datos 2026" className={COL_PRINCIPAL}>
           <div className="grid grid-cols-1 gap-grid sm:grid-cols-2">
             <StatCard
               label="Nuevos Inactivos"
