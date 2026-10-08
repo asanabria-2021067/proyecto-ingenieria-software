@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, CalendarClock, CalendarRange, RotateCw } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarClock, RotateCw } from 'lucide-react';
 import { MiniCalendar } from '@/components/calendar/mini-calendar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,33 +36,39 @@ export function AdminSprintPlanningWidget() {
   const { data, isLoading, isError, isFetching, refetch } = useAdminSprintCalendar();
 
   return (
-    <section aria-labelledby={tituloId} className="card-base flex h-full flex-col gap-stack xl:gap-inline xl:p-stack">
-      <header className="flex items-start gap-inline">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
-          <CalendarRange className="size-5" aria-hidden="true" />
-        </div>
-        <div className="min-w-0">
-          <h3 id={tituloId} className="type-subtitle font-semibold text-balance">
-            Próximas finalizaciones de Sprint
-          </h3>
-          <p className="type-meta">Supervisa las fechas esperadas de los Sprints activos.</p>
-        </div>
+    // Tarjetas separadas por un intervalo corto: título, métricas y calendario
+    // se leen como un mismo bloque sin compartir una sola superficie.
+    <section aria-labelledby={tituloId} className="flex h-full flex-col gap-tight">
+      <header className="card-base px-stack py-inline xl:py-tight">
+        <h3 id={tituloId} className="type-subtitle font-semibold text-balance">
+          Próximas finalizaciones de Sprint
+        </h3>
+        <p className="type-meta">Supervisa las fechas esperadas de los Sprints activos.</p>
       </header>
 
       {isLoading ? (
-        <SprintPlanningSkeleton />
+        <div className={TARJETA}>
+          <SprintPlanningSkeleton />
+        </div>
       ) : isError || !data ? (
-        <SprintPlanningError onRetry={() => void refetch()} retrying={isFetching} />
+        <div className={TARJETA}>
+          <SprintPlanningError onRetry={() => void refetch()} retrying={isFetching} />
+        </div>
       ) : data.items.length === 0 ? (
-        <p className="type-body rounded-control bg-surface-container-low p-stack text-center text-text-secondary">
-          No hay Sprints operables para supervisar.
-        </p>
+        <div className={TARJETA}>
+          <p className="type-body rounded-control bg-surface-container-low p-stack text-center text-text-secondary">
+            No hay Sprints operables para supervisar.
+          </p>
+        </div>
       ) : (
         <SprintPlanningContent calendar={data} />
       )}
     </section>
   );
 }
+
+/** Tarjeta del cuerpo del widget. Desde `xl` vive en la columna lateral del panel, un paso más ceñida. */
+const TARJETA = 'card-base flex flex-col gap-stack xl:gap-inline xl:p-stack';
 
 function SprintPlanningSkeleton() {
   return (
@@ -76,10 +82,20 @@ function SprintPlanningSkeleton() {
 
 function SprintPlanningError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
   return (
-    <div role="alert" className="flex flex-col items-center gap-inline rounded-control bg-surface-container-low p-stack text-center">
+    <div
+      role="alert"
+      className="flex flex-col items-center gap-inline rounded-control bg-surface-container-low p-stack text-center"
+    >
       <AlertCircle className="size-6 text-error" aria-hidden="true" />
       <p className="type-body text-text-secondary">No se pudo cargar la planificación de Sprints.</p>
-      <Button type="button" variant="outline" size="sm" className="rounded-control" onClick={onRetry} disabled={retrying}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="rounded-control"
+        onClick={onRetry}
+        disabled={retrying}
+      >
         <RotateCw className={`size-4 ${retrying ? 'animate-spin' : ''}`} aria-hidden="true" />
         Reintentar
       </Button>
@@ -87,17 +103,35 @@ function SprintPlanningError({ onRetry, retrying }: { onRetry: () => void; retry
   );
 }
 
-function Metric({ label, value, atencion = false }: { label: string; value: number; atencion?: boolean }) {
+/**
+ * Métrica del resumen, con la misma interfaz que las tarjetas KPI de Mis
+ * Tareas (punto de color + etiqueta en versalitas + número) y el tamaño
+ * compacto de este widget. El punto distingue la métrica sin otro icono.
+ */
+function Metric({
+  label,
+  value,
+  punto,
+  atencion = false,
+}: {
+  label: string;
+  value: number;
+  punto: string;
+  atencion?: boolean;
+}) {
   return (
-    <div className="min-w-0 px-stack py-inline first:pl-0 last:pr-0 xl:py-tight">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</dt>
-      <dd
+    <div role="group" aria-label={label} className="card-base min-w-0 px-stack py-inline xl:py-tight">
+      <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${punto}`} />
+        {label}
+      </p>
+      <p
         className={`mt-micro font-headline text-3xl font-bold tabular-nums xl:text-2xl ${
           atencion ? 'text-attention-strong dark:text-attention' : 'text-text-primary'
         }`}
       >
         {value}
-      </dd>
+      </p>
     </div>
   );
 }
@@ -120,50 +154,55 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
 
   return (
     <>
-      <dl className="grid grid-cols-2 divide-x divide-outline-variant/50 border-y border-outline-variant/50">
-        <Metric label="Próximos 7 días" value={calendar.resumen.proximos7Dias} />
-        <Metric label="Plan vencido" value={calendar.resumen.planVencido} atencion={calendar.resumen.planVencido > 0} />
-      </dl>
-
-      <div className="mx-auto w-full max-w-sm">
-        <MiniCalendar
-          year={cursor.year}
-          month={cursor.month}
-          todayKey={calendar.hoy}
-          markedDates={diasMarcados}
-          markedCounts={porDia}
-          getDayLabel={describePlannedDay}
-          onPrevMonth={() =>
-            setCursor(({ year, month }) => (month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 }))
-          }
-          onNextMonth={() =>
-            setCursor(({ year, month }) => (month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 }))
-          }
+      <div className="grid grid-cols-2 gap-tight">
+        <Metric label="Próximos 7 días" value={calendar.resumen.proximos7Dias} punto="bg-primary" />
+        <Metric
+          label="Plan vencido"
+          value={calendar.resumen.planVencido}
+          punto="bg-attention"
+          atencion={calendar.resumen.planVencido > 0}
         />
       </div>
 
-      {(enFinalizacion > 0 || sinFecha > 0) && (
-        <ul className="flex flex-wrap gap-tight" aria-label="Otros Sprints en supervisión">
-          {enFinalizacion > 0 && (
-            <li className={`pill ${SITUACION_SPRINT_TONE.EN_FINALIZACION}`}>
-              {enFinalizacion} en finalización
-            </li>
-          )}
-          {sinFecha > 0 && (
-            <li className={`pill ${SITUACION_SPRINT_TONE.SIN_FECHA}`}>{sinFecha} sin fecha planificada</li>
-          )}
-        </ul>
-      )}
+      <div className={`${TARJETA} flex-1`}>
+        <div className="mx-auto w-full max-w-sm">
+          <MiniCalendar
+            year={cursor.year}
+            month={cursor.month}
+            todayKey={calendar.hoy}
+            markedDates={diasMarcados}
+            markedCounts={porDia}
+            getDayLabel={describePlannedDay}
+            onPrevMonth={() =>
+              setCursor(({ year, month }) => (month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 }))
+            }
+            onNextMonth={() =>
+              setCursor(({ year, month }) => (month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 }))
+            }
+          />
+        </div>
 
-      <NextFinalization item={proxima} />
+        {(enFinalizacion > 0 || sinFecha > 0) && (
+          <ul className="flex flex-wrap gap-tight" aria-label="Otros Sprints en supervisión">
+            {enFinalizacion > 0 && (
+              <li className={`pill ${SITUACION_SPRINT_TONE.EN_FINALIZACION}`}>{enFinalizacion} en finalización</li>
+            )}
+            {sinFecha > 0 && (
+              <li className={`pill ${SITUACION_SPRINT_TONE.SIN_FECHA}`}>{sinFecha} sin fecha planificada</li>
+            )}
+          </ul>
+        )}
 
-      <Link
-        href="/dashboard/admin/sprints"
-        className="type-body mt-auto inline-flex min-h-9 items-center justify-center gap-tight self-center rounded-control px-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40 xl:text-[0.8125rem]"
-      >
-        Ver calendario de Sprints
-        <ArrowRight className="size-4" aria-hidden="true" />
-      </Link>
+        <NextFinalization item={proxima} />
+
+        <Link
+          href="/dashboard/admin/sprints"
+          className="type-body mt-auto inline-flex min-h-9 items-center justify-center gap-tight self-center rounded-control px-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40 xl:text-[0.8125rem]"
+        >
+          Ver calendario de Sprints
+          <ArrowRight className="size-4" aria-hidden="true" />
+        </Link>
+      </div>
     </>
   );
 }

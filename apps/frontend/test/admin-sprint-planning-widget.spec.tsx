@@ -105,8 +105,8 @@ describe('AdminSprintPlanningWidget', () => {
     getCalendarMock.mockResolvedValue({ ...calendarioDemo(), resumen: { proximos7Dias: 42, planVencido: 17 } });
     renderWidget();
 
-    const proximos = (await screen.findByText('Próximos 7 días')).parentElement as HTMLElement;
-    const vencidos = screen.getByText('Plan vencido', { selector: 'dt' }).parentElement as HTMLElement;
+    const proximos = await screen.findByRole('group', { name: 'Próximos 7 días' });
+    const vencidos = screen.getByRole('group', { name: 'Plan vencido' });
     // 42 y 17 no salen de contar los items (serían 4 y 1): son el resumen del servidor.
     expect(within(proximos).getByText('42')).toBeInTheDocument();
     expect(within(vencidos).getByText('17')).toBeInTheDocument();
@@ -116,8 +116,27 @@ describe('AdminSprintPlanningWidget', () => {
     getCalendarMock.mockResolvedValue({ ...calendarioDemo(), resumen: { proximos7Dias: 4, planVencido: 0 } });
     renderWidget();
 
-    const vencidos = (await screen.findByText('Plan vencido', { selector: 'dt' })).parentElement as HTMLElement;
+    const vencidos = await screen.findByRole('group', { name: 'Plan vencido' });
     expect(within(vencidos).getByText('0').className).not.toContain('attention');
+  });
+
+  it('título, métricas y calendario van en tarjetas separadas, y el título ya no lleva icono', async () => {
+    getCalendarMock.mockResolvedValue(calendarioDemo());
+    renderWidget();
+
+    const region = await screen.findByRole('region', { name: 'Próximas finalizaciones de Sprint' });
+    expect(region).not.toHaveClass('card-base');
+    const titulo = within(region).getByRole('heading', { name: 'Próximas finalizaciones de Sprint' });
+    const tarjetaTitulo = titulo.closest('.card-base') as HTMLElement;
+    expect(tarjetaTitulo).toHaveTextContent('Supervisa las fechas esperadas de los Sprints activos.');
+    expect(tarjetaTitulo.querySelector('svg')).toBeNull();
+
+    const proximos = await within(region).findByRole('group', { name: 'Próximos 7 días' });
+    const vencidos = within(region).getByRole('group', { name: 'Plan vencido' });
+    const calendario = (await within(region).findByText('Octubre 2026')).closest('.card-base');
+    expect(proximos).toHaveClass('card-base');
+    expect(vencidos).toHaveClass('card-base');
+    expect(new Set([tarjetaTitulo, proximos, vencidos, calendario]).size).toBe(4);
   });
 
   describe('mini calendario', () => {
