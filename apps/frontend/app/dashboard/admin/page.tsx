@@ -247,7 +247,7 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
                     {estadoBadgeLabel(item.estadoProyecto)}
                   </span>
                 </div>
-                <Button asChild size="sm" className={ACT_COL_ACCION}>
+                <Button asChild size="sm" className={`${ACT_COL_ACCION} text-xs font-semibold`}>
                   <Link href={`/dashboard/proyectos/${item.idProyecto}`}>Ver proyecto</Link>
                 </Button>
               </li>
