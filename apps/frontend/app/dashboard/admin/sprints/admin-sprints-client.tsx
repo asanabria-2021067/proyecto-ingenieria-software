@@ -16,6 +16,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,39 +49,45 @@ const FILTRO_TODAS = 'TODAS';
 const RUTA = '/dashboard/admin/sprints';
 const hrefVista = (vista: Vista) => `${RUTA}?vista=${vista}`;
 
-/** Selector Mes | Lista. Son enlaces: la vista es navegable, compartible y sobrevive a la recarga. */
+/**
+ * Selector Mes | Lista, con el mismo grupo de botones del calendario del
+ * estudiante. Son enlaces: la vista es navegable, compartible y sobrevive a
+ * la recarga.
+ */
 function SelectorVista({ vista }: { vista: Vista }) {
   return (
-    <nav aria-label="Vista del calendario" className="flex shrink-0 rounded-control bg-surface-container-high p-micro">
-      {(['mes', 'lista'] as const).map((opcion) => {
-        const activa = opcion === vista;
-        return (
-          <Link
+    <nav aria-label="Vista del calendario">
+      <ButtonGroup>
+        {(['mes', 'lista'] as const).map((opcion) => (
+          <Button
             key={opcion}
-            href={hrefVista(opcion)}
-            aria-current={activa ? 'page' : undefined}
-            className={`flex min-h-11 min-w-20 items-center sm:min-h-9 justify-center rounded-[calc(var(--radius-control)-var(--spacing-micro))] px-stack text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 ${
-              activa
-                ? 'bg-surface-container-lowest text-text-primary shadow-card'
-                : 'text-text-secondary hover:text-text-primary'
-            }`}
+            asChild
+            variant={opcion === vista ? 'default' : 'outline'}
+            className="h-9 rounded-md text-xs font-bold"
           >
-            {opcion === 'mes' ? 'Mes' : 'Lista'}
-          </Link>
-        );
-      })}
+            <Link href={hrefVista(opcion)} aria-current={opcion === vista ? 'page' : undefined}>
+              {opcion === 'mes' ? 'Mes' : 'Lista'}
+            </Link>
+          </Button>
+        ))}
+      </ButtonGroup>
     </nav>
   );
 }
 
 function MesSkeleton() {
   return (
-    <div className="card-base p-stack sm:p-card">
-      <Skeleton className="mb-stack h-8 w-64 max-w-full" />
-      <div className="grid grid-cols-7 gap-micro">
-        {Array.from({ length: 35 }, (_, i) => (
-          <Skeleton key={i} className="h-14 rounded-control" />
-        ))}
+    <div>
+      <Skeleton className="mb-4 h-8 w-56 max-w-full" />
+      <div className="grid grid-cols-1 gap-grid lg:grid-cols-[1fr_320px]">
+        <div className="card-base">
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 42 }, (_, i) => (
+              <Skeleton key={i} className="h-[92px] rounded-control" />
+            ))}
+          </div>
+        </div>
+        <Skeleton className="h-40 rounded-card" />
       </div>
     </div>
   );
@@ -160,7 +167,22 @@ export default function AdminSprintsClient() {
             Supervisa las fechas planificadas de finalización de los Sprints activos.
           </p>
         </div>
-        <SelectorVista vista={vista} />
+        <div className="flex flex-wrap items-center gap-gap">
+          {/* Leyenda junto al selector, como en el calendario del estudiante. */}
+          {vista === 'mes' && (
+            <div className="flex items-center gap-tight">
+              <span className="flex items-center gap-1 type-meta">
+                <span className="h-1.5 w-1.5 rounded-pill bg-primary" aria-hidden="true" />
+                Finalización
+              </span>
+              <span className="flex items-center gap-1 type-meta">
+                <span className="h-1.5 w-1.5 rounded-pill bg-attention" aria-hidden="true" />
+                Con plan vencido
+              </span>
+            </div>
+          )}
+          <SelectorVista vista={vista} />
+        </div>
       </header>
 
       <div className="@container/sprints flex flex-col gap-stack">

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { CALENDAR_DAY_CHIP_CLASS, CalendarMonthGrid } from '@/components/calendar/month-view';
 import { Button } from '@/components/ui/button';
 import {
   SITUACION_SPRINT_LABEL_CORTA,
@@ -13,16 +14,19 @@ import {
   formatDiaConAnio,
   formatDiaLargoConAnio,
 } from '@/lib/admin/sprint-calendar';
-import { formatMonthLabel, getMonthMatrix, parseFechaSolo, WEEKDAY_LABELS_ES } from '@/lib/calendar/utils';
+import { formatMonthLabel, parseFechaSolo } from '@/lib/calendar/utils';
 import type { AdminSprintCalendarItem } from '@/lib/types/admin-sprints';
 
 /**
  * Vista Mes del calendario administrativo de Sprints.
  *
- * Usa la misma rejilla que el calendario del estudiante (`getMonthMatrix`,
- * lunes a domingo, seis semanas), pero cada día muestra solo CUÁNTAS
- * finalizaciones esperadas caen en él: con decenas de proyectos, los nombres
- * no caben en una celda y van en el detalle del día, debajo.
+ * Es la MISMA interfaz del calendario del estudiante: la rejilla compartida
+ * (`CalendarMonthGrid`, con sus medidas y sus seis semanas), la misma fila de
+ * navegación entre meses y la misma distribución en dos columnas. Lo único
+ * propio es el contenido: cada día lleva una ficha con CUÁNTAS finalizaciones
+ * esperadas caen en él (los nombres no escalan a decenas de proyectos y van
+ * en el detalle del día), y la columna lateral muestra ese detalle en vez de
+ * las tarjetas del estudiante. Hoy se marca con el acento relleno.
  *
  * «Hoy» es el día que usó el servidor (Guatemala), no el del navegador, y qué
  * Sprint está vencido lo dice su `situacion`: aquí no se compara ninguna fecha.
@@ -45,13 +49,9 @@ export function SprintMonthView({
   // sola a una fecha pasada solo porque tenga datos.
   const [selectedKey, setSelectedKey] = useState(hoy);
 
-  // La rejilla compartida siempre trae seis semanas; una semana entera del mes
-  // siguiente no aporta nada aquí y empuja el detalle del día fuera de pantalla.
-  const weeks = getMonthMatrix(cursor.year, cursor.month).filter((week) => week.some((day) => day.inCurrentMonth));
-  const delMes = weeks
-    .flat()
-    .filter((day) => day.inCurrentMonth)
-    .reduce((suma, day) => suma + (itemsByDay.get(day.key)?.length ?? 0), 0);
+  const prefijoMes = `${cursor.year}-${String(cursor.month + 1).padStart(2, '0')}-`;
+  let delMes = 0;
+  for (const [dia, items] of itemsByDay) if (dia.startsWith(prefijoMes)) delMes += items.length;
   const delDia = itemsByDay.get(selectedKey) ?? [];
 
   const mover = (delta: number) =>
@@ -66,130 +66,96 @@ export function SprintMonthView({
   };
 
   return (
-    <div className="flex flex-col gap-section">
-      <section aria-label="Calendario mensual de finalizaciones" className="card-base p-stack sm:p-card">
-        <div className="mb-stack flex flex-wrap items-center justify-between gap-inline">
-          <div className="flex items-center gap-tight">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              className="size-11 rounded-control sm:size-8"
-              aria-label="Mes anterior"
-              onClick={() => mover(-1)}
-            >
-              <ChevronLeft className="size-4" aria-hidden="true" />
-            </Button>
-            <h2 className="type-section min-w-36 text-center sm:min-w-40" aria-live="polite">
-              {formatMonthLabel(cursor.year, cursor.month)}
-            </h2>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              className="size-11 rounded-control sm:size-8"
-              aria-label="Mes siguiente"
-              onClick={() => mover(1)}
-            >
-              <ChevronRight className="size-4" aria-hidden="true" />
-            </Button>
-            <Button type="button" variant="ghost" size="sm" className="min-h-11 font-medium text-primary sm:min-h-8" onClick={irAHoy}>
-              Hoy
-            </Button>
-          </div>
-          <p className="type-meta tabular-nums">
+    <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-gap gap-y-tight">
+        <div className="flex items-center gap-tight">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 w-8 rounded-control p-0"
+            aria-label="Mes anterior"
+            onClick={() => mover(-1)}
+          >
+            ‹
+          </Button>
+          <h2 className="type-section capitalize text-text-primary" aria-live="polite">
+            {formatMonthLabel(cursor.year, cursor.month)}
+          </h2>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 w-8 rounded-control p-0"
+            aria-label="Mes siguiente"
+            onClick={() => mover(1)}
+          >
+            ›
+          </Button>
+        </div>
+        <div className="flex items-center gap-gap">
+          <span className="type-meta tabular-nums">
             {delMes === 0 ? 'Sin finalizaciones planificadas este mes' : `${contarFinalizaciones(delMes)} este mes`}
-          </p>
+          </span>
+          <button type="button" onClick={irAHoy} className="type-body font-medium text-primary hover:underline">
+            Hoy
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-grid lg:grid-cols-[1fr_320px]">
+        <div className="@container/mes min-w-0">
+          <CalendarMonthGrid
+            year={cursor.year}
+            month={cursor.month}
+            todayKey={hoy}
+            todayTone="accent"
+            selectedKey={selectedKey}
+            onSelectDay={setSelectedKey}
+            getDayLabel={(day) => {
+              const items = itemsByDay.get(day.key) ?? [];
+              return `${formatDiaLargoConAnio(day.key)}${day.key === hoy ? ', hoy' : ''}, ${
+                items.length === 0 ? 'sin finalizaciones planificadas' : contarFinalizaciones(items.length)
+              }${items.some((item) => item.situacion === 'PLAN_VENCIDO') ? ', con plan vencido' : ''}`;
+            }}
+            renderDay={(day) => {
+              const items = itemsByDay.get(day.key) ?? [];
+              if (items.length === 0) return null;
+              const conVencido = items.some((item) => item.situacion === 'PLAN_VENCIDO');
+              return (
+                <span className={`${CALENDAR_DAY_CHIP_CLASS} tabular-nums`}>
+                  <span
+                    aria-hidden="true"
+                    className={`h-1.5 w-1.5 shrink-0 rounded-pill ${conVencido ? 'bg-attention' : 'bg-primary'}`}
+                  />
+                  <span className="truncate">
+                    {items.length}
+                    {/* La palabra solo cuando la celda tiene ancho para ella. */}
+                    <span className="hidden @xl/mes:inline"> {items.length === 1 ? 'Sprint' : 'Sprints'}</span>
+                  </span>
+                </span>
+              );
+            }}
+          />
         </div>
 
-        <div className="mb-micro grid grid-cols-7 gap-micro" aria-hidden="true">
-          {WEEKDAY_LABELS_ES.map((label, i) => (
-            <div key={i} className="py-micro text-center text-xs font-semibold uppercase text-text-secondary">
-              {label}
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col gap-micro">
-          {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 gap-micro">
-              {week.map((day) => {
-                const items = itemsByDay.get(day.key) ?? [];
-                const isToday = day.key === hoy;
-                const isSelected = day.key === selectedKey;
-                const conVencido = items.some((item) => item.situacion === 'PLAN_VENCIDO');
-                return (
-                  <button
-                    key={day.key}
-                    type="button"
-                    onClick={() => setSelectedKey(day.key)}
-                    aria-current={isToday ? 'date' : undefined}
-                    aria-pressed={isSelected}
-                    aria-label={`${formatDiaLargoConAnio(day.key)}${isToday ? ', hoy' : ''}, ${
-                      items.length === 0 ? 'sin finalizaciones planificadas' : contarFinalizaciones(items.length)
-                    }${conVencido ? ', con plan vencido' : ''}`}
-                    data-count={items.length || undefined}
-                    className={`flex min-h-14 flex-col items-stretch rounded-control border p-micro text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-tight ${
-                      isSelected
-                        ? 'border-primary bg-primary/10'
-                        : `hover:bg-surface-container ${day.inCurrentMonth ? 'bg-surface-container-lowest' : ''} ${
-                            day.inCurrentMonth ? 'border-outline-variant/40' : 'border-outline-variant/20'
-                          }`
-                    } ${day.inCurrentMonth ? 'text-text-primary' : 'text-text-disabled'}`}
-                  >
-                    <span
-                      className={`flex size-6 items-center justify-center self-end rounded-pill text-xs font-medium tabular-nums sm:text-sm ${
-                        isToday ? 'bg-accent font-bold text-on-accent' : ''
-                      }`}
-                    >
-                      {day.date.getDate()}
-                    </span>
-                    {items.length > 0 && (
-                      <span className="mt-auto flex items-center gap-micro text-xs font-semibold leading-4 tabular-nums text-text-primary sm:text-sm sm:leading-4">
-                        <span
-                          aria-hidden="true"
-                          className={`size-2 shrink-0 rounded-pill ${conVencido ? 'bg-attention' : 'bg-primary'}`}
-                        />
-                        {items.length}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-
-        <ul className="mt-stack flex flex-wrap gap-x-stack gap-y-micro type-meta" aria-label="Leyenda">
-          <li className="flex items-center gap-micro">
-            <span aria-hidden="true" className="size-2 rounded-pill bg-primary" />
-            Finalizaciones planificadas
-          </li>
-          <li className="flex items-center gap-micro">
-            <span aria-hidden="true" className="size-2 rounded-pill bg-attention" />
-            Incluye un plan vencido
-          </li>
-        </ul>
-      </section>
-
-      <section aria-labelledby="sprints-dia-titulo" aria-live="polite">
-        <div className="mb-stack flex flex-wrap items-baseline justify-between gap-x-inline gap-y-micro">
-          <h2 id="sprints-dia-titulo" className="type-section">
+        {/* Donde el estudiante tiene «Mis Proyectos», el admin ve el día elegido. */}
+        <section aria-labelledby="sprints-dia-titulo" aria-live="polite" className="card-base h-fit">
+          <h2 id="sprints-dia-titulo" className="type-subtitle text-text-primary">
             {formatDiaLargoConAnio(selectedKey)}
           </h2>
-          {delDia.length > 0 && <p className="type-meta tabular-nums">{contarFinalizaciones(delDia.length)}</p>}
-        </div>
-        {delDia.length === 0 ? (
-          <p className="type-body rounded-control bg-surface-container-low px-stack py-inline text-text-secondary">
-            No hay finalizaciones planificadas para este día.
-          </p>
-        ) : (
-          <ul className="card-base divide-y divide-outline-variant/50 overflow-hidden p-0">
-            {delDia.map((item) => (
-              <DiaSprintRow key={item.idSprint} item={item} />
-            ))}
-          </ul>
-        )}
-      </section>
+          {delDia.length === 0 ? (
+            <p className="type-meta mt-micro">No hay finalizaciones planificadas para este día.</p>
+          ) : (
+            <>
+              <p className="type-meta mt-micro tabular-nums">{contarFinalizaciones(delDia.length)}</p>
+              <ul className="mt-stack divide-y divide-outline-variant/50">
+                {delDia.map((item) => (
+                  <DiaSprintRow key={item.idSprint} item={item} />
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -197,22 +163,20 @@ export function SprintMonthView({
 function DiaSprintRow({ item }: { item: AdminSprintCalendarItem }) {
   const dias = describeDiasRestantes(item);
   return (
-    <li className="flex flex-wrap items-center gap-x-stack gap-y-tight px-stack py-stack sm:px-card">
-      <div className="min-w-0 flex-1 basis-64">
-        <p className="type-body break-words font-semibold">{item.tituloProyecto}</p>
-        <p className="mt-micro flex flex-wrap items-center gap-tight">
-          <span className="type-body font-medium">Sprint {item.numero}</span>
-          <span className={`pill whitespace-nowrap ${SITUACION_SPRINT_TONE[item.situacion]}`}>
-            {SITUACION_SPRINT_LABEL_CORTA[item.situacion]}
-          </span>
-        </p>
-      </div>
-      <dl className="grid shrink-0 grid-cols-[auto_auto] gap-x-inline gap-y-micro type-meta">
+    <li className="py-inline first:pt-0 last:pb-0">
+      <p className="type-body break-words font-semibold text-text-primary">{item.tituloProyecto}</p>
+      <p className="mt-micro flex flex-wrap items-center gap-tight">
+        <span className="type-body font-medium">Sprint {item.numero}</span>
+        <span className={`pill whitespace-nowrap ${SITUACION_SPRINT_TONE[item.situacion]}`}>
+          {SITUACION_SPRINT_LABEL_CORTA[item.situacion]}
+        </span>
+      </p>
+      <dl className="mt-tight grid grid-cols-[auto_1fr] gap-x-inline gap-y-micro type-meta">
         <dt>Líder</dt>
         <dd className="font-medium text-text-primary">
           {item.lider.nombre} {item.lider.apellido}
         </dd>
-        <dt>Finalización esperada</dt>
+        <dt>Finalización</dt>
         <dd className="font-medium tabular-nums text-text-primary">
           {item.fechaFinPlaneada ? formatDiaConAnio(item.fechaFinPlaneada) : 'Sin fecha'}
           {dias && <span className="font-normal text-text-secondary"> · {dias}</span>}
@@ -221,7 +185,7 @@ function DiaSprintRow({ item }: { item: AdminSprintCalendarItem }) {
       <Link
         href={adminProjectHref(item.idProyecto)}
         aria-label={`Ver proyecto ${item.tituloProyecto}`}
-        className="type-meta -my-tight inline-flex min-h-11 shrink-0 items-center gap-micro rounded-control font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="type-meta mt-tight inline-flex items-center gap-micro rounded-control font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         Ver proyecto
         <ArrowRight className="size-3.5" aria-hidden="true" />

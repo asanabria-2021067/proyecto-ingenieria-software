@@ -137,7 +137,7 @@ describe('Calendario de Sprints — vista Mes', () => {
     renderPage('mes');
     await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
 
-    expect(dia(/^8 de octubre de 2026, 2 finalizaciones planificadas$/)).toHaveTextContent('82');
+    expect(dia(/^8 de octubre de 2026, 2 finalizaciones planificadas$/)).toHaveTextContent('2 Sprints');
     expect(dia(/^12 de octubre de 2026, 1 finalización planificada$/)).toBeInTheDocument();
     expect(dia(/^4 de octubre de 2026, 1 finalización planificada, con plan vencido$/)).toBeInTheDocument();
     expect(dia(/^9 de octubre de 2026, sin finalizaciones planificadas$/)).toBeInTheDocument();
