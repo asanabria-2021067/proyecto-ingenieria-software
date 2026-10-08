@@ -231,6 +231,69 @@ describeIntegration('S7 lectura histórica de proyectos', () => {
       }
     }
 
+    // La bandeja de cierres clasifica cada solicitud por su cadena de
+    // revisiones REAL: un reenvío tras corrección, y un legacy sin entrega.
+    const reenviado = await createIntegrationProject(db, f.leader.idUsuario, {
+      estadoProyecto: 'EN_SOLICITUD_CIERRE',
+    });
+    scope.projectIds = [...(scope.projectIds ?? []), reenviado.idProyecto];
+    const enviadaEn = new Date('2026-10-01T15:00:00.000Z');
+    const resueltaEn = new Date('2026-10-03T15:00:00.000Z');
+    await db.revisionCierreProyecto.create({
+      data: {
+        idProyecto: reenviado.idProyecto,
+        numeroRevision: 1,
+        estadoRevision: 'CORRECCION_DOCUMENTAL',
+        idSolicitante: f.leader.idUsuario,
+        enviadaEn,
+        fingerprintEntrega: 'a'.repeat(64),
+        idRevisor: admin.idUsuario,
+        resueltaEn,
+        comentarioRevisor: 'Falta el acta firmada',
+      },
+    });
+    const vigente = await db.revisionCierreProyecto.create({
+      data: {
+        idProyecto: reenviado.idProyecto,
+        numeroRevision: 2,
+        estadoRevision: 'ENVIADA',
+        idSolicitante: f.leader.idUsuario,
+        enviadaEn,
+        fingerprintEntrega: 'b'.repeat(64),
+      },
+    });
+    try {
+      // `page`/`limit` no recortan el grupo: se entrega entero, con sus contadores.
+      const cierres = await service.adminList(
+        admin.idUsuario,
+        await parseAdminQuery({ grupo: 'cierres', page: 2, limit: 1 }),
+      );
+      expect(cierres.page).toBe(1);
+      expect(cierres.items).toHaveLength(cierres.total);
+      expect(Object.values(cierres.resumenCierre!).reduce((a, b) => a + b, 0)).toBe(cierres.total);
+      const cierreDe = (idProyecto: number) =>
+        cierres.items.find((item) => item.idProyecto === idProyecto)!.cierre as Record<string, unknown>;
+      expect(cierreDe(reenviado.idProyecto)).toEqual({
+        situacion: 'REENVIADA_PARA_REVISION',
+        origen: null,
+        revisionId: vigente.idRevisionCierre,
+        numeroRevision: 2,
+        enviadaEn,
+        correccionSolicitadaEn: resueltaEn,
+        puedeResolver: true,
+      });
+      expect(cierreDe(enCierre.idProyecto)).toMatchObject({
+        situacion: 'SIN_ENTREGA_FORMAL',
+        revisionId: null,
+        numeroRevision: null,
+        puedeResolver: false,
+      });
+      expect(cierres.resumenCierre!.REENVIADA_PARA_REVISION).toBeGreaterThanOrEqual(1);
+      expect(cierres.resumenCierre!.SIN_ENTREGA_FORMAL).toBeGreaterThanOrEqual(1);
+    } finally {
+      await db.revisionCierreProyecto.deleteMany({ where: { idProyecto: reenviado.idProyecto } });
+    }
+
     // El Sprint ambiente viaja como RESUMEN, sin detalle.
     const activos = await service.adminList(
       admin.idUsuario,

@@ -89,8 +89,8 @@ export class HistoricalProjectReadService {
    *
    * `grupo=cierres` es una bandeja de trabajo por etapas: cada proyecto lleva
    * la situación de su solicitud (bloque `cierre`) y la respuesta trae el
-   * conteo por situación. Ese grupo NO se pagina —`page` y `limit` se ignoran
-   * y se devuelve entero— porque con una página mixta una etapa parecería
+   * conteo por situación. Ese grupo NO se pagina —`page` y `limit` no recortan
+   * nada y se devuelve entero; `limit` solo se devuelve tal cual llegó— porque con una página mixta una etapa parecería
    * vacía solo por tener sus solicitudes en otra página, y los contadores no
    * cuadrarían con lo visible. La población es acotada: son los proyectos
    * detenidos a la espera de un veredicto.
@@ -165,7 +165,7 @@ export class HistoricalProjectReadService {
       })),
       total,
       page,
-      limit: esCierres ? Math.max(proyectos.length, 1) : limit,
+      limit,
       ...(cierres ? { resumenCierre: cierres.resumen } : {}),
     };
   }
