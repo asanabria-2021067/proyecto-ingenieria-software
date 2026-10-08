@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { CALENDAR_DAY_CHIP_CLASS, CalendarMonthGrid } from '@/components/calendar/month-view';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,6 +53,33 @@ export function SprintMonthView({
   let delMes = 0;
   for (const [dia, items] of itemsByDay) if (dia.startsWith(prefijoMes)) delMes += items.length;
   const delDia = itemsByDay.get(selectedKey) ?? [];
+
+  // Carrusel vertical del día: la lista toma el alto del calendario y, si las
+  // tarjetas no caben, se desplaza. Es scroll nativo (rueda, tacto y teclado
+  // funcionan solos); las flechas solo aparecen cuando hay algo que mover.
+  const listaRef = useRef<HTMLUListElement>(null);
+  const [desplazable, setDesplazable] = useState({ arriba: false, abajo: false });
+  const medirLista = () => {
+    const lista = listaRef.current;
+    if (!lista) return;
+    setDesplazable({
+      arriba: lista.scrollTop > 1,
+      abajo: lista.scrollTop + lista.clientHeight < lista.scrollHeight - 1,
+    });
+  };
+  useEffect(() => {
+    const lista = listaRef.current;
+    if (!lista) return;
+    lista.scrollTop = 0;
+    // El observador avisa al empezar a observar y cada vez que cambia el alto disponible.
+    const observador = new ResizeObserver(medirLista);
+    observador.observe(lista);
+    return () => observador.disconnect();
+  }, [selectedKey, delDia.length]);
+  const moverLista = (direccion: 1 | -1) => {
+    const lista = listaRef.current;
+    lista?.scrollBy({ top: direccion * lista.clientHeight * 0.8 });
+  };
 
   const mover = (delta: number) =>
     setCursor(({ year, month }) => {
@@ -137,33 +164,73 @@ export function SprintMonthView({
           />
         </div>
 
-        {/* Donde el estudiante tiene «Mis Proyectos», el admin ve el día elegido. */}
-        <section aria-labelledby="sprints-dia-titulo" aria-live="polite" className="card-base h-fit">
-          <h2 id="sprints-dia-titulo" className="type-subtitle text-text-primary">
-            {formatDiaLargoConAnio(selectedKey)}
-          </h2>
-          {delDia.length === 0 ? (
-            <p className="type-meta mt-micro">No hay finalizaciones planificadas para este día.</p>
-          ) : (
-            <>
-              <p className="type-meta mt-micro tabular-nums">{contarFinalizaciones(delDia.length)}</p>
-              <ul className="mt-stack divide-y divide-outline-variant/50">
+        {/* Donde el estudiante tiene «Mis Proyectos», el admin ve el día elegido:
+            una tarjeta con la fecha y, debajo, una tarjeta por Sprint. Desde `lg`
+            la columna mide lo mismo que el calendario (capa absoluta: no estira
+            la fila) y la lista se desplaza dentro de ese alto. */}
+        <section aria-labelledby="sprints-dia-titulo" className="relative min-h-0">
+          <div className="flex flex-col gap-gap lg:absolute lg:inset-0">
+            <div className="card-base flex shrink-0 items-start justify-between gap-inline" aria-live="polite">
+              <div className="min-w-0">
+                <h2 id="sprints-dia-titulo" className="type-subtitle text-text-primary">
+                  {formatDiaLargoConAnio(selectedKey)}
+                </h2>
+                <p className="type-meta mt-micro tabular-nums">
+                  {delDia.length === 0
+                    ? 'No hay finalizaciones planificadas para este día.'
+                    : contarFinalizaciones(delDia.length)}
+                </p>
+              </div>
+              {delDia.length > 0 && (desplazable.arriba || desplazable.abajo) && (
+                <div className="flex shrink-0 gap-micro">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 w-8 rounded-control p-0"
+                    aria-label="Sprints anteriores"
+                    disabled={!desplazable.arriba}
+                    onClick={() => moverLista(-1)}
+                  >
+                    <ChevronUp className="size-4" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 w-8 rounded-control p-0"
+                    aria-label="Sprints siguientes"
+                    disabled={!desplazable.abajo}
+                    onClick={() => moverLista(1)}
+                  >
+                    <ChevronDown className="size-4" aria-hidden="true" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {delDia.length > 0 && (
+              <ul
+                ref={listaRef}
+                onScroll={medirLista}
+                aria-label={`Sprints que finalizan el ${formatDiaLargoConAnio(selectedKey)}`}
+                className="-mx-1 flex flex-col gap-gap px-1 pb-1 motion-safe:scroll-smooth lg:min-h-0 lg:flex-1 lg:snap-y lg:overflow-y-auto lg:overscroll-contain"
+              >
                 {delDia.map((item) => (
                   <DiaSprintRow key={item.idSprint} item={item} />
                 ))}
               </ul>
-            </>
-          )}
+            )}
+          </div>
         </section>
       </div>
     </div>
   );
 }
 
+/** Tarjeta de un Sprint que finaliza el día elegido: proyecto, Sprint, situación, líder y fecha. */
 function DiaSprintRow({ item }: { item: AdminSprintCalendarItem }) {
   const dias = describeDiasRestantes(item);
   return (
-    <li className="py-inline first:pt-0 last:pb-0">
+    <li className="card-base shrink-0 lg:snap-start">
       <p className="type-body break-words font-semibold text-text-primary">{item.tituloProyecto}</p>
       <p className="mt-micro flex flex-wrap items-center gap-tight">
         <span className="type-body font-medium">Sprint {item.numero}</span>

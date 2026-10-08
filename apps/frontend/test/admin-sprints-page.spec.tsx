@@ -170,6 +170,25 @@ describe('Calendario de Sprints — vista Mes', () => {
     expect(dia(/^6 de octubre de 2026, hoy/)).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('separa la fecha de los Sprints: una tarjeta con el día y el conteo, y una tarjeta por Sprint', async () => {
+    renderPage('mes');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+    fireEvent.click(dia(/^8 de octubre de 2026,/));
+
+    const panel = within(detalle());
+    const lista = panel.getByRole('list', { name: 'Sprints que finalizan el 8 de octubre de 2026' });
+    const tarjetas = within(lista).getAllByRole('listitem');
+    expect(tarjetas).toHaveLength(2);
+    for (const tarjeta of tarjetas) expect(tarjeta).toHaveClass('card-base');
+    // La fecha y el conteo viven en su propia tarjeta, fuera de la lista.
+    const fecha = panel.getByRole('heading', { level: 2, name: '8 de octubre de 2026' });
+    expect(lista).not.toContainElement(fecha);
+    expect(lista).not.toHaveTextContent('2 finalizaciones planificadas');
+    expect(fecha.closest('.card-base')).toHaveTextContent('2 finalizaciones planificadas');
+    // Sin desbordamiento no hay flechas de carrusel.
+    expect(panel.queryByRole('button', { name: /^Sprints (anteriores|siguientes)$/ })).not.toBeInTheDocument();
+  });
+
   it('un día sin finalizaciones lo dice sin tarjeta vacía', async () => {
     renderPage('mes');
     await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
