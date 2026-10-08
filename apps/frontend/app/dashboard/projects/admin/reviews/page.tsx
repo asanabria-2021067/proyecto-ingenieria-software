@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, GitPullRequest, CheckCheck, MessageSquareWarning } from 'lucide-react';
+import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, Repeat2, CheckCheck, MessageSquareWarning } from 'lucide-react';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal from '@/lib/swal';
@@ -62,34 +61,74 @@ export default function AdminReviewsInboxPage() {
     }
   }
 
-  // S7 (V5 §31.2): esta bandeja es de revisiones de PUBLICACIÓN. Los cierres
-  // se resuelven únicamente en la revisión administrativa del cierre
-  // (`/dashboard/admin/proyectos/[id]/cierre`); aquí solo se enlazan.
-  const CIERRES_HREF = '/dashboard/admin/proyectos?grupo=cierres';
+  // S7 (V5 §31.2): esta bandeja es SOLO de publicación. Los cierres se
+  // consultan y resuelven en «Solicitudes de cierre»
+  // (`/dashboard/admin/proyectos?grupo=cierres`); aquí no se muestran, aunque
+  // el endpoint siga devolviendo `cierresPendientes`.
+  //
+  // Una revisión PENDIENTE con `numeroEnvio > 1` solo puede existir tras un
+  // reenvío desde OBSERVADO: el estudiante ya corrigió y espera una NUEVA
+  // revisión. Un proyecto OBSERVADO, en cambio, espera al estudiante.
+  const pendientes = inbox?.revisionesPendientes ?? [];
+  const primerEnvio = pendientes.filter((r) => r.numeroEnvio <= 1);
+  const reenviadas = pendientes.filter((r) => r.numeroEnvio > 1);
+  const enEsperaDeCorrecciones = inbox?.correccionesEnviadas ?? [];
 
-  const totalPendientes =
-    (inbox?.revisionesPendientes.length ?? 0) + (inbox?.cierresPendientes.length ?? 0) + (inbox?.correccionesEnviadas.length ?? 0);
+  const totalPendientes = pendientes.length + enEsperaDeCorrecciones.length;
+
+  const filaRevision = (r: (typeof pendientes)[number]) => (
+    <div
+      key={r.idRevisionProyecto}
+      className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="min-w-0">
+        <p className="break-words font-headline text-base font-black text-on-surface">{r.proyecto.tituloProyecto}</p>
+        <p className="mt-0.5 text-xs text-tertiary">
+          {r.proyecto.creador.nombre} {r.proyecto.creador.apellido} · Envío #{r.numeroEnvio}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2 sm:shrink-0">
+        <button
+          type="button"
+          onClick={() => void resolveApprove(r.idProyecto)}
+          className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-on-primary outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+          Aprobar
+        </button>
+        <button
+          type="button"
+          onClick={() => openReviewSheet(r.idProyecto)}
+          className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-amber-700 focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <SendHorizonal className="h-3.5 w-3.5" aria-hidden="true" />
+          Revisar
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <>
       <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-        <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Revisiones" />
+        <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Solicitudes de publicación" />
         {/* Header */}
-        <section className="mb-6 flex items-start justify-between">
-          <div>
+        <section className="mb-6 flex items-start justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="type-display text-balance">
-              Revisiones
+              Solicitudes de publicación
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-tertiary">
-              Bandeja de revisiones de publicación. Los cierres de proyecto se resuelven en Solicitudes de cierre.
+              Evalúa los proyectos enviados por estudiantes, aprueba su publicación o solicita correcciones.
             </p>
           </div>
           <button
+            type="button"
             onClick={() => void refresh()}
             disabled={loading}
-            className="flex items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary disabled:opacity-50"
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
             Actualizar
           </button>
         </section>
@@ -108,110 +147,79 @@ export default function AdminReviewsInboxPage() {
 
         {!loading && inbox && (
           <div className="space-y-10">
-            {/* Resumen */}
+            {/* Resumen: solo publicación. */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <ClipboardList className="h-6 w-6 text-primary" />
+                  <ClipboardList className="h-6 w-6 text-primary" aria-hidden="true" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">En revisión</p>
-                  <p className="text-3xl font-black tracking-tighter text-on-surface">
-                    {inbox.revisionesPendientes.length}
-                  </p>
-                  <p className="text-xs text-tertiary">Proyectos pendientes de revisión</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Pendientes de revisión</p>
+                  <p className="text-3xl font-black tabular-nums tracking-tighter text-on-surface">{primerEnvio.length}</p>
+                  <p className="text-xs text-tertiary">Primer envío, sin revisar</p>
                 </div>
               </div>
-              <Link
-                href={CIERRES_HREF}
-                aria-label="Cierre pendiente: ver en Solicitudes de cierre"
-                className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5 transition-colors hover:border-primary/40 hover:bg-surface-container"
-              >
+              <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                  <GitPullRequest className="h-6 w-6 text-amber-600" />
+                  <Repeat2 className="h-6 w-6 text-amber-600" aria-hidden="true" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Cierre pendiente</p>
-                  <p className="text-3xl font-black tracking-tighter text-on-surface">
-                    {inbox.cierresPendientes.length}
-                  </p>
-                  <p className="text-xs text-tertiary">Se resuelven en Solicitudes de cierre</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Reenviadas para revisión</p>
+                  <p className="text-3xl font-black tabular-nums tracking-tighter text-on-surface">{reenviadas.length}</p>
+                  <p className="text-xs text-tertiary">Corregidas por el estudiante</p>
                 </div>
-              </Link>
+              </div>
               <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
-                  <MessageSquareWarning className="h-6 w-6 text-orange-600" />
+                  <MessageSquareWarning className="h-6 w-6 text-orange-600" aria-hidden="true" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Correcciones enviadas</p>
-                  <p className="text-3xl font-black tracking-tighter text-on-surface">
-                    {inbox.correccionesEnviadas.length}
-                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">En espera de correcciones</p>
+                  <p className="text-3xl font-black tabular-nums tracking-tighter text-on-surface">{enEsperaDeCorrecciones.length}</p>
                   <p className="text-xs text-tertiary">Esperando corrección del estudiante</p>
                 </div>
               </div>
             </div>
 
-            {/* Revisiones pendientes */}
+            {/* Primer envío: nadie lo ha revisado todavía. */}
             <section>
-              <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
-                Revisiones pendientes
-              </h2>
-              {inbox.revisionesPendientes.length === 0 ? (
+              <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">Pendientes de revisión</h2>
+              {primerEnvio.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
-                  <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" />
-                  <p className="text-sm font-medium text-tertiary">No hay revisiones pendientes</p>
+                  <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" aria-hidden="true" />
+                  <p className="text-sm font-medium text-tertiary">No hay solicitudes pendientes de revisión</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {inbox.revisionesPendientes.map((r) => (
-                    <div
-                      key={r.idRevisionProyecto}
-                      className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="font-headline text-base font-black text-on-surface">
-                          {r.proyecto.tituloProyecto}
-                        </p>
-                        <p className="mt-0.5 text-xs text-tertiary">
-                          {r.proyecto.creador.nombre} {r.proyecto.creador.apellido} · Envío #{r.numeroEnvio}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2 sm:shrink-0">
-                        <button
-                          onClick={() => void resolveApprove(r.idProyecto)}
-                          className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-on-primary transition-colors hover:bg-primary/90"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Aprobar
-                        </button>
-                        <button
-                          onClick={() => openReviewSheet(r.idProyecto)}
-                          className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-700"
-                        >
-                          <SendHorizonal className="h-3.5 w-3.5" />
-                          Revisar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <div className="space-y-3">{primerEnvio.map(filaRevision)}</div>
               )}
             </section>
 
-            {/* Correcciones enviadas */}
+            {/* El estudiante ya corrigió: esperan una nueva revisión administrativa. */}
+            <section>
+              <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">Reenviadas para revisión</h2>
+              {reenviadas.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
+                  <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" aria-hidden="true" />
+                  <p className="text-sm font-medium text-tertiary">No hay solicitudes reenviadas</p>
+                </div>
+              ) : (
+                <div className="space-y-3">{reenviadas.map(filaRevision)}</div>
+              )}
+            </section>
+
+            {/* Observadas: el administrador pidió cambios y el estudiante aún no reenvía. */}
             <section>
               <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
-                Correcciones enviadas
+                En espera de correcciones
               </h2>
-              {inbox.correccionesEnviadas.length === 0 ? (
+              {enEsperaDeCorrecciones.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
                   <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" />
-                  <p className="text-sm font-medium text-tertiary">No hay proyectos esperando corrección</p>
+                  <p className="text-sm font-medium text-tertiary">No hay solicitudes en espera de correcciones</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {inbox.correccionesEnviadas.map((p) => {
+                  {enEsperaDeCorrecciones.map((p) => {
                     const revision = p.revisiones[0];
                     return (
                       <div
@@ -236,67 +244,21 @@ export default function AdminReviewsInboxPage() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <button
+                            type="button"
                             onClick={() => openFeedbackSheet(p.idProyecto)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-700"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-amber-700 focus-visible:ring-2 focus-visible:ring-primary/40"
                           >
-                            <Eye className="h-3.5 w-3.5" />
+                            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                             Ver retroalimentación
                           </button>
                           <span className="inline-flex items-center gap-1.5 rounded-xl border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-on-surface dark:border-orange-500/30 dark:bg-orange-500/10">
-                            <MessageSquareWarning className="h-3.5 w-3.5" />
+                            <MessageSquareWarning className="h-3.5 w-3.5" aria-hidden="true" />
                             Esperando corrección
                           </span>
                         </div>
                       </div>
                     );
                   })}
-                </div>
-              )}
-            </section>
-
-            {/* Solicitudes de cierre */}
-            <section>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="font-headline text-lg font-black tracking-tight text-on-surface">
-                  Solicitudes de cierre
-                </h2>
-                <Link href={CIERRES_HREF} className="text-xs font-bold text-primary underline-offset-4 hover:underline">
-                  Ver en Solicitudes de cierre
-                </Link>
-              </div>
-              {inbox.cierresPendientes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
-                  <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" />
-                  <p className="text-sm font-medium text-tertiary">No hay cierres pendientes</p>
-                  <p className="mt-1 text-xs text-tertiary">Los veredictos de cierre no se emiten desde esta bandeja.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {inbox.cierresPendientes.map((c) => (
-                    <div
-                      key={c.idProyecto}
-                      className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <p className="font-headline text-base font-black text-on-surface">
-                        {c.tituloProyecto}
-                      </p>
-                      <div className="flex flex-wrap gap-2 sm:shrink-0">
-                        <Link
-                          href={`/dashboard/admin/proyectos/${c.idProyecto}/cierre`}
-                          className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-on-primary transition-colors hover:bg-primary/90"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Revisar cierre
-                        </Link>
-                        <Link
-                          href={CIERRES_HREF}
-                          className="flex items-center gap-1.5 rounded-xl border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high"
-                        >
-                          Ver en Solicitudes de cierre
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
             </section>
