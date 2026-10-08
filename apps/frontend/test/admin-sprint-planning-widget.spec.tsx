@@ -59,10 +59,10 @@ function renderWidget() {
   return render(<AdminSprintPlanningWidget />, { wrapper });
 }
 
-/** Botón de un día del mes visible. */
+/** Día del mes visible: un enlace al calendario completo. */
 function dia(numero: number): HTMLElement {
   const boton = screen
-    .getAllByRole('button')
+    .getAllByRole('link')
     .find(
       (candidato) =>
         candidato.firstChild?.textContent === String(numero) &&
@@ -169,7 +169,7 @@ describe('AdminSprintPlanningWidget', () => {
       renderWidget();
       await screen.findByText('Octubre 2026');
 
-      expect(screen.getByRole('button', { name: '8 de octubre, 1 finalización planificada' })).toBe(dia(8));
+      expect(screen.getByRole('link', { name: '8 de octubre, 1 finalización planificada' })).toBe(dia(8));
     });
 
     it('varios Sprints el mismo día muestran el conteo, sin nombres de proyecto en la celda', async () => {
@@ -200,12 +200,29 @@ describe('AdminSprintPlanningWidget', () => {
       expect(screen.getByText('Noviembre 2026')).toBeInTheDocument();
     });
 
-    it('los días no abren ningún detalle: eso pertenece a la vista completa', async () => {
+    it('cualquier día enlaza al calendario completo con esa fecha, tenga o no Sprints', async () => {
       getCalendarMock.mockResolvedValue(calendarioDemo());
       renderWidget();
       await screen.findByText('Octubre 2026');
 
-      expect(dia(8)).toBeDisabled();
+      expect(dia(8)).toHaveAttribute('href', '/dashboard/admin/sprints?vista=mes&fecha=2026-10-08');
+      // El 9 no tiene finalizaciones: también enlaza y lo dice su nombre.
+      expect(dia(9)).toHaveAccessibleName('9 de octubre, sin finalizaciones planificadas');
+      expect(dia(9)).toHaveAttribute('href', '/dashboard/admin/sprints?vista=mes&fecha=2026-10-09');
+      // Hoy conserva su marca; los días navegan, no conmutan una selección.
+      expect(dia(5)).toHaveAttribute('aria-current', 'date');
+      expect(dia(8)).not.toHaveAttribute('aria-pressed');
+    });
+
+    it('un día del mes vecino enlaza a su propia fecha', async () => {
+      getCalendarMock.mockResolvedValue(calendarioDemo());
+      renderWidget();
+      await screen.findByText('Octubre 2026');
+
+      expect(screen.getByRole('link', { name: '1 de noviembre, sin finalizaciones planificadas' })).toHaveAttribute(
+        'href',
+        '/dashboard/admin/sprints?vista=mes&fecha=2026-11-01',
+      );
     });
 
     it('un Sprint sin fecha planificada no marca ningún día y se informa aparte', async () => {

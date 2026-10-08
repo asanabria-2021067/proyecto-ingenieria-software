@@ -10,6 +10,7 @@ import { useAdminSprintCalendar } from '@/hooks/use-admin-sprint-calendar';
 import {
   SITUACION_SPRINT_LABEL,
   SITUACION_SPRINT_TONE,
+  adminSprintsHref,
   countSprintsByPlannedDay,
   describePlannedDay,
   formatDiaCorto,
@@ -175,6 +176,9 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
             markedDates={diasMarcados}
             markedCounts={porDia}
             getDayLabel={describePlannedDay}
+            // El widget es el resumen: cualquier día, con o sin Sprints, enlaza
+            // al calendario completo con ese día ya seleccionado.
+            getDayHref={(dia) => adminSprintsHref('mes', dia)}
             onPrevMonth={() =>
               setCursor(({ year, month }) => (month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 }))
             }
