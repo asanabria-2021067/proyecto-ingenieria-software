@@ -2,13 +2,15 @@ import { useId } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ChevronRight, ClipboardList, Clock, type LucideIcon } from 'lucide-react';
 
-type AttentionTone = 'atencion' | 'bloqueo';
+type AttentionTone = 'atencion' | 'cierre' | 'bloqueo';
 
 const TONO: Record<AttentionTone, { icono: string; pill: string }> = {
   // Acento del sistema (lima) para lo que espera una decisión.
-  atencion: { icono: 'bg-status-warning text-on-status-warning', pill: 'pill-warning' },
+  atencion: { icono: 'text-secondary-fixed-dim dark:text-secondary-fixed', pill: 'pill-warning' },
+  // Los cierres comparten píldora; solo su icono va en dorado.
+  cierre: { icono: 'text-amber-500', pill: 'pill-warning' },
   // El rojo queda solo para accesos restringidos.
-  bloqueo: { icono: 'bg-status-error text-on-status-error', pill: 'pill-error' },
+  bloqueo: { icono: 'text-error', pill: 'pill-error' },
 };
 
 // Anchos compartidos por el encabezado de columnas y las filas. «Estado» se
@@ -66,7 +68,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
       href: '/dashboard/admin/proyectos?grupo=cierres',
       enlaceLabel: 'Ver solicitudes de cierre pendientes',
       icono: Clock,
-      tono: 'atencion',
+      tono: 'cierre',
     },
     {
       clave: 'bloqueados',
@@ -114,9 +116,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
               data-fila={fila.clave}
               className="relative flex items-center gap-inline px-card py-stack transition-colors hover:bg-surface-container-low"
             >
-              <div className={`flex size-9 shrink-0 items-center justify-center rounded-control ${tono.icono}`}>
-                <Icono className="size-5" aria-hidden="true" />
-              </div>
+              <Icono className={`size-5 shrink-0 ${tono.icono}`} aria-hidden="true" />
               <div className="min-w-0 flex-1">
                 <Link
                   href={fila.href}
