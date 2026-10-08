@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronRight, ClipboardList, Clock, Inbox, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, ChevronRight, ClipboardList, Clock, type LucideIcon } from 'lucide-react';
 
 type AttentionTone = 'atencion' | 'bloqueo';
 
@@ -10,6 +10,11 @@ const TONO: Record<AttentionTone, { icono: string; pill: string }> = {
   // El rojo queda solo para accesos restringidos.
   bloqueo: { icono: 'bg-status-error text-on-status-error', pill: 'pill-error' },
 };
+
+// Anchos compartidos por el encabezado de columnas y las filas. «Estado» se
+// oculta donde la tarjeta es estrecha (móvil y `lg`, con la sidebar abierta).
+const COL_ESTADO = 'hidden w-36 shrink-0 sm:block lg:hidden xl:block';
+const COL_TOTAL = 'w-10 shrink-0 text-right';
 
 interface AttentionRow {
   clave: string;
@@ -80,18 +85,24 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
   return (
     <section aria-labelledby={tituloId} className="card-base flex flex-col overflow-hidden p-0">
       <header className="flex items-center justify-between gap-inline border-b border-outline-variant/50 px-card py-stack">
-        <div className="flex min-w-0 items-center gap-inline">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
-            <Inbox className="size-5" aria-hidden="true" />
-          </div>
-          <h3 id={tituloId} className="type-subtitle font-semibold">
-            Requieren atención
-          </h3>
-        </div>
+        <h3 id={tituloId} className="type-subtitle min-w-0 text-lg font-semibold">
+          Requieren atención
+        </h3>
         <span className="type-meta tabular-nums">
           {total === 0 ? 'Todo al día' : total === 1 ? '1 pendiente' : `${total} pendientes`}
         </span>
       </header>
+
+      {/* Encabezado de columnas: solo visual, calca los anchos de cada fila. */}
+      <div
+        aria-hidden="true"
+        className="type-meta flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight font-medium"
+      >
+        <span className="min-w-0 flex-1">Tipo</span>
+        <span className={COL_ESTADO}>Estado</span>
+        <span className={COL_TOTAL}>Total</span>
+        <span className="size-4 shrink-0" />
+      </div>
 
       <ul className="divide-y divide-outline-variant/50">
         {filas.map((fila) => {
@@ -116,8 +127,10 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
                 </Link>
                 <p className="type-meta">{fila.descripcion}</p>
               </div>
-              {fila.valor > 0 && <span className={`pill hidden shrink-0 sm:inline-flex lg:hidden xl:inline-flex ${tono.pill}`}>{fila.accion}</span>}
-              <span className="w-10 shrink-0 text-right font-headline text-2xl font-bold tabular-nums text-text-primary">
+              <div className={COL_ESTADO}>
+                {fila.valor > 0 && <span className={`pill ${tono.pill}`}>{fila.accion}</span>}
+              </div>
+              <span className={`${COL_TOTAL} font-headline text-2xl font-bold tabular-nums text-text-primary`}>
                 {fila.valor}
               </span>
               <ChevronRight className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
