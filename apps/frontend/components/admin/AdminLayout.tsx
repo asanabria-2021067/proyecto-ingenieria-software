@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Archive,
+  CalendarRange,
   Clock,
   FileSearch,
   FolderKanban,
@@ -41,6 +42,8 @@ export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendiente
  * backend (`GET /admin/proyectos?grupo=activos|revision|cierres|cerrados`); no
  * existe un quinto. «Revisiones» se conserva en su ruta: es la bandeja de
  * revisiones de PUBLICACIÓN (V5 §31.2), un flujo distinto del cierre.
+ * «Calendario de Sprints» cierra el grupo como vista de supervisión, no como
+ * un grupo más de la bandeja.
  */
 export const adminNavEntries: NavEntry[] = [
   { href: '/dashboard/admin', label: 'Panel Admin', icon: LayoutDashboard, exact: true },
@@ -56,6 +59,9 @@ export const adminNavEntries: NavEntry[] = [
       { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: FileSearch },
       { href: '/dashboard/admin/proyectos?grupo=cierres', label: 'Solicitudes de cierre', icon: Clock },
       { href: '/dashboard/admin/proyectos?grupo=cerrados', label: 'Cerrados', icon: Archive },
+      // No es un grupo de la bandeja: es la supervisión temporal de los Sprints
+      // operables de los proyectos activos (mismo icono que su widget del panel).
+      { href: '/dashboard/admin/sprints', label: 'Calendario de Sprints', icon: CalendarRange },
     ],
   },
   {

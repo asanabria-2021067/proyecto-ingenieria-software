@@ -65,14 +65,28 @@ describe('AdminLayout — shell administrativo S7 (F011)', () => {
     expect(nav.getByRole('button', { name: /Gobernanza/ })).toBeInTheDocument();
   });
 
-  it('Proyectos agrupa los tres grupos de la bandeja más la revisión de publicación, sin un «todos»', () => {
+  it('Proyectos agrupa los tres grupos de la bandeja, la revisión de publicación y el calendario de Sprints, sin un «todos»', () => {
     const proyectos = adminNavEntries.find((e) => e.type === 'group' && e.label === 'Proyectos');
     expect(proyectos && proyectos.type === 'group' ? proyectos.items.map((i) => i.href) : []).toEqual([
       '/dashboard/admin/proyectos?grupo=activos',
       '/dashboard/projects/admin/reviews',
       '/dashboard/admin/proyectos?grupo=cierres',
       '/dashboard/admin/proyectos?grupo=cerrados',
+      '/dashboard/admin/sprints',
     ]);
+  });
+
+  it('en /dashboard/admin/sprints el grupo Proyectos queda abierto y «Calendario de Sprints» es el destino activo', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin/sprints');
+    searchParamsMock.mockReturnValue(new URLSearchParams('vista=lista'));
+    renderShell();
+    const nav = desktopNav();
+
+    expect(nav.getByRole('button', { name: /Proyectos/ })).toHaveAttribute('aria-expanded', 'true');
+    const enlace = nav.getByRole('link', { name: 'Calendario de Sprints' });
+    expect(enlace).toHaveAttribute('href', '/dashboard/admin/sprints');
+    expect(enlace).toHaveAttribute('aria-current', 'page');
+    expect(nav.getByRole('link', { name: 'Cerrados' })).not.toHaveAttribute('aria-current');
   });
 
   it('«Revisiones» aparece una sola vez, abre su grupo y ya no queda ningún destino al grupo retirado', () => {
@@ -251,6 +265,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Revisiones',
     'Solicitudes de cierre',
     'Cerrados',
+    'Calendario de Sprints',
     'Apelaciones',
     'Gestión de Usuarios',
     'Recuperación de contraseña',
