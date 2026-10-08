@@ -8,7 +8,6 @@ import {
   AlertCircle,
   Calendar,
   GraduationCap,
-  Activity,
   ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -214,43 +213,58 @@ function AdminStatsSkeleton() {
 
 // ─── Activity list ────────────────────────────────────────────────────────────
 
+// Anchos compartidos por el encabezado de columnas y las filas (desde `sm`;
+// en móvil la fila se apila y el encabezado se oculta).
+const ACT_COL_ESTADO = 'flex shrink-0 sm:w-36 sm:justify-center';
+const ACT_COL_ACCION = 'shrink-0 text-center sm:w-28';
+
 function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] }) {
   const tituloId = useId();
   return (
     <section aria-labelledby={tituloId} className="card-base flex h-full flex-col overflow-hidden p-0">
-      <header className="flex items-center gap-inline border-b border-outline-variant/50 px-card py-stack">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10">
-          <Activity className="size-5 text-primary" aria-hidden="true" />
-        </div>
-        <h3 id={tituloId} className="type-subtitle font-semibold">
+      <header className="border-b border-outline-variant/50 px-card py-stack">
+        <h3 id={tituloId} className="type-subtitle text-lg font-semibold">
           Actividad reciente
         </h3>
       </header>
       {items.length === 0 ? (
         <p className="type-body px-card py-stack text-text-secondary">No hay actividad reciente</p>
       ) : (
-        <ul className="divide-y divide-outline-variant/50">
-          {items.map((item) => (
-            <li
-              key={item.idProyecto}
-              className="flex flex-wrap items-center gap-x-inline gap-y-tight px-card py-inline transition-colors hover:bg-surface-container-low"
-            >
-              <div className="min-w-0 flex-1 basis-full sm:basis-48">
-                <p className="type-body line-clamp-1 font-semibold">{item.tituloProyecto}</p>
-                <p className="type-meta mt-micro">{timeAgo(item.fechaActualizacion)}</p>
-              </div>
-              <span className={`pill shrink-0 ${estadoBadgeClasses(item.estadoProyecto)}`}>
-                {estadoLegible(item.estadoProyecto)}
-              </span>
-              <Link
-                href={`/dashboard/proyectos/${item.idProyecto}`}
-                className="shrink-0 rounded-control bg-surface-container-high px-stack py-tight text-xs font-semibold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+        <>
+          {/* Encabezado de columnas: solo visual, calca los anchos de cada fila. */}
+          <div
+            aria-hidden="true"
+            className="type-meta hidden items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight font-medium sm:flex"
+          >
+            <span className="min-w-0 flex-1">Proyecto</span>
+            <span className={ACT_COL_ESTADO}>Estado</span>
+            <span className={ACT_COL_ACCION}>Acción</span>
+          </div>
+          <ul className="divide-y divide-outline-variant/50">
+            {items.map((item) => (
+              <li
+                key={item.idProyecto}
+                className="flex flex-wrap items-center gap-x-inline gap-y-tight px-card py-inline transition-colors hover:bg-surface-container-low"
               >
-                Ver proyecto
-              </Link>
-            </li>
-          ))}
-        </ul>
+                <div className="min-w-0 flex-1 basis-full sm:basis-48">
+                  <p className="type-body line-clamp-1 font-semibold">{item.tituloProyecto}</p>
+                  <p className="type-meta mt-micro">{timeAgo(item.fechaActualizacion)}</p>
+                </div>
+                <div className={ACT_COL_ESTADO}>
+                  <span className={`pill ${estadoBadgeClasses(item.estadoProyecto)}`}>
+                    {estadoLegible(item.estadoProyecto)}
+                  </span>
+                </div>
+                <Link
+                  href={`/dashboard/proyectos/${item.idProyecto}`}
+                  className={`${ACT_COL_ACCION} rounded-control bg-surface-container-high px-stack py-tight text-xs font-semibold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40`}
+                >
+                  Ver proyecto
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
