@@ -130,9 +130,7 @@ function StatRow({
 }) {
   return (
     <li role="group" aria-label={label} className="flex items-center gap-inline px-card py-stack">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10">
-        <Icon className="size-5 text-primary" aria-hidden="true" />
-      </div>
+      <Icon className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="type-body font-semibold">{label}</p>
         <p className="type-meta">{subtexto}</p>
