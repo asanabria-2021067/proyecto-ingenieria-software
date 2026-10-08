@@ -221,7 +221,7 @@ export function ProjectReviewSheet({
         <div className="h-5 w-px bg-outline-variant/40" />
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-black uppercase tracking-widest text-primary">
-            Administración · Revisiones
+            Proyectos · Solicitudes de publicación
           </p>
           <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
             {proyecto?.tituloProyecto ?? 'Revisión de proyecto'}

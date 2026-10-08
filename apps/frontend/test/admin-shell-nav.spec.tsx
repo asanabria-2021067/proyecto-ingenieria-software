@@ -59,7 +59,7 @@ describe('AdminLayout — shell administrativo S7 (F011)', () => {
     const nav = desktopNav();
 
     expect(nav.getByRole('link', { name: 'Activos' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=activos');
-    expect(nav.getByRole('link', { name: 'Revisiones' })).toHaveAttribute('href', '/dashboard/projects/admin/reviews');
+    expect(nav.getByRole('link', { name: 'Solicitudes de publicación' })).toHaveAttribute('href', '/dashboard/projects/admin/reviews');
     expect(nav.getByRole('link', { name: 'Solicitudes de cierre' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cierres');
     expect(nav.getByRole('link', { name: 'Cerrados' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cerrados');
     expect(nav.getByRole('button', { name: /Gobernanza/ })).toBeInTheDocument();
@@ -89,13 +89,13 @@ describe('AdminLayout — shell administrativo S7 (F011)', () => {
     expect(nav.getByRole('link', { name: 'Cerrados' })).not.toHaveAttribute('aria-current');
   });
 
-  it('«Revisiones» aparece una sola vez, abre su grupo y ya no queda ningún destino al grupo retirado', () => {
-    // Estando en la propia ruta de Revisiones, el grupo Proyectos se despliega:
+  it('«Solicitudes de publicación» aparece una sola vez, abre su grupo y ya no queda ningún destino al grupo retirado', () => {
+    // Estando en la propia ruta de Solicitudes de publicación, el grupo Proyectos se despliega:
     // la vista quedó integrada entre los otros tres destinos, no suelta.
     pathnameMock.mockReturnValue('/dashboard/projects/admin/reviews');
     searchParamsMock.mockReturnValue(new URLSearchParams());
     renderShell();
-    expect(desktopNav().getAllByRole('link', { name: 'Revisiones' })).toHaveLength(1);
+    expect(desktopNav().getAllByRole('link', { name: 'Solicitudes de publicación' })).toHaveLength(1);
 
     const hrefs = desktopNav()
       .getAllByRole('link')
@@ -227,7 +227,7 @@ describe('AdminLayout — sidebar graphite', () => {
     expect(activos).toHaveAttribute('aria-current', 'page');
     expect(activos).toHaveClass('admin-nav-subitem');
     expect(activos).not.toHaveClass('admin-nav-inactive');
-    for (const hermano of ['Revisiones', 'Solicitudes de cierre', 'Cerrados']) {
+    for (const hermano of ['Solicitudes de publicación', 'Solicitudes de cierre', 'Cerrados']) {
       const enlace = nav.getByRole('link', { name: hermano });
       expect(enlace).toHaveClass('admin-nav-subitem', 'admin-nav-inactive');
       expect(enlace).not.toHaveAttribute('aria-current');
@@ -262,12 +262,13 @@ describe('AdminLayout — sidebar colapsable', () => {
   const DESTINOS = [
     'Panel Admin',
     'Activos',
-    'Revisiones',
+    'Solicitudes de publicación',
     'Solicitudes de cierre',
     'Cerrados',
     'Calendario de Sprints',
     'Apelaciones',
     'Gestión de Usuarios',
+    'Cuentas pendientes',
     'Recuperación de contraseña',
   ];
 

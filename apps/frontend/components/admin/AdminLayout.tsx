@@ -40,7 +40,7 @@ export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendiente
 /**
  * S7 (VIEW-12, F011). Los cuatro grupos de «Proyectos» son EXACTAMENTE los del
  * backend (`GET /admin/proyectos?grupo=activos|revision|cierres|cerrados`); no
- * existe un quinto. «Revisiones» se conserva en su ruta: es la bandeja de
+ * existe un quinto. «Solicitudes de publicación» conserva su ruta: es la bandeja de
  * revisiones de PUBLICACIÓN (V5 §31.2), un flujo distinto del cierre.
  * «Calendario de Sprints» cierra el grupo como vista de supervisión, no como
  * un grupo más de la bandeja.
@@ -56,7 +56,7 @@ export const adminNavEntries: NavEntry[] = [
       // La revisión de publicación es su propio flujo, no un grupo de la
       // bandeja: se enlaza aquí para que los cuatro destinos de Proyectos
       // sigan juntos, y no se repite abajo como entrada suelta.
-      { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: FileSearch },
+      { href: '/dashboard/projects/admin/reviews', label: 'Solicitudes de publicación', icon: FileSearch },
       { href: '/dashboard/admin/proyectos?grupo=cierres', label: 'Solicitudes de cierre', icon: Clock },
       { href: '/dashboard/admin/proyectos?grupo=cerrados', label: 'Cerrados', icon: Archive },
       // No es un grupo de la bandeja: es la supervisión temporal de los Sprints
