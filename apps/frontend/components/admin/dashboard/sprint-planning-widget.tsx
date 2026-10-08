@@ -36,7 +36,7 @@ export function AdminSprintPlanningWidget() {
   const { data, isLoading, isError, isFetching, refetch } = useAdminSprintCalendar();
 
   return (
-    <section aria-labelledby={tituloId} className="card-base flex h-full flex-col gap-stack">
+    <section aria-labelledby={tituloId} className="card-base flex h-full flex-col gap-stack xl:gap-inline xl:p-stack">
       <header className="flex items-start gap-inline">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
           <CalendarRange className="size-5" aria-hidden="true" />
@@ -89,10 +89,10 @@ function SprintPlanningError({ onRetry, retrying }: { onRetry: () => void; retry
 
 function Metric({ label, value, atencion = false }: { label: string; value: number; atencion?: boolean }) {
   return (
-    <div className="min-w-0 px-stack py-inline first:pl-0 last:pr-0">
+    <div className="min-w-0 px-stack py-inline first:pl-0 last:pr-0 xl:py-tight">
       <dt className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</dt>
       <dd
-        className={`mt-micro font-headline text-3xl font-bold tabular-nums ${
+        className={`mt-micro font-headline text-3xl font-bold tabular-nums xl:text-2xl ${
           atencion ? 'text-attention-strong dark:text-attention' : 'text-text-primary'
         }`}
       >
@@ -161,7 +161,7 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
           próxima en vez de enlazar a una ruta que respondería 404. */}
       <p
         aria-disabled="true"
-        className="type-body mt-auto flex flex-wrap items-center justify-center gap-tight text-center font-medium text-text-secondary"
+        className="type-body mt-auto flex flex-wrap items-center justify-center gap-tight text-center font-medium text-text-secondary xl:text-[0.8125rem]"
       >
         <span className="inline-flex items-center gap-tight whitespace-nowrap">
           Ver calendario de Sprints
@@ -183,7 +183,7 @@ function NextFinalization({ item }: { item: AdminSprintCalendarItem | null }) {
   }
 
   return (
-    <div className="flex items-start gap-inline border-t border-outline-variant/50 pt-stack">
+    <div className="flex items-start gap-inline border-t border-outline-variant/50 pt-stack xl:pt-inline">
       <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
         <CalendarClock className="size-5" aria-hidden="true" />
       </div>
