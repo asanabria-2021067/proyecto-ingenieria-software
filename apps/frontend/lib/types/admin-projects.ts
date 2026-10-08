@@ -54,6 +54,36 @@ export interface AdminProjectListItem {
   /** Resumen del Sprint operable; nunca un detalle operable por el administrador. */
   sprintAmbiente: AdminProjectSprintSummary | null;
   accion: AdminProjectAction;
+  /** Solo en `grupo=cierres` (que el backend entrega completo, sin paginar). */
+  cierre?: AdminProjectClosure;
+}
+
+/**
+ * Situación de una solicitud de cierre. La calcula el backend a partir de las
+ * revisiones de cierre del proyecto (`closure-request-situation.ts`); el
+ * cliente la presenta y nunca la deduce.
+ */
+export const CLOSURE_REQUEST_SITUATIONS = [
+  'PENDIENTE_DE_EVALUACION',
+  'REENVIADA_PARA_REVISION',
+  'EN_ESPERA_DE_CORRECCIONES',
+  'SIN_ENTREGA_FORMAL',
+  'SIN_CLASIFICACION',
+] as const;
+export type ClosureRequestSituation = (typeof CLOSURE_REQUEST_SITUATIONS)[number];
+
+/** Bloque `cierre` de un proyecto de `grupo=cierres`. Los legacy no tienen revisión, número ni fechas. */
+export interface AdminProjectClosure {
+  situacion: ClosureRequestSituation;
+  origen: 'PRIMERA_SOLICITUD' | 'NUEVA_SOLICITUD_TRAS_DEVOLUCION' | null;
+  revisionId: number | null;
+  numeroRevision: number | null;
+  /** Instante ISO del envío de la entrega vigente. */
+  enviadaEn: string | null;
+  /** Instante ISO en que el administrador pidió la corrección documental. */
+  correccionSolicitadaEn: string | null;
+  /** Solo una entrega enviada admite veredicto; se resuelve en el detalle, nunca en la bandeja. */
+  puedeResolver: boolean;
 }
 
 export interface AdminProjectsPage {
@@ -61,6 +91,8 @@ export interface AdminProjectsPage {
   total: number;
   page: number;
   limit: number;
+  /** Solo en `grupo=cierres`: solicitudes por situación sobre TODO el grupo; suman `total`. */
+  resumenCierre?: Record<ClosureRequestSituation, number>;
 }
 
 export interface AdminProjectsQuery {

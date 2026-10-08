@@ -3,9 +3,10 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, ChevronLeft, ChevronRight, FolderKanban } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, FolderKanban, RefreshCw } from 'lucide-react';
 import { useAdminProjects } from '@/hooks/use-admin-projects';
 import { ActiveProjectsBoard } from './active-projects-board';
+import { ClosureRequestsInbox } from './closure-requests-inbox';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -43,13 +44,15 @@ const EMPTY_LABEL: Record<AdminProjectGroup, string> = {
 const DESCRIPCION_GRUPO: Record<AdminProjectGroup, string> = {
   activos:
     'Supervisa proyectos publicados o en progreso, sus equipos y la planificación temporal de sus Sprints. El administrador consulta y supervisa; no opera dentro del Sprint del equipo.',
-  cierres:
-    'Bandeja administrativa por grupo. El administrador consulta y decide sobre cierres; nunca opera dentro del Sprint de un equipo.',
+  cierres: 'Evalúa las solicitudes de cierre de proyectos, verifica sus requisitos y gestiona su resolución.',
   cerrados:
     'Bandeja administrativa por grupo. El administrador consulta y decide sobre cierres; nunca opera dentro del Sprint de un equipo.',
 };
 
-/** Etiqueta del contador de cada grupo. Activos pinta el suyo dentro de su tablero, junto a los filtros. */
+/**
+ * Etiqueta del contador de cada grupo. Activos pinta el suyo dentro de su
+ * tablero, junto a los filtros; Cierres lo reparte en sus indicadores por etapa.
+ */
 const TOTAL_LABEL: Record<AdminProjectGroup, string> = {
   activos: 'Total de proyectos activos',
   cierres: 'Total de solicitudes de cierre',
@@ -107,10 +110,13 @@ export default function AdminProjectsClient() {
   // Activos carga su lista completa dentro de `ActiveProjectsBoard`; aquí solo
   // se pagina para los demás grupos.
   const esActivos = grupo === 'activos';
-  const { data, isPending, isError, error, refetch, isPlaceholderData } = useAdminProjects(
+  // Cierres es una bandeja por etapas: el backend la entrega completa y con
+  // sus contadores globales, así que no se pagina ni lee `page`/`limit`.
+  const esCierres = grupo === 'cierres';
+  const { data, isPending, isError, error, refetch, isFetching, isPlaceholderData } = useAdminProjects(
     grupo,
-    page,
-    limit,
+    esCierres ? 1 : page,
+    esCierres ? ADMIN_PROJECTS_DEFAULT_LIMIT : limit,
     !esActivos,
   );
 
@@ -132,15 +138,28 @@ export default function AdminProjectsClient() {
 
       {/* El grupo activo se elige en la sidebar administrativa: la página no
           repite esa navegación, solo declara en qué grupo está parada. */}
-      <section className="mb-6">
-        {/* Título limpio: el total del grupo va justo antes de la tabla, no como badge aquí. */}
-        <h1 className="type-display text-balance">{ADMIN_PROJECT_GROUP_LABEL[grupo]}</h1>
-        <p className="mt-tight max-w-2xl text-base text-tertiary">{DESCRIPCION_GRUPO[grupo]}</p>
+      <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          {/* Título limpio: el total del grupo va justo antes de la tabla, no como badge aquí. */}
+          <h1 className="type-display text-balance">{ADMIN_PROJECT_GROUP_LABEL[grupo]}</h1>
+          <p className="mt-tight max-w-2xl text-base text-tertiary">{DESCRIPCION_GRUPO[grupo]}</p>
+        </div>
+        {esCierres && (
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+            className="flex shrink-0 items-center gap-2 self-start rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
+            Actualizar
+          </button>
+        )}
       </section>
 
       {/* Total REAL del grupo (todas las páginas), con el patrón de Mis Tareas.
           Estas bandejas no tienen búsqueda ni filtros: no hay «encontrados». */}
-      {!esActivos && !isError && data && (
+      {!esActivos && !esCierres && !isError && data && (
         <p className="type-body mb-stack text-text-secondary" role="status">
           {TOTAL_LABEL[grupo]}: <span className="font-semibold tabular-nums text-text-primary">{data.total}</span>
         </p>
@@ -148,6 +167,10 @@ export default function AdminProjectsClient() {
 
       {esActivos ? (
         <ActiveProjectsBoard />
+      ) : esCierres && data && data.items.length > 0 && !isError ? (
+        <div aria-busy={isFetching}>
+          <ClosureRequestsInbox data={data} />
+        </div>
       ) : (
         <div
           className="rounded-xl border border-outline-variant bg-surface-container-lowest"
@@ -287,7 +310,7 @@ export default function AdminProjectsClient() {
         </div>
       )}
 
-      {!esActivos && !isPending && !isError && data && (
+      {!esActivos && !esCierres && !isPending && !isError && data && (
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-tertiary">
             Mostrando{' '}

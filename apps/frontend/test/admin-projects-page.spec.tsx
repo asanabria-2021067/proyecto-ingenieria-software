@@ -102,15 +102,15 @@ afterEach(() => {
 
 describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
   it('el grupo vive en la URL y encabeza la página, con su total', async () => {
-    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cierres&page=2'));
-    (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'REVISAR_CIERRE', estadoProyecto: 'EN_SOLICITUD_CIERRE' })], { total: 25, page: 2 }));
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados&page=2'));
+    (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'CONSULTAR_HISTORICO', estadoProyecto: 'CERRADO' })], { total: 25, page: 2 }));
     renderPage();
 
-    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cierres', page: 2, limit: 20 }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Solicitudes de cierre' })).toBeInTheDocument();
+    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 2, limit: 20 }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Cerrados' })).toBeInTheDocument();
     // El total real (todas las páginas) va antes de la tabla, sin badge junto al título.
-    const total = await screen.findByText(/Total de solicitudes de cierre:/);
-    expect(total.textContent?.replace(/\s+/g, ' ')).toBe('Total de solicitudes de cierre: 25');
+    const total = await screen.findByText(/Total de proyectos cerrados:/);
+    expect(total.textContent?.replace(/\s+/g, ' ')).toBe('Total de proyectos cerrados: 25');
     expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toHaveTextContent('25');
     expect(screen.queryByText('25 proyectos')).not.toBeInTheDocument();
     expect(ADMIN_PROJECT_GROUPS).toEqual(['activos', 'cierres', 'cerrados']);
@@ -236,16 +236,16 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     expect(accionHref(item({ accion: 'CONSULTAR_HISTORICO' }))).toBe('/dashboard/admin/proyectos/37');
   });
 
-  it('la paginación de los demás grupos respeta limit y nunca supera 50', async () => {
-    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cierres&page=1&limit=500'));
-    (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'REVISAR_CIERRE' })], { total: 120, limit: 50 }));
+  it('la paginación de Cerrados respeta limit y nunca supera 50', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados&page=1&limit=500'));
+    (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'CONSULTAR_HISTORICO', estadoProyecto: 'CERRADO' })], { total: 120, limit: 50 }));
     renderPage();
 
-    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cierres', page: 1, limit: 50 }));
+    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 50 }));
     expect(await screen.findByText(/Página 1 de 3/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Página siguiente' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cierres&page=2&limit=50');
-    expect(screen.getByText('Revisar cierre')).toBeInTheDocument();
-    expect(adminProjectsQueryKey('cierres', 1, 50)).toEqual(['admin', 'proyectos', 'cierres', 1, 50]);
+    expect(screen.getByRole('link', { name: 'Página siguiente' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cerrados&page=2&limit=50');
+    expect(screen.getByText('Consultar histórico')).toBeInTheDocument();
+    expect(adminProjectsQueryKey('cerrados', 1, 50)).toEqual(['admin', 'proyectos', 'cerrados', 1, 50]);
   });
 
   it('un grupo vacío muestra su Empty específico', async () => {
