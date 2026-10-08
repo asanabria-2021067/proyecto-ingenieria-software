@@ -107,9 +107,9 @@ function SprintPlanningError({ onRetry, retrying }: { onRetry: () => void; retry
 }
 
 /**
- * Métrica del resumen, con la misma interfaz que las tarjetas KPI de Mis
- * Tareas (punto de color + etiqueta en versalitas + número) y el tamaño
- * compacto de este widget. El punto distingue la métrica sin otro icono.
+ * Métrica del resumen, con la misma tarjeta KPI de Mis Tareas (`ResumenKpi`):
+ * mismo relleno, punto de color + etiqueta en versalitas y número a su
+ * tamaño. El punto distingue la métrica sin otro icono.
  */
 function Metric({
   label,
@@ -123,13 +123,13 @@ function Metric({
   atencion?: boolean;
 }) {
   return (
-    <div role="group" aria-label={label} className="card-base min-w-0 px-stack py-inline xl:py-tight">
+    <div role="group" aria-label={label} className="card-base min-w-0 px-card py-stack">
       <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-secondary">
         <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${punto}`} />
         {label}
       </p>
       <p
-        className={`mt-micro font-headline text-3xl font-bold tabular-nums xl:text-2xl ${
+        className={`mt-tight font-headline text-3xl font-bold tabular-nums ${
           atencion ? 'text-attention-strong dark:text-attention' : 'text-text-primary'
         }`}
       >
@@ -200,15 +200,16 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
         )}
 
         <NextFinalization item={proxima} />
+      </div>
 
-        <Link
-          href="/dashboard/admin/sprints"
-          className="type-body mt-auto inline-flex min-h-9 items-center xl:min-h-6 justify-center gap-tight self-center rounded-control px-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40 xl:text-[0.8125rem]"
-        >
+      {/* Fuera de la tarjeta: es la salida del resumen hacia la vista completa,
+          con el mismo botón oscuro de «Ver proyecto» en Actividad reciente. */}
+      <Button asChild size="sm" className="w-full text-xs font-semibold">
+        <Link href="/dashboard/admin/sprints">
           Ver calendario de Sprints
           <ArrowRight className="size-4" aria-hidden="true" />
         </Link>
-      </div>
+      </Button>
     </>
   );
 }
