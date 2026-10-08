@@ -192,7 +192,7 @@ describe('ActiveProjectsBoard — búsqueda, filtros y orden', () => {
 
     fireEvent.change(buscador, { target: { value: 'hernandez' } });
     expect(titulosVisibles()).toEqual(['App de Monitoreo Ambiental']);
-    expect(screen.getByRole('status').textContent?.replace(/\s+/g, ' ')).toBe('1 de 6 proyectos');
+    expect(screen.getByRole('status').textContent?.replace(/\s+/g, ' ')).toBe('Proyectos encontrados: 1 de 6 activos');
   });
 
   it('filtra por estado del proyecto, estado del Sprint y situación temporal; combina y limpia', async () => {
@@ -253,6 +253,8 @@ describe('ActiveProjectsBoard — búsqueda, filtros y orden', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Buscar proyectos por nombre o líder' }), {
       target: { value: 'zzz' },
     });
+    // Cero resultados: el contador distingue lo encontrado del total real.
+    expect(screen.getByText(/Proyectos encontrados:/).textContent?.replace(/\s+/g, ' ')).toBe('Proyectos encontrados: 0 de 6 activos');
     const vacio = screen.getByText('No encontramos proyectos o líderes que coincidan con “zzz”.').closest('section');
     expect(vacio).not.toBeNull();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
@@ -264,7 +266,7 @@ describe('ActiveProjectsBoard — búsqueda, filtros y orden', () => {
   it('sin filtros los selects quedan en «todos» y el contador dice la población total', async () => {
     renderBoard();
     await screen.findByRole('table');
-    expect(screen.getByRole('status').textContent?.replace(/\s+/g, ' ')).toBe('6 proyectos activos');
+    expect(screen.getByRole('status').textContent?.replace(/\s+/g, ' ')).toBe('Total de proyectos activos: 6');
     expect(screen.getByRole('combobox', { name: 'Filtrar por estado del Sprint' })).toHaveTextContent('Todos los Sprints');
   });
 });

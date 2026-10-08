@@ -108,7 +108,11 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
 
     await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cierres', page: 2, limit: 20 }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Solicitudes de cierre' })).toBeInTheDocument();
-    expect(await screen.findByText('25 proyectos')).toBeInTheDocument();
+    // El total real (todas las páginas) va antes de la tabla, sin badge junto al título.
+    const total = await screen.findByText(/Total de solicitudes de cierre:/);
+    expect(total.textContent?.replace(/\s+/g, ' ')).toBe('Total de solicitudes de cierre: 25');
+    expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toHaveTextContent('25');
+    expect(screen.queryByText('25 proyectos')).not.toBeInTheDocument();
     expect(ADMIN_PROJECT_GROUPS).toEqual(['activos', 'cierres', 'cerrados']);
   });
 
@@ -147,6 +151,26 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
       );
       unmount();
     }
+  });
+
+  it('Cerrados y Activos tampoco llevan badge en el título; cada uno etiqueta su total', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados'));
+    (getAdminProjects as any).mockResolvedValue(pagina([item({ estadoProyecto: 'CERRADO' })], { total: 61 }));
+    const cerrados = renderPage();
+    const total = await screen.findByText(/Total de proyectos cerrados:/);
+    expect(total.textContent?.replace(/\s+/g, ' ')).toBe('Total de proyectos cerrados: 61');
+    expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toHaveTextContent('61');
+    cerrados.unmount();
+
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=activos'));
+    (getAdminProjects as any).mockResolvedValue(pagina([item()], { total: 1 }));
+    renderPage();
+    const activos = await screen.findByText(/Total de proyectos activos:/);
+    expect(activos.textContent?.replace(/\s+/g, ' ')).toBe('Total de proyectos activos: 1');
+    // Un solo contador: el del tablero, antes de la tabla.
+    expect(screen.getAllByText(/Total de proyectos/)).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Activos' })).toBeInTheDocument();
+    expect(screen.queryByText(/^\d+ proyectos?$/)).not.toBeInTheDocument();
   });
 
   it('un grupo inválido en la URL redirige a ?grupo=activos', async () => {

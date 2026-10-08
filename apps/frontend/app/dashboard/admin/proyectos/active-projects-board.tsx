@@ -443,15 +443,18 @@ export function ActiveProjectsBoard() {
       {proyectos.isSuccess && (
         <div className="flex min-h-8 flex-wrap items-center justify-between gap-inline">
           <p className="type-body text-text-secondary" role="status" aria-live="polite">
+            {/* `total` es la población activa completa; `filasVisibles` lo que pasa la búsqueda y los filtros. */}
             {hayFiltrosActivos ? (
               <>
-                <span className="font-semibold text-text-primary tabular-nums">{filasVisibles.length}</span> de{' '}
-                <span className="tabular-nums">{total}</span> proyectos
+                Proyectos encontrados:{' '}
+                <span className="font-semibold tabular-nums text-text-primary">{filasVisibles.length}</span> de{' '}
+                <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}
+                {total === 1 ? 'activo' : 'activos'}
               </>
             ) : (
               <>
-                <span className="font-semibold text-text-primary tabular-nums">{total}</span>{' '}
-                {total === 1 ? 'proyecto activo' : 'proyectos activos'}
+                Total de proyectos activos:{' '}
+                <span className="font-semibold tabular-nums text-text-primary">{total}</span>
               </>
             )}
           </p>

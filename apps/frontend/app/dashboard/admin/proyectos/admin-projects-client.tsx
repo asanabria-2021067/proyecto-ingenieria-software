@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ChevronLeft, ChevronRight, FolderKanban } from 'lucide-react';
-import { useAdminProjects, useAllActiveAdminProjects } from '@/hooks/use-admin-projects';
+import { useAdminProjects } from '@/hooks/use-admin-projects';
 import { ActiveProjectsBoard } from './active-projects-board';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
@@ -47,6 +47,13 @@ const DESCRIPCION_GRUPO: Record<AdminProjectGroup, string> = {
     'Bandeja administrativa por grupo. El administrador consulta y decide sobre cierres; nunca opera dentro del Sprint de un equipo.',
   cerrados:
     'Bandeja administrativa por grupo. El administrador consulta y decide sobre cierres; nunca opera dentro del Sprint de un equipo.',
+};
+
+/** Etiqueta del contador de cada grupo. Activos pinta el suyo dentro de su tablero, junto a los filtros. */
+const TOTAL_LABEL: Record<AdminProjectGroup, string> = {
+  activos: 'Total de proyectos activos',
+  cierres: 'Total de solicitudes de cierre',
+  cerrados: 'Total de proyectos cerrados',
 };
 
 const SPRINT_ESTADO_LABEL: Record<string, string> = {
@@ -106,9 +113,6 @@ export default function AdminProjectsClient() {
     limit,
     !esActivos,
   );
-  // Misma consulta (y misma caché) que usa el tablero: aquí solo para el contador del título.
-  const activos = useAllActiveAdminProjects(esActivos);
-  const totalEncabezado = esActivos ? activos.data?.total : data?.total;
 
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -129,19 +133,18 @@ export default function AdminProjectsClient() {
       {/* El grupo activo se elige en la sidebar administrativa: la página no
           repite esa navegación, solo declara en qué grupo está parada. */}
       <section className="mb-6">
-        {/* Misma jerarquía que el panel de administración: un solo nivel pesado (el título). */}
-        <div className="flex flex-wrap items-baseline gap-inline">
-          <h1 className="type-display text-balance">
-            {ADMIN_PROJECT_GROUP_LABEL[grupo]}
-          </h1>
-          {totalEncabezado !== undefined && (
-            <span className="rounded-pill bg-surface-container-high px-inline py-micro text-sm font-medium tabular-nums text-on-surface-variant">
-              {totalEncabezado} {totalEncabezado === 1 ? 'proyecto' : 'proyectos'}
-            </span>
-          )}
-        </div>
+        {/* Título limpio: el total del grupo va justo antes de la tabla, no como badge aquí. */}
+        <h1 className="type-display text-balance">{ADMIN_PROJECT_GROUP_LABEL[grupo]}</h1>
         <p className="mt-tight max-w-2xl text-base text-tertiary">{DESCRIPCION_GRUPO[grupo]}</p>
       </section>
+
+      {/* Total REAL del grupo (todas las páginas), con el patrón de Mis Tareas.
+          Estas bandejas no tienen búsqueda ni filtros: no hay «encontrados». */}
+      {!esActivos && !isError && data && (
+        <p className="type-body mb-stack text-text-secondary" role="status">
+          {TOTAL_LABEL[grupo]}: <span className="font-semibold tabular-nums text-text-primary">{data.total}</span>
+        </p>
+      )}
 
       {esActivos ? (
         <ActiveProjectsBoard />
