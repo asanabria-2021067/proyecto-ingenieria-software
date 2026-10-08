@@ -156,8 +156,8 @@ describe('Panel de Administración (/dashboard/admin)', () => {
     expect(within(actividad).getByText('En solicitud de cierre')).toBeInTheDocument();
     const enlaces = within(actividad).getAllByRole('link', { name: 'Ver proyecto' });
     expect(enlaces.map((enlace) => enlace.getAttribute('href'))).toEqual([
-      '/dashboard/proyectos/36',
-      '/dashboard/proyectos/57',
+      '/dashboard/admin/proyectos/36',
+      '/dashboard/admin/proyectos/57',
     ]);
   });
 

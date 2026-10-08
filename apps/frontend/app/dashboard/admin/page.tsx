@@ -15,6 +15,7 @@ import { GOLD_BADGE, estadoBadgeLabel, estadoBadgeStyle } from '@/components/pro
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queue';
+import { adminProjectHref } from '@/lib/admin/sprint-calendar';
 import { AdminSprintPlanningWidget } from '@/components/admin/dashboard/sprint-planning-widget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminMetricsSection } from '@/components/admin/AdminMetricsSection';
@@ -249,7 +250,7 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
                   </span>
                 </div>
                 <Button asChild size="sm" className={`${ACT_COL_ACCION} text-xs font-semibold`}>
-                  <Link href={`/dashboard/proyectos/${item.idProyecto}`}>Ver proyecto</Link>
+                  <Link href={adminProjectHref(item.idProyecto)}>Ver proyecto</Link>
                 </Button>
               </li>
             ))}
