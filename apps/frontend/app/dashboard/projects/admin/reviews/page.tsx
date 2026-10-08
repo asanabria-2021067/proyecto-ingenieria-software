@@ -4,6 +4,15 @@ import { useState } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardList, RefreshCw, CheckCircle2, Eye, SendHorizonal, Repeat2, CheckCheck, MessageSquareWarning } from 'lucide-react';
+import {
+  REQUEST_INBOX_ACTION,
+  RequestInboxCard,
+  RequestInboxKpi,
+  RequestInboxKpis,
+  RequestInboxMeta,
+  RequestInboxSection,
+  RequestInboxTitle,
+} from '@/components/admin/request-inbox';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal from '@/lib/swal';
@@ -77,35 +86,26 @@ export default function AdminReviewsInboxPage() {
   const totalPendientes = pendientes.length + enEsperaDeCorrecciones.length;
 
   const filaRevision = (r: (typeof pendientes)[number]) => (
-    <div
+    <RequestInboxCard
       key={r.idRevisionProyecto}
-      className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:flex-row sm:items-center sm:justify-between"
+      actions={
+        <>
+          <button type="button" onClick={() => void resolveApprove(r.idProyecto)} className={REQUEST_INBOX_ACTION.primary}>
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+            Aprobar
+          </button>
+          <button type="button" onClick={() => openReviewSheet(r.idProyecto)} className={REQUEST_INBOX_ACTION.attention}>
+            <SendHorizonal className="h-3.5 w-3.5" aria-hidden="true" />
+            Revisar
+          </button>
+        </>
+      }
     >
-      <div className="min-w-0">
-        <p className="break-words font-headline text-base font-black text-on-surface">{r.proyecto.tituloProyecto}</p>
-        <p className="mt-0.5 text-xs text-tertiary">
-          {r.proyecto.creador.nombre} {r.proyecto.creador.apellido} · Envío #{r.numeroEnvio}
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2 sm:shrink-0">
-        <button
-          type="button"
-          onClick={() => void resolveApprove(r.idProyecto)}
-          className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-on-primary outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-          Aprobar
-        </button>
-        <button
-          type="button"
-          onClick={() => openReviewSheet(r.idProyecto)}
-          className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-amber-700 focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-          <SendHorizonal className="h-3.5 w-3.5" aria-hidden="true" />
-          Revisar
-        </button>
-      </div>
-    </div>
+      <RequestInboxTitle>{r.proyecto.tituloProyecto}</RequestInboxTitle>
+      <RequestInboxMeta>
+        {r.proyecto.creador.nombre} {r.proyecto.creador.apellido} · Envío #{r.numeroEnvio}
+      </RequestInboxMeta>
+    </RequestInboxCard>
   );
 
   return (
@@ -148,120 +148,89 @@ export default function AdminReviewsInboxPage() {
         {!loading && inbox && (
           <div className="space-y-10">
             {/* Resumen: solo publicación. */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <ClipboardList className="h-6 w-6 text-primary" aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Pendientes de revisión</p>
-                  <p className="text-3xl font-black tabular-nums tracking-tighter text-on-surface">{primerEnvio.length}</p>
-                  <p className="text-xs text-tertiary">Primer envío, sin revisar</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                  <Repeat2 className="h-6 w-6 text-amber-600" aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Reenviadas para revisión</p>
-                  <p className="text-3xl font-black tabular-nums tracking-tighter text-on-surface">{reenviadas.length}</p>
-                  <p className="text-xs text-tertiary">Corregidas por el estudiante</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
-                  <MessageSquareWarning className="h-6 w-6 text-orange-600" aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">En espera de correcciones</p>
-                  <p className="text-3xl font-black tabular-nums tracking-tighter text-on-surface">{enEsperaDeCorrecciones.length}</p>
-                  <p className="text-xs text-tertiary">Esperando corrección del estudiante</p>
-                </div>
-              </div>
-            </div>
+            <RequestInboxKpis columns={3}>
+              <RequestInboxKpi
+                icon={ClipboardList}
+                tone="primary"
+                label="Pendientes de revisión"
+                value={primerEnvio.length}
+                description="Primer envío, sin revisar"
+              />
+              <RequestInboxKpi
+                icon={Repeat2}
+                tone="amber"
+                label="Reenviadas para revisión"
+                value={reenviadas.length}
+                description="Corregidas por el estudiante"
+              />
+              <RequestInboxKpi
+                icon={MessageSquareWarning}
+                tone="orange"
+                label="En espera de correcciones"
+                value={enEsperaDeCorrecciones.length}
+                description="Esperando corrección del estudiante"
+              />
+            </RequestInboxKpis>
 
             {/* Primer envío: nadie lo ha revisado todavía. */}
-            <section>
-              <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">Pendientes de revisión</h2>
-              {primerEnvio.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
-                  <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" aria-hidden="true" />
-                  <p className="text-sm font-medium text-tertiary">No hay solicitudes pendientes de revisión</p>
-                </div>
-              ) : (
-                <div className="space-y-3">{primerEnvio.map(filaRevision)}</div>
-              )}
-            </section>
+            <RequestInboxSection
+              title="Pendientes de revisión"
+              empty="No hay solicitudes pendientes de revisión"
+              isEmpty={primerEnvio.length === 0}
+            >
+              {primerEnvio.map(filaRevision)}
+            </RequestInboxSection>
 
             {/* El estudiante ya corrigió: esperan una nueva revisión administrativa. */}
-            <section>
-              <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">Reenviadas para revisión</h2>
-              {reenviadas.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
-                  <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" aria-hidden="true" />
-                  <p className="text-sm font-medium text-tertiary">No hay solicitudes reenviadas</p>
-                </div>
-              ) : (
-                <div className="space-y-3">{reenviadas.map(filaRevision)}</div>
-              )}
-            </section>
+            <RequestInboxSection
+              title="Reenviadas para revisión"
+              empty="No hay solicitudes reenviadas"
+              isEmpty={reenviadas.length === 0}
+            >
+              {reenviadas.map(filaRevision)}
+            </RequestInboxSection>
 
             {/* Observadas: el administrador pidió cambios y el estudiante aún no reenvía. */}
-            <section>
-              <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">
-                En espera de correcciones
-              </h2>
-              {enEsperaDeCorrecciones.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
-                  <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" />
-                  <p className="text-sm font-medium text-tertiary">No hay solicitudes en espera de correcciones</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {enEsperaDeCorrecciones.map((p) => {
-                    const revision = p.revisiones[0];
-                    return (
-                      <div
-                        key={p.idProyecto}
-                        className="flex flex-col gap-4 rounded-2xl border border-orange-200 bg-orange-50/50 dark:border-orange-500/20 dark:bg-orange-500/5 p-5 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div>
-                          <p className="font-headline text-base font-black text-on-surface">
-                            {p.tituloProyecto}
-                          </p>
-                          <p className="mt-0.5 text-xs text-tertiary">
-                            {p.creador.nombre} {p.creador.apellido}
-                          </p>
-                          {revision && (
-                            <p className="mt-0.5 text-xs text-tertiary">
-                              Envío #{revision.numeroEnvio}
-                              {revision.revisadaEn && (
-                                <> · Revisado el {new Intl.DateTimeFormat('es-GT', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(revision.revisadaEn))}</>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => openFeedbackSheet(p.idProyecto)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-amber-700 focus-visible:ring-2 focus-visible:ring-primary/40"
-                          >
-                            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                            Ver retroalimentación
-                          </button>
-                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-on-surface dark:border-orange-500/30 dark:bg-orange-500/10">
-                            <MessageSquareWarning className="h-3.5 w-3.5" aria-hidden="true" />
-                            Esperando corrección
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
+            <RequestInboxSection
+              title="En espera de correcciones"
+              empty="No hay solicitudes en espera de correcciones"
+              isEmpty={enEsperaDeCorrecciones.length === 0}
+            >
+              {enEsperaDeCorrecciones.map((p) => {
+                const revision = p.revisiones[0];
+                return (
+                  <RequestInboxCard
+                    key={p.idProyecto}
+                    tone="waiting"
+                    actions={
+                      <>
+                        <button type="button" onClick={() => openFeedbackSheet(p.idProyecto)} className={REQUEST_INBOX_ACTION.attention}>
+                          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                          Ver retroalimentación
+                        </button>
+                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-on-surface dark:border-orange-500/30 dark:bg-orange-500/10">
+                          <MessageSquareWarning className="h-3.5 w-3.5" aria-hidden="true" />
+                          Esperando corrección
+                        </span>
+                      </>
+                    }
+                  >
+                    <RequestInboxTitle>{p.tituloProyecto}</RequestInboxTitle>
+                    <RequestInboxMeta>
+                      {p.creador.nombre} {p.creador.apellido}
+                    </RequestInboxMeta>
+                    {revision && (
+                      <RequestInboxMeta>
+                        Envío #{revision.numeroEnvio}
+                        {revision.revisadaEn && (
+                          <> · Revisado el {new Intl.DateTimeFormat('es-GT', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(revision.revisadaEn))}</>
+                        )}
+                      </RequestInboxMeta>
+                    )}
+                  </RequestInboxCard>
+                );
+              })}
+            </RequestInboxSection>
 
             {totalPendientes === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-center">
