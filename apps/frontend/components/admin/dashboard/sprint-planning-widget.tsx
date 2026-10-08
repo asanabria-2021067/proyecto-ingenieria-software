@@ -39,11 +39,13 @@ export function AdminSprintPlanningWidget() {
     // Tarjetas separadas por un intervalo corto: título, métricas y calendario
     // se leen como un mismo bloque sin compartir una sola superficie.
     <section aria-labelledby={tituloId} className="flex h-full flex-col gap-tight">
-      <header className="card-base px-stack py-inline xl:py-tight">
+      {/* Misma tarjeta que la fecha del calendario de Sprints: relleno completo
+          y un respiro entre el título y su descripción. */}
+      <header className="card-base">
         <h3 id={tituloId} className="type-subtitle font-semibold text-balance">
           Próximas finalizaciones de Sprint
         </h3>
-        <p className="type-meta">Supervisa las fechas esperadas de los Sprints activos.</p>
+        <p className="type-meta mt-micro">Supervisa las fechas esperadas de los Sprints activos.</p>
       </header>
 
       {isLoading ? (
@@ -68,7 +70,7 @@ export function AdminSprintPlanningWidget() {
 }
 
 /** Tarjeta del cuerpo del widget. Desde `xl` vive en la columna lateral del panel, un paso más ceñida. */
-const TARJETA = 'card-base flex flex-col gap-stack xl:gap-inline xl:p-stack';
+const TARJETA = 'card-base flex flex-col gap-stack xl:gap-tight xl:p-stack';
 
 function SprintPlanningSkeleton() {
   return (
@@ -126,7 +128,7 @@ function Metric({
         {label}
       </p>
       <p
-        className={`mt-micro font-headline text-3xl font-bold tabular-nums xl:text-2xl ${
+        className={`mt-micro font-headline text-3xl font-bold tabular-nums xl:mt-0 xl:text-2xl ${
           atencion ? 'text-attention-strong dark:text-attention' : 'text-text-primary'
         }`}
       >
@@ -197,7 +199,7 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
 
         <Link
           href="/dashboard/admin/sprints"
-          className="type-body mt-auto inline-flex min-h-9 items-center justify-center gap-tight self-center rounded-control px-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40 xl:text-[0.8125rem]"
+          className="type-body mt-auto inline-flex min-h-9 items-center xl:min-h-6 justify-center gap-tight self-center rounded-control px-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40 xl:text-[0.8125rem]"
         >
           Ver calendario de Sprints
           <ArrowRight className="size-4" aria-hidden="true" />
@@ -217,7 +219,7 @@ function NextFinalization({ item }: { item: AdminSprintCalendarItem | null }) {
   }
 
   return (
-    <div className="flex items-start gap-inline border-t border-outline-variant/50 pt-stack xl:pt-inline">
+    <div className="flex items-start gap-inline border-t border-outline-variant/50 pt-stack xl:pt-tight">
       <div className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
         <CalendarClock className="size-5" aria-hidden="true" />
       </div>
