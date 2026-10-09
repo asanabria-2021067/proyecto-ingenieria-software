@@ -2,7 +2,7 @@ import { apiFetch } from '@/lib/api/client';
 
 // ─── Base types ───────────────────────────────────────────────────────────────
 
-export type AdminUserStatus = 'ACTIVO' | 'INACTIVO' | 'BLOQUEADO';
+export type AdminUserStatus = 'ACTIVO' | 'INACTIVO' | 'BLOQUEADO' | 'PENDIENTE_VERIFICACION';
 
 export type AdminRole =
   | 'estudiante'
