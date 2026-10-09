@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, CalendarDays, ChevronDown, ChevronUp } from 'lucide-react';
 import { CALENDAR_DAY_CHIP_CLASS, CalendarMonthGrid } from '@/components/calendar/month-view';
 import { Button } from '@/components/ui/button';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
   SITUACION_SPRINT_LABEL_CORTA,
   SITUACION_SPRINT_TONE,
@@ -185,11 +186,9 @@ export function SprintMonthView({
                 <h2 id="sprints-dia-titulo" className="type-subtitle text-text-primary">
                   {formatDiaLargoConAnio(selectedKey)}
                 </h2>
-                <p className="type-meta mt-micro tabular-nums">
-                  {delDia.length === 0
-                    ? 'No hay finalizaciones planificadas para este día.'
-                    : contarFinalizaciones(delDia.length)}
-                </p>
+                {delDia.length > 0 && (
+                  <p className="type-meta mt-micro tabular-nums">{contarFinalizaciones(delDia.length)}</p>
+                )}
               </div>
               {delDia.length > 0 && (desplazable.arriba || desplazable.abajo) && (
                 <div className="flex shrink-0 gap-micro">
@@ -216,6 +215,18 @@ export function SprintMonthView({
                 </div>
               )}
             </div>
+
+            {/* Día sin Sprints: mismo vacío que «Nada programado ese día» del calendario del estudiante. */}
+            {delDia.length === 0 && (
+              <Empty className="surface-enter flex-none" aria-live="polite">
+                <EmptyMedia variant="icon">
+                  <CalendarDays aria-hidden="true" className="h-7 w-7" />
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle>No hay finalizaciones planificadas para este día.</EmptyTitle>
+                </EmptyHeader>
+              </Empty>
+            )}
 
             {delDia.length > 0 && (
               <ul

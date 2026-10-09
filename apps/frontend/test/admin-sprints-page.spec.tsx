@@ -191,12 +191,17 @@ describe('Calendario de Sprints — vista Mes', () => {
     expect(panel.queryByRole('button', { name: /^Sprints (anteriores|siguientes)$/ })).not.toBeInTheDocument();
   });
 
-  it('un día sin finalizaciones lo dice sin tarjeta vacía', async () => {
+  it('un día sin finalizaciones lo dice en su propia tarjeta de vacío, aparte de la fecha', async () => {
     renderPage('mes');
     await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
 
     fireEvent.click(dia(/^9 de octubre de 2026,/));
-    expect(within(detalle()).getByText('No hay finalizaciones planificadas para este día.')).toBeInTheDocument();
+    const mensaje = within(detalle()).getByText('No hay finalizaciones planificadas para este día.');
+    // mismo vacío que el calendario del estudiante: tarjeta Empty con icono, no un texto bajo la fecha
+    const vacio = mensaje.closest('[data-slot="empty"]') as HTMLElement;
+    expect(vacio).not.toBeNull();
+    expect(vacio.querySelector('[data-slot="empty-icon"]')).toHaveAttribute('data-variant', 'icon');
+    expect(vacio).not.toContainElement(screen.getByRole('heading', { level: 2, name: /9 de octubre de 2026/ }));
     expect(within(detalle()).queryByRole('listitem')).not.toBeInTheDocument();
   });
 
