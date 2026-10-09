@@ -58,10 +58,10 @@ function SectionComment({
   return (
     <div className="mt-6 rounded-xl border border-review-soft/60 bg-review-soft/10 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-review dark:text-review-soft shrink-0" />
+        <MessageSquare className="h-3.5 w-3.5 text-review-ink dark:text-review-soft shrink-0" />
         <label
           htmlFor={`comment-${sectionKey}`}
-          className="text-[10px] font-black uppercase tracking-widest text-review dark:text-review-soft"
+          className="text-[10px] font-black uppercase tracking-widest text-review-ink dark:text-review-soft"
         >
           Comentarios del revisor
         </label>

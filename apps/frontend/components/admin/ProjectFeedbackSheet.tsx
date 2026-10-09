@@ -48,8 +48,8 @@ function SectionCommentReadonly({ comment }: { comment: string }) {
   return (
     <div className="mt-6 rounded-xl border border-review-soft/60 bg-review-soft/10 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-review dark:text-review-soft shrink-0" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-review dark:text-review-soft">
+        <MessageSquare className="h-3.5 w-3.5 text-review-ink dark:text-review-soft shrink-0" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
           Comentarios enviados al estudiante
         </span>
       </div>
@@ -142,7 +142,7 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
         </button>
         <div className="h-5 w-px bg-outline-variant/40" />
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-widest text-review dark:text-review-soft">
+          <p className="text-[10px] font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
             Administración · Retroalimentación enviada
           </p>
           <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
