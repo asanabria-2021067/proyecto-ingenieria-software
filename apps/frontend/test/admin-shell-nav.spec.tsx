@@ -280,6 +280,8 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Gestión de Usuarios',
     'Cuentas pendientes',
     'Recuperación de contraseña',
+    // TEMPORAL: inventario de etiquetas; quitar junto con su página.
+    'Etiquetas (temporal)',
   ];
 
   function colapsar() {

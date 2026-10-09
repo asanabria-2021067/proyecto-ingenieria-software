@@ -20,6 +20,7 @@ import {
   UserCheck,
   Users,
   RotateCcw,
+  Tags,
 } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { avisarSinPermiso, useCan, RUTA_SIN_PERMISO } from '@/hooks/use-can';
@@ -80,6 +81,8 @@ export const adminNavEntries: NavEntry[] = [
       { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
       { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
       { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
+      // TEMPORAL: inventario de etiquetas para revisión de diseño; quitar junto con su página.
+      { href: '/dashboard/admin/etiquetas', label: 'Etiquetas (temporal)', icon: Tags },
     ],
   },
 ];

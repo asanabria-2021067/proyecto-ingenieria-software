@@ -263,7 +263,7 @@ describe('redirección por URL directa', () => {
   it('un estudiante que abre una ruta de administración vuelve a /dashboard con un mensaje', async () => {
     usarUsuario(['estudiante']);
     pathnameMock.mockReturnValue('/dashboard/admin/usuarios');
-    render(createElement(AdminLayout, null, createElement('div', null, 'contenido admin')));
+    withClient(createElement(AdminLayout, null, createElement('div', null, 'contenido admin')));
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/dashboard'));
     expect(toastErrorMock).toHaveBeenCalledWith(MENSAJE_SIN_PERMISO, expect.anything());
@@ -273,7 +273,7 @@ describe('redirección por URL directa', () => {
   it('un administrador entra a su panel sin mensaje ni redirección', () => {
     usarUsuario(['administrador']);
     pathnameMock.mockReturnValue('/dashboard/admin/usuarios');
-    render(createElement(AdminLayout, null, createElement('div', null, 'contenido admin')));
+    withClient(createElement(AdminLayout, null, createElement('div', null, 'contenido admin')));
 
     expect(screen.getByText('contenido admin')).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
