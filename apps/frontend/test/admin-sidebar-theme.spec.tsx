@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { UserMenu } from '../components/dashboard/UserMenu';
 
-// Sidebar del administrador «Enterprise Control Panel»: graphite + verde
-// institucional + acento lima. La del estudiante no cambia.
+// Sidebar del administrador «Forest Graphite»: verde bosque institucional en
+// modo claro, grafito verdoso en modo oscuro y acento lima en ambos. La del
+// estudiante no cambia.
 
 const CSS = readFileSync(join(__dirname, '..', 'app/global.css'), 'utf-8');
 
@@ -24,35 +25,59 @@ function token(nombre: string): string | undefined {
   return undefined;
 }
 
+/** Modo claro: verde bosque institucional. */
 export const PALETA_ADMIN = {
-  '--admin-graphite': '#191d20',
-  '--admin-graphite-surface': '#20252a',
-  '--admin-graphite-hover': '#262b30',
-  '--admin-graphite-active': '#2d352f',
-  '--admin-graphite-border': '#30363b',
-  '--admin-ink': '#f7f8f9',
-  '--admin-ink-muted': '#d1d5db',
-  '--admin-ink-secondary': '#9ca3af',
-  '--admin-icon': '#c4c8cc',
+  '--admin-graphite': '#103d30',
+  '--admin-graphite-surface': '#204b3b',
+  '--admin-graphite-hover': '#254f3e',
+  '--admin-graphite-active': '#295441',
+  '--admin-graphite-border': '#356050',
+  '--admin-ink': '#f7faf8',
+  '--admin-ink-muted': '#c0d8cc',
+  '--admin-ink-secondary': '#c0d8cc',
+  '--admin-icon': '#c0d8cc',
   '--admin-green': '#007a3d',
   '--admin-lime': '#a3e635',
 } as const;
 
-describe('Tokens del tema graphite del administrador', () => {
-  it.each(Object.entries(PALETA_ADMIN))('%s vale %s', (nombre, valor) => {
+/** Modo oscuro: grafito verdoso. Solo redefine superficies y texto secundario. */
+export const PALETA_ADMIN_OSCURA = {
+  '--admin-graphite': '#192320',
+  '--admin-graphite-surface': '#242f2a',
+  '--admin-graphite-hover': '#2a3831',
+  '--admin-graphite-active': '#304239',
+  '--admin-graphite-border': '#34413b',
+  '--admin-ink-muted': '#b6c4bd',
+  '--admin-ink-secondary': '#b6c4bd',
+  '--admin-icon': '#b6c4bd',
+} as const;
+
+function tokenOscuro(nombre: string): string | undefined {
+  for (const cuerpo of bloques('.dark')) {
+    const m = cuerpo.match(new RegExp(`${nombre}:\\s*([^;]+);`));
+    if (m) return m[1].trim();
+  }
+  return undefined;
+}
+
+describe('Tokens del tema Forest Graphite del administrador', () => {
+  it.each(Object.entries(PALETA_ADMIN))('claro: %s vale %s', (nombre, valor) => {
     expect(token(nombre)).toBe(valor);
   });
 
-  it('son fijos: el modo oscuro no los redefine (la sidebar es graphite en ambos temas)', () => {
-    const oscuro = bloques('.dark').join('\n');
-    for (const nombre of Object.keys(PALETA_ADMIN)) {
-      expect(oscuro).not.toContain(`${nombre}:`);
+  it.each(Object.entries(PALETA_ADMIN_OSCURA))('oscuro: %s vale %s', (nombre, valor) => {
+    expect(tokenOscuro(nombre)).toBe(valor);
+  });
+
+  it('el modo oscuro no toca la tinta principal, el verde del avatar ni la barra lima', () => {
+    for (const nombre of ['--admin-ink', '--admin-green', '--admin-lime']) {
+      expect(tokenOscuro(nombre)).toBeUndefined();
     }
   });
 });
 
 describe('Superficie graphite de la sidebar', () => {
-  it('los tokens de superficie y texto apuntan a la paleta graphite en ambos temas', () => {
+  it('los tokens de superficie y texto apuntan a la paleta en ambos temas (el oscuro solo cambia sus valores)', () => {
     expect(token('--admin-bg')).toBe('var(--admin-graphite)');
     expect(token('--admin-border')).toBe('var(--admin-graphite-border)');
     expect(token('--admin-text')).toBe('var(--admin-ink)');
@@ -218,21 +243,27 @@ describe('Foco y contraste (WCAG AA)', () => {
     const [l1, l2] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
     return (l1 + 0.05) / (l2 + 0.05);
   }
-  const P = PALETA_ADMIN;
+  const TEMAS = {
+    claro: PALETA_ADMIN,
+    oscuro: { ...PALETA_ADMIN, ...PALETA_ADMIN_OSCURA },
+  } as const;
 
-  it.each([
-    ['texto inactivo / fondo', P['--admin-ink-muted'], P['--admin-graphite'], 4.5],
-    ['etiqueta y correo / fondo', P['--admin-ink-secondary'], P['--admin-graphite'], 4.5],
-    ['texto hover / hover', P['--admin-ink'], P['--admin-graphite-hover'], 4.5],
-    ['texto activo / activo', P['--admin-ink'], P['--admin-graphite-active'], 4.5],
-    ['grupo abierto / superficie', P['--admin-ink'], P['--admin-graphite-surface'], 4.5],
-    ['chevron cerrado / superficie', P['--admin-ink-secondary'], P['--admin-graphite-surface'], 3],
-    ['iniciales / avatar verde', P['--admin-ink'], P['--admin-green'], 4.5],
-    ['icono inactivo / fondo', P['--admin-icon'], P['--admin-graphite'], 3],
-    ['barra y foco lima / activo', P['--admin-lime'], P['--admin-graphite-active'], 3],
-    ['foco lima / fondo', P['--admin-lime'], P['--admin-graphite'], 3],
-  ])('%s cumple %s:1 o más', (_nombre, frente, fondo, minimo) => {
-    expect(contraste(frente, fondo)).toBeGreaterThanOrEqual(minimo as number);
+  describe.each(Object.entries(TEMAS))('tema %s', (_tema, P) => {
+    it.each([
+      ['texto inactivo / fondo', P['--admin-ink-muted'], P['--admin-graphite'], 4.5],
+      ['etiqueta y correo / fondo', P['--admin-ink-secondary'], P['--admin-graphite'], 4.5],
+      ['texto inactivo / hover', P['--admin-ink-muted'], P['--admin-graphite-hover'], 4.5],
+      ['texto hover / hover', P['--admin-ink'], P['--admin-graphite-hover'], 4.5],
+      ['texto activo / activo', P['--admin-ink'], P['--admin-graphite-active'], 4.5],
+      ['grupo abierto / superficie', P['--admin-ink'], P['--admin-graphite-surface'], 4.5],
+      ['chevron cerrado / superficie', P['--admin-ink-secondary'], P['--admin-graphite-surface'], 3],
+      ['iniciales / avatar verde', P['--admin-ink'], P['--admin-green'], 4.5],
+      ['icono inactivo / fondo', P['--admin-icon'], P['--admin-graphite'], 3],
+      ['barra y foco lima / activo', P['--admin-lime'], P['--admin-graphite-active'], 3],
+      ['foco lima / fondo', P['--admin-lime'], P['--admin-graphite'], 3],
+    ])('%s cumple %s:1 o más', (_nombre, frente, fondo, minimo) => {
+      expect(contraste(frente, fondo)).toBeGreaterThanOrEqual(minimo as number);
+    });
   });
 
   it('items, subitems, cuenta y controles de colapsar tienen foco visible lima, distinto del hover', () => {
