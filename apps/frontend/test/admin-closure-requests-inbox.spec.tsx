@@ -219,6 +219,13 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
     expect(screen.getByRole('link', { name: 'Revisar cierre: Huerto Comunitario' })).toHaveAttribute('href', '/dashboard/admin/proyectos/63/cierre');
     expect(screen.getByRole('link', { name: 'Ver solicitud: Feria de Ciencias' })).toHaveAttribute('href', '/dashboard/admin/proyectos/70/cierre');
     expect(screen.getByRole('link', { name: 'Ver proyecto: Biblioteca Digital' })).toHaveAttribute('href', '/dashboard/admin/proyectos/8');
+    // «Ver proyecto» es el botón oscuro por defecto del panel, no el verde de decisión ni el de consulta.
+    const verProyecto = screen.getByRole('link', { name: 'Ver proyecto: Biblioteca Digital' });
+    expect(verProyecto).toHaveClass('bg-action', 'text-on-action');
+    expect(verProyecto).not.toHaveClass('bg-primary');
+    expect(verProyecto).not.toHaveClass('bg-consult');
+    expect(screen.getByRole('link', { name: 'Ver solicitud: Feria de Ciencias' })).toHaveClass('bg-consult');
+    expect(screen.getByRole('link', { name: 'Revisar cierre: Portal de Voluntariado' })).toHaveClass('bg-primary');
 
     expect(seccion('En espera de correcciones').queryByRole('link', { name: /Revisar cierre/ })).not.toBeInTheDocument();
     expect(seccion('Sin entrega formal').queryByRole('link', { name: /Revisar cierre|Ver solicitud/ })).not.toBeInTheDocument();

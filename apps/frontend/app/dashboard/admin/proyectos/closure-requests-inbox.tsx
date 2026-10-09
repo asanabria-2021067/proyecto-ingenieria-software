@@ -29,10 +29,28 @@ import type { AdminProjectListItem, AdminProjectsPage, ClosureRequestSituation }
 const hrefCierre = (idProyecto: number) => `/dashboard/admin/proyectos/${idProyecto}/cierre`;
 const hrefProyecto = (idProyecto: number) => `/dashboard/admin/proyectos/${idProyecto}`;
 
-/** Enlace al detalle con forma de botón compacto; nunca resuelve nada desde la bandeja. */
-function Accion({ href, decision = false, texto, proyecto }: { href: string; decision?: boolean; texto: string; proyecto: string }) {
+/**
+ * Enlace al detalle con forma de botón compacto; nunca resuelve nada desde la
+ * bandeja. `decision`: verde, abre una entrega por resolver. `neutro`: el botón
+ * oscuro por defecto, el mismo «Ver proyecto» de Actividad reciente del panel,
+ * para lo que solo lleva al detalle del proyecto. El resto: verde de consulta.
+ */
+function Accion({
+  href,
+  decision = false,
+  neutro = false,
+  texto,
+  proyecto,
+}: {
+  href: string;
+  decision?: boolean;
+  neutro?: boolean;
+  texto: string;
+  proyecto: string;
+}) {
+  const tono = decision ? REQUEST_INBOX_BUTTON_GREEN : neutro ? '' : REQUEST_INBOX_BUTTON_CONSULT;
   return (
-    <Button asChild size="sm" className={`${REQUEST_INBOX_BUTTON} ${decision ? REQUEST_INBOX_BUTTON_GREEN : REQUEST_INBOX_BUTTON_CONSULT}`}>
+    <Button asChild size="sm" className={`${REQUEST_INBOX_BUTTON} ${tono}`}>
       <Link href={href} aria-label={`${texto}: ${proyecto}`}>
         {texto}
       </Link>
@@ -87,7 +105,7 @@ function SolicitudSoloConsulta({ item, nota }: { item: AdminProjectListItem; not
   return (
     <RequestInboxCard
       icon={<IconoTipo tipo={item.tipoProyecto} />}
-      actions={<Accion href={hrefProyecto(item.idProyecto)} texto="Ver proyecto" proyecto={item.tituloProyecto} />}
+      actions={<Accion href={hrefProyecto(item.idProyecto)} neutro texto="Ver proyecto" proyecto={item.tituloProyecto} />}
     >
       <RequestInboxDetails titulo={item.tituloProyecto} tipo={item.tipoProyecto}>
         {lider(item)} · {nota}
