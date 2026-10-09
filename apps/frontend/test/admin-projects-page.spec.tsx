@@ -58,6 +58,7 @@ function item(overrides: Partial<AdminProjectListItem> = {}): AdminProjectListIt
   return {
     idProyecto: 37,
     tituloProyecto: 'Plataforma de Seguimiento de Laboratorios',
+    tipoProyecto: 'ACADEMICO_HORAS_BECA',
     estadoProyecto: 'EN_PROGRESO',
     lider: { idUsuario: 1, nombre: 'Valeria', apellido: 'Ortiz' },
     usuariosActivos: 8,

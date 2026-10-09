@@ -12,6 +12,7 @@ import type {
   AssignHitoTasksResult,
   ResolverRevisionPayload,
 } from '@/lib/dto/project.dto';
+import type { TipoProyecto } from '@/types';
 
 export async function getProjectById(id: number): Promise<ProyectoDetalleDTO> {
   return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}`);
@@ -131,7 +132,7 @@ export async function getAdminReviewInbox(): Promise<{
     numeroEnvio: number;
     enviadaEn: string;
     idRevisor: number | null;
-    proyecto: { tituloProyecto: string; creadoPor: number; creador: { nombre: string; apellido: string } };
+    proyecto: { tituloProyecto: string; tipoProyecto: TipoProyecto; creadoPor: number; creador: { nombre: string; apellido: string } };
   }>;
   cierresPendientes: Array<{
     idProyecto: number;
@@ -142,6 +143,7 @@ export async function getAdminReviewInbox(): Promise<{
   correccionesEnviadas: Array<{
     idProyecto: number;
     tituloProyecto: string;
+    tipoProyecto: TipoProyecto;
     creador: { nombre: string; apellido: string };
     revisiones: Array<{ idRevisionProyecto: number; numeroEnvio: number; revisadaEn: string | null }>;
   }>;

@@ -5,6 +5,7 @@ import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, CheckCircle2, Eye, SendHorizonal, CheckCheck, MessageSquareWarning } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
+import { IconoTipo } from '@/components/hours/my-hours-project-list';
 import {
   REQUEST_INBOX_ACTION,
   RequestInboxCard,
@@ -88,6 +89,7 @@ export default function AdminReviewsInboxPage() {
   const filaRevision = (r: (typeof pendientes)[number]) => (
     <RequestInboxCard
       key={r.idRevisionProyecto}
+      icon={<IconoTipo tipo={r.proyecto.tipoProyecto} />}
       actions={
         <>
           <button type="button" onClick={() => void resolveApprove(r.idProyecto)} className={REQUEST_INBOX_ACTION.primary}>
@@ -183,6 +185,7 @@ export default function AdminReviewsInboxPage() {
                 return (
                   <RequestInboxCard
                     key={p.idProyecto}
+                    icon={<IconoTipo tipo={p.tipoProyecto} />}
                     tone="waiting"
                     actions={
                       <>

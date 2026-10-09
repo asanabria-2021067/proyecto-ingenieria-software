@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
+import { IconoTipo } from '@/components/hours/my-hours-project-list';
 import {
   REQUEST_INBOX_ACTION,
   RequestInboxCard,
@@ -42,6 +43,7 @@ function SolicitudEnviada({ item }: { item: AdminProjectListItem }) {
   const cierre = item.cierre;
   return (
     <RequestInboxCard
+      icon={<IconoTipo tipo={item.tipoProyecto} />}
       actions={<Accion href={hrefCierre(item.idProyecto)} tipo="primary" texto="Revisar cierre" proyecto={item.tituloProyecto} />}
     >
       <RequestInboxTitle>{item.tituloProyecto}</RequestInboxTitle>
@@ -67,6 +69,7 @@ function SolicitudEnEspera({ item }: { item: AdminProjectListItem }) {
   const solicitadaEn = item.cierre?.correccionSolicitadaEn;
   return (
     <RequestInboxCard
+      icon={<IconoTipo tipo={item.tipoProyecto} />}
       tone="waiting"
       actions={<Accion href={hrefCierre(item.idProyecto)} tipo="outline" texto="Ver solicitud" proyecto={item.tituloProyecto} />}
     >
@@ -83,6 +86,7 @@ function SolicitudEnEspera({ item }: { item: AdminProjectListItem }) {
 function SolicitudSoloConsulta({ item, nota }: { item: AdminProjectListItem; nota: string }) {
   return (
     <RequestInboxCard
+      icon={<IconoTipo tipo={item.tipoProyecto} />}
       actions={<Accion href={hrefProyecto(item.idProyecto)} tipo="outline" texto="Ver proyecto" proyecto={item.tituloProyecto} />}
     >
       <RequestInboxTitle>{item.tituloProyecto}</RequestInboxTitle>

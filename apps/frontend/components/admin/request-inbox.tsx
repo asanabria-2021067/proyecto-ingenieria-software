@@ -55,13 +55,19 @@ const CARD_TONE = {
   waiting: 'border-orange-200 bg-orange-50/50 dark:border-orange-500/20 dark:bg-orange-500/5',
 } as const;
 
-/** Tarjeta horizontal de una solicitud: contenido a la izquierda y acciones a la derecha (debajo en móvil). */
+/**
+ * Tarjeta horizontal de una solicitud: icono del proyecto y contenido a la
+ * izquierda, acciones a la derecha (debajo en móvil).
+ */
 export function RequestInboxCard({
   tone = 'default',
+  icon,
   actions,
   children,
 }: {
   tone?: keyof typeof CARD_TONE;
+  /** Icono del tipo de proyecto, a la izquierda del título. */
+  icon?: ReactNode;
   actions: ReactNode;
   children: ReactNode;
 }) {
@@ -69,7 +75,10 @@ export function RequestInboxCard({
     <div
       className={`flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between ${CARD_TONE[tone]}`}
     >
-      <div className="min-w-0">{children}</div>
+      <div className="flex min-w-0 items-center gap-3">
+        {icon}
+        <div className="min-w-0">{children}</div>
+      </div>
       <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
     </div>
   );

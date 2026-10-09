@@ -34,6 +34,7 @@ function solicitud(
   return {
     idProyecto,
     tituloProyecto,
+    tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
     estadoProyecto: 'EN_SOLICITUD_CIERRE',
     lider: { idUsuario: 1, nombre: 'Valeria', apellido: 'Ortiz' },
     usuariosActivos: 8,
@@ -166,6 +167,8 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
     for (const titulo of ['Portal de Voluntariado', 'Huerto Comunitario', 'Feria de Ciencias', 'Biblioteca Digital']) {
       expect(screen.getAllByText(titulo)).toHaveLength(1);
     }
+    // Cada tarjeta lleva el icono del tipo de proyecto, como en «Mis Horas».
+    expect(document.querySelectorAll('[data-slot="icono-tipo"]')).toHaveLength(4);
   });
 
   it('muestra responsable, número de envío y fechas reales; un legacy no recibe envío ni fecha inventados', async () => {

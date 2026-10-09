@@ -37,6 +37,7 @@ const getCalendarMock = vi.mocked(getAdminSprintCalendar);
 function proyecto(overrides: Partial<AdminProjectListItem> & { idProyecto: number }): AdminProjectListItem {
   return {
     tituloProyecto: `Proyecto ${overrides.idProyecto}`,
+    tipoProyecto: 'ACADEMICO_HORAS_BECA',
     estadoProyecto: 'EN_PROGRESO',
     lider: { idUsuario: 1, nombre: 'Valeria', apellido: 'Ortiz' },
     usuariosActivos: 5,

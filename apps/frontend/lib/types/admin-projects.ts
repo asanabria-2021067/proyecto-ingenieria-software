@@ -4,6 +4,8 @@
  * y `historical-project-read.service.ts` (`adminList` / `adminDetail`).
  */
 
+import type { TipoProyecto } from '@/types';
+
 /**
  * Los grupos de la bandeja espejan estados concretos; no existe uno «todos».
  * `EN_REVISION`/`OBSERVADO` NO son un grupo aquí: la revisión de publicación
@@ -47,6 +49,7 @@ export interface AdminProjectSprintSummary {
 export interface AdminProjectListItem {
   idProyecto: number;
   tituloProyecto: string;
+  tipoProyecto: TipoProyecto;
   estadoProyecto: string;
   lider: { idUsuario: number; nombre: string; apellido: string };
   /** Usuarios ACTIVOS distintos (alguien con dos roles cuenta una vez). Nunca se recalcula en cliente. */

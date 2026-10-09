@@ -31,7 +31,7 @@ function inbox(overrides: Partial<Inbox> = {}): Inbox {
         numeroEnvio: 1,
         enviadaEn: '2026-08-01T12:00:00.000Z',
         idRevisor: null,
-        proyecto: { tituloProyecto: 'App de Biblioteca', creadoPor: 3, creador: { nombre: 'Ana', apellido: 'López' } },
+        proyecto: { tituloProyecto: 'App de Biblioteca', tipoProyecto: 'ACADEMICO_HORAS_BECA', creadoPor: 3, creador: { nombre: 'Ana', apellido: 'López' } },
       },
     ],
     cierresPendientes: [
@@ -89,13 +89,14 @@ describe('VIEW-05 — bandeja de solicitudes de publicación (F017)', () => {
             numeroEnvio: 2,
             enviadaEn: '2026-08-02T12:00:00.000Z',
             idRevisor: null,
-            proyecto: { tituloProyecto: 'Huerto Comunitario', creadoPor: 4, creador: { nombre: 'Luis', apellido: 'Paz' } },
+            proyecto: { tituloProyecto: 'Huerto Comunitario', tipoProyecto: 'EXTRACURRICULAR_EXTENSION', creadoPor: 4, creador: { nombre: 'Luis', apellido: 'Paz' } },
           },
         ],
         correccionesEnviadas: [
           {
             idProyecto: 43,
             tituloProyecto: 'Feria de Ciencias',
+            tipoProyecto: 'ACADEMICO_EXPERIENCIA',
             creador: { nombre: 'Eva', apellido: 'Ruiz' },
             revisiones: [{ idRevisionProyecto: 12, numeroEnvio: 1, revisadaEn: '2026-08-03T12:00:00.000Z' }],
           },
@@ -107,6 +108,10 @@ describe('VIEW-05 — bandeja de solicitudes de publicación (F017)', () => {
 
     const seccion = (nombre: string) => screen.getByRole('heading', { level: 2, name: nombre }).closest('section')!;
     expect(within(seccion('Pendientes de revisión')).getByText('App de Biblioteca')).toBeInTheDocument();
+    // Cada tarjeta lleva el icono del tipo de proyecto, como en «Mis Horas».
+    for (const nombre of ['Pendientes de revisión', 'Reenviadas para revisión', 'En espera de correcciones']) {
+      expect(seccion(nombre).querySelectorAll('[data-slot="icono-tipo"]')).toHaveLength(1);
+    }
     expect(within(seccion('Pendientes de revisión')).queryByText('Huerto Comunitario')).not.toBeInTheDocument();
 
     // Reenviada: ya corregida, vuelve a ser accionable por el administrador.
