@@ -21,8 +21,6 @@ const INLINE_HEX_STYLE = /(?:backgroundColor|color|borderColor|fill|stroke)\s*:\
 const MIGRATED_FILES = [
   'app/dashboard/page.tsx',
   'app/dashboard/admin/page.tsx',
-  'app/dashboard/projects/page.tsx',
-  'app/dashboard/projects/projects-list-client.tsx',
   'app/dashboard/projects/mine/[id]/my-project-view-client.tsx',
   'app/dashboard/projects/[id]/kanban/kanban-workspace-client.tsx',
   'app/dashboard/projects/[id]/kanban/tasks/[taskId]/task-detail-client.tsx',

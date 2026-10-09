@@ -8,7 +8,7 @@ import { useRequireCan } from '@/hooks/use-can';
 
 // Rutas huérfanas que nunca tuvieron shell (sidebar/header): no están
 // enlazadas desde la navegación y usan su propio layout de página completa.
-const NO_SHELL_ROUTES = new Set(['/dashboard/mis-proyectos', '/dashboard/projects']);
+const NO_SHELL_ROUTES = new Set(['/dashboard/mis-proyectos']);
 
 // Rutas exclusivas de administrador: siempre AdminLayout (que internamente
 // bloquea el acceso a usuarios no administradores).
