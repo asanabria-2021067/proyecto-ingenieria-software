@@ -8,7 +8,7 @@ import { useAdminProjectDetail } from '@/hooks/use-admin-projects';
 import { useLeadershipHistory } from '@/hooks/use-leadership';
 import { isHistoricalDetail } from '@/lib/services/admin-projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
-import { estadoBadgeLabel, estadoBadgeStyle, tipoBadgeLabel, tipoBadgeStyle } from '@/components/projects/available-project-card';
+import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
 import { ClosureStatusBanner } from '@/components/projects/closure-status-banner';
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { LeadershipCard } from '@/components/leadership/leadership-card';
@@ -36,6 +36,7 @@ import {
   type AdminProjectDetail,
   type AdminProjectGroup,
 } from '@/lib/types/admin-projects';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
 
@@ -260,9 +261,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
               <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${estadoBadgeStyle(vista.estado)}`}>
                 {estadoBadgeLabel(vista.estado)}
               </span>
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${tipoBadgeStyle(vista.tipo)}`}>
-                {tipoBadgeLabel(vista.tipo)}
-              </span>
+              <TipoBadge tipo={vista.tipo} />
             </div>
             <h1 className="font-headline text-2xl font-black leading-tight text-on-surface md:text-[28px]">{vista.titulo}</h1>
             <p className="max-w-3xl text-sm leading-relaxed text-on-surface-variant">

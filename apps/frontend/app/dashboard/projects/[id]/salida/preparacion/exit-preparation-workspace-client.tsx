@@ -29,8 +29,6 @@ import {
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import {
   ESTADO_COLUMNA_STYLE,
@@ -41,6 +39,7 @@ import { getApiErrorMessage } from '@/components/projects/api-error';
 import { MODALIDAD_LABEL } from '@/types';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import type { ExitPreparationBlockerDto, ExitPreparationSummaryDto } from '@/lib/types/exit-requests';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 interface Props {
   id: number;
@@ -463,11 +462,7 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
               >
                 {estadoBadgeLabel(proyecto.estadoProyecto)}
               </span>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tipoBadgeStyle(proyecto.tipoProyecto)}`}
-              >
-                {tipoBadgeLabel(proyecto.tipoProyecto)}
-              </span>
+              <TipoBadge tipo={proyecto.tipoProyecto} />
               <span className="inline-flex items-center rounded-full border border-outline-variant/30 px-2.5 py-0.5 text-[11px] font-medium text-on-surface-variant">
                 {MODALIDAD_LABEL[proyecto.modalidadProyecto as keyof typeof MODALIDAD_LABEL] ??
                   proyecto.modalidadProyecto}

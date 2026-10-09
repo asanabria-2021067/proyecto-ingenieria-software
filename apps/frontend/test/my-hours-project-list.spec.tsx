@@ -78,7 +78,7 @@ describe('MyHoursProjectList', () => {
     );
 
     const cabecera = screen.getByRole('button', { name: /Tutorías/ });
-    expect(within(cabecera).getByText('Horas Beca')).toHaveClass('pill');
+    expect(within(cabecera).getByText('Horas Beca')).toHaveClass('rounded-[7px]');
     expect(within(cabecera).getByText('En progreso')).toHaveClass('pill');
     // 5.5 h registradas, NO 7.5 h: el legacy va aparte.
     expect(cabecera).toHaveTextContent('Registradas5.5 h');

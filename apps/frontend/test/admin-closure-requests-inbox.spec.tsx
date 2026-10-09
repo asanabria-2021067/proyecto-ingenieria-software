@@ -172,7 +172,7 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
     // …y la categoría real con la etiqueta de las vistas de estudiante.
     const categorias = screen.getAllByText('Extensión');
     expect(categorias).toHaveLength(4);
-    for (const etiqueta of categorias) expect(etiqueta).toHaveClass('pill');
+    for (const etiqueta of categorias) expect(etiqueta).toHaveClass('rounded-[7px]');
     // Las acciones son el botón compacto del panel, sin icono.
     for (const accion of screen.getAllByRole('link', { name: /^(Revisar cierre|Ver solicitud|Ver proyecto): / })) {
       expect(accion).toHaveAttribute('data-slot', 'button');

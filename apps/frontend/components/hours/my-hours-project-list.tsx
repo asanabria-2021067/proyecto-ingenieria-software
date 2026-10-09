@@ -9,13 +9,12 @@ import {
   SLATE_BADGE,
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { ESTADO_LABEL } from '@/components/projects/task-board.utils';
 import { formatearHoras } from '@/lib/hours/format';
 import type { MisHorasProyecto, MisHorasTarea } from '@/lib/services/users';
 import type { EstadoTarea, TipoProyecto } from '@/types';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 const ICONO_TIPO: Record<TipoProyecto, LucideIcon> = {
   ACADEMICO_HORAS_BECA: GraduationCap,
@@ -123,7 +122,7 @@ function ProyectoAbierto({ proyecto }: { proyecto: MisHorasProyecto }) {
               <span className="type-subtitle font-semibold">{proyecto.tituloProyecto}</span>
             </span>
             <span className="flex flex-wrap gap-micro">
-              <span className={`pill ${tipoBadgeStyle(proyecto.tipoProyecto)}`}>{tipoBadgeLabel(proyecto.tipoProyecto)}</span>
+              <TipoBadge tipo={proyecto.tipoProyecto} />
               <span className={`pill ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
                 {estadoBadgeLabel(proyecto.estadoProyecto)}
               </span>

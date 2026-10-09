@@ -39,8 +39,6 @@ import {
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import {
   ESTADO_COLUMNA_STYLE,
@@ -54,6 +52,7 @@ import { MODALIDAD_LABEL } from '@/types';
 import type { AvanceProyectoDTO, ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import type { TareaPublicaDTO } from '@/lib/types/tasks';
 import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 interface Props {
   id: number;
@@ -292,11 +291,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               >
                 {estadoBadgeLabel(proyecto.estadoProyecto)}
               </span>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tipoBadgeStyle(proyecto.tipoProyecto)}`}
-              >
-                {tipoBadgeLabel(proyecto.tipoProyecto)}
-              </span>
+              <TipoBadge tipo={proyecto.tipoProyecto} />
               <span className="inline-flex items-center rounded-full border border-outline-variant/30 px-2.5 py-0.5 text-[11px] font-medium text-on-surface-variant">
                 {MODALIDAD_LABEL[proyecto.modalidadProyecto as keyof typeof MODALIDAD_LABEL] ??
                   proyecto.modalidadProyecto}

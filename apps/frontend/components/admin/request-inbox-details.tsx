@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { tipoBadgeLabel, tipoBadgeStyle } from '@/components/projects/available-project-card';
 import type { TipoProyecto } from '@/types';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 /**
  * Contenido de una tarjeta de solicitud en las bandejas administrativas:
@@ -14,7 +14,7 @@ export function RequestInboxDetails({ titulo, tipo, children }: { titulo: string
     <>
       <p className="type-subtitle break-words font-semibold">{titulo}</p>
       <div className="mt-micro flex flex-wrap items-center gap-x-tight gap-y-micro">
-        <span className={`pill ${tipoBadgeStyle(tipo)}`}>{tipoBadgeLabel(tipo)}</span>
+        <TipoBadge tipo={tipo} />
         <p className="type-meta">{children}</p>
       </div>
     </>

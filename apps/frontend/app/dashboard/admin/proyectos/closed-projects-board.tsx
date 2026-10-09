@@ -8,8 +8,6 @@ import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { DASHBOARD_FILTER_TRIGGER_CLASS, DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import {
@@ -36,6 +34,7 @@ import {
 } from '@/lib/admin/closed-projects';
 import type { AdminProjectListItem } from '@/lib/types/admin-projects';
 import { TIPO_LABEL } from '@/types';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 /**
  * Bandeja de proyectos CERRADOS (`?grupo=cerrados`): consulta histórica.
@@ -77,7 +76,7 @@ function FilaProyecto({ item }: { item: AdminProjectListItem }) {
         <p className="type-body break-words font-semibold text-text-primary">{item.tituloProyecto}</p>
         <div className="mt-micro flex flex-wrap items-center gap-x-tight gap-y-micro">
           <span className={`pill ${estadoBadgeStyle(item.estadoProyecto)}`}>{estadoBadgeLabel(item.estadoProyecto)}</span>
-          <span className={`pill ${tipoBadgeStyle(item.tipoProyecto)}`}>{tipoBadgeLabel(item.tipoProyecto)}</span>
+          <TipoBadge tipo={item.tipoProyecto} />
           <span className={`type-meta ${META_LIDER}`}>{nombreLider(item)}</span>
         </div>
       </TableCell>

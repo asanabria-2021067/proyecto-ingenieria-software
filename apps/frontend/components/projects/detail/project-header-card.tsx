@@ -8,11 +8,10 @@ import {
   MODALIDAD_ICON,
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { MODALIDAD_LABEL, type ModalidadProyecto } from '@/types';
 import { ProjectPageHeader } from '@/components/projects/detail/project-page-shell';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 /**
  * S7 (VIEW-01): la acción de cierre es un ENLACE a la preparación del cierre
@@ -108,7 +107,7 @@ export function ProjectHeaderCard({
             <div className="flex flex-wrap items-center gap-tight">
               {lider && <span className="pill bg-primary text-on-primary">Líder del proyecto</span>}
               <span className={`pill ${estadoBadgeStyle(estadoProyecto)}`}>{estadoBadgeLabel(estadoProyecto)}</span>
-              <span className={`pill ${tipoBadgeStyle(tipoProyecto)}`}>{tipoBadgeLabel(tipoProyecto)}</span>
+              <TipoBadge tipo={tipoProyecto} />
               <span className="pill pill-neutral">
                 <ModalidadIcon className="size-3" aria-hidden="true" />
                 {MODALIDAD_LABEL[modalidadProyecto as ModalidadProyecto] ?? modalidadProyecto}

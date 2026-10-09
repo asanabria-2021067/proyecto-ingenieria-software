@@ -6,7 +6,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCheck } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { IconoTipo } from '@/components/hours/my-hours-project-list';
-import { tipoBadgeLabel, tipoBadgeStyle } from '@/components/projects/available-project-card';
 import { formatInstanteGuatemala } from '@/lib/admin/sprint-calendar';
 import type { TipoProyecto } from '@/types';
 import {
@@ -20,6 +19,7 @@ import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal from '@/lib/swal';
 import { getAdminReviewInbox, resolverRevision } from '@/lib/services/projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 // Acciones de la tarjeta: el mismo botón compacto de «Ver proyecto» del panel
 // (alto, radio y tipografía), sin icono y con el color semántico de cada acción.
@@ -38,7 +38,7 @@ function DetalleSolicitud({ titulo, tipo, children }: { titulo: string; tipo: Ti
       {/* Mismo título de proyecto que «Mis Horas». */}
       <p className="type-subtitle break-words font-semibold">{titulo}</p>
       <div className="mt-micro flex flex-wrap items-center gap-x-tight gap-y-micro">
-        <span className={`pill ${tipoBadgeStyle(tipo)}`}>{tipoBadgeLabel(tipo)}</span>
+        <TipoBadge tipo={tipo} />
         <p className="type-meta">{children}</p>
       </div>
     </>

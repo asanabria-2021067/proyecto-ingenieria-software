@@ -31,8 +31,6 @@ import {
   estadoBadgeStyle,
   formatFechaCorta,
   getIniciales,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -71,6 +69,7 @@ import uvgSwal from '@/lib/swal';
 import type { Rol } from '@/types';
 import type { HistoricalProjectView, HistoricalRevision } from '@/lib/services/historical';
 import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 const MODALIDAD_BADGE = 'bg-surface-container-high text-on-surface-variant';
 
@@ -666,9 +665,7 @@ function HistoricalProjectPage({
             <span className={`inline-flex h-6.5 items-center rounded-full px-3 text-[12px] font-semibold whitespace-nowrap ${estadoBadgeStyle('CERRADO')}`}>
               {estadoBadgeLabel('CERRADO')}
             </span>
-            <span className={`inline-flex h-6.5 items-center rounded-full px-3 text-[12px] font-semibold whitespace-nowrap ${tipoBadgeStyle(resumen.tipoProyecto)}`}>
-              {tipoBadgeLabel(resumen.tipoProyecto)}
-            </span>
+            <TipoBadge tipo={resumen.tipoProyecto} />
             {proyecto && (
               <span className={`inline-flex h-6.5 items-center rounded-full px-3 text-[12px] font-semibold whitespace-nowrap ${MODALIDAD_BADGE}`}>
                 {MODALIDAD_LABEL[proyecto.modalidadProyecto]}

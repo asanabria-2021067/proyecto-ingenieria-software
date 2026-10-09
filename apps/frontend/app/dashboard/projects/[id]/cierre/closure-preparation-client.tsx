@@ -28,8 +28,6 @@ import {
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,6 +44,7 @@ import {
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import type { ClosurePhase, ClosureWarning } from '@/lib/types/closure';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 interface Props {
   id: number;
@@ -285,9 +284,7 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
             Preparación del cierre{draft ? ` — entrega #${draft.numeroRevision}` : ''}
           </p>
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tipoBadgeStyle(proyecto.tipoProyecto)}`}>
-              {tipoBadgeLabel(proyecto.tipoProyecto)}
-            </span>
+            <TipoBadge tipo={proyecto.tipoProyecto} />
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
               {estadoBadgeLabel(proyecto.estadoProyecto)}
             </span>
