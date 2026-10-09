@@ -120,6 +120,7 @@ export class HistoricalProjectReadService {
         select: {
           idProyecto: true,
           tituloProyecto: true,
+          tipoProyecto: true,
           estadoProyecto: true,
           creador: { select: { idUsuario: true, nombre: true, apellido: true } },
           sprints: {
@@ -146,6 +147,7 @@ export class HistoricalProjectReadService {
       items: proyectos.map((proyecto) => ({
         idProyecto: proyecto.idProyecto,
         tituloProyecto: proyecto.tituloProyecto,
+        tipoProyecto: proyecto.tipoProyecto,
         estadoProyecto: proyecto.estadoProyecto,
         lider: proyecto.creador,
         // Usuarios ACTIVOS distintos: alguien con dos roles cuenta una vez.

@@ -14,6 +14,7 @@ function proyecto(idProyecto: number) {
   return {
     idProyecto,
     tituloProyecto: `Proyecto ${idProyecto}`,
+    tipoProyecto: 'ACADEMICO_HORAS_BECA',
     estadoProyecto: 'EN_SOLICITUD_CIERRE',
     creador: { idUsuario: 7, nombre: 'Ana', apellido: 'López' },
     sprints: [],
@@ -173,7 +174,7 @@ describe('Bandeja administrativa — grupo cierres', () => {
     expect(pagina).not.toHaveProperty('resumenCierre');
     expect(pagina.items[0]).not.toHaveProperty('cierre');
     expect(Object.keys(pagina.items[0]).sort()).toEqual(
-      ['accion', 'estadoProyecto', 'idProyecto', 'lider', 'sprintAmbiente', 'tituloProyecto', 'usuariosActivos'],
+      ['accion', 'estadoProyecto', 'idProyecto', 'lider', 'sprintAmbiente', 'tipoProyecto', 'tituloProyecto', 'usuariosActivos'],
     );
   });
 

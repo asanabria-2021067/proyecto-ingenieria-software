@@ -49,6 +49,7 @@ export class RevisionesService {
           proyecto: {
             select: {
               tituloProyecto: true,
+              tipoProyecto: true,
               creadoPor: true,
               creador: { select: { nombre: true, apellido: true } },
             },
@@ -73,6 +74,7 @@ export class RevisionesService {
         select: {
           idProyecto: true,
           tituloProyecto: true,
+          tipoProyecto: true,
           creador: { select: { nombre: true, apellido: true } },
           revisiones: {
             where: { estadoRevision: 'OBSERVADA' },
