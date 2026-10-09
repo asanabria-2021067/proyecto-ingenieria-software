@@ -63,6 +63,29 @@ export class AdminController {
     return this.adminService.updateUsuarioEstado(user.userId, id, dto.estado, securityRequestContext(req));
   }
 
+  @Get('cuentas-pendientes')
+  getCuentasPendientes(@CurrentUser() user: { userId: number }) {
+    return this.adminService.getCuentasPendientes(user.userId);
+  }
+
+  @Patch('cuentas-pendientes/:id/aprobar')
+  aprobarCuentaPendiente(
+    @CurrentUser() user: { userId: number },
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
+  ) {
+    return this.adminService.aprobarCuentaPendiente(user.userId, id, securityRequestContext(req));
+  }
+
+  @Patch('cuentas-pendientes/:id/rechazar')
+  rechazarCuentaPendiente(
+    @CurrentUser() user: { userId: number },
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
+  ) {
+    return this.adminService.rechazarCuentaPendiente(user.userId, id, securityRequestContext(req));
+  }
+
   @Get('password-reset-requests')
   getSolicitudesRecuperacion(@CurrentUser() user: { userId: number }) {
     return this.adminService.getSolicitudesRecuperacionPendientes(user.userId);

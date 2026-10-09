@@ -50,10 +50,10 @@ describe('G04-C01: throttle dedicado a registro', () => {
     expect(register).toHaveBeenCalledTimes(REGISTER_LIMIT);
   });
 
-  it('la respuesta normal conserva el contrato (201 + mensaje + cookies de sesión)', async () => {
+  it('la respuesta normal conserva el contrato (201 + mensaje, sin cookies de sesión)', async () => {
     harness = await startAuthHarness({
       throttler: appThrottlerOptions(AppModule),
-      authService: { register: vi.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'r' }) },
+      authService: { register: vi.fn().mockResolvedValue({ idUsuario: 9, estado: 'PENDIENTE_VERIFICACION' }) },
     });
 
     const response = await fetch(`${harness.url}/auth/register`, {
@@ -63,11 +63,10 @@ describe('G04-C01: throttle dedicado a registro', () => {
     });
 
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ mensaje: 'Cuenta creada' });
-    expect(response.headers.getSetCookie().map((cookie) => cookie.split('=')[0])).toEqual([
-      'access_token',
-      'refresh_token',
-    ]);
+    expect(await response.json()).toEqual({
+      mensaje: 'Cuenta creada. Queda pendiente de verificación por administración',
+    });
+    expect(response.headers.getSetCookie()).toEqual([]);
   });
 
   it('fixture negativo: sin @Throttle dedicado, la misma ráfaga pasa completa (solo quedan los buckets globales)', async () => {

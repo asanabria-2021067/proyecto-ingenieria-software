@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -19,6 +20,7 @@ import {
   TipoProyecto,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SecurityEventsService } from '../security-events/security-events.service';
 import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
 import type { SecurityRequestContext } from '../security-events/request-context';
@@ -38,6 +40,7 @@ export class AdminService {
     private readonly securityEvents: SecurityEventsService = new SecurityEventsService(prisma),
     // G07: EventEmitter global de la app; ausente en instancias manuales (tests).
     @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   // ─── Guards ──────────────────────────────────────────────────────────────────
@@ -659,6 +662,12 @@ export class AdminService {
       throw new ForbiddenException('No se puede cambiar el estado de un usuario administrador');
     }
 
+    if (user.estado === EstadoUsuario.PENDIENTE_VERIFICACION) {
+      throw new ConflictException(
+        'La cuenta está pendiente de verificación: usa aprobar o rechazar en cuentas pendientes',
+      );
+    }
+
     const updated = await this.prisma.usuario.update({
       where: { idUsuario: targetId },
       data: { estado },
@@ -704,6 +713,96 @@ export class AdminService {
       estado: updated.estado,
       roles: updated.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil),
       fechaCreacion: updated.fechaCreacion.toISOString(),
+    };
+  }
+
+  async getCuentasPendientes(callerId: number) {
+    await this.requireAdmin(callerId);
+
+    const pendientes = await this.prisma.usuario.findMany({
+      where: { estado: EstadoUsuario.PENDIENTE_VERIFICACION },
+      orderBy: { fechaCreacion: 'asc' },
+      select: {
+        idUsuario: true,
+        nombre: true,
+        apellido: true,
+        correo: true,
+        fechaCreacion: true,
+        perfil: {
+          select: {
+            carne: true,
+            carrera: { select: { idCarrera: true, nombreCarrera: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      total: pendientes.length,
+      cuentas: pendientes.map((u) => ({
+        idUsuario: u.idUsuario,
+        nombre: u.nombre,
+        apellido: u.apellido,
+        correo: u.correo,
+        carne: u.perfil?.carne ?? null,
+        carrera: u.perfil?.carrera ?? null,
+        fechaRegistro: u.fechaCreacion.toISOString(),
+      })),
+    };
+  }
+
+  async aprobarCuentaPendiente(callerId: number, targetId: number, origen?: SecurityRequestContext) {
+    const cuenta = await this.resolverCuentaPendiente(callerId, targetId, EstadoUsuario.ACTIVO, origen);
+
+    await this.notifications?.notifyFromTemplate([cuenta.idUsuario], 'CUENTA_VERIFICADA', {
+      userName: cuenta.nombre,
+    });
+
+    return cuenta;
+  }
+
+  async rechazarCuentaPendiente(callerId: number, targetId: number, origen?: SecurityRequestContext) {
+    return this.resolverCuentaPendiente(callerId, targetId, EstadoUsuario.INACTIVO, origen);
+  }
+
+  private async resolverCuentaPendiente(
+    callerId: number,
+    targetId: number,
+    estadoNuevo: EstadoUsuario,
+    origen?: SecurityRequestContext,
+  ) {
+    await this.requireAdmin(callerId);
+
+    const user = await this.prisma.usuario.findUnique({
+      where: { idUsuario: targetId },
+      select: { idUsuario: true, nombre: true, apellido: true, correo: true, estado: true },
+    });
+
+    if (!user) throw new NotFoundException(`Usuario ${targetId} no encontrado`);
+
+    const resultado = await this.prisma.usuario.updateMany({
+      where: { idUsuario: targetId, estado: EstadoUsuario.PENDIENTE_VERIFICACION },
+      data: { estado: estadoNuevo },
+    });
+
+    if (resultado.count !== 1) {
+      throw new ConflictException('La cuenta ya no está pendiente de verificación');
+    }
+
+    await this.securityEvents.record({
+      tipo: TipoEventoSeguridad.USER_STATUS_CHANGED,
+      origen,
+      idActor: callerId,
+      idUsuarioAfectado: targetId,
+      detalle: { estadoAnterior: EstadoUsuario.PENDIENTE_VERIFICACION, estadoNuevo },
+    });
+
+    return {
+      idUsuario: user.idUsuario,
+      nombre: user.nombre,
+      apellido: user.apellido,
+      correo: user.correo,
+      estado: estadoNuevo,
     };
   }
 

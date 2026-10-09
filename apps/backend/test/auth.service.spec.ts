@@ -53,7 +53,7 @@ describe('AuthService', () => {
     );
   });
 
-  it('register crea usuario y perfil y retorna token', async () => {
+  it('register crea usuario y perfil pendientes de verificación, sin tokens', async () => {
     const tx = {
       usuario: { create: vi.fn().mockResolvedValue({ idUsuario: 7, correo: 'n@uvg.edu' }) },
       perfilEstudiante: { create: vi.fn().mockResolvedValue({}) },
@@ -82,7 +82,8 @@ describe('AuthService', () => {
       semestre: 4,
     });
 
-    expect(result).toEqual({ accessToken: 'token-register', refreshToken: 'token-register' });
+    expect(result).toEqual({ idUsuario: 7, estado: 'PENDIENTE_VERIFICACION' });
+    expect(jwtService.sign).not.toHaveBeenCalled();
     expect(tx.usuario.create).toHaveBeenCalled();
     expect(tx.perfilEstudiante.create).toHaveBeenCalled();
   });

@@ -121,6 +121,16 @@ export interface NotificationTemplateData {
     solicitudId: number;
   };
 
+  CUENTA_PENDIENTE_VERIFICACION: {
+    userName: string;
+    carne: string;
+    userId: number;
+  };
+
+  CUENTA_VERIFICADA: {
+    userName: string;
+  };
+
   // G05-C12 (OWASP25-C038): ráfaga de eventos de seguridad. Solo conteos:
   // nunca IPs, correos, cuentas ni tokens.
   ALERTA_SEGURIDAD: {
@@ -448,6 +458,18 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Recordatorio de evento',
     message: (data: NotificationTemplateData['RECORDATORIO_EVENTO']) =>
       `"${data.eventTitle}" en el proyecto "${data.projectTitle}" comienza el ${data.fechaInicioTexto}.`,
+  },
+
+  CUENTA_PENDIENTE_VERIFICACION: {
+    title: 'Cuenta nueva pendiente de verificación',
+    message: (data: NotificationTemplateData['CUENTA_PENDIENTE_VERIFICACION']) =>
+      `${data.userName} (carné ${data.carne}) creó una cuenta y espera verificación.`,
+  },
+
+  CUENTA_VERIFICADA: {
+    title: 'Tu cuenta fue verificada',
+    message: (data: NotificationTemplateData['CUENTA_VERIFICADA']) =>
+      `${data.userName}, administración aprobó tu cuenta. Ya puedes usar la plataforma.`,
   },
 } as const;
 
