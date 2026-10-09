@@ -897,8 +897,12 @@ button:disabled {
   color: var(--admin-menu-danger);
 }
 
-.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive'] svg {
-  color: var(--admin-menu-danger) !important;
+/* El icono destructivo lo fija una utilidad con `!important`; entre reglas
+   importantes gana la capa más temprana, así que esta va en `components`. */
+@layer components {
+  .admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive'] svg {
+    color: var(--admin-menu-danger) !important;
+  }
 }
 
 .admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:hover,
