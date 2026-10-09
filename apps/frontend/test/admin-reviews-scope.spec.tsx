@@ -137,6 +137,41 @@ describe('VIEW-05 — bandeja de solicitudes de publicación (F017)', () => {
     expect(screen.queryByText('Correcciones enviadas')).not.toBeInTheDocument();
   });
 
+  it('cada tarjeta muestra la categoría real del proyecto, el líder y el envío; sin etiquetas de estado redundantes', async () => {
+    (getAdminReviewInbox as any).mockResolvedValue(
+      inbox({
+        correccionesEnviadas: [
+          {
+            idProyecto: 43,
+            tituloProyecto: 'Feria de Ciencias',
+            tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+            creador: { nombre: 'Eva', apellido: 'Ruiz' },
+            // Mediodía de Guatemala: el día no cambia en ningún huso.
+            revisiones: [{ idRevisionProyecto: 12, numeroEnvio: 1, revisadaEn: '2026-08-03T18:00:00.000Z' }],
+          },
+        ] as Inbox['correccionesEnviadas'],
+      }),
+    );
+    renderPage();
+    await screen.findByText('App de Biblioteca');
+    const seccion = (nombre: string) => within(screen.getByRole('heading', { level: 2, name: nombre }).closest('section')!);
+
+    // Misma etiqueta de categoría que las vistas de estudiante (clase y texto).
+    const beca = seccion('Pendientes de revisión').getByText('Horas Beca');
+    expect(beca).toHaveClass('pill');
+    expect(beca.className).toContain('bg-[#FFF1C4]');
+    expect(seccion('Pendientes de revisión').getByText(/Líder: Ana López · Envío #1 · Recibida el 1 ago 2026/)).toBeInTheDocument();
+
+    const espera = seccion('En espera de correcciones');
+    expect(espera.getByText('Experiencia').className).toContain('bg-[#DFEBFF]');
+    expect(espera.getByText(/Líder: Eva Ruiz · Envío #1 · Revisado el 3 ago 2026/)).toBeInTheDocument();
+    expect(espera.queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
+
+    for (const redundante of ['Publicado', 'En revisión', 'Pendiente', 'Líder']) {
+      expect(screen.queryByText(redundante)).not.toBeInTheDocument();
+    }
+  });
+
   it('el único «Aprobar» es el de la revisión de PUBLICACIÓN y sigue funcionando invalidando adminReviewInbox', async () => {
     swalFire.mockResolvedValue({ isConfirmed: true });
     (resolverRevision as any).mockResolvedValue({ revision: {}, estadoProyecto: 'PUBLICADO' });

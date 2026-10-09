@@ -51,8 +51,9 @@ export function RequestInboxSection({
 
 const CARD_TONE = {
   default: 'border-outline-variant bg-surface-container-lowest',
-  // Solicitud detenida a la espera del responsable.
-  waiting: 'border-orange-200 bg-orange-50/50 dark:border-orange-500/20 dark:bg-orange-500/5',
+  // Solicitud detenida a la espera del responsable: el naranja va solo en un
+  // borde tenue; la superficie queda neutra, como el resto de tarjetas.
+  waiting: 'border-orange-200 bg-surface-container-lowest dark:border-orange-500/25',
 } as const;
 
 /**

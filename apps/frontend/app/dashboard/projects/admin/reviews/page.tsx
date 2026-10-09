@@ -1,24 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, CheckCircle2, Eye, SendHorizonal, CheckCheck, MessageSquareWarning } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { IconoTipo } from '@/components/hours/my-hours-project-list';
+import { tipoBadgeLabel, tipoBadgeStyle } from '@/components/projects/available-project-card';
+import { formatInstanteGuatemala } from '@/lib/admin/sprint-calendar';
+import type { TipoProyecto } from '@/types';
 import {
   REQUEST_INBOX_ACTION,
   RequestInboxCard,
   RequestInboxKpis,
-  RequestInboxMeta,
   RequestInboxSection,
-  RequestInboxTitle,
 } from '@/components/admin/request-inbox';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal from '@/lib/swal';
 import { getAdminReviewInbox, resolverRevision } from '@/lib/services/projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
+
+/**
+ * Contenido de una tarjeta de solicitud: título, y debajo la categoría REAL del
+ * proyecto (la misma etiqueta de «Mis Horas») junto al líder y el envío. El
+ * estado de la revisión no se repite como etiqueta: ya lo dice la sección.
+ */
+function DetalleSolicitud({ titulo, tipo, children }: { titulo: string; tipo: TipoProyecto; children: ReactNode }) {
+  return (
+    <>
+      <p className="break-words font-headline text-base font-semibold text-on-surface">{titulo}</p>
+      <div className="mt-micro flex flex-wrap items-center gap-x-tight gap-y-micro">
+        <span className={`pill ${tipoBadgeStyle(tipo)}`}>{tipoBadgeLabel(tipo)}</span>
+        <p className="type-meta">{children}</p>
+      </div>
+    </>
+  );
+}
 
 export default function AdminReviewsInboxPage() {
   const queryClient = useQueryClient();
@@ -103,10 +121,10 @@ export default function AdminReviewsInboxPage() {
         </>
       }
     >
-      <RequestInboxTitle>{r.proyecto.tituloProyecto}</RequestInboxTitle>
-      <RequestInboxMeta>
-        {r.proyecto.creador.nombre} {r.proyecto.creador.apellido} · Envío #{r.numeroEnvio}
-      </RequestInboxMeta>
+      <DetalleSolicitud titulo={r.proyecto.tituloProyecto} tipo={r.proyecto.tipoProyecto}>
+        Líder: {r.proyecto.creador.nombre} {r.proyecto.creador.apellido} · Envío #{r.numeroEnvio}
+        {r.enviadaEn && <> · Recibida el {formatInstanteGuatemala(r.enviadaEn)}</>}
+      </DetalleSolicitud>
     </RequestInboxCard>
   );
 
@@ -200,18 +218,11 @@ export default function AdminReviewsInboxPage() {
                       </>
                     }
                   >
-                    <RequestInboxTitle>{p.tituloProyecto}</RequestInboxTitle>
-                    <RequestInboxMeta>
-                      {p.creador.nombre} {p.creador.apellido}
-                    </RequestInboxMeta>
-                    {revision && (
-                      <RequestInboxMeta>
-                        Envío #{revision.numeroEnvio}
-                        {revision.revisadaEn && (
-                          <> · Revisado el {new Intl.DateTimeFormat('es-GT', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(revision.revisadaEn))}</>
-                        )}
-                      </RequestInboxMeta>
-                    )}
+                    <DetalleSolicitud titulo={p.tituloProyecto} tipo={p.tipoProyecto}>
+                      Líder: {p.creador.nombre} {p.creador.apellido}
+                      {revision && <> · Envío #{revision.numeroEnvio}</>}
+                      {revision?.revisadaEn && <> · Revisado el {formatInstanteGuatemala(revision.revisadaEn)}</>}
+                    </DetalleSolicitud>
                   </RequestInboxCard>
                 );
               })}
