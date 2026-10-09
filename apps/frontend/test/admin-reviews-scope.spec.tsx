@@ -125,6 +125,13 @@ describe('VIEW-05 — bandeja de solicitudes de publicación (F017)', () => {
     expect(espera.getByText('Feria de Ciencias')).toBeInTheDocument();
     expect(espera.queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
     expect(espera.getByRole('button', { name: 'Ver retroalimentación' })).toBeInTheDocument();
+    // Ya no hay chip de estado: la sección dice que se espera la corrección.
+    expect(screen.queryByText('Esperando corrección')).not.toBeInTheDocument();
+    // Los botones van sin icono, con el botón compacto del panel.
+    for (const boton of screen.getAllByRole('button', { name: /^(Aprobar|Revisar|Ver retroalimentación)$/ })) {
+      expect(boton.querySelector('svg')).toBeNull();
+      expect(boton).toHaveAttribute('data-slot', 'button');
+    }
 
     for (const [etiqueta, valor] of [
       ['Pendientes de revisión', '1'],

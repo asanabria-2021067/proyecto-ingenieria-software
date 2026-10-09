@@ -3,23 +3,29 @@
 import { useState, type ReactNode } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, CheckCircle2, Eye, SendHorizonal, CheckCheck, MessageSquareWarning } from 'lucide-react';
+import { RefreshCw, CheckCheck } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { IconoTipo } from '@/components/hours/my-hours-project-list';
 import { tipoBadgeLabel, tipoBadgeStyle } from '@/components/projects/available-project-card';
 import { formatInstanteGuatemala } from '@/lib/admin/sprint-calendar';
 import type { TipoProyecto } from '@/types';
 import {
-  REQUEST_INBOX_ACTION,
   RequestInboxCard,
   RequestInboxKpis,
   RequestInboxSection,
 } from '@/components/admin/request-inbox';
+import { Button } from '@/components/ui/button';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal from '@/lib/swal';
 import { getAdminReviewInbox, resolverRevision } from '@/lib/services/projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
+
+// Acciones de la tarjeta: el mismo botón compacto de «Ver proyecto» del panel
+// (alto, radio y tipografía), sin icono y con el color semántico de cada acción.
+const ACCION = 'text-xs font-semibold';
+const ACCION_VERDE = 'bg-primary text-on-primary hover:bg-primary/90';
+const ACCION_NARANJA = 'bg-amber-600 text-white hover:bg-amber-700';
 
 /**
  * Contenido de una tarjeta de solicitud: título, y debajo la categoría REAL del
@@ -111,14 +117,12 @@ export default function AdminReviewsInboxPage() {
       icon={<IconoTipo tipo={r.proyecto.tipoProyecto} />}
       actions={
         <>
-          <button type="button" onClick={() => void resolveApprove(r.idProyecto)} className={REQUEST_INBOX_ACTION.primary}>
-            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+          <Button type="button" size="sm" onClick={() => void resolveApprove(r.idProyecto)} className={`${ACCION} ${ACCION_VERDE}`}>
             Aprobar
-          </button>
-          <button type="button" onClick={() => openReviewSheet(r.idProyecto)} className={REQUEST_INBOX_ACTION.attention}>
-            <SendHorizonal className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+          <Button type="button" size="sm" onClick={() => openReviewSheet(r.idProyecto)} className={`${ACCION} ${ACCION_NARANJA}`}>
             Revisar
-          </button>
+          </Button>
         </>
       }
     >
@@ -208,14 +212,9 @@ export default function AdminReviewsInboxPage() {
                     tone="waiting"
                     actions={
                       <>
-                        <button type="button" onClick={() => openFeedbackSheet(p.idProyecto)} className={REQUEST_INBOX_ACTION.attention}>
-                          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                        <Button type="button" size="sm" onClick={() => openFeedbackSheet(p.idProyecto)} className={`${ACCION} ${ACCION_NARANJA}`}>
                           Ver retroalimentación
-                        </button>
-                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-on-surface dark:border-orange-500/30 dark:bg-orange-500/10">
-                          <MessageSquareWarning className="h-3.5 w-3.5" aria-hidden="true" />
-                          Esperando corrección
-                        </span>
+                        </Button>
                       </>
                     }
                   >
