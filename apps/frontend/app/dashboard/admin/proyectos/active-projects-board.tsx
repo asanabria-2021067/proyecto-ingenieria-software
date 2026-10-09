@@ -8,6 +8,13 @@ import { useAdminSprintCalendar } from '@/hooks/use-admin-sprint-calendar';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
 import { DASHBOARD_FILTER_TRIGGER_CLASS, DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -93,10 +100,9 @@ const META_SPRINT = '@xl/bandeja:hidden';
 const META_USUARIOS = '@3xl/bandeja:hidden';
 const META_LIDER = '@5xl/bandeja:hidden';
 
-// Encabezados como etiquetas: pequeños, en versalitas y semibold, para que no
-// compitan con los nombres de proyecto (body semibold) de las filas.
-const TH =
-  'h-auto whitespace-normal px-stack py-tight text-xs font-semibold uppercase tracking-wide text-text-secondary';
+// Rótulos con el estilo común de tablas (el de Mis Tareas): pequeños, semibold
+// y en su caja normal. El relleno y los anchos son de esta tabla.
+const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
 // Anchos fijos (la tabla es `table-fixed`): la columna Proyecto absorbe el
 // resto y los títulos largos se parten en vez de empujar las demás columnas
 // fuera de la tarjeta. En móvil Finalización y Abrir se estrechan.
@@ -253,7 +259,7 @@ function FilaProyecto({
   const href = `/dashboard/admin/proyectos/${project.idProyecto}`;
   const sprint = project.sprintAmbiente;
   return (
-    <TableRow className="border-outline-variant/50 hover:bg-surface-container-low">
+    <TableRow className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
       <TableCell className={`${TD} min-w-0`}>
         <Link
           href={href}
@@ -307,7 +313,7 @@ function FilaProyecto({
 
 function TablaSkeleton() {
   return (
-    <div className="card-base overflow-hidden p-0" role="status" aria-label="Cargando proyectos activos">
+    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando proyectos activos">
       <div className="border-b border-outline-variant/50 bg-surface-container-low px-stack py-tight">
         <Skeleton className="h-4 w-40" />
       </div>
@@ -538,10 +544,10 @@ export function ActiveProjectsBoard() {
           </EmptyContent>
         </Empty>
       ) : (
-        <div className="card-base overflow-hidden p-0">
+        <div className={DATA_TABLE_CARD}>
           <Table className="table-fixed">
             <TableHeader>
-              <TableRow className="border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low">
+              <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                 <TableHead scope="col" className={TH}>
                   Proyecto
                 </TableHead>

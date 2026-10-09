@@ -41,6 +41,14 @@ import {
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 import { parseFechaSolo } from '@/lib/calendar/utils';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROWS,
+  DATA_TABLE_ROW_HOVER,
+  DataTablePager,
+} from '@/components/dashboard/data-table';
 
 const TAMANIO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
@@ -178,7 +186,7 @@ function FilaTarea({ tarea }: { tarea: MiTareaDTO }) {
   const VencimientoIcon = config?.icon;
   return (
     <li
-      className={`relative flex flex-wrap items-center gap-x-inline gap-y-micro px-card py-inline transition-colors hover:bg-surface-container-low @md/grupo:grid ${COLUMNAS_CORTAS} ${COLUMNAS_LISTA}`}
+      className={`relative flex flex-wrap items-center gap-x-inline gap-y-micro px-card py-inline ${DATA_TABLE_ROW_HOVER} @md/grupo:grid ${COLUMNAS_CORTAS} ${COLUMNAS_LISTA}`}
     >
       <div className={`min-w-0 ${CELDA_ANCHA}`}>
         {/* El enlace del título se estira sobre toda la fila (after:inset-0):
@@ -227,7 +235,7 @@ function GrupoTareas({
   const idLista = `${idTitulo}-lista`;
 
   return (
-    <section aria-labelledby={idTitulo} className="card-base @container/grupo overflow-hidden p-0">
+    <section aria-labelledby={idTitulo} className={`${DATA_TABLE_CARD} @container/grupo`}>
       <header
         className={`flex items-center justify-between gap-inline px-card py-stack ${
           visible ? 'border-b border-outline-variant/50' : ''
@@ -260,7 +268,7 @@ function GrupoTareas({
               visual (cada pastilla ya dice qué es), por eso aria-hidden. */}
           <div
             aria-hidden="true"
-            className={`hidden gap-x-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold text-text-secondary @2xl/grupo:grid ${COLUMNAS_LISTA}`}
+            className={`hidden gap-x-inline ${DATA_TABLE_HEAD_ROW} px-card py-tight ${DATA_TABLE_HEAD_TEXT} @2xl/grupo:grid ${COLUMNAS_LISTA}`}
           >
             <span>Tarea</span>
             <span>Proyecto</span>
@@ -268,7 +276,7 @@ function GrupoTareas({
             <span>Prioridad</span>
             <span>Estado</span>
           </div>
-          <ul id={idLista} className="divide-y divide-outline-variant/50">
+          <ul id={idLista} className={DATA_TABLE_ROWS}>
             {tareas.map((tarea) => (
               <FilaTarea key={tarea.idTarea} tarea={tarea} />
             ))}
@@ -508,7 +516,7 @@ export default function MisTareasPage() {
 
         {/* loading — skeleton con forma de grupo y filas, nunca spinner */}
         {isLoading && (
-          <div className="card-base overflow-hidden p-0" role="status" aria-label="Cargando tus tareas">
+          <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando tus tareas">
             <div className="border-b border-outline-variant/50 px-card py-stack">
               <Skeleton className="h-5 w-32" />
             </div>
@@ -593,37 +601,12 @@ export default function MisTareasPage() {
               <GrupoTareas key={grupo.id} grupo={grupo} tareas={delGrupo} />
             ))}
 
-            {/* paginación */}
-            <nav
-              aria-label="Paginación de tareas"
-              className="card-base flex items-center justify-between gap-inline px-card py-inline"
-            >
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={paginado.pagina <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                aria-label="Página anterior"
-                className="rounded-control"
-              >
-                Anterior
-              </Button>
-              <span className="type-meta font-medium" aria-live="polite">
-                Página {paginado.pagina} de {paginado.totalPaginas}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={paginado.pagina >= paginado.totalPaginas}
-                onClick={() => setPage((p) => Math.min(paginado.totalPaginas, p + 1))}
-                aria-label="Página siguiente"
-                className="rounded-control"
-              >
-                Siguiente
-              </Button>
-            </nav>
+            <DataTablePager
+              label="Paginación de tareas"
+              pagina={paginado.pagina}
+              totalPaginas={paginado.totalPaginas}
+              onPagina={setPage}
+            />
           </>
         )}
       </div>
