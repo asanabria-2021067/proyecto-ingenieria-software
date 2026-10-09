@@ -192,6 +192,17 @@ describe('VIEW-16 — detalle administrativo (F013)', () => {
     expect(screen.getByRole('tab', { name: 'Resumen' })).toHaveAttribute('data-state', 'inactive');
   });
 
+  it('la etiqueta de rol en Miembros usa verde muy claro con texto verde institucional', async () => {
+    renderPage();
+    await screen.findByRole('heading', { level: 1 });
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /miembros/i }));
+    await screen.findByText('Elena Gómez');
+    const etiquetas = document.querySelectorAll('[data-slot="badge"].bg-\\[\\#E2EFE8\\]');
+    expect(etiquetas.length).toBeGreaterThan(0);
+    for (const etiqueta of etiquetas) expect(etiqueta).toHaveClass('text-[#006735]', 'font-semibold');
+  });
+
   it('cabecera: líder, integrantes activos (usuarios distintos) y Sprints cerrados', async () => {
     renderPage();
     await screen.findByRole('heading', { level: 1 });

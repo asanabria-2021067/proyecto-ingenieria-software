@@ -420,7 +420,8 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
                           </span>
                         </TableCell>
                         <TableCell className="px-5 py-3">
-                          <Badge className="border-transparent bg-primary/10 text-[11px] font-semibold text-primary">{m.rol}</Badge>
+                          {/* Verde muy claro + texto verde institucional, igual en claro y oscuro. */}
+                          <Badge className="border-transparent bg-[#E2EFE8] text-[11px] font-semibold text-[#006735]">{m.rol}</Badge>
                         </TableCell>
                         <TableCell className="px-5 py-3 text-sm text-on-surface-variant">
                           <span className="inline-flex items-center gap-1.5">
