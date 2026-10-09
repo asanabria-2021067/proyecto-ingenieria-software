@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/dashboard/admin'));
 const searchParamsMock = vi.hoisted(() => vi.fn(() => new URLSearchParams()));
@@ -28,7 +29,12 @@ import AdminLayout, { adminNavEntries, adminNavItemsMobile } from '../components
 import { flattenNavEntries } from '../components/dashboard/SidebarNav';
 
 function renderShell() {
-  return render(createElement(AdminLayout, null, createElement('div', null, 'contenido')));
+  // La barra superior lleva el botón «Actualizar», que invalida las consultas.
+  const queryClient = new QueryClient();
+  const utils = render(
+    createElement(QueryClientProvider, { client: queryClient }, createElement(AdminLayout, null, createElement('div', null, 'contenido'))),
+  );
+  return { ...utils, queryClient };
 }
 
 function desktopNav() {
@@ -333,5 +339,33 @@ describe('AdminLayout — sidebar colapsable', () => {
     colapsar();
     expect(window.localStorage.getItem('uvg-collab-admin-sidebar')).toBe('collapsed');
     expect(window.localStorage.getItem('uvg-collab-dashboard-sidebar')).toBeNull();
+  });
+});
+
+describe('AdminLayout — «Actualizar» en la barra superior', () => {
+  it('es un botón de icono situado entre las notificaciones y el cambio de tema', () => {
+    renderShell();
+    const boton = screen.getByRole('button', { name: 'Actualizar' });
+    expect(boton.querySelector('svg')).not.toBeNull();
+    expect(boton).toHaveTextContent('');
+    // Mismo botón de icono de la barra del estudiante.
+    expect(boton).toHaveClass('size-10', 'rounded-control', 'bg-muted');
+    expect(boton.previousElementSibling).toBe(screen.getByTestId('bell'));
+    expect(boton.nextElementSibling).toBe(screen.getByTestId('theme'));
+  });
+
+  it('vuelve a pedir los datos de la vista: invalida las consultas y se desactiva mientras tanto', async () => {
+    const { queryClient } = renderShell();
+    let resolver: () => void = () => {};
+    const invalidar = vi.spyOn(queryClient, 'invalidateQueries').mockReturnValue(new Promise<void>((r) => (resolver = r)));
+
+    const boton = screen.getByRole('button', { name: 'Actualizar' });
+    fireEvent.click(boton);
+    expect(invalidar).toHaveBeenCalledTimes(1);
+    expect(invalidar).toHaveBeenCalledWith();
+    expect(boton).toBeDisabled();
+
+    resolver();
+    await waitFor(() => expect(boton).toBeEnabled());
   });
 });

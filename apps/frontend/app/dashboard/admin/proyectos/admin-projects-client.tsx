@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, ChevronLeft, ChevronRight, FolderKanban, RefreshCw } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, FolderKanban } from 'lucide-react';
 import { useAdminProjects } from '@/hooks/use-admin-projects';
 import { ActiveProjectsBoard } from './active-projects-board';
 import { ClosureRequestsInbox } from './closure-requests-inbox';
@@ -144,17 +144,6 @@ export default function AdminProjectsClient() {
           <h1 className="type-display text-balance">{ADMIN_PROJECT_GROUP_LABEL[grupo]}</h1>
           <p className="mt-tight max-w-2xl text-base text-tertiary">{DESCRIPCION_GRUPO[grupo]}</p>
         </div>
-        {esCierres && (
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            disabled={isFetching}
-            className="flex shrink-0 items-center gap-2 self-start rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
-            Actualizar
-          </button>
-        )}
       </section>
 
       {/* Total REAL del grupo (todas las páginas), con el patrón de Mis Tareas.

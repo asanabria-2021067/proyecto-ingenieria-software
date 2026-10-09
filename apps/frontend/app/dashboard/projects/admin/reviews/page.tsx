@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, CheckCheck } from 'lucide-react';
+import { CheckCheck } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { IconoTipo } from '@/components/hours/my-hours-project-list';
 import { tipoBadgeLabel, tipoBadgeStyle } from '@/components/projects/available-project-card';
@@ -147,15 +147,6 @@ export default function AdminReviewsInboxPage() {
               Evalúa los proyectos enviados por estudiantes, aprueba su publicación o solicita correcciones.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            disabled={loading}
-            className="flex shrink-0 items-center gap-2 self-start rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface outline-none transition-colors hover:bg-primary hover:text-on-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
-            Actualizar
-          </button>
         </section>
 
         {error && (

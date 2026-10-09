@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Suspense, useEffect, useMemo } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Archive,
@@ -18,6 +19,7 @@ import {
   ShieldCheck,
   UserCheck,
   Users,
+  RotateCcw,
 } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { avisarSinPermiso, useCan, RUTA_SIN_PERMISO } from '@/hooks/use-can';
@@ -130,6 +132,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     [totalPendientes],
   );
 
+  // «Actualizar» de la barra superior: invalida las consultas y React Query
+  // vuelve a pedir las que la vista actual tiene montadas.
+  const queryClient = useQueryClient();
+  const [actualizando, setActualizando] = useState(false);
+  const actualizar = async () => {
+    setActualizando(true);
+    try {
+      await queryClient.invalidateQueries();
+    } finally {
+      setActualizando(false);
+    }
+  };
+
   useEffect(() => {
     if (isLoading) return;
     if (isError) {
@@ -215,6 +230,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="flex items-center gap-3">
             <NotificationsBell onlyIcon />
+            {/* Mismo botón de icono de la barra del estudiante. Vuelve a pedir
+                los datos de la vista actual: sustituye a los «Actualizar»
+                que cada página administrativa llevaba en su encabezado. */}
+            <button
+              type="button"
+              onClick={actualizar}
+              disabled={actualizando}
+              aria-label="Actualizar"
+              title="Actualizar"
+              className="flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary outline-none transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+            >
+              <RotateCcw
+                className={`size-5 ${actualizando ? 'motion-safe:animate-spin [animation-direction:reverse]' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
             <ThemeToggle />
           </div>
         </header>

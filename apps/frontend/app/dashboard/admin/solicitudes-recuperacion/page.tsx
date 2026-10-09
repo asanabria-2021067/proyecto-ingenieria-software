@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, AlertCircle, Copy, Link2 } from 'lucide-react';
+import { AlertCircle, Copy, Link2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -164,7 +164,7 @@ export default function AdminSolicitudesRecuperacionPage() {
   const [generated, setGenerated] = useState<GeneratedLink[]>([]);
   const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['adminPasswordResetRequests'],
     queryFn: listPasswordResetRequests,
   });
@@ -208,13 +208,6 @@ export default function AdminSolicitudesRecuperacionPage() {
               al correo institucional del usuario.
             </p>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary self-start"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Actualizar
-          </button>
         </section>
 
         {/* Table card */}

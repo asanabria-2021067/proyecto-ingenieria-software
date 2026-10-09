@@ -101,7 +101,7 @@ const RESUMEN = { PENDIENTE_DE_EVALUACION: 1, REENVIADA_PARA_REVISION: 1, EN_ESP
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
-  return render(createElement(AdminProjectsClient), { wrapper });
+  return { ...render(createElement(AdminProjectsClient), { wrapper }), queryClient };
 }
 
 const seccion = (nombre: string) => within(screen.getByRole('heading', { level: 2, name: nombre }).closest('section')!);
@@ -229,8 +229,9 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
 
     expect(seccion('En espera de correcciones').queryByRole('link', { name: /Revisar cierre/ })).not.toBeInTheDocument();
     expect(seccion('Sin entrega formal').queryByRole('link', { name: /Revisar cierre|Ver solicitud/ })).not.toBeInTheDocument();
-    // El único botón de la página es «Actualizar»: no hay aprobar, corregir ni devolver.
-    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Actualizar']);
+    // La página no tiene ningún botón: ni aprobar, ni corregir, ni devolver
+    // («Actualizar» vive en la barra superior del panel).
+    expect(screen.queryAllByRole('button')).toEqual([]);
     expect(screen.queryByText(/Aprobar|Devolver a ejecución|Solicitar corrección/)).not.toBeInTheDocument();
   });
 
@@ -267,12 +268,12 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
     expect(screen.queryByRole('heading', { name: 'Sin clasificar' })).not.toBeInTheDocument();
   });
 
-  it('«Actualizar» vuelve a pedir la bandeja', async () => {
-    renderPage();
+  it('el «Actualizar» de la barra superior (invalidar consultas) vuelve a pedir la bandeja', async () => {
+    const { queryClient } = renderPage();
     await screen.findByText('Portal de Voluntariado');
     expect(getProjectsMock).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    await queryClient.invalidateQueries();
     await waitFor(() => expect(getProjectsMock).toHaveBeenCalledTimes(2));
   });
 

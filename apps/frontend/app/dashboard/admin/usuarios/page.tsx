@@ -5,7 +5,6 @@ import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import {
-  RefreshCw,
   X,
   AlertCircle,
   Eye,
@@ -185,7 +184,6 @@ export default function AdminUsuariosPage() {
     data,
     isLoading,
     isError,
-    refetch,
   } = useQuery({
     queryKey: ['adminUsers', queryParams],
     queryFn: () => listAdminUsers(queryParams),
@@ -259,13 +257,6 @@ export default function AdminUsuariosPage() {
               Consulta usuarios registrados, revisa su estado y administra accesos básicos.
             </p>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary self-start"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Actualizar
-          </button>
         </section>
 
         {/* Filters */}

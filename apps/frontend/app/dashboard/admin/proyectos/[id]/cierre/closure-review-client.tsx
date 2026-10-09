@@ -13,7 +13,6 @@ import {
   ListChecks,
   Loader2,
   MessageSquareWarning,
-  RefreshCw,
   Undo2,
   User,
   Users,
@@ -267,10 +266,6 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
 
   const pending = devolver.isPending || corregir.isPending || aprobar.isPending;
 
-  const actualizar = () => {
-    invalidateAll();
-  };
-
   if (detalle.isPending) return <ReviewSkeleton />;
 
   if (detalle.isError || !detalle.data) {
@@ -395,10 +390,6 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <Button type="button" variant="outline" size="sm" onClick={actualizar} className="h-9 gap-1.5 rounded-lg text-xs font-semibold">
-          <RefreshCw className="size-3.5" aria-hidden="true" />
-          Actualizar
-        </Button>
       </div>
 
       {/* Cabecera */}
