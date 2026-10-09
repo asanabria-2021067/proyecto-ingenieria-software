@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -42,7 +42,7 @@ function createMockSocket() {
 const mockIo = vi.fn();
 vi.mock('socket.io-client', () => ({ io: (...args: unknown[]) => mockIo(...args) }));
 
-import AdminProjectsClient, { accionHref } from '../app/dashboard/admin/proyectos/admin-projects-client';
+import AdminProjectsClient from '../app/dashboard/admin/proyectos/admin-projects-client';
 import { useRealtimeNotifications } from '../lib/hooks/useRealtimeNotifications';
 import { getAdminProjects } from '../lib/services/admin-projects';
 import { getAdminSprintCalendar } from '../lib/services/admin-sprints';
@@ -107,7 +107,8 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'CONSULTAR_HISTORICO', estadoProyecto: 'CERRADO' })], { total: 25, page: 2 }));
     renderPage();
 
-    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 2, limit: 20 }));
+    // Cerrados carga el grupo completo (páginas de 50): `page` en la URL ya no pagina en servidor.
+    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 50 }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Cerrados' })).toBeInTheDocument();
     // El total real (todas las páginas) va antes de la tabla, sin badge junto al título.
     const total = await screen.findByText(/Total de proyectos cerrados:/);
@@ -122,7 +123,7 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     (getAdminProjects as any).mockResolvedValue(pagina([item({ estadoProyecto: 'CERRADO', accion: 'CONSULTAR_HISTORICO' })]));
     renderPage();
 
-    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 20 }));
+    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 50 }));
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
     // Ningún enlace de la página apunta a otro grupo de la bandeja.
@@ -230,23 +231,29 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     expect(links.some((h) => h?.includes('/sprints/'))).toBe(false);
   });
 
-  it('accionHref enruta por la acción sugerida sin habilitar escrituras', () => {
-    expect(accionHref(item({ accion: 'REVISAR_CIERRE' }))).toBe('/dashboard/admin/proyectos/37/cierre');
-    // «Abrir» nunca saca al administrador del proyecto elegido hacia otra bandeja.
-    expect(accionHref(item({ accion: 'REVISAR_PUBLICACION' }))).toBe('/dashboard/admin/proyectos/37');
-    expect(accionHref(item({ accion: 'CONSULTAR_HISTORICO' }))).toBe('/dashboard/admin/proyectos/37');
-  });
-
-  it('la paginación de Cerrados respeta limit y nunca supera 50', async () => {
-    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados&page=1&limit=500'));
-    (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'CONSULTAR_HISTORICO', estadoProyecto: 'CERRADO' })], { total: 120, limit: 50 }));
+  it('Cerrados carga el grupo completo en páginas de 50 y pagina el resultado en cliente', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados'));
+    (getAdminProjects as any).mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve(
+        pagina(
+          Array.from({ length: page === 3 ? 20 : 50 }, (_, i) =>
+            item({ idProyecto: page * 100 + i, tituloProyecto: `Proyecto ${page}-${i}`, estadoProyecto: 'CERRADO', accion: 'CONSULTAR_HISTORICO' }),
+          ),
+          { total: 120, limit: 50, page },
+        ),
+      ),
+    );
     renderPage();
 
-    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 50 }));
-    expect(await screen.findByText(/Página 1 de 3/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Página siguiente' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cerrados&page=2&limit=50');
-    expect(screen.getByText('Consultar histórico')).toBeInTheDocument();
-    expect(adminProjectsQueryKey('cerrados', 1, 50)).toEqual(['admin', 'proyectos', 'cerrados', 1, 50]);
+    expect(await screen.findByText(/Página 1 de 6/)).toBeInTheDocument();
+    expect(getAdminProjects).toHaveBeenCalledTimes(3);
+    for (const page of [1, 2, 3]) expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page, limit: 50 });
+    expect(screen.getAllByRole('row')).toHaveLength(21);
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText(/Página 2 de 6/)).toBeInTheDocument();
+    expect(screen.getByText('Proyecto 1-20')).toBeInTheDocument();
+    // La consulta histórica no arrastra columnas de supervisión.
+    expect(screen.queryByText(/Usuarios activos|Sprint ambiente|Acción sugerida|Consultar histórico/)).not.toBeInTheDocument();
   });
 
   it('un grupo vacío muestra su Empty específico', async () => {

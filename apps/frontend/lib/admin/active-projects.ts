@@ -56,7 +56,8 @@ export function joinProjectsWithSprints(
   }));
 }
 
-function normalizar(texto: string): string {
+/** Texto en minúsculas y sin tildes, para búsquedas que no distinguen ni lo uno ni lo otro. */
+export function normalizar(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 

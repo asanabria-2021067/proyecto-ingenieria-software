@@ -33,7 +33,8 @@ export function useAdminProjects(grupo: AdminProjectGroup, page = 1, limit = 20,
 }
 
 /**
- * Lista COMPLETA de proyectos activos para la bandeja de supervisión. El
+ * Lista COMPLETA de un grupo (activos, cerrados) para sus bandejas con
+ * búsqueda y filtros en cliente. El
  * backend solo pagina (`limit ≤ 50`) y no acepta búsqueda ni filtros, así que
  * la única forma de que los filtros del cliente sean correctos es tener toda
  * la población: se pide la primera página al máximo y, si hay más, el resto
@@ -43,20 +44,16 @@ export function useAdminProjects(grupo: AdminProjectGroup, page = 1, limit = 20,
  * La key cae bajo `adminProjectsPrefix`, así que las invalidaciones por
  * socket (`PROJECT_STATE_CHANGED`, …) la refrescan igual que a las páginas.
  */
-export function useAllActiveAdminProjects(enabled = true) {
+export function useAllAdminProjects(grupo: AdminProjectGroup, enabled = true) {
   return useQuery<{ items: AdminProjectListItem[]; total: number }>({
-    queryKey: [...adminProjectsPrefix, 'activos', 'todos'],
+    queryKey: [...adminProjectsPrefix, grupo, 'todos'],
     queryFn: async () => {
       const limit = ADMIN_PROJECTS_MAX_LIMIT;
-      const primera = await getAdminProjects({
-        grupo: 'activos',
-        page: 1,
-        limit,
-      });
+      const primera = await getAdminProjects({ grupo, page: 1, limit });
       const paginas = Math.ceil(primera.total / limit);
       if (paginas <= 1) return { items: primera.items, total: primera.total };
       const resto = await Promise.all(
-        Array.from({ length: paginas - 1 }, (_, i) => getAdminProjects({ grupo: 'activos', page: i + 2, limit })),
+        Array.from({ length: paginas - 1 }, (_, i) => getAdminProjects({ grupo, page: i + 2, limit })),
       );
       return {
         items: [...primera.items, ...resto.flatMap((p) => p.items)],
@@ -66,6 +63,11 @@ export function useAllActiveAdminProjects(enabled = true) {
     enabled,
     retry: false,
   });
+}
+
+/** Población completa de proyectos activos (bandeja de supervisión). */
+export function useAllActiveAdminProjects(enabled = true) {
+  return useAllAdminProjects('activos', enabled);
 }
 
 /** VIEW-16 (F013) — detalle administrativo (vivo o histórico). */
