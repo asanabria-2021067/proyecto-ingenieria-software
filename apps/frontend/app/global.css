@@ -296,13 +296,13 @@
 
   /* Revisión / corrección de solicitudes de publicación: verde salvia
      #9AB07E exacto, en botones (`review`) y en bordes, puntos y fondos
-     suaves (`review-soft`). Sobre él el texto va en verde muy oscuro
-     (`on-review`, 6.3:1; el blanco daría 2.4:1). `review-strong` es el hover
-     y `review-ink` el salvia oscuro para texto sobre superficies claras. */
+     suaves (`review-soft`). Sobre él el texto va en blanco (`on-review`) por
+     decisión de diseño: da 2.4:1, por debajo de AA. `review-strong` es el
+     hover y `review-ink` el salvia oscuro para texto sobre superficies claras. */
   --color-review: #9ab07e;
   --color-review-strong: #879d6b;
   --color-review-soft: #9ab07e;
-  --color-on-review: #1c2b16;
+  --color-on-review: #ffffff;
   --color-review-ink: #486d3c;
 
   /* Verde salvia claro de las acciones de consulta en las bandejas de

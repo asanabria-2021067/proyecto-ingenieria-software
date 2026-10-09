@@ -98,7 +98,7 @@ function ProjectReadOnlyView({
           </div>
           <button
             onClick={onEdit}
-            className="shrink-0 flex items-center gap-2 rounded-xl bg-on-review px-4 py-2 type-meta font-bold text-review transition-colors hover:bg-on-review/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
+            className="shrink-0 flex items-center gap-2 rounded-xl bg-on-review px-4 py-2 type-meta font-bold text-review-ink transition-colors hover:bg-on-review/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
           >
             <Pencil className="h-3.5 w-3.5" />
             Editar y corregir
