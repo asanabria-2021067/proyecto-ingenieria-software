@@ -466,8 +466,8 @@ html {
 :root {
   --blink-gray-bg: #e9edf1;
   --blink-gray-text: #59616c;
-  --blink-gold-bg: #f6e7b0;
-  --blink-gold-text: #775700;
+  --blink-gold-bg: #2b5830;
+  --blink-gold-text: #ffffff;
 }
 
 .dark {

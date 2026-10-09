@@ -32,11 +32,17 @@ export type ProyectoDisponibleResumen = Omit<ProyectoResumen, 'roles'> & {
 export const NEUTRAL_BADGE = 'bg-surface-container-high text-on-surface-variant';
 const BLUE_BADGE = 'bg-[#DFEBFF] text-[#1659C7] dark:bg-[#13294d] dark:text-[#7fc4ff]';
 const PURPLE_BADGE = 'bg-[#EEE8FF] text-[#6448AE] dark:bg-[#2a1f4d] dark:text-[#c9a6ff]';
-const YELLOW_BADGE = 'bg-[#FFF1C4] text-[#956500] dark:bg-[#453405] dark:text-[#ffd873]';
+const YELLOW_BADGE = 'bg-[#E4EFE4] text-[#326B43] dark:bg-[#453405] dark:text-[#ffd873]';
 export const GREEN_BADGE = 'bg-[#E2F1DD] text-[#286327] dark:bg-[#123a1a] dark:text-[#6fe08a]';
 // Observado / requiere corrección: verde salvia (antes naranja).
 const SAGE_BADGE = 'bg-[#E7EEDD] text-[#3F6B35] dark:bg-[#26331f] dark:text-[#b9cf9f]';
-export const GOLD_BADGE = 'bg-[#F6E7B0] text-[#775700] dark:bg-[#453405] dark:text-[#ffd873]';
+/**
+ * Cierre solicitado: verde esmeralda (en modo oscuro conserva el dorado). El
+ * nombre es histórico —fue dorado— y se mantiene para no tocar a quien lo importa.
+ */
+export const GOLD_BADGE = 'bg-[#2B5830] text-white dark:bg-[#453405] dark:text-[#ffd873]';
+/** Cerrado: verde grisáceo apagado, que resta protagonismo a lo ya concluido. */
+export const CLOSED_BADGE = 'bg-[#4A6B5D] text-white dark:bg-[#453405] dark:text-[#ffd873]';
 /** Tono de texto de `GOLD_BADGE`, para iconos dorados sin fondo. */
 export const GOLD_ICON = 'text-[#775700] dark:text-[#ffd873]';
 export const SLATE_BADGE = 'bg-[#E2E9F7] text-[#486386] dark:bg-[#182740] dark:text-[#9dc1ea]';
@@ -63,7 +69,7 @@ const ESTADO_BADGE_STYLE: Record<string, string> = {
   BORRADOR: NEUTRAL_BADGE,
   EN_REVISION: SLATE_BADGE,
   OBSERVADO: SAGE_BADGE,
-  CERRADO: NEUTRAL_BADGE,
+  CERRADO: CLOSED_BADGE,
 };
 const ESTADO_LABEL: Record<string, string> = {
   BORRADOR: 'Borrador',
@@ -76,7 +82,11 @@ const ESTADO_LABEL: Record<string, string> = {
   CANCELADO: 'Cancelado',
 };
 
-/** Mapeo central estado → estilo de etiqueta. Un estado no contemplado usa el fallback y muestra su valor real. */
+/**
+ * Mapeo central estado → estilo de etiqueta, único para tarjetas, tablas y
+ * «Mis Proyectos». Un estado no contemplado (p. ej. Cancelado) usa el fallback
+ * neutral y muestra su valor real.
+ */
 export function estadoBadgeStyle(estado: string): string {
   return ESTADO_BADGE_STYLE[estado] ?? NEUTRAL_BADGE;
 }
@@ -120,8 +130,6 @@ export function formatFechaCorta(iso: string): string {
 }
 
 interface MineEstadoConfig {
-  badgeStyle: string;
-  badgeAnimated: boolean;
   estadoLabel: string;
   buttonLabel: string;
   buttonHref: string;
@@ -135,10 +143,8 @@ interface MineEstadoConfig {
   secondaryIconClassName?: string;
 }
 
-const MINE_GRAY = NEUTRAL_BADGE;
-const MINE_SAGE = SAGE_BADGE;
-const MINE_GREEN = GREEN_BADGE;
-const MINE_GOLD = GOLD_BADGE;
+/** «Ver proyecto» de un proyecto con cierre solicitado: verde oscuro de marca. */
+const BOTON_CIERRE_SOLICITADO = 'bg-[#0A4232] text-white hover:bg-[#08352A] dark:bg-primary dark:text-on-primary dark:hover:bg-primary/90';
 
 /**
  * Función central para "Mis Proyectos": a partir del estado real determina
@@ -150,8 +156,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
   switch (estadoProyecto) {
     case 'BORRADOR':
       return {
-        badgeStyle: MINE_GRAY,
-        badgeAnimated: false,
         estadoLabel: 'Borrador',
         buttonLabel: 'Seguir editando proyecto',
         buttonHref: `/dashboard/projects/mine/form?id=${idProyecto}`,
@@ -161,8 +165,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
       };
     case 'EN_REVISION':
       return {
-        badgeStyle: MINE_GRAY,
-        badgeAnimated: false,
         estadoLabel: 'En revisión',
         buttonLabel: 'Ver mi solicitud',
         buttonHref: `/dashboard/projects/mine/${idProyecto}`,
@@ -174,8 +176,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
       };
     case 'OBSERVADO':
       return {
-        badgeStyle: MINE_SAGE,
-        badgeAnimated: false,
         estadoLabel: 'Observado',
         buttonLabel: 'Editar',
         buttonHref: `/dashboard/projects/mine/${idProyecto}?edit=true`,
@@ -186,8 +186,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
       };
     case 'PUBLICADO':
       return {
-        badgeStyle: MINE_GREEN,
-        badgeAnimated: false,
         estadoLabel: 'Publicado',
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
@@ -200,8 +198,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
     case 'EN_PROGRESO':
       // Mismo tratamiento visual que "Publicado": es un proyecto activo/visible.
       return {
-        badgeStyle: MINE_GREEN,
-        badgeAnimated: false,
         estadoLabel: 'En progreso',
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
@@ -212,28 +208,26 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         secondaryIconClassName: 'text-primary',
       };
     case 'CERRADO':
-      // El botón usa exactamente el mismo dorado que la etiqueta de estado.
+      // Botón desaturado: el acceso sigue disponible como consulta histórica,
+      // pero retrocede frente a los proyectos que piden atención.
       return {
-        badgeStyle: MINE_GOLD,
-        badgeAnimated: false,
         estadoLabel: 'Cerrado',
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
-        buttonClassName: 'bg-[#F6E7B0] text-[#775700] hover:bg-[#F0DA95] dark:bg-[#453405] dark:text-[#ffd873] dark:hover:bg-[#5a4408]',
+        buttonClassName: 'bg-[#64756C] text-white hover:bg-[#57675F] dark:bg-[#453405] dark:text-[#ffd873] dark:hover:bg-[#5a4408]',
         buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Lock,
-        secondaryIconClassName: GOLD_ICON,
+        secondaryIconClassName: 'text-[#4A6B5D] dark:text-[#ffd873]',
       };
     case 'EN_SOLICITUD_CIERRE':
       return {
-        badgeStyle: MINE_GRAY,
-        badgeAnimated: true,
         estadoLabel: 'En solicitud de cierre',
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
-        buttonClassName: '',
-        buttonAnimated: true,
+        // Botón principal sólido: invita a revisar; solo la etiqueta y el reloj parpadean.
+        buttonClassName: BOTON_CIERRE_SOLICITADO,
+        buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Clock,
         // El reloj también parpadea entre gris y dorado, sincronizado con el badge/botón.
@@ -243,8 +237,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
       // Estados fuera de este flujo (p. ej. Cancelado): acción neutral de
       // solo lectura, sin inventar un texto de estado distinto.
       return {
-        badgeStyle: NEUTRAL_BADGE,
-        badgeAnimated: false,
         estadoLabel: ESTADO_LABEL[estadoProyecto] ?? estadoProyecto,
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
@@ -306,18 +298,17 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
   const tipoStyle = tipoBadgeStyle(tipoProyecto);
   const ModalidadIcon = MODALIDAD_ICON[modalidadProyecto as ModalidadProyecto] ?? MapPin;
 
-  let estadoStyle: string;
+  // «En solicitud de cierre» parpadea solo en «Mis Proyectos»; en el resto es la etiqueta neutral fija.
+  const estadoStyle =
+    props.context === 'mine' && estadoProyecto === 'EN_SOLICITUD_CIERRE' ? 'blink-gold-gray' : estadoBadgeStyle(estadoProyecto);
   let estadoLabelText: string;
-  let estadoAnimated = false;
   let metadataExtra: React.ReactNode = null;
   let footerLeft: React.ReactNode = null;
   let footerAction: React.ReactNode;
 
   if (props.context === 'mine') {
     const cfg = mineEstadoConfig(estadoProyecto, idProyecto);
-    estadoStyle = cfg.badgeStyle;
     estadoLabelText = cfg.estadoLabel;
-    estadoAnimated = cfg.badgeAnimated;
 
     const revision = props.proyecto.revisiones?.[0] ?? null;
     metadataExtra =
@@ -372,7 +363,6 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
       </>
     );
   } else {
-    estadoStyle = estadoBadgeStyle(estadoProyecto);
     estadoLabelText = estadoBadgeLabel(estadoProyecto);
 
     const roles = props.proyecto.roles ?? [];
@@ -478,9 +468,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
               {tipoBadgeLabel(tipoProyecto)}
             </span>
             <span
-              className={`inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap ${
-                estadoAnimated ? 'blink-gold-gray' : estadoStyle
-              }`}
+              className={`inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap ${estadoStyle}`}
             >
               {estadoLabelText}
             </span>
