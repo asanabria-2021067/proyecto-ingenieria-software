@@ -34,7 +34,8 @@ const BLUE_BADGE = 'bg-[#DFEBFF] text-[#1659C7] dark:bg-[#13294d] dark:text-[#7f
 const PURPLE_BADGE = 'bg-[#EEE8FF] text-[#6448AE] dark:bg-[#2a1f4d] dark:text-[#c9a6ff]';
 const YELLOW_BADGE = 'bg-[#FFF1C4] text-[#956500] dark:bg-[#453405] dark:text-[#ffd873]';
 export const GREEN_BADGE = 'bg-[#E2F1DD] text-[#286327] dark:bg-[#123a1a] dark:text-[#6fe08a]';
-const ORANGE_BADGE = 'bg-[#FBE8D5] text-[#A85A00] dark:bg-[#3a2308] dark:text-[#ffab5c]';
+// Observado / requiere corrección: verde salvia (antes naranja).
+const SAGE_BADGE = 'bg-[#E7EEDD] text-[#3F6B35] dark:bg-[#26331f] dark:text-[#b9cf9f]';
 export const GOLD_BADGE = 'bg-[#F6E7B0] text-[#775700] dark:bg-[#453405] dark:text-[#ffd873]';
 /** Tono de texto de `GOLD_BADGE`, para iconos dorados sin fondo. */
 export const GOLD_ICON = 'text-[#775700] dark:text-[#ffd873]';
@@ -61,7 +62,7 @@ const ESTADO_BADGE_STYLE: Record<string, string> = {
   EN_PROGRESO: GREEN_BADGE,
   BORRADOR: NEUTRAL_BADGE,
   EN_REVISION: SLATE_BADGE,
-  OBSERVADO: ORANGE_BADGE,
+  OBSERVADO: SAGE_BADGE,
   CERRADO: NEUTRAL_BADGE,
 };
 const ESTADO_LABEL: Record<string, string> = {
@@ -135,7 +136,7 @@ interface MineEstadoConfig {
 }
 
 const MINE_GRAY = NEUTRAL_BADGE;
-const MINE_ORANGE = ORANGE_BADGE;
+const MINE_SAGE = SAGE_BADGE;
 const MINE_GREEN = GREEN_BADGE;
 const MINE_GOLD = GOLD_BADGE;
 
@@ -173,12 +174,12 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
       };
     case 'OBSERVADO':
       return {
-        badgeStyle: MINE_ORANGE,
+        badgeStyle: MINE_SAGE,
         badgeAnimated: false,
         estadoLabel: 'Observado',
         buttonLabel: 'Editar',
         buttonHref: `/dashboard/projects/mine/${idProyecto}?edit=true`,
-        buttonClassName: 'bg-amber-600 text-white hover:bg-amber-700',
+        buttonClassName: 'bg-review text-on-review hover:bg-review-strong',
         buttonAnimated: false,
         buttonIcon: Pencil,
         showDelete: true,

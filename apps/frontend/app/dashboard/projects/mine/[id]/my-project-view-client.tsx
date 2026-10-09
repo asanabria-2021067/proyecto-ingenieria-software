@@ -82,23 +82,23 @@ function ProjectReadOnlyView({
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-10">
 
       {esObservado && (
-        // Naranja = observación que requiere corrección: tokens `attention`,
-        // el mismo naranja del botón «Editar» de un proyecto observado.
+        // Observación que requiere corrección: tokens `review` (verde salvia),
+        // el mismo del botón «Editar» de un proyecto observado.
         <div
           data-slot="aviso-observado"
-          className="rounded-2xl border border-attention bg-attention-strong px-5 py-4 flex items-start justify-between gap-4"
+          className="rounded-2xl border border-review-strong bg-review px-5 py-4 flex items-start justify-between gap-4"
         >
           <div>
-            <p className="type-subtitle text-on-attention">
+            <p className="type-subtitle text-on-review">
               Tu proyecto tiene observaciones del revisor
             </p>
-            <p className="type-meta mt-0.5 text-on-attention/85">
+            <p className="type-meta mt-0.5 text-on-review/85">
               Revisa los comentarios de cada sección y aplica las correcciones necesarias.
             </p>
           </div>
           <button
             onClick={onEdit}
-            className="shrink-0 flex items-center gap-2 rounded-xl bg-on-attention px-4 py-2 type-meta font-bold text-attention-strong transition-colors hover:bg-on-attention/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-attention/70"
+            className="shrink-0 flex items-center gap-2 rounded-xl bg-on-review px-4 py-2 type-meta font-bold text-review-strong transition-colors hover:bg-on-review/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
           >
             <Pencil className="h-3.5 w-3.5" />
             Editar y corregir
@@ -729,7 +729,7 @@ export default function MyProjectViewClient({ id }: Props) {
             <button
               disabled={saving}
               onClick={() => void submit('EN_REVISION')}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-attention px-5 py-3 type-body font-bold text-on-attention transition-colors hover:bg-attention-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-attention/40 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-review px-5 py-3 type-body font-bold text-on-review transition-colors hover:bg-review-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-review/40 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="h-4 w-4" />
               {saving ? 'Enviando…' : 'Enviar correcciones'}

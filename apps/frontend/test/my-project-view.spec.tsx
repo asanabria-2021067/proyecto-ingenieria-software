@@ -230,27 +230,27 @@ describe('MyProjectViewClient — vista actual vs panel histórico', () => {
     expect(screen.getByText('Comentario actual roles.')).toBeInTheDocument();
   });
 
-  it('observado: aviso del revisor y «Enviar correcciones» usan el naranja de atención, no el lima', async () => {
+  it('observado: aviso del revisor y «Enviar correcciones» usan el verde salvia de revisión, no naranja ni lima', async () => {
     getMyProjectByIdMock.mockResolvedValue(proyectoActual({ estadoProyecto: 'OBSERVADO' }));
     getProjectRevisionsMock.mockResolvedValue([]);
     renderPage();
 
     const titulo = await screen.findByText('Tu proyecto tiene observaciones del revisor');
     const aviso = titulo.closest('[data-slot="aviso-observado"]') as HTMLElement;
-    expect(aviso).toHaveClass('bg-attention-strong', 'border-attention');
-    expect(titulo).toHaveClass('text-on-attention');
+    expect(aviso).toHaveClass('bg-review', 'border-review-strong');
+    expect(titulo).toHaveClass('text-on-review');
     expect(
       within(aviso).getByText('Revisa los comentarios de cada sección y aplica las correcciones necesarias.'),
-    ).toHaveClass('text-on-attention/85');
-    expect(aviso.className).not.toMatch(/status-warning/);
+    ).toHaveClass('text-on-review/85');
+    expect(aviso.className).not.toMatch(/status-warning|attention|amber/);
 
     const corregir = within(aviso).getByRole('button', { name: /editar y corregir/i });
-    expect(corregir).toHaveClass('bg-on-attention', 'text-attention-strong');
+    expect(corregir).toHaveClass('bg-on-review', 'text-review-strong');
 
     fireEvent.click(corregir);
     const enviar = await screen.findByRole('button', { name: /enviar correcciones/i });
-    expect(enviar).toHaveClass('bg-attention', 'text-on-attention', 'hover:bg-attention-strong');
-    expect(enviar.className).not.toMatch(/status-warning/);
+    expect(enviar).toHaveClass('bg-review', 'text-on-review', 'hover:bg-review-strong');
+    expect(enviar.className).not.toMatch(/status-warning|attention|amber/);
   });
 
   it('panel histórico con snapshot: datos y comentarios aislados, sin contaminación en ninguna dirección', async () => {
