@@ -25,7 +25,7 @@ import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api
 // (alto, radio y tipografía), sin icono y con el color semántico de cada acción.
 const ACCION = 'text-xs font-semibold';
 const ACCION_VERDE = 'bg-primary text-on-primary hover:bg-primary/90';
-const ACCION_NARANJA = 'bg-amber-600 text-white hover:bg-amber-700';
+const ACCION_REVISION = 'bg-review text-on-review hover:bg-review-strong';
 
 /**
  * Contenido de una tarjeta de solicitud: título, y debajo la categoría REAL del
@@ -120,7 +120,7 @@ export default function AdminReviewsInboxPage() {
           <Button type="button" size="sm" onClick={() => void resolveApprove(r.idProyecto)} className={`${ACCION} ${ACCION_VERDE}`}>
             Aprobar
           </Button>
-          <Button type="button" size="sm" onClick={() => openReviewSheet(r.idProyecto)} className={`${ACCION} ${ACCION_NARANJA}`}>
+          <Button type="button" size="sm" onClick={() => openReviewSheet(r.idProyecto)} className={`${ACCION} ${ACCION_REVISION}`}>
             Revisar
           </Button>
         </>
@@ -176,7 +176,7 @@ export default function AdminReviewsInboxPage() {
             <RequestInboxKpis columns={3}>
               <ResumenKpi label="Pendientes de revisión" valor={primerEnvio.length} punto="bg-outline" />
               <ResumenKpi label="Reenviadas para revisión" valor={reenviadas.length} punto="bg-status-warning" />
-              <ResumenKpi label="En espera de correcciones" valor={enEsperaDeCorrecciones.length} punto="bg-attention" />
+              <ResumenKpi label="En espera de correcciones" valor={enEsperaDeCorrecciones.length} punto="bg-review-soft" />
             </RequestInboxKpis>
 
             {/* Primer envío: nadie lo ha revisado todavía. */}
@@ -209,10 +209,10 @@ export default function AdminReviewsInboxPage() {
                   <RequestInboxCard
                     key={p.idProyecto}
                     icon={<IconoTipo tipo={p.tipoProyecto} />}
-                    tone="waiting"
+                    tone="review"
                     actions={
                       <>
-                        <Button type="button" size="sm" onClick={() => openFeedbackSheet(p.idProyecto)} className={`${ACCION} ${ACCION_NARANJA}`}>
+                        <Button type="button" size="sm" onClick={() => openFeedbackSheet(p.idProyecto)} className={`${ACCION} ${ACCION_REVISION}`}>
                           Ver retroalimentación
                         </Button>
                       </>

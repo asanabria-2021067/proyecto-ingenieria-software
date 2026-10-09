@@ -56,12 +56,12 @@ function SectionComment({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+    <div className="mt-6 rounded-xl border border-review-soft/60 bg-review-soft/10 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+        <MessageSquare className="h-3.5 w-3.5 text-review dark:text-review-soft shrink-0" />
         <label
           htmlFor={`comment-${sectionKey}`}
-          className="text-[10px] font-black uppercase tracking-widest text-amber-600"
+          className="text-[10px] font-black uppercase tracking-widest text-review dark:text-review-soft"
         >
           Comentarios del revisor
         </label>
@@ -72,7 +72,7 @@ function SectionComment({
         placeholder="Escribe aquí los comentarios para el estudiante sobre esta sección..."
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all duration-200 resize-none"
+        className="w-full rounded-lg border border-review-soft/60 bg-transparent px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-review focus:outline-none focus:ring-2 focus:ring-review-soft/40 transition-all duration-200 resize-none"
       />
     </div>
   );
@@ -374,7 +374,7 @@ export function ProjectReviewSheet({
           <button
             disabled={submitting || !proyecto}
             onClick={() => void handleResolve('OBSERVADA')}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-review px-4 py-3 text-sm font-bold text-on-review transition-colors hover:bg-review-strong disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <SendHorizonal className="h-4 w-4" />
             Mandar correcciones

@@ -46,14 +46,14 @@ function ReadonlyField({ label, value }: { label: string; value: string | null |
 
 function SectionCommentReadonly({ comment }: { comment: string }) {
   return (
-    <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+    <div className="mt-6 rounded-xl border border-review-soft/60 bg-review-soft/10 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+        <MessageSquare className="h-3.5 w-3.5 text-review dark:text-review-soft shrink-0" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-review dark:text-review-soft">
           Comentarios enviados al estudiante
         </span>
       </div>
-      <div className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
+      <div className="w-full rounded-lg border border-review-soft/60 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
         {comment.trim() || <span className="text-outline-variant italic">Sin comentarios para esta sección.</span>}
       </div>
     </div>
@@ -142,7 +142,7 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
         </button>
         <div className="h-5 w-px bg-outline-variant/40" />
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+          <p className="text-[10px] font-black uppercase tracking-widest text-review dark:text-review-soft">
             Administración · Retroalimentación enviada
           </p>
           <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">

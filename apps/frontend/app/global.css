@@ -293,6 +293,15 @@
   --color-attention: oklch(66.6% 0.179 58.318);
   --color-attention-strong: oklch(55.5% 0.163 48.998);
   --color-on-attention: #ffffff;
+
+  /* Revisión / corrección de solicitudes de publicación: verde salvia.
+     `review-soft` es el tono de referencia (#9FB880) para bordes, puntos y
+     fondos suaves; `review` lo oscurece para botones con texto blanco
+     (4.65:1) y `review-strong` es su hover. */
+  --color-review: #557f47;
+  --color-review-strong: #486d3c;
+  --color-review-soft: #9fb880;
+  --color-on-review: #ffffff;
 }
 
 /* G04 (UI-33): texto denso del calendario (horas dentro de un bloque, chips de

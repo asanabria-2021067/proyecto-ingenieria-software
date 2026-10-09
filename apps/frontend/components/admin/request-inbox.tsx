@@ -54,6 +54,8 @@ const CARD_TONE = {
   // Solicitud detenida a la espera del responsable: el naranja va solo en un
   // borde tenue; la superficie queda neutra, como el resto de tarjetas.
   waiting: 'border-orange-200 bg-surface-container-lowest dark:border-orange-500/25',
+  // Solicitud de publicación a la espera de correcciones: mismo criterio, en verde salvia.
+  review: 'border-review-soft bg-surface-container-lowest dark:border-review-soft/40',
 } as const;
 
 /**

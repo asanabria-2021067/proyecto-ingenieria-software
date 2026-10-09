@@ -39,10 +39,10 @@ function ReadonlyField({ label, value }: { label: string; value: string | null |
 
 function CommentBlock({ text }: { text: string }) {
   return (
-    <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+    <div className="mt-6 rounded-xl border border-review-soft/60 bg-review-soft/10 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+        <MessageSquare className="h-3.5 w-3.5 text-review dark:text-review-soft shrink-0" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-review dark:text-review-soft">
           Comentarios del revisor
         </span>
       </div>
