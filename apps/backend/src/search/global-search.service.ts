@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { EstadoParticipacion, EstadoProyecto, Prisma } from '@prisma/client';
+import { EstadoParticipacion, EstadoProyecto, EstadoUsuario, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserNameSearchService } from '../common/search/user-name-search.service';
 
@@ -87,6 +87,7 @@ export class GlobalSearchService {
         // Mismo criterio que el directorio de SocialService.buscarUsuarios:
         // los administradores no aparecen como resultado de búsqueda.
         rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } },
+        estado: { not: EstadoUsuario.PENDIENTE_VERIFICACION },
       },
       select: {
         idUsuario: true,
