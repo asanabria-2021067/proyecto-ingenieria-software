@@ -74,13 +74,15 @@ export function RequestInboxCard({
 }) {
   return (
     <div
-      className={`flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between ${CARD_TONE[tone]}`}
+      // En fila solo desde `lg`: con la sidebar abierta, a anchos de tablet el
+      // contenido es demasiado estrecho para texto y acciones lado a lado.
+      className={`flex flex-col gap-4 rounded-2xl border p-5 lg:flex-row lg:items-center lg:justify-between ${CARD_TONE[tone]}`}
     >
       <div className="flex min-w-0 items-center gap-3">
         {icon}
         <div className="min-w-0">{children}</div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
+      <div className="flex flex-wrap items-center gap-2 lg:shrink-0">{actions}</div>
     </div>
   );
 }
