@@ -162,7 +162,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           data-slot="admin-sidebar-brand"
           className={`admin-sidebar-brand flex h-16 shrink-0 items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-5'}`}
         >
-          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto shrink-0" />
+          {/* El escudo oficial sobre una tarjeta marfil: sus detalles dorados y
+              oscuros no contrastan con el verde bosque ni con el grafito. 52 px
+              y no más: la marca mide lo mismo que la topbar (h-16). */}
+          <span
+            data-slot="admin-brand-logo"
+            className="admin-brand-logo flex size-13 shrink-0 items-center justify-center rounded-lg border p-1.5"
+          >
+            <Image src={logo} alt="UVGENIUS" className="h-full w-auto object-contain" />
+          </span>
           {!collapsed && (
             <>
               <span className="admin-sidebar-brand-name font-headline text-xl font-bold tracking-tight">UVGenius</span>

@@ -628,6 +628,10 @@ button:disabled {
   /* Menú de la cuenta: superficie de grupo, hover de selección y coral para salir. */
   --admin-menu-border:       #356050;
   --admin-menu-danger:       #ffada6;
+  /* Tarjeta del escudo UVG: marfil para que sus dorados y verdes oscuros se
+     lean sobre la sidebar. Nunca blanco puro ni un tono de la propia sidebar. */
+  --admin-logo-bg:           #f7f2e7;
+  --admin-logo-border:       #daceb5;
 }
 
 .dark {
@@ -640,6 +644,9 @@ button:disabled {
   --admin-ink-muted:         #b6c4bd;
   --admin-ink-secondary:     #b6c4bd;
   --admin-icon:              #b6c4bd;
+  /* Marfil algo más apagado sobre el grafito: sigue siendo una superficie clara. */
+  --admin-logo-bg:           #e8e1d2;
+  --admin-logo-border:       #c9bfa8;
 }
 
 /* Carcasa graphite de la sidebar del administrador: texto neutro por defecto
@@ -662,6 +669,13 @@ button:disabled {
 
 .admin-sidebar-brand-name {
   color: var(--admin-text);
+}
+
+/* Tarjeta del escudo: solo superficie y borde; el escudo original va dentro
+   sin filtros ni recolorear. */
+.admin-brand-logo {
+  background-color: var(--admin-logo-bg);
+  border-color: var(--admin-logo-border);
 }
 
 /* Etiqueta de sección: discreta pero legible (gris secundario, no verde). */

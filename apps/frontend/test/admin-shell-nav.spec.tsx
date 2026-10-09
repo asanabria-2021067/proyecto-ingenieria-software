@@ -161,6 +161,10 @@ describe('AdminLayout — sidebar graphite', () => {
     const marca = document.querySelector('[data-slot="admin-sidebar-brand"]') as HTMLElement;
     expect(marca).toHaveClass('admin-sidebar-brand');
     expect(within(marca).getByRole('img', { name: 'UVGENIUS' })).toBeInTheDocument();
+    // El escudo original va dentro de una tarjeta marfil cuadrada, centrado y sin deformar.
+    const tarjeta = marca.querySelector('[data-slot="admin-brand-logo"]') as HTMLElement;
+    expect(tarjeta).toHaveClass('admin-brand-logo', 'size-13', 'rounded-lg', 'border', 'items-center', 'justify-center');
+    expect(tarjeta).toContainElement(within(marca).getByRole('img', { name: 'UVGENIUS' }));
     expect(within(marca).getByText('UVGenius')).toHaveClass('admin-sidebar-brand-name', 'font-headline');
     expect(marca.querySelector('[style]')).toBeNull();
   });
