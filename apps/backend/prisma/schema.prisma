@@ -12,6 +12,7 @@ enum EstadoUsuario {
   ACTIVO
   INACTIVO
   BLOQUEADO
+  PENDIENTE_VERIFICACION
 }
 
 enum TipoTelefono {
@@ -253,6 +254,8 @@ enum TipoNotificacion {
   ALERTA_SEGURIDAD
   // HU-169 (T-265): recordatorio de un EventoProyecto próximo a iniciar.
   RECORDATORIO_EVENTO
+  CUENTA_PENDIENTE_VERIFICACION
+  CUENTA_VERIFICADA
 }
 
 enum EstadoAmistad {
