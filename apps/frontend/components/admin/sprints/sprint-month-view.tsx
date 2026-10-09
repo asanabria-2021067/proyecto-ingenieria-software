@@ -219,11 +219,12 @@ export function SprintMonthView({
             {/* Día sin Sprints: mismo vacío que «Nada programado ese día» del calendario del estudiante. */}
             {delDia.length === 0 && (
               <Empty className="surface-enter flex-none" aria-live="polite">
-                <EmptyMedia variant="icon">
-                  <CalendarDays aria-hidden="true" className="h-7 w-7" />
+                {/* 25 % más pequeño que el vacío del estudiante (64→48 px, 28→21 px, 20→15 px). */}
+                <EmptyMedia variant="icon" className="size-12 ring-6">
+                  <CalendarDays aria-hidden="true" className="size-[21px]" />
                 </EmptyMedia>
                 <EmptyHeader>
-                  <EmptyTitle>No hay finalizaciones planificadas para este día.</EmptyTitle>
+                  <EmptyTitle className="text-[15px]">No hay finalizaciones planificadas para este día.</EmptyTitle>
                 </EmptyHeader>
               </Empty>
             )}
