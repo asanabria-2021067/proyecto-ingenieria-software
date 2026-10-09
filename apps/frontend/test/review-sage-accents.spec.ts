@@ -33,14 +33,17 @@ describe('Acentos de revisión en verde salvia', () => {
     expect(leer(ruta)).not.toMatch(/\b(?:bg|text|border|ring)-(?:amber|orange)-\d|attention|#A85A00|#FBE8D5/);
   });
 
-  it('los tokens usan el salvia #9AB07E exacto con texto blanco en los botones', () => {
+  it('los tokens usan el salvia #9AB07E exacto: texto blanco en claro y negro en oscuro', () => {
     const css = leer('app/global.css');
     const token = (nombre: string) => css.match(new RegExp(`--color-${nombre}:\\s*(#[0-9a-fA-F]{6})`))![1];
     expect(token('review').toLowerCase()).toBe('#9ab07e');
     expect(token('review-soft').toLowerCase()).toBe('#9ab07e');
     expect(contraste(token('review-ink'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
     // Texto blanco sobre el salvia: decisión de diseño explícita (2.4:1, bajo AA).
-    expect(token('on-review').toLowerCase()).toBe('#ffffff');
+    // `on-review` se declara dos veces: negro en `.dark` y blanco en el tema base.
+    const oscuro = css.slice(css.indexOf('.dark {'), css.indexOf('}', css.indexOf('.dark {')));
+    expect(oscuro).toMatch(/--color-on-review:\s*#000000/);
+    expect(css.replace(oscuro, '')).toMatch(/--color-on-review:\s*#ffffff/);
     // «Aprobar» (primary) y «Revisar» (review) no deben confundirse
     expect(token('review').toLowerCase()).not.toBe('#006735');
   });
