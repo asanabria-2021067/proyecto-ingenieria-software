@@ -1,15 +1,18 @@
 import Link from 'next/link';
-import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { IconoTipo } from '@/components/hours/my-hours-project-list';
 import {
-  REQUEST_INBOX_ACTION,
   RequestInboxCard,
   RequestInboxKpis,
-  RequestInboxMeta,
   RequestInboxSection,
-  RequestInboxTitle,
 } from '@/components/admin/request-inbox';
+import {
+  REQUEST_INBOX_BUTTON,
+  REQUEST_INBOX_BUTTON_GREEN,
+  RequestInboxDetails,
+} from '@/components/admin/request-inbox-details';
+import { Button } from '@/components/ui/button';
 import { formatInstanteGuatemala } from '@/lib/admin/sprint-calendar';
 import type { AdminProjectListItem, AdminProjectsPage, ClosureRequestSituation } from '@/lib/types/admin-projects';
 
@@ -25,17 +28,19 @@ import type { AdminProjectListItem, AdminProjectsPage, ClosureRequestSituation }
 const hrefCierre = (idProyecto: number) => `/dashboard/admin/proyectos/${idProyecto}/cierre`;
 const hrefProyecto = (idProyecto: number) => `/dashboard/admin/proyectos/${idProyecto}`;
 
-function Accion({ href, tipo, texto, proyecto }: { href: string; tipo: 'primary' | 'outline'; texto: string; proyecto: string }) {
+/** Enlace al detalle con forma de botón compacto; nunca resuelve nada desde la bandeja. */
+function Accion({ href, decision = false, texto, proyecto }: { href: string; decision?: boolean; texto: string; proyecto: string }) {
   return (
-    <Link href={href} aria-label={`${texto}: ${proyecto}`} className={REQUEST_INBOX_ACTION[tipo]}>
-      {texto}
-      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-    </Link>
+    <Button asChild size="sm" className={`${REQUEST_INBOX_BUTTON} ${decision ? REQUEST_INBOX_BUTTON_GREEN : ''}`}>
+      <Link href={href} aria-label={`${texto}: ${proyecto}`}>
+        {texto}
+      </Link>
+    </Button>
   );
 }
 
 function lider(item: AdminProjectListItem): string {
-  return `${item.lider.nombre} ${item.lider.apellido}`;
+  return `Líder: ${item.lider.nombre} ${item.lider.apellido}`;
 }
 
 /** Entrega enviada (pendiente o reenviada): se revisa en el detalle del cierre. */
@@ -44,22 +49,17 @@ function SolicitudEnviada({ item }: { item: AdminProjectListItem }) {
   return (
     <RequestInboxCard
       icon={<IconoTipo tipo={item.tipoProyecto} />}
-      actions={<Accion href={hrefCierre(item.idProyecto)} tipo="primary" texto="Revisar cierre" proyecto={item.tituloProyecto} />}
+      actions={<Accion href={hrefCierre(item.idProyecto)} decision texto="Revisar cierre" proyecto={item.tituloProyecto} />}
     >
-      <RequestInboxTitle>{item.tituloProyecto}</RequestInboxTitle>
-      <RequestInboxMeta>
+      <RequestInboxDetails titulo={item.tituloProyecto} tipo={item.tipoProyecto}>
         {lider(item)}
         {cierre?.numeroRevision != null && <> · Envío #{cierre.numeroRevision}</>}
-        {cierre?.enviadaEn && <> · Enviada el {formatInstanteGuatemala(cierre.enviadaEn)}</>}
-      </RequestInboxMeta>
-      {cierre?.origen === 'NUEVA_SOLICITUD_TRAS_DEVOLUCION' && (
-        <RequestInboxMeta>Nueva solicitud tras una devolución a ejecución</RequestInboxMeta>
-      )}
-      {cierre?.correccionSolicitadaEn && (
-        <RequestInboxMeta>
-          Corrección solicitada el {formatInstanteGuatemala(cierre.correccionSolicitadaEn)}
-        </RequestInboxMeta>
-      )}
+        {cierre?.enviadaEn && <> · Recibida el {formatInstanteGuatemala(cierre.enviadaEn)}</>}
+        {cierre?.origen === 'NUEVA_SOLICITUD_TRAS_DEVOLUCION' && <> · Nueva solicitud tras una devolución a ejecución</>}
+        {cierre?.correccionSolicitadaEn && (
+          <> · Corrección solicitada el {formatInstanteGuatemala(cierre.correccionSolicitadaEn)}</>
+        )}
+      </RequestInboxDetails>
     </RequestInboxCard>
   );
 }
@@ -71,13 +71,12 @@ function SolicitudEnEspera({ item }: { item: AdminProjectListItem }) {
     <RequestInboxCard
       icon={<IconoTipo tipo={item.tipoProyecto} />}
       tone="waiting"
-      actions={<Accion href={hrefCierre(item.idProyecto)} tipo="outline" texto="Ver solicitud" proyecto={item.tituloProyecto} />}
+      actions={<Accion href={hrefCierre(item.idProyecto)} texto="Ver solicitud" proyecto={item.tituloProyecto} />}
     >
-      <RequestInboxTitle>{item.tituloProyecto}</RequestInboxTitle>
-      <RequestInboxMeta>
+      <RequestInboxDetails titulo={item.tituloProyecto} tipo={item.tipoProyecto}>
         {lider(item)}
         {solicitadaEn ? <> · Corrección solicitada el {formatInstanteGuatemala(solicitadaEn)}</> : <> · Corrección solicitada</>}
-      </RequestInboxMeta>
+      </RequestInboxDetails>
     </RequestInboxCard>
   );
 }
@@ -87,12 +86,11 @@ function SolicitudSoloConsulta({ item, nota }: { item: AdminProjectListItem; not
   return (
     <RequestInboxCard
       icon={<IconoTipo tipo={item.tipoProyecto} />}
-      actions={<Accion href={hrefProyecto(item.idProyecto)} tipo="outline" texto="Ver proyecto" proyecto={item.tituloProyecto} />}
+      actions={<Accion href={hrefProyecto(item.idProyecto)} texto="Ver proyecto" proyecto={item.tituloProyecto} />}
     >
-      <RequestInboxTitle>{item.tituloProyecto}</RequestInboxTitle>
-      <RequestInboxMeta>
+      <RequestInboxDetails titulo={item.tituloProyecto} tipo={item.tipoProyecto}>
         {lider(item)} · {nota}
-      </RequestInboxMeta>
+      </RequestInboxDetails>
     </RequestInboxCard>
   );
 }

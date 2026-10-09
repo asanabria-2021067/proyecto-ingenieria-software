@@ -169,20 +169,28 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
     }
     // Cada tarjeta lleva el icono del tipo de proyecto, como en «Mis Horas».
     expect(document.querySelectorAll('[data-slot="icono-tipo"]')).toHaveLength(4);
+    // …y la categoría real con la etiqueta de las vistas de estudiante.
+    const categorias = screen.getAllByText('Extensión');
+    expect(categorias).toHaveLength(4);
+    for (const etiqueta of categorias) expect(etiqueta).toHaveClass('pill');
+    // Las acciones son el botón compacto del panel, sin icono.
+    for (const accion of screen.getAllByRole('link', { name: /^(Revisar cierre|Ver solicitud|Ver proyecto): / })) {
+      expect(accion).toHaveAttribute('data-slot', 'button');
+      expect(accion.querySelector('svg')).toBeNull();
+    }
   });
 
   it('muestra responsable, número de envío y fechas reales; un legacy no recibe envío ni fecha inventados', async () => {
     renderPage();
     await screen.findByText('Portal de Voluntariado');
 
-    expect(seccion('Pendientes de evaluación').getByText(/Valeria Ortiz · Envío #1 · Enviada el 1 oct 2026/)).toBeInTheDocument();
+    expect(seccion('Pendientes de evaluación').getByText(/Líder: Valeria Ortiz · Envío #1 · Recibida el 1 oct 2026/)).toBeInTheDocument();
     const reenviada = seccion('Reenviadas para revisión');
-    expect(reenviada.getByText(/Envío #2 · Enviada el 5 oct 2026/)).toBeInTheDocument();
-    expect(reenviada.getByText('Corrección solicitada el 3 oct 2026')).toBeInTheDocument();
-    expect(seccion('En espera de correcciones').getByText(/Valeria Ortiz · Corrección solicitada el 4 oct 2026/)).toBeInTheDocument();
+    expect(reenviada.getByText(/Envío #2 · Recibida el 5 oct 2026 · Corrección solicitada el 3 oct 2026/)).toBeInTheDocument();
+    expect(seccion('En espera de correcciones').getByText(/Líder: Valeria Ortiz · Corrección solicitada el 4 oct 2026/)).toBeInTheDocument();
 
     const legacy = seccion('Sin entrega formal');
-    expect(legacy.getByText('Valeria Ortiz · Sin entrega formal registrada')).toBeInTheDocument();
+    expect(legacy.getByText('Líder: Valeria Ortiz · Sin entrega formal registrada')).toBeInTheDocument();
     expect(legacy.queryByText(/Envío #/)).not.toBeInTheDocument();
     expect(legacy.queryByText(/2026/)).not.toBeInTheDocument();
   });
@@ -199,7 +207,7 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
 
     const pendientes = seccion('Pendientes de evaluación');
     expect(pendientes.getByText(/Envío #2/)).toBeInTheDocument();
-    expect(pendientes.getByText('Nueva solicitud tras una devolución a ejecución')).toBeInTheDocument();
+    expect(pendientes.getByText(/Nueva solicitud tras una devolución a ejecución/)).toBeInTheDocument();
     expect(screen.getByText('No hay solicitudes reenviadas para revisión.')).toBeInTheDocument();
   });
 
