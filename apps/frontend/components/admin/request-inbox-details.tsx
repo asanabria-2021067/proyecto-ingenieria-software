@@ -23,8 +23,9 @@ export function RequestInboxDetails({ titulo, tipo, children }: { titulo: string
 
 /**
  * Acciones de una tarjeta: el botón compacto del panel (`<Button size="sm">`),
- * sin icono. El verde es para lo que pide una decisión; las acciones de solo
- * consulta usan el botón neutro por defecto.
+ * sin icono. El verde institucional es para lo que pide una decisión; las
+ * acciones de solo consulta van en verde salvia claro.
  */
 export const REQUEST_INBOX_BUTTON = 'text-xs font-semibold';
 export const REQUEST_INBOX_BUTTON_GREEN = 'bg-primary text-on-primary hover:bg-primary/90';
+export const REQUEST_INBOX_BUTTON_CONSULT = 'bg-consult text-on-consult hover:bg-consult-strong';

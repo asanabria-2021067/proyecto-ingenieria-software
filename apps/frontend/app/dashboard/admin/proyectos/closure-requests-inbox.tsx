@@ -9,6 +9,7 @@ import {
 } from '@/components/admin/request-inbox';
 import {
   REQUEST_INBOX_BUTTON,
+  REQUEST_INBOX_BUTTON_CONSULT,
   REQUEST_INBOX_BUTTON_GREEN,
   RequestInboxDetails,
 } from '@/components/admin/request-inbox-details';
@@ -31,7 +32,7 @@ const hrefProyecto = (idProyecto: number) => `/dashboard/admin/proyectos/${idPro
 /** Enlace al detalle con forma de botón compacto; nunca resuelve nada desde la bandeja. */
 function Accion({ href, decision = false, texto, proyecto }: { href: string; decision?: boolean; texto: string; proyecto: string }) {
   return (
-    <Button asChild size="sm" className={`${REQUEST_INBOX_BUTTON} ${decision ? REQUEST_INBOX_BUTTON_GREEN : ''}`}>
+    <Button asChild size="sm" className={`${REQUEST_INBOX_BUTTON} ${decision ? REQUEST_INBOX_BUTTON_GREEN : REQUEST_INBOX_BUTTON_CONSULT}`}>
       <Link href={href} aria-label={`${texto}: ${proyecto}`}>
         {texto}
       </Link>

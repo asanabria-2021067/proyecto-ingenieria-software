@@ -302,6 +302,13 @@
   --color-review-strong: #486d3c;
   --color-review-soft: #9fb880;
   --color-on-review: #ffffff;
+
+  /* Verde salvia claro de las acciones de consulta en las bandejas de
+     solicitudes («Ver solicitud», «Ver proyecto»). Lleva texto oscuro: el
+     blanco no alcanza contraste AA sobre este tono. */
+  --color-consult: #9ab07e;
+  --color-consult-strong: #8aa16e;
+  --color-on-consult: #16210f;
 }
 
 /* G04 (UI-33): texto denso del calendario (horas dentro de un bloque, chips de
