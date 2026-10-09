@@ -29,7 +29,8 @@ import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api
 function DetalleSolicitud({ titulo, tipo, children }: { titulo: string; tipo: TipoProyecto; children: ReactNode }) {
   return (
     <>
-      <p className="break-words font-headline text-base font-semibold text-on-surface">{titulo}</p>
+      {/* Mismo título de proyecto que «Mis Horas». */}
+      <p className="type-subtitle break-words font-semibold">{titulo}</p>
       <div className="mt-micro flex flex-wrap items-center gap-x-tight gap-y-micro">
         <span className={`pill ${tipoBadgeStyle(tipo)}`}>{tipoBadgeLabel(tipo)}</span>
         <p className="type-meta">{children}</p>
