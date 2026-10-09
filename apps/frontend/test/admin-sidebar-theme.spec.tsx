@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { UserMenu } from '../components/dashboard/UserMenu';
 
 // Sidebar del administrador «Forest Graphite»: verde bosque institucional en
@@ -271,6 +271,61 @@ describe('Foco y contraste (WCAG AA)', () => {
       /\.admin-sidebar \.admin-nav-item:focus-visible,\s*\.admin-sidebar \.admin-nav-subitem:focus-visible,\s*\.admin-sidebar \.admin-account-trigger:focus-visible,\s*\.admin-sidebar \.admin-collapse-toggle:focus-visible,\s*\.admin-sidebar \[data-slot='account-compact-trigger'\]:focus-visible \{\s*outline: 2px solid var\(--admin-lime\);/,
     );
     expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).not.toContain('outline');
+  });
+});
+
+describe('Menú desplegable de la cuenta del administrador', () => {
+  const admin = { nombre: 'Admin', apellido: 'UVG', correo: 'admin@uvg.edu.gt' };
+  const contenido = () => document.querySelector('[data-slot="dropdown-menu-content"]')!;
+  async function abrir(theme: 'admin' | 'default') {
+    render(<UserMenu user={admin} onLogout={vi.fn()} variant="sidebar" theme={theme} />);
+    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
+    await screen.findByRole('menuitem', { name: 'Cerrar sesión' });
+  }
+
+  it('solo el menú del administrador lleva la paleta; conserva ancho, opciones y orden', async () => {
+    await abrir('admin');
+    expect(contenido()).toHaveClass('admin-account-menu', 'w-56');
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Perfil', 'Notificaciones', 'Cerrar sesión']);
+    expect(screen.getByRole('menuitem', { name: 'Perfil' })).toHaveAttribute('href', '/dashboard/perfil');
+    expect(screen.getByRole('menuitem', { name: 'Notificaciones' })).toHaveAttribute('href', '/dashboard/notificaciones');
+  });
+
+  it('el menú del estudiante no cambia', async () => {
+    await abrir('default');
+    expect(contenido()).toHaveClass('w-56');
+    expect(contenido()).not.toHaveClass('admin-account-menu');
+  });
+
+  it('usa la superficie de grupo, el hover de selección y el coral de salida, sin lima', () => {
+    expect(bloques('.admin-account-menu')[0]).toContain('background-color: var(--admin-graphite-surface)');
+    expect(bloques('.admin-account-menu')[0]).toContain('border-color: var(--admin-menu-border)');
+    expect(token('--admin-menu-border')).toBe('#356050');
+    expect(tokenOscuro('--admin-menu-border')).toBe('#3d5548');
+    expect(token('--admin-menu-danger')).toBe('#ffada6');
+    const inicio = CSS.indexOf('.admin-account-menu {');
+    const reglasMenu = CSS.slice(inicio, CSS.indexOf('@media', inicio));
+    expect(reglasMenu).toContain('background-color: var(--admin-graphite-active)');
+    expect(reglasMenu).not.toContain('--admin-lime');
+  });
+
+  it.each([
+    ['claro', PALETA_ADMIN],
+    ['oscuro', { ...PALETA_ADMIN, ...PALETA_ADMIN_OSCURA }],
+  ] as const)('contraste AA en tema %s: texto, secundario y coral sobre el menú y su hover', (_tema, P) => {
+    const lum = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a: string, b: string) => {
+      const [l1, l2] = [lum(a), lum(b)].sort((x, y) => y - x);
+      return (l1 + 0.05) / (l2 + 0.05);
+    };
+    for (const fondo of [P['--admin-graphite-surface'], P['--admin-graphite-active']]) {
+      for (const texto of [P['--admin-ink'], P['--admin-ink-secondary'], '#ffada6']) {
+        expect(ratio(texto, fondo), `${texto} sobre ${fondo}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
   });
 });
 

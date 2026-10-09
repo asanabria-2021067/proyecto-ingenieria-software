@@ -625,9 +625,13 @@ button:disabled {
   --admin-icon:              #c0d8cc;
   --admin-green:             #007a3d;
   --admin-lime:              #a3e635;
+  /* Menú de la cuenta: superficie de grupo, hover de selección y coral para salir. */
+  --admin-menu-border:       #356050;
+  --admin-menu-danger:       #ffada6;
 }
 
 .dark {
+  --admin-menu-border:       #3d5548;
   --admin-graphite:          #192320;
   --admin-graphite-surface:  #242f2a;
   --admin-graphite-hover:    #2a3831;
@@ -842,6 +846,64 @@ button:disabled {
 .admin-sidebar [data-slot='account-compact-trigger']:focus-visible {
   outline: 2px solid var(--admin-lime);
   outline-offset: 2px;
+}
+
+/* Menú desplegable de la cuenta del administrador: misma paleta que la
+   sidebar (se pinta en un portal, por eso no cuelga de `.admin-sidebar`).
+   Solo colores, borde y sombra; sin lima, que queda para el indicador de la
+   opción activa. */
+.admin-account-menu {
+  background-color: var(--admin-graphite-surface);
+  border-color: var(--admin-menu-border);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.32);
+  color: var(--admin-ink);
+}
+
+.admin-account-menu .type-body {
+  color: var(--admin-ink);
+}
+
+.admin-account-menu .type-meta {
+  color: var(--admin-ink-secondary);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-separator'] {
+  background-color: var(--admin-menu-border);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item'] {
+  color: var(--admin-ink);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item'] svg {
+  color: var(--admin-ink-secondary);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item']:hover,
+.admin-account-menu [data-slot='dropdown-menu-item']:focus {
+  background-color: var(--admin-graphite-active);
+  color: var(--admin-ink);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item']:focus-visible {
+  outline: 2px solid var(--admin-ink-secondary);
+  outline-offset: -2px;
+}
+
+/* «Cerrar sesión»: coral en texto e icono, y un velo rojizo solo al pasar o enfocar. */
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive'],
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:hover,
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:focus {
+  color: var(--admin-menu-danger);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive'] svg {
+  color: var(--admin-menu-danger) !important;
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:hover,
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:focus {
+  background-color: color-mix(in srgb, var(--admin-menu-danger) 14%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

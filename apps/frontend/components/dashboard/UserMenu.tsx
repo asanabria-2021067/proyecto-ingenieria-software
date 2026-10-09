@@ -58,12 +58,16 @@ function UserAvatar({ user, theme }: { user: UserMenuUser | null | undefined; th
 function UserMenuContent({
   user,
   onLogout,
+  theme,
 }: {
   user: UserMenuUser | null | undefined;
   onLogout: () => void;
+  theme: 'default' | 'admin';
 }) {
   return (
-    <DropdownMenuContent align="end" side="top" className="w-56">
+    // `admin-account-menu` solo cambia colores (paleta Forest Graphite); el
+    // menú se pinta en un portal, fuera de `.admin-sidebar`.
+    <DropdownMenuContent align="end" side="top" className={theme === 'admin' ? 'admin-account-menu w-56' : 'w-56'}>
       {user && (
         <>
           <DropdownMenuLabel className="font-normal">
@@ -125,7 +129,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
             <UserAvatar user={user} theme={theme} />
           </button>
         </DropdownMenuTrigger>
-        <UserMenuContent user={user} onLogout={onLogout} />
+        <UserMenuContent user={user} onLogout={onLogout} theme={theme} />
       </DropdownMenu>
     );
   }
@@ -158,7 +162,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
           />
         </button>
       </DropdownMenuTrigger>
-      <UserMenuContent user={user} onLogout={onLogout} />
+      <UserMenuContent user={user} onLogout={onLogout} theme={theme} />
     </DropdownMenu>
   );
 }
