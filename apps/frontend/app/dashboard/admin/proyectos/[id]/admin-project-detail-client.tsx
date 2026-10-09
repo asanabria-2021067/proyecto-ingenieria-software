@@ -169,6 +169,12 @@ export function puedeTransferirLiderazgo(estadoProyecto: string): boolean {
  * filtro es del backend) y en `CERRADO` se muestra el histórico completo.
  * No hay botones inertes: la única acción (cambiar liderazgo) la añade F014.
  */
+// Rótulos de la tabla de miembros. `px-5!` es deliberado: el `TableHead` base
+// trae `px-inline` (12 px), un token propio que `cn` no reconoce como conflicto
+// con `px-5`, así que sin forzarlo el rótulo queda 8 px a la izquierda de su
+// contenido (las celdas sí usan 20 px).
+const TH_MIEMBROS = 'px-5! py-3 text-[10px] font-black uppercase tracking-widest text-tertiary';
+
 export default function AdminProjectDetailClient({ id }: AdminProjectDetailClientProps) {
   const searchParams = useSearchParams();
   const grupoParam = searchParams.get('grupo');
@@ -399,11 +405,11 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
                 <Table>
                   <TableHeader>
                     <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                      <TableHead className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Integrante</TableHead>
-                      <TableHead className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Roles</TableHead>
-                      <TableHead className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Participación</TableHead>
-                      <TableHead className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Tareas</TableHead>
-                      <TableHead className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Horas</TableHead>
+                      <TableHead className={TH_MIEMBROS}>Integrante</TableHead>
+                      <TableHead className={TH_MIEMBROS}>Roles</TableHead>
+                      <TableHead className={TH_MIEMBROS}>Participación</TableHead>
+                      <TableHead className={TH_MIEMBROS}>Tareas</TableHead>
+                      <TableHead className={TH_MIEMBROS}>Horas</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
