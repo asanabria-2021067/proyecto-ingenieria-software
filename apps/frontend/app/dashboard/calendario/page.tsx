@@ -180,19 +180,27 @@ export default function CalendarioPage() {
   // recibidos (misma consulta que la columna izquierda: no hay petición
   // extra). Si no está (revocado o id ajeno) se avisa y no se consulta ninguna
   // agenda; un id inválido se ignora en silencio.
+  // El id leído se guarda en una ref: en desarrollo React monta el efecto dos
+  // veces (StrictMode) y la URL ya está limpia en la segunda pasada.
+  const compartidoSolicitadoRef = useRef<number | null | undefined>(undefined);
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (!params.has('compartido')) return;
-    const idSolicitado = idUsuarioSeguro(params.get('compartido'));
-    params.delete('compartido');
-    const resto = params.toString();
-    window.history.replaceState(window.history.state, '', `${window.location.pathname}${resto ? `?${resto}` : ''}`);
+    if (compartidoSolicitadoRef.current === undefined) {
+      const params = new URLSearchParams(window.location.search);
+      compartidoSolicitadoRef.current = params.has('compartido') ? idUsuarioSeguro(params.get('compartido')) : null;
+      if (params.has('compartido')) {
+        params.delete('compartido');
+        const resto = params.toString();
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}${resto ? `?${resto}` : ''}`);
+      }
+    }
+    const idSolicitado = compartidoSolicitadoRef.current;
     if (idSolicitado === null) return;
     let vigente = true;
     queryClient
       .fetchQuery({ queryKey: calendariosCompartidosQueryKey, queryFn: getCalendariosCompartidos })
       .then((lista) => {
         if (!vigente) return;
+        compartidoSolicitadoRef.current = null;
         const persona = lista.compartidosConmigo.find((p) => p.idUsuario === idSolicitado);
         if (!persona) {
           aviso.advertencia('Ese calendario ya no está compartido contigo', 'Quien lo compartió pudo retirarlo. Revisa la columna izquierda.');

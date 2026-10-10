@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import type { ReactNode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -386,6 +386,24 @@ describe('CalendarioPage — abrir un calendario compartido desde la notificaci�
     expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' })).not.toBeChecked();
     expect(sharesMock.getAgendaCompartida).not.toHaveBeenCalled();
     expect(window.localStorage.getItem('calendario:compartidos-activos')).toBeNull();
+    expect(window.location.search).toBe('');
+  });
+
+  it('en StrictMode (montaje doble de efectos en desarrollo) la activación ocurre igual y una sola vez', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [ANA] });
+    sharesMock.getAgendaCompartida.mockResolvedValue({ eventos: [], tareas: [] });
+    window.history.replaceState(null, '', '/dashboard/calendario?compartido=9');
+    render(
+      <StrictMode>
+        <CalendarioPage />
+      </StrictMode>,
+      { wrapper },
+    );
+    await waitFor(() => expect(screen.queryByText('Cargando tu calendario...')).not.toBeInTheDocument());
+
+    expect(await screen.findByRole('checkbox', { name: 'Ver el calendario de Ana García' })).toBeChecked();
+    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Calendario activado', expect.stringContaining('Ana García')));
+    expect(mensajesMock.aviso.exito).toHaveBeenCalledTimes(1);
     expect(window.location.search).toBe('');
   });
 
