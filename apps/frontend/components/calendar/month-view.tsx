@@ -91,7 +91,7 @@ export function MonthView({
                       ? 'border-primary'
                       : day.inCurrentMonth
                         ? 'border-outline-variant/40'
-                        : 'border-transparent opacity-50'
+                        : 'border-transparent'
                   } ${isSelected ? 'bg-surface-container-high' : 'bg-surface-container-lowest hover:bg-surface-container'}`}
                 >
                   <span className="flex items-center justify-center gap-1 sm:justify-end">
@@ -100,19 +100,22 @@ export function MonthView({
                       className={`type-meta flex h-6 min-w-6 items-center justify-center rounded-pill px-1 ${
                         // HU-184 (T-324): "hoy" con relleno primario (no acento: el
                         // acento es de los eventos virtuales) + borde de la celda.
-                        isToday ? 'bg-primary font-bold text-on-primary' : ''
+                        // G04 (UI-14): fuera del mes la fecha se lee a opacidad completa
+                        // (antes heredaba opacity-50 de la celda: 2.52:1); lo atenuado
+                        // es solo el contenido inactivo de abajo.
+                        isToday ? 'bg-primary font-bold text-on-primary' : day.inCurrentMonth ? '' : 'text-text-secondary'
                       }`}
                     >
                       {day.date.getDate()}
                     </span>
                   </span>
-                  <div className="flex flex-wrap items-center justify-center gap-0.5 sm:hidden" aria-hidden="true">
+                  <div className={`flex flex-wrap items-center justify-center gap-0.5 sm:hidden ${day.inCurrentMonth ? '' : 'opacity-50'}`} aria-hidden="true">
                     {visibles.map((item) => (
                       <span key={agendaItemKey(item)} className={`h-1.5 w-1.5 rounded-pill ${puntoDe(item)}`} />
                     ))}
                     {restantes > 0 && <span className="type-meta leading-none">+{restantes}</span>}
                   </div>
-                  <div className="hidden flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
+                  <div className={`hidden flex-1 flex-col gap-0.5 overflow-hidden sm:flex ${day.inCurrentMonth ? '' : 'opacity-50'}`}>
                     {visibles.map((item) => (
                       <span
                         key={agendaItemKey(item)}

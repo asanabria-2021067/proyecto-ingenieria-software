@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { MonthView } from '../components/calendar/month-view';
 import type { AgendaItem } from '../lib/calendar/agenda';
 
@@ -185,5 +187,91 @@ describe('MonthView (HU-169 T-264)', () => {
     );
 
     expect(screen.getByRole('button', { name: /10 de septiembre, 2 actividades$/ })).toBeInTheDocument();
+  });
+});
+
+describe('MonthView — fechas fuera del mes legibles (G04-C05, UI-14)', () => {
+  function renderOctubre(selectedKey: string | null = null) {
+    // La cuadrícula de octubre 2026 empieza el lunes 28 de septiembre y termina el 8 de noviembre.
+    const itemsByDay = new Map<string, AgendaItem[]>([
+      ['2026-09-29', [evento(1, '2026-09-29', 'Cierre de septiembre', 'ENTREGA')]],
+      ['2026-10-09', [evento(2, '2026-10-09', 'Reunión de octubre', 'REUNION')]],
+    ]);
+    render(<MonthView year={2026} month={9} todayKey="2026-10-09" selectedKey={selectedKey} itemsByDay={itemsByDay} onSelectDay={() => {}} />);
+    return {
+      fuera: screen.getByRole('button', { name: 'martes, 29 de septiembre, 1 actividad' }),
+      dentro: screen.getByRole('button', { name: 'martes, 6 de octubre, sin actividad' }),
+      hoy: screen.getByRole('button', { name: 'Hoy, viernes, 9 de octubre, 1 actividad' }),
+    };
+  }
+  const numero = (celda: HTMLElement) => celda.querySelector('span > span.type-meta.rounded-pill') as HTMLElement;
+  /** ¿Algún ancestro (hasta la celda) atenúa este nodo con opacidad? */
+  const atenuado = (nodo: HTMLElement, celda: HTMLElement) => {
+    for (let n: HTMLElement | null = nodo; n && n !== celda.parentElement; n = n.parentElement) {
+      if ([...n.classList].some((c) => c.startsWith('opacity-'))) return true;
+    }
+    return false;
+  };
+
+  it('el número de un día fuera del mes ya no hereda opacidad: usa text-text-secondary a opacidad completa', () => {
+    const { fuera } = renderOctubre();
+    expect(fuera.className).not.toMatch(/\bopacity-/);
+    expect(numero(fuera)).toHaveTextContent('29');
+    expect(numero(fuera)).toHaveClass('text-text-secondary');
+    expect(atenuado(numero(fuera), fuera)).toBe(false);
+  });
+
+  it('lo que sigue atenuado es el contenido inactivo (chips y puntos), no la fecha', () => {
+    const { fuera, dentro } = renderOctubre();
+    const chip = [...fuera.querySelectorAll('span')].find((n) => n.textContent === 'Cierre de septiembre') as HTMLElement;
+    expect(atenuado(chip, fuera)).toBe(true);
+    // Un día del mes no tiene nada atenuado y conserva su borde; el de fuera sigue sin borde visible.
+    expect(dentro.querySelector('[class*="opacity-"]')).toBeNull();
+    expect(dentro).toHaveClass('border-outline-variant/40');
+    expect(fuera).toHaveClass('border-transparent');
+  });
+
+  it('etiqueta accesible, selección, hoy y contenido de las celdas no cambian', () => {
+    const { fuera, hoy } = renderOctubre('2026-09-29');
+    expect(fuera).toHaveAttribute('aria-pressed', 'true');
+    expect(fuera).toHaveClass('bg-surface-container-high');
+    expect(fuera).not.toHaveAttribute('aria-current');
+    expect(hoy).toHaveAttribute('aria-current', 'date');
+    expect(hoy).toHaveClass('border-primary');
+    expect(numero(hoy)).toHaveClass('bg-primary', 'text-on-primary');
+    expect(numero(hoy)).not.toHaveClass('text-text-secondary');
+    expect(screen.getAllByRole('button')).toHaveLength(42);
+  });
+
+  it('text-text-secondary alcanza 4.5:1 sobre la celda normal y la seleccionada, en claro y en oscuro', () => {
+    const css = readFileSync(join(__dirname, '..', 'app', 'global.css'), 'utf8');
+    const bloque = (encabezado: string) => {
+      const abre = css.indexOf('{', css.indexOf(encabezado));
+      let profundidad = 0;
+      for (let i = abre; i < css.length; i += 1) {
+        if (css[i] === '{') profundidad += 1;
+        else if (css[i] === '}' && --profundidad === 0) return css.slice(abre + 1, i);
+      }
+      return '';
+    };
+    const token = (b: string, nombre: string) => (b.match(new RegExp(`--color-${nombre}:\\s*(#[0-9a-fA-F]{6})\\b`)) as RegExpMatchArray)[1];
+    const luminancia = (hex: string) => {
+      const canal = (i: number) => {
+        const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * canal(1) + 0.7152 * canal(3) + 0.0722 * canal(5);
+    };
+    const contraste = (a: string, b: string) => {
+      const [x, y] = [luminancia(a), luminancia(b)].sort((m, n) => n - m);
+      return (x + 0.05) / (y + 0.05);
+    };
+    // --color-text-secondary es un alias de on-surface-variant (global.css).
+    expect(css).toMatch(/--color-text-secondary:\s*var\(--color-on-surface-variant\)/);
+    for (const tema of [bloque('@theme {'), bloque('.dark {')]) {
+      const texto = token(tema, 'on-surface-variant');
+      expect(contraste(texto, token(tema, 'surface-container-lowest'))).toBeGreaterThanOrEqual(4.5);
+      expect(contraste(texto, token(tema, 'surface-container-high'))).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });
