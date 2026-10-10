@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildEventFormSchema,
   buildEventPayload,
@@ -350,5 +350,66 @@ describe('matriz de creación y edición de varios días (G02-C10, UI-06/T-325)'
     const payload = buildEventPayload(form, { keepEmptyDescripcion: false });
     const recargado = eventFormFromEvento(evento({ fechaInicio: payload.fechaInicio, fechaFin: payload.fechaFin }));
     expect(recargado).toMatchObject({ fecha: dia6, horaInicio: '23:30', horaFin: '00:30', terminaOtroDia: true, fechaFin: dia7 });
+  });
+});
+
+describe('validación del inicio contra el reloj vivo (G03-C03, UI-26)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const dia5 = new Date(2026, 9, 5);
+
+  it('un esquema construido a las 10:00 rechaza a las 11:00 un inicio de 10:30 que al abrir era válido', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 5, 10, 0));
+    const schema = buildEventFormSchema({ mode: 'create' });
+    const form = valores({ fecha: dia5, horaInicio: '10:30', horaFin: '11:30' });
+
+    expect(schema.safeParse(form).success).toBe(true);
+
+    vi.setSystemTime(new Date(2026, 9, 5, 11, 0));
+    const resultado = schema.safeParse(form);
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues.map((i) => [i.path.join('.'), i.message])).toContainEqual([
+      'horaInicio',
+      'El inicio no puede ser anterior al momento actual.',
+    ]);
+  });
+
+  it('cruzar un minuto con el diálogo abierto no produce falsos positivos: 10:31 sigue siendo válido a las 10:30:59', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 5, 10, 0));
+    const schema = buildEventFormSchema({ mode: 'create' });
+    const form = valores({ fecha: dia5, horaInicio: '10:31', horaFin: '11:30' });
+
+    vi.setSystemTime(new Date(2026, 9, 5, 10, 30, 59));
+    expect(schema.safeParse(form).success).toBe(true);
+    vi.setSystemTime(new Date(2026, 9, 5, 10, 31, 1));
+    expect(schema.safeParse(form).success).toBe(false);
+  });
+
+  it('acepta un reloj inyectado como función (se consulta en cada validación) o como Date fijo', () => {
+    let hora = new Date(2026, 9, 5, 10, 0);
+    const schema = buildEventFormSchema({ mode: 'create', ahora: () => hora });
+    const form = valores({ fecha: dia5, horaInicio: '10:30', horaFin: '11:30' });
+    expect(schema.safeParse(form).success).toBe(true);
+    hora = new Date(2026, 9, 5, 12, 0);
+    expect(schema.safeParse(form).success).toBe(false);
+    expect(buildEventFormSchema({ mode: 'create', ahora: new Date(2026, 9, 5, 12, 0) }).safeParse(form).success).toBe(false);
+  });
+
+  it('en edición, cambiar el título de un evento cuyo inicio ya pasó sigue la política existente (válido si el inicio no se mueve)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 5, 10, 0));
+    const original = evento({ fechaInicio: new Date(2026, 9, 5, 8, 0).toISOString(), fechaFin: new Date(2026, 9, 5, 9, 0).toISOString() });
+    const schema = buildEventFormSchema({ mode: 'edit', fechaInicioOriginal: original.fechaInicio });
+    const form = eventFormFromEvento(original);
+
+    vi.setSystemTime(new Date(2026, 9, 5, 15, 0));
+    expect(schema.safeParse({ ...form, tituloEvento: 'Renombrado' }).success).toBe(true);
+    // Mover el inicio dentro del pasado sí se rechaza, contra la hora actual.
+    const movido = schema.safeParse({ ...form, horaInicio: '08:30' });
+    expect(movido.success).toBe(false);
   });
 });

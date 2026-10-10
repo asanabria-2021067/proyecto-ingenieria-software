@@ -172,7 +172,13 @@ export interface BuildEventFormSchemaOptions {
   mode: 'create' | 'edit';
   /** Inicio ya persistido (solo en edición): si no se mueve, puede quedar en el pasado. */
   fechaInicioOriginal?: string | null;
-  ahora?: Date;
+  /**
+   * G03 (UI-26): reloj de la validación. Por defecto se lee en cada
+   * ejecución del esquema (nunca se congela al construirlo): un diálogo
+   * abierto un buen rato valida contra la hora real, como el backend.
+   * Un `Date` fijo sirve para pruebas deterministas.
+   */
+  ahora?: Date | (() => Date);
 }
 
 /**
@@ -182,7 +188,7 @@ export interface BuildEventFormSchemaOptions {
  * http(s) si es virtual/híbrida), pero validadas antes de enviar y con el
  * mensaje pegado a su campo.
  */
-export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora = new Date() }: BuildEventFormSchemaOptions) {
+export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora = () => new Date() }: BuildEventFormSchemaOptions) {
   return z
     .object({
       idProyecto: z.string(),
@@ -251,7 +257,8 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
         fechaInicioOriginal !== null &&
         inicio !== null &&
         inicio.getTime() === new Date(fechaInicioOriginal).getTime();
-      if (inicio && !inicioSinCambios && inicio.getTime() < ahora.getTime()) {
+      const momento = typeof ahora === 'function' ? ahora() : ahora;
+      if (inicio && !inicioSinCambios && inicio.getTime() < momento.getTime()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['horaInicio'],
